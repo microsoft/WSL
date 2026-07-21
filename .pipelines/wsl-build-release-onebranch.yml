@@ -4,8 +4,18 @@ parameters:
   type: boolean
   default: false
 
+- name: pushToStore
+  displayName: 'Push the release to the Microsoft Store'
+  type: boolean
+  default: false
+
 - name: testVersion
   displayName: 'Test the release pipeline'
+  type: string
+  default: ''
+  
+- name: nugetSuffix
+  displayName: 'Nuget version suffix (must include "-")'
   type: string
   default: ''
 
@@ -35,6 +45,10 @@ extends:
     globalSdl:
       credscan:
         enabled: true
+      codesign:
+        enabled: true
+        break: true
+        targetGlob: '**\*.dll;**\*.exe;**\*.sys;**\*.msi;**\*.msix;**\*.msixbundle;**\*.appx;**\*.nupkg'
       perStage:
         credscan:
           enabled: true
@@ -51,6 +65,7 @@ extends:
       parameters:
         isRelease: true
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+        nugetSuffix: ${{ parameters.nugetSuffix }}
         traceLoggingConfig: $(ReleaseTraceLoggingConfig)
         vsoOrg: microsoft
         vsoProject: Microsoft.WSL
@@ -64,8 +79,9 @@ extends:
         publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
         bypassTests: ${{ parameters.bypassTests }}
+        pushToStore: ${{ parameters.pushToStore }}
 
-    - ${{ if eq(parameters.testVersion, '') }}:
+    - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self
           parameters:
             isNightly: false

@@ -1,0 +1,113 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCVhdVolume.h
+
+Abstract:
+
+    Internal implementation for a VHD-backed volume.
+
+--*/
+
+#pragma once
+
+#include "IWSLCVolume.h"
+#include "WSLCVolumeMetadata.h"
+#include "wslc.h"
+#include <filesystem>
+#include <memory>
+#include <string>
+
+namespace wsl::windows::common::docker_schema {
+struct Volume;
+}
+
+namespace wsl::windows::service::wslc {
+
+class WSLCVirtualMachine;
+class DockerHTTPClient;
+
+class WSLCVhdVolumeImpl : public IWSLCVolume
+{
+public:
+    NON_COPYABLE(WSLCVhdVolumeImpl);
+    NON_MOVABLE(WSLCVhdVolumeImpl);
+
+    WSLCVhdVolumeImpl(
+        std::string&& Name,
+        std::filesystem::path&& HostPath,
+        ULONGLONG SizeBytes,
+        ULONG Lun,
+        std::string&& VirtualMachinePath,
+        std::string&& CreatedAt,
+        std::map<std::string, std::string>&& DriverOpts,
+        std::map<std::string, std::string>&& Labels,
+        WSLCVirtualMachine& VirtualMachine,
+        DockerHTTPClient& DockerClient,
+        bool Attached = true,
+        std::pair<HRESULT, std::string> Status = {S_OK, {}});
+
+    ~WSLCVhdVolumeImpl();
+
+    static std::unique_ptr<WSLCVhdVolumeImpl> Create(
+        _In_opt_ LPCSTR Name,
+        _In_ std::map<std::string, std::string>&& DriverOpts,
+        _In_ std::map<std::string, std::string>&& Labels,
+        _In_ const std::filesystem::path& StoragePath,
+        _In_ WSLCVirtualMachine& VirtualMachine,
+        _In_ DockerHTTPClient& DockerClient);
+
+    static std::unique_ptr<WSLCVhdVolumeImpl> Open(
+        _In_ const wsl::windows::common::docker_schema::Volume& Volume, _In_ WSLCVirtualMachine& VirtualMachine, _In_ DockerHTTPClient& DockerClient);
+
+    // IWSLCVolume
+    const std::string& Name() const noexcept override
+    {
+        return m_name;
+    }
+    const char* Driver() const noexcept override
+    {
+        return WSLCVhdVolumeDriver;
+    }
+    const std::map<std::string, std::string>& Labels() const noexcept override
+    {
+        return m_labels;
+    }
+
+    std::pair<HRESULT, std::string> Status() const override
+    {
+        return m_status;
+    }
+
+    void Delete() override;
+    std::string Inspect() const override;
+    WSLCVolumeInformation GetVolumeInformation() const override;
+
+    const std::string& VirtualMachinePath() const noexcept
+    {
+        return m_virtualMachinePath;
+    }
+
+    void OnDeleted() override;
+
+private:
+    void Detach();
+    std::string m_name;
+    std::filesystem::path m_hostPath;
+    std::string m_virtualMachinePath;
+    std::string m_createdAt;
+    std::map<std::string, std::string> m_driverOpts;
+    std::map<std::string, std::string> m_labels;
+    ULONGLONG m_sizeBytes{};
+    ULONG m_lun{};
+    WSLCVirtualMachine& m_virtualMachine;
+    DockerHTTPClient& m_dockerClient;
+    bool m_attached;
+
+    std::pair<HRESULT, std::string> m_status;
+};
+
+} // namespace wsl::windows::service::wslc

@@ -8,15 +8,26 @@ using System.Diagnostics;
 
 using Windows.System;
 
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using WslSettings.Contracts.Services;
 using WslSettings.Services;
 using WslSettings.ViewModels;
 
 namespace WslSettings.Views.Settings;
 
-public sealed partial class ShellPage : Page
+public sealed partial class ShellPage : Page, INotifyPropertyChanged
 {
     private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+
+    public bool HasPendingChanges => App.GetService<IWslConfigService>().HasPendingChanges;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     private void RegisterNavigationService()
     {
@@ -45,6 +56,21 @@ public sealed partial class ShellPage : Page
         App.MainWindow.Activated += MainWindow_Activated;
         AppTitleBarText.Text = "Settings_AppDisplayName".GetLocalized();
         NavigationFrame.LostFocus += NavigationFrame_LostFocus;
+
+        App.GetService<IWslConfigService>().PendingChangesChanged += OnPendingChangesChanged;
+    }
+
+    private void OnPendingChangesChanged()
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            OnPropertyChanged(nameof(HasPendingChanges));
+        });
+    }
+
+    private async void ApplyChanges_Click(object sender, RoutedEventArgs e)
+    {
+        await SettingsApplyHelper.ShowApplyChangesDialogAsync(XamlRoot);
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

@@ -31,7 +31,7 @@ endfunction()
 function (parse_nuget_packages_versions)
 
     # Parse the list of available packages
-    set(CMD "$packages=@{}; (Select-Xml -path ${CMAKE_SOURCE_DIR}/packages.config /packages).Node.ChildNodes | Where-Object { $_.name -ne '#whitespace'} | % {$packages.add($_.id, $_.Attributes['version'].Value) }; $packages | ConvertTo-Json | Write-Host")
+    set(CMD "$packages=@{}; (Select-Xml -path '${CMAKE_SOURCE_DIR}/packages.config' /packages).Node.ChildNodes | Where-Object { $_.name -ne '#whitespace'} | % {$packages.add($_.id, $_.Attributes['version'].Value) }; $packages | ConvertTo-Json | Write-Host")
 
     execute_process(
         COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive -Command "${CMD}"

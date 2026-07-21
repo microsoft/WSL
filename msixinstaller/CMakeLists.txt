@@ -1,15 +1,17 @@
-set(DEPENDENCIES "wsl.exe;wslinstaller.exe;wslinstallerproxystub.dll")
+if (NOT BUNDLE_ONLY)
+    set(DEPENDENCIES "wsl.exe;wslinstaller.exe;wslinstallerproxystub.dll")
 
-# Don't include the MSI if building a thin package.
-if (NOT "${WSL_BUILD_THIN_PACKAGE}")
-    list(APPEND DEPENDENCIES "wsl.msi")
+    # Don't include the MSI if building a thin package.
+    if (NOT "${WSL_BUILD_THIN_PACKAGE}")
+        list(APPEND DEPENDENCIES "wsl.msi")
+    endif()
+
+    add_appx_target(msixinstallerpackage
+                    "${DEPENDENCIES}"
+                    "${CMAKE_CURRENT_LIST_DIR}/AppxManifest.in"
+                    "${BIN}/installer.msix"
+                    "wsl;wslinstaller;msipackage;wslinstallerproxystub")
 endif()
-
-add_appx_target(msixinstallerpackage
-                "${DEPENDENCIES}"
-                "${CMAKE_CURRENT_LIST_DIR}/AppxManifest.in"
-                "${BIN}/installer.msix"
-                "wsl;wslinstaller;msipackage;wslinstallerproxystub")
 
 set(ARM64_BUNDLE_PATH ${CMAKE_SOURCE_DIR}/bin/arm64/${CMAKE_BUILD_TYPE}/installer.msix)
 set(X64_BUNDLE_PATH ${CMAKE_SOURCE_DIR}/bin/X64/${CMAKE_BUILD_TYPE}/installer.msix)
@@ -38,6 +40,8 @@ if ((TARGET_PLATFORM STREQUAL "arm64" AND EXISTS ${X64_BUNDLE_PATH}) OR (TARGET_
 
     set_source_files_properties(${OUTPUT_BUNDLE} PROPERTIES GENERATED TRUE)
     add_custom_target(bundle DEPENDS ${OUTPUT_BUNDLE})
-    add_dependencies(bundle msixinstallerpackage)
+    if (NOT BUNDLE_ONLY)
+        add_dependencies(bundle msixinstallerpackage)
+    endif()
     set_target_properties(bundle PROPERTIES EXCLUDE_FROM_ALL FALSE)
 endif()

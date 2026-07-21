@@ -13,7 +13,7 @@ After launching `/sbin/init`, [init](init.md) waits for systemd to be ready by w
 
 ## User sessions
 
-When systemd is enabled, WSL tries synchronizes launching processes with systemd user sessions. This is currently done by launching `login -f <user>` to start the associated systemd user session.
+When systemd is enabled, WSL tries to synchronize launching processes with systemd user sessions. This is currently done by launching `login -f <user>` to start the associated systemd user session.
 
 ## Additional systemd configuration 
 

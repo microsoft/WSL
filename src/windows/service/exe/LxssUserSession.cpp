@@ -891,7 +891,7 @@ HRESULT LxssUserSessionImpl::MountDisk(
     _Out_ int* Step,
     _Out_ LPWSTR* MountName)
 {
-    ExecutionContext context(Context::DetachDisk);
+    ExecutionContext context(Context::MountDisk);
 
     std::lock_guard lock(m_instanceLock);
     return wil::ResultFromException([&]() {
@@ -939,12 +939,42 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
         THROW_WIN32(error.value());
     }
 
+    // Read the original VHD owner before the move so we can restore it after.
+    // Cross-volume MoveFileEx may set the owner to BUILTIN\Administrators for
+    // elevated callers, which breaks HcsGrantVmAccess (needs WRITE_DAC via
+    // ownership) from non-elevated contexts.
+    PSID originalOwner = nullptr;
+    wil::unique_hlocal originalDescriptor;
+    THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+        distro.VhdFilePath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &originalOwner, nullptr, nullptr, nullptr, &originalDescriptor));
+
     // Move the VHD to the new location.
     THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
+
+    // Restore the original VHD owner on the moved file.
+    // Run as self (SYSTEM) for both the file open and the SetSecurityInfo call,
+    // because after a cross-volume MoveFileEx the new file's owner may be
+    // BUILTIN\Administrators and the impersonated user token may lack WRITE_OWNER.
+    auto setVhdOwner = [&originalOwner](const std::filesystem::path& vhdPath) {
+        auto runAsSelf = wil::run_as_self();
+        auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
+
+        wil::unique_hfile vhdHandle(CreateFileW(
+            vhdPath.c_str(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+        THROW_LAST_ERROR_IF(!vhdHandle);
+
+        THROW_IF_WIN32_ERROR(
+            ::SetSecurityInfo(vhdHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
+    };
+
+    setVhdOwner(newVhdPath);
 
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(
             newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+
+        // Fix ownership on the reverted VHD in case MoveFileEx copied across volumes.
+        LOG_IF_FAILED(wil::ResultFromException([&] { setVhdOwner(distro.VhdFilePath); }));
 
         // Write the location back to the original path in case the second registry write failed. Otherwise, this is a no-op.
         registration.Write(Property::BasePath, distro.BasePath.c_str());
@@ -1013,7 +1043,7 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
         static_assert((RTL_NUMBER_OF(current->DistroName) - 1) == LX_INIT_DISTRO_NAME_MAX);
 
         memset(current->DistroName, 0, sizeof(current->DistroName));
-        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName) - 1, configuration.Name.c_str());
+        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName), configuration.Name.c_str());
     }
 
     *DistributionCount = numberOfDistributions;
@@ -1778,47 +1808,48 @@ try
     std::lock_guard lock(m_instanceLock);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
     const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
-    LXSS_DISTRO_CONFIGURATION configuration = s_GetDistributionConfiguration(registration);
+    const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
-    const auto vhdFilePath = configuration.VhdFilePath;
-    if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdFilePath.c_str()))
+    const auto& vhdPath = configuration.VhdFilePath;
+    if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str()))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_DISTRO_NOT_STOPPED, wsl::shared::Localization::MessageVhdInUse());
     }
 
-    auto diskHandle = wsl::core::filesystem::OpenVhd(vhdFilePath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
-    const auto diskSize = wsl::core::filesystem::GetDiskSize(diskHandle.get());
-
-    const auto resizingLarger = NewSize > diskSize;
-    if (resizingLarger)
+    // If growing the VHD, resize the underlying VHD file before resizing the filesystem.
+    bool resizingLarger;
     {
-        wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_NONE);
-    }
+        auto runAsUser = wil::CoImpersonateClient();
+        auto diskHandle = wsl::core::filesystem::OpenVhd(vhdPath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
+        resizingLarger = NewSize > wsl::core::filesystem::GetDiskSize(diskHandle.get());
 
-    diskHandle.reset();
+        if (resizingLarger)
+        {
+            wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_NONE);
+        }
+    }
 
     // Ensure VM exists and attach the VHD.
     _CreateVm();
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    const auto lun = m_utilityVm->AttachDisk(vhdFilePath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+    const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
 
     // Resize the underlying filesystem.
     //
     // N.B. Passing zero as the size causes the resize to consume all available space on the block device.
     {
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdFilePath.c_str()); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
         m_utilityVm->ResizeDistribution(lun, OutputHandle, resizingLarger ? 0 : NewSize);
     }
 
     // If shrinking the VHD, resize the underlying VHD file. This is only supported for .vhdx files.
     //
     // N.B. RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE is required because vhdmp can't validate that the minimum safe ext4 size.
-    if (!resizingLarger &&
-        wsl::shared::string::IsEqual(vhdFilePath.extension().c_str(), wsl::windows::common::wslutil::c_vhdxFileExtension, true))
+    if (!resizingLarger && wsl::shared::string::IsEqual(vhdPath.extension().c_str(), wsl::windows::common::wslutil::c_vhdxFileExtension, true))
     {
-        const auto diskHandle =
-            wsl::core::filesystem::OpenVhd(vhdFilePath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
+        auto runAsUser = wil::CoImpersonateClient();
+        const auto diskHandle = wsl::core::filesystem::OpenVhd(vhdPath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
         wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE);
     }
 
@@ -2197,7 +2228,7 @@ try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"Telemetry");
 
-    wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", m_vmTerminating.get());
+    wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", {m_vmTerminating.get()});
 
     // Check if drvfs notifications are enabled for the user.
     bool drvFsNotifications{};
@@ -2999,8 +3030,16 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         // Remove start menu entry for the distribution, if any.
         if (Configuration.ShortcutPath.has_value())
         {
-            LOG_IF_WIN32_BOOL_FALSE_MSG(
-                DeleteFileW(Configuration.ShortcutPath->c_str()), "Failed to delete %ls", Configuration.ShortcutPath->c_str());
+            // The shortcut file may be in use. Try to delete it for up to 10 seconds, and then give up.
+            try
+            {
+                wsl::shared::retry::RetryWithTimeout<void>(
+                    [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
+                    std::chrono::milliseconds(100),
+                    std::chrono::seconds(10),
+                    []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+            }
+            CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
         }
 
         // Remove the terminal profile, if any.
@@ -3195,10 +3234,20 @@ try
 
     // Attach the disk to the VM, reusing the same LUN if possible.
     //
-    // N.B. The user token is not provided because the key that holds the disk
-    // state can only be written by elevated users.
+    // N.B. The disk-mount state is stored under the user's SID in a volatile (per-boot)
+    // registry key, so the disk being restored here was mounted earlier in this same boot
+    // by this same user. For a VHD we therefore pass the user token so the access grant and
+    // the path resolution run under the mounting user's identity: a privileged operation can
+    // only ever touch a file that user can already reach, which closes the restore-time
+    // junction/symlink swap (TOCTOU) without re-resolving the path as SYSTEM.
+    //
+    // A pass-through (raw block device) attach is elevation-gated and the reconnecting user
+    // may no longer be elevated, so it is restored as SYSTEM (no token). Block-device paths
+    // (\\.\PhysicalDriveN) have no reparse-point surface, so there is no swap to defend
+    // against.
     auto lun = std::stoul(LunStr);
-    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, nullptr);
+    const HANDLE userToken = (diskType == WslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
+    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, userToken);
 
     // Restore each mount point.
     for (const auto& e : wsl::windows::common::registry::EnumKeys(Key, KEY_READ))
@@ -3803,11 +3852,12 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Name != nullptr && wsl::shared::string::IsEqual(Name, configuration.Name, true))
         {
-            THROW_HR_MSG(
-                (configuration.State == LxssDistributionStateInstalled) ? HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) : E_ILLEGAL_STATE_CHANGE,
-                "%ls already registered (state = %d)",
-                Name,
-                configuration.State);
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                wsl::shared::Localization::MessageDistroNameAlreadyExists(),
+                configuration.State == LxssDistributionStateInstalled);
+
+            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, configuration.State);
         }
 
         if (Path != nullptr)
@@ -3819,8 +3869,9 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
             }
 
             // Ensure another distribution by a different name is not already registered to the same location.
-            THROW_HR_IF(
+            THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
                 wsl::windows::common::string::IsPathComponentEqual(error ? configuration.BasePath.native() : canonicalDistroPath.native(), Path));
         }
     }
@@ -4075,6 +4126,14 @@ try
         // We only add uppercase as there is no standard environment variable for PAC proxies.
         // This at least makes the PAC url available to the user in case they wish to use it.
         environment.emplace_back(std::format("{}={}", c_pacProxy, proxySettings.PacUrl));
+
+        // When PAC is used, the reply only populates the proxy field.
+        // Set both envs to this value as best effort since PAC is not functional in headless Linux.
+        if (proxySettings.SecureProxy.empty() && !proxySettings.Proxy.empty())
+        {
+            environment.emplace_back(std::format("{}={}", c_httpsProxyLower, proxySettings.Proxy));
+            environment.emplace_back(std::format("{}={}", c_httpsProxyUpper, proxySettings.Proxy));
+        }
     }
 }
 CATCH_LOG()

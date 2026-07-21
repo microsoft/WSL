@@ -15,11 +15,16 @@
 #include "waitablevalue.h"
 #include "SecCompDispatcher.h"
 #include "SocketChannel.h"
+#include "lxinitshared.h"
 
 class GnsPortTracker
 {
 public:
-    GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel, NetlinkChannel&& netlinkChannel, std::shared_ptr<SecCompDispatcher> seccompDispatcher);
+    GnsPortTracker(
+        std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
+        NetlinkChannel&& netlinkChannel,
+        std::shared_ptr<SecCompDispatcher> seccompDispatcher,
+        LX_MINI_INIT_NETWORKING_MODE networkingMode);
 
     GnsPortTracker(const GnsPortTracker&) = delete;
     GnsPortTracker(GnsPortTracker&&) = delete;
@@ -92,25 +97,56 @@ public:
         }
     };
 
+    struct DeferredPortLookup
+    {
+        pid_t Pid;
+        wil::unique_fd DuplicatedSocketFd; // Duplicated via pidfd_getfd while process was stopped
+        int Protocol;
+
+        DeferredPortLookup(pid_t Pid, wil::unique_fd DuplicatedSocketFd, int Protocol) :
+            Pid(Pid), DuplicatedSocketFd(std::move(DuplicatedSocketFd)), Protocol(Protocol)
+        {
+        }
+
+        DeferredPortLookup(DeferredPortLookup&&) = default;
+        DeferredPortLookup& operator=(DeferredPortLookup&&) = default;
+        DeferredPortLookup(const DeferredPortLookup&) = delete;
+        DeferredPortLookup& operator=(const DeferredPortLookup&) = delete;
+    };
+
     struct BindCall
     {
         std::optional<PortAllocation> Request;
+        std::optional<DeferredPortLookup> PortZeroBind;
         std::uint64_t CallId;
+    };
+
+private:
+    using ActivePortSet = std::set<std::pair<std::uint16_t, int>>;
+
+    struct ActivePorts
+    {
+        std::set<PortAllocation> FullAllocations;
+        ActivePortSet PortProtocolPairs; // Always populated, but only used in mirrored mode
     };
 
     struct PortRefreshResult
     {
-        std::set<PortAllocation> Ports;
+        ActivePorts Ports;
         time_t Timestamp;
         std::function<void()> Resume;
     };
 
-private:
-    void OnRefreshAllocatedPorts(const std::set<PortAllocation>& Ports, time_t Timestamp);
+    bool IsMirroredMode() const
+    {
+        return m_networkingMode == LxMiniInitNetworkingModeMirrored;
+    }
+
+    void OnRefreshAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
 
     void RunPortRefresh();
 
-    std::set<PortAllocation> ListAllocatedPorts();
+    ActivePorts ListAllocatedPorts();
 
     std::optional<BindCall> ReadNextRequest();
 
@@ -118,13 +154,17 @@ private:
 
     int RequestPort(const PortAllocation& Port, bool Allocate);
 
-    int ClosePort(const PortAllocation& Port);
-
     int HandleRequest(const PortAllocation& Request);
 
     void CompleteRequest(uint64_t Id, int Result);
 
     static int GetSocketProtocol(int Pid, int Fd);
+
+    static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
+
+    std::optional<PortAllocation> ResolvePortZeroBind(DeferredPortLookup lookup);
+
+    void TrackPort(PortAllocation allocation);
 
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
@@ -135,6 +175,8 @@ private:
     WaitableValue<int> m_reply;
 
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
+
+    LX_MINI_INIT_NETWORKING_MODE m_networkingMode;
 
     std::string m_networkNamespace;
 };

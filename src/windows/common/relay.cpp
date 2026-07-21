@@ -16,14 +16,8 @@ Abstract:
 #include "relay.hpp"
 #pragma hdrstop
 
-using wsl::windows::common::relay::EventHandle;
-using wsl::windows::common::relay::HandleWrapper;
-using wsl::windows::common::relay::IOHandleStatus;
-using wsl::windows::common::relay::MultiHandleWait;
-using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
-using wsl::windows::common::relay::SingleAcceptHandle;
 
 namespace {
 
@@ -36,6 +30,36 @@ LARGE_INTEGER InitializeFileOffset(HANDLE File)
     }
 
     return Offset;
+}
+
+void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
+{
+    DWORD bytesTransferred{};
+    if (CancelIoEx((HANDLE)Handle, &Overlapped))
+    {
+        if constexpr (std::is_same_v<decltype(Handle), SOCKET>)
+        {
+            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, nullptr))
+            {
+                auto error = WSAGetLastError();
+                LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && error != WSAECONNRESET);
+            }
+        }
+        else
+        {
+            static_assert(std::is_same_v<decltype(Handle), HANDLE>);
+            if (!GetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true))
+            {
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            }
+        }
+    }
+    else
+    {
+        // ERROR_NOT_FOUND is returned if there was no IO to cancel.
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+    }
 }
 
 } // namespace
@@ -109,7 +133,7 @@ wsl::windows::common::relay::InterruptableRead(
     if (!ReadFile(InputHandle, Buffer.data(), gsl::narrow_cast<DWORD>(Buffer.size()), &bytesRead, Overlapped))
     {
         auto lastError = GetLastError();
-        if ((lastError == ERROR_HANDLE_EOF) || (lastError == ERROR_BROKEN_PIPE))
+        if ((lastError == ERROR_HANDLE_EOF) || (lastError == ERROR_BROKEN_PIPE) || (lastError == ERROR_OPERATION_ABORTED))
         {
             return 0;
         }
@@ -207,7 +231,7 @@ bool wsl::windows::common::relay::InterruptableWait(_In_ HANDLE WaitObject, _In_
     const DWORD waitResult = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(waitObjects.size()), waitObjects.data(), FALSE, INFINITE);
     if (waitResult != WAIT_OBJECT_0)
     {
-        if (waitResult > WAIT_OBJECT_0 && waitResult <= WAIT_OBJECT_0 + waitObjects.size())
+        if (waitResult > WAIT_OBJECT_0 && waitResult < WAIT_OBJECT_0 + waitObjects.size())
         {
             return false;
         }
@@ -381,6 +405,30 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
             THROW_HR_MSG(E_FAIL, "WaitForMultipleObjects %d", waitResult);
         }
     }
+}
+
+bool wsl::windows::common::relay::StandardInputRelay(HANDLE ConsoleHandle, HANDLE OutputHandle, std::function<void()>&& UpdateTerminalSize, HANDLE ExitEvent)
+{
+    try
+    {
+        if (GetFileType(ConsoleHandle) != FILE_TYPE_CHAR)
+        {
+            wsl::windows::common::relay::InterruptableRelay(ConsoleHandle, OutputHandle, ExitEvent);
+            return true;
+        }
+
+        MultiHandleWait io;
+
+        io.AddHandle(std::make_unique<io::RelayHandle<io::ReadConsoleHandle>>(ConsoleHandle, OutputHandle, std::move(UpdateTerminalSize)));
+
+        io.AddHandle(std::make_unique<io::EventHandle>(ExitEvent), MultiHandleWait::CancelOnCompleted | MultiHandleWait::NeedNotComplete);
+        io.Run({});
+
+        return true;
+    }
+    CATCH_LOG();
+
+    return false;
 }
 
 void wsl::windows::common::relay::SocketRelay(_In_ SOCKET LeftSocket, _In_ SOCKET RightSocket, _In_ size_t BufferSize)
@@ -576,214 +624,3 @@ try
     }
 }
 CATCH_LOG()
-
-void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
-{
-    m_handles.emplace_back(flags, std::move(handle));
-}
-
-void MultiHandleWait::Cancel()
-{
-    m_cancel = true;
-}
-bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
-{
-    m_cancel = false; // Run may be called multiple times.
-
-    std::optional<std::chrono::steady_clock::time_point> deadline;
-
-    if (Timeout.has_value())
-    {
-        deadline = std::chrono::steady_clock::now() + Timeout.value();
-    }
-
-    // Run until all handles are completed.
-
-    while (!m_handles.empty() && !m_cancel)
-    {
-        // Schedule IO on each handle until all are either pending, or completed.
-        for (size_t i = 0; i < m_handles.size(); i++)
-        {
-            while (m_handles[i].second->GetState() == IOHandleStatus::Standby)
-            {
-                try
-                {
-                    m_handles[i].second->Schedule();
-                }
-                catch (...)
-                {
-                    if (WI_IsFlagSet(m_handles[i].first, Flags::IgnoreErrors))
-                    {
-                        m_handles[i].second.reset(); // Reset the handle so it can be deleted.
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-            }
-        }
-
-        // Remove completed handles from m_handles.
-        for (auto it = m_handles.begin(); it != m_handles.end();)
-        {
-            if (!it->second)
-            {
-                it = m_handles.erase(it);
-            }
-            else if (it->second->GetState() == IOHandleStatus::Completed)
-            {
-                if (WI_IsFlagSet(it->first, Flags::CancelOnCompleted))
-                {
-                    m_cancel = true; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
-                }
-
-                it = m_handles.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-
-        if (m_handles.empty() || m_cancel)
-        {
-            break;
-        }
-
-        // Wait for the next operation to complete.
-        std::vector<HANDLE> waitHandles;
-        for (const auto& e : m_handles)
-        {
-            waitHandles.emplace_back(e.second->GetHandle());
-        }
-
-        DWORD waitTimeout = INFINITE;
-        if (deadline.has_value())
-        {
-            auto miliseconds =
-                std::chrono::duration_cast<std::chrono::milliseconds>(deadline.value() - std::chrono::steady_clock::now()).count();
-
-            waitTimeout = static_cast<DWORD>(std::max(0LL, miliseconds));
-        }
-
-        auto result = WaitForMultipleObjects(static_cast<DWORD>(waitHandles.size()), waitHandles.data(), false, waitTimeout);
-        if (result == WAIT_TIMEOUT)
-        {
-            THROW_WIN32(ERROR_TIMEOUT);
-        }
-        else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
-        {
-            auto index = result - WAIT_OBJECT_0;
-
-            try
-            {
-                m_handles[index].second->Collect();
-            }
-            catch (...)
-            {
-                if (WI_IsFlagSet(m_handles[index].first, Flags::IgnoreErrors))
-                {
-                    m_handles.erase(m_handles.begin() + index);
-                }
-                else
-                {
-                    throw;
-                }
-            }
-        }
-        else
-        {
-            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
-        }
-    }
-
-    return !m_cancel;
-}
-
-IOHandleStatus OverlappedIOHandle::GetState() const
-{
-    return State;
-}
-
-EventHandle::EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled) :
-    Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
-{
-}
-
-void EventHandle::Schedule()
-{
-    State = IOHandleStatus::Pending;
-}
-
-void EventHandle::Collect()
-{
-    State = IOHandleStatus::Completed;
-    OnSignalled();
-}
-
-HANDLE EventHandle::GetHandle() const
-{
-    return Handle.Get();
-}
-
-SingleAcceptHandle::SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted) :
-    ListenSocket(std::move(ListenSocket)), AcceptedSocket(std::move(AcceptedSocket)), OnAccepted(std::move(OnAccepted))
-{
-    Overlapped.hEvent = Event.get();
-}
-
-SingleAcceptHandle::~SingleAcceptHandle()
-{
-    if (State == IOHandleStatus::Pending)
-    {
-        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
-
-        DWORD bytesProcessed{};
-        DWORD flagsReturned{};
-        if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
-        {
-            auto error = GetLastError();
-            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-        }
-    }
-}
-
-void SingleAcceptHandle::Schedule()
-{
-    WI_ASSERT(State == IOHandleStatus::Standby);
-
-    // Schedule the accept.
-    DWORD bytesReturned{};
-    if (AcceptEx((SOCKET)ListenSocket.Get(), (SOCKET)AcceptedSocket.Get(), &AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
-    {
-        // Accept completed immediately.
-        State = IOHandleStatus::Completed;
-        OnAccepted();
-    }
-    else
-    {
-        auto error = WSAGetLastError();
-        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)ListenSocket.Get());
-
-        State = IOHandleStatus::Pending;
-    }
-}
-
-void SingleAcceptHandle::Collect()
-{
-    WI_ASSERT(State == IOHandleStatus::Pending);
-
-    DWORD bytesReceived{};
-    DWORD flagsReturned{};
-
-    THROW_IF_WIN32_BOOL_FALSE(WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesReceived, false, &flagsReturned));
-
-    State = IOHandleStatus::Completed;
-    OnAccepted();
-}
-
-HANDLE SingleAcceptHandle::GetHandle() const
-{
-    return Event.get();
-}

@@ -2,7 +2,6 @@
 
 [cmdletbinding(PositionalBinding = $false)]
 param (
-    [ValidateSet("X64", "arm64")][string]$Platform = "X64",
     [ValidateSet("Debug", "Release")][string]$BuildType = "Debug",
     [string]$BuildOutputPath = [string](Get-Location),
     [string]$PackageCertPath = $null,
@@ -12,10 +11,17 @@ param (
 
 $ErrorActionPreference = "Stop"
 
+$processorArchitecture = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment').PROCESSOR_ARCHITECTURE
+$Platform = switch -Wildcard ($processorArchitecture) {
+    '*ARM64*' { 'arm64' }
+    '*AMD64*' { 'X64' }
+    default   { throw "Failed to determine system architecture: $processorArchitecture" }
+}
+
 $PackagePath = "$BuildOutputPath\bin\$Platform\$BuildType\wsl.msi"
 
 # msiexec.exe doesn't like symlinks, so use the canonical path
-$Target = (Get-ChildItem $PackagePath)[0].Target
+$Target = (Get-ChildItem $PackagePath).Target
 if ($Target)
 {
     $PackagePath = $Target

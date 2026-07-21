@@ -7,4 +7,4 @@ For user documentation, including installation and configuration, see [https://l
 
 To get started developing (building, testing and deploying), see [Getting started](dev-loop.md).
 
-To learn more about how WSL works, see [technical documentation](technical-documentation/index.md)
+To learn more about how WSL works, see [technical documentation](technical-documentation/index.md).

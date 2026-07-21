@@ -10,6 +10,11 @@ import functools
 from git import Repo
 from urllib.parse import urlparse
 
+# Reconfigure stdout/stderr to handle unencodable characters (e.g. Unicode in
+# commit messages) on consoles that use legacy code-pages such as cp1252.
+sys.stdout.reconfigure(errors='backslashreplace')
+sys.stderr.reconfigure(errors='backslashreplace')
+
 @click.command()
 @click.argument('version', required=True)
 @click.argument('assets', default=None, nargs=-1)
@@ -78,10 +83,10 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
         print(f'\n{changes}')
 
 @backoff.on_exception(backoff.expo, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException), max_time=600)
-def get_github_pr_message(token: str, message: str) -> str:
+def get_github_pr_message(token: str, message: str) -> tuple[str | None, str | None]:
     match = re.search(r'\(#([0-9]+)\)', message)
     if match is None:
-        print(f'Warning: failed to extract GitHub PR number from message: {message}')
+        print(f'Warning: failed to extract GitHub PR number from message: {message}', file=sys.stderr)
         return None, None
 
     pr_number = match.group(1)

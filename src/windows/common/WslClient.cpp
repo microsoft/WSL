@@ -13,11 +13,13 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "WslInstall.h"
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
 #include <conio.h>
+#include "WslCoreFilesystem.h"
 
 #define BASH_PATH L"/bin/bash"
 
@@ -106,17 +108,9 @@ struct ShellExecOptions
     }
 };
 
-bool IsInteractiveConsole()
-{
-    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode{};
-
-    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
-}
-
 void PromptForKeyPress()
 {
-    if (IsInteractiveConsole())
+    if (wsl::windows::common::wslutil::IsInteractiveConsole())
     {
         wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessagePressAnyKeyToExit());
         LOG_IF_WIN32_BOOL_FALSE(FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE)));
@@ -156,7 +150,7 @@ int BashMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     const auto options = ParseLegacyArguments(commandLine);
@@ -258,7 +252,7 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
 
     parser.AddPositionalArgument(name, 0);
     parser.AddPositionalArgument(filePath, 1);
-    parser.AddArgument(SetFlag<ULONG, LXSS_EXPORT_DISTRO_FLAGS_VHD>(flags), WSL_EXPORT_ARG_VHD_OPTION);
+    parser.AddArgument(SetFlag<LXSS_EXPORT_DISTRO_FLAGS_VHD, ULONG>(flags), WSL_EXPORT_ARG_VHD_OPTION);
     parser.AddArgument(parseFormat, WSL_EXPORT_ARG_FORMAT_OPTION);
     parser.Parse();
 
@@ -324,7 +318,7 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     parser.AddPositionalArgument(AbsolutePath(installPath), 1);
     parser.AddPositionalArgument(filePath, 2);
     parser.AddArgument(WslVersion(version), WSL_IMPORT_ARG_VERSION);
-    parser.AddArgument(SetFlag<ULONG, LXSS_IMPORT_DISTRO_FLAGS_VHD>{flags}, WSL_IMPORT_ARG_VHD);
+    parser.AddArgument(SetFlag<LXSS_IMPORT_DISTRO_FLAGS_VHD, ULONG>{flags}, WSL_IMPORT_ARG_VHD);
 
     parser.Parse();
 
@@ -693,7 +687,9 @@ bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
         const auto exitCode = LaunchElevated(elevatedCommand.c_str());
         if (exitCode != 0)
         {
-            return exitCode;
+            THROW_HR_WITH_USER_ERROR(
+                WSL_E_INSTALL_COMPONENT_FAILED,
+                Localization::MessageOptionalComponentInstallFailed(wsl::shared::string::Join(missingComponents, L','), exitCode));
         }
     }
     else
@@ -1270,9 +1266,8 @@ int Unmount(_In_ const std::wstring& arg)
     wsl::windows::common::SvcComm service;
     const HRESULT result = wil::ResultFromException([&] { value = service.DetachDisk(disk); });
 
-    // support relative paths in unmount
-    // check is the result is the error code for "file not found" and the path is relative
-    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) && PathIsRelative(disk))
+    // Retry with the normalized path to handle relative paths and \\?\ prefix mismatches.
+    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
     {
         // retry dismounting with the absolute path
         const auto absoluteDisk = wsl::windows::common::filesystem::GetFullPath(filesystem::UnquotePath(disk).c_str());
@@ -1318,7 +1313,7 @@ int UpdatePackage(std::wstring_view commandLine)
     parser.AddArgument(NoOp(), WSL_UPDATE_ARG_PROMPT_OPTION_LONG);
     parser.Parse();
 
-    return wsl::windows::common::wslutil::UpdatePackage(preRelease, false);
+    return wsl::windows::common::install::UpdatePackage(preRelease, false);
 }
 
 int Uninstall()
@@ -1327,9 +1322,13 @@ int Uninstall()
     auto clearLogs =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFile(logFile.c_str())); });
 
-    const auto exitCode = wsl::windows::common::wslutil::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::wslutil::MsiMessageCallback);
+    const auto exitCode = wsl::windows::common::install::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::install::MsiMessageCallback);
 
-    if (exitCode != 0)
+    if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+    {
+        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+    }
+    else if (exitCode != 0)
     {
         clearLogs.release();
         THROW_HR_WITH_USER_ERROR(
@@ -1364,7 +1363,7 @@ int WslconfigMain(_In_ int argc, _In_reads_(argc) LPWSTR* argv)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     using wsl::shared::string::IsEqual;
@@ -1554,10 +1553,12 @@ int RunDebugShell()
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(pipe.get(), "\n", 1, nullptr, nullptr));
 
     // Create a thread to relay stdin to the pipe.
-    wsl::windows::common::ConsoleState Io;
+    wsl::windows::common::ConsoleState console;
+    console.SetInteractiveMode();
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
-    std::thread inputThread(
-        [&]() { wsl::windows::common::RelayStandardInput(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), {}, exitEvent.get(), &Io); });
+    std::thread inputThread([&]() {
+        wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), []() {}, exitEvent.get());
+    });
 
     auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         exitEvent.SetEvent();
@@ -1577,7 +1578,7 @@ int WslMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     // Use exit code -1 so invokers of wsl.exe can distinguish between a Linux
@@ -1803,6 +1804,15 @@ int WslMain(_In_ std::wstring_view commandLine)
         }
         else if (argument == WSL_UNINSTALL_ARG)
         {
+            commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
+            argument = wsl::windows::common::helpers::ParseArgument(commandLine);
+            if (!argument.empty())
+            {
+                wsl::windows::common::wslutil::PrintMessage(
+                    Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG), stdout);
+                return exitCode;
+            }
+
             return Uninstall();
         }
         else

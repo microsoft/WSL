@@ -16,7 +16,7 @@ See: `src/windows/common/notifications.cpp`
 
 ## Background processes 
 
-When [wsl.exe](wsl.exe.md) terminates before the associated Linux processes terminates, `wslhost.exe` takes over the lifetime of the Linux process. 
+When [wsl.exe](wsl.exe.md) terminates before the associated Linux process terminates, `wslhost.exe` takes over the lifetime of the Linux process. 
 
 This allows Linux processes to keep running Windows commands and access the terminal even after the associated `wsl.exe` terminates. 
 

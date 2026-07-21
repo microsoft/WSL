@@ -49,4 +49,5 @@ extends:
 
     - template: test-stage.yml@self
       parameters:
+        includePackageStage: false
         rs_prerelease_only: true

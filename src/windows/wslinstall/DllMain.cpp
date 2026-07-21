@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include <msiquery.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -24,6 +25,7 @@ using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &
 
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::common::install;
 
 static constexpr auto c_progIdPrefix{L"App."};
 static constexpr auto c_protocolProgIdSuffix{L".Protocol"};
@@ -872,46 +874,6 @@ extern "C" UINT __stdcall UnregisterLspCategories(MSIHANDLE install)
     return NOERROR;
 }
 
-extern "C" UINT __stdcall CreateInitrd(MSIHANDLE install)
-try
-{
-    WSL_INSTALL_LOG("CreateInitrd");
-
-    const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
-    THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
-
-    const auto toolsPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY;
-    const auto initPath = toolsPath / L"init";
-    const auto initrdPath = toolsPath / LXSS_VM_MODE_INITRD_NAME;
-    wsl::windows::common::filesystem::CreateCpioInitrd(initPath, initrdPath);
-
-    return NOERROR;
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
-
-    return ERROR_INSTALL_FAILURE;
-}
-
-extern "C" UINT __stdcall RemoveInitrd(MSIHANDLE install)
-{
-    try
-    {
-        WSL_INSTALL_LOG("RemoveInitrd");
-
-        const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
-        THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
-
-        const auto initrdPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
-        THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(initrdPath.c_str()));
-    }
-    CATCH_LOG()
-
-    // Failures in this method aren't fatal.
-    return NOERROR;
-}
-
 std::wstring GetWslSettingsInstalledExePath(MSIHANDLE install)
 {
     const auto wslSettingsInstallFolder = GetMsiProperty(install, c_wslSettingsInstalledDirectoryPropertyName);
@@ -977,6 +939,63 @@ extern "C" UINT __stdcall CalculateWslSettingsProtocolIds(MSIHANDLE install)
 
     return NOERROR;
 }
+
+static void SetWslServiceStartType(DWORD StartType)
+{
+    const wil::unique_schandle manager{OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    THROW_LAST_ERROR_IF(!manager);
+
+    const wil::unique_schandle service{OpenServiceW(manager.get(), L"WSLService", SERVICE_CHANGE_CONFIG)};
+    if (!service)
+    {
+        const auto error = GetLastError();
+        if (error == ERROR_SERVICE_DOES_NOT_EXIST)
+        {
+            return;
+        }
+        THROW_WIN32(error);
+    }
+
+    THROW_IF_WIN32_BOOL_FALSE(ChangeServiceConfigW(
+        service.get(), SERVICE_NO_CHANGE, StartType, SERVICE_NO_CHANGE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr));
+}
+
+extern "C" UINT __stdcall DisableWslService(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("DisableWslService");
+        SetWslServiceStartType(SERVICE_DISABLED);
+    }
+    CATCH_LOG();
+
+    return NOERROR;
+}
+
+extern "C" UINT __stdcall EnableWslService(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("EnableWslService");
+        SetWslServiceStartType(SERVICE_AUTO_START);
+    }
+    CATCH_LOG();
+
+    return NOERROR;
+}
+
+#ifndef WSL_OFFICIAL_BUILD
+extern "C" __declspec(dllexport) UINT __stdcall WslTestForceInstallFailure(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("WslTestForceInstallFailure", TraceLoggingValue("Forcing install failure for rollback testing", "Reason"));
+    }
+    CATCH_LOG();
+
+    return ERROR_INSTALL_FAILURE;
+}
+#endif
 
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {

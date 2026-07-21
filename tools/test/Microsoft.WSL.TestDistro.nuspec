@@ -8,6 +8,7 @@
     <description>WSL Test distribution</description>
   </metadata>
   <files>
-    <file src="test_distro.tar.xz" target="test_distro.tar.xz"/>
+    <file src="x64\test_distro.tar.xz" target="x64"/>
+    <file src="arm64\test_distro.tar.xz" target="arm64"/>
   </files>
 </package>

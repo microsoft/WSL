@@ -16,10 +16,16 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslc.h"
+#include "WSLCContainerLauncher.h"
+#include "WSLCProcessLauncher.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 
 using namespace wsl::windows::common::registry;
+using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDistroPath;
+extern std::wstring g_testDataPath;
 
 class PluginTests
 {
@@ -150,17 +156,15 @@ class PluginTests
         }
     }
 
-    TEST_METHOD(Success)
+    WSL2_TEST_METHOD(Success)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=0)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -168,10 +172,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(CustomKernelOverriddenByPolicy)
+    WSL2_TEST_METHOD(CustomKernelOverriddenByPolicy)
     {
-        WSL2_TEST_ONLY();
-
         RegistryKeyChange policy(
             HKEY_LOCAL_MACHINE, wsl::windows::policies::c_registryKey, wsl::windows::policies::c_allowCustomKernelUserSetting, static_cast<DWORD>(0));
 
@@ -182,8 +184,8 @@ class PluginTests
             VM created (settings->CustomConfigurationFlags=0)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -191,17 +193,15 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DuplicatedPlugin)
+    WSL2_TEST_METHOD(DuplicatedPlugin)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=0)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -217,10 +217,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(CustomKernel)
+    WSL2_TEST_METHOD(CustomKernel)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=1)
@@ -250,17 +248,15 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(CustomKernelCommandLine)
+    WSL2_TEST_METHOD(CustomKernelCommandLine)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=2)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         WslConfigChange config(LxssGenerateTestConfig({.vmIdleTimeout = 1, .kernelCommandLine = L"custom"}));
@@ -270,20 +266,18 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DistroIdStaysTheSame)
+    WSL2_TEST_METHOD(DistroIdStaysTheSame)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=10
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             OnDistroStarted: received same GUID
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::SameDistroId);
@@ -294,18 +288,16 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(InitPidIsDifferent)
+    WSL2_TEST_METHOD(InitPidIsDifferent)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=14
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             Distribution Stopping, name=test_distro, package=, PidNs=*
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             Init's pid is different (* ! = *)
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::InitPidIsDifferent);
@@ -316,10 +308,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(PluginUpdateRequired)
+    WSL2_TEST_METHOD(PluginUpdateRequired)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=9
             OnLoad: WSL_E_PLUGINREQUIRESUPDATE)";
@@ -333,16 +323,14 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(APIErrors)
+    WSL2_TEST_METHOD(APIErrors)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=7
             VM created (settings->CustomConfigurationFlags=0)
             API error tests passed
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::ApiErrors);
@@ -350,10 +338,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(SuccessWSL1)
+    WSL1_TEST_METHOD(SuccessWSL1)
     {
-        WSL1_TEST_ONLY();
-
         constexpr auto ExpectedOutput = LR"(Plugin loaded. TestMode=1)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -361,9 +347,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(LoadFailureFatalWSL2)
+    WSL2_TEST_METHOD(LoadFailureFatalWSL2)
     {
-        WSL2_TEST_ONLY();
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=2
             OnLoad: E_UNEXPECTED)";
@@ -376,10 +361,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(LoadFailureNonFatalWSL1)
+    WSL1_TEST_METHOD(LoadFailureNonFatalWSL1)
     {
-        WSL1_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=2
             OnLoad: E_UNEXPECTED)";
@@ -389,10 +372,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(VmStartFailure)
+    WSL2_TEST_METHOD(VmStartFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=3
             VM created (settings->CustomConfigurationFlags=0)
@@ -407,10 +388,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(VmStartFailureWithPluginErrorTwice)
+    WSL2_TEST_METHOD(VmStartFailureWithPluginErrorTwice)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=13
             VM created (settings->CustomConfigurationFlags=0)
@@ -435,15 +414,13 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(VmStopFailure)
+    WSL2_TEST_METHOD(VmStopFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=5
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping
             OnVmStopping: E_UNEXPECTED)";
 
@@ -452,14 +429,12 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DistributionStartFailure)
+    WSL2_TEST_METHOD(DistributionStartFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=4
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             OnDistroStarted: E_UNEXPECTED
             VM Stopping)";
 
@@ -472,15 +447,13 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DistributionStopFailure)
+    WSL2_TEST_METHOD(DistributionStopFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=6
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             OnDistroStopping: E_UNEXPECTED
             VM Stopping)";
 
@@ -489,10 +462,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ErrorMessageStartVm)
+    WSL2_TEST_METHOD(ErrorMessageStartVm)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=11
             VM created (settings->CustomConfigurationFlags=0)
@@ -508,14 +479,12 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ErrorMessageStartDistro)
+    WSL2_TEST_METHOD(ErrorMessageStartDistro)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=12
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             OnDistroStarted: E_FAIL
             VM Stopping)";
 
@@ -529,10 +498,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(RegisterSuccess)
+    WSL2_TEST_METHOD(RegisterSuccess)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::Success);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
@@ -543,17 +510,15 @@ class PluginTests
                 VM created (settings->CustomConfigurationFlags=0)
                 Folder mounted (* -> /test-plugin)
                 Process created
-                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=12
-                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=13
+                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 VM Stopping)";
 
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ImportInplaceSuccess)
+    WSL2_TEST_METHOD(ImportInplaceSuccess)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::Success);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
@@ -568,23 +533,21 @@ class PluginTests
                 VM created (settings->CustomConfigurationFlags=0)
                 Folder mounted (* -> /test-plugin)
                 Process created
-                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 VM Stopping
-                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 VM created (settings->CustomConfigurationFlags=0)
                 Folder mounted (* -> /test-plugin)
                 Process created
-                Distribution registered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=12
-                Distribution unregistered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=13
+                Distribution unregistered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=13
                 VM Stopping)";
 
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(RegisterUnregisterFail)
+    WSL2_TEST_METHOD(RegisterUnregisterFail)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::FailToRegisterUnregisterDistro);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
@@ -593,57 +556,233 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=15
                 VM created (settings->CustomConfigurationFlags=0)
-                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 OnDistributionRegistered: E_UNEXPECTED
-                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 OnDistributionUnregistered: E_UNEXPECTED
                 VM Stopping)";
 
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ExecuteDistroCommand)
+    WSL2_TEST_METHOD(ExecuteDistroCommand)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::RunDistroCommand);
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=16
                 VM created (settings->CustomConfigurationFlags=0)
-                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
                 Process created
                 Failed process launch returned:  -2147467259
                 Invalid distro launch returned:  -2147220717
-                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
                 VM Stopping)";
 
         StartWsl(0);
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(PluginToken)
+    WSL2_TEST_METHOD(PluginToken)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::GetUsername);
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=17
                 VM created (settings->CustomConfigurationFlags=0)
                 Username: *
-                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
                 VM Stopping)";
 
         StartWsl(0);
         ValidateLogFile(ExpectedOutput);
     }
-    // This test must run last so it doesn't break test cases that depends on plugin signature.
-    TEST_METHOD(InvalidPluginSignature)
+    static wil::com_ptr<IWSLCSessionManager> OpenWslcSessionManager()
     {
-        WSL2_TEST_ONLY();
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        return sessionManager;
+    }
 
+    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone)
+    {
+        WSLCSessionSettings settings{};
+        settings.DisplayName = Name;
+        settings.CpuCount = 4;
+        settings.MemoryMb = 4096;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.NetworkingMode = NetworkingMode;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateRunning);
+
+        return session;
+    }
+
+    WSL2_TEST_METHOD(WslcSuccess)
+    {
+        ConfigurePlugin(PluginTestType::WslcSuccess);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-test");
+
+            LoadTestImage(*session, "debian:latest");
+
+            // Create a container that will have a stuck process so it's still in a running state when the callback is made.
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-container", {"/bin/sh", "-c", "sleep 120"});
+
+            auto container = launcher.Launch(*session, WSLCContainerStartFlagsAttach);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            // Delete the image so we get an ImageDeleted notification before the session goes away.
+            WSLCDeleteImageOptions options{.Image = "debian:latest", .Flags = WSLCDeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+        }
+
+        const auto ExpectedOutput = std::format(
+            LR"(Plugin loaded. TestMode=18
+            WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
+            Command: 'echo -n stdout-ok && echo -n stderr-ok >&2', status=0, stdout: stdout-ok, stderr: stderr-ok
+            Command: 'cat', status=0, stdout: stdin-ok, stderr: 
+            Command: 'exit 12', status=12, stdout: , stderr: 
+            Command: 'echo -n $ENV', status=0, stdout: env-ok, stderr: 
+            WSLCCreateProcess(does-not-exist): {:x}, errno=2
+            WSLCProcessGetFd(999): {}
+            WSLCProcessGetExitCode(<running>): {}
+            WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
+            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/plugin-test.txt', status=0, stdout: Windows-content, stderr: 
+            WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
+            Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
+            WSLCMountFolder(nonexistent): {}
+            WSLCMountFolder(relative): {}
+            Test completed
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
+            WSLC Container stopping, session=*, id=*
+            WSLC Image deleted, session=*, id=*
+            WSLC Session stopping, name=plugin-wslc-test, id=*)",
+            static_cast<uint32_t>(E_FAIL),
+            E_INVALIDARG,
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+            E_INVALIDARG);
+
+        ValidateLogFile(ExpectedOutput.c_str());
+    }
+
+    WSL2_TEST_METHOD(WslcPullImageNotification)
+    {
+        ConfigurePlugin(PluginTestType::WslcImagePull);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-pull-test", WSLCNetworkingModeConsomme);
+
+            // Load the registry and debian images.
+            LoadTestImage(*session, "debian:latest");
+
+            // Start a local registry container.
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
+
+            // Tag debian:latest for the local registry and push it.
+            auto registryImage = std::format("{}/debian:latest", registryAddress);
+            auto registryRepo = std::format("{}/debian", registryAddress);
+            WSLCTagImageOptions tagOptions{};
+            tagOptions.Image = "debian:latest";
+            tagOptions.Repo = registryRepo.c_str();
+            tagOptions.Tag = "latest";
+            VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
+
+            auto emptyAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
+            VERIFY_SUCCEEDED(session->PushImage(registryImage.c_str(), emptyAuth.c_str(), nullptr, nullptr));
+
+            // Delete the local tagged copy so PullImage actually downloads it.
+            WSLCDeleteImageOptions deleteOpts{.Image = registryImage.c_str(), .Flags = WSLCDeleteImageFlagsNone};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&deleteOpts, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+
+            // Pull the image back — this should trigger the ImageCreated plugin callback.
+            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=21
+            WSLC Session created, name=plugin-wslc-pull-test, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Image created, session=*, id=sha256:*, name=wslc-registry:latest
+            WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
+            WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcSessionRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcSessionRejected);
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"plugin-wslc-rejected";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.MaximumStorageSizeMb = 1024 * 20;
+        settings.NetworkingMode = WSLCNetworkingModeNone;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+        ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
+        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=19
+            WSLC Session created, name=plugin-wslc-rejected, id=*, pid=*, token=set, sid=set
+            OnWslcSessionCreated: ERROR_ACCESS_DENIED)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcContainerRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRejected);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-rejected");
+
+            LoadTestImage(*session, "debian:latest");
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-rejected-container", {"/bin/sh", "-c", "echo nope"});
+
+            auto [hr, container] = launcher.LaunchNoThrow(*session, WSLCContainerStartFlagsAttach);
+            ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=20
+            WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
+            OnWslcContainerStarted: ERROR_ACCESS_DENIED
+            WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    // This test must run last so it doesn't break test cases that depends on plugin signature.
+    WSL2_TEST_METHOD(InvalidPluginSignature)
+    {
         if constexpr (!wsl::shared::OfficialBuild)
         {
             LogSkipped("This test only applies to signed builds");
