@@ -3241,8 +3241,8 @@ class WSLCTests
 
             HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
-                m_promise.set_value(
-                    Invocation{DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+                m_promise.set_value(Invocation{
+                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
 
                 // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
                 m_release.wait();
@@ -7836,10 +7836,10 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateContainer(&options, nullptr, &container));
-            ValidateCOMErrorMessage(
-                std::format(
-                    L"Endpoint settings are not yet supported (network '{}').", std::wstring(networkName.begin(), networkName.end()))
-                    .c_str());
+            ValidateCOMErrorMessage(std::format(
+                                        L"Endpoint settings are not yet supported (network '{}').",
+                                        std::wstring(networkName.begin(), networkName.end()))
+                                        .c_str());
         }
     }
 
