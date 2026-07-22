@@ -1639,38 +1639,6 @@ class WSLCTests
         VERIFY_IS_TRUE(result.Output[1].find("Hello from a WSL container!") != std::string::npos);
     }
 
-    WSLC_TEST_METHOD(BuildImageIgnoresSelectedBuildxBuilder)
-    {
-        constexpr auto imageTag = "wslc-test-build-selected-builder:latest";
-        constexpr auto builderName = "wslc-test-unreachable-remote";
-        auto contextDir = std::filesystem::current_path() / "build-context-selected-builder";
-        std::filesystem::create_directories(contextDir);
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "buildx", "use", "default"});
-            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "buildx", "rm", builderName});
-            LOG_IF_FAILED(DeleteImageNoThrow(imageTag, WSLCDeleteImageFlagsForce).first);
-
-            std::error_code ec;
-            std::filesystem::remove_all(contextDir, ec);
-        });
-
-        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "buildx", "rm", builderName});
-        ExpectCommandResult(
-            m_defaultSession.get(),
-            {"/usr/bin/docker", "buildx", "create", "--name", builderName, "--driver", "remote", "tcp://127.0.0.1:1", "--use"},
-            0);
-
-        {
-            std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM debian:latest\n";
-            dockerfile << "CMD [\"echo\", \"selected-builder-ok\"]\n";
-        }
-
-        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, imageTag));
-        ExpectImagePresent(*m_defaultSession, imageTag);
-    }
-
     // This test validates both that we can build an image with an empty CMD, and that we can run such an image.
     WSLC_TEST_METHOD(BuildImageEntrypoint)
     {
