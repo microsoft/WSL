@@ -89,6 +89,23 @@ interface IWarningCallback : IUnknown
     HRESULT OnWarning([in, string] LPCWSTR Message);
 };
 
+typedef enum _EnumReferenceFormat
+{
+    EnumReferenceFormatNone = 0,
+    EnumReferenceFormatTag = 1,
+    EnumReferenceFormatDigest = 2,
+} EnumReferenceFormat;
+
+[
+    uuid(7F3B62FD-E1C1-4F69-A8E2-853CAD9051BD),
+    pointer_default(unique),
+    object
+]
+interface IImageLoadCallback : IUnknown
+{
+    HRESULT OnImageLoaded([in, string] LPCSTR Image, [in] EnumReferenceFormat Format);
+};
+
 [
     uuid(F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2),
     pointer_default(unique),
@@ -268,6 +285,12 @@ typedef struct _WSLCContainerOptions
 
     // Ignored unless WSLCContainerFlagsStopTimeout is set in Flags.
     LONG StopTimeout;
+
+    [unique] LPCSTR HealthCmd;
+    LONGLONG HealthIntervalNs;
+    LONGLONG HealthTimeoutNs;
+    LONGLONG HealthStartPeriodNs;
+    LONG HealthRetries;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
@@ -383,11 +406,10 @@ interface IWSLCVirtualMachine : IUnknown
     HRESULT RemoveShare([in] REFGUID ShareId);
 
     // Configures the per-VM state discovered from the guest kernel after boot
-    // (currently the hv_pci swiotlb pool). Subsequent calls to AddShare and
-    // ConfigureNetworking forward these values to wsldevicehost via the
-    // swiotlb device-options token. A capabilities struct whose fields are
-    // all zero means the guest kernel does not support the feature; the
-    // token is then omitted.
+    // (currently the hv_pci swiotlb pool). Non-zero values are forwarded to
+    // wsldevicehost before virtiofs shares or Consomme networking devices are
+    // created. A capabilities struct whose fields are all zero means the guest
+    // kernel does not support the feature.
     HRESULT ApplyGuestCapabilities([in] const WSLCGuestCapabilities* Capabilities);
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
@@ -475,6 +497,8 @@ interface IWSLCContainer : IUnknown
     HRESULT Stats([out] LPSTR* Output);
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
+    HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
+    HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] WSLCHandle OutHandle);
 }
 
 typedef struct _WSLCDeletedImageInformation
@@ -534,6 +558,9 @@ typedef struct _WSLCNetworkOptions
     ULONG DriverOptsCount;
     [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
     ULONG LabelsCount;
+    BOOL Internal;
+    [unique] LPCSTR Subnet;
+    [unique] LPCSTR Gateway;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
@@ -624,8 +651,8 @@ interface IWSLCSession : IUnknown
     // Image management.
     HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
-    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in, unique] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [out] LPSTR* ImageId);
+    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [in, unique] IImageLoadCallback* LoadCallback);
+    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in, unique] LPCSTR ImageName, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [out] LPSTR* ImageId);
     HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT SaveImages([in] WSLCHandle OutputHandle, [in] const WSLCStringArray* ImageNames, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImagesOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);

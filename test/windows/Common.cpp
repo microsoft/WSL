@@ -17,6 +17,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "LxssDynamicFunction.h"
+#include "WslCoreNetworkEndpointSettings.h"
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
@@ -1459,9 +1460,9 @@ std::wstring LxssWriteWslConfig(const std::wstring& Content)
 }
 
 // writes distro specific settings /etc/wsl.conf
-std::string LxssWriteWslDistroConfig(const std::string& Content)
+std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName)
 {
-    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", LXSS_DISTRO_NAME_TEST);
+    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", wsl::shared::string::WideToMultiByte(DistributionName));
 
     std::ifstream distroConfigRead(path);
     auto previousContent = std::string{std::istreambuf_iterator<char>(distroConfigRead), {}};
@@ -1644,8 +1645,20 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"[wsl2]\n";
     }
 
+    if (Default.virtioFsAggregateShares.has_value())
+    {
+        newConfig += L"\n[experimental]\n";
+        newConfig += boolOptionToString(L"virtioFsAggregateShares", Default.virtioFsAggregateShares, true);
+        newConfig += L"[wsl2]\n";
+    }
+
     // TODO: Remove once SetVersion() truncated archive error is root caused.
     newConfig += L"\n[experimental]\nSetVersionDebug=true\n[wsl2]\n";
+
+    if (Default.isolateDistroCgroup.has_value())
+    {
+        newConfig += boolOptionToString(L"isolateDistroCgroup", Default.isolateDistroCgroup, true);
+    }
 
     return newConfig;
 }
@@ -2985,7 +2998,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart, nullptr));
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), fileSize.QuadPart, nullptr, nullptr));
 }
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
@@ -3041,53 +3054,15 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
     }
 }
 
-std::optional<std::string> GetHostAdapterIpv4()
+std::optional<std::wstring> GetHostAdapterIpv4()
 {
-    ULONG bufferSize = 0;
-    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
-    auto result = GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &bufferSize);
-    if (result != ERROR_BUFFER_OVERFLOW)
+    auto endpoint = wsl::core::networking::GetHostEndpointSettings();
+    if (!endpoint || endpoint->PreferredIpAddress.AddressString.empty())
     {
-        return std::nullopt;
+        return {};
     }
 
-    std::vector<BYTE> buffer(bufferSize);
-    auto* adapters = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
-    result = GetAdaptersAddresses(AF_INET, flags, nullptr, adapters, &bufferSize);
-    if (result != ERROR_SUCCESS)
-    {
-        return std::nullopt;
-    }
-
-    for (auto* adapter = adapters; adapter != nullptr; adapter = adapter->Next)
-    {
-        if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK || adapter->IfType == IF_TYPE_TUNNEL)
-        {
-            continue;
-        }
-
-        for (auto* addr = adapter->FirstUnicastAddress; addr != nullptr; addr = addr->Next)
-        {
-            if (addr->Address.lpSockaddr->sa_family != AF_INET)
-            {
-                continue;
-            }
-
-            auto& ipv4 = reinterpret_cast<sockaddr_in*>(addr->Address.lpSockaddr)->sin_addr;
-
-            // Skip APIPA (169.254.x.x) addresses.
-            if ((ntohl(ipv4.s_addr) & 0xFFFF0000) == 0xA9FE0000)
-            {
-                continue;
-            }
-
-            char buf[INET_ADDRSTRLEN];
-            VERIFY_IS_NOT_NULL(inet_ntop(AF_INET, &ipv4, buf, sizeof(buf)));
-            return std::string(buf);
-        }
-    }
-
-    return std::nullopt;
+    return endpoint->PreferredIpAddress.AddressString;
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)

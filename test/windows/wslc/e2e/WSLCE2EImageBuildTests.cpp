@@ -24,32 +24,40 @@ class WSLCE2EImageBuildTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        DeleteAllBuiltImages();
+        DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
         EnsureImageIsLoaded(DebianTestImage());
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        DeleteAllBuiltImages();
+        DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
         EnsureImageIsDeleted(DebianTestImage());
         return true;
     }
 
-    TEST_METHOD_SETUP(MethodSetup)
-    {
-        DeleteAllBuiltImages();
-        return true;
-    }
+    // Each test owns and cleans up exactly the image(s) it builds via DeleteImageOnExit, so there is
+    // no per-method sweep. DeleteImagesWithRepositoryPrefix in the class setup/cleanup above is only a
+    // safety net for images left behind by a crashed run.
+    static constexpr auto c_builtImagePrefix = L"wslc-e2e-build-";
 
-    TEST_METHOD_CLEANUP(MethodCleanup)
+    // Returns an RAII guard that best-effort deletes the given image when it goes out of scope. It is
+    // deliberately non-throwing (no VERIFY) because it may run while the stack unwinds after a test
+    // failure; the class-level prune is the authoritative cleanup.
+    static auto DeleteImageOnExit(const TestImage& image)
     {
-        DeleteAllBuiltImages();
-        return true;
+        return wil::scope_exit([image]() {
+            try
+            {
+                RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
+            }
+            CATCH_LOG()
+        });
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_EmptyContextDirectory_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImage);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-empty-context";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -63,7 +71,7 @@ class WSLCE2EImageBuildTests
 
         auto buildResult = RunWslc(
             std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltImage.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImage.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -73,6 +81,8 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_BuildArgsFileAndMultipleTags_Success)
     {
+        auto imageCleanup1 = DeleteImageOnExit(BuiltImageTag1);
+        auto imageCleanup2 = DeleteImageOnExit(BuiltImageTag2);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-args-tags";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -100,7 +110,7 @@ class WSLCE2EImageBuildTests
             dockerfilePath.wstring(),
             BuiltImageTag1.NameAndTag(),
             BuiltImageTag2.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         // Verify both tags are present by inspecting each one
         auto inspectData1 = InspectImage(BuiltImageTag1.NameAndTag());
@@ -124,6 +134,7 @@ class WSLCE2EImageBuildTests
     {
         SKIP_TEST_UNSTABLE(); // TODO: Enable when a private image source is available.
 
+        auto imageCleanup = DeleteImageOnExit(BuiltImagePull);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-pull";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -137,17 +148,18 @@ class WSLCE2EImageBuildTests
 
         // Build with --pull --verbose. When --pull causes docker to resolve the base image
         // from the registry, the FROM step includes a @sha256: digest (e.g.
-        // "FROM docker.io/library/debian:latest@sha256:..."). Without --pull, no digest appears.
+        // "FROM docker.io/library/debian:latest@sha256:..."). Build progress goes to stderr.
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(buildResult.Stdout.has_value());
-        VERIFY_IS_TRUE(buildResult.Stdout->find(L"@sha256:") != std::wstring::npos);
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"@sha256:") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Target_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageTarget);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-target";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -168,7 +180,7 @@ class WSLCE2EImageBuildTests
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --target build-stage", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageTarget.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageTarget.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
@@ -184,6 +196,7 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Label_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageLabel);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -201,7 +214,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageLabel.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabel.NameAndTag());
         VERIFY_IS_TRUE(inspectData.Config.has_value());
@@ -219,6 +232,7 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_LabelOverridesDockerfile_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageLabelOverride);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-label-override";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -236,7 +250,7 @@ class WSLCE2EImageBuildTests
             contextDir.wstring(),
             dockerfilePath.wstring(),
             BuiltImageLabelOverride.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabelOverride.NameAndTag());
         VERIFY_IS_TRUE(inspectData.Config.has_value());
@@ -249,11 +263,13 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageDockerfile);
         BuildFromContextFile(L"Dockerfile", BuiltImageDockerfile);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_ContainerfileInContextDir_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageContainerfile);
         BuildFromContextFile(L"Containerfile", BuiltImageContainerfile);
     }
 
@@ -307,6 +323,7 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_NoCache_Success)
     {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageNoCache);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-no-cache";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -328,19 +345,19 @@ class WSLCE2EImageBuildTests
 
         // Seed the cache.
         auto firstBuild = RunWslc(buildCmd);
-        firstBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        firstBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto firstId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_NOT_EQUAL(std::string{}, firstId);
 
         // A repeated build without --no-cache should hit the cache and produce the same id.
         auto cachedBuild = RunWslc(buildCmd);
-        cachedBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        cachedBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto cachedId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_EQUAL(firstId, cachedId, L"Repeated build without --no-cache should reuse the cached layer");
 
         // --no-cache must re-run the non-deterministic step, producing a new id.
         auto noCacheBuild = RunWslc(buildCmd + L" --no-cache");
-        noCacheBuild.Verify({.Stderr = L"", .ExitCode = 0});
+        noCacheBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto noCacheId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
     }
@@ -365,26 +382,12 @@ private:
         WriteTestFileContent(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
 
         auto buildResult = RunWslc(std::format(L"build \"{}\" -t {}", testRoot.wstring(), image.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(image.NameAndTag());
         VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
         VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
         VERIFY_ARE_EQUAL(image.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
-    }
-
-    void DeleteAllBuiltImages()
-    {
-        EnsureImageIsDeleted(BuiltImage);
-        EnsureImageIsDeleted(BuiltImageTag1);
-        EnsureImageIsDeleted(BuiltImageTag2);
-        EnsureImageIsDeleted(BuiltImagePull);
-        EnsureImageIsDeleted(BuiltImageTarget);
-        EnsureImageIsDeleted(BuiltImageDockerfile);
-        EnsureImageIsDeleted(BuiltImageContainerfile);
-        EnsureImageIsDeleted(BuiltImageNoCache);
-        EnsureImageIsDeleted(BuiltImageLabel);
-        EnsureImageIsDeleted(BuiltImageLabelOverride);
     }
 };
 } // namespace WSLCE2ETests

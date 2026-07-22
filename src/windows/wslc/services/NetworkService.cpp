@@ -22,8 +22,9 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
-void NetworkService::Create(models::Session& session, const models::CreateNetworkOptions& createOptions)
+void NetworkService::Create(Reporter& reporter, models::Session& session, const models::CreateNetworkOptions& createOptions)
 {
+    WarningCallback warningCallback(reporter);
     WSLCNetworkOptions options{};
     options.Name = createOptions.Name.c_str();
     if (createOptions.Driver.has_value())
@@ -50,8 +51,18 @@ void NetworkService::Create(models::Session& session, const models::CreateNetwor
     options.Labels = labels.data();
     options.LabelsCount = static_cast<ULONG>(labels.size());
 
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, warningCallback.Get()));
+    options.Internal = createOptions.Internal ? TRUE : FALSE;
+    if (createOptions.Subnet.has_value())
+    {
+        options.Subnet = createOptions.Subnet->c_str();
+    }
+
+    if (createOptions.Gateway.has_value())
+    {
+        options.Gateway = createOptions.Gateway->c_str();
+    }
+
+    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &warningCallback));
 }
 
 void NetworkService::Delete(models::Session& session, const std::string& name)
@@ -103,5 +114,22 @@ models::PruneNetworksResult NetworkService::Prune(models::Session& session, cons
     }
 
     return result;
+}
+
+void NetworkService::Connect(models::Session& session, const std::string& networkName, const std::string& containerId)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(containerId.c_str(), &container));
+
+    WSLCNetworkConnectionOptions options{};
+    options.NetworkName = networkName.c_str();
+    THROW_IF_FAILED(container->ConnectToNetwork(&options));
+}
+
+void NetworkService::Disconnect(models::Session& session, const std::string& networkName, const std::string& containerId)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(containerId.c_str(), &container));
+    THROW_IF_FAILED(container->DisconnectFromNetwork(networkName.c_str()));
 }
 } // namespace wsl::windows::wslc::services
