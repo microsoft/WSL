@@ -7159,12 +7159,10 @@ class WSLCTests
         ValidateCOMErrorMessageContains(L"Network name");
     }
 
-    WSLC_TEST_METHOD(ContainerNetworkEndpointSettingsNotImplementedTest)
+    WSLC_TEST_METHOD(ContainerNetworkEndpointSettingsUnknownKeyTest)
     {
-        // Per-endpoint Settings (Aliases, IPAMConfig, etc.) are reserved for a future PR.
-        // Until that lands, any non-empty Settings payload must be rejected with E_NOTIMPL
-        // so callers don't silently lose data.
-        const std::string networkName = "custom-net-settings";
+        // Unknown endpoint setting keys must be rejected at container creation time.
+        const std::string networkName = "custom-net-settings-unknown";
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
         WSLCNetworkOptions networkOptions{};
@@ -7174,7 +7172,7 @@ class WSLCTests
         auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         LPCSTR args[] = {"sleep", "99999"};
-        KeyValuePair settings[] = {{"Aliases", "my-alias"}};
+        KeyValuePair settings[] = {{"BogusKey", "value"}};
         WSLCNetworkConnection connection{};
         connection.NetworkName = networkName.c_str();
         connection.Settings = settings;
@@ -7182,7 +7180,7 @@ class WSLCTests
 
         WSLCContainerOptions options{};
         options.Image = "debian:latest";
-        options.Name = "test-endpoint-settings";
+        options.Name = "test-endpoint-settings-unknown";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
         options.ContainerNetwork.NetworkMode = "bridge";
         options.ContainerNetwork.Networks = &connection;
@@ -7190,8 +7188,10 @@ class WSLCTests
 
         wil::com_ptr<IWSLCContainer> container;
         auto hr = m_defaultSession->CreateContainer(&options, nullptr, &container);
-        VERIFY_ARE_EQUAL(E_NOTIMPL, hr);
-        ValidateCOMErrorMessage(L"Endpoint settings are not yet supported (network 'custom-net-settings').");
+        VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
+        const auto expectedError =
+            std::format(L"Unknown endpoint setting 'BogusKey' for network '{}'.", std::wstring(networkName.begin(), networkName.end()));
+        ValidateCOMErrorMessage(expectedError);
     }
 
     WSLC_TEST_METHOD(ContainerUnsupportedColonNetworkModeRejectedTest)
@@ -7544,34 +7544,36 @@ class WSLCTests
             expectBothReject(container, nonExistentNetwork.c_str(), WSLC_E_NETWORK_NOT_FOUND, expectedError.c_str());
         }
 
-        // Host and none mode rejection.
+        // Host, none, and container:* mode rejection.
         {
             const std::string networkName = "test-connect-mode-net";
             createNetwork(networkName, "172.52.0.0/16");
             auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-            auto expectModeRejection = [&](const std::string& name, std::string mode) {
-                auto container = launchContainer(name, std::move(mode));
-                expectBothReject(
-                    container,
-                    networkName.c_str(),
-                    E_INVALIDARG,
-                    L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            auto expectModeRejection = [&](const std::string& name, const std::string& mode) {
+                auto container = launchContainer(name, mode);
+                const auto expected = std::format(
+                    L"The primary network mode '{}' does not support connecting or disconnecting additional networks.",
+                    std::wstring(mode.begin(), mode.end()));
+                expectBothReject(container, networkName.c_str(), E_INVALIDARG, expected.c_str());
             };
 
             expectModeRejection("test-connect-host-ctr", "host");
             expectModeRejection("test-connect-none-ctr", "none");
-        }
 
-        // ContainerIpAddress not supported.
-        {
-            auto container = launchContainer("test-connect-ip-ctr");
+            // container:<name> is resolved to container:<id> internally, so the emitted mode string
+            // contains the target's container ID rather than its name. Verify HRESULT + a stable substring.
+            const std::string ctrModeTarget = "test-connect-ctrmode-target";
+            auto target = launchContainer(ctrModeTarget);
+            auto ctrModeContainer = launchContainer("test-connect-ctrmode-ctr", "container:" + ctrModeTarget);
+            const std::wstring expectedSubstring = L"does not support connecting or disconnecting additional networks";
 
             WSLCNetworkConnectionOptions options{};
-            options.NetworkName = "bridge";
-            options.ContainerIpAddress = "10.0.0.5";
-            VERIFY_ARE_EQUAL(E_NOTIMPL, container.Get().ConnectToNetwork(&options));
-            ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
+            options.NetworkName = networkName.c_str();
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ctrModeContainer.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessageContains(expectedSubstring);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ctrModeContainer.Get().DisconnectFromNetwork(networkName.c_str()));
+            ValidateCOMErrorMessageContains(expectedSubstring);
         }
 
         // Connect and disconnect from the container's primary network.
@@ -7614,6 +7616,221 @@ class WSLCTests
                 std::wstring(containerName.begin(), containerName.end()),
                 std::wstring(networkName.begin(), networkName.end()));
             ValidateCOMErrorMessage(expectedError);
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkConnectEndpointSettingsTest)
+    {
+        const std::string networkName = "connect-endpoint-net";
+        const std::string subnet = "172.70.0.0/16";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        WSLCNetworkOptions netOpts{};
+        netOpts.Name = networkName.c_str();
+        netOpts.Driver = "bridge";
+        netOpts.Subnet = subnet.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+        auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        auto launchContainer = [&](const std::string& name) {
+            WSLCContainerLauncher launcher("debian:latest", name, {"sleep", "99999"}, {}, "bridge");
+            return launcher.Launch(*m_defaultSession);
+        };
+
+        auto expectConnectReject =
+            [&](auto& container, const std::vector<KeyValuePair>& settings, HRESULT expectedResult, const std::wstring& expectedMessage) {
+                WSLCNetworkConnectionOptions options{};
+                options.NetworkName = networkName.c_str();
+                options.Settings = settings.data();
+                options.SettingsCount = static_cast<ULONG>(settings.size());
+                VERIFY_ARE_EQUAL(expectedResult, container.Get().ConnectToNetwork(&options));
+                ValidateCOMErrorMessage(expectedMessage);
+            };
+
+        // Unknown endpoint setting key rejected.
+        {
+            auto container = launchContainer("connect-endpoint-unknown");
+            const std::string unknownKey = "BogusKey";
+            const std::string unknownValue = "value";
+            const auto expected = std::format(
+                L"Unknown endpoint setting '{}' for network '{}'.",
+                std::wstring(unknownKey.begin(), unknownKey.end()),
+                std::wstring(networkName.begin(), networkName.end()));
+            expectConnectReject(container, {{unknownKey.c_str(), unknownValue.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Malformed IPv4 address rejected.
+        {
+            auto container = launchContainer("connect-endpoint-badip");
+            const std::string badIp = "not-an-ip";
+            const auto expected = std::format(L"Invalid IP address '{}'", std::wstring(badIp.begin(), badIp.end()));
+            expectConnectReject(container, {{"IPAddress", badIp.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Multiple IPAddress values rejected.
+        {
+            auto container = launchContainer("connect-endpoint-dupip");
+            const std::string firstIp = "172.70.0.5";
+            const std::string secondIp = "172.70.0.6";
+            const auto expected = std::format(
+                L"Only one IP address may be specified for network '{}'.", std::wstring(networkName.begin(), networkName.end()));
+            expectConnectReject(container, {{"IPAddress", firstIp.c_str()}, {"IPAddress", secondIp.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Empty link rejected.
+        {
+            auto container = launchContainer("connect-endpoint-emptylink");
+            expectConnectReject(container, {{"Links", ""}}, E_INVALIDARG, L"Network link cannot be empty.");
+        }
+
+        // Malformed driver option (missing '=') rejected.
+        {
+            auto container = launchContainer("connect-endpoint-badopt");
+            const std::string badEntry = "no-equals";
+            const auto expected =
+                std::format(L"Invalid driver option '{}'; expected 'key=value'.", std::wstring(badEntry.begin(), badEntry.end()));
+            expectConnectReject(container, {{"DriverOpts", badEntry.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Duplicate driver option key rejected.
+        {
+            auto container = launchContainer("connect-endpoint-dupopt");
+            const std::string dupKey = "mtu";
+            const std::string firstEntry = "mtu=1500";
+            const std::string secondEntry = "mtu=1400";
+            const auto expected = std::format(L"Duplicate driver option '{}'.", std::wstring(dupKey.begin(), dupKey.end()));
+            expectConnectReject(container, {{"DriverOpts", firstEntry.c_str()}, {"DriverOpts", secondEntry.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Malformed link-local IPv4 address rejected.
+        {
+            auto container = launchContainer("connect-endpoint-badlli");
+            const std::string badIp = "not-a-link-local";
+            const auto expected = std::format(L"Invalid IP address '{}'", std::wstring(badIp.begin(), badIp.end()));
+            expectConnectReject(container, {{"LinkLocalIPs", badIp.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Empty/whitespace-only alias rejected.
+        {
+            auto container = launchContainer("connect-endpoint-emptyalias");
+            expectConnectReject(container, {{"Aliases", "   "}}, E_INVALIDARG, L"Network alias cannot be empty.");
+        }
+
+        // Driver option with empty key ('=value') rejected.
+        {
+            auto container = launchContainer("connect-endpoint-emptykey");
+            const std::string badEntry = "=value";
+            const auto expected =
+                std::format(L"Invalid driver option '{}'; expected 'key=value'.", std::wstring(badEntry.begin(), badEntry.end()));
+            expectConnectReject(container, {{"DriverOpts", badEntry.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Driver option value containing '=' — everything after the first '=' is preserved verbatim.
+        {
+            auto container = launchContainer("connect-endpoint-eqvalue");
+            const std::string driverOptKey = "com.docker.network.endpoint.custom";
+            const std::string driverOptValue = "a=b=c";
+            const std::string driverOptEntry = driverOptKey + "=" + driverOptValue;
+
+            const std::vector<KeyValuePair> settings{{"DriverOpts", driverOptEntry.c_str()}};
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            const auto opt = endpoint.DriverOpts.find(driverOptKey);
+            VERIFY_IS_TRUE(opt != endpoint.DriverOpts.end());
+            VERIFY_ARE_EQUAL(driverOptValue, opt->second);
+        }
+
+        // Aliases + IPAddress + LinkLocalIPs + DriverOpts together — success, inspect verifies every field.
+        {
+            auto container = launchContainer("connect-endpoint-combo");
+            const std::string alias1 = "primary-alias";
+            const std::string alias2 = "secondary-alias";
+            const std::string ipAddress = "172.70.0.42";
+            const std::string linkLocal = "169.254.10.5";
+            const std::string driverOptEntry = "com.docker.network.endpoint.custom=verify";
+            const std::string driverOptKey = "com.docker.network.endpoint.custom";
+            const std::string driverOptValue = "verify";
+
+            const std::vector<KeyValuePair> settings{
+                {"Aliases", alias1.c_str()},
+                {"Aliases", alias2.c_str()},
+                {"IPAddress", ipAddress.c_str()},
+                {"LinkLocalIPs", linkLocal.c_str()},
+                {"DriverOpts", driverOptEntry.c_str()},
+            };
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias1) != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias2) != endpoint.Aliases.end());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAddress);
+            VERIFY_IS_TRUE(endpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAMConfig->IPv4Address);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.IPAMConfig->LinkLocalIPs, linkLocal) != endpoint.IPAMConfig->LinkLocalIPs.end());
+            const auto opt = endpoint.DriverOpts.find(driverOptKey);
+            VERIFY_IS_TRUE(opt != endpoint.DriverOpts.end());
+            VERIFY_ARE_EQUAL(driverOptValue, opt->second);
+        }
+
+        // Links: connect two containers to the same user-defined bridge, verify Links echoes back in inspect.
+        {
+            const std::string targetName = "connect-endpoint-link-target";
+            const std::string targetAlias = "db";
+            auto target = launchContainer(targetName);
+            WSLCNetworkConnectionOptions targetOptions{};
+            targetOptions.NetworkName = networkName.c_str();
+            const std::vector<KeyValuePair> targetSettings{{"Aliases", targetAlias.c_str()}};
+            targetOptions.Settings = targetSettings.data();
+            targetOptions.SettingsCount = static_cast<ULONG>(targetSettings.size());
+            VERIFY_SUCCEEDED(target.Get().ConnectToNetwork(&targetOptions));
+
+            auto source = launchContainer("connect-endpoint-link-source");
+            const std::string linkEntry = targetName + ":" + targetAlias;
+            const std::vector<KeyValuePair> sourceSettings{{"Links", linkEntry.c_str()}};
+            WSLCNetworkConnectionOptions sourceOptions{};
+            sourceOptions.NetworkName = networkName.c_str();
+            sourceOptions.Settings = sourceSettings.data();
+            sourceOptions.SettingsCount = static_cast<ULONG>(sourceSettings.size());
+            VERIFY_SUCCEEDED(source.Get().ConnectToNetwork(&sourceOptions));
+
+            auto inspect = source.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Links, linkEntry) != endpoint.Links.end());
+        }
+
+        // Connecting a stopped container succeeds — Docker allows attach in created/exited state.
+        {
+            auto container = launchContainer("connect-endpoint-stopped");
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            const std::string alias = "stopped-alias";
+            const std::vector<KeyValuePair> settings{{"Aliases", alias.c_str()}};
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias) != endpoint.Aliases.end());
         }
     }
 
@@ -7729,14 +7946,16 @@ class WSLCTests
             expectError("alias-ctr-empty", networkName, {""}, E_INVALIDARG, L"Network alias cannot be empty.");
         }
 
-        // Unknown KVP key on primary settings — rejected with E_NOTIMPL.
+        // Unknown KVP key on primary settings — rejected with the unified endpoint-settings error.
         {
             const std::string networkName = "alias-net-unknown";
+            const std::string unknownKey = "BogusKey";
+            const std::string unknownValue = "value";
             createNetwork(networkName, "172.63.0.0/16");
             auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
             LPCSTR args[] = {"sleep", "99999"};
-            const KeyValuePair settings[] = {{"IPAddress", "10.0.0.5"}};
+            const KeyValuePair settings[] = {{unknownKey.c_str(), unknownValue.c_str()}};
             WSLCContainerOptions options{};
             options.Image = "debian:latest";
             options.Name = "alias-ctr-unknown";
@@ -7746,11 +7965,92 @@ class WSLCTests
             options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
 
             wil::com_ptr<IWSLCContainer> container;
-            VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateContainer(&options, nullptr, &container));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
             ValidateCOMErrorMessage(std::format(
-                                        L"Endpoint settings are not yet supported (network '{}').",
-                                        std::wstring(networkName.begin(), networkName.end()))
-                                        .c_str());
+                L"Unknown endpoint setting '{}' for network '{}'.",
+                std::wstring(unknownKey.begin(), unknownKey.end()),
+                std::wstring(networkName.begin(), networkName.end())));
+        }
+
+        // Primary endpoint settings (IPAddress + Aliases + LinkLocalIPs + DriverOpts) round-trip via inspect at create time.
+        {
+            const std::string networkName = "alias-net-combo";
+            createNetwork(networkName, "172.64.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            const std::string alias1 = "primary-alias";
+            const std::string alias2 = "secondary-alias";
+            const std::string ipAddress = "172.64.0.42";
+            const std::string linkLocal = "169.254.11.5";
+            const std::string driverOptEntry = "com.docker.network.endpoint.custom=verify";
+            const std::string driverOptKey = "com.docker.network.endpoint.custom";
+            const std::string driverOptValue = "verify";
+
+            LPCSTR args[] = {"sleep", "99999"};
+            const KeyValuePair settings[] = {
+                {"Aliases", alias1.c_str()},
+                {"Aliases", alias2.c_str()},
+                {"IPAddress", ipAddress.c_str()},
+                {"LinkLocalIPs", linkLocal.c_str()},
+                {"DriverOpts", driverOptEntry.c_str()},
+            };
+            WSLCContainerOptions options{};
+            options.Image = "debian:latest";
+            options.Name = "alias-ctr-combo";
+            options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+            options.ContainerNetwork.NetworkMode = networkName.c_str();
+            options.ContainerNetwork.Settings = settings;
+            options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
+
+            wil::com_ptr<IWSLCContainer> containerCom;
+            VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, nullptr, &containerCom));
+            RunningWSLCContainer container(std::move(containerCom), WSLCProcessFlagsNone);
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias1) != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias2) != endpoint.Aliases.end());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAddress);
+            VERIFY_IS_TRUE(endpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAMConfig->IPv4Address);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.IPAMConfig->LinkLocalIPs, linkLocal) != endpoint.IPAMConfig->LinkLocalIPs.end());
+            const auto opt = endpoint.DriverOpts.find(driverOptKey);
+            VERIFY_IS_TRUE(opt != endpoint.DriverOpts.end());
+            VERIFY_ARE_EQUAL(driverOptValue, opt->second);
+        }
+
+        // Primary endpoint Links: launch a target container with an alias, then a source with --link at create time.
+        {
+            const std::string networkName = "alias-net-link";
+            const std::string targetName = "alias-ctr-link-target";
+            const std::string targetAlias = "db";
+            createNetwork(networkName, "172.65.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto target = launchWithAliases(targetName, networkName, {targetAlias});
+
+            const std::string linkEntry = targetName + ":" + targetAlias;
+            LPCSTR args[] = {"sleep", "99999"};
+            const KeyValuePair settings[] = {{"Links", linkEntry.c_str()}};
+            WSLCContainerOptions options{};
+            options.Image = "debian:latest";
+            options.Name = "alias-ctr-link-source";
+            options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+            options.ContainerNetwork.NetworkMode = networkName.c_str();
+            options.ContainerNetwork.Settings = settings;
+            options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
+
+            wil::com_ptr<IWSLCContainer> sourceCom;
+            VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, nullptr, &sourceCom));
+            RunningWSLCContainer source(std::move(sourceCom), WSLCProcessFlagsNone);
+            VERIFY_SUCCEEDED(source.Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
+
+            auto inspect = source.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Links, linkEntry) != endpoint.Links.end());
         }
     }
 
