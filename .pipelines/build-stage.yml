@@ -101,7 +101,10 @@ stages:
           pool: {'type': 'windows'}
 
         ${{ else }}:
-          pool: ${{ parameters.pool }}
+          pool:
+            name: ${{ parameters.pool }}
+            demands:
+              - ImageOverride -equals 2026-07-22-wsl-build-image
 
         steps:
           - script: python tools/devops/validate-localization.py

@@ -61,7 +61,10 @@ jobs:
       pool: {'type': 'windows'}
 
     ${{ else }}:
-      pool: ${{ parameters.pool }}
+      pool:
+        name: ${{ parameters.pool }}
+        demands:
+          - ImageOverride -equals 2026-07-22-wsl-build-image
 
     variables:
       NUGET_PLUGIN_HANDSHAKE_TIMEOUT_IN_SECONDS: 60

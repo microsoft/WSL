@@ -39,7 +39,10 @@ stages:
           pool: {'type': 'windows'}
 
         ${{ else }}:
-          pool: ${{ parameters.pool }}
+          pool:
+            name: ${{ parameters.pool }}
+            demands:
+              - ImageOverride -equals 2026-07-22-wsl-build-image
 
         variables:
           ob_outputDirectory: '$(Build.SourcesDirectory)\out'
