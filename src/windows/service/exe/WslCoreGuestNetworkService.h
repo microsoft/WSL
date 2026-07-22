@@ -64,6 +64,11 @@ private:
     _Requires_lock_held_(m_dataLock)
     bool IsPortInGuestEphemeralRange(uint16_t PortNumber) const noexcept;
 
+    uint32_t ComputeHostEphemeralPortCap(int Protocol) const noexcept;
+
+    _Requires_lock_held_(m_dataLock)
+    uint32_t ComputeHostEphemeralOverlap(int Protocol) const noexcept;
+
     static std::pair<uint16_t, uint16_t> QueryHostEphemeralPortRange(LPCWSTR WmiClassName) noexcept;
 
     static std::optional<LxssDynamicFunction<decltype(HcnReserveGuestNetworkServicePortRange)>> m_allocatePortRange;
@@ -81,5 +86,11 @@ private:
     // Host ephemeral port ranges can change. They are queried once at startup, if a change occurs, the service will need to be restarted.
     std::pair<uint16_t, uint16_t> m_hostTcpEphemeralPortRange{};
     std::pair<uint16_t, uint16_t> m_hostUdpEphemeralPortRange{};
+
+    uint32_t m_hostTcpEphemeralPortCap{};
+    uint32_t m_hostUdpEphemeralPortCap{};
+
+    _Guarded_by_(m_dataLock) uint32_t m_hostTcpEphemeralPortsInUse {};
+    _Guarded_by_(m_dataLock) uint32_t m_hostUdpEphemeralPortsInUse {};
 };
 } // namespace wsl::core::networking

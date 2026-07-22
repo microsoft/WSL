@@ -64,6 +64,9 @@ void wsl::core::networking::GuestNetworkService::CreateGuestNetworkService(
         TraceLoggingValue(m_hostUdpEphemeralPortRange.first, "udpStartPort"),
         TraceLoggingValue(m_hostUdpEphemeralPortRange.second, "udpEndPort"));
 
+    m_hostTcpEphemeralPortCap = ComputeHostEphemeralPortCap(IPPROTO_TCP);
+    m_hostUdpEphemeralPortCap = ComputeHostEphemeralPortCap(IPPROTO_UDP);
+
     hns::GuestNetworkService request{};
     request.VirtualMachineId = VmId;
     request.MirrorHostNetworking = true;
@@ -126,6 +129,11 @@ std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::Alloca
     THROW_IF_FAILED(m_allocatePortRange.value()(m_service.get(), c_ephemeralPortRangeSize, &m_reservedPortRange, &port));
 
     WI_ASSERT(m_reservedPortRange.endingPort - m_reservedPortRange.startingPort == c_ephemeralPortRangeSize);
+
+    // Count the overlap of the guest's reserved ephemeral range with the host ephemeral range
+    // and seed the in-use counters accordingly.
+    m_hostTcpEphemeralPortsInUse = ComputeHostEphemeralOverlap(IPPROTO_TCP);
+    m_hostUdpEphemeralPortsInUse = ComputeHostEphemeralOverlap(IPPROTO_UDP);
 
     // setting the port to zero as we do not expect any bind requests to be sent to wslcore for ports in this range
     m_reservedPorts.emplace(std::make_pair(HCN_PORT_PROTOCOL_TCP, static_cast<uint16_t>(0)), HcnPortReservation{port, 1});
@@ -225,6 +233,32 @@ bool wsl::core::networking::GuestNetworkService::IsPortInGuestEphemeralRange(uin
     return PortNumber >= m_reservedPortRange.startingPort && PortNumber <= m_reservedPortRange.endingPort;
 }
 
+uint32_t wsl::core::networking::GuestNetworkService::ComputeHostEphemeralPortCap(int Protocol) const noexcept
+{
+    const auto& range = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortRange : m_hostTcpEphemeralPortRange;
+    if (range.second < range.first)
+    {
+        return 0;
+    }
+
+    // Cap the guest at (at most) half of the host ephemeral range so it can't exhaust the host's ports.
+    return (static_cast<uint32_t>(range.second) - range.first + 1) / 2;
+}
+
+uint32_t wsl::core::networking::GuestNetworkService::ComputeHostEphemeralOverlap(int Protocol) const noexcept
+{
+    const auto& range = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortRange : m_hostTcpEphemeralPortRange;
+    if (range.second < range.first)
+    {
+        return 0;
+    }
+
+    // Number of guest reserved ports that fall within the host ephemeral range.
+    const uint32_t overlapStart = std::max<uint32_t>(m_reservedPortRange.startingPort, range.first);
+    const uint32_t overlapEnd = std::min<uint32_t>(m_reservedPortRange.endingPort, range.second);
+    return (overlapStart <= overlapEnd) ? (overlapEnd - overlapStart + 1) : 0;
+}
+
 int wsl::core::networking::GuestNetworkService::OnPortAllocationRequest(const SOCKADDR_INET& Address, _In_ int Protocol, _In_ bool Allocate) noexcept
 try
 {
@@ -263,21 +297,6 @@ try
 
     const auto lock = m_dataLock.lock_exclusive();
 
-    // The guest's reserved ephemeral range can overlap with the host range. Ports in
-    // the guest range are safe for the guest to use even if they fall within the host range.
-    if (IsPortInHostEphemeralRange(PortNumber, Protocol) && !IsPortInGuestEphemeralRange(PortNumber))
-    {
-        const auto& range = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortRange : m_hostTcpEphemeralPortRange;
-        WSL_LOG(
-            "GuestNetworkService::OnPortAllocationRequest - denying port in host ephemeral range",
-            TraceLoggingValue(StringAddress.c_str(), "IP address"),
-            TraceLoggingValue(Protocol == IPPROTO_TCP ? "TCP" : "UDP", "protocol"),
-            TraceLoggingValue(PortNumber, "portNumber"),
-            TraceLoggingValue(range.first, "hostEphemeralStart"),
-            TraceLoggingValue(range.second, "hostEphemeralEnd"));
-        return -LX_EADDRINUSE;
-    }
-
     if (IsPortInGuestEphemeralRange(PortNumber))
     {
         WSL_LOG(
@@ -289,6 +308,8 @@ try
             TraceLoggingValue(StringAddress.c_str(), "IP address"));
         return 0;
     }
+
+    const bool isHostEphemeralPort = IsPortInHostEphemeralRange(PortNumber, Protocol);
 
     HRESULT result = E_UNEXPECTED;
     const auto it = m_reservedPorts.find(std::make_pair(HnsProtocol, PortNumber));
@@ -305,6 +326,24 @@ try
                 TraceLoggingValue(Protocol, "Protocol"),
                 TraceLoggingValue(it->second.ReferenceCount, "ReferenceCount"));
             return 0;
+        }
+
+        // New reservation for a port in the host ephemeral range: enforce the cap.
+        if (isHostEphemeralPort)
+        {
+            const auto cap = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortCap : m_hostTcpEphemeralPortCap;
+            auto& portsInUse = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse;
+            if (portsInUse >= cap)
+            {
+                WSL_LOG(
+                    "GuestNetworkService::OnPortAllocationRequest - denying port in host ephemeral range, cap reached",
+                    TraceLoggingValue(StringAddress.c_str(), "IP address"),
+                    TraceLoggingValue(Protocol == IPPROTO_TCP ? "TCP" : "UDP", "protocol"),
+                    TraceLoggingValue(PortNumber, "portNumber"),
+                    TraceLoggingValue(portsInUse, "hostEphemeralPortsInUse"),
+                    TraceLoggingValue(cap, "hostEphemeralPortCap"));
+                return -LX_EADDRINUSE;
+            }
         }
 
         HANDLE port{nullptr};
@@ -324,6 +363,11 @@ try
         if (SUCCEEDED(result))
         {
             m_reservedPorts.emplace(std::make_pair(HnsProtocol, PortNumber), HcnPortReservation{port, 1});
+
+            if (isHostEphemeralPort)
+            {
+                ((Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse)++;
+            }
         }
         // if the port was reserved, we successfully handed over ownership
         releasePortOnError.release();
@@ -347,6 +391,16 @@ try
         {
             result = m_releasePort.value()(it->second.Handle);
             m_reservedPorts.erase(it);
+
+            if (isHostEphemeralPort)
+            {
+                auto& portsInUse = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse;
+                if (portsInUse > 0)
+                {
+                    portsInUse--;
+                }
+            }
+
             WSL_LOG(
                 "GuestNetworkService::OnPortAllocationRequest - released port",
                 TraceLoggingValue(PortNumber, "Port"),
@@ -387,6 +441,9 @@ void wsl::core::networking::GuestNetworkService::Stop() noexcept
             m_releasePort.value()(reservedPort.second.Handle);
         }
         m_reservedPorts.clear();
+
+        m_hostTcpEphemeralPortsInUse = 0;
+        m_hostUdpEphemeralPortsInUse = 0;
     }
 
     m_guestNetworkServiceCallback.reset();
