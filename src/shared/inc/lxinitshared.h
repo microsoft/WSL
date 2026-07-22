@@ -1160,10 +1160,11 @@ typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE
     MESSAGE_HEADER Header;
     int Result;
     unsigned int TagOffset;
+    unsigned int ChildNameOffset;
     unsigned int SourceOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(SourceOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(ChildNameOffset), STRING_FIELD(SourceOffset));
 } LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, *PLX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE;
 
 typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE
