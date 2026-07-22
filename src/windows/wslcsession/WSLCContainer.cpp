@@ -1120,21 +1120,26 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 {
     std::shared_ptr<StateTransition> transition;
-    auto transitionGuard = m_transitionLock.lock_exclusive();
-    auto lock = m_lock.lock_exclusive();
 
-    WI_ASSERT(!m_transition);
+    {
+        auto transitionGuard = m_transitionLock.lock_exclusive();
+        auto lock = m_lock.lock_exclusive();
 
-    RequestDeleteExclusiveLockHeld(Flags);
+        WI_ASSERT(!m_transition);
 
-    transition = std::make_shared<StateTransition>(ContainerEvent::Destroy);
-    WI_ASSERT(!m_transition);
-    m_transition = transition;
+        RequestDeleteExclusiveLockHeld(Flags);
 
-    lock.reset();
-    WaitForTransition(transition);
+        transition = std::make_shared<StateTransition>(ContainerEvent::Destroy);
+        WI_ASSERT(!m_transition);
+        m_transition = transition;
 
-    lock = m_lock.lock_exclusive();
+        lock.reset();
+        WaitForTransition(transition);
+
+        // Reacquire m_lock to wait for OnEvent() to leave its critical section. Both locks must be released before transition
+        // destroys the COM wrapper.
+        lock = m_lock.lock_exclusive();
+    }
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
