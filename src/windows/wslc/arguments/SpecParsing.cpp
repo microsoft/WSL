@@ -253,13 +253,15 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         return value;
     };
 
-    // Shorthand: a single token with no '=' names the destination. '-' streams a tarball to stdout;
-    // anything else exports the final stage's filesystem to that local path.
+    // Shorthand: a single token with no '=' names the destination. '-' would stream a tarball to
+    // stdout, which we disallow (see the tar+stdout rejection below); anything else exports the final
+    // stage's filesystem to that local path.
     if (fields.size() == 1 && fields[0].find(L'=') == std::wstring::npos)
     {
         if (fields[0] == L"-")
         {
-            return services::BuildOutput{.Type = L"tar", .Dest = L"-"};
+            throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
+                spec, L"streaming a tarball to stdout is not supported; use 'dest=' with a file path"));
         }
 
         return services::BuildOutput{.Type = L"local", .Dest = fields[0]};
@@ -315,6 +317,13 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
     if ((output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci") && (!hasDest || output.Dest.empty()))
     {
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'dest='", output.Type)));
+    }
+
+    // Streaming a tarball to stdout ('dest=-') is not supported; require a real file path instead.
+    if (output.Type == L"tar" && output.Dest == L"-")
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
+            spec, L"streaming a tarball to stdout is not supported; use 'dest=' with a file path"));
     }
 
     // The registry exporter pushes to a named reference, so 'name=' is mandatory.
