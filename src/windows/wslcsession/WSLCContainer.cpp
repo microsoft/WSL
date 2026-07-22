@@ -925,6 +925,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         // Otherwise the container was started externally. Log if the container was started externally.
         if (transition && transition->ExpectedEvent == ContainerEvent::Start)
         {
+            WI_ASSERT(m_state == WslcContainerStateCreated || m_state == WslcContainerStateExited);
             CommitState(WslcContainerStateRunning, eventTime);
             CompleteTransition(transition);
         }
