@@ -42,7 +42,7 @@ std::wstring VersionCommand::LongDescription() const
 
 void VersionCommand::PrintVersion(Reporter& reporter)
 {
-    reporter.Output(L"{} {}\n", s_ExecutableName, WSL_PACKAGE_VERSION);
+    reporter.Output(L"{} {}\n", s_ExecutableName, wsl::shared::string::MultiByteToWide(WSL_PACKAGE_VERSION));
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const

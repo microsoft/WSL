@@ -251,7 +251,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Reporter& repor
             // Implicit pull for run/create: progress goes to Info (stderr), keeping stdout for the
             // container id/output.
             ImageProgressCallback callback(reporter, Reporter::Level::Info);
-            reporter.Info(L"{}\n", Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)));
+            reporter.Info(L"{}\n", Localization::WSLCCLI_ImageNotFoundPulling(image));
             ImageService imageService;
             imageService.Pull(reporter, session, image, &callback);
         }

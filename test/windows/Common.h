@@ -662,6 +662,17 @@ std::optional<std::wstring> GetHostAdapterIpv4();
 template <typename T>
 void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
 {
+    auto formatValue = [](const T& value) {
+        if constexpr (std::is_same_v<T, std::string>)
+        {
+            return wsl::shared::string::MultiByteToWide(value);
+        }
+        else
+        {
+            return value;
+        }
+    };
+
     std::map<T, size_t> expectedCounts;
     std::map<T, size_t> actualCounts;
 
@@ -681,7 +692,7 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
     {
         if (actualCounts[value] != count)
         {
-            error += std::format(L"Value '{}' expected {} times but was found {} times.\n", value, count, actualCounts[value]);
+            error += std::format(L"Value '{}' expected {} times but was found {} times.\n", formatValue(value), count, actualCounts[value]);
         }
     }
 
@@ -689,7 +700,7 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
     {
         if (expectedCounts.find(value) == expectedCounts.end())
         {
-            error += std::format(L"Unexpected value found: '{}'", value);
+            error += std::format(L"Unexpected value found: '{}'", formatValue(value));
         }
     }
 
@@ -698,14 +709,14 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
         error += std::format(L"Expected ({} elements):\n", expected.size());
         for (const auto& e : expected)
         {
-            error += std::format(L"- {}\n", e);
+            error += std::format(L"- {}\n", formatValue(e));
         }
 
         error += std::format(L"Actual ({} elements):\n", actual.size());
 
         for (const auto& e : actual)
         {
-            error += std::format(L"- {}\n", e);
+            error += std::format(L"- {}\n", formatValue(e));
         }
 
         error += std::format(L"Called from: {}", source);

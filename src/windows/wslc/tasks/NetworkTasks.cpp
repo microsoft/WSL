@@ -224,7 +224,7 @@ void PruneNetworks(CLIExecutionContext& context)
 
     for (const auto& networkName : result.PrunedNetworks)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
+        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(networkName));
     }
 }
 

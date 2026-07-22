@@ -60,7 +60,7 @@ void Logout(CLIExecutionContext& context)
 
     RegistryService::Erase(serverAddress);
 
-    context.Reporter.Output(L"{}\n", Localization::WSLCCLI_LogoutSucceeded(MultiByteToWide(serverAddress)));
+    context.Reporter.Output(L"{}\n", Localization::WSLCCLI_LogoutSucceeded(serverAddress));
 }
 
 } // namespace wsl::windows::wslc::task

@@ -590,7 +590,7 @@ class WSLCE2EGlobalTests
 private:
     std::wstring GetVersionMessage() const
     {
-        return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
+        return std::format(L"wslc {}\r\n", wsl::shared::string::MultiByteToWide(WSL_PACKAGE_VERSION));
     }
 };
 } // namespace WSLCE2ETests

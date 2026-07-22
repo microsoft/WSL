@@ -160,7 +160,7 @@ void ListImages(CLIExecutionContext& context)
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
         for (const auto& image : images)
         {
-            context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
+            context.Reporter.Output(L"{}\n", wsl::shared::string::MultiByteToWide(trunc ? TruncateId(image.Id, true) : image.Id));
         }
 
         return;

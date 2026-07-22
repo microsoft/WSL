@@ -927,80 +927,14 @@ struct std::formatter<std::source_location, wchar_t>
     template <typename TCtx>
     auto format(const std::source_location& location, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), L"{}[{}:{}]", location.function_name(), location.file_name(), location.line());
+        return std::format_to(
+            ctx.out(),
+            L"{}[{}:{}]",
+            wsl::shared::string::MultiByteToWide(location.function_name()),
+            wsl::shared::string::MultiByteToWide(location.file_name()),
+            location.line());
     }
 };
-
-// char -> wchar_t formatting is only used by the Windows components. libc++ (used to
-// build the Linux components) now provides these as deleted specializations per C++23
-// [format.formatter.spec], which would collide, so restrict them to Windows.
-#ifdef WIN32
-
-template <>
-struct std::formatter<char*, wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const char* str, TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
-    }
-};
-
-template <>
-struct std::formatter<const char*, wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const char* str, TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
-    }
-};
-
-template <std::size_t N>
-struct std::formatter<char[N], wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const char str[N], TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
-    }
-};
-
-template <class Traits, class Allocator>
-struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
-{
-    template <typename TCtx>
-    static constexpr auto parse(TCtx& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename TCtx>
-    auto format(const std::basic_string<char, Traits, Allocator>& str, TCtx& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
-    }
-};
-
-#endif // WIN32
 
 template <>
 struct std::formatter<std::filesystem::path, wchar_t>

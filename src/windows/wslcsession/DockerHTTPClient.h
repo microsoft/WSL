@@ -26,7 +26,10 @@ Abstract:
     if ((_Ex).HasErrorMessage()) \
     { \
         THROW_HR_WITH_USER_ERROR_MSG( \
-            (_Ex).HResultFromStatusCode(), (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
+            (_Ex).HResultFromStatusCode(), \
+            wsl::shared::string::MultiByteToWide((_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message), \
+            _Msg, \
+            ##__VA_ARGS__); \
     } \
     else \
     { \

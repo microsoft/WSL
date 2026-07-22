@@ -21,7 +21,7 @@ using namespace wsl::shared::string;
 
 PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
 {
-    static auto parsePort = [](const std::string& value, const std::string& errorMessage) -> uint16_t {
+    static auto parsePort = [](const std::string& value, const std::wstring& errorMessage) -> uint16_t {
         try
         {
             // Ensure the value is not empty and contains only digits before parsing
@@ -51,13 +51,15 @@ PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& 
         // Port range specified
         auto startPortStr = portPart.substr(0, dashPos);
         auto endPortStr = portPart.substr(dashPos + 1);
-        auto startPort = parsePort(startPortStr, std::format("Invalid port range specified in port mapping: '{}'.", portPart));
-        auto endPort = parsePort(endPortStr, std::format("Invalid port range specified in port mapping: '{}'.", portPart));
+        auto startPort =
+            parsePort(startPortStr, MultiByteToWide(std::format("Invalid port range specified in port mapping: '{}'.", portPart)));
+        auto endPort =
+            parsePort(endPortStr, MultiByteToWide(std::format("Invalid port range specified in port mapping: '{}'.", portPart)));
         return {startPort, endPort};
     }
 
     // Single port specified
-    auto port = parsePort(portPart, std::format("Invalid port specified in port mapping: '{}'.", portPart));
+    auto port = parsePort(portPart, MultiByteToWide(std::format("Invalid port specified in port mapping: '{}'.", portPart)));
     return {port, port};
 }
 
@@ -84,7 +86,7 @@ PublishPort PublishPort::Parse(const std::string& value)
         else
         {
             THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG, "Invalid protocol specified in port mapping. Only 'tcp' and 'udp' are supported.");
+                E_INVALIDARG, MultiByteToWide("Invalid protocol specified in port mapping. Only 'tcp' and 'udp' are supported."));
         }
     }
 
@@ -128,24 +130,24 @@ void PublishPort::Validate() const
 {
     if (m_containerPort.Count() == 0)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must specify at least one port.");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide("Container port must specify at least one port."));
     }
 
     if (!m_containerPort.IsValid())
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must be a valid port number (1-65535).");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide("Container port must be a valid port number (1-65535)."));
     }
 
     if (!m_hostPort.IsEphemeral())
     {
         if (!m_hostPort.IsValid())
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port must be a valid port number (1-65535).");
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide("Host port must be a valid port number (1-65535)."));
         }
 
         if (m_hostPort.Count() != m_containerPort.Count())
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port range must match the container port range.");
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide("Host port range must match the container port range."));
         }
     }
 }
