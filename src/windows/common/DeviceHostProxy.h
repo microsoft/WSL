@@ -21,6 +21,8 @@ public:
     GUID AddVirtiofsDevice(
         _In_ HANDLE UserToken, const std::wstring& Label, const std::wstring& RootPath, VirtiofsShareKind Kind, UINT32 ShmemSizeMb, const std::wstring& MountOptions);
 
+    void AddVirtiofsChild(const GUID& InstanceId, const std::wstring& Name, const std::wstring& RootPath, const std::wstring& MountOptions);
+
     GUID AddVirtioPmemDevice(_In_ HANDLE UserToken, const std::wstring& Path, bool Writable);
 
     void RemoveDevice(const GUID& InstanceId);
@@ -30,6 +32,8 @@ public:
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag);
 
     wil::com_ptr<IWslVirtioNetDevice> GetVirtioNetDevice(const GUID& InstanceId);
+
+    wil::com_ptr<IWslVirtiofsDevice> GetVirtiofsDevice(const GUID& InstanceId);
 
     void SetSwiotlb(UINT64 GpaBase, UINT64 SizeBytes);
 

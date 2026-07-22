@@ -236,12 +236,21 @@ void PruneNetworks(CLIExecutionContext& context)
 void ConnectNetwork(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Data.Contains(Data::NetworkEndpointOptions));
     WI_ASSERT(context.Args.Contains(ArgType::NetworkName));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
 
-    const auto networkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
-    const auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    NetworkService::Connect(context.Data.Get<Data::Session>(), networkName, containerId);
+    const auto& endpoint = context.Data.Get<Data::NetworkEndpointOptions>();
+    models::ConnectNetworkOptions options{};
+    options.NetworkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
+    options.ContainerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+    options.Aliases = endpoint.Aliases;
+    options.IpAddress = endpoint.IpAddress;
+    options.Links = endpoint.Links;
+    options.LinkLocalIps = endpoint.LinkLocalIps;
+    options.DriverOpts = endpoint.DriverOpts;
+
+    NetworkService::Connect(context.Data.Get<Data::Session>(), options);
 }
 
 void DisconnectNetwork(CLIExecutionContext& context)
@@ -253,5 +262,37 @@ void DisconnectNetwork(CLIExecutionContext& context)
     const auto networkName = WideToMultiByte(context.Args.Get<ArgType::NetworkName>());
     const auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
     NetworkService::Disconnect(context.Data.Get<Data::Session>(), networkName, containerId);
+}
+
+void SetNetworkEndpointOptionsFromArgs(CLIExecutionContext& context)
+{
+    models::NetworkEndpointOptions options{};
+
+    for (const auto& alias : context.Args.GetAll<ArgType::NetworkAlias>())
+    {
+        options.Aliases.emplace_back(WideToMultiByte(alias));
+    }
+
+    if (context.Args.Contains(ArgType::IpAddress))
+    {
+        options.IpAddress = WideToMultiByte(context.Args.Get<ArgType::IpAddress>());
+    }
+
+    for (const auto& link : context.Args.GetAll<ArgType::Link>())
+    {
+        options.Links.emplace_back(WideToMultiByte(link));
+    }
+
+    for (const auto& linkLocalIp : context.Args.GetAll<ArgType::LinkLocalIp>())
+    {
+        options.LinkLocalIps.emplace_back(WideToMultiByte(linkLocalIp));
+    }
+
+    for (const auto& driverOpt : context.Args.GetAll<ArgType::DriverOpt>())
+    {
+        options.DriverOpts.emplace_back(WideToMultiByte(driverOpt));
+    }
+
+    context.Data.Add<Data::NetworkEndpointOptions>(std::move(options));
 }
 } // namespace wsl::windows::wslc::task

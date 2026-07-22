@@ -113,6 +113,14 @@ struct ContainerConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck);
 };
 
+struct InspectEndpointIPAMConfig
+{
+    std::string IPv4Address;
+    std::vector<std::string> LinkLocalIPs;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
+};
+
 struct InspectEndpointSettings
 {
     std::string IPAddress;
@@ -120,8 +128,11 @@ struct InspectEndpointSettings
     std::string MacAddress;
     int IPPrefixLen{};
     std::vector<std::string> Aliases;
+    std::vector<std::string> Links;
+    std::map<std::string, std::string> DriverOpts;
+    std::optional<InspectEndpointIPAMConfig> IPAMConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases, Links, DriverOpts, IPAMConfig);
 };
 
 struct InspectNetworkSettings

@@ -409,7 +409,7 @@ public:
         VERIFY_IS_TRUE(out.find(L"test-file.txt") != std::wstring::npos);
     }
 
-    void DrvfsMountManyVirtioFsShares(DrvFsMode Mode)
+    void DrvfsMountManyVirtioFsShares(DrvFsMode Mode, bool AggregateShares = true)
     {
         if (Mode != DrvFsMode::VirtioFs)
         {
@@ -420,18 +420,26 @@ public:
         WINDOWS_11_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        constexpr auto c_iterations = 15;
+        std::optional<WslConfigChange> config;
+        if (!AggregateShares)
+        {
+            config.emplace(LxssGenerateTestConfig({.drvFsMode = Mode, .virtioFsAggregateShares = false}));
+        }
+
+        const auto iterations = AggregateShares ? 32 : 12;
         auto testDir = std::filesystem::current_path() / "virtiofs-loop-test";
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(L"umount /tmp/virtiofs-loop-test-*-nested");
             LxsstuLaunchWsl(L"umount /tmp/virtiofs-loop-test-*");
 
             std::error_code ec;
             std::filesystem::remove_all(testDir, ec);
         });
 
-        for (int i = 0; i < c_iterations; ++i)
+        for (int i = 0; i < iterations; ++i)
         {
+            const bool readOnly = (i % 2) != 0;
             const auto sourceDir = testDir / std::to_string(i);
             std::filesystem::create_directories(sourceDir);
 
@@ -445,7 +453,8 @@ public:
 
             // Mount the share.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs '{}' '{}'", sourceDir.string(), mountPoint)), 0);
+            const auto mountCommand = std::format(L"mount -t drvfs {}'{}' '{}'", readOnly ? L"-o ro " : L"", sourceDir.string(), mountPoint);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand), 0);
 
             // Validate that it can be accessed.
             {
@@ -457,7 +466,44 @@ public:
             {
                 auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}'", mountPoint));
 
-                VerifyPatternMatch(wsl::shared::string::WideToMultiByte(out.c_str()), std::format("{} * virtiofs rw,relatime\n", mountPoint));
+                VerifyPatternMatch(
+                    wsl::shared::string::WideToMultiByte(out.c_str()),
+                    std::format("{} * virtiofs {},relatime\n", mountPoint, readOnly ? "ro" : "rw"));
+
+                if (!AggregateShares)
+                {
+                    std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -n -o SOURCE '{}'", mountPoint));
+                    VERIFY_IS_TRUE(out.ends_with(L'\n'));
+                    out.pop_back();
+                    VERIFY_IS_TRUE(wsl::shared::string::ToGuid(out).has_value());
+                }
+            }
+
+            const auto writeResult = LxsstuLaunchWsl(std::format(L"touch '{}/write-test'", mountPoint));
+            VERIFY_ARE_EQUAL(readOnly, writeResult != 0);
+
+            if (AggregateShares && i == 0)
+            {
+                const auto nestedSourceDir = sourceDir / "nested";
+                const auto nestedMountPoint = mountPoint + L"-nested";
+                const auto nestedExpected = "nested virtiofs marker";
+                std::filesystem::create_directory(nestedSourceDir);
+                {
+                    std::ofstream markerFile(nestedSourceDir / "marker");
+                    markerFile << nestedExpected;
+                }
+
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", nestedMountPoint)), 0);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount --bind '{}/nested' '{}'", mountPoint, nestedMountPoint)), 0);
+
+                auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -w '{}'", nestedMountPoint));
+                VERIFY_ARE_EQUAL(std::filesystem::canonical(nestedSourceDir).wstring() + L"\n", out);
+
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -u '{}'", nestedSourceDir.wstring()));
+                VERIFY_ARE_EQUAL(nestedMountPoint + L"\n", out);
+
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/marker'", nestedMountPoint));
+                VERIFY_ARE_EQUAL(wsl::shared::string::MultiByteToWide(nestedExpected), out);
             }
         }
     }
@@ -1360,6 +1406,11 @@ class WSL1 : public DrvFsTests
         WSL2_TEST_METHOD(DrvfsMountManyVirtioFsShares) \
         { \
             DrvFsTests::DrvfsMountManyVirtioFsShares(DrvFsMode::##_mode##); \
+        } \
+\
+        WSL2_TEST_METHOD(DrvfsMountManyVirtioFsSharesLegacy) \
+        { \
+            DrvFsTests::DrvfsMountManyVirtioFsShares(DrvFsMode::##_mode##, false); \
         } \
     }
 

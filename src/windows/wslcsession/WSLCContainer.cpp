@@ -231,9 +231,8 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
     return std::string{mode};
 }
 
-// Parses the primary endpoint's Settings KVP. Today only "Aliases" is recognised; unknown
-// keys are rejected to avoid silently dropping caller data (mirrors the per-connection guard).
-EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG count, std::string_view networkMode)
+// Unknown Settings keys are rejected rather than silently dropped, so callers get a clear error.
+EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, std::string_view networkName)
 {
     EndpointConfig config{};
     if (count == 0)
@@ -245,22 +244,81 @@ EndpointConfig ResolvePrimaryEndpointConfig(const KeyValuePair* settings, ULONG 
 
     auto parsed = ParseKeyMultiValuePairs(settings, count);
 
+    static constexpr std::array knownKeys{"Aliases", "IPAddress", "Links", "LinkLocalIPs", "DriverOpts"};
     for (const auto& [key, _] : parsed)
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(std::string{networkMode}), key != "Aliases");
+            E_INVALIDARG,
+            Localization::MessageWslcEndpointSettingUnknown(key, std::string{networkName}),
+            std::find(knownKeys.begin(), knownKeys.end(), key) == knownKeys.end());
     }
+
+    auto isBlank = [](const std::string& value) {
+        return value.empty() || std::all_of(value.begin(), value.end(), [](unsigned char ch) { return std::isspace(ch); });
+    };
 
     if (auto it = parsed.find("Aliases"); it != parsed.end())
     {
         for (const auto& alias : it->second)
         {
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG,
-                Localization::MessageWslcAliasEmpty(),
-                alias.empty() || std::all_of(alias.begin(), alias.end(), [](unsigned char ch) { return std::isspace(ch); }));
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasEmpty(), isBlank(alias));
         }
         config.Aliases = std::move(it->second);
+    }
+
+    if (auto it = parsed.find("IPAddress"); it != parsed.end())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcIpAddressSingleValue(std::string{networkName}), it->second.size() != 1);
+
+        const auto& address = it->second.front();
+        in_addr parsedAddress{};
+        ParseIpv4Address(address.c_str(), parsedAddress);
+
+        EndpointIPAMConfig ipam{};
+        ipam.IPv4Address = address;
+        config.IPAMConfig = std::move(ipam);
+    }
+
+    if (auto it = parsed.find("Links"); it != parsed.end())
+    {
+        for (const auto& link : it->second)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcLinkEmpty(), isBlank(link));
+        }
+        config.Links = std::move(it->second);
+    }
+
+    if (auto it = parsed.find("LinkLocalIPs"); it != parsed.end())
+    {
+        for (const auto& address : it->second)
+        {
+            in_addr parsedAddress{};
+            ParseIpv4Address(address.c_str(), parsedAddress);
+        }
+        if (!config.IPAMConfig.has_value())
+        {
+            config.IPAMConfig = EndpointIPAMConfig{};
+        }
+        config.IPAMConfig->LinkLocalIPs = std::move(it->second);
+    }
+
+    if (auto it = parsed.find("DriverOpts"); it != parsed.end())
+    {
+        std::map<std::string, std::string> driverOpts;
+        for (const auto& entry : it->second)
+        {
+            const auto separator = entry.find('=');
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcDriverOptInvalid(entry), separator == std::string::npos || separator == 0);
+
+            auto key = entry.substr(0, separator);
+            auto value = entry.substr(separator + 1);
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDriverOptInvalid(entry), isBlank(key));
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcDriverOptDuplicate(key), !driverOpts.try_emplace(key, std::move(value)).second);
+        }
+        config.DriverOpts = std::move(driverOpts);
     }
 
     return config;
@@ -294,9 +352,7 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
                 WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
         }
 
-        // Per-endpoint Settings are reserved for future use (IPAddress, Aliases, ...). No keys
-        // are interpreted today, so reject any non-empty payload rather than silently dropping it.
-        THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcEndpointSettingsNotSupported(name), connections[i].SettingsCount > 0);
+        it->second = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
     }
     return resolved;
 }
@@ -1523,6 +1579,15 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcEndpoint.MacAddress = endpoint.MacAddress;
         wslcEndpoint.IPPrefixLen = endpoint.IPPrefixLen;
         wslcEndpoint.Aliases = endpoint.Aliases.value_or(std::vector<std::string>{});
+        wslcEndpoint.Links = endpoint.Links.value_or(std::vector<std::string>{});
+        wslcEndpoint.DriverOpts = endpoint.DriverOpts.value_or(std::map<std::string, std::string>{});
+        if (endpoint.IPAMConfig.has_value())
+        {
+            wslc_schema::InspectEndpointIPAMConfig ipam{};
+            ipam.IPv4Address = endpoint.IPAMConfig->IPv4Address;
+            ipam.LinkLocalIPs = endpoint.IPAMConfig->LinkLocalIPs.value_or(std::vector<std::string>{});
+            wslcEndpoint.IPAMConfig = std::move(ipam);
+        }
         wslcInspect.NetworkSettings.Networks[name] = std::move(wslcEndpoint);
     }
 
@@ -1846,29 +1911,32 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.ContainerNetwork.Networks, containerOptions.ContainerNetwork.NetworksCount, networkMode, sessionNetworks);
 
     auto primaryConfig =
-        ResolvePrimaryEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
+        ResolveEndpointConfig(containerOptions.ContainerNetwork.Settings, containerOptions.ContainerNetwork.SettingsCount, networkMode);
 
-    // Aliases require a user-defined endpoint. bridge/host/none/container: modes don't support them.
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
         primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
+
+    const bool hasNonAliasEndpointSettings =
+        primaryConfig.IPAMConfig.has_value() || primaryConfig.Links.has_value() || primaryConfig.DriverOpts.has_value();
+    // N.B. NetworkModeAllocatesVmPorts is reused here as the "supports endpoint settings" predicate: modes
+    // that lack a dedicated netns (host/none/container:*) also can't accept per-endpoint settings.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcEndpointSettingsRequireNetwork(networkMode),
+        hasNonAliasEndpointSettings && !NetworkModeAllocatesVmPorts(networkMode));
 
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
 
     request.HostConfig.NetworkMode = networkMode;
     request.NetworkingConfig.EndpointsConfig = std::move(endpoints);
 
-    // Docker API v1.44 (Docker 25.x) requires the primary network to be present in EndpointsConfig
-    // when EndpointsConfig is non-empty. Insert it so Docker attaches all networks at create time.
-    // Also insert when the caller supplied aliases for the primary endpoint.
-    if (NetworkModeAllocatesVmPorts(networkMode) && (!request.NetworkingConfig.EndpointsConfig.empty() || primaryConfig.Aliases.has_value()))
+    const bool hasPrimaryEndpointSettings = primaryConfig.Aliases.has_value() || primaryConfig.IPAMConfig.has_value() ||
+                                            primaryConfig.Links.has_value() || primaryConfig.DriverOpts.has_value();
+    if (NetworkModeAllocatesVmPorts(networkMode) && (!request.NetworkingConfig.EndpointsConfig.empty() || hasPrimaryEndpointSettings))
     {
-        auto [it, _] = request.NetworkingConfig.EndpointsConfig.try_emplace(networkMode);
-        if (primaryConfig.Aliases.has_value())
-        {
-            it->second.Aliases = std::move(primaryConfig.Aliases);
-        }
+        request.NetworkingConfig.EndpointsConfig[networkMode] = std::move(primaryConfig);
     }
 
     for (const auto& e : mappedPorts)
@@ -2670,20 +2738,20 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
 void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Options)
 {
     THROW_HR_IF(E_POINTER, Options == nullptr);
-    THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), Options->ContainerIpAddress != nullptr);
 
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !Options->NetworkName || strlen(Options->NetworkName) == 0);
 
+    auto endpointConfig = ResolveEndpointConfig(Options->Settings, Options->SettingsCount, Options->NetworkName);
+
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG,
-        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
-        m_networkMode == "host" || m_networkMode == "none");
+        E_INVALIDARG, Localization::MessageWslcNetworkModeNoAdditionalNetworks(m_networkMode), !NetworkModeAllocatesVmPorts(m_networkMode));
 
     common::docker_schema::ContainerNetworkRequest request{};
     request.Container = m_id;
+    request.EndpointConfig = std::move(endpointConfig);
 
     try
     {
@@ -2710,9 +2778,7 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG,
-        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
-        m_networkMode == "host" || m_networkMode == "none");
+        E_INVALIDARG, Localization::MessageWslcNetworkModeNoAdditionalNetworks(m_networkMode), !NetworkModeAllocatesVmPorts(m_networkMode));
 
     common::docker_schema::ContainerNetworkRequest request{};
     request.Container = m_id;
