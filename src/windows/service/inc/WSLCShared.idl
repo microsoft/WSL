@@ -220,9 +220,10 @@ typedef enum _WSLCBuildImageFlags
     WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps.
     WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
     WSLCBuildImageFlagsPull = 4,    // Always attempt to pull a newer version of the image.
+    WSLCBuildImageFlagsOutputIsDirectory = 8, // OutputHandle receives a tar stream of a directory exporter (type=local); the client extracts it into the destination directory.
 } WSLCBuildImageFlags;
 
-cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull)")
+cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull | WSLCBuildImageFlagsOutputIsDirectory)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
 

@@ -28,7 +28,7 @@ Abstract:
 
     Grammar / behavior (docker buildx parity):
       * A single token with no '=' is shorthand for the destination:
-          - L"-"            -> rejected (streaming a tarball to stdout is not supported)
+          - L"-"            -> {type=tar, dest=-} (stream a tarball to stdout, matching docker)
           - any other path  -> {type=local, dest=<path>}
       * Otherwise the spec is a comma separated list of key=value pairs. Keys are matched
         case-insensitively. 'type' and 'dest' populate the struct fields; every other key is
@@ -37,7 +37,8 @@ Abstract:
           - 'type' is required once any key=value pair is present.
           - 'type' must be one of: local, tar, oci, docker, image, registry, cacheonly.
           - local / tar / oci require 'dest='.
-          - tar may not target stdout ('dest=-').
+          - local may not target stdout ('dest=-'); tar / oci / docker may (they stream to stdout),
+            and image / registry / cacheonly ignore 'dest' entirely (matching docker).
           - registry requires 'name='.
           - docker / image / cacheonly do not require a destination.
       * On rejection the parser throws ArgumentException whose message is the standard
@@ -114,8 +115,8 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Shorthand_DashIsTarToStdout)
     {
-        // '-' is docker's shorthand for streaming a tarball to stdout, which we disallow.
-        VerifyInvalid(L"-", L"streaming a tarball to stdout is not supported");
+        // '-' is docker's shorthand for streaming a tarball to stdout ('type=tar,dest=-').
+        VerifyValid(L"-", L"tar", L"-");
     }
 
     // --- Valid: explicit local / tar / oci / docker exporters ---
@@ -132,8 +133,14 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Tar_ToStdout)
     {
-        // Streaming a tarball to stdout is not supported; a real file path is required.
-        VerifyInvalid(L"type=tar,dest=-", L"streaming a tarball to stdout is not supported");
+        // tar streams a single tarball, so it may target stdout ('dest=-'), matching docker.
+        VerifyValid(L"type=tar,dest=-", L"tar", L"-");
+    }
+
+    TEST_METHOD(Output_Local_ToStdout_Rejected)
+    {
+        // The local exporter writes a directory tree, so it cannot stream to stdout.
+        VerifyInvalid(L"type=local,dest=-", L"dest cannot be stdout for local exporter");
     }
 
     TEST_METHOD(Output_Oci_ToFile)
