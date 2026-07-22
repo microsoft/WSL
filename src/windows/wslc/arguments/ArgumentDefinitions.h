@@ -78,6 +78,7 @@ _(ImportFile,     "file",                NO_ALIAS,          Kind::Positional,  L
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,       "internal",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NetworkInternalArgDescription()) \
+_(IpRange,        "ip-range",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkIpRangeArgDescription()) \
 _(Label,          "label",               L"l",              Kind::Value,       Localization::WSLCCLI_LabelArgDescription()) \
 _(Last,           "last",                L"n",              Kind::Value,       Localization::WSLCCLI_LastArgDescription()) \
 _(Latest,         "latest",              L"l",              Kind::Flag,        Localization::WSLCCLI_LatestArgDescription()) \

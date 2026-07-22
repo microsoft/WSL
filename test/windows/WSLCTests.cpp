@@ -3241,8 +3241,8 @@ class WSLCTests
 
             HRESULT OnCrashDump(LPCWSTR DumpPath, LPCSTR ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp) override
             {
-                m_promise.set_value(Invocation{
-                    DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
+                m_promise.set_value(
+                    Invocation{DumpPath ? std::wstring{DumpPath} : std::wstring{}, ProcessName ? std::string{ProcessName} : std::string{}, Pid, Signal, Timestamp});
 
                 // Block until the test has finished probing, so anything the test verifies is observed mid-callback.
                 m_release.wait();
@@ -5562,6 +5562,15 @@ class WSLCTests
             options.Gateway = "172.44.0.1";
             verifyInvalid(L"--subnet");
         }
+
+        // IpRange specified without Subnet
+        {
+            options.Driver = "bridge";
+            options.Subnet = nullptr;
+            options.Gateway = nullptr;
+            options.IpRange = "172.44.10.0/24";
+            verifyInvalid(L"--subnet");
+        }
     }
 
     WSLC_TEST_METHOD(NetworkCreateDefaultDriverTest)
@@ -5685,6 +5694,86 @@ class WSLCTests
         VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
         VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
         VERIFY_ARE_EQUAL(gateway, inspect.IPAM.Config->at(0).Gateway);
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateWithIpRangeTest)
+    {
+        const std::string networkName = "ip-range-test-net";
+        const std::string subnet = "172.32.0.0/16";
+        const std::string ipRange = "172.32.10.0/24";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = ipRange.c_str();
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
+        VERIFY_ARE_EQUAL(ipRange, inspect.IPAM.Config->at(0).IPRange);
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInvalidIpRangeTest)
+    {
+        const std::string networkName = "bad-ip-range-net";
+        const std::string subnet = "172.33.0.0/16";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = "10.0.0.0/24";
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+    }
+
+    WSLC_TEST_METHOD(NetworkSessionRecoveryWithIpRangeTest)
+    {
+        const std::string networkName = "recovery-ip-range-net";
+        const std::string subnet = "172.34.0.0/16";
+        const std::string ipRange = "172.34.20.0/24";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = ipRange.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        // Reset the session (simulates session restart).
+        ResetTestSession();
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
+        VERIFY_ARE_EQUAL(ipRange, inspect.IPAM.Config->at(0).IPRange);
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithArbitraryDriverOptsTest)
@@ -7747,10 +7836,10 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> container;
             VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateContainer(&options, nullptr, &container));
-            ValidateCOMErrorMessage(std::format(
-                                        L"Endpoint settings are not yet supported (network '{}').",
-                                        std::wstring(networkName.begin(), networkName.end()))
-                                        .c_str());
+            ValidateCOMErrorMessage(
+                std::format(
+                    L"Endpoint settings are not yet supported (network '{}').", std::wstring(networkName.begin(), networkName.end()))
+                    .c_str());
         }
     }
 
@@ -9540,15 +9629,18 @@ class WSLCTests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+            io.AddHandle(
+                std::make_unique<DockerIORelayHandle>(
+                    std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
+                readStdout.append(buffer.data(), buffer.size());
+            }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrRead), [&](const auto& buffer) {
+                readStderr.append(buffer.data(), buffer.size());
+            }));
 
             io.Run({});
 
@@ -9627,8 +9719,9 @@ class WSLCTests
                 std::string output;
                 MultiHandleWait io;
 
-                io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                    std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+                io.AddHandle(
+                    std::make_unique<DockerIORelayHandle>(
+                        std::move(inputRead), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
                 io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
                     output.append(buffer.data(), buffer.size());
@@ -9668,8 +9761,9 @@ class WSLCTests
 
         // Collect the relayed output.
         std::string output;
-        io.AddHandle(std::make_unique<ReadHandle>(
-            std::move(dstRead), [&](const gsl::span<char>& buffer) { output.append(buffer.data(), buffer.size()); }));
+        io.AddHandle(std::make_unique<ReadHandle>(std::move(dstRead), [&](const gsl::span<char>& buffer) {
+            output.append(buffer.data(), buffer.size());
+        }));
 
         io.Run({});
 

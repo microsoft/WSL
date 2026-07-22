@@ -631,11 +631,13 @@ ServiceRunningProcess WSLCSession::StartProcess(
 
     auto process = launcher.Launch(*m_virtualMachine);
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(
+        std::make_unique<windows::common::io::LineBasedReadHandle>(
+            process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(
+        std::make_unique<windows::common::io::LineBasedReadHandle>(
+            process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
     m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
@@ -1147,8 +1149,9 @@ try
 
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
     // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
-    io.AddHandle(std::make_unique<io::ReadHandle>(
-        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
+    io.AddHandle(std::make_unique<io::ReadHandle>(buildProcess.GetStdHandle(1), [&](const auto& content) {
+        allOutput.append(content.begin(), content.end());
+    }));
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
@@ -1500,8 +1503,9 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
     else
     {
-        io.AddHandle(std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
-            common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
+        io.AddHandle(
+            std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
+                common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     io.Run({});
@@ -2509,6 +2513,9 @@ try
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
 
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcIpRangeRequiresSubnet(), Options->IpRange != nullptr && Options->Subnet == nullptr);
+
     if (Options->Subnet != nullptr)
     {
         docker_schema::IPAMConfig ipamConfig;
@@ -2517,6 +2524,11 @@ try
         if (Options->Gateway != nullptr)
         {
             ipamConfig.Gateway = Options->Gateway;
+        }
+
+        if (Options->IpRange != nullptr)
+        {
+            ipamConfig.IPRange = Options->IpRange;
         }
 
         auto& ipam = request.IPAM.emplace();
@@ -2576,7 +2588,7 @@ try
         auto& cfgs = entry.IPAM.Config.emplace();
         for (const auto& c : *full.IPAM.Config)
         {
-            cfgs.push_back({c.Subnet, c.Gateway});
+            cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
         }
     }
 
@@ -2708,6 +2720,7 @@ try
             wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
             inspectCfg.Gateway = cfg.Gateway;
+            inspectCfg.IPRange = cfg.IPRange;
             configs.push_back(std::move(inspectCfg));
         }
     }
@@ -3533,7 +3546,7 @@ void WSLCSession::RecoverExistingNetworks()
                 auto& cfgs = entry.IPAM.Config.emplace();
                 for (const auto& c : *network.IPAM.Config)
                 {
-                    cfgs.push_back({c.Subnet, c.Gateway});
+                    cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
                 }
             }
 

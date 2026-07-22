@@ -97,8 +97,8 @@ class WSLCE2ENetworkCreateTests
     {
         auto result = RunWslc(std::format(L"network create --driver invalid_driver {}", TestNetworkName));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG")));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG")));
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }
@@ -163,6 +163,34 @@ class WSLCE2ENetworkCreateTests
         result.Verify(
             {.Stdout = L"",
              .Stderr = L"The '--gateway' option requires '--subnet' to also be specified.\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
+
+        VerifyNetworkIsNotListed(TestNetworkName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_SubnetAndIpRange_Success)
+    {
+        const std::wstring subnet = L"172.51.0.0/16";
+        const std::wstring ipRange = L"172.51.10.0/24";
+        auto result = RunWslc(std::format(L"network create --subnet {} --ip-range {} {}", subnet, ipRange, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(subnet), (*inspect.IPAM.Config)[0].Subnet);
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(ipRange), (*inspect.IPAM.Config)[0].IPRange);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_IpRangeWithoutSubnet_Fail)
+    {
+        auto result = RunWslc(std::format(L"network create --ip-range 172.52.10.0/24 {}", TestNetworkName));
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = L"The '--ip-range' option requires '--subnet' to also be specified.\r\nError code: E_INVALIDARG\r\n",
              .ExitCode = 1});
 
         VerifyNetworkIsNotListed(TestNetworkName);
