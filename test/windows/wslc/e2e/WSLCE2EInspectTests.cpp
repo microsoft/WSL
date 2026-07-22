@@ -293,9 +293,9 @@ class WSLCE2EInspectTests
     {
         auto result = RunWslc(std::format(L"inspect --type invalid {}", DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(
-            result.StderrContainsSubstring(L"Invalid type value: invalid is not a recognized inspect type. Supported inspect "
-                                           L"types are: image, container, network, volume."));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid type value: invalid is not a recognized inspect type. Supported inspect "
+            L"types are: image, container, network, volume."));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidFormatError)

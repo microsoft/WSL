@@ -7625,14 +7625,15 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // N.B. Mini_init cleans up per-distro cgroups asynchronously from its SIGCHLD reaper after
         // wsl --terminate returns. On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
         // can still be in flight when this check runs, so retry until cleanup completes.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                auto [out2, _] =
-                    LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
-                THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
-            },
-            std::chrono::seconds(1),
-            std::chrono::seconds(30)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    auto [out2, _] =
+                        LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
+                    THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
+                },
+                std::chrono::seconds(1),
+                std::chrono::seconds(30)));
     }
 
     WSL2_TEST_METHOD(IsolatedCgroupLayout)
