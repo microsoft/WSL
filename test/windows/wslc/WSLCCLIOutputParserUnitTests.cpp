@@ -28,7 +28,7 @@ Abstract:
 
     Grammar / behavior (docker buildx parity):
       * A single token with no '=' is shorthand for the destination:
-          - L"-"            -> {type=tar,  dest=-}     (stream a tarball to stdout)
+          - L"-"            -> rejected (streaming a tarball to stdout is not supported)
           - any other path  -> {type=local, dest=<path>}
       * Otherwise the spec is a comma separated list of key=value pairs. Keys are matched
         case-insensitively. 'type' and 'dest' populate the struct fields; every other key is
@@ -37,6 +37,7 @@ Abstract:
           - 'type' is required once any key=value pair is present.
           - 'type' must be one of: local, tar, oci, docker, image, registry, cacheonly.
           - local / tar / oci require 'dest='.
+          - tar may not target stdout ('dest=-').
           - registry requires 'name='.
           - docker / image / cacheonly do not require a destination.
       * On rejection the parser throws ArgumentException whose message is the standard
@@ -113,8 +114,8 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Shorthand_DashIsTarToStdout)
     {
-        // '-' is docker's shorthand for streaming a tarball to stdout.
-        VerifyValid(L"-", L"tar", L"-");
+        // '-' is docker's shorthand for streaming a tarball to stdout, which we disallow.
+        VerifyInvalid(L"-", L"streaming a tarball to stdout is not supported");
     }
 
     // --- Valid: explicit local / tar / oci / docker exporters ---
@@ -131,7 +132,8 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Tar_ToStdout)
     {
-        VerifyValid(L"type=tar,dest=-", L"tar", L"-");
+        // Streaming a tarball to stdout is not supported; a real file path is required.
+        VerifyInvalid(L"type=tar,dest=-", L"streaming a tarball to stdout is not supported");
     }
 
     TEST_METHOD(Output_Oci_ToFile)
@@ -340,11 +342,6 @@ class WSLCCLIOutputParserUnitTests
     {
         // Shorthand paths are normalized to their explicit type=local,dest= form for buildx.
         VerifyFormat(L"./out", L"type=local,dest=./out");
-    }
-
-    TEST_METHOD(Format_Shorthand_DashNormalizedToTarStdout)
-    {
-        VerifyFormat(L"-", L"type=tar,dest=-");
     }
 
     TEST_METHOD(Format_TypeOnly_NoDestOrAttributes)
