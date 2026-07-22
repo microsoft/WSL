@@ -201,7 +201,7 @@ private:
     // Called after the root filesystem is mounted.
     void ReadGuestCapabilities();
 
-    static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags, _In_opt_ LPCSTR ChildName = nullptr);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
 
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcessImpl(
@@ -277,10 +277,6 @@ private:
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::map<std::string, GUID> m_mountedWindowsFolders;
-
-    // VirtioFs share cache: maps (normalized WindowsPath, readOnly) to share GUID.
-    // Shares are kept alive after unmount for reuse on subsequent mounts of the same folder.
-    std::map<std::pair<std::wstring, bool>, GUID> m_virtioFsShares;
 
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;

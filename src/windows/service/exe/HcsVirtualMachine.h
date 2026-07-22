@@ -97,8 +97,9 @@ private:
     std::map<ULONG, DiskInfo> m_attachedDisks;
     std::bitset<MAX_VHD_COUNT> m_lunBitmap;
 
-    // Shares: key is ShareId, value is nullopt for Plan9 or DeviceInstanceId for VirtioFS
+    // Shares: key is ShareId, value is nullopt for Plan9 or the aggregate DeviceInstanceId for VirtioFS.
     std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;
+    std::optional<GUID> m_virtioFsDevice;
 
     std::filesystem::path m_vmSavedStateFile;
     std::filesystem::path m_crashDumpFolder;

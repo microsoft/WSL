@@ -1642,6 +1642,7 @@ struct WSLC_MOUNT
     unsigned int TypeIndex{};
     unsigned int OptionsIndex{};
     unsigned int Flags{};
+    unsigned int ChildNameIndex{};
 
     enum MountType : uint8_t
     {
@@ -1654,7 +1655,7 @@ struct WSLC_MOUNT
 
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex), STRING_FIELD(ChildNameIndex));
 };
 
 struct WSLC_EXEC

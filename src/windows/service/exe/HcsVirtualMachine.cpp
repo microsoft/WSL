@@ -620,7 +620,15 @@ try
     {
         std::wstring options = ReadOnly ? L"ro" : L"";
 
-        it->second = m_guestDeviceManager->AddVirtiofsDevice(shareName.c_str(), options.c_str(), WindowsPath, m_userToken.get());
+        if (!m_virtioFsDevice.has_value())
+        {
+            VirtioFsShareOptions aggregateOptions{.Kind = VirtiofsShareKind_Aggregate};
+            m_virtioFsDevice =
+                m_guestDeviceManager->AddVirtiofsDevice(TEXT(LX_INIT_DRVFS_VIRTIO_TAG), L"", L"", m_userToken.get(), aggregateOptions);
+        }
+
+        m_guestDeviceManager->AddVirtiofsChild(m_virtioFsDevice.value(), shareName.c_str(), options.c_str(), WindowsPath);
+        it->second = m_virtioFsDevice;
     }
 
     cleanup.release();
@@ -645,7 +653,8 @@ try
     }
     else
     {
-        m_guestDeviceManager->RemoveGuestDevice(it->second.value());
+        auto shareName = wsl::shared::string::GuidToString<wchar_t>(it->first, wsl::shared::string::None);
+        m_guestDeviceManager->RemoveVirtiofsChild(it->second.value(), shareName.c_str());
     }
 
     m_shares.erase(it);

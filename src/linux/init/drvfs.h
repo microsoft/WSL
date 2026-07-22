@@ -30,6 +30,14 @@ struct VirtioFsMountRoot
 
 std::optional<VirtioFsMountRoot> ParseAggregateVirtioFsMountRoot(std::string_view Tag, std::string_view Root);
 
+int MountVirtioFsChild(
+    const char* Tag,
+    const char* ChildName,
+    const char* Target,
+    const char* Options,
+    int* ExitCode = nullptr,
+    std::string_view SubPath = "/");
+
 int MountDrvfs(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode = nullptr);
 
 int MountDrvfsEntry(int Argc, char* Argv[]);
