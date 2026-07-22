@@ -931,6 +931,11 @@ struct std::formatter<std::source_location, wchar_t>
     }
 };
 
+// char -> wchar_t formatting is only used by the Windows components. libc++ (used to
+// build the Linux components) now provides these as deleted specializations per C++23
+// [format.formatter.spec], which would collide, so restrict them to Windows.
+#ifdef WIN32
+
 template <>
 struct std::formatter<char*, wchar_t>
 {
@@ -994,6 +999,8 @@ struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
         return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
+
+#endif // WIN32
 
 template <>
 struct std::formatter<std::filesystem::path, wchar_t>
