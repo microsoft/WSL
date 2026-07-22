@@ -36,6 +36,7 @@ using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadHandle;
 using wsl::windows::common::io::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
+using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
 using wsl::windows::service::wslc::DockerHTTPException;
 using wsl::windows::service::wslc::IWSLCVolume;
@@ -741,8 +742,11 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
-    // Acquire an exclusive lock since this method modifies m_initProcessControl, m_initProcess and m_state.
+    std::shared_ptr<StateTransition> transition;
+    auto transitionGuard = m_transitionLock.lock_exclusive();
     auto lock = m_lock.lock_exclusive();
+
+    WI_ASSERT(!m_transition);
 
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
 
@@ -794,12 +798,14 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient);
 
-    std::lock_guard processesLock{m_processesLock};
-    m_initProcessControl = control.get();
-
-    m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
+    {
+        std::lock_guard processesLock{m_processesLock};
+        m_initProcessControl = control.get();
+        m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
+    }
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable {
+        std::lock_guard processesLock{m_processesLock};
         m_initProcess.Reset();
         m_initProcessControl = nullptr;
     });
@@ -825,9 +831,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
 
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
     MapPorts();
-
-    m_stopNotification.Event.ResetEvent();
-    m_stopNotification.EventTime.store(0, std::memory_order_relaxed);
 
     try
     {
@@ -873,54 +876,92 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         }
     }
 
+    transition = std::make_shared<StateTransition>(ContainerEvent::Start);
+    WI_ASSERT(!m_transition);
+    m_transition = transition;
+
+    lock.reset();
+    WaitForTransition(transition);
+
     portCleanup.release();
     volumeCleanup.release();
-
-    Transition(WslcContainerStateRunning);
     cleanup.release();
 }
 
-void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime)
+void WSLCContainerImpl::WaitForTransition(const std::shared_ptr<StateTransition>& transition) const
 {
-    // We must release m_lock and m_stopLock before the wrapper's destructor calls
-    // Disconnect(), so in-flight COM callers can drain from COMImplClass::m_callers.
-    unique_com_disconnect comWrapper;
+    THROW_HR_IF_MSG(
+        E_UNEXPECTED,
+        !m_wslcSession.WaitForEventOrSessionTerminating(transition->Completed.get(), std::chrono::milliseconds{INFINITE}),
+        "Unexpected lifecycle transition timeout for container '%hs'",
+        m_id.c_str());
 
-    if (event == ContainerEvent::Stop)
+    WI_ASSERT(transition->Completed.is_signaled());
+
+    if (transition->Exception)
+    {
+        std::rethrow_exception(transition->Exception);
+    }
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransition(const std::shared_ptr<StateTransition>& transition, std::exception_ptr exception) noexcept
+{
+    WI_ASSERT(m_transition == transition);
+    transition->Exception = std::move(exception);
+    m_transition.reset();
+    transition->Completed.SetEvent();
+}
+
+void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime) noexcept
+{
+    // The wrapper must be disconnected after m_lock is released so in-flight COM callers can drain.
+    unique_com_disconnect comWrapper;
+    auto lock = m_lock.lock_exclusive();
+    auto transition = m_transition;
+
+    // TODO - Only WSLC should start the container, so if we receive a start event, it must be expected by a transition.
+    // Otherwise the container was started externally. Consider logging or emitting a warning if the container was started
+    // externally.
+    if (event == ContainerEvent::Start && transition && transition->ExpectedEvent == ContainerEvent::Start)
+    {
+        CommitState(WslcContainerStateRunning, eventTime);
+        CompleteTransition(transition);
+    }
+    else if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
-        SetExitCode(exitCode.value());
 
-        std::unique_lock stopGuard{m_stopLock, std::try_to_lock};
-
-        m_stopNotification.EventTime.store(eventTime, std::memory_order_release);
-        m_stopNotification.Event.SetEvent();
-
-        // If Stop() is already in flight, it will wake when the stop event is signaled and take care of cleanup.
-        if (!stopGuard.owns_lock())
+        // A Stop while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
+        //  them serially. It would indicate external manipulation. Ignoring it avoids applying an old exit code to the newly
+        //  staged init process.
+        if (transition && (transition->ExpectedEvent == ContainerEvent::Start))
         {
-            return;
+            WSL_LOG(
+                "UnexpectedContainerExit", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(exitCode.value(), "ExitCode"));
         }
-
-        auto lock = m_lock.lock_exclusive();
-        comWrapper = OnStopped(eventTime);
+        else
+        {
+            SetExitCode(exitCode.value());
+            OnStopped(eventTime);
+        }
     }
     else if (event == ContainerEvent::Destroy)
     {
-        WI_ASSERT(!m_destroyEvent.is_signaled());
-        m_destroyEvent.SetEvent();
-
-        auto lock = m_lock.lock_exclusive();
-
         if (m_state != WslcContainerStateDeleted)
         {
-            Transition(WslcContainerStateDeleted, eventTime);
+            CommitState(WslcContainerStateDeleted, eventTime);
             comWrapper = ReleaseResources();
         }
 
-        // Signal init exit after the state transition so awaiters observe state=Deleted
-        // (and any post-delete cleanup) rather than the prior Running/Exited state.
+        // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
         SignalInitProcessExit();
+
+        if (transition)
+        {
+            WI_ASSERT(transition->ExpectedEvent == ContainerEvent::Destroy);
+            transition->Wrapper = std::move(comWrapper);
+            CompleteTransition(transition);
+        }
     }
 
     WSL_LOG(
@@ -932,11 +973,21 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
-    // N.B. comWrapper must be destructed after m_lock and m_stopLock are released.
-    unique_com_disconnect comWrapper;
+    std::shared_ptr<StateTransition> transition;
 
-    std::unique_lock stopGuard{m_stopLock};
+    // Stop callers take the transition lock shared. m_lock serializes the first caller's
+    // Docker request and publication of m_transition; later callers copy that transition
+    // and wait on the same completion event. Start and Delete take this lock exclusively.
+    auto transitionGuard = m_transitionLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
+
+    if (m_transition)
+    {
+        transition = m_transition;
+        lock.reset();
+        WaitForTransition(transition);
+        return;
+    }
 
     if (m_state == WslcContainerStateExited && !Kill)
     {
@@ -969,11 +1020,6 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         if (Kill)
         {
             m_dockerClient.SignalContainer(m_id, SignalArg);
-
-            if (!waitForStop)
-            {
-                return;
-            }
         }
         else
         {
@@ -995,29 +1041,19 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         }
     }
 
-    // Wait for the stop event to get the Docker timestamp.
-    std::optional<std::uint64_t> stopTimestamp;
-    if (m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s))
+    if (waitForStop)
     {
-        stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
-    }
+        transition = std::make_shared<StateTransition>(ContainerEvent::Stop);
+        WI_ASSERT(!m_transition);
+        m_transition = transition;
 
-    comWrapper = OnStopped(stopTimestamp);
-
-    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
-    {
-        // Release locks before waiting on the docker destroy event: OnEvent(Destroy) takes m_lock,
-        // and the wrapper's destructor (Disconnect) must run after locks are released.
         lock.reset();
-        stopGuard.unlock();
-        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
+        WaitForTransition(transition);
     }
 }
 
-__requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::OnStopped(std::optional<std::uint64_t> stopTimestamp)
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(std::optional<std::uint64_t> stopTimestamp)
 {
-    unique_com_disconnect comWrapper;
-
     // Notify plugin manager that the container is stopping. Errors are ignored.
     if (m_state == WslcContainerStateRunning)
     {
@@ -1031,46 +1067,71 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     ReleaseProcesses();
     ReleaseRuntimeResources();
 
-    // Only drive state transition + auto-delete if we're still Running. A concurrent
-    // Delete() may have already moved us to Deleted.
+    // Ignore duplicate or late Stop events so they do not overwrite an already committed state.
     if (m_state == WslcContainerStateRunning)
     {
-        Transition(WslcContainerStateExited, stopTimestamp);
+        CommitState(WslcContainerStateExited, stopTimestamp);
+    }
 
-        if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
+    auto transition = m_transition;
+    std::exception_ptr transitionException;
+
+    // Docker delete request is already sent.
+    if (transition && transition->ExpectedEvent == ContainerEvent::Destroy)
+    {
+        return;
+    }
+
+    // Stop with Rm must initiate Delete.
+    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
+    {
+        try
         {
-            comWrapper = DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
+            m_dockerClient.DeleteContainer(m_id, true, true);
+
+            if (transition)
+            {
+                transition->ExpectedEvent = ContainerEvent::Destroy;
+            }
+
+            return;
+        }
+        catch (...)
+        {
+            transitionException = std::current_exception();
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to remove container '%hs'", m_id.c_str());
         }
     }
 
-    // For the Rm path, defer init-exit signaling to OnEvent(Destroy) so callers waiting
-    // on init exit observe destroy-side cleanup first.
-    if (WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm))
-    {
-        SignalInitProcessExit();
-    }
+    SignalInitProcessExit();
 
-    return comWrapper;
+    if (transition)
+    {
+        CompleteTransition(transition, std::move(transitionException));
+    }
 }
 
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 {
-    // N.B. wrapper must be destroyed after m_lock is released, since its destructor calls Disconnect().
-    unique_com_disconnect wrapper;
-    {
-        auto lock = m_lock.lock_exclusive();
-        wrapper = DeleteExclusiveLockHeld(Flags);
-    }
+    std::shared_ptr<StateTransition> transition;
+    auto transitionGuard = m_transitionLock.lock_exclusive();
+    auto lock = m_lock.lock_exclusive();
 
-    // Wait for the docker destroy event so anonymous volume cleanup is reflected in tracking by
-    // the time we return.
-    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
-    {
-        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
-    }
+    WI_ASSERT(!m_transition);
+
+    RequestDeleteExclusiveLockHeld(Flags);
+
+    transition = std::make_shared<StateTransition>(ContainerEvent::Destroy);
+    WI_ASSERT(!m_transition);
+    m_transition = transition;
+
+    lock.reset();
+    WaitForTransition(transition);
+
+    lock = m_lock.lock_exclusive();
 }
 
-__requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::DeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
 {
     // Validate that the container is not running or already deleted.
     THROW_HR_WITH_USER_ERROR_IF(
@@ -1088,9 +1149,6 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
         m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
-
-    Transition(WslcContainerStateDeleted);
-    return ReleaseResources();
 }
 
 void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
@@ -2355,7 +2413,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
-__requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept
+__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
