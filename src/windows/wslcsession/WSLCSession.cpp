@@ -1371,25 +1371,6 @@ try
     // it into the destination directory. The streamer's stdout is relayed to the client OutputHandle.
     if (streamOutput)
     {
-        // TEMP DIAGNOSTIC: inspect the VM-side exporter output before streaming it back.
-        {
-            ServiceProcessLauncher diag(
-                "/bin/sh",
-                {"/bin/sh",
-                 "--norc",
-                 "-c",
-                 std::format(
-                     "echo DEST={0}; stat -c 'STAT size=%s name=%n' '{0}' 2>&1; echo '--- ls base ---'; ls -la '{1}' 2>&1; "
-                     "echo '--- find tmp ---'; find /var/lib/docker/tmp 2>&1; echo '--- mounts ---'; grep -E 'docker' "
-                     "/proc/self/mountinfo 2>&1",
-                     outputDestPath,
-                     "/var/lib/docker/tmp/wslc-build-output")},
-                {},
-                WSLCProcessFlagsNone);
-            auto diagResult = diag.Launch(*m_virtualMachine).WaitAndCaptureOutput(60000UL);
-            reportProgress(std::format("\n===WSLC BUILD OUTPUT DIAGNOSTIC===\n{}\n===END DIAGNOSTIC===\n", diag.FormatResult(diagResult)), c_logId);
-        }
-
         auto userHandle = OpenUserHandle(Options->OutputHandle);
 
         std::vector<std::string> streamArgs;
