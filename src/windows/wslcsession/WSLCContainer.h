@@ -184,7 +184,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(std::optional<std::uint64_t> stopTimestamp);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::optional<std::uint64_t> stopTimestamp);
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;

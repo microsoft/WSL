@@ -919,31 +919,24 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     auto lock = m_lock.lock_exclusive();
     auto transition = m_transition;
 
-    // TODO - Only WSLC should start the container, so if we receive a start event, it must be expected by a transition.
-    // Otherwise the container was started externally. Consider logging or emitting a warning if the container was started
-    // externally.
-    if (event == ContainerEvent::Start && transition && transition->ExpectedEvent == ContainerEvent::Start)
+    if (event == ContainerEvent::Start)
     {
-        CommitState(WslcContainerStateRunning, eventTime);
-        CompleteTransition(transition);
+        // Only WSLC should start the container, so if we receive a start event, it must be expected by a transition.
+        // Otherwise the container was started externally. Log if the container was started externally.
+        if (transition && transition->ExpectedEvent == ContainerEvent::Start)
+        {
+            CommitState(WslcContainerStateRunning, eventTime);
+            CompleteTransition(transition);
+        }
+        else
+        {
+            WSL_LOG("UnexpectedContainerStart", TraceLoggingValue(m_id.c_str(), "Id"));
+        }
     }
     else if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
-
-        // A Stop while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
-        //  them serially. It would indicate external manipulation. Ignoring it avoids applying an old exit code to the newly
-        //  staged init process.
-        if (transition && (transition->ExpectedEvent == ContainerEvent::Start))
-        {
-            WSL_LOG(
-                "UnexpectedContainerExit", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(exitCode.value(), "ExitCode"));
-        }
-        else
-        {
-            SetExitCode(exitCode.value());
-            OnStopped(eventTime);
-        }
+        OnStopped(exitCode.value(), eventTime);
     }
     else if (event == ContainerEvent::Destroy)
     {
@@ -1052,8 +1045,21 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(std::optional<std::uint64_t> stopTimestamp)
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::optional<std::uint64_t> stopTimestamp)
 {
+    auto transition = m_transition;
+
+    // A Stop while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
+    //  them serially. It would indicate external manipulation. Ignoring it avoids applying an old exit code to the newly
+    //  staged init process.
+    if (transition && (transition->ExpectedEvent == ContainerEvent::Start))
+    {
+        WSL_LOG("UnexpectedContainerExit", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(exitCode, "ExitCode"));
+        return;
+    }
+
+    SetExitCode(exitCode);
+
     // Notify plugin manager that the container is stopping. Errors are ignored.
     if (m_state == WslcContainerStateRunning)
     {
@@ -1073,7 +1079,6 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(std::op
         CommitState(WslcContainerStateExited, stopTimestamp);
     }
 
-    auto transition = m_transition;
     std::exception_ptr transitionException;
 
     // Docker delete request is already sent.
