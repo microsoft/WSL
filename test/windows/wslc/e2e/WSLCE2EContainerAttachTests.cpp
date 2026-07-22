@@ -54,7 +54,10 @@ class WSLCE2EContainerAttachTests
 
         const auto& prompt = ">";
         auto result = RunWslc(std::format(
-            L"container run -itd -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
+            L"container run -itd -e PS1={} --name {} {} bash --norc",
+            wsl::shared::string::MultiByteToWide(prompt),
+            WslcContainerName,
+            DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 

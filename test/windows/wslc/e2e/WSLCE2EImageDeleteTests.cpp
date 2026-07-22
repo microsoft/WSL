@@ -109,8 +109,8 @@ class WSLCE2EImageDeleteTests
                 L"conflict: unable to remove repository reference \"{}\" (must force) - container {} is using its referenced "
                 L"image {}",
                 DebianImage.Name,
-                containerId,
-                imageId),
+                wsl::shared::string::MultiByteToWide(containerId),
+                wsl::shared::string::MultiByteToWide(imageId)),
             L"ERROR_SHARING_VIOLATION");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }

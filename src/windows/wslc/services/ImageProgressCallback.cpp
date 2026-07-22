@@ -57,15 +57,8 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
         {
             if (id == nullptr || *id == '\0')
             {
-                m_terminal.Write(m_level, L"{}\n", status);
-            }
-            else
-            {
-                auto [it, inserted] = m_lastStatusById.try_emplace(id, status);
-                if (inserted || it->second != status)
-                {
-                    it->second = status;
-                    m_terminal.Write(m_level, L"{}: {}\n", id, status);
+                m_terminal.Write(m_level, L"{}\n", wsl::shared::string::MultiByteToWide(status));
+                    m_terminal.Write(m_level, L"{}: {}\n", wsl::shared::string::MultiByteToWide(id), wsl::shared::string::MultiByteToWide(status));
                 }
             }
 
@@ -79,7 +72,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            m_terminal.Write(m_level, L"{}\n", status);
+            m_terminal.Write(m_level, L"{}\n", wsl::shared::string::MultiByteToWide(status));
             m_currentLine++;
             return S_OK;
         }
@@ -144,15 +137,20 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
             progress += std::format(L"/{}", FormatHumanReadableSize(total, c_progressPrecision));
         }
 
-        line = std::format(L"{}: {} [{}] {}", safeId, safeStatus, bar, progress);
+        line = std::format(
+            L"{}: {} [{}] {}", wsl::shared::string::MultiByteToWide(safeId), wsl::shared::string::MultiByteToWide(safeStatus), bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}", safeId, safeStatus, FormatHumanReadableSize(current, c_progressPrecision));
+        line = std::format(
+            L"{}: {} {}",
+            wsl::shared::string::MultiByteToWide(safeId),
+            wsl::shared::string::MultiByteToWide(safeStatus),
+            FormatHumanReadableSize(current, c_progressPrecision));
     }
     else
     {
-        line = std::format(L"{}: {}", safeId, safeStatus);
+        line = std::format(L"{}: {}", wsl::shared::string::MultiByteToWide(safeId), wsl::shared::string::MultiByteToWide(safeStatus));
     }
 
     // Truncate to the console width to prevent wrapping that breaks cursor repositioning, then pad

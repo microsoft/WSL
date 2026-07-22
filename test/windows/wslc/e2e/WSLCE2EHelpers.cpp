@@ -101,7 +101,11 @@ namespace {
             std::filesystem::remove_all(storagePath, error);
             if (error)
             {
-                Log::Error(std::format(L"Failed to cleanup storage path {}: {}", storagePath.wstring(), error.message()).c_str());
+                Log::Error(std::format(
+                               L"Failed to cleanup storage path {}: {}",
+                               storagePath.wstring(),
+                               wsl::shared::string::MultiByteToWide(error.message()))
+                               .c_str());
             }
         }
     }

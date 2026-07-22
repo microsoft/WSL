@@ -40,7 +40,7 @@ try
     {
         for (const auto& line : m_allLines)
         {
-            m_terminal.Info(L"{}", line);
+            m_terminal.Info(L"{}", MultiByteToWide(line));
         }
     }
 }
@@ -130,7 +130,7 @@ try
         // updates those lines are mostly noise.
         if (!isPullProgress)
         {
-            m_terminal.Info(L"{}", status);
+            m_terminal.Info(L"{}", MultiByteToWide(status));
         }
         return S_OK;
     }
