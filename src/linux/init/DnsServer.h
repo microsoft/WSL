@@ -44,8 +44,8 @@ private:
         wil::unique_fd m_tcpConnection;
 
         // Offset in m_currentDnsRequest indicating how much of the current DNS request on
-        // the TCP connection has been read. Using 2 bytes to represent the offset as the request length is represented using 2 bytes.
-        uint16_t m_currentRequestOffset = 0;
+        // the TCP connection has been read.
+        size_t m_currentRequestOffset = 0;
 
         // Buffer containing the current DNS request received on the TCP connection.
         std::vector<gsl::byte> m_currentDnsRequest;

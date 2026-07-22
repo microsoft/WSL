@@ -3515,7 +3515,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     {
         execResult = 0;
     }
-    else if (execResult == sizeof(execResult))
+    else if (ReadResult == sizeof(execResult))
     {
         // Otherwise, return the error code to the service
         execResult = abs(execResult);
