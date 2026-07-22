@@ -743,7 +743,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
     std::shared_ptr<StateTransition> transition;
-    auto transitionGuard = m_transitionLock.lock_exclusive();
+    auto transitionLock = m_transitionLock.lock_exclusive();
     auto lock = m_lock.lock_exclusive();
 
     WI_ASSERT(!m_transition);
@@ -972,7 +972,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     // Stop callers take the transition lock shared. m_lock serializes the first caller's
     // Docker request and publication of m_transition; later callers copy that transition
     // and wait on the same completion event. Start and Delete take this lock exclusively.
-    auto transitionGuard = m_transitionLock.lock_shared();
+    auto transitionLock = m_transitionLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
 
     if (m_transition)
@@ -1122,7 +1122,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     std::shared_ptr<StateTransition> transition;
 
     {
-        auto transitionGuard = m_transitionLock.lock_exclusive();
+        auto transitionLock = m_transitionLock.lock_exclusive();
         auto lock = m_lock.lock_exclusive();
 
         WI_ASSERT(!m_transition);
