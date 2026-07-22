@@ -947,10 +947,46 @@ try
         buildArgs.push_back("--target");
         buildArgs.push_back(Options->Target);
     }
+    // Docker-style --output routing. When the client provides an OutputHandle it has stripped dest=
+    // from the spec and expects the exporter output streamed back: the exporter writes to a VM temp
+    // path (disk-backed under the docker storage root to avoid buffering large outputs in tmpfs) and,
+    // after a successful build, a streamer process relays that path to the client handle. Without a
+    // handle the spec is forwarded verbatim and the build runs entirely in the VM.
+    const bool streamOutput = Options->OutputHandle.Type != WSLCHandleTypeUnknown;
+    const bool outputIsDirectory = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsOutputIsDirectory);
+    std::string outputDestPath;
+    auto removeOutput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (!outputDestPath.empty())
+        {
+            ServiceProcessLauncher cleanup("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("rm -rf '{}'", outputDestPath)}, {}, WSLCProcessFlagsNone);
+            auto cleanupResult = cleanup.LaunchNoThrow(*m_virtualMachine);
+            if (auto& process = std::get<2>(cleanupResult); process)
+            {
+                std::ignore = process->WaitAndCaptureOutput(60000UL);
+            }
+        }
+    });
+
     if (Options->Output != nullptr && Options->Output[0] != '\0')
     {
+        std::string outputSpec = Options->Output;
+        if (streamOutput)
+        {
+            GUID id{};
+            THROW_IF_FAILED(CoCreateGuid(&id));
+            constexpr auto c_outputBaseDir = "/var/lib/docker/tmp/wslc-build-output";
+            outputDestPath = std::format("{}/{}", c_outputBaseDir, wsl::shared::string::GuidToString<char>(id));
+
+            // buildx creates the leaf dest (a file for tar/oci/docker, a directory for local) but not
+            // the parent, so ensure the base directory exists first.
+            ServiceProcessLauncher mkdir("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("mkdir -p '{}'", c_outputBaseDir)}, {}, WSLCProcessFlagsNone);
+            auto mkdirResult = mkdir.Launch(*m_virtualMachine).WaitAndCaptureOutput(60000UL);
+            THROW_HR_IF_MSG(E_FAIL, mkdirResult.Code != 0, "failed to create build output directory");
+
+            outputSpec += std::format(",dest={}", outputDestPath);
+        }
         buildArgs.push_back("--output");
-        buildArgs.push_back(Options->Output);
+        buildArgs.push_back(outputSpec);
     }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
@@ -1329,6 +1365,59 @@ try
     // translation.
     std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
+
+    // Stream the exporter output back to the client. For file exporters (tar/oci/docker) cat the temp
+    // file; for the directory exporter (type=local) tar the export directory so the client can extract
+    // it into the destination directory. The streamer's stdout is relayed to the client OutputHandle.
+    if (streamOutput)
+    {
+        // TEMP DIAGNOSTIC: inspect the VM-side exporter output before streaming it back.
+        {
+            ServiceProcessLauncher diag(
+                "/bin/sh",
+                {"/bin/sh",
+                 "--norc",
+                 "-c",
+                 std::format(
+                     "echo DEST={0}; stat -c 'STAT size=%s name=%n' '{0}' 2>&1; echo '--- ls base ---'; ls -la '{1}' 2>&1; "
+                     "echo '--- find tmp ---'; find /var/lib/docker/tmp 2>&1; echo '--- mounts ---'; grep -E 'docker' "
+                     "/proc/self/mountinfo 2>&1",
+                     outputDestPath,
+                     "/var/lib/docker/tmp/wslc-build-output")},
+                {},
+                WSLCProcessFlagsNone);
+            auto diagResult = diag.Launch(*m_virtualMachine).WaitAndCaptureOutput(60000UL);
+            reportProgress(std::format("\n===WSLC BUILD OUTPUT DIAGNOSTIC===\n{}\n===END DIAGNOSTIC===\n", diag.FormatResult(diagResult)), c_logId);
+        }
+
+        auto userHandle = OpenUserHandle(Options->OutputHandle);
+
+        std::vector<std::string> streamArgs;
+        if (outputIsDirectory)
+        {
+            streamArgs = {"/usr/bin/tar", "-C", outputDestPath, "-cf", "-", "."};
+        }
+        else
+        {
+            streamArgs = {"/bin/cat", outputDestPath};
+        }
+
+        ServiceProcessLauncher streamLauncher(streamArgs[0], streamArgs, {}, WSLCProcessFlagsNone);
+        auto streamProcess = streamLauncher.Launch(*m_virtualMachine);
+
+        auto streamIo = CreateIOContext(CancelEvent);
+        std::string streamError;
+        streamIo.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+            common::io::HandleWrapper{streamProcess.GetStdHandle(1)}, userHandle.Get()));
+        streamIo.AddHandle(std::make_unique<io::ReadHandle>(streamProcess.GetStdHandle(2), [&](const gsl::span<char>& content) {
+            streamError.append(content.data(), content.size());
+        }));
+        streamIo.Run({});
+
+        std::erase(streamError, '\r');
+        int streamCode = streamProcess.Wait();
+        THROW_HR_IF_MSG(E_FAIL, streamCode != 0, "failed to stream build output: %hs", streamError.c_str());
+    }
 
     return S_OK;
 }

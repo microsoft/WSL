@@ -17,6 +17,7 @@ Abstract:
 #include "ImageModel.h"
 #include "Reporter.h"
 #include <map>
+#include <optional>
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
@@ -48,7 +49,7 @@ public:
         const std::vector<BuildSecret>& secrets,
         const std::wstring& dockerfilePath,
         const std::wstring& target,
-        const std::wstring& output,
+        const std::optional<BuildOutput>& output,
         WSLCBuildImageFlags flags,
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);

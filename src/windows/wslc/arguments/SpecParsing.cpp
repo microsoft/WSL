@@ -253,15 +253,14 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         return value;
     };
 
-    // Shorthand: a single token with no '=' names the destination. '-' would stream a tarball to
-    // stdout, which we disallow (see the tar+stdout rejection below); anything else exports the final
-    // stage's filesystem to that local path.
+    // Shorthand: a single token with no '=' names the destination. Matching Docker, '-' streams a
+    // tarball to stdout ('type=tar,dest=-'); anything else exports the final stage's filesystem to
+    // that local path ('type=local,dest=<path>').
     if (fields.size() == 1 && fields[0].find(L'=') == std::wstring::npos)
     {
         if (fields[0] == L"-")
         {
-            throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
-                spec, L"streaming a tarball to stdout is not supported; use 'dest=' with a file path"));
+            return services::BuildOutput{.Type = L"tar", .Dest = L"-"};
         }
 
         return services::BuildOutput{.Type = L"local", .Dest = fields[0]};
@@ -319,11 +318,14 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'dest='", output.Type)));
     }
 
-    // Streaming a tarball to stdout ('dest=-') is not supported; require a real file path instead.
-    if (output.Type == L"tar" && output.Dest == L"-")
+    // Mirroring Docker: the local exporter writes a directory tree and so cannot stream to stdout.
+    // tar/oci/docker stream fine and image/registry/cacheonly ignore 'dest', so only local is rejected.
+    if (output.Type == L"local" && output.Dest == L"-")
     {
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
-            spec, L"streaming a tarball to stdout is not supported; use 'dest=' with a file path"));
+            spec,
+            L"dest cannot be stdout for local exporter; the local exporter writes a directory tree, so pass a directory "
+            L"path via 'dest=' (or use 'type=tar,dest=-' to stream a tarball to stdout)"));
     }
 
     // The registry exporter pushes to a named reference, so 'name=' is mandatory.

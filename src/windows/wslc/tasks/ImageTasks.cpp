@@ -126,11 +126,12 @@ void BuildImage(CLIExecutionContext& context)
         target = context.Args.Get<ArgType::BuildTarget>();
     }
 
-    std::wstring output;
+    std::optional<services::BuildOutput> output;
     if (context.Args.Contains(ArgType::Output))
     {
-        // Validate and normalize the spec client-side, then forward the canonical form to buildx.
-        output = validation::FormatOutputSpec(validation::ParseOutputSpec(context.Args.Get<ArgType::Output>()));
+        // Validate and normalize the spec client-side; ImageService::Build decides how to route the
+        // exporter (stream a destination file/dir back over a handle, or run entirely in the VM).
+        output = validation::ParseOutputSpec(context.Args.Get<ArgType::Output>());
     }
 
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
