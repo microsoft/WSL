@@ -251,16 +251,16 @@
         ],
         "AzureLinux": [
             {
-                "Name": "AzureLinux-4.0-BETA",
+                "Name": "AzureLinux-4.0",
                 "FriendlyName": "Azure Linux 4.0 (BETA)",
                 "Default": true,
                 "Amd64Url": {
                     "Url": "https://osrelease.download.prss.microsoft.com/pr/download/AzureLinux-4.0-x86_64.wsl",
-                    "Sha256": "92e709a8f7e9e5981d839c74358449857dcdfae57636a6b5e30001898790d992"
+                    "Sha256": "a7b3f2ff714105dcb22a45c9b8072b66df7a71b0b6dcd97455b1fb60ca176056"
                 },
                 "Arm64Url": {
                     "Url": "https://osrelease.download.prss.microsoft.com/pr/download/AzureLinux-4.0-aarch64.wsl",
-                    "Sha256": "6ac4a5cdfa8d3c1308cb6cca133c0f30a47ae2cb639ee4cde0ada2d3a65298ce"
+                    "Sha256": "f5a36b4185977cef3d62db44acb566da039d81db3bae04f6241364189a754d6c"
                 }
             }
         ]
