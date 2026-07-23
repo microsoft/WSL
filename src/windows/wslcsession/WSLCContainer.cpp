@@ -1193,8 +1193,9 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
         // Export failed, parse the error message.
         auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(error.message);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, wideErrorMessage, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 }
 
@@ -1254,8 +1255,9 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     {
         auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
 
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, httpStatusCode == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(error.message);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), wideErrorMessage, httpStatusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 }
 
@@ -1301,8 +1303,9 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
     {
         auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
 
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, statusCode == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(error.message);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), wideErrorMessage, statusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 }
 

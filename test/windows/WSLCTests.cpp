@@ -351,7 +351,10 @@ class WSLCTests
 
         if (options.has_value() && !PathMatchSpecA(output.c_str(), options->c_str()))
         {
-            std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", output, options.value());
+            std::wstring message = std::format(
+                L"Output: '{}' didn't match pattern: '{}'",
+                wsl::shared::string::MultiByteToWide(output),
+                wsl::shared::string::MultiByteToWide(options.value()));
             VERIFY_FAIL(message.c_str());
         }
     }
@@ -6526,7 +6529,7 @@ class WSLCTests
 
             auto id = container.Id();
             VERIFY_ARE_EQUAL(container.Get().Stop(WSLCSignalSIGKILL, 0), WSLC_E_CONTAINER_NOT_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", wsl::shared::string::MultiByteToWide(id)));
 
             // Verify that the container is in running state.
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
@@ -6648,7 +6651,7 @@ class WSLCTests
             // Validate that a created container cannot be killed.
             auto id = container.Id();
             VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), WSLC_E_CONTAINER_NOT_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", wsl::shared::string::MultiByteToWide(id)));
 
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
@@ -6659,7 +6662,7 @@ class WSLCTests
 
             // Validate that killing a non-running container fails (unlike Stop())
             VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), WSLC_E_CONTAINER_NOT_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", wsl::shared::string::MultiByteToWide(id)));
 
             // Verify that deleting a container stopped via Kill() works.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
@@ -6705,7 +6708,7 @@ class WSLCTests
             auto id = container.Id();
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
             ValidateCOMErrorMessage(
-                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
+                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", wsl::shared::string::MultiByteToWide(id)));
 
             // Kill the container.
             auto initProcess = container.GetInitProcess();
@@ -6758,7 +6761,7 @@ class WSLCTests
             // Verify that Start() can't be called again on a running container.
             auto id = container->Id();
             VERIFY_ARE_EQUAL(container->Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is running.", id));
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is running.", wsl::shared::string::MultiByteToWide(id)));
 
             VERIFY_ARE_EQUAL(container->State(), WslcContainerStateRunning);
 
@@ -6815,7 +6818,7 @@ class WSLCTests
             auto id = container.Id();
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
             ValidateCOMErrorMessage(
-                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
+                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", wsl::shared::string::MultiByteToWide(id)));
 
             // Validate that invalid flags are rejected.
             VERIFY_ARE_EQUAL(container.Get().Delete(static_cast<WSLCDeleteFlags>(0x4)), E_INVALIDARG);
@@ -8097,7 +8100,7 @@ class WSLCTests
 
         auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
         VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, retVal.first);
-        ValidateCOMErrorMessage(std::format(L"Target container '{}' not found.", targetName));
+        ValidateCOMErrorMessage(std::format(L"Target container '{}' not found.", wsl::shared::string::MultiByteToWide(targetName)));
     }
 
     WSLC_TEST_METHOD(ContainerNetworkModePortsRejectedTest)
@@ -8481,7 +8484,7 @@ class WSLCTests
             auto [result, _] = WSLCProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
 
             VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", wsl::shared::string::MultiByteToWide(id)));
         }
 
         // Validate that invalid tty sizes are rejected.
@@ -8942,7 +8945,7 @@ class WSLCTests
                 auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, "127.0.0.1"}});
                 auto hostPort = validateInspectPortBinding(container, 8000, IPPROTO_TCP, "127.0.0.1", std::nullopt);
 
-                ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort).c_str(), 200);
+                ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", wsl::shared::string::MultiByteToWide(hostPort)).c_str(), 200);
             }
 
             // Anonymous bind on host ip (ephemeral host port).
@@ -8952,7 +8955,8 @@ class WSLCTests
                     auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, hostIpNarrow.value()}});
                     auto hostPort = validateInspectPortBinding(container, 8000, IPPROTO_TCP, hostIpNarrow.value(), std::nullopt);
 
-                    ExpectHttpResponse(std::format(L"http://{}:{}", hostIp.value(), hostPort).c_str(), 200);
+                    ExpectHttpResponse(
+                        std::format(L"http://{}:{}", hostIp.value(), wsl::shared::string::MultiByteToWide(hostPort)).c_str(), 200);
                 }
                 else
                 {
@@ -10706,7 +10710,7 @@ class WSLCTests
             COMOutputHandle stderrHandle{};
             auto id = container->Id();
             VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", wsl::shared::string::MultiByteToWide(id)));
 
             // Start the container.
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
@@ -10761,7 +10765,7 @@ class WSLCTests
             stdoutHandle.Reset();
             stderrHandle.Reset();
             VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", wsl::shared::string::MultiByteToWide(id)));
 
             // Validate that attaching to a deleted container fails.
             VERIFY_SUCCEEDED(container->Get().Delete(WSLCDeleteFlagsNone));
@@ -11022,7 +11026,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &container), E_INVALIDARG);
             VERIFY_IS_NULL(container.get());
 
-            ValidateCOMErrorMessage(std::format(L"Invalid name: '{}'", name));
+            ValidateCOMErrorMessage(std::format(L"Invalid name: '{}'", wsl::shared::string::MultiByteToWide(name)));
         };
 
         expectInvalidArg("container with spaces");
@@ -11041,7 +11045,7 @@ class WSLCTests
             auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
             VERIFY_IS_TRUE(comError.has_value());
 
-            VERIFY_ARE_EQUAL(comError->Message.get(), std::format(L"Invalid image: '{}'", name));
+            VERIFY_ARE_EQUAL(comError->Message.get(), std::format(L"Invalid image: '{}'", wsl::shared::string::MultiByteToWide(name)));
         };
 
         expectInvalidPull("?foo&bar/url\n:name");
@@ -12092,9 +12096,7 @@ class WSLCTests
 
             // Verify the warning matches the expected localized message for the corrupt container.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(
-                L"wsl: {}\n",
-                wsl::shared::Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(containerId)));
+            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverContainer(containerId));
 
             VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 

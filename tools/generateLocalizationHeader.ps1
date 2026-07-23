@@ -21,6 +21,47 @@ $content = @"
 
 namespace wsl::shared {
 
+namespace localization_detail {
+
+#ifdef WIN32
+
+inline std::wstring FormatArgument(const char* value)
+{
+    return string::MultiByteToWide(value);
+}
+
+inline std::wstring FormatArgument(char* value)
+{
+    return string::MultiByteToWide(value);
+}
+
+inline std::wstring FormatArgument(const std::string& value)
+{
+    return string::MultiByteToWide(value);
+}
+
+template <typename Traits, typename Allocator>
+std::wstring FormatArgument(const std::basic_string<char, Traits, Allocator>& value)
+{
+    return string::MultiByteToWide(value.c_str());
+}
+
+template <typename Traits>
+std::wstring FormatArgument(std::basic_string_view<char, Traits> value)
+{
+    return string::MultiByteToWide(std::string{value.data(), value.size()});
+}
+
+#endif
+
+template <typename T>
+constexpr const T& FormatArgument(const T& value) noexcept
+{
+    return value;
+}
+
+} // namespace localization_detail
+
 class Localization
 {
 public:
@@ -108,7 +149,10 @@ function generateEntry
     {
         $ArgumentTypes = [string]::Join(', ', ((1..$ArgumentsCount) |% {"typename T$_"}))
         $ArgumentHeaders = [string]::Join(', ', ((1..$ArgumentsCount) |% {"const T$_& arg$_"}))
-        $Arguments = [string]::Join(', ', ((1..$ArgumentsCount) |% {"arg$_"}))
+        $ArgumentConversions = [string]::Join(
+            "`r`n            ",
+            ((1..$ArgumentsCount) |% {"decltype(auto) formattedArg$_ = localization_detail::FormatArgument(arg$_);"}))
+        $Arguments = [string]::Join(', ', ((1..$ArgumentsCount) |% {"formattedArg$_"}))
         return '
         /* Message: {4}*/
         
@@ -118,9 +162,10 @@ function generateEntry
             {5};
 
             auto message = LookupString(strings, options);
+            {6}
             return std::vformat(message, ARGS({3}));
         }}
-        ' -f $Name, $ArgumentTypes, $ArgumentHeaders, $Arguments, $Content.split("`n")[0], $map
+        ' -f $Name, $ArgumentTypes, $ArgumentHeaders, $Arguments, $Content.split("`n")[0], $map, $ArgumentConversions
 
     }
 }

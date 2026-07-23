@@ -2760,7 +2760,8 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern)
 {
     if (!PathMatchSpecA(Content.c_str(), Pattern.c_str()))
     {
-        std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", Content, Pattern);
+        std::wstring message = std::format(
+            L"Output: '{}' didn't match pattern: '{}'", wsl::shared::string::MultiByteToWide(Content), wsl::shared::string::MultiByteToWide(Pattern));
         VERIFY_FAIL(message.c_str());
     }
 }
