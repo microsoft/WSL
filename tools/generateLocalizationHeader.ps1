@@ -43,7 +43,7 @@ inline std::wstring FormatArgument(const std::string& value)
 template <typename Traits, typename Allocator>
 std::wstring FormatArgument(const std::basic_string<char, Traits, Allocator>& value)
 {
-    return string::MultiByteToWide(std::string{value.data(), value.size()});
+    return string::MultiByteToWide(value.c_str());
 }
 
 template <typename Traits>
