@@ -463,15 +463,15 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
     // ResolvePortZeroBind(), the same as a bind(port=0) call, since the port isn't assigned until
     // the listen() syscall (which performs the implicit autobind) actually completes in-kernel.
     auto ParseListen = [&](int Socket) -> std::optional<BindCall> {
-        auto networkNamespace = std::filesystem::read_symlink(std::format("/proc/{}/ns/net", Pid)).string();
-        if (networkNamespace != m_networkNamespace)
-        {
-            GNS_LOG_INFO("Skipping listen() call for pid {} in network namespace {}", Pid, networkNamespace.c_str());
-            return {{{}, {}, CallId}}; // Different network namespace. Let it go through.
-        }
-
         try
         {
+            auto networkNamespace = std::filesystem::read_symlink(std::format("/proc/{}/ns/net", Pid)).string();
+            if (networkNamespace != m_networkNamespace)
+            {
+                GNS_LOG_INFO("Skipping listen() call for pid {} in network namespace {}", Pid, networkNamespace.c_str());
+                return {{{}, {}, CallId}}; // Different network namespace. Let it go through.
+            }
+
             const int protocol = GetSocketProtocol(Pid, Socket);
             auto dupFd = DuplicateSocketFd(Pid, Socket);
             if (!dupFd)
