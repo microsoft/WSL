@@ -21,26 +21,26 @@ using namespace wsl::shared::string;
 
 PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
 {
-    static auto parsePort = [](const std::string& value, const std::wstring& errorMessage) -> uint16_t {
+    static auto parsePort = [](const std::string& value, const std::string& errorMessage) -> uint16_t {
         try
         {
             // Ensure the value is not empty and contains only digits before parsing
             if (value.empty() || !std::all_of(value.begin(), value.end(), ::isdigit))
             {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide(errorMessage));
             }
 
             // Parse the port number and validate the range
             auto port = std::stoul(value, nullptr, 10);
             if (!PublishPort::IsValidPort(port))
             {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide(errorMessage));
             }
             return static_cast<uint16_t>(port);
         }
         catch (const std::exception&)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide(errorMessage));
         }
     };
 
@@ -51,15 +51,13 @@ PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& 
         // Port range specified
         auto startPortStr = portPart.substr(0, dashPos);
         auto endPortStr = portPart.substr(dashPos + 1);
-        auto startPort =
-            parsePort(startPortStr, MultiByteToWide(std::format("Invalid port range specified in port mapping: '{}'.", portPart)));
-        auto endPort =
-            parsePort(endPortStr, MultiByteToWide(std::format("Invalid port range specified in port mapping: '{}'.", portPart)));
+        auto startPort = parsePort(startPortStr, std::format("Invalid port range specified in port mapping: '{}'.", portPart));
+        auto endPort = parsePort(endPortStr, std::format("Invalid port range specified in port mapping: '{}'.", portPart));
         return {startPort, endPort};
     }
 
     // Single port specified
-    auto port = parsePort(portPart, MultiByteToWide(std::format("Invalid port specified in port mapping: '{}'.", portPart)));
+    auto port = parsePort(portPart, std::format("Invalid port specified in port mapping: '{}'.", portPart));
     return {port, port};
 }
 
