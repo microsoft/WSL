@@ -1412,6 +1412,124 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL("127.0.0.1", bindings[0].HostIp);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_PublishAll_DualStack)
+    {
+        // Remove the container and built image on exit. Both helpers are idempotent, so this is safe
+        // to arm before either resource exists.
+        auto cleanup = wil::scope_exit([&] {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            EnsureImageIsDeleted(PublishAllImage);
+        });
+
+        // Load the Python base image so the test image can be built offline.
+        EnsureImageIsLoaded(PythonImage);
+
+        // Build an image that exposes a TCP and a UDP port and ships a server that listens on both,
+        // so publish-all can be exercised end to end.
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-publish-all";
+        auto cleanupDir = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        // Dual-stack HTTP server on 8080/tcp plus a UDP echo server on 9090/udp in one process. Both
+        // sockets bind before "SERVERS READY" is printed, so that marker signals both ports accept.
+        WriteTestFileContent(
+            contextDir / L"server.py",
+            R"PY(
+import contextlib, socket, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+class DualStackHttp(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        with contextlib.suppress(Exception):
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        super().server_bind()
+
+http_server = DualStackHttp(('::', 8080), SimpleHTTPRequestHandler)
+
+udp = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+udp.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+udp.bind(('::', 9090))
+
+threading.Thread(target=http_server.serve_forever, daemon=True).start()
+print('SERVERS READY', flush=True)
+
+while True:
+    data, address = udp.recvfrom(1024)
+    udp.sendto(data.upper(), address)
+)PY");
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            std::format(
+                "FROM {}\n"
+                "COPY server.py /server.py\n"
+                "EXPOSE 8080/tcp\n"
+                "EXPOSE 9090/udp\n",
+                string::WideToMultiByte(PythonImage.NameAndTag())));
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), PublishAllImage.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        // Port bindings only show up in inspect after start, so create then start before inspecting.
+        auto result = RunWslc(
+            std::format(L"container create --name {} -P {} python3 -u /server.py", WslcContainerName, PublishAllImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Wait until both listeners are bound before probing the published ports.
+        WaitForContainerOutput(WslcContainerName, "SERVERS READY");
+
+        // Each exposed port must be published dual-stack: one IPv4 (127.0.0.1) and one IPv6 (::1)
+        // loopback binding, each on an ephemeral host port. Return both host ports for the protocol.
+        const auto inspect = InspectContainer(WslcContainerName);
+        auto getDualStackHostPorts = [&](const std::string& portKey) -> std::pair<uint16_t, uint16_t> {
+            VERIFY_IS_TRUE(inspect.Ports.contains(portKey));
+
+            const auto& bindings = inspect.Ports.at(portKey);
+            VERIFY_ARE_EQUAL(2u, bindings.size());
+
+            uint16_t ipv4Port = 0;
+            uint16_t ipv6Port = 0;
+            for (const auto& binding : bindings)
+            {
+                const int hostPort = std::stoi(binding.HostPort);
+                VERIFY_IS_TRUE(hostPort > 0 && hostPort <= 65535);
+                if (binding.HostIp == "127.0.0.1")
+                {
+                    ipv4Port = static_cast<uint16_t>(hostPort);
+                }
+                else if (binding.HostIp == "::1")
+                {
+                    ipv6Port = static_cast<uint16_t>(hostPort);
+                }
+            }
+
+            VERIFY_IS_TRUE(ipv4Port > 0);
+            VERIFY_IS_TRUE(ipv6Port > 0);
+            return {ipv4Port, ipv6Port};
+        };
+
+        // TCP: the HTTP server must respond over both IPv4 and IPv6 loopback.
+        const auto [tcpIpv4, tcpIpv6] = getDualStackHostPorts("8080/tcp");
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", tcpIpv4).c_str(), HTTP_STATUS_OK, true);
+        ExpectHttpResponse(std::format(L"http://[::1]:{}", tcpIpv6).c_str(), HTTP_STATUS_OK, true);
+
+        // UDP: the echo server must reply over both IPv4 and IPv6 loopback.
+        const auto [udpIpv4, udpIpv6] = getDualStackHostPorts("9090/udp");
+        SendUdpAndReceive(udpIpv4, "hello", "HELLO", AF_INET);
+        SendUdpAndReceive(udpIpv6, "hello", "HELLO", AF_INET6);
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -1433,7 +1551,11 @@ private:
     // Test images
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& PythonImage = PythonTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+
+    // Image built at test time with exposed TCP and UDP ports for publish-all coverage.
+    const TestImage PublishAllImage{L"wslc-e2e-publish-all", L"latest", L""};
 
     // Test ports
     const uint16_t ContainerTestPort = 8080;

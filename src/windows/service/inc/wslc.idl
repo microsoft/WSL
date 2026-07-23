@@ -235,7 +235,10 @@ typedef struct _WSLCNetworkConnection
 typedef struct _WSLCNetworkConnectionOptions
 {
     [unique] LPCSTR NetworkName;
-    [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
+    // Endpoint settings for the network connection (Aliases, IPAddress, Links, LinkLocalIPs, DriverOpts).
+    // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
+    [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
+    ULONG SettingsCount;
 } WSLCNetworkConnectionOptions;
 
 typedef struct _WSLCContainerNetwork

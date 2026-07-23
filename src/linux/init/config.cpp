@@ -1714,7 +1714,8 @@ Return Value:
         // Do not consider bind mounts.
         //
 
-        if (strcmp(MountEnum.Current().Root, "/") != 0)
+        if (strcmp(MountEnum.Current().Root, "/") != 0 &&
+            !ParseAggregateVirtioFsMountRoot(MountEnum.Current().Source, MountEnum.Current().Root))
         {
             continue;
         }
@@ -1739,7 +1740,7 @@ Return Value:
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source, MountEnum.Current().Root);
         }
         else
         {
@@ -2330,12 +2331,12 @@ try
         }
 
         //
-        // Bind mounts which have a root other than / are currently not supported.
+        // Bind mounts which have a root other than / are currently not supported, except for aggregate virtio-fs shares.
         //
         // TODO_LX: Support bind mounts.
         //
 
-        if (strcmp(MountEntry.Root, "/") != 0)
+        if (strcmp(MountEntry.Root, "/") != 0 && !ParseAggregateVirtioFsMountRoot(MountEntry.Source, MountEntry.Root))
         {
             continue;
         }
@@ -2355,6 +2356,11 @@ try
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) != 0)
         {
+            continue;
+        }
+        else if (wsl::shared::string::StartsWith(std::string_view{MountEntry.MountPoint}, VIRTIOFS_MOUNT_DIR))
+        {
+            // Hidden aggregate mounts are inherited by the new namespace and must not be replaced by a child bind mount.
             continue;
         }
 
@@ -2452,7 +2458,15 @@ try
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            RemountVirtioFs(MountEntry.Source, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
+            if (const auto aggregateRoot = ParseAggregateVirtioFsMountRoot(MountEntry.Source, MountEntry.Root))
+            {
+                const std::string childName{aggregateRoot->ChildName};
+                RemountVirtioFs(childName.c_str(), MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin, aggregateRoot->SubPath);
+            }
+            else
+            {
+                RemountVirtioFs(MountEntry.Source, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
+            }
         }
         else
         {
