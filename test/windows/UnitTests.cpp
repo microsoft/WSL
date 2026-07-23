@@ -516,6 +516,49 @@ class UnitTests
         }
     }
 
+    WSL2_TEST_METHOD(SharedMountSurvivesDistroTermination)
+    {
+        constexpr auto peerDistroName = L"mount-guard-peer-test";
+
+        auto validate = [&](const std::string& automountRoot) {
+            const auto extraConfig = automountRoot.empty() ? "" : std::format("[automount]\nroot={}\n", automountRoot);
+            const auto effectiveAutomountRoot = automountRoot.empty() ? "/mnt" : automountRoot;
+            const auto mountPoint = std::format(L"{}/wsl/mount-guard-test", wsl::shared::string::MultiByteToWide(effectiveAutomountRoot));
+
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+            auto cleanupSystemd = EnableSystemd(extraConfig);
+
+            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+            auto cleanupPeer = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+
+            auto cleanupPeerSystemd = EnableSystemd(extraConfig, peerDistroName);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)), 0L);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
+                0L);
+            auto cleanupMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"sh -c 'umount {0} 2>/dev/null || true; rmdir {0} 2>/dev/null || true'", mountPoint));
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- findmnt -n {}", peerDistroName, mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- grep -qx survived {}/marker", peerDistroName, mountPoint)), 0L);
+
+            TerminateDistribution(peerDistroName);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"findmnt -n {}", mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"grep -qx survived {}/marker", mountPoint)), 0L);
+        };
+
+        validate("");
+        validate("/wsl-test-mount");
+    }
+
     WSL2_TEST_METHOD(ConfigUpdateLanguage)
     {
         // Validates that init populates $LANG from the distro locale configuration file.
