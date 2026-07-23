@@ -6826,6 +6826,94 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ConcurrentContainerStopAndKill)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest",
+            "test-concurrent-container-stops",
+            {"/bin/sh", "-c", "trap 'echo stopping; read value; exit 0' TERM; echo ready; while true; do sleep 1; done"},
+            {},
+            "host",
+            WSLCProcessFlagsStdin);
+
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+        auto input = initProcess.GetStdHandle(0);
+        auto outputHandle = initProcess.GetStdHandle(1);
+        PartialHandleRead output{outputHandle.get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult{};
+        HRESULT killResult{};
+        std::thread stopThread;
+        std::thread killThread;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            input.reset();
+
+            if (stopThread.joinable())
+            {
+                stopThread.join();
+            }
+
+            if (killThread.joinable())
+            {
+                killThread.join();
+            }
+        });
+
+        stopThread = std::thread([&]() { stopResult = container.Get().Stop(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE); });
+
+        output.ExpectConsume("stopping\n");
+
+        // Kill fails after the container exits, so success proves it joined the active Stop transition.
+        wil::unique_event killStarted{wil::EventOptions::ManualReset};
+        killThread = std::thread([&]() {
+            killStarted.SetEvent();
+            killResult = container.Get().Kill(WSLCSignalSIGTERM);
+        });
+
+        VERIFY_IS_TRUE(killStarted.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(killThread.native_handle(), 100), WAIT_TIMEOUT);
+
+        const char stopInput = '\n';
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
+        VERIFY_ARE_EQUAL(bytesWritten, static_cast<DWORD>(sizeof(stopInput)));
+        input.reset();
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(killThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+
+        stopThread.join();
+        killThread.join();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(stopResult);
+        VERIFY_SUCCEEDED(killResult);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
+    WSLC_TEST_METHOD(ForceDeleteAutoRemoveContainer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "test-force-delete-auto-remove", {"sleep", "99999"});
+        launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+        auto container = launcher.Launch(*m_defaultSession);
+        auto id = container.Id();
+        auto name = container.Name();
+
+        VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+        container.SetDeleteOnClose(false);
+
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+        VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsForce), RPC_E_DISCONNECTED);
+
+        wil::com_ptr<IWSLCContainer> openedContainer;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &openedContainer), WSLC_E_CONTAINER_NOT_FOUND);
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &openedContainer), WSLC_E_CONTAINER_NOT_FOUND);
+    }
+
     WSLC_TEST_METHOD(ContainerListFilter)
     {
         // Lists containers with the given filter options and returns the names as a set.
