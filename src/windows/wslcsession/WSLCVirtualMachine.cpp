@@ -886,8 +886,7 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
     THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
-void WSLCVirtualMachine::MountVirtioFsChild(
-    shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
+void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
 {
     wsl::shared::MessageWriter<WSLC_MOUNT_VIRTIOFS> message;
     message.WriteString(message->SourceIndex, Source);
