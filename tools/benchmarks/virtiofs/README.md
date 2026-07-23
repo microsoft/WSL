@@ -38,3 +38,7 @@ The script temporarily replaces `%LOCALAPPDATA%\wslc\settings.yaml`, restores it
 `raw.csv` contains one row per share, including its duration, aggregate device ID, and filesystem root. `summary.csv` contains mean, median, and p95 batch duration plus aggregate shares per second for each queue count, share count, and workload.
 
 The container rejects a run unless all shares report the same `MAJ:MIN` and distinct `FSROOT` values. This verifies that the workload uses separate children on one aggregate virtiofs device.
+
+Before timing, the container also requires exactly one virtiofs device and verifies its active request queue count. Virtio PCI assigns one MSI-X config vector, and virtiofs has one high-priority queue, so the harness calculates active request queues as `MSI-X vectors - 2`. A mismatch with `experimental.virtioFsQueueCount` fails the run. `raw.csv` records both `ActiveQueueCount` and `MsiVectorCount`.
+
+A mismatch usually means the installed WSL service or device host does not contain the queue-count change, or the session was not recreated after changing settings. Deploy the updated package, run `wslc system session terminate`, and rebuild the benchmark image before retrying. Do not use results from a run that reports a mismatch.

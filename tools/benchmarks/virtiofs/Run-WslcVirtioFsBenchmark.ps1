@@ -64,8 +64,17 @@ function Invoke-Wslc
     )
 
     Write-Verbose ("wslc " + ($Arguments -join " "))
-    $output = @(& $WslcPath @Arguments 2>&1 | ForEach-Object { $_.ToString() })
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try
+    {
+        $output = @(& $WslcPath @Arguments 2>&1 | ForEach-Object { $_.ToString() })
+        $exitCode = $LASTEXITCODE
+    }
+    finally
+    {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     if ($exitCode -ne 0 -and -not $AllowFailure)
     {
         throw "wslc exited with code ${exitCode}:`n$($output -join [Environment]::NewLine)"
@@ -140,10 +149,14 @@ function Invoke-BenchmarkRun
     }
     $arguments.Add($Image)
     $arguments.Add($Workload)
+    $arguments.Add($QueueCount.ToString())
     $arguments.AddRange($guestPaths)
 
     $run = Invoke-Wslc -Arguments $arguments.ToArray() -AllowFailure
     $batchMs = $null
+    $requestedQueueCount = $null
+    $activeQueueCount = $null
+    $msiVectorCount = $null
     $topology = @{}
     $workers = @{}
     foreach ($line in $run.Output)
@@ -157,13 +170,20 @@ function Invoke-BenchmarkRun
         {
             $workers[[int]$fields[1]] = [pscustomobject]@{ DurationMs = [long]$fields[2]; ExitCode = [int]$fields[3] }
         }
+        elseif ($fields.Count -eq 4 -and $fields[0] -eq "QUEUES")
+        {
+            $requestedQueueCount = [int]$fields[1]
+            $activeQueueCount = [int]$fields[2]
+            $msiVectorCount = [int]$fields[3]
+        }
         elseif ($fields.Count -eq 2 -and $fields[0] -eq "BATCH")
         {
             $batchMs = [long]$fields[1]
         }
     }
 
-    if ($run.ExitCode -ne 0 -or $null -eq $batchMs -or $workers.Count -ne $ShareCount -or $topology.Count -ne $ShareCount)
+    if ($run.ExitCode -ne 0 -or $null -eq $batchMs -or $workers.Count -ne $ShareCount -or $topology.Count -ne $ShareCount -or
+        $requestedQueueCount -ne $QueueCount -or $activeQueueCount -ne $QueueCount)
     {
         throw "Benchmark run failed or returned incomplete data:`n$($run.Output -join [Environment]::NewLine)"
     }
@@ -173,6 +193,8 @@ function Invoke-BenchmarkRun
         $results.Add([pscustomobject]@{
             Timestamp = [DateTime]::UtcNow.ToString("o")
             QueueCount = $QueueCount
+            ActiveQueueCount = $activeQueueCount
+            MsiVectorCount = $msiVectorCount
             ShareCount = $ShareCount
             Workload = $Workload
             Repetition = $Repetition
