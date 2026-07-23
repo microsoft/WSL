@@ -120,6 +120,11 @@ private:
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
 
+    // Strips a single pair of surrounding double quotes from an adjoined value if present
+    // (e.g. --name="value" or --flag="true"). Shared by the value and flag adjoined-value
+    // paths so both treat quoted "=value" tokens identically.
+    static std::wstring_view StripSurroundingQuotes(std::wstring_view value);
+
     void AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const;
 
     // Backs up one token and stops cleanly so Position() points at the unconsumed token.
@@ -133,9 +138,11 @@ private:
     void SetFlag(ArgType type, bool value);
 
     // Parses an adjoined boolean token for a flag (e.g. the "false" in "--flag=false" or
-    // "-f=false"; accepts true/false/1/0, case-insensitive) and applies it via SetFlag.
-    // Returns an error State if the token is not a recognized boolean. Shared by the
-    // alias, alias-chain, and named-flag paths so all three treat "=value" identically.
+    // "-f=false"). A single pair of surrounding double quotes is stripped first (so
+    // "--flag=\"true\"" works like the value path), then the token is parsed as a Docker-style
+    // boolean (true/false/1/0/t/f, case-insensitive) and applied via SetFlag. Returns an error
+    // State if the token is not a recognized boolean. Shared by the alias, alias-chain, and
+    // named-flag paths so all three treat "=value" identically.
     State ApplyFlagValue(ArgType type, std::wstring_view value, const std::wstring_view& currArg);
 
     // Removes all entries for an argument and consumes any overridable-default slot,

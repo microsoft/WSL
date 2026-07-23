@@ -311,8 +311,12 @@ inline bool IsEqual(const std::wstring_view String1, const std::wstring_view Str
     return (Compare(String1, String2, CaseInsensitive) == String1.size());
 }
 
+// Parses a boolean from a string. By default only "1"/"0" and "true"/"false"
+// (case-insensitive) are recognized. When AllowExtendedForms is true the single
+// character forms "t"/"f" (case-insensitive) are also accepted, matching the full
+// set understood by Go's strconv.ParseBool (and therefore the Docker CLI).
 template <typename T>
-inline std::optional<bool> ParseBool(const T* String)
+inline std::optional<bool> ParseBool(const T* String, bool AllowExtendedForms = false)
 {
     if (!String)
     {
@@ -322,14 +326,16 @@ inline std::optional<bool> ParseBool(const T* String)
     const std::basic_string_view<T> StringView(String);
     constexpr T One[] = {T('1'), T('\0')};
     constexpr T True[] = {T('t'), T('r'), T('u'), T('e'), T('\0')};
-    if (IsEqual(StringView, One) || IsEqual(StringView, True, true))
+    constexpr T ShortTrue[] = {T('t'), T('\0')};
+    if (IsEqual(StringView, One) || IsEqual(StringView, True, true) || (AllowExtendedForms && IsEqual(StringView, ShortTrue, true)))
     {
         return true;
     }
 
     constexpr T Zero[] = {T('0'), T('\0')};
     constexpr T False[] = {T('f'), T('a'), T('l'), T('s'), T('e'), T('\0')};
-    if (IsEqual(StringView, Zero) || IsEqual(StringView, False, true))
+    constexpr T ShortFalse[] = {T('f'), T('\0')};
+    if (IsEqual(StringView, Zero) || IsEqual(StringView, False, true) || (AllowExtendedForms && IsEqual(StringView, ShortFalse, true)))
     {
         return false;
     }

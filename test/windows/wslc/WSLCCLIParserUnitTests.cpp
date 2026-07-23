@@ -578,10 +578,17 @@ class WSLCCLIParserUnitTests
         return args;
     }
 
-    // "--flag" and every recognized true form store a single true entry.
+    // "--flag" and every recognized true form store a single true entry. The single-letter
+    // "t"/"T" forms are Docker-parity extensions enabled for the CLI flag path.
     TEST_METHOD(Flag_TrueForms_StoreSingleTrueEntry)
     {
-        for (const auto* cmd : {L"wslc --verbose", L"wslc --verbose=true", L"wslc --verbose=1", L"wslc --verbose=TRUE"})
+        for (const auto* cmd :
+             {L"wslc --verbose",
+              L"wslc --verbose=true",
+              L"wslc --verbose=1",
+              L"wslc --verbose=TRUE",
+              L"wslc --verbose=t",
+              L"wslc --verbose=T"})
         {
             Log::Comment(String().Format(L"Testing: %ls", cmd));
             ArgMap args = ParseFlags(cmd, {Argument::Create(ArgType::Verbose)});
@@ -592,10 +599,12 @@ class WSLCCLIParserUnitTests
         }
     }
 
-    // Every recognized false form leaves the flag absent so Contains() is false.
+    // Every recognized false form leaves the flag absent so Contains() is false. The
+    // single-letter "f"/"F" forms are Docker-parity extensions enabled for the CLI flag path.
     TEST_METHOD(Flag_FalseForms_LeaveFlagAbsent)
     {
-        for (const auto* cmd : {L"wslc --verbose=false", L"wslc --verbose=0", L"wslc --verbose=False"})
+        for (const auto* cmd :
+             {L"wslc --verbose=false", L"wslc --verbose=0", L"wslc --verbose=False", L"wslc --verbose=f", L"wslc --verbose=F"})
         {
             Log::Comment(String().Format(L"Testing: %ls", cmd));
             ArgMap args = ParseFlags(cmd, {Argument::Create(ArgType::Verbose)});
@@ -651,6 +660,28 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_TRUE(ParseFlags(L"wslc -q", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
         VERIFY_IS_TRUE(ParseFlags(L"wslc -q=true", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
         VERIFY_IS_FALSE(ParseFlags(L"wslc -q=false", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+    }
+
+    // Docker-parity single-letter forms ("t"/"T"/"f"/"F") are honored on the alias form too.
+    TEST_METHOD(Flag_AliasShortBooleanForms)
+    {
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=t", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=T", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=f", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=F", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+    }
+
+    // An adjoined boolean value may be wrapped in double quotes (e.g. --flag="true"), just like
+    // an adjoined value argument. The quotes are stripped before the boolean is parsed, on both
+    // the named and alias forms.
+    TEST_METHOD(Flag_QuotedAdjoinedBoolean)
+    {
+        VERIFY_IS_TRUE(ParseFlags(L"wslc --verbose=\"true\"", {Argument::Create(ArgType::Verbose)}).Contains(ArgType::Verbose));
+        VERIFY_IS_FALSE(ParseFlags(L"wslc --verbose=\"false\"", {Argument::Create(ArgType::Verbose)}).Contains(ArgType::Verbose));
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=\"true\"", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=\"false\"", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+        VERIFY_IS_TRUE(ParseFlags(L"wslc --verbose=\"t\"", {Argument::Create(ArgType::Verbose)}).Contains(ArgType::Verbose));
+        VERIFY_IS_FALSE(ParseFlags(L"wslc --verbose=\"f\"", {Argument::Create(ArgType::Verbose)}).Contains(ArgType::Verbose));
     }
 
     // In an alias chain, leading flags are true and a trailing "=false" turns only the

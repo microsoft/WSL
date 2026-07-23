@@ -143,9 +143,20 @@ void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
     }
 }
 
+std::wstring_view ParseArgumentsStateMachine::StripSurroundingQuotes(std::wstring_view value)
+{
+    if (value.length() >= 2 && value.front() == L'"' && value.back() == L'"')
+    {
+        value = value.substr(1, value.length() - 2);
+    }
+
+    return value;
+}
+
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ApplyFlagValue(ArgType type, std::wstring_view value, const std::wstring_view& currArg)
 {
-    const auto boolVal = string::ParseBool(std::wstring(value).c_str());
+    const auto unquoted = StripSurroundingQuotes(value);
+    const auto boolVal = string::ParseBool(std::wstring(unquoted).c_str(), /*AllowExtendedForms*/ true);
     if (!boolVal.has_value())
     {
         return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
@@ -522,11 +533,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
 void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring_view value)
 {
     // If the adjoined value is wrapped in quotes, strip them off.
-    if (value.length() >= 2 && value[0] == '"' && value[value.length() - 1] == '"')
-    {
-        value = value.substr(1, value.length() - 2);
-    }
-
-    AddValue(type, std::wstring{value});
+    AddValue(type, std::wstring{StripSurroundingQuotes(value)});
 }
 } // namespace wsl::windows::wslc
