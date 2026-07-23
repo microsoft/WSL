@@ -222,6 +222,10 @@ ErrorStrings ErrorToString(const Error& error);
 
 std::filesystem::path GetBasePath();
 
+// Returns the fully-qualified canonical image reference for the given input, matching the string
+// printed by `docker pull` (e.g. "ubuntu" -> "docker.io/library/ubuntu:latest").
+std::string GetCanonicalImageReference(const std::string& input);
+
 std::optional<COMErrorInfo> GetCOMErrorInfo();
 
 DWORD GetDefaultVersion(void);

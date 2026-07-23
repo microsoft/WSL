@@ -26,6 +26,7 @@ Abstract:
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include <regex>
 #include <thread>
 #include <chrono>
@@ -877,6 +878,21 @@ try
     while (MountEnum.Next())
     {
         //
+        // Skip internal virtiofs device mounts. The aggregate virtiofs root and
+        // its per-share child binds live under VIRTIOFS_MOUNT_DIR and carry the
+        // same Windows source as the user-facing /mnt/<drive> bind mounts. If
+        // they were considered, reverse (Windows->Linux) translation could
+        // return an internal plumbing path (for example
+        // /run/wsl/virtiofs-mounts/drvfsa/<guid>) instead of the real mount
+        // point such as /mnt/c.
+        //
+
+        if (UtilIsPathPrefix(MountEnum.Current().MountPoint, VIRTIOFS_MOUNT_DIR, false) > 0)
+        {
+            continue;
+        }
+
+        //
         // If a mount point was previously found, and this mount point is a
         // prefix of the path (or the previously found mount point, for Windows
         // to Linux translation), it means that the path is not actually on
@@ -911,6 +927,7 @@ try
         //
 
         std::string MountSource;
+        std::string_view MountRoot{MountEnum.Current().Root};
         if (strcmp(MountEnum.Current().FileSystemType, PLAN9_FS_TYPE) == 0)
         {
             MountSource = UtilParsePlan9MountSource(MountEnum.Current().SuperOptions);
@@ -923,13 +940,18 @@ try
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            const auto aggregateRoot = ParseAggregateVirtioFsMountRoot(MountEnum.Current().Source, MountRoot);
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source, MountEnum.Current().Root);
             if (MountSource.empty())
             {
                 continue;
             }
 
             MountEnum.Current().Source = MountSource.data();
+            if (aggregateRoot)
+            {
+                MountRoot = aggregateRoot->SubPath;
+            }
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {
@@ -961,10 +983,10 @@ try
         //
 
         std::string CombinedMountSource;
-        if (strcmp(MountEnum.Current().Root, "/") != 0)
+        if (MountRoot != "/")
         {
             CombinedMountSource += MountEnum.Current().Source;
-            CombinedMountSource += MountEnum.Current().Root;
+            CombinedMountSource += MountRoot;
             UtilCanonicalisePathSeparator(CombinedMountSource, PATH_SEP_NT);
             MountEnum.Current().Source = CombinedMountSource.data();
         }
@@ -3751,19 +3773,40 @@ std::string UtilGetDistroCgroupPath(pid_t DistroInitPid)
 
 int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
 {
-    // Only cpu and memory are required for wsl's resource limit.
-    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), "+cpu +memory") < 0)
+    // Only cpu and memory are required for wsl's resource limit; every other controller cgroup.controllers
+    // reports is enabled on a best-effort basis.
+    constexpr std::string_view RequiredControllers[] = {"cpu", "memory"};
+    std::string RequiredEntries;
+    for (const auto Controller : RequiredControllers)
+    {
+        RequiredEntries += std::format("+{} ", Controller);
+    }
+
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), RequiredEntries.c_str()) < 0)
     {
         LOG_ERROR("Failed to enable cgroup controllers for {}: {}", CgroupPath, errno);
         return -1;
     }
-    const char* const OptionalControllers[] = {"+pids", "+io", "+cpuset", "+hugetlb", "+rdma", "+misc"};
-    for (const auto Controller : OptionalControllers)
+
+    std::string AvailableControllers;
+    try
     {
-        if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), Controller) < 0)
+        AvailableControllers = UtilReadFileContent(CgroupPath + "/cgroup.controllers");
+    }
+    CATCH_LOG();
+
+    std::string_view Remaining{AvailableControllers};
+    while (!Remaining.empty())
+    {
+        auto Controller = UtilStringNextToken(Remaining, " \n");
+        if (Controller.empty() ||
+            std::find(std::begin(RequiredControllers), std::end(RequiredControllers), Controller) != std::end(RequiredControllers))
         {
-            LOG_WARNING("Failed to enable optional cgroup controller {} for {}: {}", Controller, CgroupPath, errno);
+            continue;
         }
+
+        // WriteToFile() already logs a failure; these controllers are best-effort so no extra handling is needed.
+        WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), std::format("+{}", Controller).c_str());
     }
     return 0;
 }

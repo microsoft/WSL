@@ -95,7 +95,8 @@ COMMAND_LINE_TEST_CASE(L"container run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --cidfile C:\\temp\\cidfile ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run -it --name foo ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --rm -it --name foo ubuntu", L"run", true)
-COMMAND_LINE_TEST_CASE(L"stop", L"stop", true)
+COMMAND_LINE_TEST_CASE(L"stop", L"stop", false)           // Missing required container-id positional
+COMMAND_LINE_TEST_CASE(L"container stop", L"stop", false) // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal 9", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal SIGALRM", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal sigkill", L"stop", true)
@@ -294,6 +295,8 @@ COMMAND_LINE_TEST_CASE(L"image list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"pull ubuntu --quiet", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"pull ubuntu -q", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 --force --no-prune", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 cont2 cont3 --force --no-prune", L"remove", true)
 

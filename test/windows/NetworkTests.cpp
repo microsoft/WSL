@@ -345,6 +345,11 @@ class NetworkTests
         VERIFY_ARE_EQUAL(v6State.DefaultRoute->Device, L"eth0");
     }
 
+    WSL2_TEST_METHOD(AddDefaultRouteWithOfflinkGateway)
+    {
+        TestCase({{L"eth0", {{L"100.96.5.160", 32}}, L"100.96.5.161"}});
+    }
+
     WSL2_TEST_METHOD(AddRemoveDefaultOnlinkRoutes)
     {
         wsl::shared::hns::Route defaultRouteV4;

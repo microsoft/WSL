@@ -110,6 +110,12 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Networks>(std::move(networks));
                 handled = true;
             }
+            else if (dataType == Data::NetworkEndpointOptions)
+            {
+                wsl::windows::wslc::models::NetworkEndpointOptions endpointOptions;
+                dataMap.Add<Data::NetworkEndpointOptions>(std::move(endpointOptions));
+                handled = true;
+            }
 
             if (!handled)
             {
