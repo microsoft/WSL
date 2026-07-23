@@ -878,16 +878,16 @@ try
     while (MountEnum.Next())
     {
         //
-        // Skip internal virtiofs device mounts. The aggregate virtiofs root and
-        // its per-share child binds live under VIRTIOFS_MOUNT_DIR and carry the
-        // same Windows source as the user-facing /mnt/<drive> bind mounts. If
-        // they were considered, reverse (Windows->Linux) translation could
-        // return an internal plumbing path (for example
+        // When translating Windows paths to Linux, skip internal virtiofs
+        // device mounts. The aggregate virtiofs root and its per-share child
+        // binds live under VIRTIOFS_MOUNT_DIR and carry the same Windows source
+        // as the user-facing /mnt/<drive> bind mounts. If they were considered,
+        // translation could return an internal plumbing path (for example
         // /run/wsl/virtiofs-mounts/drvfsa/<guid>) instead of the real mount
         // point such as /mnt/c.
         //
 
-        if (UtilIsPathPrefix(MountEnum.Current().MountPoint, VIRTIOFS_MOUNT_DIR, false) > 0)
+        if (WinPath && UtilIsPathPrefix(MountEnum.Current().MountPoint, VIRTIOFS_MOUNT_DIR, false) > 0)
         {
             continue;
         }
