@@ -781,6 +781,259 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(expectedCmd, inspectData.Config.value().Cmd.value());
     }
 
+    // Tier 2: the tar exporter streams a filesystem tarball out of the VM to a client-side file. Verify
+    // the file is a valid, non-empty tar that contains the marker written by the build. Asserting the
+    // file is non-empty guards the regression where the streamed tarball once came back with 0 bytes.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeTarToFile_ProducesValidTarball_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-tar-file";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-tar-marker > /wslc-build-marker.txt\n");
+
+        auto tarPath = testRoot / L"out.tar";
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --output type=tar,dest=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), tarPath.wstring()));
+        buildResult.Verify({.ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(tarPath));
+        VERIFY_IS_TRUE(std::filesystem::file_size(tarPath) > 0, L"the streamed tarball must not be empty");
+        VERIFY_IS_TRUE(ListTarEntries(tarPath).find(L"wslc-build-marker.txt") != std::wstring::npos);
+    }
+
+    // Tier 2: dest=- streams the tarball to the client's stdout (matching docker). This is the exact path
+    // that once regressed to an empty tarball, so it redirects stdout to a file and asserts the result is
+    // a non-empty tar containing the build marker.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeTarToStdout_ProducesValidTarball_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-tar-stdout";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-tar-marker > /wslc-build-marker.txt\n");
+
+        auto tarPath = testRoot / L"stdout.tar";
+        auto buildResult = RunWslcAndRedirectToFile(
+            std::format(L"build \"{}\" -f \"{}\" --output type=tar,dest=-", contextDir.wstring(), dockerfilePath.wstring()), tarPath);
+        buildResult.Verify({.ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(tarPath));
+        VERIFY_IS_TRUE(std::filesystem::file_size(tarPath) > 0, L"the streamed tarball must not be empty");
+        VERIFY_IS_TRUE(ListTarEntries(tarPath).find(L"wslc-build-marker.txt") != std::wstring::npos);
+    }
+
+    // Tier 2: the local exporter streams a directory tree out of the VM; the client extracts it into the
+    // destination directory. Verify the marker file lands on disk under the dest directory.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeLocalToDirectory_ExtractsTree_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-local-dir";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-local-marker > /wslc-build-marker.txt\n");
+
+        auto destDir = testRoot / L"export";
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --output type=local,dest=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), destDir.wstring()));
+        buildResult.Verify({.ExitCode = 0});
+
+        VERIFY_IS_TRUE(
+            std::filesystem::exists(destDir / L"wslc-build-marker.txt"),
+            L"the local exporter must extract the build tree to disk");
+    }
+
+    // Tier 1: the local exporter writes a directory tree, so dest=- (stdout) is rejected client-side
+    // before any build runs, mirroring docker.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeLocalToStdout_Rejected_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-local-stdout";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --output type=local,dest=-", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(
+            buildResult.Stderr->find(L"Invalid --output value 'type=local,dest=-': dest cannot be stdout for local exporter") !=
+            std::wstring::npos);
+    }
+
+    // Tier 2: the image exporter loads the built image into the engine's image store (like the docker
+    // exporter with no dest), so the result is host-observable via inspect. Tag with -t.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeImage_LoadsIntoStore_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageOutputImage);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-image";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-image-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=image",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputImage.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageOutputImage.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+        VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
+        VERIFY_ARE_EQUAL(BuiltImageOutputImage.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
+    }
+
+    // Tier 2: the cacheonly exporter runs the build only to populate the build cache, producing no image
+    // artifact. Verify the build succeeds and, because nothing is exported, the tag is not in the store.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeCacheOnly_ProducesNoImage_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-cacheonly";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"cacheonly-ok\"]\n");
+
+        // Guard against a leaked image if cacheonly ever regresses to loading into the store.
+        auto imageCleanup = DeleteImageOnExit(BuiltImageOutputCacheOnly);
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=cacheonly",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputCacheOnly.NameAndTag()));
+        buildResult.Verify({.ExitCode = 0});
+
+        // cacheonly exports nothing, so the tag must not resolve in the image store.
+        auto inspectResult = RunWslc(std::format(L"image inspect {}", BuiltImageOutputCacheOnly.NameAndTag()));
+        VERIFY_ARE_NOT_EQUAL(0u, inspectResult.ExitCode.value_or(0u), L"cacheonly must not load an image into the store");
+    }
+
+    // Tier 1: the registry exporter pushes to a named reference, so 'name=' is mandatory and its absence
+    // is rejected client-side before any build runs.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeRegistryMissingName_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-registry-noname";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --output type=registry", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --output value 'type=registry': 'type=registry' requires 'name='") != std::wstring::npos);
+    }
+
+    // Tier 1: the tar exporter writes a tarball to a caller-provided location, so 'dest=' is mandatory
+    // and its absence is rejected client-side before any build runs.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeTarMissingDest_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-tar-nodest";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --output type=tar", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --output value 'type=tar': 'type=tar' requires 'dest='") != std::wstring::npos);
+    }
+
+    // Tier 2: a failing build step must surface as a non-zero exit with the image exporter, and the tag
+    // must not be left in the store. This is the failing counterpart to TypeImage_LoadsIntoStore.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeImage_BuildFailure_Fails)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageOutputImageFail);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-image-fail";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN exit 7\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=image",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputImageFail.NameAndTag()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.StderrContainsSubstring(L"failed to solve"));
+
+        auto inspectResult = RunWslc(std::format(L"image inspect {}", BuiltImageOutputImageFail.NameAndTag()));
+        VERIFY_ARE_NOT_EQUAL(0u, inspectResult.ExitCode.value_or(0u), L"a failed build must not leave an image in the store");
+    }
+
+    // Tier 2: a failing build step must surface as a non-zero exit with the cacheonly exporter. This is
+    // the failing counterpart to TypeCacheOnly_ProducesNoImage.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeCacheOnly_BuildFailure_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-cacheonly-fail";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN exit 7\n");
+
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --output type=cacheonly", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.StderrContainsSubstring(L"failed to solve"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
         auto imageCleanup = DeleteImageOnExit(BuiltImageDockerfile);
@@ -905,6 +1158,20 @@ private:
     const TestImage BuiltImageSecretBinary{L"wslc-e2e-build-secret-binary", L"latest", L""};
     const TestImage BuiltImageOutputDockerTag{L"wslc-e2e-build-output-docker-tag", L"latest", L""};
     const TestImage BuiltImageOutputDockerConfig{L"wslc-e2e-build-output-docker-config", L"latest", L""};
+    const TestImage BuiltImageOutputImage{L"wslc-e2e-build-output-image", L"latest", L""};
+    const TestImage BuiltImageOutputImageFail{L"wslc-e2e-build-output-image-fail", L"latest", L""};
+    const TestImage BuiltImageOutputCacheOnly{L"wslc-e2e-build-output-cacheonly", L"latest", L""};
+
+    // Runs `tar.exe -tf <path>` and returns the member listing so tests can assert an exporter produced a
+    // valid, non-empty archive that contains an expected entry.
+    static std::wstring ListTarEntries(const std::filesystem::path& tarPath)
+    {
+        auto cmd = std::format(L"tar.exe -tf \"{}\"", tarPath.wstring());
+        wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+        auto output = process.RunAndCaptureOutput();
+        VERIFY_ARE_EQUAL(0u, output.ExitCode, L"tar.exe failed to list the produced archive");
+        return output.Stdout;
+    }
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
