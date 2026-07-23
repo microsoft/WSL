@@ -11873,6 +11873,41 @@ class WSLCTests
             "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80", "path");
     }
 
+    TEST_METHOD(CanonicalImageReference)
+    {
+        using wsl::windows::common::wslutil::GetCanonicalImageReference;
+
+        auto Validate = [](const std::string& input, const std::string& expected) {
+            VERIFY_ARE_EQUAL(GetCanonicalImageReference(input), expected);
+        };
+
+        // Name-only references default to ":latest" and the docker.io/library prefix (matches `docker pull` output).
+        Validate("ubuntu", "docker.io/library/ubuntu:latest");
+        Validate("ubuntu:22.04", "docker.io/library/ubuntu:22.04");
+        Validate("library/ubuntu", "docker.io/library/ubuntu:latest");
+        Validate("pytorch/pytorch", "docker.io/pytorch/pytorch:latest");
+        Validate("docker.io/ubuntu", "docker.io/library/ubuntu:latest");
+        Validate("index.docker.io/library/ubuntu:latest", "docker.io/library/ubuntu:latest");
+
+        // Custom registries keep their domain and path.
+        Validate("ghcr.io/owner/repo:sha-abc123", "ghcr.io/owner/repo:sha-abc123");
+        Validate("myregistry.io:5000/myimage", "myregistry.io:5000/myimage:latest");
+        Validate("localhost:5000/myimage:latest", "localhost:5000/myimage:latest");
+
+        // A mixed-case registry domain is preserved verbatim, matching Docker (which never lowercases the domain).
+        Validate("Example.COM/owner/repo", "Example.COM/owner/repo:latest");
+
+        // Digest references are preserved.
+        Validate(
+            "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "docker.io/library/ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        // A tag and digest are both preserved when both are present, matching Docker's canonical reference.
+        Validate(
+            "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "docker.io/library/ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+    }
+
     WSLC_TEST_METHOD(ElevatedTokenCanOpenNonElevatedHandles)
     {
         wil::com_ptr<IWSLCSession> nonElevatedSession;

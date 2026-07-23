@@ -294,6 +294,8 @@ COMMAND_LINE_TEST_CASE(L"image list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"pull ubuntu --quiet", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"pull ubuntu -q", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 --force --no-prune", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 cont2 cont3 --force --no-prune", L"remove", true)
 
