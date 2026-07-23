@@ -849,6 +849,107 @@ inline std::wstring FormatBytes(uint64_t bytes)
     }
 }
 
+template <typename TChar>
+inline std::basic_string<TChar> Trim(const std::basic_string<TChar>& input)
+{
+    constexpr TChar whitespace[] = {TChar(' '), TChar('\t'), TChar('\n'), TChar('\r'), TChar('\f'), TChar('\v'), TChar('\0')};
+    const auto first = input.find_first_not_of(whitespace);
+    if (first == std::basic_string<TChar>::npos)
+    {
+        return {};
+    }
+
+    const auto last = input.find_last_not_of(whitespace);
+    return input.substr(first, last - first + 1);
+}
+
+template <typename TChar>
+inline std::basic_string<TChar> UnescapeShell(const std::basic_string<TChar>& input)
+{
+    enum class Quote
+    {
+        None,
+        Single,
+        Double
+    };
+
+    Quote quote = Quote::None;
+    std::basic_string<TChar> output;
+    output.reserve(input.size());
+
+    for (size_t index = 0; index < input.size(); index += 1)
+    {
+        const auto current = input[index];
+        if (quote == Quote::Single)
+        {
+            if (current == TChar('\''))
+            {
+                quote = Quote::None;
+            }
+            else
+            {
+                output.push_back(current);
+            }
+
+            continue;
+        }
+
+        if (current == TChar('\''))
+        {
+            if (quote == Quote::Double)
+            {
+                output.push_back(current);
+            }
+            else
+            {
+                quote = Quote::Single;
+            }
+
+            continue;
+        }
+
+        if (current == TChar('"'))
+        {
+            quote = (quote == Quote::Double) ? Quote::None : Quote::Double;
+            continue;
+        }
+
+        if (current != TChar('\\'))
+        {
+            output.push_back(current);
+            continue;
+        }
+
+        if (++index == input.size())
+        {
+            // return the original string if the escape is invalid.
+            return input;
+        }
+
+        const auto escaped = input[index];
+        if (quote == Quote::None)
+        {
+            // "\\\n" out of escape means continue the line.
+            if (escaped != TChar('\n'))
+            {
+                output.push_back(escaped);
+            }
+        }
+        else if (escaped == TChar('"') || escaped == TChar('\\') || escaped == TChar('$') || escaped == TChar('`'))
+        {
+            output.push_back(escaped);
+        }
+        else if (escaped != TChar('\n'))
+        {
+            output.push_back(current);
+            output.push_back(escaped);
+        }
+    }
+
+    // return the original string if the escape is invalid.
+    return (quote == Quote::None) ? output : input;
+}
+
 } // namespace wsl::shared::string
 
 template <>
