@@ -1,6 +1,6 @@
 # WSLC aggregate virtiofs benchmark
 
-This harness compares virtiofs request queue counts while multiple WSLC bind mounts use distinct children of one aggregate virtiofs device. It runs pinned, offline Git clone and source archive extraction workloads concurrently across 1, 2, 4, 8, or 16 host shares.
+This harness compares virtiofs request queue counts while multiple WSLC bind mounts use distinct children of one aggregate virtiofs device. It runs pinned, offline Git clone and source extraction workloads concurrently across 1, 2, 4, 8, or 16 host shares.
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ This harness compares virtiofs request queue counts while multiple WSLC bind mou
 - Ensure `wslc.exe` can create containers and reach GitHub while building the fixture image.
 - Run PowerShell from an account that can use WSLC.
 
-The image build fetches TypeScript `v5.8.3` once and stores both a bare repository and an uncompressed source archive in the image. The Git workload checks out a clone, while the archive workload extracts tens of thousands of source files. Timed runs use only data stored in the image, so network latency is excluded and no npm registry access is required.
+The image build fetches TypeScript `v5.8.3` once and selects its `src` tree plus real project test cases, about 1,500 entries. It stores that subset as both a bare repository and an uncompressed source archive. The Git workload checks out a clone, while the source extraction workload creates the same tree without Git processing. Timed runs use only data stored in the image, so network latency is excluded and no npm registry access is required.
 
 ## Run
 

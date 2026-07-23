@@ -4,7 +4,7 @@
 set -uo pipefail
 
 usage() {
-    echo "usage: run-workload.sh <git-clone|archive-extract> <share-path>..." >&2
+    echo "usage: run-workload.sh <git-clone|source-extract> <share-path>..." >&2
     exit 2
 }
 
@@ -14,7 +14,7 @@ shift
 shares=("$@")
 
 case "$workload" in
-    git-clone|archive-extract)
+    git-clone|source-extract)
         ;;
     *)
         usage
@@ -62,10 +62,10 @@ for index in "${!shares[@]}"; do
                 git clone --quiet --no-local file:///fixtures/git/repository.git "$share/repository" \
                     >"$result_directory/worker-$index.log" 2>&1 || status=$?
                 ;;
-            archive-extract)
+            source-extract)
                 rm -rf "$share/typescript"
                 mkdir -p "$share/typescript"
-                tar --extract --file=/fixtures/typescript.tar --directory="$share/typescript" \
+                tar --extract --file=/fixtures/typescript-source.tar --directory="$share/typescript" \
                     >"$result_directory/worker-$index.log" 2>&1 || status=$?
                 ;;
         esac
