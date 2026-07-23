@@ -3005,7 +3005,16 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
-                LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str()));
+                // The VHD might be in use so try to delete it for up to 10 seconds.
+                try
+                {
+                    wsl::shared::retry::RetryWithTimeout<void>(
+                        [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
+                        std::chrono::milliseconds(100),
+                        std::chrono::seconds(10),
+                        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+                }
+                CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
             }
         }
     }
