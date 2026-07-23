@@ -5560,7 +5560,16 @@ class WSLCTests
             options.Driver = "bridge";
             options.Subnet = nullptr;
             options.Gateway = "172.44.0.1";
-            verifyInvalid(L"--subnet");
+            verifyInvalid(L"--gateway");
+        }
+
+        // IpRange specified without Subnet
+        {
+            options.Driver = "bridge";
+            options.Subnet = nullptr;
+            options.Gateway = nullptr;
+            options.IpRange = "172.44.10.0/24";
+            verifyInvalid(L"--ip-range");
         }
     }
 
@@ -5685,6 +5694,86 @@ class WSLCTests
         VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
         VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
         VERIFY_ARE_EQUAL(gateway, inspect.IPAM.Config->at(0).Gateway);
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateWithIpRangeTest)
+    {
+        const std::string networkName = "ip-range-test-net";
+        const std::string subnet = "172.32.0.0/16";
+        const std::string ipRange = "172.32.10.0/24";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = ipRange.c_str();
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
+        VERIFY_ARE_EQUAL(ipRange, inspect.IPAM.Config->at(0).IPRange);
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInvalidIpRangeTest)
+    {
+        const std::string networkName = "bad-ip-range-net";
+        const std::string subnet = "172.33.0.0/16";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = "10.0.0.0/24";
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+    }
+
+    WSLC_TEST_METHOD(NetworkSessionRecoveryWithIpRangeTest)
+    {
+        const std::string networkName = "recovery-ip-range-net";
+        const std::string subnet = "172.34.0.0/16";
+        const std::string ipRange = "172.34.20.0/24";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = ipRange.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        // Reset the session (simulates session restart).
+        ResetTestSession();
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
+        VERIFY_ARE_EQUAL(ipRange, inspect.IPAM.Config->at(0).IPRange);
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithArbitraryDriverOptsTest)

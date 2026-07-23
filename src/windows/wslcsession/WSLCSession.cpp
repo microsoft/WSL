@@ -2509,6 +2509,9 @@ try
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
 
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcIpRangeRequiresSubnet(), Options->IpRange != nullptr && Options->Subnet == nullptr);
+
     if (Options->Subnet != nullptr)
     {
         docker_schema::IPAMConfig ipamConfig;
@@ -2517,6 +2520,11 @@ try
         if (Options->Gateway != nullptr)
         {
             ipamConfig.Gateway = Options->Gateway;
+        }
+
+        if (Options->IpRange != nullptr)
+        {
+            ipamConfig.IPRange = Options->IpRange;
         }
 
         auto& ipam = request.IPAM.emplace();
@@ -2576,7 +2584,7 @@ try
         auto& cfgs = entry.IPAM.Config.emplace();
         for (const auto& c : *full.IPAM.Config)
         {
-            cfgs.push_back({c.Subnet, c.Gateway});
+            cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
         }
     }
 
@@ -2708,6 +2716,7 @@ try
             wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
             inspectCfg.Gateway = cfg.Gateway;
+            inspectCfg.IPRange = cfg.IPRange;
             configs.push_back(std::move(inspectCfg));
         }
     }
@@ -3533,7 +3542,7 @@ void WSLCSession::RecoverExistingNetworks()
                 auto& cfgs = entry.IPAM.Config.emplace();
                 for (const auto& c : *network.IPAM.Config)
                 {
-                    cfgs.push_back({c.Subnet, c.Gateway});
+                    cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
                 }
             }
 

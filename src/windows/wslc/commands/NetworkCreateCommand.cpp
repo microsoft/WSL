@@ -33,6 +33,7 @@ std::vector<Argument> NetworkCreateCommand::GetArguments() const
         Argument::Create(ArgType::Label, false, NO_LIMIT, Localization::WSLCCLI_NetworkLabelArgDescription()),
         Argument::Create(ArgType::Gateway),
         Argument::Create(ArgType::Internal),
+        Argument::Create(ArgType::IpRange),
         Argument::Create(ArgType::Subnet),
     };
 }

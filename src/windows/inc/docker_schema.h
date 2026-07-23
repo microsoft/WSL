@@ -118,8 +118,9 @@ struct IPAMConfig
 {
     std::string Subnet;
     std::string Gateway;
+    std::string IPRange;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway, IPRange);
 };
 
 struct IPAM
