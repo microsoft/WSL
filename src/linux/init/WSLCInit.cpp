@@ -669,8 +669,9 @@ void HandleMessageImpl(
     Transaction.Send(Response);
 }
 
-void HandleMessageImpl(
-    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+template <typename TMessage>
+void HandleMountMessage(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const TMessage& Message, const gsl::span<gsl::byte>& Buffer)
 {
     WSLC_MOUNT_RESULT response{};
     response.Header.MessageType = WSLC_MOUNT_RESULT::Type;
@@ -695,7 +696,6 @@ void HandleMessageImpl(
         }
 
         const char* source = readField(Message.SourceIndex);
-        const char* childName = readField(Message.ChildNameIndex);
 
         const char* target{};
         if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::KernelModules))
@@ -719,14 +719,15 @@ void HandleMessageImpl(
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 
         auto type = readField(Message.TypeIndex);
-        if (*childName == '\0')
+        if constexpr (std::is_same_v<TMessage, WSLC_MOUNT_VIRTIOFS>)
         {
-            THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+            const char* childName = readField(Message.ChildNameIndex);
+            THROW_ERRNO_IF(EINVAL, !wsl::shared::string::IsEqual(type, VIRTIO_FS_TYPE));
+            THROW_LAST_ERROR_IF(MountVirtioFsChild(source, childName, target, mountOptions) < 0);
         }
         else
         {
-            THROW_ERRNO_IF(EINVAL, !wsl::shared::string::IsEqual(type, VIRTIO_FS_TYPE));
-            THROW_LAST_ERROR_IF(MountVirtioFsChild(source, childName, target, mountOptions) < 0);
+            THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
         }
 
         // Workaround for a Linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs share before the permissions have been fetched.
@@ -827,6 +828,21 @@ void HandleMessageImpl(
     }
 
     Transaction.Send<WSLC_MOUNT_RESULT>(response);
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    HandleMountMessage(Channel, Transaction, Message, Buffer);
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel,
+    wsl::shared::Transaction& Transaction,
+    const WSLC_MOUNT_VIRTIOFS& Message,
+    const gsl::span<gsl::byte>& Buffer)
+{
+    HandleMountMessage(Channel, Transaction, Message, Buffer);
 }
 
 void HandleMessageImpl(
@@ -1032,7 +1048,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

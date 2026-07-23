@@ -850,7 +850,7 @@ void WSLCVirtualMachine::Mount(LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR
     Mount(m_initChannel, Source, Target, Type, Options, Flags);
 }
 
-void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags, LPCSTR ChildName)
+void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
 {
     static_assert(WSLCMountFlagsNone == WSLC_MOUNT::None);
     static_assert(WSLCMountFlagsReadOnly == WSLC_MOUNT::ReadOnly);
@@ -871,7 +871,6 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
     optionalAdd(Type, message->TypeIndex);
     optionalAdd(Options, message->OptionsIndex);
     message->Flags = Flags;
-    optionalAdd(ChildName, message->ChildNameIndex);
 
     const auto& response = Channel.Transaction<WSLC_MOUNT>(message.Span());
 
@@ -882,7 +881,31 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
         TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
         TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
         TraceLoggingValue(Flags, "Flags"),
-        TraceLoggingValue(ChildName == nullptr ? "<null>" : ChildName, "ChildName"),
+        TraceLoggingValue(response.Result, "Result"));
+
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+}
+
+void WSLCVirtualMachine::MountVirtioFsChild(
+    shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
+{
+    wsl::shared::MessageWriter<WSLC_MOUNT_VIRTIOFS> message;
+    message.WriteString(message->SourceIndex, Source);
+    message.WriteString(message->ChildNameIndex, ChildName);
+    message.WriteString(message->DestinationIndex, Target);
+    message.WriteString(message->TypeIndex, "virtiofs");
+    message.WriteString(message->OptionsIndex, Options);
+    message->Flags = Flags;
+
+    const auto& response = Channel.Transaction<WSLC_MOUNT_VIRTIOFS>(message.Span());
+
+    WSL_LOG(
+        "WSLCMountVirtioFsChild",
+        TraceLoggingValue(Source, "Source"),
+        TraceLoggingValue(ChildName, "ChildName"),
+        TraceLoggingValue(Target, "Target"),
+        TraceLoggingValue(Options, "Options"),
+        TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
     THROW_HR_IF(E_FAIL, response.Result != 0);
@@ -1124,7 +1147,7 @@ try
     else
     {
         std::string options = readOnly ? "ro" : "rw";
-        Mount(m_initChannel, LX_INIT_DRVFS_VIRTIO_TAG, LinuxPath, "virtiofs", options.c_str(), Flags, shareName.c_str());
+        MountVirtioFsChild(m_initChannel, LX_INIT_DRVFS_VIRTIO_TAG, shareName.c_str(), LinuxPath, options.c_str(), Flags);
     }
 
     deleteOnFailure.release();

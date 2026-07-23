@@ -201,7 +201,9 @@ private:
     // Called after the root filesystem is mounted.
     void ReadGuestCapabilities();
 
-    static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags, _In_opt_ LPCSTR ChildName = nullptr);
+    static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    static void MountVirtioFsChild(
+        wsl::shared::SocketChannel& Channel, _In_ LPCSTR Source, _In_ LPCSTR ChildName, _In_ LPCSTR Target, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
 
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcessImpl(
