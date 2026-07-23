@@ -2134,10 +2134,6 @@ Usage:
     <value>A(z) {} tároló fut.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>A ContainerIpAddress még nem támogatott.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>A portleképezések nem támogatottak tárolóhálózati módban; a portok a céltárolóhoz tartoznak.</value>
   </data>
@@ -2208,6 +2204,21 @@ Usage:
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Ha további információra van szüksége egy adott parancsról, adja meg hozzá a súgó argumentumát.</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Parancsok:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Beállítások:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Globális kapcsolók:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliasok:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Paraméterek:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Az aktuális parancs argumentumának neve nem ismerhető fel: {}</value>
@@ -2368,17 +2379,32 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Érvénytelen leállítási időkorlát érték: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>További hálózatok nem engedélyezettek, ha az elsődleges hálózati mód 'host' vagy 'none'.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>A(z) {} elsődleges hálózati mód nem támogatja további hálózatok csatlakoztatását vagy leválasztását.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplikált hálózat: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>A végponti beállítások még nem támogatottak (hálózat: {}).</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Duplicate driver option '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>Csak egy IP-cím adható meg a(z) {} hálózathoz.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Network link cannot be empty.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>A hálózati alias nem lehet üres.</value>
@@ -2386,6 +2412,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Hálózati aliasokhoz felhasználó által definiált hálózat szükséges. A --network használatával adhat meg egyet.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>Endpoint settings are not supported for network mode '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Hálózati aliasok nem adhatók meg, ha több hálózatra van szükség. Használjon egyetlen --network argumentumot.</value>
@@ -2976,6 +3006,22 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Hálózati hatókörű alias hozzáadása a tárolóhoz</value>
+  </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Assign the container an IPv4 address on the network</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Add link to another container (--link name:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Add a link-local IPv4 address for the container</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Érvénytelen {} érték: a hálózati alias nem lehet üres vagy szóköz</value>
