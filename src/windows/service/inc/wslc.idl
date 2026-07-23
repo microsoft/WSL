@@ -125,6 +125,13 @@ interface IWSLCPluginNotifier : IUnknown
 
     // Called when an image is deleted. 'ImageId' is the image identifier. Errors are logged but ignored.
     HRESULT OnImageDeleted([in] LPCSTR ImageId);
+
+    // Called when the VM backing the session has started (first start or recreation after idle
+    // teardown). Errors are logged but ignored.
+    HRESULT OnVmStarted();
+
+    // Called when the VM backing the session is about to stop. Errors are logged but ignored.
+    HRESULT OnVmStopping();
 };
 
 typedef struct _WSLCImageInformation
@@ -469,6 +476,7 @@ typedef struct _WSLCSessionSettings {
     WSLCFeatureFlags FeatureFlags;
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
+    ULONG IdleTimeoutSec;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
@@ -605,6 +613,7 @@ typedef struct _WSLCSessionInitSettings
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
+    ULONG IdleTimeoutSec;
 } WSLCSessionInitSettings;
 
 [
@@ -692,6 +701,21 @@ interface IWSLCSession : IUnknown
     HRESULT PruneNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *NetworksCount)] WSLCNetworkName** Networks, [out] ULONG* NetworksCount);
 
     HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
+
+    // Used only for testing. Synchronously runs the idle-termination teardown path, ignoring the
+    // activity-count guard so a test can force the VM down even while a container holds an activity
+    // reference. The idle-termination-enabled (persistent-storage) guard is still honored: a
+    // tmpfs-backed session is never torn down, since that would lose unrecoverable state.
+    // WasAlreadyIdle is TRUE when the VM was not running.
+    HRESULT TriggerIdleTermination([out] BOOL* WasAlreadyIdle);
+
+    // Keeps the VM alive for the duration of a client-side container operation. The CLI performs
+    // each mutation as two round-trips (OpenContainer followed by the operation) and may stream
+    // output afterwards. With on-demand VM idle-termination the VM could otherwise tear down
+    // between those calls, disconnecting the container wrapper and failing the second call with
+    // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
+    // it (or the client exiting) lets the VM idle-terminate again.
+    HRESULT BeginContainerOperation([out] IUnknown** Operation);
 }
 
 //

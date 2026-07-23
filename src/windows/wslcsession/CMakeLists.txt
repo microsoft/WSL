@@ -9,6 +9,7 @@ set(SOURCES
 
     # Session and container implementation
     WSLCSession.cpp
+    WSLCSessionRuntime.cpp
     WSLCContainer.cpp
     WSLCVirtualMachine.cpp
 
@@ -44,6 +45,8 @@ set(HEADERS
     WSLCProcessControl.h
     WSLCProcessIO.h
     WSLCSession.h
+    WSLCSessionRuntime.h
+    WSLCIdleState.h
     WSLCSessionFactory.h
     WSLCSessionReference.h
     WSLCVirtualMachine.h

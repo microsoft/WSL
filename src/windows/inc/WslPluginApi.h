@@ -141,6 +141,19 @@ typedef HRESULT (*WSLPluginAPI_ImageCreated)(const struct WSLCSessionInformation
 // Called when an image is deleted. 'ImageId' is the deleted image identifier. Errors are ignored.
 typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation* Session, LPCSTR ImageId);
 
+// Called when the VM backing a WSLC session has started. Unlike OnSessionCreated (which fires once
+// per session), this fires every time a VM is created for the session: on the first operation that
+// needs a VM, and again each time the VM is recreated after being idle-terminated. Errors are logged
+// but ignored (they do not abort VM startup or the triggering operation).
+typedef HRESULT (*WSLPluginAPI_OnWslcVmStarted)(const struct WSLCSessionInformation* Session);
+
+// Called when the VM backing a WSLC session is about to stop (idle teardown, explicit termination,
+// or unexpected exit). Fires every time a VM is torn down, paired with a prior OnWslcVmStarted.
+// Errors are logged but ignored. On an idle teardown the session remains alive, so a callback that
+// needs the VM (e.g. WSLCCreateProcess) transparently restarts it; during a permanent session
+// termination the same call fails cleanly because the session is being torn down.
+typedef HRESULT (*WSLPluginAPI_OnWslcVmStopping)(const struct WSLCSessionInformation* Session);
+
 //
 // WSLC plugin API calls.
 //
@@ -220,6 +233,8 @@ struct WSLPluginHooksV1
     WSLPluginAPI_ContainerStopping ContainerStopping;
     WSLPluginAPI_ImageCreated ImageCreated;
     WSLPluginAPI_ImageDeleted ImageDeleted;
+    WSLPluginAPI_OnWslcVmStarted WslcVmStarted;   // Introduced in 2.9.5
+    WSLPluginAPI_OnWslcVmStopping WslcVmStopping; // Introduced in 2.9.5
 };
 
 struct WSLPluginAPIV1

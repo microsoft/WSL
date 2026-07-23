@@ -121,6 +121,7 @@ private:
         Settings.MemoryMb = memoryMb > 0 ? memoryMb : SessionSettings::DefaultMemoryMb();
         Settings.MaximumStorageSizeMb = userSettings.Get<settings::Setting::SessionStorageSizeMb>();
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
+        Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
 
         // TODO: Add a config setting to opt-out of GPU support.
@@ -179,6 +180,12 @@ try
     g_pluginManager.OnWslcSessionStopping(&info);
 }
 CATCH_LOG()
+
+bool WSLCSessionManagerImpl::InPluginNotificationContext() noexcept
+{
+    const auto* context = wsl::windows::common::ExecutionContext::Current();
+    return context != nullptr && WI_IsFlagSet(context->CurrentContext(), wsl::windows::common::Context::Plugin);
+}
 
 void WSLCSessionManagerImpl::CreateSession(
     _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
@@ -285,8 +292,7 @@ void WSLCSessionManagerImpl::CreateSession(
             g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
         // Create the VM factory in the SYSTEM service (privileged). The per-user session
-        // uses it to create the VM. Funneling VM creation through a factory lets the session
-        // own when VMs are created, rather than having one handed to it up front.
+        // uses it to create VMs on demand and recreate them after idle-termination.
         auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings);
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
@@ -473,6 +479,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
+    sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
     return sessionSettings;
 }
 

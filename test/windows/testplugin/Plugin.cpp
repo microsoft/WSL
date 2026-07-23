@@ -539,6 +539,84 @@ HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId
     return S_OK;
 }
 
+HRESULT OnWslcVmStarted(const WSLCSessionInformation* Session)
+try
+{
+    // Only log/exercise for the dedicated VM-restart test so other WSLC plugin tests (which start
+    // and stop VMs incidentally) are not affected by extra log lines.
+    if (g_testType != PluginTestType::WslcVmRestart)
+    {
+        return S_OK;
+    }
+
+    g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
+
+    // Prove the VM is usable from within the started hook, and that calling back into the session
+    // (WSLCCreateProcess acquires a VM lease + the runtime lock) does not deadlock.
+    std::vector<const char*> args = {"/bin/true", nullptr};
+    WSLCProcessHandle process = nullptr;
+    const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+    g_logfile << "WSLC VM started reentrant WSLCCreateProcess: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+    if (SUCCEEDED(hr))
+    {
+        g_api->WSLCReleaseProcess(process);
+    }
+
+    // Also exercise a reentrant mount + unmount from the started hook; the session is alive here so
+    // both calls succeed, validating that mount management reentrant from OnVmStarted does not deadlock.
+    constexpr auto* mountpoint = "/test-plugin/vm-started-mount";
+    const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", mountpoint, TRUE);
+    if (SUCCEEDED(mountHr))
+    {
+        const auto unmountHr = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
+        g_logfile << "WSLC VM started mount+unmount: " << (SUCCEEDED(unmountHr) ? "ok" : "failed") << std::endl;
+    }
+    else
+    {
+        g_logfile << "WSLC VM started mount+unmount: skipped" << std::endl;
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
+try
+{
+    if (g_testType != PluginTestType::WslcVmRestart)
+    {
+        return S_OK;
+    }
+
+    g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+
+    // Proves OnVmStopping doesn't deadlock a plugin that calls back in: on idle teardown the session
+    // is alive so these restart the VM and succeed; on permanent teardown they fail cleanly.
+    std::vector<const char*> args = {"/bin/true", nullptr};
+    WSLCProcessHandle process = nullptr;
+    const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+    g_logfile << "WSLC VM stopping reentrant WSLCCreateProcess: " << (SUCCEEDED(processHr) ? "ok" : "failed") << std::endl;
+    if (SUCCEEDED(processHr))
+    {
+        g_api->WSLCReleaseProcess(process);
+    }
+
+    constexpr auto* mountpoint = "/test-plugin/vm-stopping-mount";
+    const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", mountpoint, TRUE);
+    if (SUCCEEDED(mountHr))
+    {
+        const auto unmountHr = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
+        g_logfile << "WSLC VM stopping mount+unmount: " << (SUCCEEDED(unmountHr) ? "ok" : "failed") << std::endl;
+    }
+    else
+    {
+        g_logfile << "WSLC VM stopping mount+unmount: skipped" << std::endl;
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPluginAPIV1* Api, WSLPluginHooksV1* Hooks)
 {
     try
@@ -550,7 +628,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcImagePull));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmRestart));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;
@@ -566,6 +644,8 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         Hooks->ContainerStopping = &OnWslcContainerStopping;
         Hooks->ImageCreated = &OnWslcImageCreated;
         Hooks->ImageDeleted = &OnWslcImageDeleted;
+        Hooks->WslcVmStarted = &OnWslcVmStarted;
+        Hooks->WslcVmStopping = &OnWslcVmStopping;
 
         if (g_testType == PluginTestType::FailToLoad)
         {

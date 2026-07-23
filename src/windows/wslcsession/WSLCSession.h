@@ -18,12 +18,16 @@ Abstract:
 #include "WSLCCompat.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
+#include "WSLCIdleState.h"
 #include "WSLCVolumes.h"
+#include "WSLCSessionRuntime.h"
 #include "WSLCNetworkMetadata.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
+#include <atomic>
 #include <list>
+#include <optional>
 #include <unordered_map>
 
 namespace wsl::windows::service::wslc {
@@ -71,13 +75,20 @@ private:
 //
 // WSLCSession - Implements IWSLCSession for container management.
 // Runs in a per-user COM server process for security isolation.
-// The SYSTEM service creates the VM and passes IWSLCVirtualMachine to Initialize().
+// The SYSTEM service passes an IWSLCVirtualMachineFactory to Initialize(); the VM is created
+// lazily on first use and may be torn down when idle and recreated on demand.
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
 {
+    // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
+    // teardown) for the duration of a container deletion.
+    friend class WSLCContainer;
+
 public:
-    WSLCSession() = default;
+    WSLCSession() : m_runtime(*this)
+    {
+    }
 
     ~WSLCSession();
 
@@ -143,6 +154,7 @@ public:
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
+    IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
         _Out_ WSLCContainerEntry** Containers,
@@ -203,6 +215,7 @@ public:
     IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
+    IFACEMETHOD(TriggerIdleTermination)(_Out_ BOOL* WasAlreadyIdle) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
     // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
@@ -259,33 +272,57 @@ public:
 
     bool WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const;
 
+    // Shared idle-termination state. Exposed so VM-scoped objects (e.g. running containers via
+    // WSLCContainerImpl's ActivityRef) can hold an activity reference for their lifetime without
+    // keeping the session object itself alive.
+    std::shared_ptr<IdleState> IdleStateShared() const noexcept
+    {
+        return m_runtime.IdleStateShared();
+    }
+
+    WSLCSessionRuntime& Runtime() noexcept
+    {
+        return m_runtime;
+    }
+
+    const WSLCSessionRuntime& Runtime() const noexcept
+    {
+        return m_runtime;
+    }
+
+    // Creates an opaque activity token that holds a reference on this session's activity count for
+    // its lifetime, deferring idle teardown of the VM until every outstanding token is released.
+    // Used both for transient client operations (BeginContainerOperation) and to keep the VM alive
+    // for the lifetime of a process whose wrapper a client may keep (root-namespace and exec'd
+    // processes).
+    Microsoft::WRL::ComPtr<IUnknown> CreateActivityToken();
+
 private:
     ULONG m_id = 0;
+    void PersistSettings(const WSLCSessionInitSettings& Settings, PSID UserSid);
+
+    using VmLease = WSLCSessionRuntime::VmLease;
+    [[nodiscard]] VmLease AcquireVmLease();
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
 
-    _Requires_shared_lock_held_(m_lock)
     void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
-    _Requires_shared_lock_held_(m_lock)
     std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
 
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
-    _Requires_shared_lock_held_(m_lock)
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
 
-    _Requires_shared_lock_held_(m_lock)
     void OnImageDeleted(const std::string& ImageId) noexcept;
 
     void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
     void OnDockerdExited();
-    void OnVmExited();
     ServiceRunningProcess StartProcess(
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
     void InstallTrustedRootCertificates();
@@ -300,35 +337,41 @@ private:
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
 
-    std::optional<DockerHTTPClient> m_dockerClient;
-    std::optional<WSLCVirtualMachine> m_virtualMachine;
-    std::optional<DockerEventTracker> m_eventTracker;
-    wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
+    // The VM factory is a cross-process proxy supplied by the SYSTEM service at Initialize() time
+    // but first used later (on demand) from a different thread/apartment. A directly stored proxy
+    // would fail with RPC_E_WRONG_THREAD, so it is parked in the process Global Interface Table and
+    // re-fetched (re-marshalled into the calling apartment) each time a VM is created.
+    wil::com_ptr<IGlobalInterfaceTable> m_git;
+    DWORD m_vmFactoryGitCookie{};
+
+    WSLCSessionRuntime m_runtime;
     std::wstring m_displayName;
     std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
-    std::filesystem::path m_swapVhdPath;
-    bool m_storageMounted = false;
 
-    // N.B. m_lock must be acquired before acquiring m_containersLock or m_networksLock.
-    // These locks protect m_containers without requiring an exclusive m_lock.
+    // N.B. The runtime lock must be acquired before acquiring m_containersLock or m_networksLock.
+    // These locks protect m_containers without requiring an exclusive hold on the runtime lock.
     // This allows independent operations to proceed while container bookkeeping remains synchronized.
-    // WSLCVolumes has its own internal srwlock and does not require m_lock.
+    // WSLCVolumes has its own internal srwlock and does not require the runtime lock.
     std::mutex m_containersLock;
     std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
-    std::optional<WSLCVolumes> m_volumes;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
-    wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_sessionTerminatedEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_vmExitedEvent;
+    wil::shared_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_sessionTerminatedEvent{wil::EventOptions::ManualReset};
 
     WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
     std::wstring m_terminationDetails;
-    wil::srwlock m_lock;
-    IORelay m_ioRelay;
-    std::optional<ServiceRunningProcess> m_containerdProcess;
-    std::optional<ServiceRunningProcess> m_dockerdProcess;
+
+    // Persisted settings required to (re)create the VM on demand. The string fields point
+    // into the owned storage members below (or m_displayName) so they remain valid for the
+    // lifetime of the session.
+    WSLCSessionInitSettings m_settings{};
+    std::optional<std::wstring> m_settingsCreatorProcessName;
+    std::optional<std::wstring> m_settingsStoragePath;
+    std::optional<std::string> m_settingsRootVhdTypeOverride;
+    std::vector<BYTE> m_userSid;
+
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
@@ -347,14 +390,12 @@ private:
     // survive insertions and unrelated erasures, so each CrashDumpSubscription stashes its own
     // iterator and uses it as an O(1) removal handle when the last reference is released.
     // The session's lifetime extends past Terminate() (the COM object outlives the VM), so this
-    // list may outlive m_virtualMachine; that's fine because dispatch only runs while the VM
+    // list may outlive the runtime VM instance; that's fine because dispatch only runs while the VM
     // thread is alive.
     mutable wil::srwlock m_crashDumpLock;
     _Guarded_by_(m_crashDumpLock) CrashDumpCallbackList m_crashDumpCallbacks;
 
-    // Used for testing only.
-    std::mutex m_allocatedPortsLock;
-    __guarded_by(m_allocatedPortsLock) std::map<uint16_t, std::pair<std::shared_ptr<VmPortAllocation>, size_t>> m_allocatedPorts;
+    friend class WSLCSessionRuntime;
 };
 
 } // namespace wsl::windows::service::wslc

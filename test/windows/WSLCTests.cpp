@@ -11999,6 +11999,10 @@ class WSLCTests
         auto settings = GetDefaultSessionSettings(c_sessionName);
         auto session = CreateSession(settings);
 
+        // Session creation is lazy, so start the VM by launching a process before killing it.
+        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+        auto process = launcher.Launch(*session);
+
         KillVmByOwner(c_sessionName);
 
         WaitForSessionTermination(session.get());
@@ -12021,6 +12025,243 @@ class WSLCTests
         VERIFY_IS_TRUE(process.GetExitEvent().wait(10000));
 
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+    }
+
+    // TriggerIdleTermination runs the idle-teardown path synchronously and reports whether the VM
+    // was already idle. Validates the idle -> running -> forced-idle -> running lifecycle.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRestartsVm)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-trigger-test";
+
+        // Idle termination is only permitted for storage-backed sessions (tmpfs state is
+        // unrecoverable), so this lifecycle test uses a dedicated storage directory.
+        const auto storageDir = std::filesystem::current_path() / "test-storage-idle-restart";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        auto settings = GetDefaultSessionSettings(c_sessionName);
+        settings.StoragePath = storageDir.c_str();
+        auto session = CreateSession(settings);
+
+        // The VM starts lazily, so a freshly created session is already idle.
+        BOOL wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        // Starting a process brings the VM up.
+        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+        auto process = launcher.Launch(*session);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+
+        // Forcing idle termination tears the running VM down.
+        wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        // A second trigger is now a no-op.
+        wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+
+        // The session survives and lazily restarts the VM on the next operation.
+        WSLCProcessLauncher launcher2("/bin/sleep", {"/bin/sleep", "60"});
+        auto process2 = launcher2.Launch(*session);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+    }
+
+    // A tmpfs-backed session has no persistent storage, so its VM state cannot be recovered after a
+    // teardown. TriggerIdleTermination must refuse to tear such a session down (matching the
+    // automatic idle timer), leaving the VM running rather than destroying unrecoverable state.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRefusedWithoutStorage)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-tmpfs-test";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName));
+
+        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+        auto process = launcher.Launch(*session);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+
+        // The VM must still be running: the tmpfs session was not torn down.
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+    }
+
+    // A running container pins the VM via its activity hold; TriggerIdleTermination ignores that
+    // hold and forces teardown. The container's state must survive on persistent storage and be
+    // recovered against a fresh docker context when the VM lazily restarts.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRecoversRunningContainer)
+    {
+        SKIP_TEST_SERVER();
+
+        const std::string containerName = "wslc-idle-recovery";
+
+        auto cleanup = wil::scope_exit([&]() {
+            wil::com_ptr<IWSLCContainer> staleContainer;
+            if (SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &staleContainer)))
+            {
+                LOG_IF_FAILED(staleContainer->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
+            }
+        });
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"/bin/sleep", "600"});
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        container.SetDeleteOnClose(false);
+
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        // Force idle teardown even though the container holds a running-activity reference.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // The forced teardown must reconcile the surviving wrapper in place -- not merely leave
+        // docker's state to be rediscovered on the next open. The init process records a synthetic
+        // SIGKILL exit and the container drops to Exited while its client COM references stay valid.
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+        VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 128 + WSLCSignalSIGKILL);
+
+        // Re-opening lazily restarts the VM and recovers the container. It must be found (Exited, since
+        // its init process died with the VM) and remain operable against the new context: restarting it
+        // brings it back to Running on the freshly booted VM.
+        auto recovered = OpenContainer(m_defaultSession.get(), containerName);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+        VERIFY_ARE_EQUAL(recovered.State(), WslcContainerStateExited);
+
+        VERIFY_SUCCEEDED(recovered.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(recovered.State(), WslcContainerStateRunning);
+    }
+
+    // A running --rm container that survives a forced idle teardown is dropped to Exited without the
+    // auto-remove delete (dockerd is gone by then). On the next VM restart it must be auto-removed
+    // rather than leaking as a permanent Exited container.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRemovesExitedAutoRemoveContainer)
+    {
+        SKIP_TEST_SERVER();
+
+        const std::string containerName = "wslc-idle-rm-recovery";
+
+        auto cleanup = wil::scope_exit([&]() {
+            wil::com_ptr<IWSLCContainer> staleContainer;
+            if (SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &staleContainer)))
+            {
+                LOG_IF_FAILED(staleContainer->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
+            }
+        });
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"/bin/sleep", "600"});
+        launcher.SetContainerFlags(WSLCContainerFlagsRm);
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        container.SetDeleteOnClose(false);
+
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+
+        // Restart the VM via an unrelated operation, which recovers surviving containers; the exited
+        // --rm survivor must be auto-removed and absent from the container list.
+        WSLCProcessLauncher restartLauncher("/bin/true", {"/bin/true"});
+        auto process = restartLauncher.Launch(*m_defaultSession);
+        process.GetExitEvent().wait(5000);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        auto [containers, ports] = ListContainers(m_defaultSession.get());
+        bool found = false;
+        for (size_t i = 0; i < containers.size(); i++)
+        {
+            if (containerName == containers[i].Name)
+            {
+                found = true;
+                break;
+            }
+        }
+        VERIFY_IS_FALSE(found);
+    }
+
+    // Hammer the idle-teardown path concurrently with VM-level operations to surface deadlocks or
+    // stale-state races. Operations may fail while the VM is being torn down; that is tolerated, but
+    // the workers must never hang and the session must remain usable afterwards.
+    WSLC_TEST_METHOD(TriggerIdleTerminationConcurrentWithOperations)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-hammer-test";
+
+        // Idle termination only tears down storage-backed sessions, so a dedicated storage directory
+        // is required for the teardown path to actually run under the concurrent hammering.
+        const auto storageDir = std::filesystem::current_path() / "test-storage-idle-hammer";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        auto settings = GetDefaultSessionSettings(c_sessionName);
+        settings.StoragePath = storageDir.c_str();
+        auto session = CreateSession(settings);
+
+        std::atomic<bool> stop = false;
+        std::atomic<unsigned int> opFailures = 0;
+
+        // Run the hammering worker via a future so the join is bounded: a real teardown/operation
+        // deadlock would otherwise hang the test host indefinitely instead of failing. If the worker
+        // does not drain within the timeout after we signal stop, treat it as a deadlock and fail.
+        auto worker = std::async(std::launch::async, [&]() {
+            while (!stop.load())
+            {
+                try
+                {
+                    WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+                    auto process = launcher.Launch(*session);
+                    process.GetExitEvent().wait(5000);
+                }
+                catch (...)
+                {
+                    opFailures.fetch_add(1);
+                }
+            }
+        });
+
+        for (int i = 0; i < 25; ++i)
+        {
+            BOOL wasAlreadyIdle = FALSE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        }
+
+        stop.store(true);
+
+        // A real teardown/operation deadlock would leave the worker wedged forever. The std::future
+        // destructor blocks until the task completes, so letting a failed VERIFY unwind here would hang
+        // the test host -- exactly what this test guards against. Fail fast with a dump on timeout so we
+        // never unwind with an unfinished async task.
+        FAIL_FAST_IF_MSG(
+            worker.wait_for(std::chrono::seconds(60)) != std::future_status::ready,
+            "hammering worker did not drain after stop; likely teardown/operation deadlock");
+
+        worker.get();
+
+        LogInfo("TriggerIdleTerminationConcurrentWithOperations tolerated %u operation failures", opFailures.load());
+
+        // The session must still be usable after the hammering.
+        WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+        auto process = launcher.Launch(*session);
+        VERIFY_IS_TRUE(process.GetExitEvent().wait(30000));
     }
 
     // Helper: COM callback that captures all warnings received.
@@ -12090,13 +12331,21 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager2->CreateSession(&settings2, WSLCSessionFlagsNone, warningCallback.Get(), &session2));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session2.get());
 
-            // Verify the warning matches the expected localized message for the corrupt container.
+            // The VM (and container recovery) starts lazily on the first operation. Trigger it via a
+            // callback-bearing operation (CreateNetwork) so recovery warnings reach the warning callback.
+            WSLCNetworkOptions triggerNetwork{};
+            triggerNetwork.Name = "wslc-recovery-trigger";
+            triggerNetwork.Driver = "bridge";
+            VERIFY_SUCCEEDED(session2->CreateNetwork(&triggerNetwork, warningCallback.Get()));
+
+            // Recovery runs during the lazy VM start under this operation's context, so the failure
+            // warning is delivered to its warning callback.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(
+            auto recoveryWarning = std::format(
                 L"wsl: {}\n",
                 wsl::shared::Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(containerId)));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             VERIFY_SUCCEEDED(session2->Terminate());
         }
@@ -12158,12 +12407,20 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-            // Verify the warning matches the expected localized message for the missing volume.
+            // The VM (and volume recovery) starts lazily on the first operation. Trigger it via a
+            // callback-bearing operation (CreateNetwork) so recovery warnings reach the warning callback.
+            WSLCNetworkOptions triggerNetwork{};
+            triggerNetwork.Name = "wslc-recovery-trigger";
+            triggerNetwork.Driver = "bridge";
+            VERIFY_SUCCEEDED(session->CreateNetwork(&triggerNetwork, warningCallback.Get()));
+
+            // Recovery runs during the lazy VM start under this operation's context, so the failure
+            // warning is delivered to its warning callback.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning =
+            auto recoveryWarning =
                 std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(L"wslc-test-warning-recovery"));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
@@ -12223,10 +12480,19 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-            auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+            // The VM (and guest volume recovery) starts lazily on the first operation. Trigger it via a
+            // callback-bearing operation (CreateNetwork) so recovery warnings reach the warning callback.
+            WSLCNetworkOptions triggerNetwork{};
+            triggerNetwork.Name = "wslc-recovery-trigger";
+            triggerNetwork.Driver = "bridge";
+            VERIFY_SUCCEEDED(session->CreateNetwork(&triggerNetwork, warningCallback.Get()));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            // Recovery runs during the lazy VM start under this operation's context, so the failure
+            // warning is delivered to its warning callback.
+            auto warnings = warningCallback->GetWarnings();
+            auto recoveryWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             // Clean up the volume from Docker's metadata.
             ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "rm", "-f", c_volumeName}, 0);

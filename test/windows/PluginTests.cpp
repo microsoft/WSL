@@ -606,7 +606,7 @@ class PluginTests
         return sessionManager;
     }
 
-    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone)
+    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone, LPCWSTR StoragePath = nullptr)
     {
         WSLCSessionSettings settings{};
         settings.DisplayName = Name;
@@ -614,6 +614,8 @@ class PluginTests
         settings.MemoryMb = 4096;
         settings.BootTimeoutMs = 30 * 1000;
         settings.NetworkingMode = NetworkingMode;
+        settings.StoragePath = StoragePath;
+        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB, only used when StoragePath is set.
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
@@ -776,6 +778,67 @@ class PluginTests
             WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
             OnWslcContainerStarted: ERROR_ACCESS_DENIED
             WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    // Validates the VM-lifecycle hooks: OnWslcVmStarted fires each time the VM is (re)created and
+    // OnWslcVmStopping each time it is torn down, decoupled from the once-per-session hooks. Also
+    // proves the started hook can call back into the session (WSLCCreateProcess) without deadlocking.
+    WSL2_TEST_METHOD(WslcVmRestart)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmRestart);
+
+        // Idle termination only tears down storage-backed sessions (tmpfs state is unrecoverable), so
+        // this restart lifecycle test needs a dedicated persistent storage directory.
+        const auto storageDir = std::filesystem::current_path() / "test-storage-wslc-vm-restart";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-restart", WSLCNetworkingModeNone, storageDir.c_str());
+
+            // First operation brings the VM up -> OnWslcVmStarted (which reentrantly runs a process).
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Force idle teardown of the running VM -> OnWslcVmStopping.
+            BOOL wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+
+            // Next operation lazily restarts the VM -> OnWslcVmStarted fires again.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Session teardown tears the second VM down -> OnWslcVmStopping, then OnWslcSessionStopping.
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=22
+            WSLC Session created, name=plugin-wslc-vm-restart, id=*, pid=*, token=set, sid=set
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
+            WSLC VM stopping, session=*
+            WSLC VM stopping reentrant WSLCCreateProcess: ok
+            WSLC VM stopping mount+unmount: ok
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
+            WSLC VM stopping, session=*
+            WSLC VM stopping reentrant WSLCCreateProcess: failed
+            WSLC VM stopping mount+unmount: skipped
+            WSLC Session stopping, name=plugin-wslc-vm-restart, id=*)";
 
         ValidateLogFile(ExpectedOutput);
     }

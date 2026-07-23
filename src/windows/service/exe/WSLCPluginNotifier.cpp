@@ -64,3 +64,23 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLCPluginNotifier::OnVmStarted()
+try
+{
+    COMServiceExecutionContext context;
+
+    m_plugins.OnWslcVmStarted(&m_sessionInfo);
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCPluginNotifier::OnVmStopping()
+try
+{
+    COMServiceExecutionContext context;
+
+    m_plugins.OnWslcVmStopping(&m_sessionInfo);
+    return S_OK;
+}
+CATCH_RETURN();

@@ -1,0 +1,250 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCSessionRuntime.h
+
+Abstract:
+
+    Contains the definition for WSLCSessionRuntime.
+
+--*/
+
+#pragma once
+
+#include "wslc.h"
+#include "WSLCVirtualMachine.h"
+#include "WSLCVolumes.h"
+#include "WSLCIdleState.h"
+#include "DockerEventTracker.h"
+#include "DockerHTTPClient.h"
+#include "IORelay.h"
+#include "ServiceProcessLauncher.h"
+#include <atomic>
+#include <chrono>
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+
+namespace wsl::windows::service::wslc {
+
+class WSLCSession;
+
+class WSLCSessionRuntime
+{
+public:
+    enum class VmState
+    {
+        None,
+        Starting,
+        Running,
+        Stopping,
+    };
+
+    enum class VmExitDisposition
+    {
+        Active,
+        StopRequested,
+        ExitClaimed,
+    };
+
+    struct RuntimeHooks
+    {
+        std::function<void()> BringUp;
+        std::function<void()> RecoverState;
+        // Invoked while tearing down the VM, with the VM-scoped state still alive. The argument is
+        // true only for a permanent session shutdown (not an idle teardown): on idle teardown the
+        // container wrappers must be kept alive so client COM references stay valid and are reused
+        // when the VM restarts.
+        std::function<void(bool permanent)> TearDownSessionState;
+        std::function<void()> OnSpontaneousExit;
+        WSLCVirtualMachine::TOnCrashDump OnCrashDump;
+
+        // Fired when a VM has started (best-effort). Invoked without the runtime lock held so the
+        // handler may call back into the session (e.g. to run setup in the VM). Fired every time a
+        // VM is (re)created for the session.
+        std::function<void()> OnVmStarted;
+
+        // Fired when a VM is about to be torn down (best-effort), while the VM is still alive. Invoked
+        // without the runtime lock held so the handler may call back into the session or into a plugin
+        // that acquires a VM lease. Paired once with a prior OnVmStarted -- fires on both idle and
+        // permanent teardown. On a permanent teardown the session is terminating, so a callback that
+        // resolves this session (e.g. to create a process) fails cleanly instead of restarting the VM.
+        std::function<void()> OnVmStopping;
+    };
+
+    struct SessionContext
+    {
+        ULONG Id{};
+        std::wstring DisplayName;
+        const std::atomic<bool>* Terminating{};
+        wil::shared_event SessionTerminatingEvent;
+        wil::shared_event SessionTerminatedEvent;
+    };
+
+    class VmLease
+    {
+    public:
+        VmLease() = default;
+        explicit VmLease(WSLCSessionRuntime& Runtime);
+        VmLease(VmLease&& Other) noexcept;
+        VmLease& operator=(VmLease&& Other) noexcept;
+        ~VmLease();
+
+        VmLease(const VmLease&) = delete;
+        VmLease& operator=(const VmLease&) = delete;
+
+    private:
+        WSLCSessionRuntime* m_runtime{};
+        wil::rwlock_release_shared_scope_exit m_lock;
+    };
+
+    class LockedRuntime
+    {
+    public:
+        LockedRuntime() = default;
+        explicit LockedRuntime(WSLCSessionRuntime& Runtime);
+
+        WSLCVirtualMachine& Vm();
+        IORelay* Relay();
+        DockerHTTPClient& Docker();
+
+    private:
+        WSLCSessionRuntime* m_runtime{};
+        VmLease m_lease;
+    };
+
+    explicit WSLCSessionRuntime(WSLCSession& Session) noexcept;
+
+    void Initialize(
+        DWORD vmFactoryGitCookie,
+        wil::com_ptr<IGlobalInterfaceTable> git,
+        const WSLCSessionInitSettings* settings,
+        std::chrono::milliseconds idleGrace,
+        SessionContext sessionContext,
+        RuntimeHooks hooks);
+
+    WSLCVirtualMachine& Vm();
+    bool HasVm() const noexcept;
+    IORelay* Relay();
+    bool HasRelay() const noexcept;
+    DockerHTTPClient& Docker();
+    bool HasDocker() const noexcept;
+    DockerEventTracker& Events();
+    bool HasEvents() const noexcept;
+    WSLCVolumes& Volumes();
+    bool HasVolumes() const noexcept;
+    [[nodiscard]] wil::rwlock_release_exclusive_scope_exit TryLockExclusive() noexcept;
+    IdleState& Idle() noexcept;
+    std::shared_ptr<IdleState> IdleStateShared() const noexcept;
+    VmState State() const noexcept;
+    VmExitDisposition ExitDisposition() const noexcept;
+    bool VmExited() const noexcept;
+    void ResetDockerdReady() noexcept;
+    bool IsDockerdReady() const noexcept;
+    void SignalDockerdReady() noexcept;
+    void SetContainerdProcess(ServiceRunningProcess&& process);
+    void SetDockerdProcess(ServiceRunningProcess&& process);
+
+    void SetSwapVhdPath(std::filesystem::path path);
+    void SetStorageMounted(bool value) noexcept;
+
+    std::mutex& AllocatedPortsLock() noexcept;
+    std::map<uint16_t, std::pair<std::shared_ptr<VmPortAllocation>, size_t>>& AllocatedPorts() noexcept;
+
+    [[nodiscard]] bool TryClaimExpectedStop() noexcept;
+    [[nodiscard]] bool TryClaimSpontaneousExit() noexcept;
+
+    _Requires_exclusive_lock_held_(m_lock)
+    void StartVmLockHeld();
+    _Requires_exclusive_lock_held_(m_lock)
+    void StopVmLockHeld();
+    _Requires_exclusive_lock_held_(m_lock)
+    void TearDownVmLockHeld(bool CaptureTerminationReason = false);
+    void EnsureVmRunning();
+    void OnIdleTimer();
+    void OnVmExited();
+    void InitializeDockerRuntime(const std::filesystem::path& storagePath);
+    [[nodiscard]] VmLease AcquireVmLease();
+    [[nodiscard]] LockedRuntime Acquire();
+
+    [[nodiscard]] bool TriggerIdleTerminationForTest();
+
+    // runtimeLock is an exclusive hold on m_lock (this runtime's lock), which is dropped and reacquired
+    // internally so the OnVmStopping notification can fire without it and TearDownVmLockHeld runs with it.
+    void Shutdown(wil::rwlock_release_exclusive_scope_exit& runtimeLock, WSLCVirtualMachineTerminationReason& terminationReason, std::wstring& terminationDetails);
+
+private:
+    bool IdleTerminationEnabled() const noexcept;
+    int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
+
+    // Fires the OnVmStarted hook. Must be called without the runtime lock held (the handler may
+    // call back into the session), with an activity reference held so idle teardown cannot race the
+    // VM down before the notification is delivered.
+    void NotifyVmStarted();
+
+    // Fires the OnVmStopping hook (paired once with a prior OnVmStarted via m_vmStartNotified). Must
+    // be called without the runtime lock held: the handler may call into a plugin that acquires a VM
+    // lease (which takes m_lock), so firing under the lock would deadlock. Called while the VM is
+    // still running so the handler can still operate on it.
+    void NotifyVmStopping();
+
+    WSLCSession* m_session{};
+    RuntimeHooks m_hooks;
+
+    ULONG m_id{};
+    std::wstring m_displayName;
+    bool m_initialized{};
+    const std::atomic<bool>* m_terminating{};
+    wil::shared_event m_sessionTerminatingEvent;
+    wil::shared_event m_sessionTerminatedEvent;
+
+    DWORD m_vmFactoryGitCookie{};
+    wil::com_ptr<IGlobalInterfaceTable> m_git;
+    const WSLCSessionInitSettings* m_settings{};
+
+    std::optional<WSLCVirtualMachine> m_virtualMachine;
+    std::optional<IORelay> m_ioRelay;
+    std::optional<DockerEventTracker> m_eventTracker;
+    std::optional<DockerHTTPClient> m_dockerClient;
+    std::optional<WSLCVolumes> m_volumes;
+    std::optional<ServiceRunningProcess> m_containerdProcess;
+    std::optional<ServiceRunningProcess> m_dockerdProcess;
+    wil::unique_event m_vmExitedEvent;
+    // Lock-free mirror of "the current VM instance has exited": written under the runtime lock when a
+    // VM starts (false) or is observed dead during teardown (true), read without the lock by container
+    // teardown to skip VM-dependent cleanup. Avoids racing on m_vmExitedEvent, which is reset/replaced
+    // under the lock.
+    std::atomic<bool> m_vmExited{false};
+    wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
+
+    std::filesystem::path m_swapVhdPath;
+    bool m_storageMounted{false};
+    std::mutex m_allocatedPortsLock;
+    std::map<uint16_t, std::pair<std::shared_ptr<VmPortAllocation>, size_t>> m_allocatedPorts;
+
+    wil::srwlock m_lock;
+    std::atomic<VmState> m_vmState{VmState::None};
+    std::atomic<VmExitDisposition> m_vmExitDisposition{VmExitDisposition::Active};
+
+    // Set when OnVmStarted has fired for the current VM; gates the paired OnVmStopping so a VM that
+    // never finished starting (or had no started notification) does not emit a spurious stopping.
+    // The gate flip and the hook invocation both happen under m_notifyLock, so a start and a stop
+    // racing on different threads cannot interleave (which would otherwise let a stale OnVmStarted be
+    // delivered after the OnVmStopping it should have preceded). Recursive because the handler may
+    // reentrantly restart the VM, re-entering these notifications on the same thread.
+    std::recursive_mutex m_notifyLock;
+    std::atomic<bool> m_vmStartNotified{false};
+    std::shared_ptr<IdleState> m_idleState{std::make_shared<IdleState>()};
+
+    WSLCVirtualMachineTerminationReason m_lastTerminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_lastTerminationDetails;
+};
+
+} // namespace wsl::windows::service::wslc

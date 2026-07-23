@@ -49,11 +49,20 @@ struct WSLCProcessFd
 
 class WSLCVirtualMachine;
 
+// Owns the set of in-use VM-side port numbers for a single VM instance. Held by shared_ptr from the
+// VM (sole owner) and referenced weakly by each VmPortAllocation, so a VM teardown drops every
+// reservation and any surviving allocation self-neuters instead of dangling into a freed VM.
+struct VmPortReservations
+{
+    std::mutex Mutex;
+    std::set<uint16_t> Ports;
+};
+
 struct VmPortAllocation
 {
     NON_COPYABLE(VmPortAllocation);
 
-    VmPortAllocation(uint16_t port, int Family, int Protocol, WSLCVirtualMachine& vm);
+    VmPortAllocation(uint16_t port, int Family, int Protocol, std::weak_ptr<VmPortReservations> reservations);
     VmPortAllocation(VmPortAllocation&& Other);
     ~VmPortAllocation();
 
@@ -69,7 +78,7 @@ private:
     uint16_t m_port{};
     int m_family{};
     int m_protocol{};
-    WSLCVirtualMachine* m_vm{};
+    std::weak_ptr<VmPortReservations> m_reservations;
 };
 
 struct VMPortMapping
@@ -146,7 +155,6 @@ public:
 
     std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
     std::shared_ptr<VmPortAllocation> AllocatePort(int Family, int Protocol);
-    void ReleasePort(VmPortAllocation& Port);
 
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
@@ -251,7 +259,7 @@ private:
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;
 
-    std::set<uint16_t> m_allocatedPorts;
+    std::shared_ptr<VmPortReservations> m_reservations = std::make_shared<VmPortReservations>();
 
     GUID m_vmId{};
 

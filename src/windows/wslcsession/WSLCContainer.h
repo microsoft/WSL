@@ -16,6 +16,7 @@ Abstract:
 
 #include "ServiceProcessLauncher.h"
 #include "WSLCSession.h"
+#include "WSLCIdleState.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLCProcessControl.h"
@@ -32,6 +33,7 @@ namespace wsl::windows::service::wslc {
 
 class WSLCContainer;
 class WSLCSession;
+class WSLCSessionRuntime;
 class WSLCVolumes;
 
 class unique_com_disconnect
@@ -72,7 +74,7 @@ public:
 
     WSLCContainerImpl(
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
         std::string&& Id,
         std::string&& Name,
@@ -80,13 +82,9 @@ public:
         std::string NetworkMode,
         std::vector<WSLCVolumeMount>&& volumes,
         std::vector<std::string>&& namedVolumes,
-        WSLCVolumes& Volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay,
         WSLCContainerState InitialState,
         std::uint64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
@@ -122,6 +120,21 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
+    // Reconciles a surviving wrapper after its VM was torn down (idle-termination or crash) while the
+    // container was running: records a synthetic init-process exit, releases VM-scoped resources and
+    // drops to Exited (releasing the VM activity hold). Keeps the wrapper connected so client COM
+    // references stay valid across the VM restart.
+    void OnVmTornDown() noexcept;
+
+    // Re-registers a survivor's VM-scoped port allocations against the restarted VM (see OnVmTornDown).
+    void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
+
+    // Honors --rm for a survivor that was running when the VM was torn down: OnVmTornDown forced it to
+    // Exited but deferred the auto-remove delete while dockerd was down. Removes it now that the VM is
+    // back, mirroring OnStopped's Running->Exited delete. Sets Removed and returns the disconnect
+    // wrapper (destroy after dropping the container from tracking) when it deletes; otherwise a no-op.
+    [[nodiscard]] unique_com_disconnect RemoveExitedAutoRemoveSurvivor(bool& Removed);
+
     __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
@@ -137,25 +150,17 @@ public:
         const WSLCContainerOptions& Options,
         const std::string& Name,
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
-        WSLCVolumes& Volumes,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
     static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        WSLCVolumes& Volumes,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
 private:
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
@@ -180,7 +185,21 @@ private:
     void MapPorts();
     void UnmapPorts();
 
+    // Acquires or releases the activity hold so it is held exactly while the container is Running,
+    // keeping the session's VM alive across idle teardown.
+    __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
+
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
+
+    // Accessors for the session's VM-scoped resources. The container outlives any single VM: it
+    // survives idle-termination and is reused when the VM restarts. These fetch the current VM's
+    // objects from the (stable) runtime rather than caching references that would dangle across a
+    // restart. They are only valid while a VM lease is held (i.e. the VM is running).
+    WSLCVirtualMachine& Vm() const;
+    DockerHTTPClient& Docker() const;
+    WSLCVolumes& Volumes() const;
+    DockerEventTracker& Events() const;
+    IORelay& Relay() const;
 
     mutable wil::srwlock m_lock;
     std::string m_name;
@@ -205,25 +224,26 @@ private:
     // Must be acquired before m_lock when both are needed.
     std::mutex m_stopLock;
 
-    DockerHTTPClient& m_dockerClient;
+    WSLCSessionRuntime& m_runtime;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
     IWSLCPluginNotifier* m_pluginNotifier;
-    WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;
 
     std::vector<std::string> m_namedVolumes;
-    WSLCVolumes& m_volumes;
 
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
-    DockerEventTracker& m_eventTracker;
     DockerEventTracker::EventTrackingReference m_containerEvents;
-    IORelay& m_ioRelay;
     std::string m_networkMode;
+
+    // Held (non-empty) exactly while the container is Running so the session's VM stays alive even
+    // when no client holds the wrapper (e.g. a detached `run -d` container). Maintained by
+    // UpdateActivityHoldLockHeld(); released automatically when the container is destroyed.
+    ActivityRef m_activityHold;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer

@@ -41,7 +41,8 @@ enum class PluginTestType
     WslcSuccess,
     WslcSessionRejected,
     WslcContainerRejected,
-    WslcImagePull
+    WslcImagePull,
+    WslcVmRestart
 };
 
 constexpr auto c_testType = L"TestType";

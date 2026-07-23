@@ -8,8 +8,9 @@ Module Name:
 
 Abstract:
 
-    End-to-end tests validating that warnings emitted by the WSLC COM service are
-    surfaced on the wslc.exe CLI's stderr via the IWarningCallback integration.
+    End-to-end tests validating how warnings emitted by the WSLC COM service are
+    surfaced (or intentionally suppressed) on the wslc.exe CLI's stderr via the
+    IWarningCallback integration.
 --*/
 
 #include "precomp.h"
@@ -72,9 +73,10 @@ class WSLCE2EWarningTests
     CATCH_LOG()
 
     // Injects a container with corrupt WSLC metadata into the default session's storage,
-    // then verifies that running the wslc.exe CLI surfaces the COM service's recovery
-    // warning on stderr.
-    WSLC_TEST_METHOD(WSLCE2E_Warning_ContainerRecoveryPrintedOnStderr)
+    // then verifies that running the wslc.exe CLI does not surface the COM service's recovery
+    // warning on stderr: recovery runs outside the user's current command, so it is logged
+    // (and written to the event log) rather than streamed back via IWarningCallback.
+    WSLC_TEST_METHOD(WSLCE2E_Warning_ContainerRecoveryNotPrintedOnStderr)
     {
         std::string corruptContainerId;
 
@@ -98,15 +100,18 @@ class WSLCE2EWarningTests
         // Terminate the default session so the next wslc command recreates it and runs recovery.
         EnsureSessionIsTerminated();
 
-        // Run the CLI: recovery of the corrupt container fails and the warning is printed on stderr.
+        // Run the CLI: recovery of the corrupt container fails, but because the recovery runs
+        // outside the user's current command, the warning is not printed on stderr.
         auto result = RunWslc(L"container list");
         VERIFY_IS_TRUE(result.ExitCode.has_value());
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value());
-        VERIFY_IS_TRUE(result.Stderr.has_value());
 
-        const auto expectedStderr = std::format(
-            L"wsl: {}\r\n", wsl::shared::Localization::MessageWslcFailedToRecoverContainer(string::MultiByteToWide(corruptContainerId)));
-        VERIFY_ARE_EQUAL(expectedStderr, result.Stderr.value());
+        const auto recoveryWarning =
+            wsl::shared::Localization::MessageWslcFailedToRecoverContainer(string::MultiByteToWide(corruptContainerId));
+        if (result.Stderr.has_value())
+        {
+            VERIFY_IS_TRUE(result.Stderr.value().find(recoveryWarning) == std::wstring::npos);
+        }
     }
 };
 

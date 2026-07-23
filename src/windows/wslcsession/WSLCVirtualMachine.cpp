@@ -34,8 +34,8 @@ constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
-VmPortAllocation::VmPortAllocation(uint16_t port, int family, int protocol, WSLCVirtualMachine& vm) :
-    m_port(port), m_family(family), m_protocol(protocol), m_vm(&vm)
+VmPortAllocation::VmPortAllocation(uint16_t port, int family, int protocol, std::weak_ptr<VmPortReservations> reservations) :
+    m_port(port), m_family(family), m_protocol(protocol), m_reservations(std::move(reservations))
 {
 }
 
@@ -52,7 +52,7 @@ VmPortAllocation& VmPortAllocation::operator=(VmPortAllocation&& Other)
         m_port = Other.m_port;
         m_family = Other.m_family;
         m_protocol = Other.m_protocol;
-        m_vm = Other.m_vm;
+        m_reservations = Other.m_reservations;
 
         Other.Release();
     }
@@ -66,16 +66,20 @@ VmPortAllocation::~VmPortAllocation()
 
 void VmPortAllocation::Reset()
 {
-    if (m_vm != nullptr)
+    // Release the reservation only if the owning VM (and its table) is still alive. If the VM was torn
+    // down the table is already gone and lock() returns null, so a surviving allocation is a safe no-op.
+    if (auto reservations = m_reservations.lock())
     {
-        m_vm->ReleasePort(*this);
-        Release();
+        std::lock_guard lock{reservations->Mutex};
+        LOG_HR_IF(E_UNEXPECTED, reservations->Ports.erase(m_port) != 1);
     }
+
+    Release();
 }
 
 void VmPortAllocation::Release()
 {
-    m_vm = nullptr;
+    m_reservations.reset();
     m_port = 0;
     m_family = 0;
     m_protocol = 0;
@@ -1268,47 +1272,34 @@ void WSLCVirtualMachine::OnSessionTerminated()
 
 std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard lock{m_reservations->Mutex};
 
     WSL_LOG("AllocatePort", TraceLoggingValue(Port, "Port"));
 
-    auto [_, inserted] = m_allocatedPorts.insert(Port);
-
-    if (inserted)
-    {
-        return std::make_shared<VmPortAllocation>(Port, Family, Protocol, *this);
-    }
-    else
+    if (!m_reservations->Ports.insert(Port).second)
     {
         return {};
     }
+
+    return std::make_shared<VmPortAllocation>(Port, Family, Protocol, m_reservations);
 }
 
 std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::AllocatePort(int Family, int Protocol)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard lock{m_reservations->Mutex};
 
     for (uint32_t i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
         uint16_t port = static_cast<uint16_t>(i);
-        if (!m_allocatedPorts.contains(port))
+        if (!m_reservations->Ports.contains(port))
         {
-            WI_VERIFY(m_allocatedPorts.insert(port).second);
-            return std::make_shared<VmPortAllocation>(port, Family, Protocol, *this);
+            WI_VERIFY(m_reservations->Ports.insert(port).second);
+            return std::make_shared<VmPortAllocation>(port, Family, Protocol, m_reservations);
         }
     }
 
     // Fail if we couldn't find a port.
     THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES), "Failed to allocate port");
-}
-
-void WSLCVirtualMachine::ReleasePort(VmPortAllocation& Port)
-{
-    std::lock_guard lock{m_lock};
-
-    WSL_LOG("ReleasePort", TraceLoggingValue(Port.Port(), "Port"));
-
-    LOG_HR_IF(E_UNEXPECTED, m_allocatedPorts.erase(Port.Port()) != 1);
 }
 
 wil::unique_socket WSLCVirtualMachine::ConnectUnixSocket(const char* Path)
