@@ -4,7 +4,7 @@
 set -uo pipefail
 
 usage() {
-    echo "usage: run-workload.sh <git-clone|npm-ci> <share-path>..." >&2
+    echo "usage: run-workload.sh <git-clone|archive-extract> <share-path>..." >&2
     exit 2
 }
 
@@ -14,7 +14,7 @@ shift
 shares=("$@")
 
 case "$workload" in
-    git-clone|npm-ci)
+    git-clone|archive-extract)
         ;;
     *)
         usage
@@ -46,14 +46,6 @@ for index in "${!shares[@]}"; do
     printf 'TOPOLOGY\t%s\t%s\t%s\n' "$index" "$current_device" "$current_root"
 done
 
-if [[ "$workload" == "npm-ci" ]]; then
-    for share in "${shares[@]}"; do
-        rm -rf "$share/npm-project"
-        mkdir -p "$share/npm-project"
-        cp -a /fixtures/npm-project/. "$share/npm-project/"
-    done
-fi
-
 result_directory=$(mktemp -d)
 trap 'rm -rf "$result_directory"' EXIT
 pids=()
@@ -70,8 +62,10 @@ for index in "${!shares[@]}"; do
                 git clone --quiet --no-local file:///fixtures/git/repository.git "$share/repository" \
                     >"$result_directory/worker-$index.log" 2>&1 || status=$?
                 ;;
-            npm-ci)
-                npm ci --offline --prefix "$share/npm-project" \
+            archive-extract)
+                rm -rf "$share/typescript"
+                mkdir -p "$share/typescript"
+                tar --extract --file=/fixtures/typescript.tar --directory="$share/typescript" \
                     >"$result_directory/worker-$index.log" 2>&1 || status=$?
                 ;;
         esac

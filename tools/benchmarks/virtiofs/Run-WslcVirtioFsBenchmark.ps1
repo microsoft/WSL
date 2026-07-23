@@ -8,8 +8,8 @@ param(
     [ValidateNotNullOrEmpty()]
     [int[]]$ShareCounts = @(1, 2, 4, 8, 16),
 
-    [ValidateSet("git-clone", "npm-ci")]
-    [string[]]$Workloads = @("git-clone", "npm-ci"),
+    [ValidateSet("git-clone", "archive-extract")]
+    [string[]]$Workloads = @("git-clone", "archive-extract"),
 
     [ValidateRange(1, 100)]
     [int]$Repetitions = 5,
