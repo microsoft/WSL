@@ -19,6 +19,13 @@ Abstract:
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
+
+struct BuildSecret
+{
+    std::wstring Id;         // value for docker's --secret id= field
+    std::vector<BYTE> Value; // raw secret bytes (may contain NULs); materialized into a VM tmpfs file server-side
+};
+
 class ImageService
 {
 public:
@@ -28,6 +35,7 @@ public:
         const std::vector<std::wstring>& tags,
         const std::vector<std::wstring>& buildArgs,
         const std::vector<std::wstring>& labels,
+        const std::vector<BuildSecret>& secrets,
         const std::wstring& dockerfilePath,
         const std::wstring& target,
         WSLCBuildImageFlags flags,

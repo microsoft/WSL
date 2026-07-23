@@ -120,6 +120,7 @@ void ImageService::Build(
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
     const std::vector<std::wstring>& labels,
+    const std::vector<BuildSecret>& secrets,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
     WSLCBuildImageFlags flags,
@@ -172,6 +173,23 @@ void ImageService::Build(
     std::vector<LPCSTR> labelPointers;
     toMultiByte(labels, labelStrings, labelPointers);
 
+    // Keep narrow-encoded id strings alive for the duration of the COM call. The raw secret bytes are
+    // referenced in place from the caller's BuildSecret objects (which outlive this call), so they are
+    // never copied or NUL-truncated.
+    std::vector<std::string> secretIdStrings;
+    std::vector<WSLCBuildSecret> secretEntries;
+    secretIdStrings.reserve(secrets.size());
+    secretEntries.reserve(secrets.size());
+    for (const auto& secret : secrets)
+    {
+        secretIdStrings.push_back(wsl::windows::common::string::WideToMultiByte(secret.Id));
+        secretEntries.push_back(WSLCBuildSecret{
+            .Id = secretIdStrings.back().c_str(),
+            .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
+            .ValueSize = static_cast<ULONG>(secret.Value.size()),
+        });
+    }
+
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
     auto contextPathStr = absolutePath.wstring();
@@ -183,6 +201,7 @@ void ImageService::Build(
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
         .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
+        .Secrets = {secretEntries.data(), static_cast<ULONG>(secretEntries.size())},
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));

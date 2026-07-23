@@ -1480,6 +1480,19 @@ void wsl::windows::common::wslutil::PrintMessage(_In_ const std::wstring& messag
     fwprintf(stream, L"%ls\n", message.c_str());
 }
 
+std::optional<std::wstring> wsl::windows::common::wslutil::ReadEnvironmentVariable(_In_ LPCWSTR Name)
+{
+    std::wstring value;
+    const HRESULT hr = wil::GetEnvironmentVariableW(Name, value);
+    if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
+    {
+        return std::nullopt;
+    }
+
+    THROW_IF_FAILED(hr);
+    return value;
+}
+
 void wsl::windows::common::wslutil::SetCrtEncoding(int Mode)
 {
     // Configure the CRT to manipulate text as the specified mode.

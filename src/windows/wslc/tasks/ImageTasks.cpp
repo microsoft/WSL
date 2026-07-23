@@ -105,6 +105,15 @@ void BuildImage(CLIExecutionContext& context)
         validation::ParseLabel(label);
     }
 
+    std::vector<services::BuildSecret> secrets;
+    if (context.Args.Contains(ArgType::Secret))
+    {
+        for (const auto& spec : context.Args.GetAll<ArgType::Secret>())
+        {
+            secrets.push_back(validation::ParseSecretSpec(spec));
+        }
+    }
+
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
     {
@@ -124,7 +133,7 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.Contains(ArgType::Verbose));
-    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, dockerfilePath, target, flags, &callback, cancelEvent);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)
