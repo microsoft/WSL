@@ -23,7 +23,7 @@ GUID GuestDeviceManager::AddVirtiofsDevice(_In_ PCWSTR Label, _In_opt_ PCWSTR Mo
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
     return m_deviceHostSupport->AddVirtiofsDevice(
-        UserToken, Label, RootPath, Options.Kind, Options.SharedMemorySizeMb, MountOptions ? MountOptions : L"");
+        UserToken, Label, RootPath, Options.Kind, Options.SharedMemorySizeMb, Options.QueueCount, MountOptions ? MountOptions : L"");
 }
 
 _Requires_lock_not_held_(m_lock)
@@ -82,7 +82,7 @@ void GuestDeviceManager::AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path
     auto objectLifetime = CreateSectionObjectRoot(Path, UserToken);
 
     (void)m_deviceHostSupport->AddVirtiofsDevice(
-        UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, L"");
+        UserToken, Tag, objectLifetime.Path, VirtiofsShareKind_SectionBacked, SizeMb, 1, L"");
     m_objectDirectories.emplace_back(std::move(objectLifetime));
 }
 

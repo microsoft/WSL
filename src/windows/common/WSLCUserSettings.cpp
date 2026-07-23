@@ -57,6 +57,10 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # used without an explicit address (default: 127.0.0.1)\n"
     "  # defaultBindingAddress: default\n"
     "\n"
+    "experimental:\n"
+    "  # Number of virtiofs request queues (default: 1)\n"
+    "  # virtioFsQueueCount: 1\n"
+    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
@@ -119,6 +123,11 @@ namespace details {
         }
 
         return std::nullopt;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionVirtioFsQueueCount)
+    {
+        return value > 0 && value <= 1024 ? std::optional{value} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(SessionDnsTunneling)

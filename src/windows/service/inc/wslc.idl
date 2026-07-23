@@ -464,6 +464,7 @@ typedef struct _WSLCSessionSettings {
     ULONG BootTimeoutMs;
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
+    ULONG VirtioFsQueueCount;
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
 

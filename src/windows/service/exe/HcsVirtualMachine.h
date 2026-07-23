@@ -84,6 +84,7 @@ private:
     wil::shared_handle m_userToken;
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
+    ULONG m_virtioFsQueueCount = 1;
 
     bool m_swiotlbConfigured = false;
 
@@ -148,6 +149,7 @@ private:
     ULONG m_cpuCount{};
     ULONG m_memoryMb{};
     ULONG m_bootTimeoutMs{};
+    ULONG m_virtioFsQueueCount = 1;
     WSLCNetworkingMode m_networkingMode{};
     WSLCFeatureFlags m_featureFlags{};
     WSLCSessionStorageFlags m_storageFlags{};

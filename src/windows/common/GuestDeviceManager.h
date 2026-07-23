@@ -10,6 +10,7 @@ struct VirtioFsShareOptions
 {
     VirtiofsShareKind Kind = VirtiofsShareKind_FileBacked;
     UINT32 SharedMemorySizeMb = 0;
+    UINT32 QueueCount = 1;
 };
 
 //

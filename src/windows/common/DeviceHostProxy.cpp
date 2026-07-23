@@ -121,7 +121,13 @@ GUID DeviceHostProxy::AddVirtioNetDevice(_In_ HANDLE UserToken, const WslVirtioN
 }
 
 GUID DeviceHostProxy::AddVirtiofsDevice(
-    _In_ HANDLE UserToken, const std::wstring& Label, const std::wstring& RootPath, VirtiofsShareKind Kind, UINT32 ShmemSizeMb, const std::wstring& MountOptions)
+    _In_ HANDLE UserToken,
+    const std::wstring& Label,
+    const std::wstring& RootPath,
+    VirtiofsShareKind Kind,
+    UINT32 ShmemSizeMb,
+    UINT32 QueueCount,
+    const std::wstring& MountOptions)
 {
     std::lock_guard lifecycleLock(m_deviceLifecycleLock);
 
@@ -151,8 +157,7 @@ GUID DeviceHostProxy::AddVirtiofsDevice(
             .rootPath = rootPath.get(),
             .kind = Kind,
             .shmemSizeMb = ShmemSizeMb,
-            // To workaround memory aperture limitations, limit virtiofs devices to one queue.
-            .queueCount = 1,
+            .queueCount = QueueCount,
             .mountOptions = mountOptions.get()};
         THROW_IF_FAILED(GetWslVm(UserToken)->CreateVirtiofsDevice(&instanceIdForCall, GetCallback().get(), &config, virtiofsDevice.put()));
     }

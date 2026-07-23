@@ -90,6 +90,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     m_featureFlags = Settings->FeatureFlags;
     m_networkingMode = Settings->NetworkingMode;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
+    m_virtioFsQueueCount = Settings->VirtioFsQueueCount > 0 ? Settings->VirtioFsQueueCount : 1;
 
     // Build HCS settings
     hcs::ComputeSystem systemSettings{};
@@ -622,7 +623,7 @@ try
 
         if (!m_virtioFsDevice.has_value())
         {
-            VirtioFsShareOptions aggregateOptions{.Kind = VirtiofsShareKind_Aggregate};
+            VirtioFsShareOptions aggregateOptions{.Kind = VirtiofsShareKind_Aggregate, .QueueCount = m_virtioFsQueueCount};
             m_virtioFsDevice =
                 m_guestDeviceManager->AddVirtiofsDevice(TEXT(LX_INIT_DRVFS_VIRTIO_TAG), L"", L"", m_userToken.get(), aggregateOptions);
         }
@@ -949,6 +950,7 @@ WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSetti
     m_cpuCount = Settings->CpuCount;
     m_memoryMb = Settings->MemoryMb;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
+    m_virtioFsQueueCount = Settings->VirtioFsQueueCount > 0 ? Settings->VirtioFsQueueCount : 1;
     m_networkingMode = Settings->NetworkingMode;
     m_featureFlags = Settings->FeatureFlags;
     m_storageFlags = Settings->StorageFlags;
@@ -963,6 +965,7 @@ WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
     settings.CpuCount = m_cpuCount;
     settings.MemoryMb = m_memoryMb;
     settings.BootTimeoutMs = m_bootTimeoutMs;
+    settings.VirtioFsQueueCount = m_virtioFsQueueCount;
     settings.NetworkingMode = m_networkingMode;
     settings.FeatureFlags = m_featureFlags;
     settings.StorageFlags = m_storageFlags;

@@ -19,7 +19,13 @@ public:
     GUID AddVirtioNetDevice(_In_ HANDLE UserToken, const WslVirtioNetConfig& Config, const std::vector<IpAddress>& Nameservers);
 
     GUID AddVirtiofsDevice(
-        _In_ HANDLE UserToken, const std::wstring& Label, const std::wstring& RootPath, VirtiofsShareKind Kind, UINT32 ShmemSizeMb, const std::wstring& MountOptions);
+        _In_ HANDLE UserToken,
+        const std::wstring& Label,
+        const std::wstring& RootPath,
+        VirtiofsShareKind Kind,
+        UINT32 ShmemSizeMb,
+        UINT32 QueueCount,
+        const std::wstring& MountOptions);
 
     void AddVirtiofsChild(const GUID& InstanceId, const std::wstring& Name, const std::wstring& RootPath, const std::wstring& MountOptions);
 
