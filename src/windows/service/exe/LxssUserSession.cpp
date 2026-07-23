@@ -492,6 +492,18 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::CompactDistribution(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CompactDistribution(DistroGuid);
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -913,6 +925,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
 
     // Fail if the distribution is running.
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
+    _EnsureNotLocked(DistroGuid);
 
     // Lookup the distribution configuration
     const auto lxssKey = s_OpenLxssUserKey();
@@ -1771,6 +1784,8 @@ try
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageSparseVhdDisabled());
     }
 
+    _EnsureNotLocked(DistroGuid);
+
     // Don't attempt if running
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
@@ -1802,6 +1817,7 @@ try
     const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
     const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+    _EnsureNotLocked(DistroGuid);
 
     const auto& vhdPath = configuration.VhdFilePath;
     if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str()))
@@ -1845,6 +1861,56 @@ try
         wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE);
     }
 
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
+try
+{
+    auto runAsUser = wil::CoImpersonateClient();
+    std::filesystem::path vhdPath;
+    LXSS_DISTRO_CONFIGURATION configuration;
+
+    {
+        std::lock_guard lock(m_instanceLock);
+        const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+        const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+        configuration = s_GetDistributionConfiguration(registration);
+        RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+        vhdPath = configuration.VhdFilePath;
+        if (wsl::shared::string::IsEqual(vhdPath.extension().c_str(), wsl::windows::common::wslutil::c_vhdFileExtension, true))
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageCompactVhdNotSupported());
+        }
+
+        _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+    }
+
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
+
+    WSL_LOG_TELEMETRY(
+        "CompactDistributionBegin",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(configuration.Name.c_str(), "distroName"));
+
+    HRESULT result = E_UNEXPECTED;
+    auto compactDistributionComplete = wil::scope_exit([&] {
+        WSL_LOG_TELEMETRY(
+            "CompactDistributionEnd",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(result, "result"));
+    });
+
+    result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
+    if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
+    {
+        THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageVhdInUse());
+    }
+
+    THROW_IF_FAILED(result);
     return S_OK;
 }
 CATCH_RETURN()
@@ -3128,13 +3194,13 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
 _Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_EnsureNotLocked(_In_ LPCGUID DistroGuid, const std::source_location& location)
 {
-    const auto found = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
+    const auto locked = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
         return IsEqualGUID(entry.first, *DistroGuid);
     });
 
     THROW_HR_IF_MSG(
         E_ILLEGAL_STATE_CHANGE,
-        (found != m_lockedDistributions.end()),
+        locked != m_lockedDistributions.end(),
         "%hs, %hs:%u",
         location.function_name(),
         location.file_name(),
