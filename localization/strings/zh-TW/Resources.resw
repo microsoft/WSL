@@ -452,10 +452,10 @@
        選項:
             --enable-wsl1
                 啟用 WSL1 支援。
- 
+
             --fixed-vhd
                 建立大小固定的磁碟，以儲存發佈。
- 
+
             --from-file &lt;Path&gt;
                 從本機檔案安裝發佈。
 
@@ -492,7 +492,7 @@
 
             --set-sparse, -s &lt;true|false&gt;
 將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。
- 
+
             --set-default-user &lt;Username&gt;
                 設定發佈的預設使用者。
 
@@ -2140,10 +2140,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>容器 '{}' 正在執行。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress 尚未支援。</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器網路模式不支援連接埠對應；連接埠由目標容器擁有。</value>
   </data>
@@ -2214,6 +2210,21 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>如需特定命令的更多詳細資料，請向其傳遞說明引數。</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>命令:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>選項:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>一般選項:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>別名:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>引數:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>無法辨識目前命令的引數名稱: '{}'</value>
@@ -2374,17 +2385,32 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>停止逾時值無效: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>當主要網路模式為 'host' 或 'none' 時，不允許使用其他網路。</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>主要網路模式 '{}' 不支援連線或中斷其他網路的連線。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>重複的網路: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>網路 '{}' 尚不支援端點設定 ()。</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>複製驅動程式選項 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>無效的驅動程式選項 '{}'；必須是 'key=value'。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>網路 '{}' 的端點設定 '{}' 不明。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>只能為網路 '{}' 指定一個 IP 位址。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>網路連結不可為空白。</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>網路別名不可為空白。</value>
@@ -2392,6 +2418,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>網路別名需要使用者定義的網路。使用 --network 指定一個。</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>網路模式 '{}' 不支援端點設定。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>要求多個網路時，無法指定網路別名。使用單一 --network 引數。</value>
@@ -2982,6 +3012,22 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>為容器新增網路範圍的別名</value>
+  </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>設定端點驅動程式選項（--driver-opt key=value）</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>在網路上為容器指派一個 IPv4 位址</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>新增到另一個容器的連結 (--link name:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>新增容器的連結本機 IPv4 位址</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>{} 值無效： 網路別名不可為空白或空白字元</value>

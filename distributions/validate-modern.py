@@ -31,6 +31,7 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-tmpfiles-clean.service',
                             'systemd-tmpfiles-setup-dev-early.service',
                             'systemd-tmpfiles-setup-dev.service',
+                            'systemd-vconsole-setup.service',
                             'tmp.mount',
                             'NetworkManager.service',
                             'NetworkManager-wait-online.service',
@@ -239,26 +240,40 @@ def read_systemd_enabled_units(node, tar) -> dict:
     all_files = tar.getnames()
 
     def link_target(unit_path: str):
-        try:
-            info = tar.getmember(unit_path)
-        except KeyError:
-            info = tar.getmember('.' + unit_path)
+        info = get_tar_file(tar, unit_path, follow_symlink=False)[0]
+        if info is None:
+            raise KeyError(unit_path)
 
         if not info.issym():
             return unit_path
+
+        if info.linkpath.startswith('/'):
+            resolved = linux_real_path(info.linkpath)
         else:
-            if info.linkpath.startswith('/'):
-                return get_tar_file(tar, linux_real_path(info.linkpath), follow_symlink=True)[1]
-            else:
-                return get_tar_file(tar, linux_real_path(os.path.dirname(unit_path) + '/' + info.linkpath), follow_symlink=True)[1]
+            resolved = linux_real_path(os.path.dirname(unit_path) + '/' + info.linkpath)
+
+        real = get_tar_file(tar, resolved, follow_symlink=True)[1]
+        if real is not None:
+            return real
+
+        return resolved if resolved.startswith('/') else '/' + resolved
 
     def list_directory(path: str):
+        prefix = path.strip('/')
         files = []
         for e in all_files:
-            if e.startswith(path):
-                files.append(e[len(path) + 1:])
-            elif e.startswith('.' + path):
-                files.append(e[len(path) + 2:])
+            normalized = e
+            if normalized.startswith('./'):
+                normalized = normalized[2:]
+            elif normalized.startswith('/'):
+                normalized = normalized[1:]
+            normalized = normalized.rstrip('/')
+
+            if normalized == prefix:
+                continue # The directory itself, not an entry within it
+
+            if normalized.startswith(prefix + '/'):
+                files.append(normalized[len(prefix) + 1:])
 
         return files
 
@@ -283,7 +298,7 @@ def read_systemd_enabled_units(node, tar) -> dict:
 
                 unit_target = link_target(fullpath)
 
-                if is_dev_null(unit_target) and not is_masked(e):
+                if not is_dev_null(unit_target) and not is_masked(e):
                     units[e] = fullpath
 
     return units
