@@ -1,0 +1,1876 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Υποσύστημα Windows για Linux</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Το Υποσύστημα Windows για Linux επιτρέπει στους προγραμματιστές να τρέχουν ένα περιβάλλον GNU/Linux -- συμπεριλαβανομένων των περισσότερων εργαλειών γραμμής-εντολών, υπηρεσίες, και εφαρμογές -- απευθείας στα Windows, χωρίς τροποποιήσεις, χωρίς τον επιπλέον φόρτο μιας παραδοσιακής εικονικής μηχανής ή ρύθμισης dualboot.</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>Ο δίσκος απέτυχε να αποσυνδεθεί: {}. Για περισσότερες πληροφορίες, παρακαλούμε εκτελέστε 'dmesg' εντός του WSL2.
+Για να αναγκάσετε το WSL2 να σταματήσει και να αποσυνδέσει τον δίσκο, εκτελέστε 'wsl.exe {}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>Ο δίσκος '{}' έχει ήδη συνδεθεί.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>Αυτός ο τόμος έχει ήδη προσαρτηθεί μέσα στο WSL2.</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+      <value>Ένας δίσκος μ' αυτό το όνομα έχει ήδη προσαρτηθεί· παρακαλώ κάντε εξαγωγή δίσκου ή επιλέξτε άλλο όνομα και προσπαθήσετε ξανά.</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>Το συγκεκριμένο όνομα προσάρτησης περιέχει έναν μη έγκυρο χαρακτήρα '/'. Παρακαλώ προσπαθήστε ξανά χωρίς τον μη έγκυρο χαρακτήρα.</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>Ο δίσκος προσαρτήθηκε επιτυχώς ως '/mnt/wsl/{}'.
+Σημείωση: Η τοποθεσία θα είναι διαφορετική αν έχετε αλλάξει τη ρύθμιση automount.root στο /etc/wsl.conf.
+Για να κάνετε εξαγωγή και αποσύνδεση δίσκου, εκτελέστε 'wsl.exe {} {}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>Ο δίσκος συνδέθηκε αλλά απέτυχε να προσαρτηθεί: {}.
+Για περισσότερες πληροφορίες, παρακαλούμε εκτελέστε 'dmesg' εντός του WSL2.
+Για αποσύνδεση δίσκου, εκτελέστε 'wsl.exe {} {}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>Ακολουθεί λίστα με τις έγκυρες διανομές που μπορούν να εγκατασταθούν.
+Εγκαταστήστε χρησιμοποιώντας την εντολή 'wsl.exe {} &lt;Διανομή&gt;'.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>Το όνομα της διανομής έχει ήδη οριστεί.</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>Η παρεχόμενη τοποθεσία εγκατάστασης χρησιμοποιείται ήδη.</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>Μια διανομή με το παρεχόμενο όνομα υπάρχει ήδη. Χρησιμοποιήστε το --name για να επιλέξετε διαφορετικό όνομα.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>Δεν υπάρχει διανομή με το παρεχόμενο όνομα.</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>Απαιτείται πρόσβαση διαχειριστή για την προσάρτηση ενός δίσκου.</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>Η εξαγωγή της διανομής απέτυχε.</value>
+  </data>
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
+    <value>Εκτελείται εφάπαξ αναβάθμιση του συστήματος αρχείων του Υποσυστήματος Windows για Linux για αυτήν τη διανομή...</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>Δεν είναι δυνατή η εκκίνηση επειδή εκτελείται μια άλλη οντότητα χωρίς αυξημένα δικαιώματα. Δεν επιτρέπεται η ταυτόχρονη εκτέλεση παρουσιών με και χωρίς αυξημένα δικαιώματα διαχειριστή.</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>Η εισαγωγή της διανομής απέτυχε.</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>Εγκατάσταση προαιρετικού στοιχείου των Windows: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value> Γίνεται λήψη: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>Εγκατάσταση: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>Εισαγωγή διανομής</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>Η λήψη του {} ολοκληρώθηκε.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>Το Υποσύστημα Windows για Linux συνεχίζει μια προηγούμενη εγκατάσταση...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>Μη έγκυρο όνομα διανομής: '{}'.
+Για να λάβετε μια λίστα με τις έγκυρες διανομές, χρησιμοποιήστε 'wsl.exe --list --online'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>Η οντότητα του Υποσυστήματος Windows για Linux τερματίστηκε.</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>Μη έγκυρο όρισμα γραμμής εντολών: {}
+Παρακαλώ χρησιμοποιήστε '{} --help' για να λάβετε μια λίστα με τα υποστηριζόμενα ορίσματα.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>Το όρισμα γραμμής εντολών {} απαιτεί μια τιμή.
+Παρακαλώ χρησιμοποιήστε '{} --help' για να λάβετε μια λίστα με τα υποστηριζόμενα ορίσματα.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>Μη υποστηριζόμενες ρυθμίσεις κονσόλας. Για να χρησιμοποιήσετε αυτήν τη δυνατότητα, πρέπει να απενεργοποιηθεί η κονσόλα παλαιού τύπου (legacy console).</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>Το {} δεν είναι έγκυρος ακέραιος αριθμός.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>Μια εγκατάσταση, απεγκατάσταση ή μετατροπή βρίσκεται σε εξέλιξη για αυτήν τη διανομή.</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>Εκκίνηση {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>Δεν είναι δυνατή η εκκίνηση επειδή εκτελείται μια άλλη παρουσία με αυξημένα δικαιώματα διαχειριστή. Δεν επιτρέπεται η ταυτόχρονη εκτέλεση παρουσιών με και χωρίς αυξημένα δικαιώματα.</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>Το Υποσύστημα Windows για Linux δεν έχει εγκατεστημένες διανομές.
+Μπορείτε να το επιλύσετε εγκαθιστώντας μια διανομή με τις παρακάτω οδηγίες:
+
+Χρησιμοποιήστε το 'wsl.exe --list --online' για να παραθέσετε τις διαθέσιμες διανομές
+και το 'wsl.exe --install &lt;Διανομή&gt;' για εγκατάσταση.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>Δεν εκτελείται καμία διανομή.</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (Προεπιλογή)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Διανομές Υποσυστήματος Windows για Linux:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>Προεπιλεγμένη Διανομή: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>Προεπιλεγμένη Έκδοση: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>Κατάργηση καταχώρησης.</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>Ο χρήστης δεν βρέθηκε.</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>Για πληροφορίες σχετικά με τις βασικές διαφορές με το WSL 2, επισκεφθείτε τη διεύθυνση https://aka.ms/wsl2</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>Η μετατροπή βρίσκεται σε εξέλιξη, αυτό μπορεί να διαρκέσει μερικά λεπτά.</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>Η διανομή βρίσκεται ήδη στη ζητούμενη έκδοση.</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>Η διανομή παλαιού τύπου (Legacy) δεν υποστηρίζει το WSL 2.</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>Το WSL2 δεν μπορεί να ξεκινήσει επειδή η λειτουργία εικονικής μηχανής (virtualization) δεν είναι ενεργοποιημένη σε αυτόν τον υπολογιστή.
+Παρακαλώ βεβαιωθείτε ότι το προαιρετικό στοιχείο "Πλατφόρμα εικονικής μηχανής" (Virtual Machine Platform) είναι ενεργοποιημένο και ότι η λειτουργία εικονικής μηχανής είναι ενεργοποιημένη στις ρυθμίσεις υλικολογισμικού του υπολογιστή σας.
+
+Ενεργοποιήστε την "Πλατφόρμα εικονικής μηχανής" εκτελώντας: wsl.exe --install --no-distribution
+
+Για πληροφορίες, επισκεφθείτε τη διεύθυνση https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>Έχουν συνδεθεί πάρα πολλοί εικονικοί ή φυσικοί σκληροί δίσκοι.</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>Το VHD έχει ήδη προσαρτηθεί μέσω του wsl.exe --mount, παρακαλώ αποπροσαρτήστε τον δίσκο πριν από την εκκίνηση.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>Το WSL1 δεν υποστηρίζεται με την τρέχουσα διαμόρφωση του υπολογιστή σας.
+Παρακαλώ ενεργοποιήστε το προαιρετικό στοιχείο "Υποσύστημα Windows για Linux" για να χρησιμοποιήσετε το WSL1.</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>Αυτή η λειτουργία υποστηρίζεται μόνο από το WSL2.</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>Χρήση:
+    --networking-mode
+       Εμφάνιση τρέχουσας λειτουργίας δικτύου.
+
+    --msal-proxy-path
+        Εμφάνιση της διαδρομής για την εφαρμογή διακομιστή μεσολάβησης MSAL.
+
+    --vm-id
+        Εμφάνιση του αναγνωριστικού (ID) της εικονικής μηχανής WSL.
+
+    --version
+        Εμφάνιση της έκδοσης του πακέτου WSL.
+
+    -n
+        Να μην εκτυπώνεται νέος χαρακτήρας αλλαγής γραμμής.</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>Χρήση:
+    -a
+        Εξαναγκασμός του αποτελέσματος σε μορφή απόλυτης διαδρομής.
+    -u
+        Μετάφραση από διαδρομή Windows σε διαδρομή WSL (προεπιλογή).
+    -w
+        Μετάφραση από διαδρομή WSL σε διαδρομή Windows.
+    -m
+        Μετάφραση από διαδρομή WSL σε διαδρομή Windows, με '/' αντί για '\\'
+
+Παράδειγμα: wslpath 'c:\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>Εκτελεί εργασίες διαχείρισης στο Υποσύστημα Windows για Linux
+
+Χρήση:
+    /l, /list [Επιλογή]
+        Παραθέτει τις εγγεγραμμένες διανομές.
+        /all - Προαιρετική παράθεση όλων των διανομών, συμπεριλαμβανομένων αυτών
+               που εγκαθίστανται ή απεγκαθίστανται αυτήν τη στιγμή.
+
+        /running - Παράθεση μόνο των διανομών που εκτελούνται αυτήν τη στιγμή.
+
+    /s, /setdefault &lt;ΌνομαΔιανομής&gt;
+        Ορίζει τη διανομή ως προεπιλεγμένη.
+
+    /t, /terminate &lt;ΌνομαΔιανομής&gt;
+        Τερματίζει τη διανομή.
+
+    /u, /unregister &lt;ΌνομαΔιανομής&gt;
+        Καταργεί την καταχώρηση της διανομής και διαγράφει το ριζικό σύστημα αρχείων.</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Πνευματικά δικαιώματα (c) Microsoft Corporation. Με την επιφύλαξη παντός δικαιώματος.
+Για πληροφορίες απορρήτου σχετικά με αυτό το προϊόν, επισκεφθείτε τη διεύθυνση https://aka.ms/privacy.
+
+Χρήση: wsl.exe [Όρισμα] [Επιλογές...] [Γραμμή_Εντολών]
+
+Ορίσματα για την εκτέλεση δυαδικών αρχείων Linux:
+
+    Αν δεν παρασχεθεί γραμμή εντολών, το wsl.exe εκκινεί το προεπιλεγμένο κέλυφος.
+
+    --exec, -e &lt;Γραμμή_Εντολών&gt;
+        Εκτέλεση της καθορισμένης εντολής χωρίς τη χρήση του προεπιλεγμένου κελύφους Linux.
+
+    --shell-type &lt;standard|login|none&gt;
+        Εκτέλεση της καθορισμένης εντολής με τον παρεχόμενο τύπο κελύφους.
+
+    --
+        Διέλευση της υπόλοιπης γραμμής εντολών ως έχει.
+
+Επιλογές:
+    --cd &lt;Κατάλογος&gt;
+        Ορίζει τον καθορισμένο κατάλογο ως τον τρέχοντα κατάλογο εργασίας.
+        Αν χρησιμοποιηθεί το ~, θα χρησιμοποιηθεί η κεντρική διαδρομή του χρήστη Linux. Αν η διαδρομή ξεκινά
+        με τον χαρακτήρα /, θα ερμηνευτεί ως απόλυτη διαδρομή Linux.
+        Διαφορετικά, η τιμή πρέπει να είναι μια απόλυτη διαδρομή Windows.
+
+    --distribution, -d &lt;ΌνομαΔιανομής&gt;
+        Εκτέλεση της καθορισμένης διανομής.
+
+    --distribution-id &lt;ID_Διανομής&gt;
+        Εκτέλεση του καθορισμένου ID διανομής.
+
+    --user, -u &lt;ΌνομαΧρήστη&gt;
+        Εκτέλεση ως ο καθορισμένος χρήστης.
+
+    --system
+        Εκκινεί ένα κέλυφος για τη διανομή συστήματος.
+
+Ορίσματα για τη διαχείριση του Υποσυστήματος Windows για Linux:
+
+    --help
+        Εμφάνιση πληροφοριών χρήσης.
+
+    --debug-shell
+        Άνοιγμα ενός κελύφους εντοπισμού σφαλμάτων WSL2 για διαγνωστικούς σκοπούς.
+
+    --install [Διανομή] [Επιλογές...]
+        Εγκατάσταση μιας διανομής Υποσυστήματος Windows για Linux.
+        Για μια λίστα έγκυρων διανομών, χρησιμοποιήστε 'wsl.exe --list --online'.
+
+        Επιλογές:
+            --enable-wsl1
+                Ενεργοποίηση υποστήριξης WSL1.
+
+            --fixed-vhd
+                Δημιουργία ενός δίσκου σταθερού μεγέθους για την αποθήκευση της διανομής.
+
+            --from-file &lt;Διαδρομή&gt;
+                Εγκατάσταση μιας διανομής από ένα τοπικό αρχείο.
+
+            --legacy
+                Χρήση του μανιφέστου διανομής παλαιού τύπου.
+
+            --location &lt;Τοποθεσία&gt;
+                Ορισμός της διαδρομής εγκατάστασης για τη διανομή.
+
+            --name &lt;Όνομα&gt;
+                Ορισμός του ονόματος της διανομής.
+
+            --no-distribution
+                Εγκατάσταση μόνο των απαιτούμενων προαιρετικών στοιχείων, χωρίς εγκατάσταση διανομής.
+
+            --no-launch, -n
+                Να μην εκκινηθεί η διανομή μετά την εγκατάσταση.
+
+            --version &lt;Έκδοση&gt;
+                Καθορίζει την έκδοση που θα χρησιμοποιηθεί για τη νέα διανομή.
+
+            --vhd-size &lt;ΣυμβολοσειράΜνήμης&gt;
+                Καθορίζει το μέγεθος του δίσκου για την αποθήκευση της διανομής.
+
+            --web-download
+                Λήψη της διανομής από το διαδίκτυο αντί από το Microsoft Store.
+
+    --manage &lt;Διανομή&gt; &lt;Επιλογές...&gt;
+        Αλλαγή συγκεκριμένων επιλογών διανομής.
+
+        Επιλογές:
+            --move &lt;Τοποθεσία&gt;
+                Μετακίνηση της διανομής σε νέα τοποθεσία.
+
+            --set-sparse, -s &lt;true|false&gt;
+                Ορισμός του VHD της διανομής ως sparse (αραιό), επιτρέποντας την αυτόματη ανάκτηση χώρου στον δίσκο.
+
+            --set-default-user &lt;ΌνομαΧρήστη&gt;
+                Ορισμός του προεπιλεγμένου χρήστη της διανομής.
+
+            --resize &lt;ΣυμβολοσειράΜνήμης&gt;
+                Αλλαγή μεγέθους του δίσκου της διανομής στο καθορισμένο μέγεθος.
+
+    --mount &lt;Δίσκος&gt;
+        Συνδέει και προσαρτά έναν φυσικό ή εικονικό δίσκο σε όλες τις διανομές WSL 2.
+
+        Επιλογές:
+            --vhd
+                Καθορίζει ότι ο &lt;Δίσκος&gt; αναφέρεται σε εικονικό σκληρό δίσκο.
+
+            --bare
+                Σύνδεση του δίσκου στο WSL2, χωρίς προσάρτηση.
+
+            --name &lt;Όνομα&gt;
+                Προσάρτηση του δίσκου χρησιμοποιώντας προσαρμοσμένο όνομα για το σημείο προσάρτησης.
+
+            --type &lt;Τύπος&gt;
+                Σύστημα αρχείων προς χρήση κατά την προσάρτηση ενός δίσκου, αν δεν καθοριστεί, προεπιλέγεται το ext4.
+
+            --options &lt;Επιλογές&gt;
+                Πρόσθετες επιλογές προσάρτησης.
+
+            --partition &lt;Ευρετήριο&gt;
+                Ευρετήριο του διαμερίσματος προς προσάρτηση, αν δεν καθοριστεί, προεπιλέγεται ολόκληρος ο δίσκος.
+
+    --set-default-version &lt;Έκδοση&gt;
+        Αλλάζει την προεπιλεγμένη έκδοση εγκατάστασης για νέες διανομές.
+
+    --shutdown
+        Τερματίζει αμέσως όλες τις εκτελούμενες διανομές και την
+        ελαφριά εικονική μηχανή βοηθητικών εφαρμογών του WSL 2.
+
+        Επιλογές:
+            --force
+                Τερματίζει την εικονική μηχανή WSL 2 ακόμη και αν εκτελείται κάποια λειτουργία. Μπορεί να προκαλέσει απώλεια δεδομένων.
+
+    --status
+        Εμφάνιση της κατάστασης του Υποσυστήματος Windows για Linux.
+
+    --unmount [Δίσκος]
+        Εξαγάγει και αποσυνδέει έναν δίσκο από όλες τις διανομές WSL2.
+        Εξαγάγει και αποσυνδέει όλους τους δίσκους αν κληθεί χωρίς όρισμα.
+
+    --uninstall
+        Απεγκαθιστά το πακέτο του Υποσυστήματος Windows για Linux από αυτόν τον υπολογιστή.
+
+    --update
+        Ενημέρωση του πακέτου Υποσυστήματος Windows για Linux.
+
+        Επιλογές:
+            --pre-release
+                Λήψη έκδοσης προ-κυκλοφορίας αν είναι διαθέσιμη.
+
+    --version, -v
+        Εμφάνιση πληροφοριών έκδοσης.
+
+Ορίσματα για τη διαχείριση διανομών στο Υποσύστημα Windows για Linux:
+
+    --export &lt;Διανομή&gt; &lt;ΌνομαΑρχείου&gt; [Επιλογές]
+        Εξάγει τη διανομή σε ένα αρχείο tar.
+        Το όνομα αρχείου μπορεί να είναι - για το stdout.
+
+        Επιλογές:
+            --format &lt;Μορφή&gt;
+                Καθορίζει τη μορφή εξαγωγής. Υποστηριζόμενες τιμές: tar, tar.gz, tar.xz, vhd.
+
+    --import &lt;Διανομή&gt; &lt;ΤοποθεσίαΕγκατάστασης&gt; &lt;ΌνομαΑρχείου&gt; [Επιλογές]
+        Εισάγει το καθορισμένο αρχείο tar ως νέα διανομή.
+        Το όνομα αρχείου μπορεί να είναι - για το stdin.
+
+        Επιλογές:
+            --version &lt;Έκδοση&gt;
+                Καθορίζει την έκδοση που θα χρησιμοποιηθεί για τη νέα διανομή.
+
+            --vhd
+                Καθορίζει ότι το παρεχόμενο αρχείο είναι αρχείο .vhd ή .vhdx, όχι αρχείο tar.
+                Αυτή η λειτουργία δημιουργεί ένα αντίγραφο του αρχείου VHD στην καθορισμένη τοποθεσία εγκατάστασης.
+
+    --import-in-place &lt;Διανομή&gt; &lt;ΌνομαΑρχείου&gt;
+        Εισάγει το καθορισμένο αρχείο VHD ως νέα διανομή.
+        Αυτός ο εικονικός σκληρός δίσκος πρέπει να είναι μορφοποιημένος με τον τύπο συστήματος αρχείων ext4.
+
+    --list, -l [Επιλογές]
+        Παραθέτει διανομές.
+
+        Επιλογές:
+            --all
+                Παράθεση όλων των διανομών, συμπεριλαμβανομένων των διανομών που
+                εγκαθίστανται ή απεγκαθίστανται αυτήν τη στιγμή.
+
+            --running
+                Παράθεση μόνο των διανομών που εκτελούνται αυτήν τη στιγμή.
+
+            --quiet, -q
+                Εμφάνιση μόνο των ονομάτων διανομών.
+
+            --verbose, -v
+                Εμφάνιση λεπτομερών πληροφοριών για όλες τις διανομές.
+
+            --online, -o
+                Εμφανίζει μια λίστα διαθέσιμων διανομών για εγκατάσταση με το 'wsl.exe --install'.
+
+    --set-default, -s &lt;Διανομή&gt;
+        Ορίζει τη διανομή ως την προεπιλεγμένη.
+
+    --set-version &lt;Διανομή&gt; &lt;Έκδοση&gt;
+        Αλλάζει την έκδοση της καθορισμένης διανομής.
+
+    --terminate, -t &lt;Διανομή&gt;
+        Τερματίζει την καθορισμένη διανομή.
+
+    --unregister &lt;Διανομή&gt;
+        Καταργεί την καταχώρηση της διανομής και διαγράφει το ριζικό σύστημα αρχείων.</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>Έκδοση WSL: {}
+Έκδοση πυρήνα: {}
+Έκδοση WSLg: {}
+Έκδοση MSRDC: {}
+Έκδοση Direct3D: {}
+Έκδοση DXCore: {}
+Έκδοση Windows: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>Έκδοση MSBuild: {}
+Υποβολή (Commit): {}
+Χρόνος δημιουργίας: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>Ο προσαρμοσμένος πυρήνας που καθορίζεται στο {} δεν βρέθηκε: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>Το VHD προσαρμοσμένων λειτουργικών μονάδων πυρήνα (kernel modules) που καθορίζεται στο {} δεν βρέθηκε: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>Η προσαρμοσμένη διανομή συστήματος που καθορίζεται στο {} δεν βρέθηκε ή δεν έχει τη σωστή μορφή.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Πνευματικά δικαιώματα (c) Microsoft Corporation. Με την επιφύλαξη παντός δικαιώματος.
+Για πληροφορίες απορρήτου σχετικά με αυτό το προϊόν, επισκεφθείτε τη διεύθυνση https://aka.ms/privacy.
+
+Χρήση: wslg.exe [Όρισμα] [Επιλογές...] [Γραμμή_Εντολών]
+
+Ορίσματα:
+    --cd &lt;Κατάλογος&gt;
+        Ορίζει τον καθορισμένο κατάλογο ως τον τρέχοντα κατάλογο εργασίας.
+        Αν χρησιμοποιηθεί το ~, θα χρησιμοποιηθεί η κεντρική διαδρομή του χρήστη Linux. Αν η διαδρομή ξεκινά
+        με τον χαρακτήρα /, θα ερμηνευτεί ως απόλυτη διαδρομή Linux.
+        Διαφορετικά, η τιμή πρέπει να είναι μια απόλυτη διαδρομή Windows.
+
+    --distribution, -d &lt;Διανομή&gt;
+        Εκτέλεση της καθορισμένης διανομής.
+
+    --user, -u &lt;ΌνομαΧρήστη&gt;
+        Εκτέλεση ως ο καθορισμένος χρήστης.
+
+    --shell-type &lt;standard|login|none&gt;
+        Εκτέλεση της καθορισμένης εντολής με τον παρεχόμενο τύπο κελύφους.
+
+    --help
+        Εμφάνιση πληροφοριών χρήσης.
+
+    --
+        Διέλευση της υπόλοιπης γραμμής εντολών ως έχει.</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>Πατήστε οποιοδήποτε πλήκτρο για συνέχεια...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>Στο όρισμα {} λείπει μια απαιτούμενη παράμετρος.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>Η εξαγωγή βρίσκεται σε εξέλιξη, αυτό μπορεί να διαρκέσει μερικά λεπτά.</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>Η εισαγωγή βρίσκεται σε εξέλιξη, αυτό μπορεί να διαρκέσει μερικά λεπτά.</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>Η υποστήριξη εφαρμογών GUI (γραφικού περιβάλλοντος) έχει απενεργοποιηθεί μέσω του {} ή του /etc/wsl.conf.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>Έλεγχος για ενημερώσεις.</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>Αυτή η διανομή είναι διαθέσιμη μόνο από το Microsoft Store.</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>Το wsl.exe --mount σε ARM64 απαιτεί έκδοση Windows 27653 ή νεότερη.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>Η πιο πρόσφατη έκδοση του Υποσυστήματος Windows για Linux είναι ήδη εγκατεστημένη.</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>Ενημέρωση του Υποσυστήματος Windows για Linux στην έκδοση: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>Αυτή η εφαρμογή απαιτεί το Προαιρετικό Στοιχείο Υποσυστήματος Windows για Linux.
+Εγκαταστήστε το εκτελώντας: wsl.exe --install --no-distribution
+Το σύστημα ίσως χρειαστεί επανεκκίνηση για να εφαρμοστούν οι αλλαγές.</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Το καθορισμένο αρχείο πρέπει να έχει την επέκταση αρχείου {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Το καθορισμένο αρχείο πρέπει να έχει την επέκταση αρχείου {} ή {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>Ο VmSwitch (εικονικός διακόπτης) '{}' δεν βρέθηκε. Διαθέσιμοι διακόπτες: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>Η δικτύωση γέφυρας (Bridged networking) απαιτεί να έχει οριστεί το wsl2.vmSwitch.</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>Αποτυχία λήψης της λίστας διανομών από το '{}'. {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>Αποτυχία σύνδεσης του δίσκου '{}' στο WSL2: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>Αποτυχία αλλαγής μεγέθους δίσκου.</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>Δεν βρέθηκε τιμή.</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>Η έκδοση Windows {} δεν υποστηρίζει τη συσκευασμένη έκδοση (packaged version) του Υποσυστήματος Windows για Linux.
+Εγκαταστήστε την απαιτούμενη ενημέρωση μέσω του Windows Update ή μέσω του: {}
+Για πληροφορίες, επισκεφθείτε τη διεύθυνση https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>Η εκτέλεση του κελύφους εντοπισμού σφαλμάτων (debug shell) απαιτεί την εκτέλεση του wsl.exe με δικαιώματα Διαχειριστή.</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>Η διαδικασία εγκατάστασης για τη διανομή '{}' απέτυχε με κωδικό εξόδου: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>Μη έγκυρη μορφή GUID: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>Μη έγκυρο όνομα ενότητας στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>Μη έγκυρο όνομα κλειδιού στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>Αναμενόταν {} στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+    <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>Μη έγκυρος χαρακτήρας διαφυγής (escaped character): '{}' στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>Άγνωστο κλειδί '{}' στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>Μη έγκυρη ακέραιη τιμή '{}' για το κλειδί '{}' στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>Μη έγκυρη τιμή IP '{}' για το κλειδί '{}' στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>Μη έγκυρη τιμή boolean '{}' για το κλειδί '{}' στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>Μη έγκυρη διεύθυνση mac '{}' για το κλειδί '{}' στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>Αποτυχία ανοίγματος του αρχείου ρυθμίσεων {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>Παρουσιάστηκαν σφάλματα κατά την εκκίνηση του WSL</value>
+  </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Αποτυχία εκκίνησης της συνεδρίας χρήστη systemd για το '{}'. Δείτε το journalctl για περισσότερες λεπτομέρειες.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>Άνοιγμα Προβολής Συμβάντων</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>Αυτή η διανομή δεν περιέχει προεπιλεγμένο όνομα. Χρησιμοποιήστε το --name για να επιλέξετε το όνομα της διανομής.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>Τα ορίσματα {} και {} δεν μπορούν να καθοριστούν ταυτόχρονα.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>Το όρισμα {} απαιτεί το όρισμα {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>Μη έγκυρο όνομα διανομής: "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>Γίνεται χρήση καταχώρησης διανομής παλαιού τύπου (legacy). Εξετάστε το ενδεχόμενο να χρησιμοποιήσετε μια διανομή βασισμένη σε tar.</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>Οι καταχωρήσεις διανομών παλαιού τύπου δεν υποστηρίζουν το όρισμα --version.</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverridden" xml:space="preserve">
+    <value>Η διανομή "{}" παρέχεται από ένα μανιφέστο παράκαμψης (override manifest).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>Ο κατακερματισμός (hash) της διανομής δεν ταιριάζει. Αναμενόταν: {}, πραγματικός κατακερματισμός: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>Μη έγκυρη δεκαεξαδική συμβολοσειρά: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>Το '{}' δεν υποστηρίζεται κατά την εγκατάσταση διανομών παλαιού τύπου.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>Η διανομή εγκαταστάθηκε επιτυχώς. Μπορεί να εκκινηθεί μέσω του 'wsl.exe -d {}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>Μη έγκυρη συμβολοσειρά μνήμης '{}' για την καταχώρηση '{}' του .wslconfig στο {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>Αποτυχία δημιουργίας του δίσκου swap στο '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>Η ένθετη δημιουργία εικονικών μηχανών (Nested virtualization) δεν υποστηρίζεται σε αυτόν τον υπολογιστή.</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>Αποτυχία δημιουργίας τελικού σημείου δικτύου (network endpoint) με διεύθυνση: '{}', εκχωρήθηκε νέα διεύθυνση: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>Αποτυχία δημιουργίας εικονικού δικτύου με εύρος διευθύνσεων: '{}', δημιουργήθηκε νέο δίκτυο με εύρος: '{}', {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>Η ΑΣΦΑΛΗΣ ΛΕΙΤΟΥΡΓΙΑ ΕΙΝΑΙ ΕΝΕΡΓΟΠΟΙΗΜΕΝΗ - πολλές δυνατότητες θα απενεργοποιηθούν</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>Η λειτουργία κατοπτρισμού δικτύου (mirrored networking) δεν υποστηρίζεται: {}.
+Επιστροφή στη δικτύωση NAT.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>Απαιτείται έκδοση Linux Kernel 5.10 ή νεότερη</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Η έκδοση Windows {}.{} δεν διαθέτει τις απαιτούμενες δυνατότητες</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>Το τείχος προστασίας Hyper-V δεν υποστηρίζεται</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>Η διοχέτευση (Tunneling) DNS δεν υποστηρίζεται</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>Η ρύθμιση wsl2.localhostForwarding δεν έχει καμία επίδραση όταν χρησιμοποιείται λειτουργία κατοπτρισμού δικτύου</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>Εντοπίστηκε αλλαγή διακομιστή μεσολάβησης Http (Http Proxy) στον κεντρικό υπολογιστή. Παρακαλώ επανεκκινήστε το WSL για να εφαρμόσετε την αλλαγή.</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>Εντοπίστηκε μια ρύθμιση παραμέτρων διακομιστή μεσολάβησης localhost, αλλά δεν αντικατοπτρίστηκε στο WSL. Το WSL σε λειτουργία NAT δεν υποστηρίζει διακομιστές μεσολάβησης localhost.</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>Εντοπίστηκε διαμόρφωση διακομιστή μεσολάβησης IPv6, αλλά δεν αντικατοπτρίστηκε στο WSL. Το WSL σε λειτουργία NAT δεν υποστηρίζει IPv6.</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>Εντοπίστηκε διαμόρφωση διακομιστή μεσολάβησης localhost IPv6, αλλά δεν αντικατοπτρίστηκε στο WSL. Το WSL δεν υποστηρίζει διακομιστές μεσολάβησης localhost IPv6.</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>Παρουσιάστηκε ένα μη αναμενόμενο σφάλμα κατά την προσπάθεια επίλυσης των ρυθμίσεων του διακομιστή μεσολάβησης. Οι ρυθμίσεις του διακομιστή μεσολάβησης δεν αντικατοπτρίστηκαν στο WSL.</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>Παρουσιάστηκε σφάλμα κατά την πρόσβαση στο μητρώο (registry). Διαδρομή: '{}'. Σφάλμα: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>Αποτυχία εκκίνησης της διεργασίας αναμετάδοσης (relay) localhost. Σφάλμα: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>Αποτυχία εκκίνησης εικονικής δικτύωσης - παρακαλώ εγκαταστήστε το προαιρετικό στοιχείο "Πλατφόρμα εικονικής μηχανής" εκτελώντας: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>Αποτυχία διαμόρφωσης δικτύου (networkingMode {}), επιστροφή σε networkingMode {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>Αποτυχία ενεργοποίησης του στοιχείου των Windows '{}' (κωδικός εξόδου {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>Επιστράφηκε κρίσιμο σφάλμα από το πρόσθετο '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>Επιστράφηκε κρίσιμο σφάλμα από το πρόσθετο '{}'. Μήνυμα σφάλματος: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>Το πρόσθετο '{}' απαιτεί νεότερη έκδοση του WSL. Παρακαλώ εκτελέστε: wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
+    <value>Η ρύθμιση του .wslconfig '{}' είναι απενεργοποιημένη από την πολιτική του υπολογιστή.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>Το κέλυφος εντοπισμού σφαλμάτων (debug shell) είναι απενεργοποιημένο από την πολιτική του υπολογιστή.</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>Το wsl.exe --mount είναι απενεργοποιημένο από την πολιτική του υπολογιστή.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>Το WSL1 είναι απενεργοποιημένο από την πολιτική του υπολογιστή.</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>Παρακαλώ εκτελέστε 'wsl.exe --set-version {} 2' για να αναβαθμίσετε σε WSL2.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>Το WSL ολοκληρώνει μια αναβάθμιση...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>Η ενημέρωση απέτυχε (κωδικός εξόδου: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>Η απεγκατάσταση απέτυχε (κωδικός εξόδου: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>Αρχείο καταγραφής: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>Αποτυχία κατάργησης του πακέτου MSIX (σφάλμα: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>Αποτυχία εγκατάστασης του πακέτου MSIX (σφάλμα: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>Δεν έχουν εγκατασταθεί τα προαιρετικά στοιχεία που απαιτούνται για την εκτέλεση του WSL.</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>Εγκατάσταση στοιχείων που λείπουν.</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>Το εισηγμένο αρχείο δεν είναι έγκυρη διανομή Linux.</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>Πατήστε οποιοδήποτε πλήκτρο για έξοδο...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>Είναι διαθέσιμη μια νέα έκδοση του Υποσυστήματος Windows για Linux.</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>Ενημερώστε στην έκδοση {} ή δείτε τις σημειώσεις έκδοσης παρακάτω.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>Ενημέρωση</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>Δείτε την Τεκμηρίωση</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>Η λειτουργία δεν μπόρεσε να ολοκληρωθεί επειδή το VHD χρησιμοποιείται αυτήν τη στιγμή. Για να εξαναγκάσετε το WSL να σταματήσει χρησιμοποιήστε: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>Το {} δεν είναι έγκυρη τιμή boolean, &lt;true|false&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>Το Sparse VHD υποστηρίζεται μόνο στο WSL2.</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>Η εκτέλεση του WSL ως τοπικό σύστημα (local system) δεν υποστηρίζεται.</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>Συμβουλή Απόδοσης:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>Η χρήση μιας λειτουργίας με έντονη χρήση I/O όπως το {} στους δίσκους των Windows σας θα έχει κακή απόδοση. Εξετάστε το ενδεχόμενο να μετακινήσετε τα αρχεία του έργου σας στο σύστημα αρχείων Linux για καλύτερη απόδοση. Κάντε κλικ παρακάτω για να μάθετε περισσότερα.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>Προβολή Τεκμηρίωσης</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>Να μην εμφανιστεί ξανά</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>Η Εικονική Μηχανή WSL2 κατέρρευσε.</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>Το ίχνος στοίβας (stack trace) έχει αποθηκευτεί στο: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>Η εκκίνηση της διανομής απέτυχε. Κωδικός σφάλματος: {}, βήμα αποτυχίας: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>Η εκκίνηση της διανομής απέτυχε επειδή ο εικονικός της δίσκος είναι κατεστραμμένος.</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>Διπλότυπο κλειδί ρυθμίσεων '{}' στο {}:{} (Κλειδί που παρουσιάζει διένεξη: '{}' στο {}:{})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>Μη έγκυρη τιμή '{}' για το κλειδί ρυθμίσεων '{}' στο {}:{} (Έγκυρες τιμές: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+    <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>Αναμονή για την ολοκλήρωση της εντολής OOBE για τη διανομή "{}"...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>Αποτυχία ανάγνωσης της ιδιότητας '{}' από τη διανομή {} </value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>Αυτό μοιάζει με αρχείο VHD. Χρησιμοποιήστε το --vhd για εισαγωγή VHD αντί για tar.</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>Αποτυχία εγκατάστασης του {} από το Microsoft Store: {}
+Προσπάθεια λήψης από το διαδίκτυο...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>Δεν έχει ρυθμιστεί προεπιλεγμένη διανομή. Παρακαλώ καθορίστε μια διανομή προς εγκατάσταση.</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>Το wsl2.virtio9p είναι απενεργοποιημένο, επιστροφή στο 9p με μεταφορά vsock.</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>Η εγκατάσταση του WSL φαίνεται να είναι κατεστραμμένη (Κωδικός σφάλματος: {}).
+Πατήστε οποιοδήποτε πλήκτρο για επισκευή του WSL, ή CTRL-C για ακύρωση.
+Αυτό το μήνυμα θα λήξει σε 60 δευτερόλεπτα.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>Αποτυχία ανάλυσης του προφίλ τερματικού κατά την εγγραφή της διανομής: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+    <data name="MessageInvalidSize" xml:space="preserve">
+    <value>Μη έγκυρο μέγεθος: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+Κωδικός σφάλματος: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+    <data name="MessageInvalidJson" xml:space="preserve">
+    <value>Μη έγκυρο έγγραφο JSON. Σφάλμα ανάλυσης: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>Οι wsl2.processors δεν μπορούν να υπερβαίνουν τον αριθμό των λογικών επεξεργαστών του συστήματος ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>Αποτυχία ερωτήματος για τη λειτουργία δικτύου</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>Παρασχέθηκαν προσαρμοσμένες λειτουργικές μονάδες πυρήνα (kernel modules) χωρίς να έχει καθοριστεί προσαρμοσμένος πυρήνας. Παρακαλώ δείτε το https://aka.ms/wslcustomkernel για περισσότερες πληροφορίες.</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>Λόγω ενός τρέχοντος προβλήματος συμβατότητας με το Global Secure Access Client, η διοχέτευση (Tunneling) DNS είναι απενεργοποιημένη.</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>Η υποστήριξη Sparse VHD είναι επί του παρόντος απενεργοποιημένη λόγω πιθανής καταστροφής δεδομένων.
+Για να εξαναγκάσετε μια διανομή να χρησιμοποιήσει ένα sparse VHD, παρακαλώ εκτελέστε:
+wsl.exe --manage &lt;ΌνομαΔιανομής&gt; --set-sparse true --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>Αποτυχία προσάρτησης του {}, δείτε το dmesg για περισσότερες λεπτομέρειες.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>Η επεξεργασία του /etc/fstab με το mount -a απέτυχε.</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>Παρουσιάστηκε σφάλμα κατά την προσάρτηση του δίσκου της διανομής. Προσαρτήθηκε μόνο για ανάγνωση ως εναλλακτική λύση.
+Δείτε τις οδηγίες ανάκτησης στο: https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+    <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>Αποτυχία μετάφρασης του '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>Κάτι πήγε στραβά. Προσπαθήστε ξανά αργότερα.</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>Σχετικά</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>Σχετικά με τις Ρυθμίσεις του Υποσυστήματος Windows για Linux</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft. Με την επιφύλαξη παντός δικαιώματος.</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>Ρυθμίσεις του Υποσυστήματος Windows για Linux</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>Οι Ρυθμίσεις του Υποσυστήματος Windows για Linux επιτρέπουν στους προγραμματιστές να διαχειρίζονται το αρχείο .wslconfig χρησιμοποιώντας μια εφαρμογή με γραφικό περιβάλλον (GUI).</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>Αυτόματη ανάκτηση μνήμης</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>Απελευθερώνει αυτόματα τη μνήμη cache μετά τον εντοπισμό αδρανούς χρήσης της CPU. Ορίστε το σε "gradual" για αργή απελευθέρωση και "dropcache" για άμεση απελευθέρωση της μνήμης cache.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Αυτόματη ανάκτηση μνήμης.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Απελευθερώνει αυτόματα τη μνήμη cache μετά τον εντοπισμό αδρανούς χρήσης της CPU. Ορίστε το σε gradual για αργή απελευθέρωση και dropcache για άμεση απελευθέρωση της μνήμης cache.</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>Ενεργοποιημένο Auto Proxy</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>Επιτρέπει στο WSL να χρησιμοποιεί τις πληροφορίες του διακομιστή μεσολάβησης HTTP των Windows.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποιημένο Auto Proxy.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Επιτρέπει στο WSL να χρησιμοποιεί τις πληροφορίες του διακομιστή μεσολάβησης HTTP των Windows.</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>Χρήση ανάλυσης DNS βέλτιστης προσπάθειας</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.dnsTunneling έχει οριστεί σε true. Όταν οριστεί σε true, τα Windows θα εξαγάγουν το ερώτημα από το αίτημα DNS και θα προσπαθήσουν να το επιλύσουν, αγνοώντας τις άγνωστες εγγραφές.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Χρήση ανάλυσης DNS βέλτιστης προσπάθειας.</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.dnsTunneling έχει οριστεί σε true. Όταν οριστεί σε true, τα Windows θα εξαγάγουν το ερώτημα από το αίτημα DNS και θα προσπαθήσουν να το επιλύσουν, αγνοώντας τις άγνωστες εγγραφές.</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>Προσαρμοσμένος πυρήνας</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>Μια απόλυτη διαδρομή Windows προς έναν προσαρμοσμένο πυρήνα Linux.</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>Αναζήτηση πυρήνων</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Προσαρμοσμένος πυρήνας</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Μια απόλυτη διαδρομή Windows προς έναν προσαρμοσμένο πυρήνα Linux.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>Προσαρμοσμένες λειτουργικές μονάδες πυρήνα</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>Μια απόλυτη διαδρομή Windows προς ένα VHD προσαρμοσμένων λειτουργικών μονάδων (modules) πυρήνα Linux.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>Αναζήτηση λειτουργικών μονάδων πυρήνα</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Προσαρμοσμένες λειτουργικές μονάδες πυρήνα</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Μια απόλυτη διαδρομή Windows προς ένα VHD προσαρμοσμένων λειτουργικών μονάδων (modules) πυρήνα Linux.</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>Προσαρμοσμένη διανομή συστήματος</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>Αναζήτηση διανομών</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>Καθορίστε μια διαδρομή προς ένα VHD το οποίο θα φορτωθεί ως προσαρμοσμένη διανομή συστήματος, και χρησιμοποιείται κυρίως για την τροφοδοσία εφαρμογών GUI στο WSL. [Μάθετε περισσότερα για τις διανομές συστήματος εδώ].</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Προσαρμοσμένη διανομή συστήματος</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Καθορίστε μια διαδρομή προς ένα VHD το οποίο θα φορτωθεί ως προσαρμοσμένη διανομή συστήματος, και χρησιμοποιείται κυρίως για την τροφοδοσία εφαρμογών GUI στο WSL.</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>Ενεργοποίηση κονσόλας εντοπισμού σφαλμάτων</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>Τιμή boolean για την ενεργοποίηση ενός παραθύρου κονσόλας εξόδου που εμφανίζει τα περιεχόμενα του dmesg κατά την εκκίνηση μιας παρουσίας διανομής WSL 2.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποίηση κονσόλας εντοπισμού σφαλμάτων.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Τιμή boolean για την ενεργοποίηση ενός παραθύρου κονσόλας εξόδου που εμφανίζει τα περιεχόμενα των διαγνωστικών μηνυμάτων κατά την εκκίνηση μιας παρουσίας διανομής WSL 2.</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>Προεπιλεγμένο μέγεθος VHD</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>Το προεπιλεγμένο μέγιστο μέγεθος για τον επεκτάσιμο εικονικό σκληρό δίσκο (VHD) του WSL, μόνο για νέες διανομές που δημιουργούνται.</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>Επαναφορά μεγέθους</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Προεπιλεγμένο μέγεθος VHD</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Το προεπιλεγμένο μέγιστο μέγεθος, καθορισμένο σε megabytes, για τον επεκτάσιμο εικονικό σκληρό δίσκο (VHD) του WSL, μόνο για νέες διανομές που δημιουργούνται.</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>Προγραμματιστής</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>Τεκμηρίωση</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>Αλλαγή λειτουργίας DrvFS</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>Αλλάζει την υλοποίηση πρόσβασης αρχείων μεταξύ διαφορετικών Λειτουργικών Συστημάτων στο WSL.</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>Ενεργοποιημένος διακομιστής μεσολάβησης DNS</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.networkingMode έχει οριστεί σε NAT. Τιμή boolean για να ενημερώσει το WSL να ρυθμίσει τον διακομιστή DNS στο Linux σύμφωνα με το NAT του κεντρικού υπολογιστή. Αν οριστεί σε false, θα αντικατοπτρίζει τους διακομιστές DNS από τα Windows στο Linux.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποιημένος διακομιστής μεσολάβησης DNS.</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.networkingMode έχει οριστεί σε NAT. Τιμή boolean για να ενημερώσει το WSL να ρυθμίσει τον διακομιστή DNS στο Linux σύμφωνα με το NAT του κεντρικού υπολογιστή. Αν οριστεί σε false, θα αντικατοπτρίζει τους διακομιστές DNS από τα Windows στο Linux.</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>Ενεργοποιημένη διοχέτευση DNS</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>Αλλάζει τον τρόπο με τον οποίο τα αιτήματα DNS προωθούνται μέσω διακομιστή μεσολάβησης από το WSL στα Windows.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποιημένη διοχέτευση DNS.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Αλλάζει τον τρόπο με τον οποίο τα αιτήματα DNS προωθούνται μέσω διακομιστή μεσολάβησης από το WSL στα Windows.</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>Σύστημα αρχείων</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>Ενεργοποίηση εφαρμογών GUI (γραφικού περιβάλλοντος)</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>Τιμή boolean για την ενεργοποίηση ή απενεργοποίηση της υποστήριξης εφαρμογών GUI ([WSLg]) στο WSL.</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποίηση εφαρμογών GUI (γραφικού περιβάλλοντος).</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Τιμή boolean για την ενεργοποίηση ή απενεργοποίηση της υποστήριξης εφαρμογών GUI (γνωστό ως WSL g) στο WSL.</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>Ενεργοποίηση μετρητών απόδοσης υλικού</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>Ενεργοποιεί τους μετρητές απόδοσης υλικού για το Linux.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποίηση μετρητών απόδοσης υλικού.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ενεργοποιεί τους μετρητές απόδοσης υλικού για το Linux.</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>Ενεργοποιημένο τείχος προστασίας Hyper-V</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>Ενεργοποιεί το τείχος προστασίας Hyper-V το οποίο επιτρέπει στους κανόνες του Τείχους προστασίας των Windows, καθώς και στους κανόνες ειδικά για την κυκλοφορία του Hyper-V, να φιλτράρουν την κυκλοφορία δικτύου του WSL.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποιημένο τείχος προστασίας Hyper-V.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ενεργοποιεί το τείχος προστασίας Hyper-V το οποίο επιτρέπει στους κανόνες του Τείχους προστασίας των Windows, καθώς και στους κανόνες ειδικά για την κυκλοφορία του Hyper-V, να φιλτράρουν την κυκλοφορία δικτύου του WSL.</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>Διεύθυνση επαναφοράς κεντρικού υπολογιστή (Host Address Loopback)</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.networkingMode έχει οριστεί σε mirrored. Όταν οριστεί σε True, θα επιτρέψει στο κοντέινερ να συνδεθεί στον Κεντρικό υπολογιστή ή στον Κεντρικό υπολογιστή να συνδεθεί στο κοντέινερ, μέσω μιας διεύθυνσης IP που έχει εκχωρηθεί στον Κεντρικό υπολογιστή. Σημειώστε ότι η διεύθυνση επαναφοράς 127.0.0.1 μπορεί πάντα να χρησιμοποιηθεί - αυτή η επιλογή επιτρέπει να χρησιμοποιούνται επίσης όλες οι πρόσθετες τοπικές διευθύνσεις IP που έχουν εκχωρηθεί.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Διεύθυνση επαναφοράς κεντρικού υπολογιστή (Host Address Loopback).</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.networkingMode έχει οριστεί σε mirrored. Όταν οριστεί σε True, θα επιτρέψει στο κοντέινερ να συνδεθεί στον Κεντρικό υπολογιστή ή στον Κεντρικό υπολογιστή να συνδεθεί στο κοντέινερ, μέσω μιας διεύθυνσης IP που έχει εκχωρηθεί στον Κεντρικό υπολογιστή. Σημειώστε ότι η διεύθυνση επαναφοράς 127.0.0.1 μπορεί πάντα να χρησιμοποιηθεί - αυτή η επιλογή επιτρέπει να χρησιμοποιούνται επίσης όλες οι πρόσθετες τοπικές διευθύνσεις IP που έχουν εκχωρηθεί.</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>Αγνοημένες θύρες</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.networkingMode έχει οριστεί σε mirrored. Καθορίζει σε ποιες θύρες μπορούν να δεσμευτούν (bind) οι εφαρμογές Linux που δεν θα προωθούνται αυτόματα ούτε θα λαμβάνονται υπόψη στα Windows. Πρέπει να μορφοποιηθεί ως λίστα διαχωρισμένη με κόμματα, π.χ.: 3000,9000,9090.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>Επαναφορά θυρών</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Αγνοημένες θύρες</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.networkingMode έχει οριστεί σε mirrored. Καθορίζει σε ποιες θύρες μπορούν να δεσμευτούν οι εφαρμογές Linux που δεν θα προωθούνται αυτόματα ούτε θα λαμβάνονται υπόψη στα Windows. Πρέπει να μορφοποιηθεί ως λίστα διαχωρισμένη με κόμματα, για παράδειγμα, 3000, 9000, 9090.</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>Αρχικό χρονικό όριο (timeout) του Auto Proxy</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.autoProxy έχει οριστεί σε true. Διαμορφώνει τον χρόνο (σε χιλιοστά του δευτερολέπτου) που θα περιμένει το WSL για την ανάκτηση πληροφοριών του διακομιστή μεσολάβησης HTTP κατά την εκκίνηση ενός κοντέινερ WSL. Αν οι ρυθμίσεις του διακομιστή μεσολάβησης επιλυθούν μετά από αυτόν τον χρόνο, η παρουσία του WSL πρέπει να επανεκκινηθεί για να χρησιμοποιήσει τις ανακτημένες ρυθμίσεις.</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>Επαναφορά χρονικού ορίου</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Αρχικό χρονικό όριο του Auto Proxy</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ισχύει μόνο όταν το wsl2.autoProxy έχει οριστεί σε true. Διαμορφώνει τον χρόνο, σε χιλιοστά του δευτερολέπτου, που θα περιμένει το WSL για την ανάκτηση πληροφοριών του διακομιστή μεσολάβησης HTTP κατά την εκκίνηση ενός κοντέινερ WSL. Αν οι ρυθμίσεις του διακομιστή μεσολάβησης επιλυθούν μετά από αυτόν τον χρόνο, η παρουσία του WSL πρέπει να επανεκκινηθεί για να χρησιμοποιήσει τις ανακτημένες ρυθμίσεις.</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>Γραμμή εντολών πυρήνα</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>Πρόσθετα ορίσματα γραμμής εντολών πυρήνα (Kernel Command Line).</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>Ενεργοποίηση προώθησης localhost</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>Τιμή boolean που καθορίζει αν οι θύρες που είναι δεσμευμένες σε χαρακτήρες μπαλαντέρ (wildcard) ή στο localhost εντός της Εικονικής Μηχανής WSL 2 θα πρέπει να μπορούν να συνδεθούν από τον κεντρικό υπολογιστή μέσω του localhost:θύρα.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποίηση προώθησης localhost.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Τιμή boolean που καθορίζει αν οι θύρες που είναι δεσμευμένες σε χαρακτήρες μπαλαντέρ ή στο localhost εντός της Εικονικής Μηχανής WSL 2 θα πρέπει να μπορούν να συνδεθούν από τον κεντρικό υπολογιστή μέσω του localhost, άνω κάτω τελεία, θύρα.</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>Μνήμη και επεξεργαστής</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>Μέγεθος Μνήμης</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>Πόση μνήμη θα εκχωρηθεί στην Εικονική Μηχανή WSL 2.</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>Επαναφορά μεγέθους</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Μέγεθος Μνήμης</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Πόση μνήμη, καθορισμένη σε megabytes, θα εκχωρηθεί στην Εικονική Μηχανή WSL 2.</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} χιλιοστά του δευτερολέπτου</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>Ενεργοποίηση ένθετης λειτουργίας εικονικής μηχανής (nested virtualization)</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>Τιμή boolean για την ενεργοποίηση ή απενεργοποίηση της ένθετης δημιουργίας εικονικών μηχανών, επιτρέποντας σε άλλες ένθετες Εικονικές Μηχανές (VMs) να εκτελούνται μέσα στο WSL 2.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποίηση ένθετης λειτουργίας εικονικής μηχανής.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Τιμή boolean για την ενεργοποίηση ή απενεργοποίηση της ένθετης δημιουργίας εικονικών μηχανών, επιτρέποντας σε άλλες ένθετες Εικονικές Μηχανές να εκτελούνται μέσα στο WSL 2.</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>Λειτουργία δικτύου</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>Καθορίζει τη λειτουργία δικτύου για το WSL.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Λειτουργία δικτύου.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Καθορίζει τη λειτουργία δικτύου για το WSL.</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>Δικτύωση</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>Μπορείτε να εργαστείτε με όλα τα αρχεία σας σε διαφορετικά λειτουργικά συστήματα!</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>Πρόσβαση αρχείων μεταξύ διαφορετικών Λειτουργικών Συστημάτων</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>Αποκτήστε πρόσβαση στα αρχεία των Windows από το Linux</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>Μπορείτε να αποκτήσετε πρόσβαση στα αρχεία των Windows μέσα από το Linux, μεταβαίνοντας στο '/mnt' και στη συνέχεια στο γράμμα της μονάδας δίσκου των Windows, όπως σε αυτό το παράδειγμα για τη μονάδα δίσκου C:
+
+'cd /mnt/c'</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>Αποκτήστε πρόσβαση στα αρχεία του Linux με την Εξερεύνηση Αρχείων</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>Μπορείτε να δείτε τα αρχεία του Linux σας από την Εξερεύνηση Αρχείων των Windows (File Explorer) μεταβαίνοντας στο '\\wsl.localhost\' ή κάνοντας κλικ στο εικονίδιο 'Linux'.</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>Εκκίνηση αρχείων και προγραμμάτων των Windows από το WSL</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>Ακόμη και όταν χρησιμοποιείτε το WSL μπορείτε να εκτελέσετε τα εκτελέσιμα αρχεία των Windows απευθείας από το bash. Δοκιμάστε να εκτελέσετε
+το 'powershell.exe /c start .' για να ανοίξετε την Εξερεύνηση Αρχείων στον τρέχοντα φάκελο.</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>Πρόσβαση σε Εφαρμογές Δικτύωσης Linux από τα Windows</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>Εάν δημιουργείτε μια εφαρμογή δικτύωσης (για παράδειγμα, μια εφαρμογή που εκτελείται σε έναν διακομιστή NodeJS ή SQL) στη διανομή Linux σας, μπορείτε να αποκτήσετε πρόσβαση σε αυτήν από μια εφαρμογή των Windows (όπως το πρόγραμμα περιήγησης στο διαδίκτυο Edge ή Chrome) χρησιμοποιώντας το localhost (όπως θα κάνατε κανονικά). Αυτό σημαίνει ότι αν ξεκινήσατε έναν διακομιστή Linux που "ακούει" (listens) στη θύρα 3000, μπορείτε να μεταβείτε στο [http://localhost:3000] στον Edge από τα Windows για να αποκτήσετε πρόσβαση σε αυτόν.</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>Δικτύωση Λειτουργίας Κατοπτρισμού (Mirrored Mode Networking)</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>Το WSL περιλαμβάνει επίσης μια νέα λειτουργία δικτύου, που ονομάζεται λειτουργία κατοπτρισμού (mirrored mode), η οποία προσθέτει προηγμένες δυνατότητες, όπως υποστήριξη IPv6 και δυνατότητα πρόσβασης στις εφαρμογές δικτύωσης σας στο τοπικό σας δίκτυο (LAN).</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για την Πρόσβαση αρχείων μεταξύ διαφορετικών λειτουργικών συστημάτων</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>Καλώς ορίσατε στο Υποσύστημα Windows για Linux</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>Το WSL είναι ένας εξαιρετικός τρόπος για να δοκιμάσετε διαφορετικές διανομές Linux.</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>Διαχείριση Διανομών</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για τις βασικές εντολές του WSL</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για την εισαγωγή οποιασδήποτε διανομής Linux</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>Εντολή παράθεσης διανομών WSL προς εγκατάσταση</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l -o'</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>Εντολή εγκατάστασης κατονομαζόμενης διανομής WSL</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;ΌνομαΔιανομής&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>Εντολή παράθεσης διαθέσιμων διανομών WSL</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Το Docker Desktop λειτουργεί άψογα με το WSL για να σας βοηθήσει να αναπτύξετε με κοντέινερς του Linux.
+
+Ορισμένα από τα πλεονεκτήματα της χρήσης του Docker Desktop με το WSL είναι:
+
+• Μπορείτε να εκτελέσετε εντολές Docker στο WSL ή στα Windows, χρησιμοποιώντας τον ίδιο daemon και τα ίδια images του Docker.
+• Μπορείτε να μοιράζεστε αρχεία και φακέλους μεταξύ των Windows και του Linux απρόσκοπτα, χρησιμοποιώντας την αυτόματη προσάρτηση των μονάδων δίσκου των Windows στο WSL.
+• Μπορείτε να χρησιμοποιήσετε τα προτιμώμενα εργαλεία και προγράμματα επεξεργασίας των Windows για να εργαστείτε στον κώδικα και τα αρχεία του Linux, και αντίστροφα, χάρη στη διαλειτουργικότητα του WSL.</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Ενσωμάτωση Docker Desktop</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για τη χρήση του WSL με το Docker</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>Το Υποσύστημα Windows για Linux (WSL) σας επιτρέπει να εκτελείτε τα αγαπημένα σας εργαλεία, βοηθητικά προγράμματα, εφαρμογές και ροές εργασίας (workflows) του Linux απευθείας στα Windows.
+
+Αφιερώστε λίγο χρόνο για να δείτε μια προεπισκόπηση ορισμένων από τα αγαπημένα χαρακτηριστικά της κοινότητας ή δείτε την ολοκληρωμένη τεκμηρίωσή μας.</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>Καλώς ορίσατε στο WSL</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>Βέλτιστες Πρακτικές για τη Ρύθμιση</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Ξεκινώντας με το Linux</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>Τεκμηρίωση Υποσυστήματος Windows για Linux (WSL)</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>Μπορείτε να χρησιμοποιήσετε εφαρμογές του Linux βασισμένες σε γραφικό περιβάλλον με εγγενείς αλληλεπιδράσεις των Windows όπως το alt-tab, την εκκίνηση από το μενού Έναρξης, το καρφίτσωμα στη γραμμή εργασιών και την υποστήριξη αποκοπής και επικόλλησης.</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>Εφαρμογές GUI (Γραφικού περιβάλλοντος)</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>Το WSL μπορεί να αξιοποιήσει τη GPU των Windows σας για ροές εργασίας Μηχανικής Μάθησης
+
+Τα δυαδικά αρχεία του Linux που εκτελούνται στο WSL μπορούν να χρησιμοποιήσουν αυτόματα τη GPU σας στα Windows για να επιταχύνουν την απόδοσή τους. Απλώς χρειάζεται να εγκαταστήσετε και να εκτελέσετε αυτές τις ροές εργασίας με τον ίδιο τρόπο που θα κάνατε σε έναν κανονικό υπολογιστή με Linux. Υπάρχουν πολλοί διαφορετικοί τρόποι για να ξεκινήσετε: από την εκτέλεση του CUDA σε ένα κοντέινερ Docker (αν έχετε κάρτα γραφικών NVIDIA), έως την εκτέλεση του PyTorch ή του TensorFlow με DirectML στην κάρτα γραφικών AMD, Intel ή NVIDIA που διαθέτετε. Δείτε τον παρακάτω οδηγό έναρξης για να μάθετε περισσότερα.</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>Επιτάχυνση GPU</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για την επιτάχυνση GPU</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για τις εφαρμογές GUI του WSL</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>Ακολουθεί μια λίστα εφαρμογών για να δοκιμάσετε (Μπορείτε να τις εγκαταστήσετε όλες στο Ubuntu πληκτρολογώντας 'sudo apt install &lt;Όνομα Εφαρμογής&gt;')
+
+    • gedit – Βασικό πρόγραμμα επεξεργασίας κειμένου
+    • audacity – Εγγραφή και επεξεργασία αρχείων ήχου
+    • blender – Δημιουργία τρισδιάστατων (3D) κινούμενων σχεδίων και οπτικοποιήσεων
+    • gimp – Επεξεργασία φωτογραφιών
+    • nautilus – Ένας εξερευνητής αρχείων Linux
+    • vlc – Πρόγραμμα αναπαραγωγής βίντεο</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>Μπορείτε να έχετε εύκολη πρόσβαση σε εφαρμογές δικτύωσης σε διαφορετικά λειτουργικά συστήματα Windows και Linux.</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>Ενσωμάτωση Δικτύωσης</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για τις Εφαρμογές Δικτύωσης</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για τη Δικτύωση Λειτουργίας Κατοπτρισμού (Mirrored Mode)</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>Μπορείτε να χρησιμοποιήσετε το WSL ως το πλήρες περιβάλλον ανάπτυξής σας, απευθείας από το VS Code.</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>Ενσωμάτωση VS Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>Μάθετε περισσότερα για τη χρήση του WSL με το VS Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>Πώς να κάνετε εγκατάσταση</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>Αφού εγκαταστήσετε το VS Code, μπορείτε να εγκαταστήσετε την επέκταση Remote WSL από το Τερματικό των Windows:
+
+'code –install-extension ms-vscode-remote.remote-wsl'</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>Ανοίξτε ένα Έργο WSL στο Visual Studio Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>Για να ανοίξετε ένα έργο στο VS Code από τη διανομή WSL σας, ανοίξτε τη γραμμή εντολών της διανομής και εκτελέστε το 'code .' για να ανοίξετε ένα αρχείο έργου.
+
+Μπορείτε επίσης να αποκτήσετε πρόσβαση σε περισσότερες επιλογές VS Code Remote μέσω της παλέτας εντολών μέσα στο ίδιο το VS Code. Πατήστε "SHIFT+CTRL+P" στο πληκτρολόγιό σας για να ανοίξετε την παλέτας εντολών και πληκτρολογήστε 'Remote-WSL' για να δείτε μια λίστα με τις διαθέσιμες επιλογές του VS Code Remote, επιτρέποντάς σας να ανοίξετε ξανά τον φάκελο σε μια απομακρυσμένη συνεδρία, να καθορίσετε ποια διανομή θέλετε να ανοίξετε και πολλά άλλα.</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>Πώς να το χρησιμοποιήσετε</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>Προαιρετικά χαρακτηριστικά</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>Δήλωση Απορρήτου</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>Αριθμός Επεξεργαστών</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>Πόσοι λογικοί επεξεργαστές θα εκχωρηθούν στην Εικονική Μηχανή WSL 2.</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>Επαναφορά αριθμού</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Αριθμός Επεξεργαστών</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Πόσοι λογικοί επεξεργαστές θα εκχωρηθούν στην Εικονική Μηχανή WSL 2.</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>Σχετικοί σύνδεσμοι</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>Σημειώσεις έκδοσης</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>Ενεργοποίηση ασφαλούς λειτουργίας</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>Εκτελεί το WSL σε "Ασφαλή λειτουργία", η οποία απενεργοποιεί πολλές δυνατότητες και προορίζεται για χρήση με σκοπό την ανάκτηση διανομών που βρίσκονται σε κακή κατάσταση.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποίηση ασφαλούς λειτουργίας.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Εκτελεί το WSL σε "Ασφαλή λειτουργία", η οποία απενεργοποιεί πολλές δυνατότητες και προορίζεται για χρήση με σκοπό την ανάκτηση διανομών που βρίσκονται σε κακή κατάσταση.</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>Σχετικά</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>Προγραμματιστής</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Διαχείριση Διανομών</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Ενσωμάτωση Docker Desktop</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>Σύστημα Αρχείων</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>Γενικά</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>Επιτάχυνση GPU</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>Εφαρμογές GUI</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>Εκκίνηση wsl.exe</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>Μνήμη και επεξεργαστής</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>Δικτύωση</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>Ενσωμάτωση Δικτύωσης</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>Καλώς ορίσατε στο WSL</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>Προαιρετικά χαρακτηριστικά</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>Ρυθμίσεις</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>Ενσωμάτωση VS Code</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>Τι νέο υπάρχει</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>Εργασία σε διαφορετικά Συστήματα Αρχείων</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>Προβλήματα (Issues)</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>Ενεργοποίηση sparse VHD από προεπιλογή</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>Κάθε νέο VHD που δημιουργείται θα ορίζεται αυτόματα ως sparse (αραιό) όταν είναι ενεργοποιημένο.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ενεργοποίηση sparse VHD από προεπιλογή.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Κάθε νέο VHD που δημιουργείται θα ορίζεται αυτόματα ως sparse (αραιό) όταν είναι ενεργοποιημένο.</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>Τοποθεσία Αρχείου Swap</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>Μια απόλυτη διαδρομή Windows προς τον εικονικό σκληρό δίσκο swap.</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>Αναζήτηση αρχείων swap</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Τοποθεσία Αρχείου Swap</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Μια απόλυτη διαδρομή Windows προς τον εικονικό σκληρό δίσκο swap.</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>Μέγεθος Swap</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>Πόσος χώρος swap θα προστεθεί στην Εικονική Μηχανή WSL 2, 0 για απουσία αρχείου swap. Η αποθήκευση swap είναι μνήμη RAM βασισμένη σε δίσκο που χρησιμοποιείται όταν η ζήτηση μνήμης υπερβαίνει το όριο στη συσκευή υλικού.</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>Επαναφορά μεγέθους</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Μέγεθος Swap</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Πόσος χώρος swap, καθορισμένος σε megabytes, θα προστεθεί στην Εικονική Μηχανή WSL 2. 0 για απουσία αρχείου swap. Η αποθήκευση swap είναι μνήμη RAM βασισμένη σε δίσκο που χρησιμοποιείται όταν η ζήτηση μνήμης υπερβαίνει το όριο στη συσκευή υλικού.</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>Ενεργοποίηση VirtIO</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>Χρησιμοποιήστε το virtiofs αντί για το plan 9 για την πρόσβαση σε αρχεία του κεντρικού υπολογιστή, αυξάνοντας την ταχύτητα.</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>Ενεργοποίηση Virtio 9p</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>Ενεργοποιεί την προσάρτηση του συστήματος αρχείων 9P από τον κεντρικό υπολογιστή χρησιμοποιώντας τη μεταφορά virtio.</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>Χρονικό όριο αδράνειας VM</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>Ο αριθμός των χιλιοστών του δευτερολέπτου που μια Εικονική Μηχανή είναι αδρανής, πριν τερματιστεί.</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Επαναφορά χρονικού ορίου</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Χρονικό όριο αδράνειας VM</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ο αριθμός των χιλιοστών του δευτερολέπτου που μια Εικονική Μηχανή είναι αδρανής, πριν τερματιστεί.</value>
+  </data>
+</root>
