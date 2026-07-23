@@ -3023,11 +3023,11 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
-    <value>Ajouter un lien à un autre conteneur (nom --link : alias)</value>
+    <value>Ajouter un lien vers un autre conteneur (--link name:alias)</value>
     <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
-    <value>Ajouter une adresse IPv4 locale au lien pour le conteneur</value>
+    <value>Ajouter une adresse IPv4 link-local pour le conteneur</value>
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
@@ -3057,6 +3057,13 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publier tous les ports exposés sur des ports aléatoires de l’hôte</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Affiche uniquement les ID des conteneurs</value>
@@ -3529,6 +3536,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Échec de l’initialisation de l’échange</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Échec de la restauration de l’horodatage du conteneur '{}'</value>
