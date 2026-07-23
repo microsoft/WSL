@@ -577,6 +577,8 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
                             registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(OobeResult->DefaultUid));
                             m_defaultUid = static_cast<int>(OobeResult->DefaultUid);
                         }
+
+                        m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
                     }
                 }
                 CATCH_LOG()
