@@ -59,7 +59,7 @@ steps:
   displayName: Fetch GitHub PR token from Key Vault
   condition: and(succeeded(), in(variables['Build.Reason'], 'Schedule', 'Manual'))
   inputs:
-    azureSubscription: $(KeyVaultServiceConnection)
+    ConnectedServiceName: $(KeyVaultServiceConnection)
     KeyVaultName: $(KeyVaultName)
     SecretsFilter: 'GithubPRToken'
 
