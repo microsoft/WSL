@@ -53,6 +53,13 @@ steps:
   inputs:
     artifactFeeds: 'wsl'
 
+- task: AzureKeyVault@2
+  displayName: Fetch GitHub PR token from Key Vault
+  inputs:
+    azureSubscription: $(KeyVaultServiceConnection)
+    KeyVaultName: $(KeyVaultName)
+    SecretsFilter: 'GithubPRToken'
+
 - powershell: |
             pip install --user -r tools/devops/requirements.txt
             python tools/devops/create-change.py . "$env:token" "WSL notice"  "Notice change from build: $env:buildId" "user/notice/$env:buildId" "$env:targetBranch"
