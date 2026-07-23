@@ -55,6 +55,7 @@ static const LXT_TEST LxtTests[] = {
 #endif
     {"sem", false, SemTestEntry},
     {"shm", false, ShmTestEntry},
+    {"socket", false, SocketTestEntry},
     {"socket_nonblock", false, SocketNonblockTestEntry},
     {"splice", false, SpliceTestEntry},
     {"sysfs", false, SysfsTestEntry},

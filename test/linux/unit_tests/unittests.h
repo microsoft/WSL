@@ -56,6 +56,7 @@ Abstract:
 #define SELECT_TESTNAME "select"
 #define SEM_TESTNAME "sem"
 #define SHM_TESTNAME "shm"
+#define SOCKET_TESTNAME "socket"
 #define SOCKET_NONBLOCK_TESTNAME "socket_nonblock"
 #define SPLICE_TESTNAME "splice"
 #define SYSFS_TESTNAME "sysfs"
@@ -153,6 +154,8 @@ int SelectTestEntry(int Argc, char* Argv[]);
 int SemTestEntry(int Argc, char* Argv[]);
 
 int ShmTestEntry(int Argc, char* Argv[]);
+
+int SocketTestEntry(int Argc, char* Argv[]);
 
 int SocketNonblockTestEntry(int Argc, char* Argv[]);
 

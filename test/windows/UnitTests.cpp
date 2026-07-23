@@ -42,8 +42,6 @@ Abstract:
 #define LXSST_FSTAB_SETUP_COMMAND_LINE L"/bin/bash -c 'echo C:\\\\ /mnt/c drvfs metadata 0 0 >> /etc/fstab'"
 #define LXSST_FSTAB_CLEANUP_COMMAND_LINE L"/bin/bash -c \"cp /etc/fstab.bak /etc/fstab\""
 
-#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
-
 #define LXSST_IMPORT_DISTRO_TEST_DIR L"C:\\importtest\\"
 
 #define LXSST_UID_ROOT 0

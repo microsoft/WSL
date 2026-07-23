@@ -37,6 +37,7 @@ using namespace std::chrono_literals;
 #define LXSS_DISTRO_NAME_TEST_L WIDEN(LXSS_DISTRO_NAME_TEST)
 
 #define LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE L"-u root -e rm /etc/wsl.conf"
+#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
 
 //
 // Test method declaration macros that tag tests with TAEF metadata for version-based selection.
