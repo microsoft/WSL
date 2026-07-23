@@ -688,7 +688,7 @@ void HandleMessageImpl(
         };
 
         const char* mountOptions = readField(Message.OptionsIndex);
-        mountutil::ParsedOptions options;
+        mountutil::ParsedOptions options{};
         if (Message.OptionsIndex > 0)
         {
             options = mountutil::MountParseFlags(mountOptions);

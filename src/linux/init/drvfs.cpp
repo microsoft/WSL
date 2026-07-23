@@ -896,10 +896,6 @@ try
         return {};
     }
 
-    //
-    // Validate the tag is a GUID.
-    //
-
     std::string mappingName{Tag};
     if (Root != nullptr)
     {
