@@ -1462,7 +1462,7 @@ std::wstring LxssWriteWslConfig(const std::wstring& Content)
 // writes distro specific settings /etc/wsl.conf
 std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName)
 {
-    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", wsl::shared::string::WideToMultiByte(DistributionName));
+    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", DistributionName);
 
     std::ifstream distroConfigRead(path);
     auto previousContent = std::string{std::istreambuf_iterator<char>(distroConfigRead), {}};
