@@ -228,21 +228,25 @@ void PullImage(CLIExecutionContext& context)
 
     // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
     // the client reports this on stdout before contacting the registry.
-    EnumReferenceFormat format = EnumReferenceFormatNone;
-    ParseImage(image, &format);
-    if (!quiet && format == EnumReferenceFormatNone)
+    const auto reference = ImageReference::Parse(image);
+    if (!quiet && reference.Format == EnumReferenceFormatNone)
     {
         context.Reporter.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
     }
 
     // Match `docker pull`: in quiet mode, suppress progress output by passing no progress callback. Warnings are
     // unaffected because the warning callback is built internally by ImageService::Pull from the Reporter.
-    ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
-    IProgressCallback* progress = quiet ? nullptr : &callback;
+    std::optional<ImageProgressCallback> callback;
+    if (!quiet)
+    {
+        callback.emplace(context.Reporter, Reporter::Level::Output);
+    }
+
+    IProgressCallback* progress = callback ? &*callback : nullptr;
     services::ImageService::Pull(context.Reporter, session, image, progress);
 
     // Match `docker pull`: always print the resolved canonical image reference as the final line.
-    context.Reporter.Output(L"{}\n", MultiByteToWide(GetCanonicalImageReference(image)));
+    context.Reporter.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
 }
 
 void PushImage(CLIExecutionContext& context)

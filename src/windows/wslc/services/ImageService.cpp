@@ -68,9 +68,7 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
 
 std::string GetServerFromImage(const std::string& image)
 {
-    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
-    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
-    return server;
+    return wsl::windows::common::wslutil::ImageReference::Parse(image).Repository.Server;
 }
 
 struct InputSource
@@ -217,9 +215,9 @@ std::vector<ImageInformation> ImageService::List(
         std::string imageRef = image.Image;
         if (imageRef != "<none>:<none>")
         {
-            auto parsed = wsl::windows::common::wslutil::ParseImage(imageRef);
-            info.Repository = parsed.first;
-            info.Tag = parsed.second;
+            auto parsed = wsl::windows::common::wslutil::ImageReference::Parse(imageRef);
+            info.Repository = parsed.Repository.Name;
+            info.Tag = parsed.TagOrDigest();
         }
 
         info.Id = image.Hash;
@@ -277,17 +275,16 @@ void ImageService::Pull(Reporter& reporter, wsl::windows::wslc::models::Session&
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
 {
-    EnumReferenceFormat format;
-    auto [repo, tag] = ParseImage(targetImage, &format);
-    if (format == EnumReferenceFormatDigest)
+    auto reference = ImageReference::Parse(targetImage);
+    if (reference.Format == EnumReferenceFormatDigest)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
     }
 
     WSLCTagImageOptions options{};
     options.Image = sourceImage.c_str();
-    options.Repo = repo.c_str();
-    options.Tag = tag ? tag->c_str() : "";
+    options.Repo = reference.Repository.Name.c_str();
+    options.Tag = reference.Tag ? reference.Tag->c_str() : "";
 
     THROW_IF_FAILED(session.Get()->TagImage(&options));
 }
