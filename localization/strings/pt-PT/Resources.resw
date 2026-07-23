@@ -2134,10 +2134,6 @@ Utilização:
     <value>O contentor "{}" está em execução.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress ainda não é suportado.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Os mapeamentos de portas não são suportados com o modo de rede de contentores; As portas são propriedade do contentor de destino.</value>
   </data>
@@ -2208,6 +2204,21 @@ Utilização:
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Para obter mais detalhes sobre um comando específico, transmita o argumento de ajuda para o mesmo.</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Comandos:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Opções:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Opções Globais:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliases:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argumentos:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>O nome do argumento não foi reconhecido para o comando atual: '{}'</value>
@@ -2368,17 +2379,32 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <value>Valor inválido do tempo limite de paragem: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Não são permitidas redes adicionais quando o modo de rede principal é "host" ou "none".</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>O modo de rede principal "{}" não suporta ligar ou desligar redes adicionais.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Rede duplicada: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>As definições do ponto final ainda não são suportadas (rede "{}").</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Duplicate driver option '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>Só é possível especificar um endereço IP para a rede '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Network link cannot be empty.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>O alias de rede não pode estar vazio.</value>
@@ -2386,6 +2412,10 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Os aliases de rede requerem uma rede definida pelo utilizador. Utilize --network para especificar um.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>As definições do ponto final não são suportadas para o modo de rede "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
@@ -2976,6 +3006,22 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   </data>
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Adicionar um alias com âmbito de rede para o contentor</value>
+  </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Atribuir ao contentor um endereço IPv4 na rede</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Adicionar ligação a outro contentor (--link nome:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Adicionar um endereço de IPv4 local de ligação para o contentor</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Valor {} inválido: o alias de rede não pode estar vazio ou ter espaços em branco</value>
