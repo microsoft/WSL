@@ -2170,16 +2170,18 @@ class NetworkTests
             if (pos != std::string_view::npos)
             {
                 auto portStr = outputView.substr(pos + 5);
-                auto end = portStr.find_first_not_of("0123456789");
-                if (end != std::string_view::npos)
-                {
-                    portStr = portStr.substr(0, end);
-                }
 
-                if (!portStr.empty())
+                // Only parse once the line is fully read (terminated by '\n'); otherwise a
+                // partial read could truncate the port digits (e.g. "123" read as "12").
+                auto newlinePos = portStr.find('\n');
+                if (newlinePos != std::string_view::npos)
                 {
-                    assignedPort = static_cast<uint16_t>(std::stoi(std::string(portStr)));
-                    found = true;
+                    portStr = portStr.substr(0, newlinePos);
+                    if (!portStr.empty())
+                    {
+                        assignedPort = static_cast<uint16_t>(std::stoi(std::string(portStr)));
+                        found = true;
+                    }
                 }
             }
         }
