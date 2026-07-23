@@ -22,6 +22,7 @@ RUN mkdir -p /fixtures/git /tmp/source-fixture \
     && rm -rf /tmp/upstream /tmp/source-fixture
 
 COPY run-workload.sh /usr/local/bin/run-workload.sh
-RUN chmod +x /usr/local/bin/run-workload.sh
+RUN sed --in-place 's/\r$//' /usr/local/bin/run-workload.sh \
+    && chmod +x /usr/local/bin/run-workload.sh
 
 ENTRYPOINT ["/usr/local/bin/run-workload.sh"]
