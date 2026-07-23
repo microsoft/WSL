@@ -199,7 +199,9 @@ class WSLCTests
 
     std::string PushImageToRegistry(const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
     {
-        auto [repo, tag] = ParseImage(imageName);
+        auto reference = ImageReference::Parse(imageName);
+        const auto& repo = reference.Repository.Name;
+        auto tag = reference.TagOrDigest();
         auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
         auto registryRepo = std::format("{}/{}", registryAddress, repo);
         auto registryTag = tag.value_or("latest");
@@ -11821,12 +11823,37 @@ class WSLCTests
 
     TEST_METHOD(ImageParsing)
     {
-        using wsl::windows::common::wslutil::ParseImage;
+        auto ValidateImageParsing = [](const std::string& input,
+                                       const std::string& expectedRepo,
+                                       const std::optional<std::string>& expectedTag,
+                                       const std::optional<std::string>& expectedDigest = std::nullopt) {
+            auto reference = ImageReference::Parse(input);
 
-        auto ValidateImageParsing = [](const std::string& input, const std::string& expectedRepo, const std::optional<std::string>& expectedTag) {
-            auto [repo, tag] = ParseImage(input);
-            VERIFY_ARE_EQUAL(repo, expectedRepo);
-            VERIFY_ARE_EQUAL(tag.value_or("<empty>"), expectedTag.value_or("<empty>"));
+            // The repository is parsed into a RepositoryReference; Name preserves the original token while Server and
+            // Path hold its normalized form.
+            const auto expectedRepository = RepositoryReference::Parse(expectedRepo);
+            VERIFY_ARE_EQUAL(reference.Repository.Name, expectedRepository.Name);
+            VERIFY_ARE_EQUAL(reference.Repository.Server, expectedRepository.Server);
+            VERIFY_ARE_EQUAL(reference.Repository.Path, expectedRepository.Path);
+            VERIFY_ARE_EQUAL(reference.Tag.value_or("<empty>"), expectedTag.value_or("<empty>"));
+            VERIFY_ARE_EQUAL(reference.Digest.value_or("<empty>"), expectedDigest.value_or("<empty>"));
+
+            // TagOrDigest() collapses to a single field where a digest takes precedence over a tag.
+            const std::optional<std::string> expectedTagOrDigest = expectedDigest.has_value() ? expectedDigest : expectedTag;
+            VERIFY_ARE_EQUAL(reference.TagOrDigest().value_or("<empty>"), expectedTagOrDigest.value_or("<empty>"));
+
+            // Format mirrors that same classification.
+            EnumReferenceFormat expectedFormat = EnumReferenceFormatNone;
+            if (expectedDigest.has_value())
+            {
+                expectedFormat = EnumReferenceFormatDigest;
+            }
+            else if (expectedTag.has_value())
+            {
+                expectedFormat = EnumReferenceFormatTag;
+            }
+
+            VERIFY_ARE_EQUAL(reference.Format, expectedFormat);
         };
 
         ValidateImageParsing("ubuntu:22.04", "ubuntu", "22.04");
@@ -11841,47 +11868,54 @@ class WSLCTests
         ValidateImageParsing("localhost:5000/myimage:latest", "localhost:5000/myimage", "latest");
         ValidateImageParsing("ghcr.io/owner/repo:sha-abc123", "ghcr.io/owner/repo", "sha-abc123");
 
+        // A digest-only reference populates the digest field and leaves the tag empty.
         ValidateImageParsing(
             "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "ubuntu",
+            {},
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
-        // Validate that the digest takes precedence over the tag.
+        // A reference with both a tag and a digest captures each in its own field.
         ValidateImageParsing(
             "ubuntu:latest@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "ubuntu",
+            "latest",
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         ValidateImageParsing(
             "myregistry.io:5000/myimage@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "myregistry.io:5000/myimage",
+            {},
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         ValidateImageParsing(
             "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "ubuntu",
+            "22.04",
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         ValidateImageParsing("pytorch/pytorch", "pytorch/pytorch", {});
 
         // Invalid inputs
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":debian:latest"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian:latest@"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("a:"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":b"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(""); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":debian:latest"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse("debian:latest@"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(""); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse("a:"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":b"); }), E_INVALIDARG);
     }
 
     TEST_METHOD(RepoParsing)
     {
-        using wsl::windows::common::wslutil::NormalizeRepo;
-
         auto ValidateRepoParsing = [](const std::string& input, const std::string& expectedServer, const std::string& expectedPath) {
-            auto [server, path] = NormalizeRepo(input);
-            VERIFY_ARE_EQUAL(server, expectedServer);
-            VERIFY_ARE_EQUAL(path, expectedPath);
+            auto repository = RepositoryReference::Parse(input);
+            VERIFY_ARE_EQUAL(repository.Name, input);
+            VERIFY_ARE_EQUAL(repository.Server, expectedServer);
+            VERIFY_ARE_EQUAL(repository.Path, expectedPath);
+
+            // GetCanonical() rejoins the normalized server and path.
+            VERIFY_ARE_EQUAL(repository.GetCanonical(), std::format("{}/{}", expectedServer, expectedPath));
         };
 
         ValidateRepoParsing("ubuntu", "docker.io", "library/ubuntu");
@@ -11901,10 +11935,8 @@ class WSLCTests
 
     TEST_METHOD(CanonicalImageReference)
     {
-        using wsl::windows::common::wslutil::GetCanonicalImageReference;
-
         auto Validate = [](const std::string& input, const std::string& expected) {
-            VERIFY_ARE_EQUAL(GetCanonicalImageReference(input), expected);
+            VERIFY_ARE_EQUAL(ImageReference::Parse(input).GetCanonical(), expected);
         };
 
         // Name-only references default to ":latest" and the docker.io/library prefix (matches `docker pull` output).

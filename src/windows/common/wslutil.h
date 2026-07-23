@@ -222,10 +222,6 @@ ErrorStrings ErrorToString(const Error& error);
 
 std::filesystem::path GetBasePath();
 
-// Returns the fully-qualified canonical image reference for the given input, matching the string
-// printed by `docker pull` (e.g. "ubuntu" -> "docker.io/library/ubuntu:latest").
-std::string GetCanonicalImageReference(const std::string& input);
-
 std::optional<COMErrorInfo> GetCOMErrorInfo();
 
 DWORD GetDefaultVersion(void);
@@ -268,7 +264,22 @@ bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
 
-std::pair<std::string, std::string> NormalizeRepo(const std::string& Input);
+// An immutable container repository reference. Holds the original repository token together with its normalized
+// registry server and path, following Docker's client-side normalization (e.g. "ubuntu" -> {"docker.io",
+// "library/ubuntu"}). Construct one with Parse(). Normalization is lossy, so the original Name is retained for
+// callers that must echo the repository exactly as it was written.
+struct RepositoryReference
+{
+    const std::string Name;
+    const std::string Server;
+    const std::string Path;
+
+    // Split and normalize a repository string into its registry server and path.
+    static RepositoryReference Parse(const std::string& repository);
+
+    // The fully-qualified "server/path" form (e.g. "docker.io/library/ubuntu").
+    std::string GetCanonical() const;
+};
 
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 
@@ -280,7 +291,29 @@ void ParseIpv6Address(const char* Address, in_addr6& Result);
 
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input, EnumReferenceFormat* Format = nullptr);
+// A parsed, immutable image reference such as "ubuntu:22.04@sha256:...". Construct one with Parse().
+struct ImageReference
+{
+    const RepositoryReference Repository;
+    const std::optional<std::string> Tag;
+    const std::optional<std::string> Digest;
+    const EnumReferenceFormat Format;
+
+    // Parse an image reference string into its components. Throws E_INVALIDARG (with a user-facing error) when the
+    // reference is malformed.
+    static ImageReference Parse(const std::string& input);
+
+    // Collapse the reference to a single tag-or-digest field, where a digest takes precedence over a tag. This matches
+    // how callers that resolve, pull or push a single reference treat the two.
+    std::optional<std::string> TagOrDigest() const
+    {
+        return Digest.has_value() ? Digest : Tag;
+    }
+
+    // The fully-qualified canonical reference, matching the string printed by `docker pull`
+    // (e.g. "ubuntu" -> "docker.io/library/ubuntu:latest").
+    std::string GetCanonical() const;
+};
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
