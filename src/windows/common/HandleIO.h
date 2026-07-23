@@ -105,6 +105,7 @@ public:
     NON_MOVABLE(ReadHandle);
 
     ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
+    ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead, size_t BufferSize);
     virtual ~ReadHandle();
 
     void Schedule() override;
@@ -341,6 +342,11 @@ public:
         Read(
             std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }, std::forward<TArgs>(InputArgs)...),
         Write(std::move(Output), {}, false)
+    {
+    }
+
+    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output, size_t BufferSize) :
+        Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }, BufferSize), Write(std::move(Output))
     {
     }
 
