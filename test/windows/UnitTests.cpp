@@ -770,9 +770,7 @@ class UnitTests
             DistroFileChange groups(L"/etc/group", true);
             CommandLine = std::format(L"-- for i in $(seq 1 64); do groupadd group$i; usermod -a -G group$i {}; done", LXSST_TEST_USERNAME);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(CommandLine), (DWORD)0);
-            VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(L"{} {} {}", WSL_USER_ARG_LONG, LXSST_TEST_USERNAME, wsl::shared::string::MultiByteToWide("echo success"))),
-                (DWORD)0);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"{} {} {}", WSL_USER_ARG_LONG, LXSST_TEST_USERNAME, L"echo success")), (DWORD)0);
         }
 
         //
@@ -964,14 +962,14 @@ class UnitTests
 
         {
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --version");
-            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", wsl::shared::string::MultiByteToWide(WSL_PACKAGE_VERSION)));
+            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION)));
             VERIFY_ARE_EQUAL(err, L"");
         }
 
         {
             // Ensure the old version query command still works.
             const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --wsl-version");
-            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", wsl::shared::string::MultiByteToWide(WSL_PACKAGE_VERSION)));
+            VERIFY_ARE_EQUAL(out, std::format(L"{}\n", STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION)));
             VERIFY_ARE_EQUAL(err, L"");
         }
 
@@ -4647,8 +4645,8 @@ VERSION_ID="Invalid|Format"
                         WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", distroName)); });
 
                     VERIFY_ARE_EQUAL(
-                        LxsstuLaunchWsl(std::format(
-                            L"--import {} \"{}\" {}", distroName, location, wsl::shared::string::MultiByteToWide("distro-default-name-icon.tar"))),
+                        LxsstuLaunchWsl(
+                            std::format(L"--import {} \"{}\" {}", distroName, location, L"distro-default-name-icon.tar")),
                         0L);
 
                     auto [json, profile_path] = ValidateDistributionTerminalProfile(distroName, false);
