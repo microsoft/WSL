@@ -7894,6 +7894,53 @@ class WSLCTests
             VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "backup") != endpoint.Aliases.end());
         }
 
+        // Aliases on primary and additional user-defined networks — all present.
+        {
+            const std::string primaryNetworkName = "alias-net-primary";
+            const std::string additionalNetworkName = "alias-net-additional";
+            createNetwork(primaryNetworkName, "172.64.0.0/16");
+            createNetwork(additionalNetworkName, "172.65.0.0/16");
+            auto primaryNetCleanup =
+                wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(primaryNetworkName.c_str())); });
+            auto additionalNetCleanup =
+                wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(additionalNetworkName.c_str())); });
+
+            WSLCContainerLauncher launcher("debian:latest", "alias-ctr-additional", {"sleep", "99999"}, {}, primaryNetworkName);
+            launcher.AddPrimaryNetworkAlias("db");
+            launcher.AddAdditionalNetwork(additionalNetworkName, {"cache", "replica"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(primaryNetworkName));
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(additionalNetworkName));
+            const auto& primaryEndpoint = inspect.NetworkSettings.Networks.at(primaryNetworkName);
+            const auto& additionalEndpoint = inspect.NetworkSettings.Networks.at(additionalNetworkName);
+            VERIFY_IS_TRUE(std::ranges::find(primaryEndpoint.Aliases, "db") != primaryEndpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(additionalEndpoint.Aliases, "cache") != additionalEndpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(additionalEndpoint.Aliases, "replica") != additionalEndpoint.Aliases.end());
+        }
+
+        // Aliases on additional built-in/non-user-defined networks — rejected before network lookup.
+        {
+            const std::string primaryNetworkName = "alias-net-invalid-additional";
+            createNetwork(primaryNetworkName, "172.66.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(primaryNetworkName.c_str())); });
+
+            auto expectAdditionalNetworkAliasError = [&](const std::string& containerName, const std::string& additionalNetworkName) {
+                WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, primaryNetworkName);
+                launcher.AddAdditionalNetwork(additionalNetworkName, {"db"});
+
+                auto result = wil::ResultFromException([&] { launcher.Launch(*m_defaultSession); });
+                VERIFY_ARE_EQUAL(E_INVALIDARG, result);
+                ValidateCOMErrorMessage(L"Network aliases require a user-defined network. Use --network to specify one.");
+            };
+
+            expectAdditionalNetworkAliasError("alias-ctr-additional-bridge", "bridge");
+            expectAdditionalNetworkAliasError("alias-ctr-additional-host", "host");
+            expectAdditionalNetworkAliasError("alias-ctr-additional-none", "none");
+            expectAdditionalNetworkAliasError("alias-ctr-additional-container", "container:alias-ctr-target");
+        }
+
         // Alias on 'host' mode — rejected at the IDL layer.
         {
             expectError(

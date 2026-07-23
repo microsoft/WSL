@@ -141,19 +141,7 @@ void Argument::Validate(const ArgMap& execArgs) const
 
     case ArgType::Network:
     {
-        for (const auto& value : execArgs.GetAll<ArgType::Network>())
-        {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
-            }
-
-            if (IsEqual(value, L"host", true))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
-            }
-        }
+        validation::ValidateNetwork(execArgs.GetAll<ArgType::Network>(), m_name);
         break;
     }
 
@@ -216,6 +204,18 @@ void ValidateFilter(const std::vector<std::wstring>& values)
     for (const auto& value : values)
     {
         std::ignore = ParseFilter(value);
+    }
+}
+
+void ValidateNetwork(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        const auto parsed = ParseNetworkArgument(value, argName);
+        if (IsEqual(parsed.Name, "host", true))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
+        }
     }
 }
 
@@ -657,6 +657,80 @@ std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input,
     }
 
     return {WideToMultiByte(input.substr(0, equalsPos)), soft, hard};
+}
+
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName)
+{
+    ParsedNetworkArgument result;
+
+    auto parseOptions = [&](std::wstring_view options, bool requireName) {
+        bool parsedName = false;
+        for (const auto part : SplitPreserveEmpty(options, L','))
+        {
+            const auto separator = part.find(L'=');
+            if (separator == std::wstring_view::npos || separator == 0)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{part}));
+            }
+
+            const auto key = part.substr(0, separator);
+            const auto optionValue = part.substr(separator + 1);
+            if (key == L"name")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+                }
+
+                if (parsedName)
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(argName));
+                }
+
+                parsedName = true;
+                result.Name = WideToMultiByte(std::wstring{optionValue});
+            }
+            else if (key == L"alias")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(argName));
+                }
+
+                result.Aliases.emplace_back(WideToMultiByte(std::wstring{optionValue}));
+            }
+            else
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{key}));
+            }
+        }
+
+        if (requireName && !parsedName)
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+    };
+
+    if (value.find(L'=') != std::wstring_view::npos)
+    {
+        parseOptions(value, true);
+    }
+    else
+    {
+        if (IsEmptyOrWhitespace(value))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+
+        result.Name = WideToMultiByte(std::wstring{value});
+    }
+
+    if (result.Name.empty())
+    {
+        throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+    }
+
+    return result;
 }
 
 std::pair<std::string, std::string> ParseLabel(const std::wstring& value)

@@ -282,7 +282,12 @@ void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& Co
 
 void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name)
 {
-    m_additionalNetworks.push_back(Name);
+    AddAdditionalNetwork(Name, {});
+}
+
+void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases)
+{
+    m_additionalNetworks.push_back({.Name = Name, .Aliases = Aliases});
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddPrimaryNetworkAlias(const std::string& Alias)
@@ -424,24 +429,37 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     // Each additional network becomes an entry in NetworkingConfig.EndpointsConfig.
     std::vector<WSLCNetworkConnection> connections;
     connections.reserve(m_additionalNetworks.size());
+    std::vector<std::vector<KeyValuePair>> connectionSettings;
+    connectionSettings.reserve(m_additionalNetworks.size());
     for (const auto& e : m_additionalNetworks)
     {
-        connections.push_back({.NetworkName = e.c_str()});
+        auto& settings = connectionSettings.emplace_back();
+        settings.reserve(e.Aliases.size());
+        for (const auto& alias : e.Aliases)
+        {
+            settings.push_back({.Key = "Aliases", .Value = alias.c_str()});
+        }
+
+        connections.push_back({
+            .NetworkName = e.Name.c_str(),
+            .Settings = settings.empty() ? nullptr : settings.data(),
+            .SettingsCount = static_cast<ULONG>(settings.size()),
+        });
     }
 
     options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
 
     // Aliases for the primary endpoint.
-    std::vector<KeyValuePair> aliasKvps;
-    aliasKvps.reserve(m_primaryNetworkAliases.size());
+    std::vector<KeyValuePair> primarySettings;
+    primarySettings.reserve(m_primaryNetworkAliases.size());
     for (const auto& alias : m_primaryNetworkAliases)
     {
-        aliasKvps.push_back({.Key = "Aliases", .Value = alias.c_str()});
+        primarySettings.push_back({.Key = "Aliases", .Value = alias.c_str()});
     }
 
-    options.ContainerNetwork.Settings = aliasKvps.empty() ? nullptr : aliasKvps.data();
-    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(aliasKvps.size());
+    options.ContainerNetwork.Settings = primarySettings.empty() ? nullptr : primarySettings.data();
+    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(primarySettings.size());
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;

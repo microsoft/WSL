@@ -16,7 +16,9 @@ Abstract:
 
 #include <wslservice.h>
 #include <wslc.h>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace wsl::windows::wslc::models {
 
@@ -25,6 +27,12 @@ enum class FormatType
 {
     Table,
     Json,
+};
+
+struct ContainerNetwork
+{
+    std::string Name;
+    std::vector<std::string> Aliases;
 };
 
 struct ContainerOptions
@@ -57,7 +65,7 @@ struct ContainerOptions
     std::vector<std::string> DnsServers;
     std::vector<std::string> DnsSearchDomains;
     std::vector<std::string> DnsOptions;
-    std::vector<std::string> Networks;
+    std::vector<ContainerNetwork> Networks;
     std::vector<std::string> NetworkAliases;
     std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;

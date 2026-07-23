@@ -63,6 +63,7 @@ public:
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
     void AddAdditionalNetwork(const std::string& Name);
+    void AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases);
     void AddPrimaryNetworkAlias(const std::string& Alias);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
@@ -99,6 +100,12 @@ public:
     using WSLCProcessLauncher::SetWorkingDirectory;
 
 private:
+    struct NetworkConnection
+    {
+        std::string Name;
+        std::vector<std::string> Aliases;
+    };
+
     std::string m_image;
     std::string m_name;
     std::vector<WSLCPortMapping> m_ports;
@@ -123,7 +130,7 @@ private:
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
-    std::vector<std::string> m_additionalNetworks;
+    std::vector<NetworkConnection> m_additionalNetworks;
     std::vector<std::string> m_primaryNetworkAliases;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;

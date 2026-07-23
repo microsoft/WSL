@@ -21,6 +21,7 @@ Abstract:
 #include "AsyncExecution.h"
 #include "Command.h"
 #include "RootCommand.h"
+#include "ArgumentValidation.h"
 #include "ContainerCommand.h"
 #include "ContainerTasks.h"
 
@@ -374,7 +375,7 @@ class WSLCCLIExecutionUnitTests
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
         VERIFY_ARE_EQUAL(1u, options.Networks.size());
-        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
     }
 
     TEST_METHOD(RunCommand_ParseNetworkMultipleValues_PreservesOrder)
@@ -390,8 +391,50 @@ class WSLCCLIExecutionUnitTests
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
         VERIFY_ARE_EQUAL(2u, options.Networks.size());
-        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
-        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1]);
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1].Name);
+    }
+
+    TEST_METHOD(RunCommand_ParseDockerNetworkAliases_SetsPerNetworkAliases)
+    {
+        auto invocation =
+            CreateInvocationFromCommandLine(L"wslc --network name=net1,alias=a,alias=b --network name=net2,alias=c ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(2u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
+        VERIFY_ARE_EQUAL(2u, options.Networks[0].Aliases.size());
+        VERIFY_ARE_EQUAL(std::string("a"), options.Networks[0].Aliases[0]);
+        VERIFY_ARE_EQUAL(std::string("b"), options.Networks[0].Aliases[1]);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1].Name);
+        VERIFY_ARE_EQUAL(1u, options.Networks[1].Aliases.size());
+        VERIFY_ARE_EQUAL(std::string("c"), options.Networks[1].Aliases[0]);
+    }
+
+    TEST_METHOD(RunCommand_ParseDockerNetworkAliasesWithNameAfterAlias_SetsPerNetworkAliases)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network alias=a,name=net1,alias=b ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(1u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
+        VERIFY_ARE_EQUAL(2u, options.Networks[0].Aliases.size());
+        VERIFY_ARE_EQUAL(std::string("a"), options.Networks[0].Aliases[0]);
+        VERIFY_ARE_EQUAL(std::string("b"), options.Networks[0].Aliases[1]);
     }
 
     TEST_METHOD(RunCommand_ParseNetworkEmptyValue_ThrowsArgumentException)
@@ -419,7 +462,7 @@ class WSLCCLIExecutionUnitTests
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
         VERIFY_ARE_EQUAL(1u, options.Networks.size());
-        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkMultipleValues_PreservesOrder)
@@ -435,8 +478,160 @@ class WSLCCLIExecutionUnitTests
 
         const auto& options = context.Data.Get<Data::ContainerOptions>();
         VERIFY_ARE_EQUAL(2u, options.Networks.size());
-        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0]);
-        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1]);
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1].Name);
+    }
+
+    TEST_METHOD(CreateCommand_ParseDockerNetworkAliases_SetsPerNetworkAliases)
+    {
+        auto invocation =
+            CreateInvocationFromCommandLine(L"wslc --network name=net1,alias=a,alias=b --network name=net2,alias=c ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(2u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
+        VERIFY_ARE_EQUAL(2u, options.Networks[0].Aliases.size());
+        VERIFY_ARE_EQUAL(std::string("a"), options.Networks[0].Aliases[0]);
+        VERIFY_ARE_EQUAL(std::string("b"), options.Networks[0].Aliases[1]);
+        VERIFY_ARE_EQUAL(std::string("net2"), options.Networks[1].Name);
+        VERIFY_ARE_EQUAL(1u, options.Networks[1].Aliases.size());
+        VERIFY_ARE_EQUAL(std::string("c"), options.Networks[1].Aliases[0]);
+    }
+
+    TEST_METHOD(CreateCommand_ParseDockerNetworkAliasesWithNameAfterAlias_SetsPerNetworkAliases)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network alias=a,name=net1,alias=b ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(1u, options.Networks.size());
+        VERIFY_ARE_EQUAL(std::string("net1"), options.Networks[0].Name);
+        VERIFY_ARE_EQUAL(2u, options.Networks[0].Aliases.size());
+        VERIFY_ARE_EQUAL(std::string("a"), options.Networks[0].Aliases[0]);
+        VERIFY_ARE_EQUAL(std::string("b"), options.Networks[0].Aliases[1]);
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkDuplicateNameOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,name=net2 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkDuplicateNameError(L"network");
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkUnsupportedOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(
+            L"wslc --network name=net1,driver-opt=com.docker.network.endpoint.sysctls="
+            L"net.ipv4.conf.IFNAME.log_martians=1 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage =
+                wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"driver-opt");
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkUnknownOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,aliases=a ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"aliases");
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkBackendAliasesOption_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,Aliases=a ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkUnsupportedOptionError(L"network", L"Aliases");
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkAliasWithoutName_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network alias=a ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkNameWhitespaceValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network \"name=   \" ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
+            return exception.Message() == expectedMessage;
+        });
+    }
+
+    TEST_METHOD(ParseNetworkArgument_NameUnicodeWhitespaceValue_ThrowsArgumentException)
+    {
+        VERIFY_THROWS_SPECIFIC(
+            validation::ParseNetworkArgument(L"name=\u3000", L"network"), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkEmptyError(L"network");
+                return exception.Message() == expectedMessage;
+            });
+    }
+
+    TEST_METHOD(CreateCommand_ParseNetworkAliasEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,alias= ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+            const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkAliasEmptyError(L"network");
+            return exception.Message() == expectedMessage;
+        });
     }
 
     TEST_METHOD(CreateCommand_ParseNetworkEmptyValue_ThrowsArgumentException)
@@ -449,6 +644,21 @@ class WSLCCLIExecutionUnitTests
 
         VERIFY_THROWS_SPECIFIC(
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    TEST_METHOD(CreateCommand_SetContainerOptionsInvalidNetwork_ThrowsArgumentExceptionWithArgumentName)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --network name=net1,name=net2 ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            wsl::windows::wslc::task::SetContainerOptionsFromArgs(context), wsl::windows::wslc::ArgumentException, [](const auto& exception) {
+                const auto expectedMessage = wsl::shared::Localization::WSLCCLI_NetworkDuplicateNameError(L"network");
+                return exception.Message() == expectedMessage;
+            });
     }
 
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h

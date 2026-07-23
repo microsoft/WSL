@@ -169,6 +169,11 @@ bool NetworkModeAllocatesVmPorts(std::string_view mode) noexcept
     return mode != "host" && mode != "none" && !mode.starts_with(c_containerNetworkPrefix);
 }
 
+bool NetworkSupportsAliases(std::string_view mode) noexcept
+{
+    return mode != "bridge" && NetworkModeAllocatesVmPorts(mode);
+}
+
 // Reject `<prefix>:<value>` strings whose prefix isn't `container:`. Docker treats colon-prefixed
 // modes (`service:`, `ns:`, ...) as special, but WSLC only supports `container:`. Surface the
 // rejection here so both Create() and Open() recovery paths share the same gate.
@@ -263,6 +268,7 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
         {
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasEmpty(), isBlank(alias));
         }
+
         config.Aliases = std::move(it->second);
     }
 
@@ -346,13 +352,17 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         auto [it, inserted] = resolved.try_emplace(name);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !inserted);
 
+        auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), config.Aliases.has_value() && !NetworkSupportsAliases(name));
+
         if (name != "bridge")
         {
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
         }
 
-        it->second = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
+        it->second = std::move(config);
     }
     return resolved;
 }
@@ -1936,7 +1946,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
-        primaryConfig.Aliases.has_value() && (networkMode == "bridge" || !NetworkModeAllocatesVmPorts(networkMode)));
+        primaryConfig.Aliases.has_value() && !NetworkSupportsAliases(networkMode));
 
     const bool hasNonAliasEndpointSettings =
         primaryConfig.IPAMConfig.has_value() || primaryConfig.Links.has_value() || primaryConfig.DriverOpts.has_value();
