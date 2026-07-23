@@ -764,7 +764,7 @@ class WSLCE2EGlobalTests
 private:
     std::wstring GetVersionMessage() const
     {
-        return std::format(L"wslc {}\r\n", wsl::shared::string::MultiByteToWide(WSL_PACKAGE_VERSION));
+        return std::format(L"wslc {}\r\n", STRING_TO_WIDE_STRING(WSL_PACKAGE_VERSION));
     }
 
     // The session manager reports only the first three version components.

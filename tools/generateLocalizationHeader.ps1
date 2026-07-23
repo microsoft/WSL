@@ -35,12 +35,6 @@ inline std::wstring FormatArgument(char* value)
     return string::MultiByteToWide(value);
 }
 
-template <std::size_t Size>
-std::wstring FormatArgument(const char (&value)[Size])
-{
-    return string::MultiByteToWide(value);
-}
-
 inline std::wstring FormatArgument(const std::string& value)
 {
     return string::MultiByteToWide(value);
