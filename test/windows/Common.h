@@ -662,14 +662,14 @@ std::optional<std::wstring> GetHostAdapterIpv4();
 template <typename T>
 void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
 {
-    auto formatValue = [](const T& value) {
+    auto formatValue = [](const T& value) -> decltype(auto) {
         if constexpr (std::is_same_v<T, std::string>)
         {
             return wsl::shared::string::MultiByteToWide(value);
         }
         else
         {
-            return value;
+            return (value);
         }
     };
 
