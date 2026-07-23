@@ -29,11 +29,11 @@ std::vector<Argument> NetworkConnectCommand::GetArguments() const
     return {
         Argument::Create(ArgType::NetworkName, true),
         Argument::Create(ArgType::ContainerId, true),
-        Argument::Create(ArgType::DriverOpt, false, NO_LIMIT),
+        Argument::Create(ArgType::DriverOpt, false, Limit::Unlimited),
         Argument::Create(ArgType::IpAddress, false),
-        Argument::Create(ArgType::Link, false, NO_LIMIT),
-        Argument::Create(ArgType::LinkLocalIp, false, NO_LIMIT),
-        Argument::Create(ArgType::NetworkAlias, false, NO_LIMIT),
+        Argument::Create(ArgType::Link, false, Limit::Unlimited),
+        Argument::Create(ArgType::LinkLocalIp, false, Limit::Unlimited),
+        Argument::Create(ArgType::NetworkAlias, false, Limit::Unlimited),
     };
 }
 

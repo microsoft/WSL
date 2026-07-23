@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerStatsCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, false, NO_LIMIT),
+        Argument::Create(ArgType::ContainerId, false, Limit::Unlimited),
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),

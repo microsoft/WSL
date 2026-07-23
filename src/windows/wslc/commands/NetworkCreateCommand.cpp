@@ -29,8 +29,8 @@ std::vector<Argument> NetworkCreateCommand::GetArguments() const
     return {
         Argument::Create(ArgType::NetworkName, true),
         Argument::Create(ArgType::Driver, std::nullopt, std::nullopt, Localization::WSLCCLI_NetworkDriverOptionDescription()),
-        Argument::Create(ArgType::Options, false, NO_LIMIT),
-        Argument::Create(ArgType::Label, false, NO_LIMIT, Localization::WSLCCLI_NetworkLabelArgDescription()),
+        Argument::Create(ArgType::Options, false, Limit::Unlimited),
+        Argument::Create(ArgType::Label, false, Limit::Unlimited, Localization::WSLCCLI_NetworkLabelArgDescription()),
         Argument::Create(ArgType::Gateway),
         Argument::Create(ArgType::Internal),
         Argument::Create(ArgType::Subnet),

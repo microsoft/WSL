@@ -90,11 +90,6 @@ class WSLCCLIParserUnitTests
                             throw ArgumentException(std::wstring(L"Required argument missing: ") + arg.Name());
                         }
 
-                        if ((arg.Limit() > 0) && (arg.Limit() < args.Count(arg.Type())))
-                        {
-                            throw ArgumentException(std::wstring(L"Too many values for argument: ") + arg.Name());
-                        }
-
                         if (args.Contains(arg.Type()))
                         {
                             arg.Validate(args);
@@ -474,9 +469,9 @@ class WSLCCLIParserUnitTests
         VERIFY_ARE_EQUAL(std::wstring(L"9"), args.Get<ArgType::Signal>());
     }
 
-    // Overridable-default consumption is one-shot: a CLI duplicate after the
-    // override still stacks and would trip Limit during Validate().
-    TEST_METHOD(OverridableDefaults_OverrideIsConsumedOncePerType)
+    // A preloaded (env-style) default followed by multiple CLI values collapses to the
+    // final CLI value: the preload is dropped and single-value args are last-wins.
+    TEST_METHOD(PreloadedDefault_LastCliValueWins)
     {
         auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --signal 9 --signal 1");
 
@@ -492,8 +487,8 @@ class WSLCCLIParserUnitTests
         }
         sm.ThrowIfError();
 
-        // First CLI value replaced the env preload; second CLI value stacked.
-        VERIFY_ARE_EQUAL(2u, args.Count(ArgType::Signal));
+        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
+        VERIFY_ARE_EQUAL(std::wstring(L"1"), args.Get<ArgType::Signal>());
     }
 
     // Preloaded flag default plus CLI mention of the same flag stays a single
@@ -537,9 +532,9 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
     }
 
-    // Duplicate value on the CLI (no override) still stacks so Validate can
-    // catch the Limit violation.
-    TEST_METHOD(DuplicateValueOnCli_StillStacks)
+    // Duplicate single-value arg on the CLI (no preload) is last-wins (docker-style):
+    // the final value replaces the earlier one instead of accumulating.
+    TEST_METHOD(DuplicateValueOnCli_LastWins)
     {
         auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --signal 9 --signal 1");
 
@@ -553,7 +548,162 @@ class WSLCCLIParserUnitTests
         }
         sm.ThrowIfError();
 
-        VERIFY_ARE_EQUAL(2u, args.Count(ArgType::Signal));
+        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
+        VERIFY_ARE_EQUAL(std::wstring(L"1"), args.Get<ArgType::Signal>());
+    }
+
+    // Unlimited value args are exempt from last-wins: every CLI occurrence accumulates.
+    TEST_METHOD(UnlimitedValueOnCli_Accumulates)
+    {
+        ArgMap args = ParseFlags(L"wslc --publish 80:80 --publish 443:443", {Argument::Create(ArgType::Publish, false, Limit::Unlimited)});
+
+        VERIFY_ARE_EQUAL(2u, args.Count(ArgType::Publish));
+    }
+
+    // Flags are encoded purely by presence: a flag is stored (value true) only when it
+    // is effectively true, and is absent when false. This keeps Contains() a valid truth
+    // test everywhere in the CLI. The helper parses a single command line against the
+    // supplied defs and returns the resulting ArgMap so each case can assert presence.
+    static ArgMap ParseFlags(const std::wstring& commandLine, std::vector<Argument> defs)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(commandLine);
+
+        ArgMap args;
+        ParseArgumentsStateMachine sm{inv, args, std::move(defs)};
+        while (sm.Step())
+        {
+            sm.ThrowIfError();
+        }
+        sm.ThrowIfError();
+        return args;
+    }
+
+    // "--flag" and every recognized true form store a single true entry.
+    TEST_METHOD(Flag_TrueForms_StoreSingleTrueEntry)
+    {
+        for (const auto* cmd : {L"wslc --verbose", L"wslc --verbose=true", L"wslc --verbose=1", L"wslc --verbose=TRUE"})
+        {
+            Log::Comment(String().Format(L"Testing: %ls", cmd));
+            ArgMap args = ParseFlags(cmd, {Argument::Create(ArgType::Verbose)});
+
+            VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
+            VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
+            VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
+        }
+    }
+
+    // Every recognized false form leaves the flag absent so Contains() is false.
+    TEST_METHOD(Flag_FalseForms_LeaveFlagAbsent)
+    {
+        for (const auto* cmd : {L"wslc --verbose=false", L"wslc --verbose=0", L"wslc --verbose=False"})
+        {
+            Log::Comment(String().Format(L"Testing: %ls", cmd));
+            ArgMap args = ParseFlags(cmd, {Argument::Create(ArgType::Verbose)});
+
+            VERIFY_IS_FALSE(args.Contains(ArgType::Verbose));
+            VERIFY_ARE_EQUAL(0u, args.Count(ArgType::Verbose));
+        }
+    }
+
+    // A non-boolean adjoined value is an error rather than being silently ignored.
+    TEST_METHOD(Flag_InvalidBoolean_Throws)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose=maybe");
+
+        std::vector<Argument> defs = {Argument::Create(ArgType::Verbose)};
+
+        ArgMap args;
+        ParseArgumentsStateMachine sm{inv, args, std::move(defs)};
+
+        bool threw = false;
+        try
+        {
+            while (sm.Step())
+            {
+                sm.ThrowIfError();
+            }
+            sm.ThrowIfError();
+        }
+        catch (const ArgumentException&)
+        {
+            threw = true;
+        }
+
+        VERIFY_IS_TRUE(threw);
+    }
+
+    // Docker parity: a space-separated token after a boolean flag is NOT consumed as the
+    // flag's value; the flag is true and the token becomes the next positional.
+    TEST_METHOD(Flag_SpaceSeparatedValue_StaysPositional)
+    {
+        ArgMap args = ParseFlags(
+            L"wslc --verbose true", {Argument::Create(ArgType::Verbose), Argument::Create(ArgType::ContainerId, false, Limit::Unlimited)});
+
+        VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
+        VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
+        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::ContainerId));
+        VERIFY_ARE_EQUAL(std::wstring(L"true"), args.Get<ArgType::ContainerId>());
+    }
+
+    // Alias forms honor adjoined booleans just like the long name.
+    TEST_METHOD(Flag_AliasAdjoinedBoolean)
+    {
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=true", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=false", {Argument::Create(ArgType::Quiet)}).Contains(ArgType::Quiet));
+    }
+
+    // In an alias chain, leading flags are true and a trailing "=false" turns only the
+    // last flag off.
+    TEST_METHOD(Flag_AliasChain_TrailingFalse)
+    {
+        std::vector<Argument> defs = {Argument::Create(ArgType::Quiet), Argument::Create(ArgType::Interactive)};
+
+        ArgMap all = ParseFlags(L"wslc -qi", defs);
+        VERIFY_IS_TRUE(all.Contains(ArgType::Quiet));
+        VERIFY_IS_TRUE(all.Contains(ArgType::Interactive));
+
+        ArgMap trailingFalse = ParseFlags(L"wslc -qi=false", defs);
+        VERIFY_IS_TRUE(trailingFalse.Contains(ArgType::Quiet));
+        VERIFY_IS_FALSE(trailingFalse.Contains(ArgType::Interactive));
+    }
+
+    // Repeated flags are last-wins (matching docker) and never accumulate multiple
+    // entries: "--flag --flag=false" ends up false, the reverse ends up true.
+    TEST_METHOD(Flag_Repeated_LastWins)
+    {
+        ArgMap trueThenFalse = ParseFlags(L"wslc --verbose --verbose=false", {Argument::Create(ArgType::Verbose)});
+        VERIFY_IS_FALSE(trueThenFalse.Contains(ArgType::Verbose));
+        VERIFY_ARE_EQUAL(0u, trueThenFalse.Count(ArgType::Verbose));
+
+        ArgMap falseThenTrue = ParseFlags(L"wslc --verbose=false --verbose", {Argument::Create(ArgType::Verbose)});
+        VERIFY_IS_TRUE(falseThenTrue.Contains(ArgType::Verbose));
+        VERIFY_ARE_EQUAL(1u, falseThenTrue.Count(ArgType::Verbose));
+
+        ArgMap duplicateTrue = ParseFlags(L"wslc --verbose --verbose=true", {Argument::Create(ArgType::Verbose)});
+        VERIFY_ARE_EQUAL(1u, duplicateTrue.Count(ArgType::Verbose));
+    }
+
+    // "--flag=false" clears a preloaded (env-style) overridable default so it does not
+    // linger as a true value. This is the case existence-based flag checks depend on.
+    TEST_METHOD(Flag_FalseClearsOverridableDefault)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose=false");
+
+        std::vector<Argument> defs = {Argument::Create(ArgType::Verbose)};
+
+        ArgMap args;
+        args.Add(ArgType::Verbose, true); // pretend env preloaded it to true
+
+        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
+        while (sm.Step())
+        {
+            sm.ThrowIfError();
+        }
+        sm.ThrowIfError();
+
+        VERIFY_IS_FALSE(args.Contains(ArgType::Verbose));
+        VERIFY_ARE_EQUAL(0u, args.Count(ArgType::Verbose));
     }
 };
 

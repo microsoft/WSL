@@ -37,6 +37,18 @@ enum class Kind
     Forward,
 };
 
+// How many times an argument may be supplied on a command line.
+enum class Limit
+{
+    // Accepts a single value. Repeats are last-wins (docker-style): a later occurrence
+    // overwrites the earlier one rather than being an error. For flags, "present" always
+    // means true, so a later "--flag=false" clears it.
+    Single,
+
+    // Accepts any number of values, which accumulate (e.g. --publish, --env).
+    Unlimited,
+};
+
 // Generate ArgType enum from X-macro
 enum class ArgType : size_t
 {
