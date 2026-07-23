@@ -2134,10 +2134,6 @@ Użycie:
     <value>Kontener „{}” jest uruchomiony.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>Adres ContainerIpAddress nie jest jeszcze obsługiwany.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapowania portów nie są obsługiwane w trybie sieci kontenerów; porty są własnością kontenera docelowego.</value>
   </data>
@@ -2208,6 +2204,21 @@ Użycie:
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Aby poznać szczegóły danego polecenia, podaj argument pomocy.</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Polecenia:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Opcje:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Opcje globalne:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliasy:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argumenty:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Nazwa argumentu nie została rozpoznana dla bieżącego polecenia: „{}”</value>
@@ -2368,17 +2379,32 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Nieprawidłowa wartość limitu czasu zatrzymania: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Dodatkowe sieci nie są dozwolone, gdy trybem sieci podstawowej jest „host” lub „none”.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Podstawowy tryb sieciowy „{}” nie obsługuje podłączania ani odłączania dodatkowych sieci.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Zduplikowana sieć: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>Ustawienia punktu końcowego nie są jeszcze obsługiwane (sieć "{}").</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Zduplikowana opcja sterownika „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Nieprawidłowa opcja sterownika „{}”; oczekiwano „key=value”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Nieznane ustawienie punktu końcowego „{}” dla sieci „{}”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>Dla sieci '{}' można określić tylko jeden adres IP.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Łącze sieciowe nie może być puste.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Alias sieciowy nie może być pusty.</value>
@@ -2386,6 +2412,10 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Network aliases require a user-defined network. Use --network to specify one.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>Ustawienia punktu końcowego nie są obsługiwane w trybie sieciowym „{}”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
@@ -2977,6 +3007,22 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Dodaj alias o zakresie sieci dla kontenera</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Ustaw opcje sterownika punktu końcowego (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Przypisz kontenerowi adres IPv4 w sieci</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Dodaj link do innego kontenera (--link nazwa:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Dodaj adres IPv4 link-local dla kontenera</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Nieprawidłowa wartość {}: alias sieciowy nie może być pusty ani zawierać białych znaków</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3004,6 +3050,13 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publikuj wszystkie uwidocznione porty w losowych portach hosta</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Wyświetla tylko identyfikatory kontenerów</value>
@@ -3476,6 +3529,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Nie można zainicjować wymiany</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Nie można przywrócić sygnatury czasowej dla kontenera „{}”</value>

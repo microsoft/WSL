@@ -2134,10 +2134,6 @@ Využití:
     <value>Kontejner {} je spuštěný.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress zatím není podporováno.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapování portů režim sítě kontejneru nepodporuje; porty patří cílovému kontejneru.</value>
   </data>
@@ -2208,6 +2204,21 @@ Využití:
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Pokud chcete získat podrobnosti o konkrétním příkazu, předejte ho do argumentu help.</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Příkazy:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Možnosti:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Globální možnosti:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliasy:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argumenty:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Nebyl rozpoznán název argumentu pro aktuální příkaz: '{}'</value>
@@ -2368,17 +2379,32 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Neplatná hodnota časového limitu zastavení: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Další sítě nejsou povoleny, pokud je primární síťový režim 'host' nebo 'none'.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Primární síťový režim „{}“ nepodporuje připojení ani odpojení dalších sítí.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Duplicitní síť: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>Nastavení koncového bodu zatím není podporováno (síť '{}').</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Duplicitní možnost ovladače „{}“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Neplatná možnost ovladače „{}“. Očekává se formát „key=value“.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Neznámé nastavení koncového bodu „{}“ pro síť „{}“.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>Pro síť '{}' lze zadat pouze jednu IP adresu.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Síťový odkaz nesmí být prázdný.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Network alias nemůže být prázdný.</value>
@@ -2386,6 +2412,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Network aliases require a user-defined network. Use --network to specify one.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>Nastavení koncového bodu nejsou pro síťový režim „{}“ podporovaná.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
@@ -2977,6 +3007,22 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Přidání aliasu v oboru sítě pro kontejner</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Nastavit možnosti ovladače koncového bodu (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Přiřaďte kontejneru IPv4 adresu v síti</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Přidat odkaz na jiný kontejner (--link name:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Přidat kontejneru místní IPv4 adresu link-local</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Neplatná hodnota {}: alias sítě nemůže být prázdný ani obsahovat jen prázdné znaky.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3004,6 +3050,13 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publikovat všechny vystavené porty na náhodné porty hostitele</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Potlačit podrobný výstup</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Používá se výchozí značka: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Vypíše pouze ID kontejnerů</value>
@@ -3476,6 +3529,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Inicializace prohození se nezdařila</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Nepodařilo se obnovit časové razítko pro kontejner '{}'</value>

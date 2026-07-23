@@ -2140,10 +2140,6 @@ Utilizzo:
     <value>Il contenitore '{}' è in esecuzione.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress non è ancora supportato.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>I mapping delle porte non sono supportati con la modalità di rete dei contenitori; Le porte sono di proprietà del contenitore di destinazione.</value>
   </data>
@@ -2214,6 +2210,21 @@ Utilizzo:
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Per altre informazioni su un comando specifico, passa alla Guida degli argomenti.</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Comandi:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Opzioni:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Opzioni globali:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Alias:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argomenti:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Il nome dell'argomento non è stato riconosciuto per il comando corrente: '{}'</value>
@@ -2374,17 +2385,32 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <value>Valore di timeout di arresto non valido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Non sono consentite reti aggiuntive quando la modalità di rete primaria è 'host' o 'none'.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>La modalità di rete primaria '{}' non supporta la connessione o la disconnessione di reti aggiuntive.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Rete duplicata: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>Le impostazioni dell'endpoint non sono ancora supportate (rete '{}').</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Duplica opzione del driver "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Opzione del driver "{}" non valida; opzione prevista "key=value".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Impostazione dell'endpoint "{}" sconosciuta per la rete "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>È possibile specificare un solo indirizzo IP per la rete '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Il collegamento di rete non può essere vuoto.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>L'alias della rete non può essere vuoto.</value>
@@ -2392,6 +2418,10 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Gli alias di rete richiedono una rete definita dall'utente. Utilizzare --network per specificarne uno.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>Le impostazioni dell'endpoint non sono supportate per la modalità di rete '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Impossibile specificare alias di rete quando sono richieste più reti. Utilizza un singolo argomento --network .</value>
@@ -2983,6 +3013,22 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Aggiungi un alias con ambito di rete per il contenitore</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Imposta le opzioni del driver dell'endpoint (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Assegnare al contenitore un indirizzo IPv4 nella rete</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Aggiungi collegamento a un altro contenitore (--link nome:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Aggiungere un indirizzo IPv4 locale rispetto al collegamento per il contenitore</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Valore {} non valido: l'alias di rete non può essere vuoto o contenere spazi vuoti</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3010,6 +3056,13 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Pubblica tutte le porte esposte sulle porte host casuali</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Mostra solo gli ID dei contenitori</value>
@@ -3482,6 +3535,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Non è possibile inizializzare lo scambio</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Non è possibile ripristinare il timestamp per il contenitore '{}'</value>
