@@ -56,8 +56,8 @@ steps:
 - task: AzureKeyVault@2
   displayName: Fetch GitHub PR token from Key Vault
   inputs:
-    azureSubscription: $(KeyVaultServiceConnection)
-    KeyVaultName: $(KeyVaultName)
+    azureSubscription: 'Azure-Connection'
+    KeyVaultName: 'wsl-ci-key-vault'
     SecretsFilter: 'GithubPRToken'
 
 - powershell: |
