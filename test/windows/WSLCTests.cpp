@@ -9078,22 +9078,48 @@ class WSLCTests
             VERIFY_IS_TRUE(inspectData.Ports.contains("8080/tcp"));
             VERIFY_IS_TRUE(inspectData.Ports.contains("9090/tcp"));
 
-            // Verify we can connect to the 8080 exposed port from the host.
-            auto portBindings8080 = inspectData.Ports["8080/tcp"];
-            VERIFY_ARE_EQUAL(1u, portBindings8080.size());
-            auto hostPort8080 = std::stoi(portBindings8080[0].HostPort);
-            VERIFY_IS_TRUE(hostPort8080 > 0);
+            // Each exposed port is published dual-stack: one IPv4 (127.0.0.1) and one IPv6 (::1)
+            // loopback binding. Verify both are present and return both host ports.
+            struct DualStackHostPorts
+            {
+                int ipv4 = 0;
+                int ipv6 = 0;
+            };
 
-            ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort8080).c_str(), 200);
+            auto getDualStackHostPorts = [](const auto& bindings) -> DualStackHostPorts {
+                VERIFY_ARE_EQUAL(2u, bindings.size());
 
-            // Verify the second exposed port got a mapping too.
-            auto portBindings9090 = inspectData.Ports["9090/tcp"];
-            VERIFY_ARE_EQUAL(1u, portBindings9090.size());
-            auto hostPort9090 = std::stoi(portBindings9090[0].HostPort);
-            VERIFY_IS_TRUE(hostPort9090 > 0);
+                DualStackHostPorts ports;
+                for (const auto& binding : bindings)
+                {
+                    auto hostPort = std::stoi(binding.HostPort);
+                    VERIFY_IS_TRUE(hostPort > 0);
+                    if (binding.HostIp == "127.0.0.1")
+                    {
+                        ports.ipv4 = hostPort;
+                    }
+                    else if (binding.HostIp == "::1")
+                    {
+                        ports.ipv6 = hostPort;
+                    }
+                }
 
-            // The two host ports must be different.
-            VERIFY_ARE_NOT_EQUAL(hostPort8080, hostPort9090);
+                VERIFY_IS_TRUE(ports.ipv4 > 0);
+                VERIFY_IS_TRUE(ports.ipv6 > 0);
+                return ports;
+            };
+
+            // Verify we can reach the 8080 exposed port over both IPv4 and IPv6 loopback.
+            auto ports8080 = getDualStackHostPorts(inspectData.Ports["8080/tcp"]);
+            ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", ports8080.ipv4).c_str(), 200);
+            ExpectHttpResponse(std::format(L"http://[::1]:{}", ports8080.ipv6).c_str(), 200);
+
+            // Verify the second exposed port got a dual-stack mapping too.
+            auto ports9090 = getDualStackHostPorts(inspectData.Ports["9090/tcp"]);
+
+            // Each exposed port must map to distinct host ports on both loopback families.
+            VERIFY_ARE_NOT_EQUAL(ports8080.ipv4, ports9090.ipv4);
+            VERIFY_ARE_NOT_EQUAL(ports8080.ipv6, ports9090.ipv6);
         }
     }
 

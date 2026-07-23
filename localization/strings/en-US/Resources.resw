@@ -3530,6 +3530,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Failed to initialize swap</value>
   </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+  </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Failed to restore timestamp for container '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
