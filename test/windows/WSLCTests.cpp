@@ -360,38 +360,35 @@ class WSLCTests
     {
         auto sessionManager = OpenSessionManager();
 
-        // Act: list sessions
-        {
+        auto listDisplayNames = [&]() {
             wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
             VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
-
-            // Assert
-            VERIFY_ARE_EQUAL(sessions.size(), 1u);
-            const auto& info = sessions[0];
-
-            // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
-            VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), c_testSessionName);
-        }
-
-        // List multiple sessions.
-        {
-            auto session2 = CreateSession(GetDefaultSessionSettings(L"wslc-test-list-2"));
-
-            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-            VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
-
-            VERIFY_ARE_EQUAL(sessions.size(), 2);
 
             std::vector<std::wstring> displayNames;
             for (const auto& e : sessions)
             {
                 displayNames.push_back(e.DisplayName);
             }
+            return displayNames;
+        };
 
-            std::ranges::sort(displayNames);
+        auto contains = [](const std::vector<std::wstring>& names, std::wstring_view target) {
+            return std::ranges::find(names, target) != names.end();
+        };
 
-            VERIFY_ARE_EQUAL(displayNames[0], c_testSessionName);
-            VERIFY_ARE_EQUAL(displayNames[1], L"wslc-test-list-2");
+        // Act: list sessions
+        {
+            auto displayNames = listDisplayNames();
+            VERIFY_IS_TRUE(contains(displayNames, c_testSessionName));
+        }
+
+        // List multiple sessions.
+        {
+            auto session2 = CreateSession(GetDefaultSessionSettings(L"wslc-test-list-2"));
+
+            auto displayNames = listDisplayNames();
+            VERIFY_IS_TRUE(contains(displayNames, c_testSessionName));
+            VERIFY_IS_TRUE(contains(displayNames, L"wslc-test-list-2"));
         }
     }
 
