@@ -18,6 +18,7 @@ Abstract:
 
 #include "Common.h"
 #include "registry.hpp"
+#include "install.h"
 #include "PluginTests.h"
 #include "wslcsdk.h"
 
@@ -344,6 +345,90 @@ class InstallerTests
         VERIFY_IS_FALSE(GetMsiProductCode().empty());
 
         // TODO: check wslsupport, wslapi and p9rdr
+    }
+
+    // Remove any PendingFileRenameOperations entries whose source path falls under installPath.
+    // The MSI uses MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT) when a file is locked, leaving stale
+    // entries that prevent a subsequent MSI install from putting the system into a clean state.
+    void ClearPendingFileRenameOperationsForPath(const std::filesystem::path& installPath) const
+    {
+        static constexpr auto c_sessionManagerKey = L"SYSTEM\\CurrentControlSet\\Control\\Session Manager";
+        static constexpr auto c_pendingRenameValue = L"PendingFileRenameOperations";
+
+        auto [key, hr] = wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, c_sessionManagerKey, KEY_READ | KEY_WRITE);
+        if (FAILED(hr))
+        {
+            return;
+        }
+
+        DWORD size = 0;
+        if (RegGetValueW(key.get(), nullptr, c_pendingRenameValue, RRF_RT_REG_MULTI_SZ, nullptr, nullptr, &size) != ERROR_SUCCESS || size == 0)
+        {
+            return;
+        }
+
+        std::vector<WCHAR> buffer(size / sizeof(WCHAR) + 2);
+        THROW_IF_WIN32_ERROR(RegGetValueW(key.get(), nullptr, c_pendingRenameValue, RRF_RT_REG_MULTI_SZ, nullptr, buffer.data(), &size));
+
+        // Entries are stored as null-separated pairs: <source>\0<dest>\0\0
+        // Sources may carry a \??\ NT-namespace prefix — strip it before comparing.
+        // Normalize: strip trailing separators so the boundary check is unambiguous.
+        auto installPathStr = installPath.wstring();
+        while (!installPathStr.empty() && (installPathStr.back() == L'\\' || installPathStr.back() == L'/'))
+        {
+            installPathStr.pop_back();
+        }
+
+        auto matchesInstallPath = [&installPathStr](std::wstring_view src) {
+            if (wsl::shared::string::StartsWith(src, std::wstring_view{L"\\??\\"}, true))
+            {
+                src = src.substr(4);
+            }
+
+            if (!wsl::shared::string::StartsWith(src, installPathStr, true))
+            {
+                return false;
+            }
+
+            // Require a path separator (or exact match) after the prefix so that
+            // e.g. "C:\Program Files\WSL2" is not matched by "C:\Program Files\WSL".
+            return src.size() == installPathStr.size() || src[installPathStr.size()] == L'\\' || src[installPathStr.size()] == L'/';
+        };
+
+        std::wstring filtered;
+        for (auto* p = buffer.data(); *p != UNICODE_NULL;)
+        {
+            std::wstring src{p};
+            p += src.size() + 1;
+            std::wstring dst{p};
+            p += dst.size() + 1;
+
+            if (!matchesInstallPath(src))
+            {
+                filtered += src;
+                filtered += UNICODE_NULL;
+                filtered += dst;
+                filtered += UNICODE_NULL;
+            }
+        }
+        filtered += UNICODE_NULL; // REG_MULTI_SZ double-null terminator
+
+        if (filtered.size() == 1)
+        {
+            // All matching entries removed; delete the value entirely.
+            auto error = RegDeleteValueW(key.get(), c_pendingRenameValue);
+            THROW_WIN32_IF(error, error != ERROR_SUCCESS && error != ERROR_FILE_NOT_FOUND);
+        }
+        else
+        {
+            THROW_IF_WIN32_ERROR(RegSetValueExW(
+                key.get(),
+                c_pendingRenameValue,
+                0,
+                REG_MULTI_SZ,
+                reinterpret_cast<const BYTE*>(filtered.c_str()),
+                static_cast<DWORD>(filtered.size() * sizeof(WCHAR))));
+        }
     }
 
     void DeleteProductCode() const
@@ -1223,5 +1308,114 @@ class InstallerTests
         InstallMsi();
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
+    }
+
+    TEST_METHOD(UpgradeWithLockedFileReportsRebootRequired)
+    {
+        // Ensure the MSI is installed cleanly first. If a prior test run was
+        // interrupted, the MSI may be missing — reinstall it.
+        if (!IsMsiPackageInstalled())
+        {
+            InstallMsi();
+        }
+
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        // Stop the WSL service so nothing holds files open.
+        StopWslService();
+
+        // Uninstall the MSI. MsiInstallProduct on an already-registered ProductCode
+        // enters maintenance mode and won't replace files. We need a fresh install
+        // so the MSI actually writes files and hits the lock.
+        UninstallMsi();
+
+        // Create a dummy system.vhd in the install directory so we have something to lock.
+        // When the MSI does a fresh install it will try to write its real system.vhd here,
+        // but can't because the dummy is memory-mapped — resulting in 3010.
+        std::filesystem::create_directories(m_installedPath);
+        auto systemVhdPath = m_installedPath / L"system.vhd";
+        {
+            wil::unique_hfile dummyHandle{
+                CreateFileW(systemVhdPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_TRUE(dummyHandle.is_valid());
+            BYTE pad = 0;
+            DWORD written = 0;
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(dummyHandle.get(), &pad, 1, &written, nullptr));
+        }
+
+        // Memory-map the dummy to simulate a running VM. A memory-mapped file cannot
+        // be renamed or deleted regardless of directory permissions — this forces the MSI
+        // to schedule a delayed rename (MoveFileEx MOVEFILE_DELAY_UNTIL_REBOOT) and return 3010.
+        wil::unique_hfile lockedHandle{CreateFileW(
+            systemVhdPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(lockedHandle.is_valid());
+
+        wil::unique_handle mapping{CreateFileMappingW(lockedHandle.get(), nullptr, PAGE_READONLY, 0, 0, nullptr)};
+        VERIFY_IS_TRUE(mapping.is_valid());
+
+        auto* mapView = MapViewOfFile(mapping.get(), FILE_MAP_READ, 0, 0, 1);
+        VERIFY_IS_NOT_NULL(mapView);
+        auto unmapOnExit = wil::scope_exit([mapView]() { UnmapViewOfFile(mapView); });
+
+        // Fake a stale version so the WslInstaller service thinks an upgrade is needed.
+        RegistryKeyChange<std::wstring> version(
+            HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\MSI", L"Version", L"1.0.0");
+
+        // Remove the MSIX so we can reinstall it to trigger the WslInstaller service.
+        UninstallMsix();
+        VERIFY_IS_FALSE(IsMsixInstalled());
+
+        // Install the MSIX — this starts the WslInstaller service which detects the
+        // stale version and runs the MSI. With system.vhd locked, the MSI returns 3010
+        // and WslInstaller calls SetRebootRequiredMarker().
+        InstallMsix();
+
+        // Wait for the reboot-required marker — this is the signal that the installer
+        // completed the MSI install and hit the locked file (3010).
+        auto waitForMarker = []() { THROW_HR_IF(E_FAIL, !wsl::windows::common::install::IsRebootRequired()); };
+
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(waitForMarker, std::chrono::seconds(1), std::chrono::minutes(5));
+        }
+        catch (...)
+        {
+            VERIFY_FAIL("Timed out waiting for reboot-required marker to be set by WslInstaller");
+        }
+
+        // Release the memory map and handle — the file has been renamed to .rbf by MSI.
+        unmapOnExit.reset();
+        mapping.reset();
+        lockedHandle.reset();
+
+        // Verify that launching wsl.exe emits the reboot-required warning on stderr
+        // but does not fail with an error code attributable to the marker itself.
+        // (The underlying distro start may still fail because system.vhd is gone,
+        // but the user gets a clear heads-up about why.)
+        auto wslCommandLine = LxssGenerateWslCommandLine(L"echo OK");
+        auto [output, warnings, wslExitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(wslCommandLine.data());
+
+        LogInfo("wsl echo OK output: %ls", output.c_str());
+        LogInfo("wsl echo OK warnings: %ls", warnings.c_str());
+
+        // The reboot-required warning should appear on stderr.
+        VERIFY_IS_TRUE(warnings.find(wsl::shared::Localization::MessageUpdateRebootRequired()) != std::wstring::npos);
+
+        // Non-distro commands (--version, --list, --shutdown, --update) must keep working
+        // even with the marker set — they go through CallMsiPackage but don't reach the
+        // service's _CreateInstance gate, so they should not be blocked.
+        std::wstring versionCmd = wsl::windows::common::wslutil::GetMsiPackagePath().value_or(L"") + L"\\wsl.exe --version";
+        auto [versionOutput, versionWarnings, versionExitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(versionCmd.data());
+        LogInfo("wsl --version output: %ls", versionOutput.c_str());
+        VERIFY_ARE_EQUAL(versionExitCode, 0L);
+
+        // Clean up: clear any pending file-rename entries left by the locked-file MSI run,
+        // delete the volatile marker, then reinstall so subsequent tests start from a clean state.
+        ClearPendingFileRenameOperationsForPath(m_installedPath);
+        wsl::windows::common::registry::DeleteKey(OpenLxssMachineKey(KEY_ALL_ACCESS).get(), L"MSI\\RebootPending");
+        VERIFY_IS_FALSE(wsl::windows::common::install::IsRebootRequired());
+
+        InstallMsi();
+        ValidatePackageInstalledProperly();
     }
 };

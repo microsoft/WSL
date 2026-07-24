@@ -1008,6 +1008,10 @@ Falling back to NAT networking.</value>
   <data name="MessageFinishMsiInstallation" xml:space="preserve">
     <value>WSL is finishing an upgrade...</value>
   </data>
+  <data name="MessageUpdateRebootRequired" xml:space="preserve">
+    <value>WSL was updated but a system restart is required to complete the installation. Please reboot your machine and try again.</value>
+    <comment>{Locked="WSL"}</comment>
+  </data>
   <data name="MessageUpdateFailed" xml:space="preserve">
     <value>Update failed (exit code: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
