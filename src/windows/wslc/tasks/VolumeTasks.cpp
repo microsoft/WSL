@@ -108,7 +108,7 @@ void DeleteVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
-    const bool force = context.Args.Contains(ArgType::Force);
+    const bool force = context.Args.GetFlag<ArgType::Force>();
     for (const auto& name : volumeNames)
     {
         if (TryDeleteVolume(context.Reporter, session, WideToMultiByte(name), force))
@@ -157,7 +157,7 @@ void ListVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Volumes));
     auto& volumes = context.Data.Get<Data::Volumes>();
 
-    if (context.Args.Contains(ArgType::Quiet))
+    if (context.Args.GetFlag<ArgType::Quiet>())
     {
         for (const auto& volume : volumes)
         {
@@ -205,7 +205,7 @@ void PruneVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    const bool all = context.Args.Contains(ArgType::All);
+    const bool all = context.Args.GetFlag<ArgType::All>();
 
     std::vector<std::pair<std::string, std::string>> filters;
     for (const auto& value : context.Args.GetAll<ArgType::Filter>())
