@@ -51,6 +51,7 @@ _(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       L
 _(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSSearchArgDescription()) \
 _(Domainname,     "domainname",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DomainnameArgDescription()) \
 _(Driver,         "driver",              L"d",              Kind::Value,       Localization::WSLCCLI_DriverOptionDescription()) \
+_(DriverOpt,      "driver-opt",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DriverOptArgDescription()) \
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EntrypointArgDescription()) \
 _(Env,            "env",                 L"e",              Kind::Value,       Localization::WSLCCLI_EnvArgDescription()) \
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EnvFileArgDescription()) \
@@ -78,9 +79,12 @@ _(ImportFile,     "file",                NO_ALIAS,          Kind::Positional,  L
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,       "internal",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NetworkInternalArgDescription()) \
+_(IpAddress,      "ip",                  NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_IpAddressArgDescription()) \
 _(Label,          "label",               L"l",              Kind::Value,       Localization::WSLCCLI_LabelArgDescription()) \
 _(Last,           "last",                L"n",              Kind::Value,       Localization::WSLCCLI_LastArgDescription()) \
 _(Latest,         "latest",              L"l",              Kind::Flag,        Localization::WSLCCLI_LatestArgDescription()) \
+_(Link,           "link",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_LinkArgDescription()) \
+_(LinkLocalIp,    "link-local-ip",       NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_LinkLocalIpArgDescription()) \
 _(Memory,         "memory",              L"m",              Kind::Value,       Localization::WSLCCLI_MemoryArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 _(Network,        "network",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkArgDescription()) \

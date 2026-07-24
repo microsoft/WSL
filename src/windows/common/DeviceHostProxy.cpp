@@ -180,6 +180,14 @@ void DeviceHostProxy::AddVirtiofsChild(const GUID& InstanceId, const std::wstrin
     THROW_IF_FAILED(GetVirtiofsDevice(InstanceId)->AddChild(name.get(), rootPath.get(), mountOptions.get()));
 }
 
+void DeviceHostProxy::RemoveVirtiofsChild(const GUID& InstanceId, const std::wstring& Name)
+{
+    std::lock_guard lifecycleLock(m_deviceLifecycleLock);
+
+    const auto name = wil::make_bstr(Name.c_str());
+    THROW_IF_FAILED(GetVirtiofsDevice(InstanceId)->RemoveChild(name.get()));
+}
+
 GUID DeviceHostProxy::AddVirtioPmemDevice(_In_ HANDLE UserToken, const std::wstring& Path, bool Writable)
 {
     std::lock_guard lifecycleLock(m_deviceLifecycleLock);

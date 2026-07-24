@@ -27,7 +27,7 @@ struct NetworkService
     static std::vector<WSLCNetworkInformation> List(models::Session& session);
     static wsl::windows::common::wslc_schema::Network Inspect(models::Session& session, const std::string& name);
     static models::PruneNetworksResult Prune(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
-    static void Connect(models::Session& session, const std::string& networkName, const std::string& containerId);
+    static void Connect(models::Session& session, const models::ConnectNetworkOptions& connectOptions);
     static void Disconnect(models::Session& session, const std::string& networkName, const std::string& containerId);
 };
 } // namespace wsl::windows::wslc::services

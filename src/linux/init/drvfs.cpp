@@ -88,13 +88,7 @@ bool IsMountPoint(const std::string& Path)
 }
 } // namespace
 
-int MountVirtioFsChild(
-    const char* Tag,
-    const char* ChildName,
-    const char* Target,
-    const char* Options,
-    int* ExitCode = nullptr,
-    std::string_view SubPath = "/")
+int MountVirtioFsChild(const char* Tag, const char* ChildName, const char* Target, const char* Options, int* ExitCode, std::string_view SubPath)
 {
     if ((strcmp(Tag, LX_INIT_DRVFS_VIRTIO_TAG) != 0 && strcmp(Tag, LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) != 0) ||
         !wsl::shared::string::ToGuid(ChildName) || SubPath.empty() || SubPath.front() != '/')
@@ -901,10 +895,6 @@ try
     {
         return {};
     }
-
-    //
-    // Validate the tag is a GUID.
-    //
 
     std::string mappingName{Tag};
     if (Root != nullptr)
