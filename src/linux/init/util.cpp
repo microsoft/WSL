@@ -3651,7 +3651,7 @@ Return Value:
     {
         if (match[index + 1].matched)
         {
-            fields[index] = strtoull(match[index + 1].str().c_str(), nullptr, 10);
+            fields[index] = strtoull(match[index + 1].first, nullptr, 10);
         }
     }
 
