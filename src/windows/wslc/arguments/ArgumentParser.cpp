@@ -126,21 +126,20 @@ void ParseArgumentsStateMachine::ClearArgument(ArgType type)
 {
     // Drop any preloaded overridable default and remove previously parsed entries so the
     // argument is left absent. This is the single-value/last-wins primitive shared by
-    // SetFlag (presence encodes a flag's value) and AddValue (single-value args).
+    // SetFlag (which then stores the flag's explicit value) and AddValue (single-value args).
     ConsumeOverrideIfPresent(type);
     m_executionArgs.Remove(type);
 }
 
 void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
 {
-    // Flags are encoded purely by presence: present => true, absent => false. Clearing
-    // first collapses CLI duplicates to a single entry and lets a later "--flag=false"
-    // turn the flag back off, matching docker's last-wins behavior for repeated flags.
+    // Boolean flags store their explicit parsed value (true or false) so a flag whose behavior
+    // is on by default can be turned off with "--flag=false". Clearing first collapses CLI
+    // duplicates to a single entry and gives docker's last-wins behavior for repeated flags
+    // (e.g. "--flag --flag=false" ends up false). Read flags back via ArgMap::GetFlag, which
+    // folds the presence check and the stored value into one test, rather than a bare Contains().
     ClearArgument(type);
-    if (value)
-    {
-        m_executionArgs.Add(type, true);
-    }
+    m_executionArgs.Add(type, value);
 }
 
 std::wstring_view ParseArgumentsStateMachine::StripSurroundingQuotes(std::wstring_view value)

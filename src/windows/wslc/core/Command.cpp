@@ -432,7 +432,7 @@ void Command::ParseArguments(
 // Any defined validation for specific ArgTypes are also run.
 void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
 {
-    if (source.Contains(ArgType::Help))
+    if (source.GetFlag<ArgType::Help>())
     {
         return;
     }
@@ -459,7 +459,7 @@ void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument
 void Command::Execute(CLIExecutionContext& context) const
 {
     // If Help was part of the validated argument set, we will output help instead of executing.
-    if (context.Args.Contains(ArgType::Help))
+    if (context.Args.GetFlag<ArgType::Help>())
     {
         OutputHelp(context.Reporter);
     }

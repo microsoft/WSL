@@ -60,7 +60,7 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
 
 void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
 {
-    if (execArgs.Contains(ArgType::Last) && execArgs.Contains(ArgType::Latest))
+    if (execArgs.Contains(ArgType::Last) && execArgs.GetFlag<ArgType::Latest>())
     {
         throw CommandException(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"));
     }

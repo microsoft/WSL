@@ -130,11 +130,11 @@ private:
     // Backs up one token and stops cleanly so Position() points at the unconsumed token.
     State BackUpAndStop();
 
-    // Sets a boolean flag using presence to encode its value: a true value stores a
-    // single entry, a false value clears the flag entirely. Keeping "present == true"
-    // lets the whole CLI test flags with Contains(), and gives docker-style last-wins
-    // semantics for repeats (e.g. "--flag --flag=false" ends up false, and duplicate
-    // "--flag --flag" folds to a single entry).
+    // Sets a boolean flag by storing its explicit parsed value (true or false). Clearing first
+    // collapses CLI duplicates to a single entry, so a repeated flag is docker-style last-wins
+    // (e.g. "--flag --flag=false" ends up false) and a duplicate "--flag --flag" folds to one
+    // entry. Consumers read the flag with ArgMap::GetFlag (Contains ? stored value : default),
+    // which lets a flag default to on and be disabled with "--flag=false".
     void SetFlag(ArgType type, bool value);
 
     // Parses an adjoined boolean token for a flag (e.g. the "false" in "--flag=false" or

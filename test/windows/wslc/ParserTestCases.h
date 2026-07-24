@@ -178,9 +178,9 @@ WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 --verbose=invalid cont2)") \
 WSLC_PARSER_TEST_CASE(List, false, LR"(wslc cont1 cont2 --invalidarg)") \
 \
 /* Boolean flag value tests: named and alias forms accept true/false/1/0 (case-insensitive), \
- * and reject non-boolean tokens. Adjoined false forms leave the flag absent but parsing    \
- * still succeeds. Avoid --rm / changing the image1 positional so the harness spot-checks    \
- * below stay valid. */ \
+ * and reject non-boolean tokens. Adjoined false forms store the flag with an explicit false  \
+ * value (so it reads back via GetFlag) and parsing still succeeds. Avoid --rm / changing the  \
+ * image1 positional so the harness spot-checks below stay valid. */ \
 WSLC_PARSER_TEST_CASE(Run, true,  LR"(wslc --interactive=false image1)") \
 WSLC_PARSER_TEST_CASE(Run, true,  LR"(wslc --interactive=true image1)") \
 WSLC_PARSER_TEST_CASE(Run, true,  LR"(wslc --interactive=0 image1)") \
