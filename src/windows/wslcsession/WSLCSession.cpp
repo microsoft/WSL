@@ -82,13 +82,12 @@ void ValidateNewSessionStorageDirectory(const std::filesystem::path& StoragePath
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
 // service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
-// any other COM client). The repo argument must be the parsed repo from
-// wslutil::ParseImage so callers don't pay the regex cost twice.
-void EnforceRegistryAllowlist(const std::string& Repo)
+// any other COM client). Callers pass the parsed repository so no reference is
+// parsed twice.
+void EnforceRegistryAllowlist(const wslutil::RepositoryReference& Repository)
 {
     const auto policiesKey = wsl::windows::policies::OpenPoliciesKey();
-    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(Repo);
-    const auto serverWide = wsl::shared::string::MultiByteToWide(server);
+    const auto serverWide = wsl::shared::string::MultiByteToWide(Repository.Server);
 
     if (wsl::windows::policies::IsRegistryAllowed(policiesKey.get(), serverWide))
     {
@@ -960,7 +959,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    const auto reference = wslutil::ImageReference::Parse(Image);
+    const auto& repo = reference.Repository;
+    auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
     auto runtime = m_runtime.Acquire();
@@ -978,7 +979,7 @@ try
         registryAuth = std::string(RegistryAuthenticationInformation);
     }
 
-    auto requestContext = runtime.Docker().PullImage(repo, tagOrDigest, registryAuth);
+    auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
     OnImageCreated(Image);
@@ -1376,9 +1377,10 @@ try
     {
         RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
 
-        auto [parsedRepo, tagOrDigest] = wslutil::ParseImage(ImageName);
+        auto reference = wslutil::ImageReference::Parse(ImageName);
+        auto tagOrDigest = reference.TagOrDigest();
         THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
-        repo = parsedRepo;
+        repo = reference.Repository.Name;
         tag = tagOrDigest.value();
     }
 
@@ -1724,7 +1726,7 @@ try
 
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
-                auto repoName = wslutil::ParseImage(tag).first;
+                auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())
                 {
@@ -1878,13 +1880,15 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    const auto reference = wslutil::ImageReference::Parse(Image);
+    const auto& repo = reference.Repository;
+    auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
     auto lock = AcquireVmLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
-    auto requestContext = m_runtime.Docker().PushImage(repo, tagOrDigest, RegistryAuthenticationInformation);
+    auto requestContext = m_runtime.Docker().PushImage(repo.Name, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 
     return S_OK;

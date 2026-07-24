@@ -24,4 +24,5 @@ void ListNetworks(wsl::windows::wslc::execution::CLIExecutionContext& context);
 void PruneNetworks(wsl::windows::wslc::execution::CLIExecutionContext& context);
 void ConnectNetwork(wsl::windows::wslc::execution::CLIExecutionContext& context);
 void DisconnectNetwork(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void SetNetworkEndpointOptionsFromArgs(wsl::windows::wslc::execution::CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

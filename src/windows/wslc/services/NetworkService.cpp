@@ -22,8 +22,9 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
-void NetworkService::Create(models::Session& session, const models::CreateNetworkOptions& createOptions)
+void NetworkService::Create(Reporter& reporter, models::Session& session, const models::CreateNetworkOptions& createOptions)
 {
+    WarningCallback warningCallback(reporter);
     WSLCNetworkOptions options{};
     options.Name = createOptions.Name.c_str();
     if (createOptions.Driver.has_value())
@@ -61,8 +62,7 @@ void NetworkService::Create(models::Session& session, const models::CreateNetwor
         options.Gateway = createOptions.Gateway->c_str();
     }
 
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &warningCallback));
 }
 
 void NetworkService::Delete(models::Session& session, const std::string& name)
@@ -116,13 +116,46 @@ models::PruneNetworksResult NetworkService::Prune(models::Session& session, cons
     return result;
 }
 
-void NetworkService::Connect(models::Session& session, const std::string& networkName, const std::string& containerId)
+void NetworkService::Connect(models::Session& session, const models::ConnectNetworkOptions& connectOptions)
 {
     wil::com_ptr<IWSLCContainer> container;
-    THROW_IF_FAILED(session.Get()->OpenContainer(containerId.c_str(), &container));
+    THROW_IF_FAILED(session.Get()->OpenContainer(connectOptions.ContainerId.c_str(), &container));
+
+    // Build KVPs so the pointers remain valid for the duration of the ConnectToNetwork call.
+    std::vector<KeyValuePair> settings;
+    settings.reserve(
+        connectOptions.Aliases.size() + connectOptions.Links.size() + connectOptions.LinkLocalIps.size() +
+        connectOptions.DriverOpts.size() + (connectOptions.IpAddress.has_value() ? 1 : 0));
+
+    for (const auto& alias : connectOptions.Aliases)
+    {
+        settings.push_back({.Key = "Aliases", .Value = alias.c_str()});
+    }
+
+    if (connectOptions.IpAddress.has_value())
+    {
+        settings.push_back({.Key = "IPAddress", .Value = connectOptions.IpAddress->c_str()});
+    }
+
+    for (const auto& link : connectOptions.Links)
+    {
+        settings.push_back({.Key = "Links", .Value = link.c_str()});
+    }
+
+    for (const auto& linkLocalIp : connectOptions.LinkLocalIps)
+    {
+        settings.push_back({.Key = "LinkLocalIPs", .Value = linkLocalIp.c_str()});
+    }
+
+    for (const auto& entry : connectOptions.DriverOpts)
+    {
+        settings.push_back({.Key = "DriverOpts", .Value = entry.c_str()});
+    }
 
     WSLCNetworkConnectionOptions options{};
-    options.NetworkName = networkName.c_str();
+    options.NetworkName = connectOptions.NetworkName.c_str();
+    options.Settings = settings.empty() ? nullptr : settings.data();
+    options.SettingsCount = static_cast<ULONG>(settings.size());
     THROW_IF_FAILED(container->ConnectToNetwork(&options));
 }
 

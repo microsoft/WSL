@@ -15,13 +15,16 @@ Abstract:
 #include "Command.h"
 
 namespace wsl::windows::wslc {
+struct Reporter;
 struct VersionCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"version";
     VersionCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
-    static void PrintVersion();
+
+    static void PrintVersion(Reporter& reporter);
+    std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 

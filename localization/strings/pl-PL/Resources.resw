@@ -2134,10 +2134,6 @@ Użycie:
     <value>Kontener „{}” jest uruchomiony.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>Adres ContainerIpAddress nie jest jeszcze obsługiwany.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapowania portów nie są obsługiwane w trybie sieci kontenerów; porty są własnością kontenera docelowego.</value>
   </data>
@@ -2209,6 +2205,21 @@ Użycie:
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Aby poznać szczegóły danego polecenia, podaj argument pomocy.</value>
   </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Polecenia:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Opcje:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Opcje globalne:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliasy:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argumenty:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Nazwa argumentu nie została rozpoznana dla bieżącego polecenia: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2257,6 +2268,10 @@ Użycie:
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
      <value>Argument flagi nie może zawierać wartości przylegającej: „{}”</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>Nieprawidłowa wartość logiczna dla argumentu flagi: "{}". Oczekiwano wartości true, false, 1 lub 0.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2364,17 +2379,32 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Nieprawidłowa wartość limitu czasu zatrzymania: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Dodatkowe sieci nie są dozwolone, gdy trybem sieci podstawowej jest „host” lub „none”.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Podstawowy tryb sieciowy „{}” nie obsługuje podłączania ani odłączania dodatkowych sieci.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Zduplikowana sieć: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>Ustawienia punktu końcowego nie są jeszcze obsługiwane (sieć "{}").</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Zduplikowana opcja sterownika „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Nieprawidłowa opcja sterownika „{}”; oczekiwano „key=value”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Nieznane ustawienie punktu końcowego „{}” dla sieci „{}”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>Dla sieci '{}' można określić tylko jeden adres IP.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Łącze sieciowe nie może być puste.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Alias sieciowy nie może być pusty.</value>
@@ -2382,6 +2412,10 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Network aliases require a user-defined network. Use --network to specify one.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>Ustawienia punktu końcowego nie są obsługiwane w trybie sieciowym „{}”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
@@ -2427,7 +2461,7 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
-    <value>Creating session storage at '{}' as configured by session.storagePath. If you later change or remove this setting, data stored here will no longer be used by the default session and can be deleted to reclaim space.</value>
+    <value>Tworzenie magazynu sesji w lokalizacji „{}” zgodnie z konfiguracją ustawienia session.storagePath. Jeśli później zmienisz lub usuniesz to ustawienie, dane przechowywane tutaj nie będą już używane przez sesję domyślną i będzie można je usunąć, aby odzyskać miejsce.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
@@ -2482,6 +2516,58 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>Zapisz do pliku zamiast do STDOUT</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>Kopiuj pliki między kontenerem a lokalnym systemem plików.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>Kopiuj pliki między kontenerem a lokalnym systemem plików.
+Użycie: wslc container cp [OPTIONS] SOURCE DEST
+  Z lokalnego do kontenera: wslc container cp LOCAL_PATH CONTAINER:PATH
+  Z kontenera do lokalnego: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Ze stdin do kontenera: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>Źródło: ścieżka lokalna, CONTAINER:PATH lub „-” dla stdin</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>Miejsce docelowe: ścieżka lokalna lub CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>Nieprawidłowy format miejsca docelowego. Oczekiwano CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>Nieprawidłowy format źródła. Oczekiwano CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>Nie znaleziono ścieżki źródła: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>Nie znaleziono tar.exe. Plik tar systemu Windows jest wymagany do kopiowania plików lokalnych.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>Nieprawidłowy kierunek kopiowania. Użyj CONTAINER:PATH jako źródła lub miejsca docelowego.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>Nie można odczytać danych tar z terminala. Prześlij archiwum tar do stdin.
+Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>Nie wyodrębniono żadnego pliku z archiwum kontenera</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>Nie można skopiować katalogu do ścieżki pliku. Zamiast tego użyj elementu docelowego katalogu (z separatorem końcowym).</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Sprawdź kontener.</value>
@@ -2783,6 +2869,10 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Pokaż wszystko bez względu na stan.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>Tryb archiwum (akceptowany w celu zachowania zgodności z interfejsem wiersza polecenia platformy Docker)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Ustaw zmienne czasu kompilacji (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2849,6 +2939,24 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Nieprawidłowa wartość {}: „{}”. Obsługiwana jest tylko wartość „all”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>Polecenie do uruchomienia w celu kontroli kondycji kontenera</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>Czas między uruchomieniami kontroli kondycji (np. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>Liczba kolejnych niepowodzeń wymagana do zgłoszenia kontenera jako niesprawny</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>Okres początkowy na inicjację kontenera przed rozpoczęciem odliczania do kontroli kondycji (np. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>Maksymalny czas na wykonanie jednej kontroli kondycji (np. 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Usuń obrazy, nawet jeśli są używane</value>
   </data>
@@ -2899,12 +3007,31 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Dodaj alias o zakresie sieci dla kontenera</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Ustaw opcje sterownika punktu końcowego (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Przypisz kontenerowi adres IPv4 w sieci</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Dodaj link do innego kontenera (--link nazwa:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Dodaj adres IPv4 link-local dla kontenera</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Nieprawidłowa wartość {}: alias sieciowy nie może być pusty ani zawierać białych znaków</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>Nie używaj pamięci podręcznej podczas kompilowania obrazu</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>Wyłącz wszelkie kontrole kondycji określone dla kontenera</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Nie usuwaj elementów nadrzędnych bez tagów</value>
@@ -2923,6 +3050,13 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publikuj wszystkie uwidocznione porty w losowych portach hosta</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Wyświetla tylko identyfikatory kontenerów</value>
@@ -3086,6 +3220,14 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Nieprawidłowa wartość argumentu {}: »{}«. Oczekiwano rozmiaru pamięci (np. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>Nieprawidłowa wartość argumentu {}: '{}'. Oczekiwano czasu trwania (np. 30s, 1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>Opcji --no-healthcheck nie można łączyć z innymi opcjami kontroli kondycji.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>Plik CID „{}” już istnieje</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3176,6 +3318,18 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>Usunięto: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>Połącz kontener z siecią</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>Łączy kontener z istniejącą siecią.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>Odłącz kontener od sieci.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>Odłącza kontener od istniejącej sieci.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>Zarządzaj woluminami.</value>
@@ -3375,6 +3529,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Nie można zainicjować wymiany</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Nie można przywrócić sygnatury czasowej dla kontenera „{}”</value>
