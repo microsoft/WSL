@@ -914,9 +914,9 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     // Fail if the distribution is running.
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
-    // Fail if a conversion/export/compaction is in progress for this distribution. Those operations
-    // release m_instanceLock while running but keep the distribution in m_lockedDistributions, so
-    // mutating the VHD here would race with them.
+    // Fail if a conversion or export is in progress for this distribution. Those operations release
+    // m_instanceLock while running but keep the distribution in m_lockedDistributions, so mutating
+    // the VHD here would race with them.
     _EnsureNotLocked(DistroGuid);
 
     // Lookup the distribution configuration
@@ -1779,8 +1779,8 @@ try
     // Don't attempt if running
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
-    // Don't attempt while a conversion/export/compaction holds this distribution; those operations
-    // release m_instanceLock while running but keep the entry in m_lockedDistributions.
+    // Don't attempt while a conversion or export holds this distribution; those operations release
+    // m_instanceLock while running but keep the entry in m_lockedDistributions.
     _EnsureNotLocked(DistroGuid);
 
     const wil::unique_hfile vhd{::CreateFileW(configuration.VhdFilePath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
@@ -1812,9 +1812,9 @@ try
     const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
-    // Fail if a conversion/export/compaction is in progress; those operations release m_instanceLock
-    // while running but keep this distribution in m_lockedDistributions, so resizing its VHD now
-    // would race with them.
+    // Fail if a conversion or export is in progress; those operations release m_instanceLock while
+    // running but keep this distribution in m_lockedDistributions, so resizing its VHD now would
+    // race with them.
     _EnsureNotLocked(DistroGuid);
 
     const auto& vhdPath = configuration.VhdFilePath;
