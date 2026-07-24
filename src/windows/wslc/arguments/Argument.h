@@ -22,7 +22,6 @@ Abstract:
 #define WSLC_CLI_HELP_ARG L"?"
 #define WSLC_CLI_HELP_ARG_STRING WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
 #define NO_ALIAS L""
-#define NO_LIMIT -1
 
 using namespace wsl::windows::wslc::argument;
 
@@ -33,7 +32,7 @@ struct Argument
     // Default argument configuration constants
     static constexpr Kind DefaultKind = Kind::Flag;
     static constexpr bool DefaultRequired = false;
-    static constexpr int DefaultCountLimit = 1;
+    static constexpr argument::Limit DefaultLimit = argument::Limit::Single;
 
     // Full constructor with all parameters
     Argument(
@@ -43,8 +42,8 @@ struct Argument
         const std::wstring& desc,
         argument::Kind kind = DefaultKind,
         bool required = DefaultRequired,
-        int countLimit = DefaultCountLimit) :
-        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_countLimit(countLimit)
+        argument::Limit limit = DefaultLimit) :
+        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_limit(limit)
     {
     }
 
@@ -58,7 +57,7 @@ struct Argument
     static Argument Create(
         ArgType type,
         std::optional<bool> required = std::nullopt,
-        std::optional<int> countLimit = std::nullopt,
+        std::optional<argument::Limit> limit = std::nullopt,
         std::optional<std::wstring> desc = std::nullopt);
 
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
@@ -89,9 +88,21 @@ struct Argument
     {
         return m_type;
     }
-    int Limit() const
+    Limit Limit() const
     {
-        return m_countLimit;
+        return m_limit;
+    }
+
+    // A single-value argument accepts one value (last-wins on repeats).
+    bool IsSingle() const
+    {
+        return m_limit == argument::Limit::Single;
+    }
+
+    // An unlimited argument accumulates every value supplied.
+    bool IsUnlimited() const
+    {
+        return m_limit == argument::Limit::Unlimited;
     }
 
     // Validates this argument's value in the provided args
@@ -104,6 +115,6 @@ private:
     std::wstring m_alias;
     bool m_required = DefaultRequired;
     argument::Kind m_type = DefaultKind;
-    int m_countLimit = DefaultCountLimit;
+    argument::Limit m_limit = DefaultLimit;
 };
 } // namespace wsl::windows::wslc

@@ -22,7 +22,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> InspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ObjectId, true, NO_LIMIT),
+        Argument::Create(ArgType::ObjectId, true, Limit::Unlimited),
         Argument::Create(ArgType::Type),
     };
 }

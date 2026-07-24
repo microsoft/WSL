@@ -67,7 +67,7 @@ void ResolveSession(CLIExecutionContext& context)
 void ListSessions(CLIExecutionContext& context)
 {
     auto sessions = SessionService::List();
-    if (context.Args.Contains(ArgType::Verbose))
+    if (context.Args.GetFlag<ArgType::Verbose>())
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
         context.Reporter.Output(L"[wslc] Found {} session{}\n", sessions.size(), plural);
