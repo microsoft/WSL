@@ -1898,21 +1898,21 @@ try
         _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
     }
 
-    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
-
-    WSL_LOG_TELEMETRY(
-        "CompactDistributionBegin",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(configuration.Name.c_str(), "distroName"));
-
     HRESULT result = E_UNEXPECTED;
-    auto compactDistributionComplete = wil::scope_exit([&] {
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         WSL_LOG_TELEMETRY(
             "CompactDistributionEnd",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(configuration.Name.c_str(), "distroName"),
             TraceLoggingValue(result, "result"));
+
+        _ConversionComplete(configuration.DistroId);
     });
+
+    WSL_LOG_TELEMETRY(
+        "CompactDistributionBegin",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(configuration.Name.c_str(), "distroName"));
 
     result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
     if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
