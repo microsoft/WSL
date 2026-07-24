@@ -3280,14 +3280,15 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
         WslShutdown();
 
-        // Start an export to a pipe we deliberately don't drain. Once the pipe buffer fills, the export
-        // blocks mid-stream, deterministically holding the distribution in the "Exporting" locked state.
-        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true);
+        // Start an export to a pipe we deliberately don't drain. Use a tiny buffer so the export blocks
+        // as soon as it writes any data, regardless of the test distro's size, deterministically holding
+        // the distribution in the "Exporting" locked state.
+        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true, 1);
 
         std::thread exportThread([&]() { LxsstuLaunchWsl(std::format(L"--export {} -", name), nullptr, writePipe.get()); });
 
         auto joinExport = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            // Drain the pipe so the blocked export can complete, then join the thread.
+            // Close the read end so the blocked export fails with a broken pipe and returns, then join.
             readPipe.reset();
             if (exportThread.joinable())
             {
