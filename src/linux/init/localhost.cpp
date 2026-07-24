@@ -485,12 +485,21 @@ int RunPortTracker(int Argc, char** Argv)
     seccompDispatcher->RegisterHandler(
         __NR_bind, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
 
+    // listen() can perform an implicit autobind (assigning an ephemeral port) when called on a
+    // socket that was never explicitly bind()'d. That autobind is otherwise invisible to the
+    // port tracker, so listen() needs to be intercepted the same way bind() is.
+    seccompDispatcher->RegisterHandler(
+        __NR_listen, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
+
 #ifdef __x86_64__
     seccompDispatcher->RegisterHandler(I386_NR_socketcall, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
     });
 #else
     seccompDispatcher->RegisterHandler(ARMV7_NR_bind, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+    seccompDispatcher->RegisterHandler(ARMV7_NR_listen, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
     });
 #endif
