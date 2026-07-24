@@ -41,7 +41,7 @@ static bool TryInspectVolume(Reporter& reporter, Session& session, const std::st
     {
         if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
         {
-            reporter.Error(L"{}\n", Localization::MessageWslcVolumeNotFound(wsl::shared::string::MultiByteToWide(volumeName)));
+            reporter.Error(L"{}\n", Localization::MessageWslcVolumeNotFound(volumeName.c_str()));
             return false;
         }
 
@@ -62,7 +62,7 @@ static bool TryDeleteVolume(Reporter& reporter, Session& session, const std::str
         {
             if (!force)
             {
-                reporter.Error(L"{}\n", Localization::MessageWslcVolumeNotFound(wsl::shared::string::MultiByteToWide(volumeName)));
+                reporter.Error(L"{}\n", Localization::MessageWslcVolumeNotFound(volumeName.c_str()));
             }
 
             return false;
@@ -217,7 +217,7 @@ void PruneVolumes(CLIExecutionContext& context)
 
     for (const auto& volumeName : result.PrunedVolumes)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_VolumePruneDeleted(wsl::shared::string::MultiByteToWide(volumeName)));
+        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_VolumePruneDeleted(volumeName));
     }
 
     context.Reporter.Output(L"\n");

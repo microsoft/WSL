@@ -147,7 +147,7 @@ static bool TryInspectContainer(Reporter& reporter, Session& session, const std:
     {
         if (ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
         {
-            reporter.Error(L"{}\n", Localization::MessageWslcContainerNotFound(wsl::shared::string::MultiByteToWide(containerId)));
+            reporter.Error(L"{}\n", Localization::MessageWslcContainerNotFound(containerId.c_str()));
             return false;
         }
 

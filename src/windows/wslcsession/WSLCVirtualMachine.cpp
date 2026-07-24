@@ -1015,10 +1015,7 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
                 Mapping.HostPort(),
                 Mapping.Protocol == IPPROTO_TCP ? "tcp" : "udp");
 
-            THROW_HR_WITH_USER_ERROR(
-                result,
-                shared::Localization::MessageFailedToMapPort(
-                    shared::string::MultiByteToWide(portString), common::wslutil::GetErrorString(result)));
+            THROW_HR_WITH_USER_ERROR(result, shared::Localization::MessageFailedToMapPort(portString, common::wslutil::GetErrorString(result)));
         }
 
         // For anonymous binds, write back the allocated host port.

@@ -41,9 +41,7 @@ namespace {
         std::string type = (typeIt != DriverOpts.end()) ? typeIt->second : "";
 
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcUnsupportedVolumeDriverOpts(wsl::shared::string::MultiByteToWide("type=" + type)),
-            !type.empty() && type != "tmpfs");
+            E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("type=" + type), !type.empty() && type != "tmpfs");
     }
 
 } // namespace
@@ -112,11 +110,8 @@ void WSLCGuestVolumeImpl::Delete()
     catch (const DockerHTTPException& e)
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
-            Localization::MessageWslcVolumeInUse(wsl::shared::string::MultiByteToWide(m_name)),
-            e.StatusCode() == 409);
-        THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(wsl::shared::string::MultiByteToWide(m_name)), e.StatusCode() == 404);
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcVolumeInUse(m_name.c_str()), e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(m_name.c_str()), e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete volume '%hs'", m_name.c_str());
     }
 }

@@ -46,10 +46,7 @@ namespace {
 
             opts.SizeBytes = parser.Required<ULONGLONG>(c_sizeBytesOpt);
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG,
-                Localization::MessageWslcInvalidVolumeOption(
-                    wsl::shared::string::MultiByteToWide(c_sizeBytesOpt), wsl::shared::string::MultiByteToWide(DriverOpts.at(c_sizeBytesOpt))),
-                opts.SizeBytes == 0);
+                E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sizeBytesOpt, DriverOpts.at(c_sizeBytesOpt)), opts.SizeBytes == 0);
 
             opts.Fixed = parser.OptionalBool(c_fixedOpt).value_or(false);
 
@@ -60,8 +57,7 @@ namespace {
             if (opts.Uid.has_value() != opts.Gid.has_value())
             {
                 const auto* missing = opts.Uid.has_value() ? c_gidOpt : c_uidOpt;
-                THROW_HR_WITH_USER_ERROR(
-                    E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(wsl::shared::string::MultiByteToWide(missing)));
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(missing));
             }
 
             parser.RejectUnknown();
@@ -109,7 +105,7 @@ namespace {
             // rmdir only removes an empty directory, so reaching here means the
             // lone lost+found captured recovered data. Leave it and warn.
             LOG_CAUGHT_EXCEPTION();
-            EMIT_USER_WARNING(Localization::MessageWslcVolumeLostFoundNotEmpty(wsl::shared::string::MultiByteToWide(VolumeName)));
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeLostFoundNotEmpty(VolumeName));
         }
     }
     CATCH_LOG();
@@ -296,7 +292,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
         // and delete it; containers that reference it should refuse to start. The reason is surfaced via Inspect(), not the warning.
         const auto hr = wil::ResultFromCaughtException();
         const auto message = wslutil::GetErrorString(hr);
-        EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(Volume.Name)));
+        EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverVolume(Volume.Name));
         status = {hr, wsl::shared::string::WideToMultiByte(message)};
     }
 
@@ -324,11 +320,8 @@ void WSLCVhdVolumeImpl::Delete()
     catch (const DockerHTTPException& e)
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
-            Localization::MessageWslcVolumeInUse(wsl::shared::string::MultiByteToWide(m_name)),
-            e.StatusCode() == 409);
-        THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(wsl::shared::string::MultiByteToWide(m_name)), e.StatusCode() == 404);
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcVolumeInUse(m_name.c_str()), e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(m_name.c_str()), e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete volume '%hs'", m_name.c_str());
     }
 

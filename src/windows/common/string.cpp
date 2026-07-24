@@ -212,24 +212,11 @@ BYTE ConvertHexByte(const wchar_t* hex, wchar_t** endPtr)
 }
 
 template <typename T>
-std::wstring StringViewToWide(std::basic_string_view<T> input)
-{
-    if constexpr (std::is_same_v<T, char>)
-    {
-        return wsl::shared::string::MultiByteToWide(std::string{input});
-    }
-    else
-    {
-        return std::wstring{input};
-    }
-}
-
-template <typename T>
 std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
 {
     if (input.length() % 2 != 0)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(StringViewToWide(input)));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(std::basic_string<T>{input}));
     }
 
     std::vector<BYTE> result;
@@ -250,7 +237,7 @@ std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
         const auto byte = ConvertHexByte(currentHex, &endPtr);
         if (endPtr != currentHex + 2)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(StringViewToWide(input)));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(std::basic_string<T>{input}));
         }
 
         result.push_back(byte);

@@ -377,9 +377,7 @@ namespace {
         }
         catch (const std::exception& e)
         {
-            warnings.push_back(
-                {wsl::shared::Localization::WSLCUserSettings_Warning_ParseError(path.wstring(), wsl::shared::string::MultiByteToWide(e.what())),
-                 {}});
+            warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_ParseError(path.wstring(), e.what()), {}});
             return std::nullopt;
         }
     }

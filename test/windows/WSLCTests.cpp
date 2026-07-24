@@ -12096,9 +12096,7 @@ class WSLCTests
 
             // Verify the warning matches the expected localized message for the corrupt container.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(
-                L"wsl: {}\n",
-                wsl::shared::Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(containerId)));
+            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverContainer(containerId));
 
             VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
@@ -12182,7 +12180,6 @@ class WSLCTests
 
         constexpr auto c_sessionName = L"warning-guest-volume-recovery";
         constexpr auto c_volumeName = "wslc-test-warning-guest-recovery";
-        constexpr auto c_volumeNameWide = L"wslc-test-warning-guest-recovery";
         auto storagePath = (std::filesystem::current_path() / "test-warning-guest-volume-recovery").wstring();
         auto cleanupDir = wil::scope_exit([&]() {
             std::error_code ec;
@@ -12229,7 +12226,7 @@ class WSLCTests
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeNameWide));
+            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
 
             VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
 
