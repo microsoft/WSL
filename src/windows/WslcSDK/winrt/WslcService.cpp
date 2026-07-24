@@ -24,6 +24,60 @@ using namespace winrt::Windows::Foundation::Collections;
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
 namespace {
+    WslcComponentFlags GetComponentsForInstall(const InstallOptions& options)
+    {
+        WslcComponentFlags result = WslcComponentFlags::WSLC_COMPONENT_FLAG_NONE;
+        bool shouldCheckMissingComponents = true;
+
+        if (options)
+        {
+            auto components = options.Components();
+            if (components)
+            {
+                shouldCheckMissingComponents = false;
+
+                for (const auto& component : components)
+                {
+                    switch (component)
+                    {
+                    case Component::VirtualMachinePlatform:
+                        result |= WslcComponentFlags::WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM;
+                        break;
+                    case Component::WslPackage:
+                        result |= WslcComponentFlags::WSLC_COMPONENT_FLAG_WSL_PACKAGE;
+                        break;
+                    case Component::SdkNeedsUpdate:
+                        THROW_HR(WSLC_E_SDK_UPDATE_NEEDED);
+                    default:
+                        THROW_HR(E_INVALIDARG);
+                    }
+                }
+            }
+        }
+
+        if (shouldCheckMissingComponents)
+        {
+            winrt::check_hresult(WslcGetMissingComponents(&result));
+        }
+
+        return result;
+    }
+
+    WslcInstallOptions GetOptionsForInstall(const InstallOptions& options)
+    {
+        WslcInstallOptions result = WslcInstallOptions::WSLC_INSTALL_OPTION_NONE;
+
+        if (options)
+        {
+            if (options.Repair())
+            {
+                result |= WslcInstallOptions::WSLC_INSTALL_OPTION_REPAIR;
+            }
+        }
+
+        return result;
+    }
+
     void CALLBACK InstallProgressCallback(WslcComponentFlags component, uint32_t progressSteps, uint32_t totalSteps, PVOID context) noexcept
     {
         try
@@ -64,16 +118,22 @@ winrt::Microsoft::WSL::Containers::ServiceVersion WslcService::GetVersion()
     return winrt::make<implementation::ServiceVersion>(version.major, version.minor, version.revision);
 }
 
-IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::InstallProgress> WslcService::InstallWithDependenciesAsync()
+IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::InstallProgress> WslcService::InstallWithDependenciesAsync(
+    winrt::Microsoft::WSL::Containers::InstallOptions options)
 {
+    auto components = GetComponentsForInstall(options);
+    auto wslcOptions = GetOptionsForInstall(options);
+
     co_await winrt::resume_background();
 
     auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::InstallProgress>{co_await winrt::get_progress_token()};
-    winrt::check_hresult(WslcInstallWithDependencies(InstallProgressCallback, &context));
+    winrt::check_hresult(WslcInstallWithDependencies(components, wslcOptions, InstallProgressCallback, &context));
 }
 
-void WslcService::InstallWithDependencies()
+void WslcService::InstallWithDependencies(winrt::Microsoft::WSL::Containers::InstallOptions options)
 {
-    winrt::check_hresult(WslcInstallWithDependencies(nullptr, nullptr));
+    auto components = GetComponentsForInstall(options);
+    auto wslcOptions = GetOptionsForInstall(options);
+    winrt::check_hresult(WslcInstallWithDependencies(components, wslcOptions, nullptr, nullptr));
 }
 } // namespace winrt::Microsoft::WSL::Containers::implementation
