@@ -120,20 +120,8 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
-    // Reconciles a surviving wrapper after its VM was torn down (idle-termination or crash) while the
-    // container was running: records a synthetic init-process exit, releases VM-scoped resources and
-    // drops to Exited (releasing the VM activity hold). Keeps the wrapper connected so client COM
-    // references stay valid across the VM restart.
-    void OnVmTornDown() noexcept;
-
-    // Re-registers a survivor's VM-scoped port allocations against the restarted VM (see OnVmTornDown).
+    // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
-
-    // Honors --rm for a survivor that was running when the VM was torn down: OnVmTornDown forced it to
-    // Exited but deferred the auto-remove delete while dockerd was down. Removes it now that the VM is
-    // back, mirroring OnStopped's Running->Exited delete. Sets Removed and returns the disconnect
-    // wrapper (destroy after dropping the container from tracking) when it deletes; otherwise a no-op.
-    [[nodiscard]] unique_com_disconnect RemoveExitedAutoRemoveSurvivor(bool& Removed);
 
     __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 

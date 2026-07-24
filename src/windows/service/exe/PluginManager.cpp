@@ -28,6 +28,24 @@ constexpr auto c_pluginPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lx
 constexpr WSLVersion Version = {wsl::shared::VersionMajor, wsl::shared::VersionMinor, wsl::shared::VersionRevision};
 
 thread_local std::optional<std::wstring> g_pluginErrorMessage;
+thread_local bool g_inWslcPluginNotification = false;
+
+class WslcPluginNotificationContext
+{
+public:
+    WslcPluginNotificationContext() : m_previous(std::exchange(g_inWslcPluginNotification, true))
+    {
+    }
+
+    ~WslcPluginNotificationContext()
+    {
+        g_inWslcPluginNotification = m_previous;
+    }
+
+private:
+    ExecutionContext m_executionContext{Context::Plugin};
+    bool m_previous;
+};
 
 extern "C" {
 HRESULT MountFolder(WSLSessionId Session, LPCWSTR WindowsPath, LPCWSTR LinuxPath, BOOL ReadOnly, LPCWSTR Name)
@@ -565,9 +583,14 @@ void PluginManager::ThrowIfFatalPluginError() const
     }
 }
 
+bool PluginManager::IsInWslcNotification() noexcept
+{
+    return g_inWslcPluginNotification;
+}
+
 void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -588,7 +611,7 @@ void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
 
 void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -609,7 +632,7 @@ void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session)
 HRESULT PluginManager::OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
 try
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -632,7 +655,7 @@ CATCH_RETURN()
 
 void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -654,7 +677,7 @@ void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Sessio
 
 void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -674,7 +697,7 @@ void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LP
 
 void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -694,7 +717,7 @@ void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LP
 
 void PluginManager::OnWslcVmStarted(const WSLCSessionInformation* Session) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -713,7 +736,7 @@ void PluginManager::OnWslcVmStarted(const WSLCSessionInformation* Session) const
 
 void PluginManager::OnWslcVmStopping(const WSLCSessionInformation* Session) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {

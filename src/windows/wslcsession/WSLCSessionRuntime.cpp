@@ -22,6 +22,7 @@ using wsl::windows::service::wslc::WSLCSessionRuntime;
 namespace {
 
 constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
+constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -148,15 +149,27 @@ void WSLCSessionRuntime::ResetDockerdReady() noexcept
     m_dockerdReadyEvent.ResetEvent();
 }
 
-bool WSLCSessionRuntime::IsDockerdReady() const noexcept
+void WSLCSessionRuntime::OnProcessLog(const gsl::span<char>& buffer, PCSTR source) noexcept
+try
 {
-    return m_dockerdReadyEvent.is_signaled();
-}
+    if (buffer.empty())
+    {
+        return;
+    }
 
-void WSLCSessionRuntime::SignalDockerdReady() noexcept
-{
-    m_dockerdReadyEvent.SetEvent();
+    std::string entry{buffer.begin(), buffer.end()};
+    WSL_LOG(
+        "ContainerdLog",
+        TraceLoggingValue(source, "Source"),
+        TraceLoggingValue(entry.c_str(), "Content"),
+        TraceLoggingValue(m_displayName.c_str(), "Name"));
+
+    if (!m_dockerdReadyEvent.is_signaled() && entry.find(c_dockerdReadyLogLine) != std::string::npos)
+    {
+        m_dockerdReadyEvent.SetEvent();
+    }
 }
+CATCH_LOG()
 
 void WSLCSessionRuntime::SetContainerdProcess(ServiceRunningProcess&& process)
 {
@@ -447,8 +460,8 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         m_allocatedPorts.clear();
     }
 
-    // Not reset: session-scoped, subscriptions outlive the VM. Its stream handle dies with the IO relay
-    // above; InitializeDockerRuntime re-binds it on the next start.
+    // The session-scoped event tracker is intentionally not reset. Its stream handle dies with the IO
+    // relay above, and InitializeDockerRuntime re-binds it on the next start.
     m_dockerClient.reset();
 
     if (CaptureTerminationReason)
@@ -648,6 +661,12 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
                 return;
             }
 
+            // Match the production idle timer: an active container or operation keeps the VM alive.
+            if (m_idleState->ActivityCount() != 0)
+            {
+                return;
+            }
+
             if (!TryClaimExpectedStop())
             {
                 wasAlreadyIdle = true;
@@ -664,6 +683,22 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
             lock.reset();
             NotifyVmStopping();
             lock = m_lock.lock_exclusive();
+
+            if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
+            {
+                StopVmLockHeld();
+                return;
+            }
+
+            if (m_idleState->ActivityCount() != 0)
+            {
+                auto stopRequested = VmExitDisposition::StopRequested;
+                m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
+
+                lock.reset();
+                NotifyVmStarted();
+                return;
+            }
 
             StopVmLockHeld();
         }
@@ -717,6 +752,10 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime) : m_runtime(&R
             break;
         }
 
+        WSL_LOG(
+            "WslcVmLeaseRetry",
+            TraceLoggingValue(m_runtime->m_id, "SessionId"),
+            TraceLoggingValue(static_cast<uint32_t>(m_runtime->m_vmState.load()), "VmState"));
         m_lock.reset();
     }
 

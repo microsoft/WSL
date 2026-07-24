@@ -12135,11 +12135,13 @@ class WSLCTests
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
 
         // Starting a process brings the VM up.
-        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
-        auto process = launcher.Launch(*session);
-        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+        {
+            WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+            auto process = launcher.Launch(*session);
+            VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+        }
 
-        // Forcing idle termination tears the running VM down.
+        // Releasing the process wrapper removes its activity hold, allowing idle termination.
         wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
@@ -12176,102 +12178,82 @@ class WSLCTests
         VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
     }
 
-    // A running container pins the VM via its activity hold; TriggerIdleTermination ignores that
-    // hold and forces teardown. The container's state must survive on persistent storage and be
-    // recovered against a fresh docker context when the VM lazily restarts.
-    WSLC_TEST_METHOD(TriggerIdleTerminationRecoversRunningContainer)
+    // A running container pins the VM via its activity hold, matching the production idle timer.
+    WSLC_TEST_METHOD(TriggerIdleTerminationDefersForRunningContainer)
     {
         SKIP_TEST_SERVER();
 
-        const std::string containerName = "wslc-idle-recovery";
-
-        auto cleanup = wil::scope_exit([&]() {
-            wil::com_ptr<IWSLCContainer> staleContainer;
-            if (SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &staleContainer)))
-            {
-                LOG_IF_FAILED(staleContainer->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
-            }
-        });
-
-        WSLCContainerLauncher launcher("debian:latest", containerName, {"/bin/sleep", "600"});
+        WSLCContainerLauncher launcher("debian:latest", "wslc-idle-active", {"/bin/sleep", "600"});
         auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
-        container.SetDeleteOnClose(false);
 
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
         VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
 
-        // Force idle teardown even though the container holds a running-activity reference.
+        // The test hook honors the same activity guard as automatic idle teardown.
         BOOL wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
-        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
-
-        // The forced teardown must reconcile the surviving wrapper in place -- not merely leave
-        // docker's state to be rediscovered on the next open. The init process records a synthetic
-        // SIGKILL exit and the container drops to Exited while its client COM references stay valid.
-        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
-        VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 128 + WSLCSignalSIGKILL);
-
-        // Re-opening lazily restarts the VM and recovers the container. It must be found (Exited, since
-        // its init process died with the VM) and remain operable against the new context: restarting it
-        // brings it back to Running on the freshly booted VM.
-        auto recovered = OpenContainer(m_defaultSession.get(), containerName);
         VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
-        VERIFY_ARE_EQUAL(recovered.State(), WslcContainerStateExited);
-
-        VERIFY_SUCCEEDED(recovered.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
-        VERIFY_ARE_EQUAL(recovered.State(), WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
     }
 
-    // A running --rm container that survives a forced idle teardown is dropped to Exited without the
-    // auto-remove delete (dockerd is gone by then). On the next VM restart it must be auto-removed
-    // rather than leaking as a permanent Exited container.
-    WSLC_TEST_METHOD(TriggerIdleTerminationRemovesExitedAutoRemoveContainer)
+    // A created or stopped container has no activity hold. Its port mapping and bind mount must remain
+    // usable after each idle teardown and lazy VM restart.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRecoversStoppedContainerResources)
     {
         SKIP_TEST_SERVER();
 
-        const std::string containerName = "wslc-idle-rm-recovery";
-
-        auto cleanup = wil::scope_exit([&]() {
-            wil::com_ptr<IWSLCContainer> staleContainer;
-            if (SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &staleContainer)))
-            {
-                LOG_IF_FAILED(staleContainer->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
-            }
+        const auto hostFolder = std::filesystem::current_path() / "test-idle-container-volume";
+        std::filesystem::create_directories(hostFolder);
+        VERIFY_IS_TRUE((std::ofstream(hostFolder / "marker.txt") << "idle-recovery").good());
+        auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
         });
 
-        WSLCContainerLauncher launcher("debian:latest", containerName, {"/bin/sleep", "600"});
-        launcher.SetContainerFlags(WSLCContainerFlagsRm);
-        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
-        container.SetDeleteOnClose(false);
+        WSLCContainerLauncher launcher(
+            "python:3.12-alpine",
+            "wslc-idle-resource-recovery",
+            {"python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", "--directory", "/data"},
+            {"PYTHONUNBUFFERED=1"},
+            "bridge");
+        launcher.AddPort(1270, 8000, AF_INET);
+        launcher.AddVolume(hostFolder.wstring(), "/data", true);
+        auto container = launcher.Create(*m_defaultSession);
 
-        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
-        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
 
+        // Tear down before the first start, then validate both recovered resources.
         BOOL wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
-        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
 
-        // Restart the VM via an unrelated operation, which recovers surviving containers; the exited
-        // --rm survivor must be auto-removed and absent from the container list.
-        WSLCProcessLauncher restartLauncher("/bin/true", {"/bin/true"});
-        auto process = restartLauncher.Launch(*m_defaultSession);
-        process.GetExitEvent().wait(5000);
-        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
-
-        auto [containers, ports] = ListContainers(m_defaultSession.get());
-        bool found = false;
-        for (size_t i = 0; i < containers.size(); i++)
+        for (int iteration = 0; iteration < 2; ++iteration)
         {
-            if (containerName == containers[i].Name)
             {
-                found = true;
-                break;
+                VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
+                VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+                VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+                auto initProcess = container.GetInitProcess();
+                WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
+
+                const auto ports = container.Inspect().Ports;
+                VERIFY_IS_TRUE(ports.contains("8000/tcp"));
+                VERIFY_ARE_EQUAL(ports.at("8000/tcp").size(), 1u);
+                VERIFY_ARE_EQUAL(ports.at("8000/tcp")[0].HostPort, std::string{"1270"});
+                ExpectHttpResponse(L"http://127.0.0.1:1270/marker.txt", 200);
+
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+                VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
             }
+
+            wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+            VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
         }
-        VERIFY_IS_FALSE(found);
     }
 
     // Hammer the idle-teardown path concurrently with VM-level operations to surface deadlocks or

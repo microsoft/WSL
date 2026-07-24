@@ -181,12 +181,6 @@ try
 }
 CATCH_LOG()
 
-bool WSLCSessionManagerImpl::InPluginNotificationContext() noexcept
-{
-    const auto* context = wsl::windows::common::ExecutionContext::Current();
-    return context != nullptr && WI_IsFlagSet(context->CurrentContext(), wsl::windows::common::Context::Plugin);
-}
-
 void WSLCSessionManagerImpl::CreateSession(
     _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {
@@ -692,15 +686,17 @@ wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
 {
     wil::com_ptr<IWSLCSession> result;
 
-    ForEachSession<HRESULT>([&](SessionEntry& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
-        if (entry.SessionId != Id)
-        {
-            return std::nullopt;
-        }
+    ForEachSession<HRESULT>(
+        [&](SessionEntry& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
+            if (entry.SessionId != Id)
+            {
+                return std::nullopt;
+            }
 
-        result = session;
-        return S_OK;
-    });
+            result = session;
+            return S_OK;
+        },
+        PluginManager::IsInWslcNotification());
 
     THROW_HR_IF_MSG(WSLC_E_SESSION_NOT_FOUND, !result, "WSLC session %lu not found", Id);
     return result;

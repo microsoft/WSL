@@ -38,7 +38,6 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
-constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
@@ -468,15 +467,6 @@ try
         {
             m_containers.clear();
         }
-        else
-        {
-            // Session lives on but the VM is going down: reconcile each surviving wrapper to a stopped
-            // state (releasing its VM activity hold) before teardown.
-            for (auto& [id, container] : m_containers)
-            {
-                container->OnVmTornDown();
-            }
-        }
     };
 
     hooks.OnSpontaneousExit = [this]() { LOG_IF_FAILED(Terminate()); };
@@ -716,31 +706,6 @@ void WSLCSession::OnContainerdExited()
     }
 }
 
-void WSLCSession::OnProcessLog(const gsl::span<char>& Buffer, PCSTR Source)
-try
-{
-    if (Buffer.empty())
-    {
-        return;
-    }
-
-    std::string entry = {Buffer.begin(), Buffer.end()};
-    WSL_LOG(
-        "ContainerdLog",
-        TraceLoggingValue(Source, "Source"),
-        TraceLoggingValue(entry.c_str(), "Content"),
-        TraceLoggingValue(m_displayName.c_str(), "Name"));
-
-    if (!m_runtime.IsDockerdReady())
-    {
-        if (entry.find(c_dockerdReadyLogLine) != std::string::npos)
-        {
-            m_runtime.SignalDockerdReady();
-        }
-    }
-}
-CATCH_LOG();
-
 ServiceRunningProcess WSLCSession::StartProcess(
     const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback)
 {
@@ -749,10 +714,10 @@ ServiceRunningProcess WSLCSession::StartProcess(
     auto process = launcher.Launch(m_runtime.Vm());
 
     m_runtime.Relay()->AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+        process.GetStdHandle(1), [this, LogSource](const auto& data) { m_runtime.OnProcessLog(data, LogSource); }, false));
 
     m_runtime.Relay()->AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+        process.GetStdHandle(2), [this, LogSource](const auto& data) { m_runtime.OnProcessLog(data, LogSource); }, false));
 
     m_runtime.Relay()->AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
@@ -3574,31 +3539,22 @@ void WSLCSession::RecoverExistingContainers()
 
     auto containers = m_runtime.Docker().ListContainers(true); // all=true to include stopped containers
 
+    std::lock_guard containersLock(m_containersLock);
     for (const auto& dockerContainer : containers)
     {
-        // A kept-alive wrapper's cached state already matches dockerd's (reconciled in OnVmTornDown).
-        // Leave it (and its COM references) in place, just re-register its ports on the restarted VM.
+        // Keep existing wrappers and their client COM references in place, then re-register their
+        // ports against the restarted VM.
         if (auto existing = m_containers.find(dockerContainer.Id); existing != m_containers.end())
         {
-            // Isolate a port re-reservation conflict to this container so it can't fail the lazy start
-            // for every client: log, warn and continue, mirroring the Open() failure path below.
+            // Isolate recovery failures to this container so one bad container cannot fail lazy start
+            // for every client, mirroring the Open() failure path below.
             try
             {
-                // Honor --rm for a survivor forced to Exited in OnVmTornDown (delete deferred): remove
-                // it rather than leaking it. Otherwise re-register its VM-scoped port allocations.
-                bool removed = false;
-                auto wrapper = existing->second->RemoveExitedAutoRemoveSurvivor(removed);
-                if (removed)
-                {
-                    m_containers.erase(existing);
-                    continue;
-                }
-
                 existing->second->RecoverPorts(dockerContainer);
             }
             catch (...)
             {
-                LOG_CAUGHT_EXCEPTION_MSG("Failed to recover ports for container: %hs", dockerContainer.Id.c_str());
+                LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container state: %hs", dockerContainer.Id.c_str());
                 EMIT_USER_WARNING(
                     Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
             }

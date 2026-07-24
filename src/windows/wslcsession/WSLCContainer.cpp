@@ -1139,37 +1139,12 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     return comWrapper;
 }
 
-void WSLCContainerImpl::OnVmTornDown() noexcept
-try
-{
-    auto lock = m_lock.lock_exclusive();
-
-    // Only running containers have an init process and VM activity hold to reconcile. Port reservations
-    // self-neuter when the VM's table is destroyed; RecoverPorts re-reserves them on restart.
-    if (m_state != WslcContainerStateRunning)
-    {
-        return;
-    }
-
-    // VM torn down while running (idle-termination or crash). Mirror the stop path: record a synthetic
-    // SIGKILL exit (else a later die/Destroy event asserts on a missing code), release VM-scoped
-    // resources, drop to Exited (releasing the activity hold). Wrapper stays connected so COM refs stay
-    // valid; RecoverState reattaches it next start.
-    SetExitCode(128 + WSLCSignalSIGKILL);
-    ReleaseProcesses();
-    ReleaseRuntimeResources();
-
-    Transition(WslcContainerStateExited);
-    SignalInitProcessExit();
-}
-CATCH_LOG()
-
 void WSLCContainerImpl::RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer)
 {
     auto lock = m_lock.lock_exclusive();
 
-    // Re-register VM-scoped port reservations (self-neutered when the old VM's table died) against the
-    // restarted VM using the numbers recorded at create time, restoring bridge-mode forwarding.
+    // Re-register VM-scoped port reservations against the restarted VM using the numbers recorded at
+    // create time, restoring bridge-mode forwarding when the stopped container starts again.
     const bool allocateVmPorts = NetworkModeAllocatesVmPorts(m_networkMode);
     if (!allocateVmPorts)
     {
@@ -1199,24 +1174,6 @@ void WSLCContainerImpl::RecoverPorts(const common::docker_schema::ContainerInfo&
     }
 
     m_mappedPorts = std::move(ports);
-}
-
-unique_com_disconnect WSLCContainerImpl::RemoveExitedAutoRemoveSurvivor(bool& Removed)
-{
-    Removed = false;
-
-    auto lock = m_lock.lock_exclusive();
-
-    // Only an Exited --rm survivor needs cleanup: OnVmTornDown forced a running --rm container to Exited
-    // without the auto-remove delete. One that exited normally was already deleted by OnStopped.
-    if (m_state != WslcContainerStateExited || WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm))
-    {
-        return {};
-    }
-
-    auto wrapper = DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
-    Removed = true;
-    return wrapper;
 }
 
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)

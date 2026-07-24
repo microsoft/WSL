@@ -320,7 +320,6 @@ private:
 
     void OnImageDeleted(const std::string& ImageId) noexcept;
 
-    void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
     void OnDockerdExited();
     ServiceRunningProcess StartProcess(

@@ -702,10 +702,9 @@ interface IWSLCSession : IUnknown
 
     HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
 
-    // Used only for testing. Synchronously runs the idle-termination teardown path, ignoring the
-    // activity-count guard so a test can force the VM down even while a container holds an activity
-    // reference. The idle-termination-enabled (persistent-storage) guard is still honored: a
-    // tmpfs-backed session is never torn down, since that would lose unrecoverable state.
+    // Used only for testing. Synchronously runs the idle-termination teardown path. The production
+    // activity-count and persistent-storage guards are honored, so an active container keeps the VM
+    // alive and a tmpfs-backed session is never torn down.
     // WasAlreadyIdle is TRUE when the VM was not running.
     HRESULT TriggerIdleTermination([out] BOOL* WasAlreadyIdle);
 

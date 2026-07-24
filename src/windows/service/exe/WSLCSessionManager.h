@@ -108,7 +108,7 @@ private:
     // Iterates over all sessions, cleaning up released sessions.
     // The routine receives a SessionEntry& and can return an optional<T> to stop iteration.
     template <typename T>
-    inline auto ForEachSession(const auto& Routine)
+    inline auto ForEachSession(const auto& Routine, bool DeferSessionCleanup = false)
     {
         std::lock_guard lock(m_wslcSessionsLock);
 
@@ -129,12 +129,9 @@ private:
             wil::com_ptr<IWSLCSession> lockedSession;
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
-                // Session is gone. Notifying plugins fires OnWslcSessionStopping, which is a plugin
-                // callback and must not nest inside another plugin callback (ExecutionContext forbids
-                // it). If a plugin called back into WSLC from within a notification (e.g. creating a
-                // process from OnWslcVmStopping), defer this lazy notify + prune to a later, non-
-                // reentrant pass rather than firing OnWslcSessionStopping on top of the current one.
-                if (InPluginNotificationContext())
+                // FindSession is used by plugin callbacks into the API. Defer cleanup in that path so
+                // OnWslcSessionStopping is not nested inside another plugin notification.
+                if (DeferSessionCleanup)
                 {
                     return false; // Keep in tracking; clean up on a later pass.
                 }
@@ -183,9 +180,6 @@ private:
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
 
     void NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept;
-
-    // Returns true if the calling thread is currently running inside a plugin notification callback.
-    static bool InPluginNotificationContext() noexcept;
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslcSessionsLock;

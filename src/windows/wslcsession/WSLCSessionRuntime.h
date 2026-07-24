@@ -147,8 +147,7 @@ public:
     VmExitDisposition ExitDisposition() const noexcept;
     bool VmExited() const noexcept;
     void ResetDockerdReady() noexcept;
-    bool IsDockerdReady() const noexcept;
-    void SignalDockerdReady() noexcept;
+    void OnProcessLog(const gsl::span<char>& buffer, PCSTR source) noexcept;
     void SetContainerdProcess(ServiceRunningProcess&& process);
     void SetDockerdProcess(ServiceRunningProcess&& process);
 

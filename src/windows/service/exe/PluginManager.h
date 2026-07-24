@@ -55,6 +55,8 @@ public:
     void OnWslcVmStarted(const WSLCSessionInformation* Session) const;
     void OnWslcVmStopping(const WSLCSessionInformation* Session) const;
 
+    static bool IsInWslcNotification() noexcept;
+
     void ThrowIfFatalPluginError() const;
 
 private:
