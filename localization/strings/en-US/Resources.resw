@@ -1981,6 +1981,20 @@ You can also access more VS Code Remote options through the command palette with
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>The number of milliseconds that a VM is idle, before it is shut down.</value>
   </data>
+  <data name="Settings_KeepVMAlive.Header" xml:space="preserve">
+    <value>Keep WSL VM alive</value>
+  </data>
+  <data name="Settings_KeepVMAlive.Description" xml:space="preserve">
+    <value>Keep the WSL virtual machine running instead of shutting it down after it has been idle. When enabled, the VM only stops on "wsl --shutdown" or when the service is stopped.</value>
+    <comment>{Locked="wsl --shutdown"} is a command that must not be translated.</comment>
+  </data>
+  <data name="Settings_KeepVMAliveToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL VM alive.</value>
+  </data>
+  <data name="Settings_KeepVMAliveToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Keep the WSL virtual machine running instead of shutting it down after it has been idle. When enabled, the VM only stops on "wsl --shutdown" or when the service is stopped.</value>
+    <comment>{Locked="wsl --shutdown"} is a command that must not be translated.</comment>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Reset timeout</value>
   </data>

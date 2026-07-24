@@ -41,7 +41,10 @@
                 <ctControls:SettingsCard x:Uid="Settings_SparseVHD">
                     <ToggleSwitch x:Uid="Settings_SparseVHDToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnSparseVHD, Mode=TwoWay}"/>
                 </ctControls:SettingsCard>
-                <ctControls:SettingsExpander x:Name="VMIdleTimeoutExpander" x:Uid="Settings_VMIdleTimeout">
+                <ctControls:SettingsCard x:Uid="Settings_KeepVMAlive">
+                    <ToggleSwitch x:Uid="Settings_KeepVMAliveToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnKeepVMAlive, Mode=TwoWay}"/>
+                </ctControls:SettingsCard>
+                <ctControls:SettingsExpander x:Name="VMIdleTimeoutExpander" x:Uid="Settings_VMIdleTimeout" IsEnabled="{x:Bind ViewModel.VMIdleTimeoutEnabled, Mode=OneWay}">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.VMIdleTimeout, Mode=OneWay, Converter={StaticResource MillisecondsStringConverter}}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">

@@ -72,6 +72,23 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
         set { Set(ref _sparseVHD!, value); }
     }
 
+    public bool IsOnKeepVMAlive
+    {
+        get { return _vMIdleTimeout!.Int32Value < 0; }
+        set
+        {
+            Set(ref _vMIdleTimeout!, value ? -1 : _defaultVMIdleTimeout, nameof(IsOnKeepVMAlive));
+            OnPropertyChanged(nameof(VMIdleTimeout));
+            OnPropertyChanged(nameof(VMIdleTimeoutEnabled));
+            VMIdleTimeout_ResetEnabled = !Equals(_defaultVMIdleTimeout, _vMIdleTimeout!.Int32Value);
+        }
+    }
+
+    public bool VMIdleTimeoutEnabled
+    {
+        get { return _vMIdleTimeout!.Int32Value >= 0; }
+    }
+
     public string VMIdleTimeout
     {
         get
@@ -85,6 +102,8 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
                 if (Int32.TryParse(value, out int parsedValue))
                 {
                     Set(ref _vMIdleTimeout!, parsedValue);
+                    OnPropertyChanged(nameof(IsOnKeepVMAlive));
+                    OnPropertyChanged(nameof(VMIdleTimeoutEnabled));
                 }
                 else
                 {
