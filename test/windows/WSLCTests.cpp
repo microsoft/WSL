@@ -14864,7 +14864,6 @@ class WSLCTests
 
         constexpr auto c_sessionName = L"warning-guest-volume-recovery";
         constexpr auto c_volumeName = "wslc-test-warning-guest-recovery";
-        constexpr auto c_volumeNameWide = L"wslc-test-warning-guest-recovery";
         auto storagePath = (std::filesystem::current_path() / "test-warning-guest-volume-recovery").wstring();
         auto cleanupDir = wil::scope_exit([&]() {
             std::error_code ec;

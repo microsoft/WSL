@@ -129,12 +129,11 @@ void ValidateName(LPCSTR Name, size_t maxLength)
     {
         if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(wsl::shared::string::MultiByteToWide(Name)));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(Name));
         }
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcInvalidName(wsl::shared::string::MultiByteToWide(Name)), i == 0 || i > maxLength);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
@@ -2609,10 +2608,7 @@ try
         }
         catch (DockerHTTPException& e)
         {
-            THROW_HR_WITH_USER_ERROR_IF(
-                WSLC_E_CONTAINER_NOT_FOUND,
-                Localization::MessageWslcContainerNotFound(wsl::shared::string::MultiByteToWide(Id)),
-                e.StatusCode() == 404);
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), e.StatusCode() == 404);
             RETURN_HR_IF_MSG(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS, e.StatusCode() == 400, "Ambiguous prefix: '%hs'", Id);
 
             THROW_HR_MSG(E_FAIL, "Unexpected error inspecting container '%hs': %hs", Id, e.what());
@@ -2626,8 +2622,7 @@ try
     auto result = wil::ResultFromException([&]() { it->second->CopyTo(Container); });
 
     // Return WSLC_E_CONTAINER_NOT_FOUND if the container was found, but is being deleted for consistency.
-    THROW_HR_WITH_USER_ERROR_IF(
-        WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(wsl::shared::string::MultiByteToWide(Id)), result == RPC_E_DISCONNECTED);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), result == RPC_E_DISCONNECTED);
 
     return result;
 }
@@ -3154,10 +3149,8 @@ try
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcInvalidName(wsl::shared::string::MultiByteToWide(name)), IsReservedNetworkName(name));
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriver(wsl::shared::string::MultiByteToWide(driver)), driver != WSLCBridgeNetworkDriver);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(name), IsReservedNetworkName(name));
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriver(driver), driver != WSLCBridgeNetworkDriver);
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
@@ -3216,9 +3209,7 @@ try
     catch (const DockerHTTPException& e)
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-            Localization::MessageWslcNetworkAlreadyExists(wsl::shared::string::MultiByteToWide(name)),
-            e.StatusCode() == 409);
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), Localization::MessageWslcNetworkAlreadyExists(name), e.StatusCode() == 409);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
     }
 
@@ -3289,10 +3280,7 @@ try
     std::lock_guard networksLock(m_networksLock);
 
     auto it = m_networks.find(name);
-    THROW_HR_WITH_USER_ERROR_IF(
-        WSLC_E_NETWORK_NOT_FOUND,
-        Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(name)),
-        it == m_networks.end());
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
 
     try
     {
@@ -3302,11 +3290,8 @@ try
     {
         // Docker returns 403 when the network has active endpoints.
         THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
-            Localization::MessageWslcNetworkInUse(wsl::shared::string::MultiByteToWide(name)),
-            e.StatusCode() == 403);
-        THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(name)), e.StatusCode() == 404);
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), e.StatusCode() == 403);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete network '%hs'", name.c_str());
     }
 
@@ -4206,8 +4191,7 @@ void WSLCSession::RecoverExistingContainers()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container: %hs", dockerContainer.Id.c_str());
-            EMIT_USER_WARNING(
-                Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+            EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverContainer(dockerContainer.Id));
         }
     }
 
@@ -4260,7 +4244,7 @@ void WSLCSession::RecoverExistingNetworks()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover network: %hs", network.Name.c_str());
-            EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverNetwork(wsl::shared::string::MultiByteToWide(network.Name)));
+            EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverNetwork(network.Name));
         }
     }
 

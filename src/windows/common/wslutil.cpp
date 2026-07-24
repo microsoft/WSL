@@ -861,7 +861,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
             kbUrl = std::format(L"[Unexpected build number: {}]", buildNumber);
         }
 
-        return Localization::MessageOsNotSupported(wsl::shared::string::MultiByteToWide(helpers::GetWindowsVersionString()), kbUrl.c_str());
+        return Localization::MessageOsNotSupported(helpers::GetWindowsVersionString().c_str(), kbUrl.c_str());
 
     // All the errors below this comment are not supposed to be reachable here (since there's meant to be emitted from the
     // service). But if we somehow hit them here, it's better show something useful to the user.
@@ -1400,7 +1400,7 @@ void wsl::windows::common::wslutil::ParseIpv4Address(const char* Address, in_add
 {
     if (inet_pton(AF_INET, Address, &Result) != 1)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(wsl::shared::string::MultiByteToWide(Address)));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Address));
     }
 }
 
@@ -1408,7 +1408,7 @@ void wsl::windows::common::wslutil::ParseIpv6Address(const char* Address, in_add
 {
     if (inet_pton(AF_INET6, Address, &Result) != 1)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(wsl::shared::string::MultiByteToWide(Address)));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Address));
     }
 }
 

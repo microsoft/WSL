@@ -66,22 +66,17 @@ void OptionParser::RejectUnknown()
 
 void OptionParser::ThrowInvalid(std::string_view Key, const std::string& Value)
 {
-    THROW_HR_WITH_USER_ERROR(
-        E_INVALIDARG,
-        Localization::MessageWslcInvalidVolumeOption(
-            wsl::shared::string::MultiByteToWide(std::string{Key}), wsl::shared::string::MultiByteToWide(Value)));
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(std::string(Key), Value));
 }
 
 void OptionParser::ThrowMissing(std::string_view Key)
 {
-    THROW_HR_WITH_USER_ERROR(
-        E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(wsl::shared::string::MultiByteToWide(std::string{Key})));
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(std::string(Key)));
 }
 
 void OptionParser::ThrowUnknown(std::string_view Key)
 {
-    THROW_HR_WITH_USER_ERROR(
-        E_INVALIDARG, Localization::MessageWslcUnknownVolumeOption(wsl::shared::string::MultiByteToWide(std::string{Key})));
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcUnknownVolumeOption(std::string(Key)));
 }
 
 } // namespace wsl::windows::service::wslc

@@ -403,7 +403,7 @@ void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::
     auto reference = ImageReference::Parse(targetImage);
     if (reference.Format == EnumReferenceFormatDigest)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(wsl::shared::string::MultiByteToWide(targetImage)));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
     }
 
     WSLCTagImageOptions options{};

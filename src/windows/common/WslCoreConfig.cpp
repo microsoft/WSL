@@ -40,8 +40,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
             int number = 0;
             if (FAILED(wil::ResultFromException([&]() { number = std::stoi(portString); })) || (number <= 0 || number > USHRT_MAX))
             {
-                EMIT_USER_WARNING(shared::Localization::MessageConfigInvalidInteger(
-                    shared::string::MultiByteToWide(value), shared::string::MultiByteToWide(name), fileName, fileLine));
+                EMIT_USER_WARNING(shared::Localization::MessageConfigInvalidInteger(value, name, fileName, fileLine));
             }
             else
             {
@@ -56,8 +55,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
 
         if (inet_pton(AF_INET, value, &address) != 1)
         {
-            EMIT_USER_WARNING(shared::Localization::MessageConfigInvalidIp(
-                shared::string::MultiByteToWide(value), shared::string::MultiByteToWide(name), fileName, fileLine));
+            EMIT_USER_WARNING(shared::Localization::MessageConfigInvalidIp(value, name, fileName, fileLine));
             EnableDnsTunneling = false;
         }
         else
@@ -449,8 +447,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         if (NetworkingMode == NetworkingMode::Consomme)
         {
             NetworkingMode = (defaultNetworkingMode == NetworkingMode::Consomme) ? NetworkingMode::None : NetworkingMode::Nat;
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageConsommeRequiresVirtio(
-                wsl::shared::string::MultiByteToWide(ToString(NetworkingMode))));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageConsommeRequiresVirtio(ToString(NetworkingMode)));
         }
     }
 

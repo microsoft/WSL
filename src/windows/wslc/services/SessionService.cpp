@@ -241,10 +241,7 @@ int SessionService::Run(Terminal& terminal, const Session& session, const std::v
     wsl::windows::common::WSLCProcessLauncher launcher{arguments.front(), arguments, environment, WSLCProcessFlagsStdin};
 
     auto [result, process, error] = launcher.LaunchNoThrow(*session.Get());
-    THROW_HR_WITH_USER_ERROR_IF(
-        result,
-        Localization::MessageWslcFailedToLaunchCommand(wsl::shared::string::MultiByteToWide(arguments.front()), error),
-        FAILED(result) && error != 0);
+    THROW_HR_WITH_USER_ERROR_IF(result, Localization::MessageWslcFailedToLaunchCommand(arguments.front(), error), FAILED(result) && error != 0);
 
     THROW_IF_FAILED(result);
 
