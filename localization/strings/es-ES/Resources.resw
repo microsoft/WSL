@@ -2394,15 +2394,15 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Opción de controlador duplicada "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Opción de controlador "{}" no válida; se esperaba "key=value".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Configuración de punto de conexión "{}" desconocida para la red "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2410,7 +2410,7 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>El vínculo de red no puede estar vacío.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>El alias de red no puede estar vacío.</value>
@@ -3014,7 +3014,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Agregar un alias con ámbito de red para el contenedor</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Establecer opciones de controlador de punto de conexión (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
@@ -3056,6 +3056,13 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publicar todos los puertos expuestos en puertos de host aleatorios</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suprimir salida detallada</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Usando la etiqueta predeterminada: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Solo genera los identificadores de contenedor</value>
@@ -3528,6 +3535,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>No se pudo inicializar el intercambio</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>No se pudo restaurar la marca de tiempo del contenedor '{}'</value>

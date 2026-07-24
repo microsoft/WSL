@@ -2388,15 +2388,15 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Duplikált illesztőprogram-csoport: „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Érvénytelen illesztőprogram-beállítás: „{}”; a várt érték: „key=value”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Ismeretlen végpontbeállítás: „{}” a(z) „{}” hálózathoz.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2404,7 +2404,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>A hálózati hivatkozás nem lehet üres.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>A hálózati alias nem lehet üres.</value>
@@ -2414,7 +2414,7 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
-    <value>Endpoint settings are not supported for network mode '{}'.</value>
+    <value>A végpontbeállítások nem támogatottak a(z) „{}” hálózati módhoz.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
@@ -3008,19 +3008,19 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Hálózati hatókörű alias hozzáadása a tárolóhoz</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Állítsa be a végpont-illesztőprogram beállításait (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
-    <value>Assign the container an IPv4 address on the network</value>
+    <value>Rendeljen a tárolóhoz egy IPv4-címet a hálózaton</value>
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
-    <value>Add link to another container (--link name:alias)</value>
+    <value>Adjon hozzá egy hivatkozást egy másik tárolóhoz (--link name:alias)</value>
     <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
-    <value>Add a link-local IPv4 address for the container</value>
+    <value>Adjon hozzá egy link-local IPv4-címet a tárolóhoz</value>
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
@@ -3050,6 +3050,13 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Az összes közzétett port közzététele véletlenszerű gazdaportokon</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Csak a tárolóazonosítókat adja eredményként</value>
@@ -3522,6 +3529,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Nem sikerült inicializálni a váltást</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Nem sikerült visszaállítani a(z) {} tároló időbélyegét</value>

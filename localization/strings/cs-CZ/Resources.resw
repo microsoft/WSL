@@ -2380,7 +2380,7 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
-    <value>The primary network mode '{}' does not support connecting or disconnecting additional networks.</value>
+    <value>Primární síťový režim „{}“ nepodporuje připojení ani odpojení dalších sítí.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
@@ -2388,15 +2388,15 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Duplicitní možnost ovladače „{}“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Neplatná možnost ovladače „{}“. Očekává se formát „key=value“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Neznámé nastavení koncového bodu „{}“ pro síť „{}“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2404,7 +2404,7 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>Síťový odkaz nesmí být prázdný.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Network alias nemůže být prázdný.</value>
@@ -2414,7 +2414,7 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
-    <value>Endpoint settings are not supported for network mode '{}'.</value>
+    <value>Nastavení koncového bodu nejsou pro síťový režim „{}“ podporovaná.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
@@ -3008,7 +3008,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Přidání aliasu v oboru sítě pro kontejner</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Nastavit možnosti ovladače koncového bodu (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
@@ -3016,11 +3016,11 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
-    <value>Add link to another container (--link name:alias)</value>
+    <value>Přidat odkaz na jiný kontejner (--link name:alias)</value>
     <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
-    <value>Add a link-local IPv4 address for the container</value>
+    <value>Přidat kontejneru místní IPv4 adresu link-local</value>
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
@@ -3050,6 +3050,13 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publikovat všechny vystavené porty na náhodné porty hostitele</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Potlačit podrobný výstup</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Používá se výchozí značka: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Vypíše pouze ID kontejnerů</value>
@@ -3522,6 +3529,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Inicializace prohození se nezdařila</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Nepodařilo se obnovit časové razítko pro kontejner '{}'</value>

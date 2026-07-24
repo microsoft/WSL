@@ -3058,6 +3058,13 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publicar todas as portas expostas para portas aleatórias do host</value>
   </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Saída somente das IDs de contêiner</value>
   </data>
@@ -3529,6 +3536,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Falha ao inicializar a troca</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Falha ao restaurar o carimbo de data e hora do contêiner '{}'</value>
