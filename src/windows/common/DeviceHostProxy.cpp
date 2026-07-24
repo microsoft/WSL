@@ -146,13 +146,17 @@ GUID DeviceHostProxy::AddVirtiofsDevice(
         const auto label = wil::make_bstr(Label.c_str());
         const auto rootPath = wil::make_bstr(RootPath.c_str());
         const auto mountOptions = wil::make_bstr(MountOptions.c_str());
+
+        // Only a few aggregate devices exist per VM, so they can afford multiple queues. Per-share
+        // devices stay at one queue to avoid exhausting the memory aperture.
+        const UINT32 queueCount = (Kind == VirtiofsShareKind_Aggregate) ? 4 : 1;
+
         WslVirtiofsConfig config{
             .label = label.get(),
             .rootPath = rootPath.get(),
             .kind = Kind,
             .shmemSizeMb = ShmemSizeMb,
-            // To workaround memory aperture limitations, limit virtiofs devices to one queue.
-            .queueCount = 1,
+            .queueCount = queueCount,
             .mountOptions = mountOptions.get()};
         THROW_IF_FAILED(GetWslVm(UserToken)->CreateVirtiofsDevice(&instanceIdForCall, GetCallback().get(), &config, virtiofsDevice.put()));
     }
