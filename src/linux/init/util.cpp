@@ -3633,46 +3633,30 @@ Return Value:
     buffer[result] = '\0';
 
     //
-    // Format: "cpu  user nice system idle iowait irq softirq steal ...". Fields after steal are ignored.
+    // Format: "cpu  user nice system idle iowait irq softirq steal ...". The user, nice, system, idle,
+    // and iowait fields are required; irq, softirq, and steal are optional and any fields after steal
+    // are ignored.
     //
 
-    if (strncmp(buffer, "cpu ", 4) != 0)
+    static const std::regex cpuLine{R"(^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)(?:\s+(\d+))?(?:\s+(\d+))?(?:\s+(\d+))?)"};
+    std::cmatch match;
+    if (!std::regex_search(buffer, match, cpuLine))
     {
-        LOG_ERROR("/proc/stat first line missing cpu label");
+        LOG_ERROR("failed to parse /proc/stat cpu line");
         return false;
     }
 
     unsigned long long fields[8] = {};
-    const char* cursor = buffer + 3;
-    int parsed = 0;
-    for (; parsed < static_cast<int>(COUNT_OF(fields)); parsed += 1)
+    for (size_t index = 0; index < COUNT_OF(fields); index += 1)
     {
-        char* end = nullptr;
-        const unsigned long long value = strtoull(cursor, &end, 10);
-        if (end == cursor)
+        if (match[index + 1].matched)
         {
-            break;
+            fields[index] = strtoull(match[index + 1].str().c_str(), nullptr, 10);
         }
-
-        fields[parsed] = value;
-        cursor = end;
-    }
-
-    if (parsed < 5)
-    {
-        LOG_ERROR("failed to parse /proc/stat cpu line (parsed {})", parsed);
-        return false;
     }
 
     Idle = fields[3] + fields[4];
-    Busy = 0;
-    for (int index = 0; index < parsed; index += 1)
-    {
-        if (index != 3 && index != 4)
-        {
-            Busy += fields[index];
-        }
-    }
+    Busy = fields[0] + fields[1] + fields[2] + fields[5] + fields[6] + fields[7];
 
     return true;
 }
@@ -3957,7 +3941,12 @@ try
                 }
                 else if (!droppedThisIdlePeriod)
                 {
-                    if (WriteToFile("/proc/sys/vm/drop_caches", "1\n") == 0)
+                    //
+                    // drop_caches=3 frees the page cache along with reclaimable slab (dentries and
+                    // inodes), matching the SReclaimable slab counted by GetReclaimableCacheBytes.
+                    //
+
+                    if (WriteToFile("/proc/sys/vm/drop_caches", "3\n") == 0)
                     {
                         droppedThisIdlePeriod = true;
                         reclaimed = true;
