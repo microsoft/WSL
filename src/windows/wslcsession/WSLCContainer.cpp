@@ -936,7 +936,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     }
     else if (event == ContainerEvent::Stop)
     {
-        THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
+        WI_ASSERT(exitCode.has_value());
         OnStopped(exitCode.value(), eventTime);
     }
     else if (event == ContainerEvent::Destroy)
@@ -969,80 +969,87 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
     std::shared_ptr<StateTransition> transition;
 
-    // Stop callers take the transition lock shared. m_lock serializes the first caller's
-    // Docker request and publication of m_transition; later callers copy that transition
-    // and wait on the same completion event. Start and Delete take this lock exclusively.
-    auto transitionLock = m_transitionLock.lock_shared();
-    auto lock = m_lock.lock_exclusive();
-
-    if (m_transition)
     {
-        transition = m_transition;
-        lock.reset();
-        WaitForTransition(transition);
-        return;
-    }
+        // Stop callers take the transition lock shared. m_lock serializes the first caller's
+        // Docker request and publication of m_transition; later callers copy that transition
+        // and wait on the same completion event. Start and Delete take this lock exclusively.
+        auto transitionLock = m_transitionLock.lock_shared();
+        auto lock = m_lock.lock_exclusive();
 
-    if (m_state == WslcContainerStateExited && !Kill)
-    {
-        return;
-    }
-    else if (m_state != WslcContainerStateRunning)
-    {
-        THROW_HR_WITH_USER_ERROR_MSG(
-            WSLC_E_CONTAINER_NOT_RUNNING,
-            Localization::MessageWslcContainerNotRunning(m_id),
-            "Cannot stop container '%hs', state: %i",
-            m_id.c_str(),
-            m_state);
-    }
-
-    std::optional<WSLCSignal> SignalArg;
-    if (Signal != WSLCSignalNone)
-    {
-        SignalArg = Signal;
-    }
-
-    ValidateStopTimeout(TimeoutSeconds, true);
-
-    // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
-    // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
-    bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
-
-    try
-    {
-        if (Kill)
+        if (m_transition)
         {
-            m_dockerClient.SignalContainer(m_id, SignalArg);
+            transition = m_transition;
+            lock.reset();
+            WaitForTransition(transition);
+            return;
         }
-        else
+
+        if (m_state == WslcContainerStateExited && !Kill)
         {
-            std::optional<LONG> TimeoutArg;
-            if (TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT)
+            return;
+        }
+        else if (m_state != WslcContainerStateRunning)
+        {
+            THROW_HR_WITH_USER_ERROR_MSG(
+                WSLC_E_CONTAINER_NOT_RUNNING,
+                Localization::MessageWslcContainerNotRunning(m_id),
+                "Cannot stop container '%hs', state: %i",
+                m_id.c_str(),
+                m_state);
+        }
+
+        std::optional<WSLCSignal> SignalArg;
+        if (Signal != WSLCSignalNone)
+        {
+            SignalArg = Signal;
+        }
+
+        ValidateStopTimeout(TimeoutSeconds, true);
+
+        // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
+        // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
+        bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
+
+        try
+        {
+            if (Kill)
             {
-                TimeoutArg = TimeoutSeconds;
+                m_dockerClient.SignalContainer(m_id, SignalArg);
             }
+            else
+            {
+                std::optional<LONG> TimeoutArg;
 
-            m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
+                if (TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT)
+                {
+                    TimeoutArg = TimeoutSeconds;
+                }
+
+                m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
+            }
         }
-    }
-    catch (const DockerHTTPException& e)
-    {
-        // HTTP 304 is returned when the container is already stopped.
-        if (Kill || e.StatusCode() != 304)
+        catch (const DockerHTTPException& e)
         {
-            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to %hs container '%hs'", Kill ? "kill" : "stop", m_id.c_str());
+            // HTTP 304 is returned when the container is already stopped.
+            if (Kill || e.StatusCode() != 304)
+            {
+                THROW_DOCKER_USER_ERROR_MSG(e, "Failed to %hs container '%hs'", Kill ? "kill" : "stop", m_id.c_str());
+            }
         }
-    }
 
-    if (waitForStop)
-    {
-        transition = std::make_shared<StateTransition>(ContainerEvent::Stop);
-        WI_ASSERT(!m_transition);
-        m_transition = transition;
+        if (waitForStop)
+        {
+            transition = std::make_shared<StateTransition>(ContainerEvent::Stop);
 
-        lock.reset();
-        WaitForTransition(transition);
+            WI_ASSERT(!m_transition);
+            m_transition = transition;
+
+            lock.reset();
+            WaitForTransition(transition);
+
+            // Wait for OnEvent() to leave its critical section before transition can destroy the COM wrapper.
+            lock = m_lock.lock_exclusive();
+        }
     }
 }
 
