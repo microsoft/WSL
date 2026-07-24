@@ -11,3 +11,4 @@
 // You will not get this value with the standard defines.
 #define I386_NR_socketcall (102)
 #define ARMV7_NR_bind (282)
+#define ARMV7_NR_listen (284)

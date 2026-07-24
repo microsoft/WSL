@@ -93,6 +93,35 @@ class WSLCE2EPushPullTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Pull_QuietOption)
+    {
+        const auto& debianImage = DebianTestImage();
+        EnsureImageIsLoaded(debianImage);
+
+        auto session = OpenDefaultElevatedSession();
+
+        {
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15004);
+            auto registryAddressW = string::MultiByteToWide(registryAddress);
+
+            // Tag and push the image so it can be pulled back from the registry.
+            auto registryImage = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
+            auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
+
+            RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
+
+            // Delete the local copy so the pull actually fetches from the registry.
+            RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
+
+            // Quiet pull (Docker parity): progress is suppressed and stdout is exactly the resolved canonical
+            // reference. The registry image is already fully-qualified, so it equals the printed reference.
+            // GetStdoutOneLine() also asserts there is exactly one output line, proving progress was suppressed.
+            auto result = RunWslc(std::format(L"pull --quiet {}", registryImage));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_ARE_EQUAL(registryImage, result.GetStdoutOneLine());
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Push_NonExistentImage)
     {
         auto result = RunWslc(L"push does-not-exist:latest");
@@ -107,6 +136,16 @@ class WSLCE2EPushPullTests
             L"pull access denied for does-not-exist, repository does not exist or may require 'docker login': denied: requested "
             L"access to the resource is denied\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Pull_NameOnlyDefaultsTag)
+    {
+        auto result = RunWslc(L"pull does-not-exist");
+        result.Verify({.ExitCode = 1});
+        VERIFY_IS_TRUE(result.StdoutContainsLine(L"Using default tag: latest"));
+
+        // Quiet mode suppresses the "Using default tag" line, leaving stdout empty on failure.
+        RunWslcAndVerify(L"pull -q does-not-exist", {.Stdout = L"", .ExitCode = 1});
     }
 };
 } // namespace WSLCE2ETests
