@@ -70,6 +70,22 @@ class WSLCE2EImageBuildTests
         return dir;
     }
 
+    // All --output tests build from this single shared (empty) context directory, for the same reason
+    // as SharedSecretBuildContext above: the session never releases virtiofs shares (see
+    // WSLCVirtualMachine::UnmountWindowsFolder), so giving each --output test its own context directory
+    // would permanently consume one share slot per test and eventually exhaust the session's budget.
+    // Reusing one path keeps all --output builds to a single shared slot. Each test's Dockerfile is
+    // streamed via -f and its output artifacts (tarballs, extracted trees) live under its own testRoot,
+    // so none of that is mounted.
+    static std::filesystem::path SharedOutputBuildContext()
+    {
+        auto dir = std::filesystem::current_path() / L"wslc-e2e-build-output-context";
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::is_directory(dir));
+        return dir;
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_EmptyContextDirectory_Success)
     {
         auto imageCleanup = DeleteImageOnExit(BuiltImage);
@@ -865,10 +881,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-type-bad";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
@@ -890,10 +903,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-docker-tag";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-docker-tag-ok\"]\n");
@@ -919,10 +929,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-docker-config";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-docker-config-ok\"]\n");
@@ -949,10 +956,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-tar-file";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-tar-marker > /wslc-build-marker.txt\n");
@@ -975,10 +979,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-tar-stdout";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-tar-marker > /wslc-build-marker.txt\n");
@@ -1000,10 +1001,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-local-dir";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-local-marker > /wslc-build-marker.txt\n");
@@ -1025,10 +1023,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-local-stdout";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
@@ -1050,10 +1045,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-image";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-image-ok\"]\n");
@@ -1078,10 +1070,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-cacheonly";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"cacheonly-ok\"]\n");
@@ -1108,10 +1097,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-registry-noname";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
@@ -1130,10 +1116,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-tar-nodest";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
@@ -1153,10 +1136,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-image-fail";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN exit 7\n");
@@ -1180,10 +1160,7 @@ class WSLCE2EImageBuildTests
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-cacheonly-fail";
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+        auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN exit 7\n");
