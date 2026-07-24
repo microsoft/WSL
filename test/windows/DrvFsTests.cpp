@@ -1418,8 +1418,6 @@ WSL2_DRVFS_TEST_CLASS(Plan9);
 
 WSL2_DRVFS_TEST_CLASS(VirtioFs);
 
-// Disabled while an issue with the 6.1 Linux kernel causing disk corruption is investigated.
-// TODO: Enable again once the issue is resolved
-// WSL2_DRVFS_TEST_CLASS(Virtio9p);
+WSL2_DRVFS_TEST_CLASS(Virtio9p);
 
 } // namespace DrvFsTests
