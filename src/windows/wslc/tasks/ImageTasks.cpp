@@ -105,6 +105,15 @@ void BuildImage(CLIExecutionContext& context)
         validation::ParseLabel(label);
     }
 
+    std::vector<services::BuildSecret> secrets;
+    if (context.Args.Contains(ArgType::Secret))
+    {
+        for (const auto& spec : context.Args.GetAll<ArgType::Secret>())
+        {
+            secrets.push_back(validation::ParseSecretSpec(spec));
+        }
+    }
+
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
     {
@@ -117,6 +126,14 @@ void BuildImage(CLIExecutionContext& context)
         target = context.Args.Get<ArgType::BuildTarget>();
     }
 
+    std::optional<services::BuildOutput> output;
+    if (context.Args.Contains(ArgType::Output))
+    {
+        // Validate and normalize the spec client-side; ImageService::Build decides how to route the
+        // exporter (stream a destination file/dir back over a handle, or run entirely in the VM).
+        output = validation::ParseOutputSpec(context.Args.Get<ArgType::Output>());
+    }
+
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
     WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.Contains(ArgType::Verbose));
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
@@ -124,7 +141,8 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.Contains(ArgType::Verbose));
-    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, dockerfilePath, target, flags, &callback, cancelEvent);
+    services::ImageService::Build(
+        session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

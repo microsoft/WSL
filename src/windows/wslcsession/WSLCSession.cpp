@@ -880,6 +880,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->Labels.Count > 0 && Options->Labels.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Options->Secrets.Count > 0 && Options->Secrets.Values == nullptr);
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         WI_IsAnyFlagSet(static_cast<WSLCBuildImageFlags>(Options->Flags), ~WSLCBuildImageFlagsValid),
@@ -907,12 +908,30 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    GUID volumeId{};
-    THROW_IF_FAILED(CoCreateGuid(&volumeId));
-    auto mountPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
-    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(Options->ContextPath, mountPath.c_str(), TRUE));
-    auto unmountFolder =
-        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
+    // Track every Windows folder we mount into the VM during this build so a single scope_exit
+    // unmounts them all on success or on any throw partway through the loop below.
+    std::vector<std::string> mountedPaths;
+    auto unmountAll = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        for (const auto& path : mountedPaths)
+        {
+            m_virtualMachine->UnmountWindowsFolder(path.c_str());
+        }
+    });
+    auto mountInVm = [&](LPCWSTR windowsPath, BOOL readOnly) -> std::string {
+        GUID id{};
+        THROW_IF_FAILED(CoCreateGuid(&id));
+        auto vmPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(id));
+        THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(windowsPath, vmPath.c_str(), readOnly));
+        mountedPaths.push_back(std::move(vmPath));
+        return mountedPaths.back();
+    };
+
+    // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
+    // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. Only the build
+    // context is mounted; secrets are streamed into a VM tmpfs file (below) and never mount.
+    mountedPaths.reserve(1);
+
+    auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
@@ -927,6 +946,47 @@ try
     {
         buildArgs.push_back("--target");
         buildArgs.push_back(Options->Target);
+    }
+    // Docker-style --output routing. When the client provides an OutputHandle it has stripped dest=
+    // from the spec and expects the exporter output streamed back: the exporter writes to a VM temp
+    // path (disk-backed under the docker storage root to avoid buffering large outputs in tmpfs) and,
+    // after a successful build, a streamer process relays that path to the client handle. Without a
+    // handle the spec is forwarded verbatim and the build runs entirely in the VM.
+    const bool streamOutput = Options->OutputHandle.Type != WSLCHandleTypeUnknown;
+    const bool outputIsDirectory = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsOutputIsDirectory);
+    std::string outputDestPath;
+    auto removeOutput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (!outputDestPath.empty())
+        {
+            ServiceProcessLauncher cleanup("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("rm -rf '{}'", outputDestPath)}, {}, WSLCProcessFlagsNone);
+            auto cleanupResult = cleanup.LaunchNoThrow(*m_virtualMachine);
+            if (auto& process = std::get<2>(cleanupResult); process)
+            {
+                std::ignore = process->WaitAndCaptureOutput(60000UL);
+            }
+        }
+    });
+
+    if (Options->Output != nullptr && Options->Output[0] != '\0')
+    {
+        std::string outputSpec = Options->Output;
+        if (streamOutput)
+        {
+            GUID id{};
+            THROW_IF_FAILED(CoCreateGuid(&id));
+            constexpr auto c_outputBaseDir = "/var/lib/docker/tmp/wslc-build-output";
+            outputDestPath = std::format("{}/{}", c_outputBaseDir, wsl::shared::string::GuidToString<char>(id));
+
+            // buildx creates the leaf dest (a file for tar/oci/docker, a directory for local) but not
+            // the parent, so ensure the base directory exists first.
+            ServiceProcessLauncher mkdir("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("mkdir -p '{}'", c_outputBaseDir)}, {}, WSLCProcessFlagsNone);
+            auto mkdirResult = mkdir.Launch(*m_virtualMachine).WaitAndCaptureOutput(60000UL);
+            THROW_HR_IF_MSG(E_FAIL, mkdirResult.Code != 0, "failed to create build output directory");
+
+            outputSpec += std::format(",dest={}", outputDestPath);
+        }
+        buildArgs.push_back("--output");
+        buildArgs.push_back(outputSpec);
     }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
@@ -948,6 +1008,89 @@ try
         RETURN_HR_IF(E_INVALIDARG, Options->Labels.Values[i][0] == '-');
         buildArgs.push_back("--label");
         buildArgs.push_back(Options->Labels.Values[i]);
+    }
+
+    // Materialize each secret into a root-only tmpfs file inside the VM and hand docker a file
+    // reference (id=<id>,src=<path>). The bytes are streamed to a `cat > file` helper's stdin - the
+    // same relay used to install trusted roots - so arbitrary binary content (embedded NULs, keys,
+    // certificates of any size) round-trips exactly and stays re-readable across RUN steps, matching
+    // Docker's type=file semantics, without mounting any host directory into the VM. The value never
+    // reaches argv/telemetry.
+    //
+    // Each build gets its own random subdirectory so concurrent builds (which only hold a shared lock)
+    // never read or delete one another's secrets; the scope_exit removes just this build's directory.
+    std::string secretDir;
+    if (Options->Secrets.Count > 0)
+    {
+        GUID dirId{};
+        THROW_IF_FAILED(CoCreateGuid(&dirId));
+        secretDir = std::format("/run/wslc-secrets/{}", wsl::shared::string::GuidToString<char>(dirId));
+    }
+    auto removeSecrets = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (!secretDir.empty())
+        {
+            ServiceProcessLauncher cleanup("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("rm -rf '{}'", secretDir)}, {}, WSLCProcessFlagsNone);
+            auto cleanupResult = cleanup.LaunchNoThrow(*m_virtualMachine);
+            auto& process = std::get<2>(cleanupResult);
+            if (process)
+            {
+                // Best-effort wipe: we cannot recover from within the scope_exit, but a failed
+                // removal leaves the secret bytes readable in the VM tmpfs for the session lifetime,
+                // so surface it for diagnosis/security auditing. The rm output carries only error
+                // text about the directory path, never secret contents, so it is safe to log.
+                const auto result = process->WaitAndCaptureOutput(60000UL);
+                if (result.Code != 0)
+                {
+                    WSL_LOG(
+                        "BuildSecretCleanupFailed",
+                        TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+                        TraceLoggingValue(result.Code, "ExitCode"),
+                        TraceLoggingValue(cleanup.FormatResult(result).c_str(), "Output"));
+                }
+            }
+            else
+            {
+                WSL_LOG(
+                    "BuildSecretCleanupLaunchFailed",
+                    TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+                    TraceLoggingValue(std::get<0>(cleanupResult), "Result"));
+            }
+        }
+    });
+
+    for (ULONG i = 0; i < Options->Secrets.Count; i++)
+    {
+        const auto& secret = Options->Secrets.Values[i];
+        RETURN_HR_IF_NULL(E_INVALIDARG, secret.Id);
+        RETURN_HR_IF(E_INVALIDARG, secret.Id[0] == '\0');
+        RETURN_HR_IF(E_INVALIDARG, secret.Id[0] == '-');
+        // Id is interpolated into docker's comma/'='-delimited --secret spec below, so reject any ','
+        // or '=' a malicious caller could use to inject extra options.
+        RETURN_HR_IF(E_INVALIDARG, std::string_view(secret.Id).find_first_of(",=") != std::string_view::npos);
+        RETURN_HR_IF(E_INVALIDARG, secret.ValueSize != 0 && secret.Value == nullptr);
+
+        // Use a random filename (not the id) so nothing about the id can influence the path, and place
+        // it in a 0700 directory with a 0600 file (umask 077) so only root inside the VM can read it.
+        GUID fileId{};
+        THROW_IF_FAILED(CoCreateGuid(&fileId));
+        auto secretPath = std::format("{}/{}", secretDir, wsl::shared::string::GuidToString<char>(fileId));
+        auto script = std::format("umask 077 && mkdir -p '{}' && cat > '{}'", secretDir, secretPath);
+
+        ServiceProcessLauncher writer("/bin/sh", {"/bin/sh", "--norc", "-c", script}, {}, WSLCProcessFlagsStdin);
+        auto writerProcess = writer.Launch(*m_virtualMachine);
+
+        std::vector<char> bytes;
+        if (secret.ValueSize > 0)
+        {
+            bytes.assign(reinterpret_cast<const char*>(secret.Value), reinterpret_cast<const char*>(secret.Value) + secret.ValueSize);
+        }
+        std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+        extraHandles.emplace_back(std::make_unique<WriteHandle>(writerProcess.GetStdHandle(WSLCFDStdin), std::move(bytes)));
+        const auto result = writerProcess.WaitAndCaptureOutput(60000UL, std::move(extraHandles));
+        THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "failed to stage build secret: %hs", writer.FormatResult(result).c_str());
+
+        buildArgs.push_back("--secret");
+        buildArgs.push_back(std::format("id={},src={}", secret.Id, secretPath));
     }
 
     buildArgs.push_back("-f");
@@ -1222,6 +1365,40 @@ try
     // translation.
     std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
+
+    // Stream the exporter output back to the client. For file exporters (tar/oci/docker) cat the temp
+    // file; for the directory exporter (type=local) tar the export directory so the client can extract
+    // it into the destination directory. The streamer's stdout is relayed to the client OutputHandle.
+    if (streamOutput)
+    {
+        auto userHandle = OpenUserHandle(Options->OutputHandle);
+
+        std::vector<std::string> streamArgs;
+        if (outputIsDirectory)
+        {
+            streamArgs = {"/usr/bin/tar", "-C", outputDestPath, "-cf", "-", "."};
+        }
+        else
+        {
+            streamArgs = {"/bin/cat", outputDestPath};
+        }
+
+        ServiceProcessLauncher streamLauncher(streamArgs[0], streamArgs, {}, WSLCProcessFlagsNone);
+        auto streamProcess = streamLauncher.Launch(*m_virtualMachine);
+
+        auto streamIo = CreateIOContext(CancelEvent);
+        std::string streamError;
+        streamIo.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+            common::io::HandleWrapper{streamProcess.GetStdHandle(1)}, userHandle.Get()));
+        streamIo.AddHandle(std::make_unique<io::ReadHandle>(streamProcess.GetStdHandle(2), [&](const gsl::span<char>& content) {
+            streamError.append(content.data(), content.size());
+        }));
+        streamIo.Run({});
+
+        std::erase(streamError, '\r');
+        int streamCode = streamProcess.Wait();
+        THROW_HR_IF_MSG(E_FAIL, streamCode != 0, "failed to stream build output: %hs", streamError.c_str());
+    }
 
     return S_OK;
 }

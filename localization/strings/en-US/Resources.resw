@@ -2323,6 +2323,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Image '{}' not found.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Invalid --secret value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcMissingVolumeOption" xml:space = "preserve" >
     <value>Missing required option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2880,8 +2888,15 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Always attempt to pull a newer version of the image</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Output destination (format: type=local,dest=path)</value>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Set the target build stage to build</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Expose secret to the build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; defaults to env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>The command to run</value>

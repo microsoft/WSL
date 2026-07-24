@@ -14,6 +14,8 @@ Abstract:
 #include "ImageService.h"
 #include "RegistryService.h"
 #include "SessionService.h"
+#include "SpecParsing.h"
+#include "SubProcess.h"
 #include "WarningCallback.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
@@ -120,8 +122,10 @@ void ImageService::Build(
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
     const std::vector<std::wstring>& labels,
+    const std::vector<BuildSecret>& secrets,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
+    const std::optional<BuildOutput>& output,
     WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
@@ -172,7 +176,113 @@ void ImageService::Build(
     std::vector<LPCSTR> labelPointers;
     toMultiByte(labels, labelStrings, labelPointers);
 
+    // Keep narrow-encoded id strings alive for the duration of the COM call. The raw secret bytes are
+    // referenced in place from the caller's BuildSecret objects (which outlive this call), so they are
+    // never copied or NUL-truncated.
+    std::vector<std::string> secretIdStrings;
+    std::vector<WSLCBuildSecret> secretEntries;
+    secretIdStrings.reserve(secrets.size());
+    secretEntries.reserve(secrets.size());
+    for (const auto& secret : secrets)
+    {
+        secretIdStrings.push_back(wsl::windows::common::string::WideToMultiByte(secret.Id));
+        secretEntries.push_back(WSLCBuildSecret{
+            .Id = secretIdStrings.back().c_str(),
+            .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
+            .ValueSize = static_cast<ULONG>(secret.Value.size()),
+        });
+    }
+
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
+
+    // Route the docker-style --output exporter. Exporters that write to a caller-provided destination
+    // (tar/oci/docker with dest=, and local) are streamed back out of the VM: the client opens the
+    // destination here, forwards the spec with dest= stripped, and the server writes the exporter
+    // output to a VM temp path then streams it to OutputHandle. Exporters with no client destination
+    // (docker load, image, registry, cacheonly) run entirely in the VM and the spec is forwarded as-is.
+    std::string outputStr;
+    HANDLE outputHandle = nullptr;
+    wil::unique_hfile outputFile;
+
+    // For type=local the server streams a tarball of the export directory; the client extracts it into
+    // the destination directory by feeding the stream to `tar.exe -xf -`. These stay alive until after
+    // the (synchronous) BuildImage call so the pipe keeps draining while the server writes.
+    wil::unique_hfile extractPipeWrite;
+    wil::unique_handle extractProcess;
+
+    if (output.has_value())
+    {
+        const auto& spec = output.value();
+        const bool isFileExporter = spec.Type == L"tar" || spec.Type == L"oci" || (spec.Type == L"docker" && !spec.Dest.empty());
+        const bool isDirExporter = spec.Type == L"local";
+
+        if (isFileExporter)
+        {
+            if (spec.Dest == L"-")
+            {
+                // dest=- streams the exporter tarball to the client's stdout, matching docker.
+                outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+                // Refuse to dump the binary exporter stream onto an interactive console (matching docker);
+                // stdout must be redirected to a file or pipe. Otherwise ToCOMInputHandle would fail the
+                // marshal with a cryptic ERROR_NOT_SUPPORTED for the FILE_TYPE_CHAR console handle.
+                THROW_HR_WITH_USER_ERROR_IF(
+                    E_INVALIDARG,
+                    Localization::MessageWslcOutputInvalidSpec(
+                        validation::FormatOutputSpec(spec),
+                        L"refusing to write build output to the console; redirect stdout to a file or pipe (for example "
+                        L"'> out.tar') or pass 'dest=' with a file path"),
+                    GetFileType(outputHandle) == FILE_TYPE_CHAR);
+            }
+            else
+            {
+                outputFile.reset(CreateFileW(
+                    spec.Dest.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+                THROW_LAST_ERROR_IF_MSG(!outputFile, "Failed to create output file: %ls", spec.Dest.c_str());
+                outputHandle = outputFile.get();
+            }
+
+            // The server picks the VM-side dest, so forward the spec without the client's dest.
+            BuildOutput vmSpec = spec;
+            vmSpec.Dest.clear();
+            outputStr = wsl::windows::common::string::WideToMultiByte(validation::FormatOutputSpec(vmSpec));
+        }
+        else if (isDirExporter)
+        {
+            std::error_code dirError;
+            std::filesystem::create_directories(std::filesystem::absolute(spec.Dest), dirError);
+            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", spec.Dest.c_str());
+
+            // Strip any trailing separator so the CRT does not parse '\"' as an escaped quote.
+            auto destDir = std::filesystem::absolute(spec.Dest).wstring();
+            while (destDir.size() > 1 && (destDir.back() == L'\\' || destDir.back() == L'/'))
+            {
+                destDir.pop_back();
+            }
+
+            auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);
+            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(pipeRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+            auto tarCmd = std::format(L"tar.exe -xf - -C \"{}\"", destDir);
+            wsl::windows::common::SubProcess tarProcess(nullptr, tarCmd.c_str());
+            tarProcess.SetStdHandles(pipeRead.get(), nullptr, nullptr);
+            extractProcess = tarProcess.Start();
+            pipeRead.reset();
+
+            extractPipeWrite = std::move(pipeWrite);
+            outputHandle = extractPipeWrite.get();
+            WI_SetFlag(flags, WSLCBuildImageFlagsOutputIsDirectory);
+
+            // The server picks the VM-side export directory, so forward the spec without the client's dest.
+            BuildOutput vmSpec = spec;
+            vmSpec.Dest.clear();
+            outputStr = wsl::windows::common::string::WideToMultiByte(validation::FormatOutputSpec(vmSpec));
+        }
+        else
+        {
+            outputStr = wsl::windows::common::string::WideToMultiByte(validation::FormatOutputSpec(spec));
+        }
+    }
 
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
@@ -183,9 +293,21 @@ void ImageService::Build(
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
         .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
+        .Secrets = {secretEntries.data(), static_cast<ULONG>(secretEntries.size())},
+        .Output = outputStr.empty() ? nullptr : outputStr.c_str(),
+        .OutputHandle = outputHandle != nullptr ? ToCOMInputHandle(outputHandle) : WSLCHandle{.Type = WSLCHandleTypeUnknown},
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
+
+    // For type=local, signal EOF to tar.exe (the server has finished writing) and confirm it extracted
+    // the stream cleanly. The write end must be reset before waiting so tar sees end-of-input.
+    if (extractProcess)
+    {
+        extractPipeWrite.reset();
+        auto exitCode = wsl::windows::common::SubProcess::GetExitCode(extractProcess.get());
+        THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+    }
 }
 
 std::vector<ImageInformation> ImageService::List(

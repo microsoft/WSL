@@ -34,6 +34,8 @@ std::vector<Argument> ImageBuildCommand::GetArguments() const
         Argument::Create(ArgType::File),
         Argument::Create(ArgType::Label, false, NO_LIMIT),
         Argument::Create(ArgType::NoCache),
+        Argument::Create(ArgType::Output, false, std::nullopt, Localization::WSLCCLI_BuildOutputArgDescription()),
+        Argument::Create(ArgType::Secret, false, NO_LIMIT),
         Argument::Create(ArgType::Tag, false, NO_LIMIT),
         Argument::Create(ArgType::Verbose),
     };

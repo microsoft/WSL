@@ -1,0 +1,784 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    SpecParsing.cpp
+
+Abstract:
+
+    Parsers that turn delimited command-line spec strings (e.g. --secret,
+    --ulimit, --label, --filter) into structured values. These share the
+    SplitKeyValue helper for consistent key/value splitting.
+
+--*/
+
+#include "precomp.h"
+#include "SpecParsing.h"
+#include "ArgumentValidation.h"
+#include "Exceptions.h"
+#include "ImageService.h"
+#include "Localization.h"
+#include <algorithm>
+#include <charconv>
+#include <chrono>
+#include <cmath>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <limits>
+#include <optional>
+#include <sstream>
+#include <unordered_map>
+#include <wslc.h>
+
+using namespace wsl::windows::common;
+using namespace wsl::shared;
+using namespace wsl::shared::string;
+
+namespace wsl::windows::wslc::validation {
+
+KeyValueSplit SplitKeyValue(const std::wstring& value, wchar_t separator)
+{
+    const auto pos = value.find(separator);
+    if (pos == std::wstring::npos)
+    {
+        return {value, std::wstring{}, false};
+    }
+
+    return {value.substr(0, pos), value.substr(pos + 1), true};
+}
+
+services::BuildSecret ParseSecretSpec(const std::wstring& spec)
+{
+    std::wstring id;
+    std::wstring type;
+    std::wstring envName;
+    std::wstring srcPath;
+
+    for (const auto& part : Split(spec, L','))
+    {
+        const auto kv = SplitKeyValue(part);
+        if (!kv.HadSeparator || kv.Key.empty())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcSecretInvalidSpec(spec, L"expected key=value pairs separated by ','"));
+        }
+        const auto& key = kv.Key;
+        const auto& value = kv.Value;
+
+        if (key == L"id")
+        {
+            id = value;
+        }
+        else if (key == L"type")
+        {
+            type = value;
+        }
+        else if (key == L"env")
+        {
+            envName = value;
+        }
+        else if (key == L"src" || key == L"source")
+        {
+            srcPath = value;
+        }
+        else
+        {
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported key '{}'", key)));
+        }
+    }
+
+    if (id.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id=' is required"));
+    }
+
+    // Docker parity: 'id' may not start with '-' because that would be interpreted as a command-line option.
+    if (id[0] == L'-')
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may not start with '-'"));
+    }
+
+    // The id is forwarded into docker's comma/'='-delimited --secret spec, so reject any character
+    // that could break out of the id= field and inject additional options (e.g. ",src=/etc/passwd").
+    for (auto ch : id)
+    {
+        const bool allowed = (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') ||
+                             ch == L'_' || ch == L'-' || ch == L'.';
+        if (!allowed)
+        {
+            throw ArgumentException(
+                Localization::MessageWslcSecretInvalidSpec(spec, L"'id' may only contain letters, digits, '_', '-' or '.'"));
+        }
+    }
+
+    if (!type.empty() && type != L"file" && type != L"env")
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unsupported secret type '{}'", type)));
+    }
+
+    // Docker parity: 'type=file' names a source file, so it requires 'src='. Without it we would
+    // otherwise fall through to reading an environment variable, silently contradicting the type.
+    if (type == L"file" && srcPath.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"'type=file' requires 'src='"));
+    }
+
+    // Docker parity: with 'type=env', a bare 'src=' names the environment variable to read (rather
+    // than a file path), unless an explicit 'env=' was also given.
+    if (type == L"env" && envName.empty() && !srcPath.empty())
+    {
+        envName = std::move(srcPath);
+        srcPath.clear();
+    }
+
+    if (!envName.empty() && !srcPath.empty())
+    {
+        // Docker parity: 'env=' and 'src=' are not mutually exclusive; when both are given the
+        // environment variable wins and the file path is ignored.
+        srcPath.clear();
+    }
+    if (envName.empty() && srcPath.empty())
+    {
+        // Docker parity: with neither 'env=' nor 'src=', the secret value is read from the host
+        // environment variable whose name matches the id. Unlike an explicit 'env=', that variable
+        // must be set - Docker errors when the id-named variable is undefined.
+        envName = id;
+        if (!wsl::windows::common::wslutil::ReadEnvironmentVariable(envName.c_str()).has_value())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"environment variable '{}' is not set", envName)));
+        }
+    }
+
+    if (!srcPath.empty())
+    {
+        std::error_code ec;
+        // Resolve symlinks (and normalize '..') so we read the file that actually holds the secret's
+        // bytes rather than the link node itself.
+        auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
+        if (ec.value() != 0 || !std::filesystem::is_regular_file(absPath, ec))
+        {
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
+                spec, std::format(L"source file not found or not a regular file: {}", absPath.wstring())));
+        }
+
+        // Read the file's raw bytes and forward them verbatim. The server materializes them into a
+        // root-only tmpfs file inside the VM, so file secrets are byte-exact (binary, embedded NULs,
+        // and arbitrary size all round-trip) - matching Docker's type=file semantics - without ever
+        // mounting a host directory into the VM.
+        std::ifstream file(absPath, std::ios::binary | std::ios::ate);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to open source file: {}", absPath.wstring())),
+            !file);
+
+        // Read a known number of bytes rather than draining via istreambuf_iterator: that iterator
+        // cannot distinguish EOF from a mid-stream read error, so a transient I/O failure would
+        // silently truncate the secret. Size the buffer from the stream, read exactly that many
+        // bytes, then verify the full contents were delivered so a short read is surfaced as an
+        // error instead of forwarding a partial secret to the build.
+        const std::streamoff size = file.tellg();
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to determine size of source file: {}", absPath.wstring())),
+            size < 0);
+
+        std::vector<BYTE> value(static_cast<size_t>(size));
+        if (size > 0)
+        {
+            file.seekg(0);
+            file.read(reinterpret_cast<char*>(value.data()), size);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_UNEXPECTED,
+                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"failed to read source file: {}", absPath.wstring())),
+                file.bad() || file.gcount() != size);
+        }
+
+        return services::BuildSecret{
+            .Id = std::move(id),
+            .Value = std::move(value),
+        };
+    }
+
+    // Docker parity: a referenced environment variable that is unset (or set but empty) yields an
+    // empty secret value rather than an error. ReadEnvironmentVariable returns nullopt for an
+    // undefined variable, which we collapse to an empty value.
+    const std::wstring value = wsl::windows::common::wslutil::ReadEnvironmentVariable(envName.c_str()).value_or(std::wstring{});
+
+    // The env value is delivered as UTF-8 bytes, matching how the guest exposes it at /run/secrets/<id>.
+    auto valueBytes = wsl::windows::common::string::WideToMultiByte(value);
+    return services::BuildSecret{
+        .Id = std::move(id),
+        .Value = std::vector<BYTE>(valueBytes.begin(), valueBytes.end()),
+    };
+}
+
+services::BuildOutput ParseOutputSpec(const std::wstring& spec)
+{
+    // Mirrors `docker buildx build --output`. A bare token is shorthand for a destination; otherwise
+    // the spec is a comma separated list of key=value pairs where 'type'/'dest' are structural and
+    // every other key is forwarded verbatim to buildx as an exporter attribute.
+    if (spec.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"the value may not be empty"));
+    }
+
+    // Split on ',' preserving empty fields. Unlike the shared Split helper (which drops them), an
+    // empty field such as in "type=local,,dest=x" is a malformed spec that must be rejected.
+    std::vector<std::wstring> fields;
+    for (size_t start = 0;;)
+    {
+        const auto pos = spec.find(L',', start);
+        if (pos == std::wstring::npos)
+        {
+            fields.emplace_back(spec.substr(start));
+            break;
+        }
+        fields.emplace_back(spec.substr(start, pos - start));
+        start = pos + 1;
+    }
+
+    // Keys are ASCII and matched case-insensitively; lowercase them without touching values.
+    const auto toLower = [](std::wstring value) {
+        for (auto& ch : value)
+        {
+            if (ch >= L'A' && ch <= L'Z')
+            {
+                ch = static_cast<wchar_t>(ch - L'A' + L'a');
+            }
+        }
+        return value;
+    };
+
+    // Shorthand: a single token with no '=' names the destination. Matching Docker, '-' streams a
+    // tarball to stdout ('type=tar,dest=-'); anything else exports the final stage's filesystem to
+    // that local path ('type=local,dest=<path>').
+    if (fields.size() == 1 && fields[0].find(L'=') == std::wstring::npos)
+    {
+        if (fields[0] == L"-")
+        {
+            return services::BuildOutput{.Type = L"tar", .Dest = L"-"};
+        }
+
+        return services::BuildOutput{.Type = L"local", .Dest = fields[0]};
+    }
+
+    services::BuildOutput output;
+    std::wstring rawType;
+    bool hasType = false;
+    bool hasDest = false;
+
+    for (const auto& field : fields)
+    {
+        const auto kv = SplitKeyValue(field);
+        if (!kv.HadSeparator || kv.Key.empty())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcOutputInvalidSpec(spec, L"expected key=value pairs separated by ','"));
+        }
+
+        const auto key = toLower(kv.Key);
+        if (key == L"type")
+        {
+            rawType = kv.Value;
+            output.Type = toLower(kv.Value);
+            hasType = true;
+        }
+        else if (key == L"dest")
+        {
+            output.Dest = kv.Value;
+            hasDest = true;
+        }
+        else
+        {
+            // Remaining attributes (name, push, compression, annotations, ...) are stored verbatim.
+            output.Attributes[kv.Key] = kv.Value;
+        }
+    }
+
+    if (!hasType || output.Type.empty())
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"type is required"));
+    }
+
+    const bool supportedType = output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci" ||
+                               output.Type == L"docker" || output.Type == L"image" || output.Type == L"registry" ||
+                               output.Type == L"cacheonly";
+    if (!supportedType)
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"unsupported output type '{}'", rawType)));
+    }
+
+    // Filesystem/tarball exporters write to a caller-provided location, so 'dest=' is mandatory.
+    if ((output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci") && (!hasDest || output.Dest.empty()))
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'dest='", output.Type)));
+    }
+
+    // Mirroring Docker: the local exporter writes a directory tree and so cannot stream to stdout.
+    // tar/oci/docker stream fine and image/registry/cacheonly ignore 'dest', so only local is rejected.
+    if (output.Type == L"local" && output.Dest == L"-")
+    {
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
+            spec,
+            L"dest cannot be stdout for local exporter; the local exporter writes a directory tree, so pass a directory "
+            L"path via 'dest=' (or use 'type=tar,dest=-' to stream a tarball to stdout)"));
+    }
+
+    // The registry exporter pushes to a named reference, so 'name=' is mandatory.
+    if (output.Type == L"registry")
+    {
+        const auto it = output.Attributes.find(L"name");
+        if (it == output.Attributes.end() || it->second.empty())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'name='", output.Type)));
+        }
+    }
+
+    return output;
+}
+
+std::wstring FormatOutputSpec(const services::BuildOutput& output)
+{
+    // buildx consumes the same comma separated key=value form we parsed, so we round-trip the parsed
+    // struct back into a canonical spec. This is what actually reaches `docker build --output <spec>`.
+    std::wstring spec = std::format(L"type={}", output.Type);
+    if (!output.Dest.empty())
+    {
+        spec += std::format(L",dest={}", output.Dest);
+    }
+
+    for (const auto& [key, value] : output.Attributes)
+    {
+        spec += std::format(L",{}={}", key, value);
+    }
+
+    return spec;
+}
+
+std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName)
+{
+    // Accepts <name>=<soft>[:<hard>]; if hard is omitted hard = soft. -1 means unlimited.
+    const auto nameValue = SplitKeyValue(input);
+    if (!nameValue.HadSeparator || nameValue.Key.empty())
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+    }
+
+    const std::wstring& valuesPart = nameValue.Value;
+    const auto colonPos = valuesPart.find(L':');
+
+    auto parseLimit = [&](const std::wstring& limitStr) -> int64_t {
+        if (limitStr.empty())
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+        }
+
+        try
+        {
+            return GetIntegerFromString<int64_t>(limitStr, argName, [](int64_t v) { return v >= -1; });
+        }
+        catch (const ArgumentException&)
+        {
+            // Re-throw with the ulimit-specific error message so the user sees the full input.
+            throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+        }
+    };
+
+    const int64_t soft = parseLimit(colonPos == std::wstring::npos ? valuesPart : valuesPart.substr(0, colonPos));
+    const int64_t hard = colonPos == std::wstring::npos ? soft : parseLimit(valuesPart.substr(colonPos + 1));
+
+    // This rejects "-1:1024" and "-1:<finite>" while allowing "<finite>:-1", "-1:-1", and "-1".
+    const bool invalidRange = (soft == -1) ? (hard != -1) : (hard != -1 && hard < soft);
+    if (invalidRange)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidUlimitError(argName, input));
+    }
+
+    return {WideToMultiByte(nameValue.Key), soft, hard};
+}
+
+std::pair<std::string, std::string> ParseLabel(const std::wstring& value)
+{
+    const auto kv = SplitKeyValue(value);
+    auto key = WideToMultiByte(kv.Key);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_LabelKeyEmptyError(), key.empty());
+    return {std::move(key), WideToMultiByte(kv.Value)};
+}
+
+std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
+{
+    const auto kv = SplitKeyValue(value);
+    return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
+}
+
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
+{
+    const auto kv = SplitKeyValue(value);
+    if (!kv.HadSeparator)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
+    }
+
+    return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
+}
+
+// Map of signal names to WSLCSignal enum values
+static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
+    {L"SIGHUP", WSLCSignalSIGHUP},   {L"SIGINT", WSLCSignalSIGINT},     {L"SIGQUIT", WSLCSignalSIGQUIT},
+    {L"SIGILL", WSLCSignalSIGILL},   {L"SIGTRAP", WSLCSignalSIGTRAP},   {L"SIGABRT", WSLCSignalSIGABRT},
+    {L"SIGIOT", WSLCSignalSIGIOT},   {L"SIGBUS", WSLCSignalSIGBUS},     {L"SIGFPE", WSLCSignalSIGFPE},
+    {L"SIGKILL", WSLCSignalSIGKILL}, {L"SIGUSR1", WSLCSignalSIGUSR1},   {L"SIGSEGV", WSLCSignalSIGSEGV},
+    {L"SIGUSR2", WSLCSignalSIGUSR2}, {L"SIGPIPE", WSLCSignalSIGPIPE},   {L"SIGALRM", WSLCSignalSIGALRM},
+    {L"SIGTERM", WSLCSignalSIGTERM}, {L"SIGTKFLT", WSLCSignalSIGTKFLT}, {L"SIGCHLD", WSLCSignalSIGCHLD},
+    {L"SIGCONT", WSLCSignalSIGCONT}, {L"SIGSTOP", WSLCSignalSIGSTOP},   {L"SIGTSTP", WSLCSignalSIGTSTP},
+    {L"SIGTTIN", WSLCSignalSIGTTIN}, {L"SIGTTOU", WSLCSignalSIGTTOU},   {L"SIGURG", WSLCSignalSIGURG},
+    {L"SIGXCPU", WSLCSignalSIGXCPU}, {L"SIGXFSZ", WSLCSignalSIGXFSZ},   {L"SIGVTALRM", WSLCSignalSIGVTALRM},
+    {L"SIGPROF", WSLCSignalSIGPROF}, {L"SIGWINCH", WSLCSignalSIGWINCH}, {L"SIGIO", WSLCSignalSIGIO},
+    {L"SIGPOLL", WSLCSignalSIGPOLL}, {L"SIGPWR", WSLCSignalSIGPWR},     {L"SIGSYS", WSLCSignalSIGSYS},
+};
+
+// Convert string to WSLCSignal enum - accepts either signal name (e.g., "SIGKILL") or number (e.g., "9")
+WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName)
+{
+    constexpr int MIN_SIGNAL = WSLCSignalSIGHUP;
+    constexpr int MAX_SIGNAL = WSLCSignalSIGSYS;
+    constexpr std::wstring_view sigPrefix = L"SIG";
+
+    // Normalize input: ensure it has "SIG" prefix for map lookup
+    std::wstring normalizedInput;
+    if (IsEqual(input.substr(0, sigPrefix.size()), sigPrefix, true))
+    {
+        normalizedInput = input;
+    }
+    else
+    {
+        normalizedInput = std::wstring(sigPrefix) + input;
+    }
+
+    for (const auto& [signalName, signalValue] : SignalMap)
+    {
+        if (IsEqual(normalizedInput, signalName, true))
+        {
+            return signalValue;
+        }
+    }
+
+    // User may have input an integer representation instead.
+    int signalValue{};
+    try
+    {
+        signalValue = GetIntegerFromString<int>(input, argName);
+    }
+    // If it fails to be converted give a better user message than just the integer conversion
+    // failure since we also know it failed to be found in the map.
+    catch (ArgumentException)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidSignalError(argName, input));
+    }
+
+    if (signalValue < MIN_SIGNAL || signalValue > MAX_SIGNAL)
+    {
+        throw ArgumentException(Localization::WSLCCLI_SignalOutOfRangeError(argName, input, MIN_SIGNAL, MAX_SIGNAL));
+    }
+
+    return static_cast<WSLCSignal>(signalValue);
+}
+
+// Parses an RFC3339 timestamp (e.g. "2024-01-15T10:30:00Z" or "2024-01-15T10:30:00+05:30")
+// into a ULONGLONG Unix epoch seconds value using std::chrono::parse.
+// Note: +HHMM (no colon) offsets are not supported; use +HH:MM format.
+static std::optional<ULONGLONG> TryParseRfc3339(const std::string& input)
+{
+    std::string normalized = input;
+
+    // Normalize trailing 'Z'/'z' to '+00:00' so %Ez can parse it uniformly.
+    if (!normalized.empty() && (normalized.back() == 'Z' || normalized.back() == 'z'))
+    {
+        normalized.pop_back();
+        normalized += "+00:00";
+    }
+
+    // Reject bare dot with no fractional digits (e.g. "10:30:00.+00:00") since
+    // std::chrono::parse is lenient about this.
+    auto dotPos = normalized.find('.');
+    if (dotPos != std::string::npos && (dotPos + 1 >= normalized.size() || !std::isdigit(normalized[dotPos + 1])))
+    {
+        return std::nullopt;
+    }
+
+    // Pre-validate day-of-month since std::chrono::parse silently wraps invalid dates (e.g. Feb 31 → Mar 2).
+    if (normalized.size() >= 10 && normalized[4] == '-' && normalized[7] == '-')
+    {
+        int year = 0, month = 0, day = 0;
+        auto yResult = std::from_chars(normalized.data(), normalized.data() + 4, year);
+        auto mResult = std::from_chars(normalized.data() + 5, normalized.data() + 7, month);
+        auto dResult = std::from_chars(normalized.data() + 8, normalized.data() + 10, day);
+
+        if (yResult.ec == std::errc() && mResult.ec == std::errc() && dResult.ec == std::errc())
+        {
+            auto ymd = std::chrono::year{year} / std::chrono::month{static_cast<unsigned>(month)} /
+                       std::chrono::day{static_cast<unsigned>(day)};
+            if (!ymd.ok())
+            {
+                return std::nullopt;
+            }
+        }
+    }
+
+    // Parse into nanosecond precision so fractional seconds (e.g. ".123456789") are consumed
+    // by std::chrono::parse rather than requiring manual stripping.
+    std::chrono::sys_time<std::chrono::nanoseconds> utcTime;
+    std::istringstream stream(normalized);
+    stream >> std::chrono::parse("%FT%T%Ez", utcTime);
+    if (stream.fail())
+    {
+        return std::nullopt;
+    }
+
+    // Reject if there are trailing characters after the parsed timestamp
+    if (stream.peek() != std::istringstream::traits_type::eof())
+    {
+        return std::nullopt;
+    }
+
+    auto epochSeconds = std::chrono::duration_cast<std::chrono::seconds>(utcTime.time_since_epoch()).count();
+    if (epochSeconds < 0)
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<ULONGLONG>(epochSeconds);
+}
+
+ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& argName)
+{
+    std::string narrowValue = wsl::windows::common::string::WideToMultiByte(value);
+
+    // Try integer (Unix epoch seconds) first
+    ULONGLONG intValue{};
+    const char* begin = narrowValue.c_str();
+    const char* end = begin + narrowValue.size();
+    auto result = std::from_chars(begin, end, intValue);
+    if (result.ec == std::errc() && result.ptr == end)
+    {
+        return intValue;
+    }
+
+    // Try RFC3339 timestamp
+    auto rfc3339Value = TryParseRfc3339(narrowValue);
+    if (rfc3339Value.has_value())
+    {
+        return rfc3339Value.value();
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidTimestampArgumentError(argName, value));
+}
+
+models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (IsEqual(input, L"json"))
+    {
+        return models::FormatType::Json;
+    }
+    else if (IsEqual(input, L"table"))
+    {
+        return models::FormatType::Table;
+    }
+    else
+    {
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+    }
+}
+
+models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (IsEqual(input, L"image"))
+    {
+        return models::InspectType::Image;
+    }
+    else if (IsEqual(input, L"container"))
+    {
+        return models::InspectType::Container;
+    }
+    else if (IsEqual(input, L"network"))
+    {
+        return models::InspectType::Network;
+    }
+    else if (IsEqual(input, L"volume"))
+    {
+        return models::InspectType::Volume;
+    }
+    else
+    {
+        constexpr std::wstring_view supportedValues = L"image, container, network, volume";
+        throw ArgumentException(Localization::WSLCCLI_InvalidInspectError(argName, input, supportedValues));
+    }
+}
+
+int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
+    if (!parsed.has_value())
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
+    }
+
+    return static_cast<int64_t>(parsed.value());
+}
+
+// Parses duration string into nanoseconds.
+static std::optional<int64_t> TryParseDuration(const std::string& input)
+{
+    if (input.empty())
+    {
+        return std::nullopt;
+    }
+
+    size_t pos = 0;
+    bool negative = false;
+    if (input[pos] == '+' || input[pos] == '-')
+    {
+        negative = input[pos] == '-';
+        pos++;
+    }
+
+    // Special case: a bare "0" (with optional sign) is a valid zero duration.
+    if (input.substr(pos) == "0")
+    {
+        return 0;
+    }
+
+    // Accumulate in a long double so fractional units (e.g. "1.5h") are handled, then round.
+    long double totalNanos = 0.0L;
+    bool sawValue = false;
+
+    while (pos < input.size())
+    {
+        // Parse the numeric part (integer and/or fraction).
+        const size_t numberStart = pos;
+        while (pos < input.size() && (std::isdigit(static_cast<unsigned char>(input[pos])) || input[pos] == '.'))
+        {
+            pos++;
+        }
+
+        const std::string numberStr = input.substr(numberStart, pos - numberStart);
+        if (numberStr.empty() || numberStr == "." || std::count(numberStr.begin(), numberStr.end(), '.') > 1)
+        {
+            return std::nullopt;
+        }
+
+        // Parse the unit (everything up to the next digit or '.').
+        const size_t unitStart = pos;
+        while (pos < input.size() && !std::isdigit(static_cast<unsigned char>(input[pos])) && input[pos] != '.')
+        {
+            pos++;
+        }
+
+        const std::string unit = input.substr(unitStart, pos - unitStart);
+
+        long double multiplier{};
+        if (unit == "ns")
+        {
+            multiplier = 1.0L;
+        }
+        else if (unit == "us" || unit == "\xC2\xB5s" /* µs (U+00B5) */ || unit == "\xCE\xBCs" /* μs (U+03BC) */)
+        {
+            multiplier = 1000L;
+        }
+        else if (unit == "ms")
+        {
+            multiplier = 1000000L;
+        }
+        else if (unit == "s")
+        {
+            multiplier = 1000000000L;
+        }
+        else if (unit == "m")
+        {
+            multiplier = 60000000000L;
+        }
+        else if (unit == "h")
+        {
+            multiplier = 3600000000000L;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+
+        long double value{};
+        try
+        {
+            auto [ptr, ec] = std::from_chars(numberStr.data(), numberStr.data() + numberStr.size(), value, std::chars_format::fixed);
+            if (ptr != numberStr.data() + numberStr.size() || ec != std::errc())
+            {
+                return std::nullopt;
+            }
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+
+        totalNanos += value * multiplier;
+        sawValue = true;
+    }
+
+    if (!sawValue)
+    {
+        return std::nullopt;
+    }
+
+    if (negative)
+    {
+        totalNanos = -totalNanos;
+    }
+
+    if (totalNanos > static_cast<long double>(std::numeric_limits<int64_t>::max()) ||
+        totalNanos < static_cast<long double>(std::numeric_limits<int64_t>::min()))
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<int64_t>(std::llroundl(totalNanos));
+}
+
+int64_t GetDurationNanosFromString(const std::wstring& input, const std::wstring& argName)
+{
+    const std::string narrow = WideToMultiByte(input);
+    const auto parsed = TryParseDuration(narrow);
+
+    if (!parsed.has_value() || parsed.value() < 0)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidDurationError(argName, input));
+    }
+
+    return parsed.value();
+}
+
+int64_t GetNanoCpusFromString(const std::wstring& input, const std::wstring& argName)
+{
+    constexpr double NanosPerCpu = 1'000'000'000.0;
+    constexpr double MaxCpus = static_cast<double>(std::numeric_limits<int64_t>::max()) / NanosPerCpu;
+
+    const std::string narrow = WideToMultiByte(input);
+    const char* begin = narrow.c_str();
+    const char* end = begin + narrow.size();
+
+    double cpus{};
+    const auto result = std::from_chars(begin, end, cpus, std::chars_format::fixed);
+    if (result.ec != std::errc() || result.ptr != end || cpus <= 0.0 || cpus > MaxCpus)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidCpusError(argName, input));
+    }
+
+    return static_cast<int64_t>(cpus * NanosPerCpu);
+}
+
+} // namespace wsl::windows::wslc::validation

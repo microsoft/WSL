@@ -109,6 +109,7 @@ _(PublishAll,     "publish-all",         L"P",              Kind::Flag,        L
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SchemeArgDescription())*/ \
+_(Secret,         "secret",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SecretArgDescription()) \
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(ShmSize,        "shm-size",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ShmSizeArgDescription()) \
