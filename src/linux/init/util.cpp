@@ -3638,7 +3638,7 @@ Return Value:
     // are ignored.
     //
 
-    static const std::regex cpuLine{R"(^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)(?:\s+(\d+))?(?:\s+(\d+))?(?:\s+(\d+))?)"};
+    static const std::regex cpuLine{R"(^cpu[ \t]+(\d+)[ \t]+(\d+)[ \t]+(\d+)[ \t]+(\d+)[ \t]+(\d+)(?:[ \t]+(\d+))?(?:[ \t]+(\d+))?(?:[ \t]+(\d+))?)"};
     std::cmatch match;
     if (!std::regex_search(buffer, match, cpuLine))
     {
