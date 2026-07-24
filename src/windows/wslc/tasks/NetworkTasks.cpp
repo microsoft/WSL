@@ -41,7 +41,7 @@ static bool TryInspectNetwork(Reporter& reporter, Session& session, const std::s
     {
         if (ex.GetErrorCode() == WSLC_E_NETWORK_NOT_FOUND)
         {
-            reporter.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(networkName.c_str()));
+            reporter.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(networkName)));
             return false;
         }
 
@@ -62,7 +62,7 @@ static bool TryDeleteNetwork(Reporter& reporter, Session& session, const std::st
         {
             if (!force)
             {
-                reporter.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(networkName.c_str()));
+                reporter.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(networkName)));
             }
 
             return false;
@@ -224,7 +224,7 @@ void PruneNetworks(CLIExecutionContext& context)
 
     for (const auto& networkName : result.PrunedNetworks)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(networkName));
+        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(wsl::shared::string::MultiByteToWide(networkName)));
     }
 }
 

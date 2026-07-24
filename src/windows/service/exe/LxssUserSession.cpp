@@ -2758,12 +2758,12 @@ try
     }
     catch (const nlohmann::json::parse_error& e)
     {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToParseTerminalProfile(e.what()));
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToParseTerminalProfile(wsl::shared::string::MultiByteToWide(e.what())));
         return;
     }
     catch (...)
     {
-        auto error = WideToMultiByte(wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException()));
+        auto error = wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException());
         EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToParseTerminalProfile(error));
         return;
     }

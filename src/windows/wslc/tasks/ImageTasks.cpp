@@ -50,11 +50,11 @@ namespace {
         {
             if (Format == EnumReferenceFormatDigest)
             {
-                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoadedId(Reference));
+                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoadedId(wsl::shared::string::MultiByteToWide(Reference)));
             }
             else if (Format == EnumReferenceFormatTag)
             {
-                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoaded(Reference));
+                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoaded(wsl::shared::string::MultiByteToWide(Reference)));
             }
             else
             {
@@ -82,7 +82,7 @@ static bool TryInspectImage(Reporter& reporter, Session& session, const std::str
     {
         if (ex.GetErrorCode() == WSLC_E_IMAGE_NOT_FOUND)
         {
-            reporter.Error(L"{}\n", Localization::MessageWslcImageNotFound(imageId.c_str()));
+            reporter.Error(L"{}\n", Localization::MessageWslcImageNotFound(wsl::shared::string::MultiByteToWide(imageId)));
             return false;
         }
 
@@ -397,12 +397,12 @@ void PruneImages(CLIExecutionContext& context)
 
     for (const auto& image : result.UntaggedImages)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(image));
+        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(wsl::shared::string::MultiByteToWide(image)));
     }
 
     for (const auto& image : result.DeletedImages)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(image));
+        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(wsl::shared::string::MultiByteToWide(image)));
     }
 
     context.Reporter.Output(L"\n");

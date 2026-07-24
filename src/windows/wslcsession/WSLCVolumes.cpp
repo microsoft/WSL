@@ -44,7 +44,8 @@ WSLCVolumes::WSLCVolumes(
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover volume: %hs", volume.Name.c_str());
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcFailedToRecoverVolume(volume.Name));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageWslcFailedToRecoverVolume(wsl::shared::string::MultiByteToWide(volume.Name)));
         }
     }
 }
@@ -113,7 +114,7 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
     }
     else
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(wsl::shared::string::MultiByteToWide(driver)));
     }
 
     const auto& name = volume->Name();
@@ -132,7 +133,10 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
     auto lock = m_lock.lock_exclusive();
 
     auto it = m_volumes.find(Name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(Name), it == m_volumes.end());
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_VOLUME_NOT_FOUND,
+        Localization::MessageWslcVolumeNotFound(wsl::shared::string::MultiByteToWide(Name)),
+        it == m_volumes.end());
 
     it->second->Delete();
     m_volumes.erase(it);
@@ -197,7 +201,10 @@ std::string WSLCVolumes::InspectVolume(const std::string& Name) const
     auto lock = m_lock.lock_shared();
 
     auto it = m_volumes.find(Name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(Name), it == m_volumes.end());
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_VOLUME_NOT_FOUND,
+        Localization::MessageWslcVolumeNotFound(wsl::shared::string::MultiByteToWide(Name)),
+        it == m_volumes.end());
 
     return it->second->Inspect();
 }
@@ -207,7 +214,10 @@ std::pair<HRESULT, std::string> WSLCVolumes::GetVolumeStatus(const std::string& 
     auto lock = m_lock.lock_shared();
 
     auto it = m_volumes.find(Name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(Name), it == m_volumes.end());
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_VOLUME_NOT_FOUND,
+        Localization::MessageWslcVolumeNotFound(wsl::shared::string::MultiByteToWide(Name)),
+        it == m_volumes.end());
 
     return it->second->Status();
 }
@@ -248,7 +258,7 @@ WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::st
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to release host resources for pruned volume: %hs", name.c_str());
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeReleaseFailed(name));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcVolumeReleaseFailed(wsl::shared::string::MultiByteToWide(name)));
         }
 
         m_volumes.erase(it);

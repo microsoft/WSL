@@ -281,7 +281,7 @@ void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::
     auto [repo, tag] = ParseImage(targetImage, &format);
     if (format == EnumReferenceFormatDigest)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(wsl::shared::string::MultiByteToWide(targetImage)));
     }
 
     WSLCTagImageOptions options{};

@@ -585,7 +585,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             if (!natNetwork)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
-                    ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::Consomme)));
+                    wsl::shared::string::MultiByteToWide(ToString(m_vmConfig.NetworkingMode)),
+                    wsl::shared::string::MultiByteToWide(ToString(NetworkingMode::Consomme))));
 
                 m_vmConfig.NetworkingMode = NetworkingMode::Consomme;
             }
@@ -687,7 +688,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
             // Fall back to no networking.
             EMIT_USER_WARNING(wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
-                ToString(m_vmConfig.NetworkingMode), ToString(NetworkingMode::None)));
+                wsl::shared::string::MultiByteToWide(ToString(m_vmConfig.NetworkingMode)),
+                wsl::shared::string::MultiByteToWide(ToString(NetworkingMode::None))));
 
             m_vmConfig.NetworkingMode = NetworkingMode::None;
             m_networkingEngine.reset();

@@ -64,7 +64,8 @@ bool ConfigKey::ParseImpl(const char* name, const char* value, const wchar_t* fi
     const auto parsed = wsl::shared::string::ParseBool(value);
     if (!parsed.has_value())
     {
-        EMIT_USER_WARNING(Localization::MessageConfigInvalidBoolean(value, name, filePath, fileLine));
+        EMIT_USER_WARNING(Localization::MessageConfigInvalidBoolean(
+            wsl::shared::string::MultiByteToWide(value), wsl::shared::string::MultiByteToWide(name), filePath, fileLine));
         return false;
     }
 
@@ -78,7 +79,8 @@ bool ConfigKey::ParseImpl(const char* name, const char* value, const wchar_t* fi
     const long number = strtol(value, &end, 0);
     if (*value == '\0' || *end != '\0' || number < INT_MIN || number > INT_MAX)
     {
-        EMIT_USER_WARNING(Localization::MessageConfigInvalidInteger(value, name, filePath, fileLine));
+        EMIT_USER_WARNING(Localization::MessageConfigInvalidInteger(
+            wsl::shared::string::MultiByteToWide(value), wsl::shared::string::MultiByteToWide(name), filePath, fileLine));
         return false;
     }
 
@@ -97,7 +99,8 @@ bool ConfigKey::ParseImpl(const char* name, const char* value, const wchar_t* fi
     const auto memory = wsl::shared::string::ParseMemorySize(value);
     if (!memory.has_value())
     {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageInvalidNumberString(value, name, filePath, fileLine));
+        EMIT_USER_WARNING(wsl::shared::Localization::MessageInvalidNumberString(
+            wsl::shared::string::MultiByteToWide(value), wsl::shared::string::MultiByteToWide(name), filePath, fileLine));
         return false;
     }
 
@@ -121,7 +124,10 @@ bool ConfigKey::ParseImpl(const char* name, const char* value, const wchar_t* fi
     }
     else
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageConfigMacAddress(value, name, filePath, fileLine));
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG,
+            Localization::MessageConfigMacAddress(
+                wsl::shared::string::MultiByteToWide(value), wsl::shared::string::MultiByteToWide(name), filePath, fileLine));
     }
 
     return true;
@@ -188,8 +194,13 @@ void ConfigKey::Parse(const char* name, const char* value, const wchar_t* fileNa
 {
     if (m_parseResult.has_value())
     {
-        EMIT_USER_WARNING(
-            Localization::MessageConfigKeyDuplicated(name, fileName, line, m_parseResult->first, fileName, m_parseResult->second));
+        EMIT_USER_WARNING(Localization::MessageConfigKeyDuplicated(
+            wsl::shared::string::MultiByteToWide(name),
+            fileName,
+            line,
+            wsl::shared::string::MultiByteToWide(m_parseResult->first),
+            fileName,
+            m_parseResult->second));
         return;
     }
 
@@ -213,7 +224,7 @@ static void SetConfig(std::vector<ConfigKey>& keys, const char* keyName, const c
     const auto key = std::find_if(keys.begin(), keys.end(), [keyName](const auto& e) { return e.Matches(keyName); });
     if (key == keys.end())
     {
-        EMIT_USER_WARNING(Localization::MessageConfigUnknownKey(keyName, filePath, fileLine));
+        EMIT_USER_WARNING(Localization::MessageConfigUnknownKey(wsl::shared::string::MultiByteToWide(keyName), filePath, fileLine));
         return;
     }
 
@@ -498,7 +509,7 @@ ParseSection:
             fputs("expected ]\n", stderr);
         }
 
-        EMIT_USER_WARNING(Localization::MessageConfigExpected("']'", filePath, line));
+        EMIT_USER_WARNING(Localization::MessageConfigExpected(L"']'", filePath, line));
 
         if (updateConfigFile)
         {
@@ -543,7 +554,7 @@ ParseSection:
             fputs("expected space or EOL\n", stderr);
         }
 
-        EMIT_USER_WARNING(Localization::MessageConfigExpected("' ' or '\\n'", filePath, line));
+        EMIT_USER_WARNING(Localization::MessageConfigExpected(L"' ' or '\\n'", filePath, line));
 
         if (updateConfigFile)
         {
@@ -600,7 +611,7 @@ ParseKeyValue:
             fputs("expected =\n", stderr);
         }
 
-        EMIT_USER_WARNING(Localization::MessageConfigExpected("'='", filePath, line));
+        EMIT_USER_WARNING(Localization::MessageConfigExpected(L"'='", filePath, line));
 
         if (updateConfigFile)
         {
@@ -768,7 +779,7 @@ ValueDone:
             fprintf(stderr, "expected \"\n");
         }
 
-        EMIT_USER_WARNING(Localization::MessageConfigExpected("\"", filePath, line));
+        EMIT_USER_WARNING(Localization::MessageConfigExpected(L"\"", filePath, line));
 
         // This key value will be overwritten, so we can ignore any malformed values.
         // However, we can still inform the user of the issue per warning above.
