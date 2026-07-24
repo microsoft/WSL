@@ -39,6 +39,12 @@ using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc::validation {
 
+// BuildKit rejects any single secret larger than 500 KiB (MaxSecretSize == 500 * 1024 == 512000 bytes)
+// when it is mounted inside the build. Enforce the same cap client-side, before sizing and allocating
+// the read buffer, so an oversize --secret,src= file is reported with a friendly error instead of
+// ballooning CLI memory and then being rejected by the daemon after a pointless VM round-trip.
+constexpr std::streamoff c_maxSecretFileSize = 500 * 1024;
+
 KeyValueSplit SplitKeyValue(const std::wstring& value, wchar_t separator)
 {
     const auto pos = value.find(separator);
@@ -184,6 +190,19 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
             E_INVALIDARG,
             Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to determine size of source file: {}", absPath.wstring())),
             size < 0);
+
+        // Reject oversize files before allocating the buffer (see c_maxSecretFileSize) so a huge src=
+        // file can neither exhaust CLI memory nor be shipped to the daemon only to be rejected there.
+        if (size > c_maxSecretFileSize)
+        {
+            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
+                spec,
+                std::format(
+                    L"source file is {} bytes, which exceeds the maximum secret size of 500 KiB ({} bytes): {}",
+                    static_cast<long long>(size),
+                    static_cast<long long>(c_maxSecretFileSize),
+                    absPath.wstring())));
+        }
 
         std::vector<BYTE> value(static_cast<size_t>(size));
         if (size > 0)

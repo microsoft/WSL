@@ -763,7 +763,8 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_OversizeFile_Fails)
     {
-        // One byte over BuildKit's cap (500 KiB + 1) must be rejected by the daemon at mount time.
+        // One byte over BuildKit's cap (500 KiB + 1) must be rejected client-side, before the bytes are
+        // read into memory or shipped to the daemon.
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-oversize";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -783,7 +784,7 @@ class WSLCE2EImageBuildTests
             L"build \"{}\" -f \"{}\" --secret id=mysecret,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), secretFile.wstring()));
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
-        VERIFY_IS_TRUE(buildResult.Stderr->find(L"too big. max size 500KiB") != std::wstring::npos);
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"exceeds the maximum secret size of 500 KiB") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_UnknownType_Fails)

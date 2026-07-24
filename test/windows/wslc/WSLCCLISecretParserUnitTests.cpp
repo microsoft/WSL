@@ -183,6 +183,14 @@ class WSLCCLISecretParserUnitTests
         VerifyValid(L"id=s,src=" + file.wpath(), L"s", bytes);
     }
 
+    TEST_METHOD(Secret_File_MaxSizeSucceeds)
+    {
+        // A file of exactly BuildKit's cap (500 KiB == 512000 bytes) must be accepted.
+        const std::vector<BYTE> bytes(512000, 0x41);
+        ScopedTempFile file(bytes);
+        VerifyValid(L"id=s,src=" + file.wpath(), L"s", bytes);
+    }
+
     // --- Invalid: spec structure ---
 
     TEST_METHOD(Secret_Invalid_EmptyId)
@@ -244,6 +252,14 @@ class WSLCCLISecretParserUnitTests
     TEST_METHOD(Secret_Invalid_SourceFileMissing)
     {
         VerifyInvalid(L"id=s,src=C:\\wslc-ut\\definitely-missing-secret-file.txt", L"source file not found or not a regular file");
+    }
+
+    TEST_METHOD(Secret_Invalid_SourceFileTooLarge)
+    {
+        // One byte over BuildKit's cap (500 KiB + 1) must be rejected before the bytes are read.
+        const std::vector<BYTE> bytes(512000 + 1, 0x41);
+        ScopedTempFile file(bytes);
+        VerifyInvalid(L"id=s,src=" + file.wpath(), L"exceeds the maximum secret size of 500 KiB");
     }
 
     TEST_METHOD(Secret_Invalid_BareIdVariableNotSet)
