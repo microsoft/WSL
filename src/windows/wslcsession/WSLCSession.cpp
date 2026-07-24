@@ -103,6 +103,13 @@ void ValidateName(LPCSTR Name, size_t maxLength)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
+// Root under which each session creates its own per-session build-secret directory. Lives in the
+// session user's private LocalAppData, so only that user can read the secrets stored beneath it.
+std::filesystem::path GetSecretsBaseDir()
+{
+    return wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wslc-secrets";
+}
+
 // Removes build-secret directories under Base that were left behind by crashed sessions. Each live
 // session holds an exclusive lock on its "<dir>\.lock" marker; a directory is removed only when its
 // marker exists and can be opened exclusively (owner gone). Directories with no marker are skipped to
@@ -397,6 +404,20 @@ try
         TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
+
+    // Reclaim build-secret directories orphaned by an earlier session of this user that crashed before
+    // its destructor could remove them. Done unconditionally at session init - not just lazily in
+    // EnsureSecretRoot - so leftovers are cleaned up even by sessions that never run a --secret build,
+    // instead of lingering until the next --secret build (if any). Best-effort: never fails Initialize.
+    try
+    {
+        const auto secretsBase = GetSecretsBaseDir();
+        if (std::filesystem::exists(secretsBase))
+        {
+            SweepStaleSecretDirs(secretsBase);
+        }
+    }
+    CATCH_LOG();
 
     // Create the VM through the factory. The VM produces crash events; the session multiplexes
     // them out to any registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
@@ -918,7 +939,7 @@ CATCH_RETURN();
 const std::filesystem::path& WSLCSession::EnsureSecretRoot()
 {
     std::call_once(m_secretRootInit, [this]() {
-        const auto base = wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wslc-secrets";
+        const auto base = GetSecretsBaseDir();
         std::filesystem::create_directories(base);
 
         // Reclaim directories from any session that crashed before its destructor ran. Done before we
