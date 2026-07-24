@@ -123,7 +123,7 @@ try
                 </actions>
             </toast>)",
         Localization::MessagePerformanceTip(Localization::Options::DontImpersonate),
-        Localization::MessageProblematicDrvFsUsage(binaryName, Localization::Options::DontImpersonate),
+        Localization::MessageProblematicDrvFsUsage(wsl::shared::string::MultiByteToWide(binaryName), Localization::Options::DontImpersonate),
         wslhost::docs_arg,
         wslhost::docs_arg_filesystem_url,
         Localization::MessageViewDocs(Localization::Options::DontImpersonate),

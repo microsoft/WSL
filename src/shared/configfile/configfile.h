@@ -144,7 +144,12 @@ public:
                 validValues << e.first;
             }
 
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageConfigInvalidEnum(value, name, fileName, line, validValues.str().c_str()));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageConfigInvalidEnum(
+                wsl::shared::string::MultiByteToWide(value),
+                wsl::shared::string::MultiByteToWide(name),
+                fileName,
+                line,
+                wsl::shared::string::MultiByteToWide(validValues.str())));
             return {};
         }
 

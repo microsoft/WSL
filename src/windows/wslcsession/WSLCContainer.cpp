@@ -190,7 +190,10 @@ void RejectUnsupportedNetworkModes(std::string_view mode)
     }
 
     const auto colon = mode.find(':');
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkMode(std::string{mode}), colon != std::string_view::npos);
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcInvalidNetworkMode(wsl::shared::string::MultiByteToWide(std::string{mode})),
+        colon != std::string_view::npos);
 }
 
 std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const std::unordered_map<std::string, NetworkEntry>& sessionNetworks, DockerHTTPClient& dockerClient)
@@ -227,7 +230,9 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
         catch (const DockerHTTPException& e)
         {
             THROW_HR_WITH_USER_ERROR_IF(
-                WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerModeTargetNotFound(target), e.StatusCode() == 404);
+                WSLC_E_CONTAINER_NOT_FOUND,
+                Localization::MessageWslcContainerModeTargetNotFound(wsl::shared::string::MultiByteToWide(target)),
+                e.StatusCode() == 404);
             throw;
         }
     }
@@ -236,7 +241,9 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, const
     if (mode != "bridge")
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(std::string{mode}), !sessionNetworks.contains(std::string{mode}));
+            WSLC_E_NETWORK_NOT_FOUND,
+            Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(std::string{mode})),
+            !sessionNetworks.contains(std::string{mode}));
     }
     return std::string{mode};
 }
@@ -259,7 +266,8 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
     {
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
-            Localization::MessageWslcEndpointSettingUnknown(key, std::string{networkName}),
+            Localization::MessageWslcEndpointSettingUnknown(
+                wsl::shared::string::MultiByteToWide(key), wsl::shared::string::MultiByteToWide(std::string{networkName})),
             std::find(knownKeys.begin(), knownKeys.end(), key) == knownKeys.end());
     }
 
@@ -280,7 +288,9 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
     if (auto it = parsed.find("IPAddress"); it != parsed.end())
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcIpAddressSingleValue(std::string{networkName}), it->second.size() != 1);
+            E_INVALIDARG,
+            Localization::MessageWslcIpAddressSingleValue(wsl::shared::string::MultiByteToWide(std::string{networkName})),
+            it->second.size() != 1);
 
         const auto& address = it->second.front();
         in_addr parsedAddress{};
@@ -321,13 +331,18 @@ EndpointConfig ResolveEndpointConfig(const KeyValuePair* settings, ULONG count, 
         {
             const auto separator = entry.find('=');
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::MessageWslcDriverOptInvalid(entry), separator == std::string::npos || separator == 0);
+                E_INVALIDARG,
+                Localization::MessageWslcDriverOptInvalid(wsl::shared::string::MultiByteToWide(entry)),
+                separator == std::string::npos || separator == 0);
 
             auto key = entry.substr(0, separator);
             auto value = entry.substr(separator + 1);
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDriverOptInvalid(entry), isBlank(key));
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::MessageWslcDriverOptDuplicate(key), !driverOpts.try_emplace(key, std::move(value)).second);
+                E_INVALIDARG, Localization::MessageWslcDriverOptInvalid(wsl::shared::string::MultiByteToWide(entry)), isBlank(key));
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::MessageWslcDriverOptDuplicate(wsl::shared::string::MultiByteToWide(key)),
+                !driverOpts.try_emplace(key, std::move(value)).second);
         }
         config.DriverOpts = std::move(driverOpts);
     }
@@ -352,10 +367,12 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkNameRequired(), !raw || !*raw);
 
         std::string name{raw};
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), name == resolvedMode);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(wsl::shared::string::MultiByteToWide(name)), name == resolvedMode);
 
         auto [it, inserted] = resolved.try_emplace(name);
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(name), !inserted);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(wsl::shared::string::MultiByteToWide(name)), !inserted);
 
         auto config = ResolveEndpointConfig(connections[i].Settings, connections[i].SettingsCount, name);
         THROW_HR_WITH_USER_ERROR_IF(
@@ -364,7 +381,9 @@ std::map<std::string, EndpointConfig> ResolveEndpoints(
         if (name != "bridge")
         {
             THROW_HR_WITH_USER_ERROR_IF(
-                WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), !sessionNetworks.contains(name));
+                WSLC_E_NETWORK_NOT_FOUND,
+                Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(name)),
+                !sessionNetworks.contains(name));
         }
 
         it->second = std::move(config);
@@ -990,7 +1009,10 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 {
     auto lock = m_lock.lock_shared();
 
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id.c_str()), m_state != WslcContainerStateRunning);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_NOT_RUNNING,
+        Localization::MessageWslcContainerNotRunning(wsl::shared::string::MultiByteToWide(m_id)),
+        m_state != WslcContainerStateRunning);
 
     wil::shared_socket ioHandle;
 
@@ -1119,14 +1141,15 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         const auto [code, message] = m_runtime.Volumes().GetVolumeStatus(volumeName);
         if (FAILED(code))
         {
-            EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(volumeName, message));
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(
+                wsl::shared::string::MultiByteToWide(volumeName), wsl::shared::string::MultiByteToWide(message)));
             unavailableVolumes.push_back(volumeName);
         }
     }
 
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_VOLUME_NOT_AVAILABLE,
-        Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
+        Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(unavailableVolumes, ','))),
         !unavailableVolumes.empty());
 
     // A restart keeps its ports and mounts across both phases, so re-acquiring them here would collide
@@ -1728,7 +1751,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExcl
     // Validate that the container is not running or already deleted.
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_CONTAINER_IS_RUNNING,
-        Localization::MessageWslcCannotRemoveRunningContainer(m_id),
+        Localization::MessageWslcCannotRemoveRunningContainer(wsl::shared::string::MultiByteToWide(m_id)),
         m_state == WslcContainerStateRunning && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
 
     THROW_HR_IF_MSG(
@@ -1748,7 +1771,10 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     auto lock = m_lock.lock_shared();
 
     // Validate that the container is not in the running state.
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_IS_RUNNING,
+        Localization::MessageWslcContainerIsRunning(wsl::shared::string::MultiByteToWide(m_id)),
+        m_state == WslcContainerStateRunning);
 
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     SocketCodePair = m_runtime.Docker().ExportContainer(m_id);
@@ -1949,7 +1975,10 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
 
     auto lock = m_lock.lock_shared();
 
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id), m_state != WslcContainerStateRunning);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_NOT_RUNNING,
+        Localization::MessageWslcContainerNotRunning(wsl::shared::string::MultiByteToWide(m_id)),
+        m_state != WslcContainerStateRunning);
 
     if (StartOptions != nullptr)
     {
@@ -2612,7 +2641,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // that lack a dedicated netns (host/none/container:*) also can't accept per-endpoint settings.
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
-        Localization::MessageWslcEndpointSettingsRequireNetwork(networkMode),
+        Localization::MessageWslcEndpointSettingsRequireNetwork(wsl::shared::string::MultiByteToWide(networkMode)),
         hasNonAliasEndpointSettings && !NetworkModeAllocatesVmPorts(networkMode));
 
     auto mappedPorts = BuildPortMappings(ports, networkMode, virtualMachine);
@@ -3017,7 +3046,10 @@ void WSLCContainerImpl::MapPorts()
                     m_runtime.Vm().TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
 
                 THROW_HR_WITH_USER_ERROR_IF(
-                    HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id), !allocatedPort);
+                    HRESULT_FROM_WIN32(WSAEADDRINUSE),
+                    wsl::shared::Localization::MessageWslcPortInUse(
+                        wsl::shared::string::MultiByteToWide(FormatPortEndpoint(e)), wsl::shared::string::MultiByteToWide(m_id)),
+                    !allocatedPort);
 
                 e.VmMapping.AssignVmPort(allocatedPort);
 
@@ -3035,7 +3067,9 @@ void WSLCContainerImpl::MapPorts()
             if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || result == HRESULT_FROM_WIN32(WSAEADDRINUSE))
             {
                 THROW_HR_WITH_USER_ERROR(
-                    HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
+                    HRESULT_FROM_WIN32(WSAEADDRINUSE),
+                    wsl::shared::Localization::MessageWslcPortInUse(
+                        wsl::shared::string::MultiByteToWide(FormatPortEndpoint(e)), wsl::shared::string::MultiByteToWide(m_id)));
             }
             throw;
         }
@@ -3546,7 +3580,9 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcNetworkModeNoAdditionalNetworks(m_networkMode), !NetworkModeAllocatesVmPorts(m_networkMode));
+        E_INVALIDARG,
+        Localization::MessageWslcNetworkModeNoAdditionalNetworks(wsl::shared::string::MultiByteToWide(m_networkMode)),
+        !NetworkModeAllocatesVmPorts(m_networkMode));
 
     common::docker_schema::ContainerNetworkRequest request{};
     request.Container = m_id;
@@ -3559,7 +3595,9 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
     catch (const DockerHTTPException& e)
     {
         THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(Options->NetworkName), e.StatusCode() == 404);
+            WSLC_E_NETWORK_NOT_FOUND,
+            Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(Options->NetworkName)),
+            e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to connect container '%hs' to network '%hs'", m_id.c_str(), Options->NetworkName);
     }
 
@@ -3577,7 +3615,9 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
     auto lock = m_lock.lock_shared();
 
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcNetworkModeNoAdditionalNetworks(m_networkMode), !NetworkModeAllocatesVmPorts(m_networkMode));
+        E_INVALIDARG,
+        Localization::MessageWslcNetworkModeNoAdditionalNetworks(wsl::shared::string::MultiByteToWide(m_networkMode)),
+        !NetworkModeAllocatesVmPorts(m_networkMode));
 
     common::docker_schema::ContainerNetworkRequest request{};
     request.Container = m_id;
@@ -3588,7 +3628,10 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(NetworkName), e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND,
+            Localization::MessageWslcNetworkNotFound(wsl::shared::string::MultiByteToWide(NetworkName)),
+            e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to disconnect container '%hs' from network '%hs'", m_id.c_str(), NetworkName);
     }
 
