@@ -41,8 +41,8 @@ enum class Kind
 enum class Limit
 {
     // Accepts a single value. Repeats are last-wins (docker-style): a later occurrence
-    // overwrites the earlier one rather than being an error. For flags, "present" always
-    // means true, so a later "--flag=false" clears it.
+    // overwrites the earlier one rather than being an error. For flags, the stored value
+    // is the last one parsed, so "--flag --flag=false" ends up false.
     Single,
 
     // Accepts any number of values, which accumulate (e.g. --publish, --env).
