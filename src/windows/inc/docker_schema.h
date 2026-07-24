@@ -299,6 +299,7 @@ struct HostConfig
     std::int64_t ShmSize{};
     std::optional<std::vector<DeviceMapping>> Devices;
     std::optional<std::vector<DeviceRequest>> DeviceRequests;
+    bool Privileged{};
 
     // Per-container resource limits. 0 means "no limit" (Docker default).
     std::int64_t Memory{};
@@ -306,7 +307,7 @@ struct HostConfig
     std::optional<std::vector<Ulimit>> Ulimits;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Privileged, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct InspectEndpointIPAMConfig

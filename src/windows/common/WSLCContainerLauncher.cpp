@@ -227,6 +227,12 @@ void WSLCContainerLauncher::AddUlimit(const std::string& Name, std::int64_t Soft
     m_ulimits.push_back(ulimit);
 }
 
+void WSLCContainerLauncher::SetPrivileged(bool privileged)
+{
+    m_privileged = privileged;
+}
+
+
 void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     // Store a copy of the path strings to the launcher to ensure the pointers in WSLCVolume remain valid.
@@ -331,6 +337,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
     options.Flags = m_containerFlags;
+    if (m_privileged) { WI_SetFlag(options.Flags, WSLCContainerFlagsPrivileged); }
     if (m_stopTimeout.has_value())
     {
         options.StopTimeout = m_stopTimeout.value();

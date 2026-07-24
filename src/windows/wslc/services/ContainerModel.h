@@ -65,6 +65,8 @@ struct ContainerOptions
     std::optional<int64_t> MemoryBytes{};
     std::optional<int64_t> NanoCpus{};
     std::vector<std::tuple<std::string, int64_t, int64_t>> Ulimits;
+    bool Privileged = false;
+    std::vector<std::pair<std::string, std::string>> Devices;
 };
 
 struct CreateContainerResult

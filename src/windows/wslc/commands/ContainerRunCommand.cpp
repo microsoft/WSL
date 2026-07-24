@@ -62,6 +62,8 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::PublishAll),
         // Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
+        Argument::Create(ArgType::Privileged),
+        Argument::Create(ArgType::Device, false, NO_LIMIT),
         // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::ShmSize),
         Argument::Create(ArgType::StopSignal),
