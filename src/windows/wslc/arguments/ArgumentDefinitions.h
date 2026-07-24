@@ -32,6 +32,8 @@ Abstract:
 // X-Macro for defining all arguments in one place
 // Format: ARGUMENT(EnumName, Name, Alias, Kind, Desc)
 // clang-format off
+_(Device,         "device",              NO_ALIAS,          Kind::Value,       L"Add a host device to the container") \
+_(Privileged,     "privileged",          NO_ALIAS,          Kind::Flag,        L"Run container in privileged mode") \
 #define WSLC_ARGUMENTS(_) \
 _(All,            "all",                 L"a",              Kind::Flag,        Localization::WSLCCLI_AllArgDescription()) \
 _(Archive,        "archive",             L"a",              Kind::Flag,        Localization::WSLCCLI_ArchiveArgDescription()) \

@@ -51,10 +51,10 @@ template <>
 struct FlagsTraits<WslcContainerFlags>
 {
     using WslcType = WSLCContainerFlags;
-    constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
+    constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU | WSLC_CONTAINER_FLAG_PRIVILEGED;
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLCContainerFlagsRm);
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLCContainerFlagsGpu);
-    // TODO: WSLC_CONTAINER_FLAG_PRIVILEGED has no associated runtime value
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_PRIVILEGED, WSLCContainerFlagsPrivileged);
 };
 
 template <>

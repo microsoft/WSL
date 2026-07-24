@@ -1866,6 +1866,13 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.DeviceRequests = std::vector<common::docker_schema::DeviceRequest>{{"cdi", {LX_WSLC_GPU_CDI_DEVICE}}};
     }
 
+    // Configure privileged mode if requested.
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPrivileged))
+    {
+        request.HostConfig.Privileged = true;
+    }
+
+
     // Prepare port mappings from container options.
     std::vector<_WSLCPortMapping> ports;
     for (ULONG i = 0; i < containerOptions.PortsCount; i++)
