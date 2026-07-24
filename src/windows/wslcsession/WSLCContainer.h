@@ -158,12 +158,20 @@ public:
         IORelay& Relay);
 
 private:
+    enum class TransitionKind
+    {
+        Start,
+        Stop,
+        Delete
+    };
+
     struct StateTransition
     {
-        StateTransition(ContainerEvent expectedEvent) : ExpectedEvent(expectedEvent)
+        StateTransition(TransitionKind kind, ContainerEvent expectedEvent) : Kind(kind), ExpectedEvent(expectedEvent)
         {
         }
 
+        const TransitionKind Kind;
         ContainerEvent ExpectedEvent;
         wil::unique_event Completed{wil::EventOptions::ManualReset};
         std::exception_ptr Exception;
@@ -175,7 +183,11 @@ private:
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime) noexcept;
 
-    void WaitForTransition(const std::shared_ptr<StateTransition>& transition) const;
+    // Returns with lock held when no transition is active or the active transition matches kind.
+    void WaitForConflictingTransitionToComplete(wil::rwlock_release_exclusive_scope_exit& lock, std::optional<TransitionKind> kind = std::nullopt);
+    void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
+    void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
+
     __requires_exclusive_lock_held(m_lock) void CompleteTransition(
         const std::shared_ptr<StateTransition>& transition, std::exception_ptr exception = {}) noexcept;
 
@@ -209,9 +221,6 @@ private:
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
-    // Stop callers hold this lock shared so concurrent requests can join the same
-    // transition. Other lifecycle transitions hold it exclusively.
-    wil::srwlock m_transitionLock;
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
     DockerHTTPClient& m_dockerClient;

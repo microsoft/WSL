@@ -743,10 +743,8 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
     std::shared_ptr<StateTransition> transition;
-    auto transitionLock = m_transitionLock.lock_exclusive();
     auto lock = m_lock.lock_exclusive();
-
-    WI_ASSERT(!m_transition);
+    WaitForConflictingTransitionToComplete(lock);
 
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
 
@@ -876,19 +874,34 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         }
     }
 
-    transition = std::make_shared<StateTransition>(ContainerEvent::Start);
+    transition = std::make_shared<StateTransition>(TransitionKind::Start, ContainerEvent::Start);
     WI_ASSERT(!m_transition);
     m_transition = transition;
-
-    lock.reset();
-    WaitForTransition(transition);
 
     portCleanup.release();
     volumeCleanup.release();
     cleanup.release();
+
+    lock.reset();
+    AttachToTransition(transition);
 }
 
-void WSLCContainerImpl::WaitForTransition(const std::shared_ptr<StateTransition>& transition) const
+void WSLCContainerImpl::WaitForConflictingTransitionToComplete(wil::rwlock_release_exclusive_scope_exit& lock, std::optional<TransitionKind> kind)
+{
+    while (m_transition && (!kind.has_value() || m_transition->Kind != kind.value()))
+    {
+        // The transition may own the COM wrapper, so release this reference before reacquiring m_lock.
+        {
+            auto transition = m_transition;
+            lock.reset();
+            WaitForTransitionCompletion(transition);
+        }
+
+        lock = m_lock.lock_exclusive();
+    }
+}
+
+void WSLCContainerImpl::WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const
 {
     THROW_HR_IF_MSG(
         E_UNEXPECTED,
@@ -897,6 +910,11 @@ void WSLCContainerImpl::WaitForTransition(const std::shared_ptr<StateTransition>
         m_id.c_str());
 
     WI_ASSERT(transition->Completed.is_signaled());
+}
+
+void WSLCContainerImpl::AttachToTransition(const std::shared_ptr<StateTransition>& transition) const
+{
+    WaitForTransitionCompletion(transition);
 
     if (transition->Exception)
     {
@@ -914,55 +932,60 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
 
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime) noexcept
 {
-    // The wrapper must be disconnected after m_lock is released so in-flight COM callers can drain.
+    // The com wrapper can not be disconnected with lock held. Destroy event may transfer ownership of the disconnect
+    // to an awaiting COM caller via the transition object. So both must be destroyed after releasing the lock.
     unique_com_disconnect comWrapper;
-    auto lock = m_lock.lock_exclusive();
-    auto transition = m_transition;
+    std::shared_ptr<StateTransition> transition;
 
-    if (event == ContainerEvent::Start)
     {
-        // Only WSLC should start the container, so if we receive a start event, it must be expected by a transition.
-        // Otherwise the container was started externally. Log if the container was started externally.
-        if (transition && transition->ExpectedEvent == ContainerEvent::Start)
+        auto lock = m_lock.lock_exclusive();
+        transition = m_transition;
+
+        if (event == ContainerEvent::Start)
         {
-            WI_ASSERT(m_state == WslcContainerStateCreated || m_state == WslcContainerStateExited);
-            CommitState(WslcContainerStateRunning, eventTime);
-            CompleteTransition(transition);
+            // Only WSLC should start the container, so if we receive a start event, it must be expected by a transition.
+            // Otherwise the container was started externally. Log if the container was started externally.
+            if (transition && transition->ExpectedEvent == ContainerEvent::Start)
+            {
+                WI_ASSERT(m_state == WslcContainerStateCreated || m_state == WslcContainerStateExited);
+                CommitState(WslcContainerStateRunning, eventTime);
+                CompleteTransition(transition);
+            }
+            else
+            {
+                WSL_LOG("UnexpectedContainerStart", TraceLoggingValue(m_id.c_str(), "Id"));
+            }
         }
-        else
+        else if (event == ContainerEvent::Stop)
         {
-            WSL_LOG("UnexpectedContainerStart", TraceLoggingValue(m_id.c_str(), "Id"));
+            WI_ASSERT(exitCode.has_value());
+            OnStopped(exitCode.value(), eventTime);
         }
-    }
-    else if (event == ContainerEvent::Stop)
-    {
-        WI_ASSERT(exitCode.has_value());
-        OnStopped(exitCode.value(), eventTime);
-    }
-    else if (event == ContainerEvent::Destroy)
-    {
-        if (m_state != WslcContainerStateDeleted)
+        else if (event == ContainerEvent::Destroy)
         {
-            CommitState(WslcContainerStateDeleted, eventTime);
-            comWrapper = ReleaseResources();
+            if (m_state != WslcContainerStateDeleted)
+            {
+                CommitState(WslcContainerStateDeleted, eventTime);
+                comWrapper = ReleaseResources();
+            }
+
+            // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
+            SignalInitProcessExit();
+
+            if (transition)
+            {
+                WI_ASSERT(transition->ExpectedEvent == ContainerEvent::Destroy);
+                transition->Wrapper = std::move(comWrapper);
+                CompleteTransition(transition);
+            }
         }
 
-        // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
-        SignalInitProcessExit();
-
-        if (transition)
-        {
-            WI_ASSERT(transition->ExpectedEvent == ContainerEvent::Destroy);
-            transition->Wrapper = std::move(comWrapper);
-            CompleteTransition(transition);
-        }
+        WSL_LOG(
+            "ContainerEvent",
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(m_id.c_str(), "Id"),
+            TraceLoggingValue((int)event, "Event"));
     }
-
-    WSL_LOG(
-        "ContainerEvent",
-        TraceLoggingValue(m_name.c_str(), "Name"),
-        TraceLoggingValue(m_id.c_str(), "Id"),
-        TraceLoggingValue((int)event, "Event"));
 }
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
@@ -970,17 +993,15 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     std::shared_ptr<StateTransition> transition;
 
     {
-        // Stop callers take the transition lock shared. m_lock serializes the first caller's
-        // Docker request and publication of m_transition; later callers copy that transition
-        // and wait on the same completion event. Start and Delete take this lock exclusively.
-        auto transitionLock = m_transitionLock.lock_shared();
         auto lock = m_lock.lock_exclusive();
+        WaitForConflictingTransitionToComplete(lock, TransitionKind::Stop);
 
         if (m_transition)
         {
+            WI_ASSERT(m_transition->Kind == TransitionKind::Stop);
             transition = m_transition;
             lock.reset();
-            WaitForTransition(transition);
+            AttachToTransition(transition);
             return;
         }
 
@@ -1039,16 +1060,13 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
         if (waitForStop)
         {
-            transition = std::make_shared<StateTransition>(ContainerEvent::Stop);
+            transition = std::make_shared<StateTransition>(TransitionKind::Stop, ContainerEvent::Stop);
 
             WI_ASSERT(!m_transition);
             m_transition = transition;
 
             lock.reset();
-            WaitForTransition(transition);
-
-            // Wait for OnEvent() to leave its critical section before transition can destroy the COM wrapper.
-            lock = m_lock.lock_exclusive();
+            AttachToTransition(transition);
         }
     }
 }
@@ -1129,23 +1147,17 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     std::shared_ptr<StateTransition> transition;
 
     {
-        auto transitionLock = m_transitionLock.lock_exclusive();
         auto lock = m_lock.lock_exclusive();
-
-        WI_ASSERT(!m_transition);
+        WaitForConflictingTransitionToComplete(lock);
 
         RequestDeleteExclusiveLockHeld(Flags);
 
-        transition = std::make_shared<StateTransition>(ContainerEvent::Destroy);
+        transition = std::make_shared<StateTransition>(TransitionKind::Delete, ContainerEvent::Destroy);
         WI_ASSERT(!m_transition);
         m_transition = transition;
 
         lock.reset();
-        WaitForTransition(transition);
-
-        // Reacquire m_lock to wait for OnEvent() to leave its critical section. Both locks must be released before transition
-        // destroys the COM wrapper.
-        lock = m_lock.lock_exclusive();
+        AttachToTransition(transition);
     }
 }
 
