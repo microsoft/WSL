@@ -635,13 +635,6 @@ CATCH_LOG();
 
 bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
 {
-    // tmpfs sessions have no persistent storage to recover from, so tearing the VM down loses all
-    // state. Match OnIdleTimer and refuse, so this shipping hook can't force data loss.
-    if (!IdleTerminationEnabled())
-    {
-        return false;
-    }
-
     // Mirror OnIdleTimer's MTA context on a dedicated thread: the incoming RPC thread is an STA, so
     // both re-initializing MTA on it and running teardown inline would fail (RPC_E_CHANGED_MODE /
     // RPC_E_WRONG_THREAD when releasing the VM's cross-process COM proxies).
@@ -658,6 +651,14 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
             if (m_terminating->load() || m_vmState.load() != VmState::Running)
             {
                 wasAlreadyIdle = true;
+                return;
+            }
+
+            // tmpfs sessions have no persistent storage to recover from, so tearing a running VM down
+            // loses all state. Check this after the VM state so a never-started session still reports
+            // that it was already idle.
+            if (!IdleTerminationEnabled())
+            {
                 return;
             }
 

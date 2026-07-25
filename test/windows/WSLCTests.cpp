@@ -12166,11 +12166,17 @@ class WSLCTests
         constexpr auto c_sessionName = L"wslc-idle-tmpfs-test";
         auto session = CreateSession(GetDefaultSessionSettings(c_sessionName));
 
+        // A never-started session is already idle even though idle termination is disabled.
+        BOOL wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
         WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
         auto process = launcher.Launch(*session);
         VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
 
-        BOOL wasAlreadyIdle = TRUE;
+        wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
 
