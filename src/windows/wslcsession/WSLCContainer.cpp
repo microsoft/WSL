@@ -1870,6 +1870,20 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPrivileged))
     {
         request.HostConfig.Privileged = true;
+        request.HostConfig.SecurityOpt.push_back("seccomp=unconfined");
+
+        // Grant FUSE device access in privileged containers.
+        // Without this, /dev/fuse returns EPERM even with full capabilities
+        // because the device cgroup blocks access by default.
+        common::docker_schema::DeviceMapping fuseDevice;
+        fuseDevice.PathOnHost = "/dev/fuse";
+        fuseDevice.PathInContainer = "/dev/fuse";
+        fuseDevice.CgroupPermissions = "rwm";
+        if (!request.HostConfig.Devices.has_value())
+        {
+            request.HostConfig.Devices = std::vector<common::docker_schema::DeviceMapping>{};
+        }
+        request.HostConfig.Devices->push_back(std::move(fuseDevice));
     }
 
 
@@ -2750,7 +2764,7 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
             wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()));
     }
 
-    // All strings built successfully — allocate output array and transfer ownership.
+    // All strings built successfully �?allocate output array and transfer ownership.
     auto labelsArray = wil::make_unique_cotaskmem<WSLCLabelInformation[]>(localLabels.size());
     for (size_t i = 0; i < localLabels.size(); ++i)
     {
