@@ -2764,7 +2764,7 @@ void WSLCContainerImpl::GetLabels(WSLCLabelInformation** Labels, ULONG* Count) c
             wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()));
     }
 
-    // All strings built successfully �?allocate output array and transfer ownership.
+    // All strings built successfully - allocate output array and transfer ownership.
     auto labelsArray = wil::make_unique_cotaskmem<WSLCLabelInformation[]>(localLabels.size());
     for (size_t i = 0; i < localLabels.size(); ++i)
     {

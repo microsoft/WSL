@@ -911,15 +911,6 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Privileged = true;
     }
 
-    if (context.Args.Contains(ArgType::Device))
-    {
-        for (const auto& device : context.Args.GetAll<ArgType::Device>())
-        {
-            auto parsed = validation::ParseLabel(WideToMultiByte(device));
-            options.Devices.emplace_back(parsed.first, parsed.second);
-        }
-    }
-
     context.Data.Add<Data::ContainerOptions>(std::move(options));
 }
 

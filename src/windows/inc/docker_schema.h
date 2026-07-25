@@ -294,8 +294,8 @@ struct HostConfig
     std::optional<std::vector<std::string>> DnsOptions;
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
-    // Docker wire type is int64. 0 means "use daemon default" â€?same as omitting
-    // the field â€?so we don't bother with std::optional here.
+    // Docker wire type is int64. 0 means "use daemon default"  - same as omitting
+    // the field  - so we don't bother with std::optional here.
     std::int64_t ShmSize{};
     std::optional<std::vector<DeviceMapping>> Devices;
     std::optional<std::vector<DeviceRequest>> DeviceRequests;

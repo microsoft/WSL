@@ -245,9 +245,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Reporter& repor
         containerLauncher.SetPrivileged(true);
     }
 
-    // TODO: Wire devices through to SDK when MDL struct is added.
-    // for (const auto& [hostPath, containerPath] : options.Devices) { ... }
-
     for (const auto& [key, value] : options.Labels)
     {
         containerLauncher.AddLabel(key, value);

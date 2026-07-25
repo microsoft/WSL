@@ -54,7 +54,6 @@ struct FlagsTraits<WslcContainerFlags>
     constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU | WSLC_CONTAINER_FLAG_PRIVILEGED;
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLCContainerFlagsRm);
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLCContainerFlagsGpu);
-    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_PRIVILEGED, WSLCContainerFlagsPrivileged);
 };
 
 template <>
@@ -78,6 +77,18 @@ typename FlagsTraits<Flags>::WslcType ConvertFlags(Flags flags)
 {
     using traits = FlagsTraits<Flags>;
     return static_cast<typename traits::WslcType>(flags & traits::Mask);
+}
+
+template <>
+WSLCContainerFlags ConvertFlags(WslcContainerFlags flags)
+{
+    constexpr auto s_publicMask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
+    auto result = static_cast<WSLCContainerFlags>(flags & s_publicMask);
+    if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
+    {
+        WI_SetFlag(result, WSLCContainerFlagsPrivileged);
+    }
+    return result;
 }
 
 WSLCSignal Convert(WslcSignal signal)
