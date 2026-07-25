@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerStopCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
+        Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
         Argument::Create(ArgType::Signal),
         Argument::Create(ArgType::Time),
     };
