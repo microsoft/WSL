@@ -125,8 +125,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
     auto url = URL::Create("/images/create");
 
     // Normalize the repo server & path
-    auto [server, path] = wslutil::NormalizeRepo(Repo);
-    url.SetParameter("fromImage", std::format("{}/{}", server, path));
+    url.SetParameter("fromImage", wslutil::RepositoryReference::Parse(Repo).GetCanonical());
 
     if (tagOrDigest.has_value())
     {

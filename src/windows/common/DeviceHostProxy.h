@@ -23,6 +23,8 @@ public:
 
     void AddVirtiofsChild(const GUID& InstanceId, const std::wstring& Name, const std::wstring& RootPath, const std::wstring& MountOptions);
 
+    void RemoveVirtiofsChild(const GUID& InstanceId, const std::wstring& Name);
+
     GUID AddVirtioPmemDevice(_In_ HANDLE UserToken, const std::wstring& Path, bool Writable);
 
     void RemoveDevice(const GUID& InstanceId);

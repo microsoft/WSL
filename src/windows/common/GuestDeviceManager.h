@@ -28,6 +28,9 @@ public:
     void AddVirtiofsChild(_In_ const GUID& InstanceId, _In_ PCWSTR Name, _In_opt_ PCWSTR MountOptions, _In_ PCWSTR RootPath);
 
     _Requires_lock_not_held_(m_lock)
+    void RemoveVirtiofsChild(_In_ const GUID& InstanceId, _In_ PCWSTR Name);
+
+    _Requires_lock_not_held_(m_lock)
     GUID AddVirtioPmemDevice(_In_ PCWSTR Path, bool ReadOnly, _In_ HANDLE UserToken);
 
     _Requires_lock_not_held_(m_lock)
