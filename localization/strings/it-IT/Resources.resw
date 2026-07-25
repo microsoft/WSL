@@ -1204,6 +1204,10 @@ Vedere le istruzioni per il ripristino in: https://aka.ms/wsldiskmountrecovery</
     <value>Traduzione di '{}' non riuscita</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>C'è un problema. Riprova più tardi.</value>
   </data>
@@ -2165,10 +2169,6 @@ Utilizzo:
     <value>Argomento obbligatorio non specificato: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argomento specificato più volte di quanto consentito: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Mostra la guida per il comando selezionato</value>
   </data>
@@ -3058,10 +3058,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Pubblica tutte le porte esposte sulle porte host casuali</value>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
-    <value>Suppress verbose output</value>
+    <value>Elimina output dettagliato</value>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
-    <value>Using default tag: {}</value>
+    <value>Uso del tag predefinito: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
@@ -3537,7 +3537,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Non è possibile inizializzare lo scambio</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>Le porte UDP esposte dall'immagine non sono state pubblicate perché il port forwarding UDP non è supportato nella modalità di rete corrente</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Non è possibile ripristinare il timestamp per il contenitore '{}'</value>

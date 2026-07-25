@@ -1198,6 +1198,10 @@ Se återställningsinstruktioner på: https://aka.ms/wsldiskmountrecovery</value
     <value>Det gick inte att översätta "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Ett fel uppstod. Försök igen senare.</value>
   </data>
@@ -2159,10 +2163,6 @@ Användning:
     <value>Obligatoriska argument saknas: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argumentet tillhandahölls fler gånger än tillåtet: "{}"</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Visar hjälp om det markerade kommandot</value>
   </data>
@@ -2388,7 +2388,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicera drivrutinsalternativet {}.</value>
+    <value>Duplicerat drivrutinsalternativet ''{}''.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
@@ -3053,10 +3053,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Publicera alla exponerade portar till slumpmässiga värdportar</value>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
-    <value>Suppress verbose output</value>
+    <value>Dölj utförlig utdata</value>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
-    <value>Using default tag: {}</value>
+    <value>Använder standardtagg: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
@@ -3532,7 +3532,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Det gick inte att initiera pendling</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>UDP-portar som exponeras av avbildningen publicerades inte eftersom UDP-portvidarebefordran inte stöds i det aktuella nätverksläget</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Det gick inte att återställa tidsstämpeln för containern {}</value>
