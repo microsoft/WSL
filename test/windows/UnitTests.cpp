@@ -1754,7 +1754,7 @@ Arguments for managing Windows Subsystem for Linux:
                 Resize the disk of the distribution to the specified size.
 
             --compact
-                Compact the VHDX file of a stopped WSL 2 distribution.
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
