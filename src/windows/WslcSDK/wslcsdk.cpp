@@ -82,7 +82,7 @@ typename FlagsTraits<Flags>::WslcType ConvertFlags(Flags flags)
 template <>
 WSLCContainerFlags ConvertFlags(WslcContainerFlags flags)
 {
-    constexpr auto s_publicMask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
+    constexpr auto s_publicMask = FlagsTraits<WslcContainerFlags>::Mask & ~WSLC_CONTAINER_FLAG_PRIVILEGED;
     auto result = static_cast<WSLCContainerFlags>(flags & s_publicMask);
     if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
     {
