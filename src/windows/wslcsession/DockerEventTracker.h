@@ -29,7 +29,8 @@ enum class ContainerEvent
     Stop,
     Exit,
     Destroy,
-    ExecDied
+    ExecDied,
+    Kill
 };
 
 enum class VolumeEvent

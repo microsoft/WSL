@@ -22,6 +22,7 @@ Abstract:
 #include "WSLCNetworkMetadata.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
+#include "EventStore.h"
 #include "IORelay.h"
 #include <list>
 #include <unordered_map>
@@ -102,6 +103,15 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
+
+    // Event streaming. Opens a stream object that yields matching events one at a time via
+    // IWSLCEventStream::GetNext.
+    IFACEMETHOD(GetEvents)(
+        _In_ ULONGLONG SinceTime,
+        _In_ ULONGLONG UntilTime,
+        _In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
+        _In_ ULONG FiltersCount,
+        _Outptr_ IWSLCEventStream** Stream) override;
 
     // Image management.
     IFACEMETHOD(PullImage)(
@@ -247,11 +257,6 @@ public:
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
 
-    HANDLE SessionTerminatingEvent() const noexcept
-    {
-        return m_sessionTerminatingEvent.get();
-    }
-
     ULONG Id() const noexcept
     {
         return m_id;
@@ -334,6 +339,9 @@ private:
     std::atomic<bool> m_terminating{false};
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
+
+    // Bounded in-memory ring of recent lifecycle events, shared by all event-stream subscribers.
+    EventStore m_eventStore;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
