@@ -414,6 +414,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCListDir,
     LxMessageWSLCListDirResult,
     LxMessageWSLCMountVirtioFs,
+    LxMiniInitMessageTrimDistribution,
+    LxMiniInitMessageTrimDistributionResponse,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -529,6 +531,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCListDir)
         X(LxMessageWSLCListDirResult)
         X(LxMessageWSLCMountVirtioFs)
+        X(LxMiniInitMessageTrimDistribution)
+        X(LxMiniInitMessageTrimDistributionResponse)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1511,6 +1515,26 @@ typedef struct _LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE
 
     PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun), FIELD(NewSize));
 } LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE, *PLX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE;
+
+typedef struct _LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE
+{
+    static inline auto Type = LxMiniInitMessageTrimDistributionResponse;
+
+    MESSAGE_HEADER Header;
+    uint32_t ResponseCode;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(ResponseCode));
+} LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE, *PLX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE;
+
+typedef struct _LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE
+{
+    static inline auto Type = LxMiniInitMessageTrimDistribution;
+
+    MESSAGE_HEADER Header;
+    unsigned int ScsiLun;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+} LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE, *PLX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE;
 
 struct CREATE_PROCESS_MESSAGE
 {

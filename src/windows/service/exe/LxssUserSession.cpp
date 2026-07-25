@@ -1896,6 +1896,25 @@ try
         }
 
         _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+
+        // Trim the filesystem before compaction so the host can reclaim the freed blocks.
+        //
+        // WSL2 does not mount ext4 with 'discard' and does not run fsck at boot, so blocks freed
+        // inside the guest are still marked as allocated in the VHD and a bare compaction reclaims
+        // little space. Attaching the (now stopped) distribution's VHD to the utility VM and running
+        // an offline fsck with block discard releases those blocks, then ejecting flushes the change
+        // back to the VHD before it is compacted below.
+        //
+        // This is best-effort: any failure here must not prevent compaction.
+        try
+        {
+            _CreateVm();
+            const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+            auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
+            m_utilityVm->TrimDistribution(lun);
+        }
+        CATCH_LOG();
     }
 
     HRESULT result = E_UNEXPECTED;
@@ -1910,9 +1929,7 @@ try
     });
 
     WSL_LOG_TELEMETRY(
-        "CompactDistributionBegin",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(configuration.Name.c_str(), "distroName"));
+        "CompactDistributionBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(configuration.Name.c_str(), "distroName"));
 
     result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
     if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))

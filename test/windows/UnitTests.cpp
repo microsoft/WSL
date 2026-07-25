@@ -3407,8 +3407,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         const auto sizeAfterWrite = getVhdSizeOnDisk(vhdPath);
         VERIFY_IS_TRUE(sizeAfterWrite >= sizeBeforeWrite + minimumCompactionDelta);
 
+        // Delete the file but do NOT trim from inside the guest: reclaiming the freed blocks now
+        // depends on the trim that '--compact' performs on the host before compacting the VHD.
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
-            L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync && fstrim -v /'", name));
+            L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync'", name));
         VERIFY_ARE_EQUAL(err, L"");
         WslShutdown();
 
