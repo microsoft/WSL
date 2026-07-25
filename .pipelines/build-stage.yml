@@ -104,7 +104,7 @@ stages:
           pool:
             name: ${{ parameters.pool }}
             demands:
-              - ImageOverride -equals 2026-07-22-wsl-build-image
+              - ImageOverride -equals 2026-07-24-build-image
 
         steps:
           - script: python tools/devops/validate-localization.py
