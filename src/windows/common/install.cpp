@@ -112,6 +112,7 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
 
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
+            wsl::windows::common::install::SetRebootRequiredMarker();
             if (callerOwnsProcess)
             {
                 PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
@@ -124,6 +125,11 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
                 HRESULT_FROM_WIN32(exitCode),
                 wsl::shared::Localization::MessageUpdateFailed(exitCode) + L"\r\n" +
                     wsl::shared::Localization::MessageSeeLogFile(logFile.c_str()));
+        }
+        else
+        {
+            // Clean install — clear any pending reboot marker from a prior 3010-result install.
+            wsl::windows::common::install::ClearRebootRequiredMarker();
         }
     }
     else
@@ -173,6 +179,16 @@ void WaitForMsiInstall()
     {
         finishLine.release();
         wprintf(L"\n%ls\n", message.get());
+    }
+
+    if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+    {
+        // The MSI completed but one or more files (typically system.vhd or wslservice.exe)
+        // were in use and have been scheduled for replacement on the next reboot. Surface
+        // this distinctly so the caller does not proceed to launch WSL against a
+        // half-installed package — notably, the previous system.vhd has been renamed away
+        // to %WINDIR%\Installer\Config.Msi\*.rbf and the new one is not yet in place.
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED), wsl::shared::Localization::MessageUpdateRebootRequired());
     }
 
     if (exitCode != 0)
@@ -240,9 +256,46 @@ void ConfigureMsiLogging(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void
 
 } // namespace
 
+static constexpr auto c_rebootPendingSubkey = L"MSI\\RebootPending";
+
+void wsl::windows::common::install::SetRebootRequiredMarker()
+{
+    const auto lxssKey = OpenLxssMachineKey(KEY_ALL_ACCESS);
+    // REG_OPTION_VOLATILE: key is automatically deleted on reboot.
+    auto key = CreateKey(lxssKey.get(), c_rebootPendingSubkey, KEY_SET_VALUE, nullptr, REG_OPTION_VOLATILE);
+    WriteDword(key.get(), nullptr, L"RebootRequired", 1);
+}
+
+void wsl::windows::common::install::ClearRebootRequiredMarker()
+{
+    // Best-effort. registry::DeleteKey treats ERROR_FILE_NOT_FOUND as a no-op,
+    // so this is safe to call on any successful install path even if no marker
+    // was previously set.
+    const auto lxssKey = OpenLxssMachineKey(KEY_ALL_ACCESS);
+    wsl::windows::common::registry::DeleteKey(lxssKey.get(), c_rebootPendingSubkey);
+}
+
+bool wsl::windows::common::install::IsRebootRequired()
+{
+    auto [key, hr] = OpenKeyNoThrow(OpenLxssMachineKey(KEY_READ).get(), c_rebootPendingSubkey, KEY_READ);
+    if (FAILED(hr))
+    {
+        return false;
+    }
+
+    return ReadDword(key.get(), nullptr, L"RebootRequired", 0) != 0;
+}
+
 int wsl::windows::common::install::CallMsiPackage()
 {
     wsl::windows::common::ExecutionContext context(wsl::windows::common::CallMsi);
+
+    // N.B. We intentionally do not block here on IsRebootRequired(). CallMsiPackage()
+    // is the bootstrap forwarder used by every MSIX-lifted wsl.exe invocation,
+    // including read-only commands like `--version`, `--list`, and recovery commands
+    // like `--shutdown` and `--update`. Blocking those would be user-hostile.
+    // The service-side check in LxssUserSession::_CreateInstance gates the
+    // distro-launching paths that actually depend on the half-installed files.
 
     auto msiPath = GetMsiPackagePath();
     if (!msiPath.has_value())
@@ -257,6 +310,18 @@ int wsl::windows::common::install::CallMsiPackage()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
+
+            // If the install completed but is pending a reboot to finish replacing files
+            // (ERROR_SUCCESS_REBOOT_REQUIRED), the registered MSI install path is already
+            // populated even though some files (e.g. system.vhd) are physically missing
+            // until the user reboots. Do not fall through to the race-recovery
+            // GetMsiPackagePath() retry below — that would silently proceed to launch
+            // wsl.exe against a half-installed package. Surface the reboot-required
+            // error to the user instead.
+            if (wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED))
+            {
+                throw;
+            }
 
             // GetMsiPackagePath() will generate a user error if the registry access fails.
             // Save the error from GetMsiPackagePath() to return a proper 'install failed' message.
