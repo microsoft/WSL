@@ -244,7 +244,8 @@ public:
     /// <summary>
     /// Imports a distribution inplace.
     /// </summary>
-    IFACEMETHOD(ImportDistributionInplace)(_In_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid) override;
+    IFACEMETHOD(ImportDistributionInplace)(
+        _In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid) override;
 
     /// <summary>
     /// Terminates a distribution by it's client identifier.
@@ -425,7 +426,7 @@ public:
     /// Imports a distribution inplace.
     /// </summary>
     HRESULT
-    ImportDistributionInplace(_In_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _Out_ GUID* pDistroGuid);
+    ImportDistributionInplace(_In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ GUID* pDistroGuid);
 
     /// <summary>
     /// Mount a disk.
