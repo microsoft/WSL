@@ -327,6 +327,21 @@ class WSLCCLIExecutionUnitTests
         VERIFY_IS_TRUE(options.Privileged);
     }
 
+    TEST_METHOD(CreateCommand_ParsePrivileged_SetsPrivilegedOption)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --privileged ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.Privileged);
+    }
+
     TEST_METHOD(RunCommand_ParseGpusInvalid_ThrowsArgumentException)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus invalid ubuntu sh");
