@@ -1198,6 +1198,10 @@ Zie de herstelinstructies voor: https://aka.ms/wsldiskmountrecovery</value>
     <value>Kan '{}' niet vertalen</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Er is iets foutgegaan. Probeer het later opnieuw.</value>
   </data>
@@ -2159,10 +2163,6 @@ Gebruik:
     <value>Vereist argument niet ingevoerd: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argument vaker ingevoerd dan toegestaan: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Toont informatie over de geselecteerde opdracht</value>
   </data>
@@ -3052,10 +3052,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Alle weergegeven poorten publiceren naar willekeurige hostpoorten</value>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
-    <value>Suppress verbose output</value>
+    <value>Gedetailleerde uitvoer onderdrukken</value>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
-    <value>Using default tag: {}</value>
+    <value>Standaardtag gebruiken: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
@@ -3531,7 +3531,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Kan wisselen niet initialiseren</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>UDP-poorten die door de afbeelding worden weergegeven, zijn niet gepubliceerd omdat UDP-port forwarding niet wordt ondersteund in de huidige netwerkmodus</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Kan tijdstempel voor container '{}' niet herstellen</value>
