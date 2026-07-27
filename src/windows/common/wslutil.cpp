@@ -1245,7 +1245,7 @@ std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
     return pids;
 }
 
-std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo(const std::string& Input)
+wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil::RepositoryReference::Parse(const std::string& input)
 {
     // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
 
@@ -1254,14 +1254,14 @@ std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo
     constexpr auto legacyDomain = "index.docker.io";
     constexpr auto localhost = "localhost";
 
-    auto slash = Input.find('/');
+    auto slash = input.find('/');
     if (slash == std::string::npos)
     {
-        return {defaultDomain, officialPrefix + Input};
+        return RepositoryReference{input, defaultDomain, officialPrefix + input};
     }
 
-    auto domain = Input.substr(0, slash);
-    auto path = Input.substr(slash + 1);
+    auto domain = input.substr(0, slash);
+    auto path = input.substr(slash + 1);
 
     if (domain == legacyDomain)
     {
@@ -1272,7 +1272,7 @@ std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo
              }))
     {
         domain = defaultDomain;
-        path = Input;
+        path = input;
     }
 
     if (domain == defaultDomain && path.find('/') == std::string::npos)
@@ -1280,7 +1280,12 @@ std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo
         path = "library/" + path;
     }
 
-    return {domain, path};
+    return RepositoryReference{input, std::move(domain), std::move(path)};
+}
+
+std::string wsl::windows::common::wslutil::RepositoryReference::GetCanonical() const
+{
+    return std::format("{}/{}", Server, Path);
 }
 
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
@@ -1397,49 +1402,8 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
-std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input, EnumReferenceFormat* Format)
+wsl::windows::common::wslutil::ImageReference wsl::windows::common::wslutil::ImageReference::Parse(const std::string& input)
 {
-    static const auto regex = BuildImageReferenceRegex();
-    std::smatch match;
-    if (!std::regex_match(Input, match, regex))
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(Input.c_str()));
-    }
-
-    const auto& repo = match[1];
-    const auto& tag = match[2];
-    const auto& digest = match[3];
-
-    THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
-
-    EnumReferenceFormat referenceFormat = EnumReferenceFormatNone;
-    std::optional<std::string> tagOrDigest;
-    if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
-    {
-        tagOrDigest = digest.str();
-        referenceFormat = EnumReferenceFormatDigest;
-    }
-    else if (tag.matched) // <repo>:<tag>
-    {
-        tagOrDigest = tag.str();
-        referenceFormat = EnumReferenceFormatTag;
-    }
-
-    if (Format)
-    {
-        *Format = referenceFormat;
-    }
-
-    return {repo.str(), std::move(tagOrDigest)};
-}
-
-std::string wsl::windows::common::wslutil::GetCanonicalImageReference(const std::string& input)
-{
-    // Mirror the Docker CLI's client-side reference normalization so the final line matches `docker pull` exactly.
-    // See github.com/distribution/reference (normalize.go, reference.go) and github.com/docker/cli
-    // (cli/command/image/pull.go). Unlike ParseImage -- which collapses to a single tag-or-digest field with digest
-    // precedence -- Docker's canonical string keeps both a tag and a digest when both are present, so compose the
-    // reference directly from the parsed name, tag and digest groups.
     static const auto regex = BuildImageReferenceRegex();
     std::smatch match;
     if (!std::regex_match(input, match, regex))
@@ -1447,13 +1411,49 @@ std::string wsl::windows::common::wslutil::GetCanonicalImageReference(const std:
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
     }
 
-    auto [domain, path] = NormalizeRepo(match[1].str());
+    const auto& repo = match[1];
+    const auto& tag = match[2];
+    const auto& digest = match[3];
+
+    THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", input.c_str());
+
+    std::optional<std::string> tagValue;
+    if (tag.matched)
+    {
+        tagValue = tag.str();
+    }
+
+    std::optional<std::string> digestValue;
+    if (digest.matched)
+    {
+        digestValue = digest.str();
+    }
+
+    // Classify the reference the way the Docker CLI does, where a digest takes precedence over a tag.
+    EnumReferenceFormat format = EnumReferenceFormatNone;
+    if (digestValue.has_value())
+    {
+        format = EnumReferenceFormatDigest;
+    }
+    else if (tagValue.has_value())
+    {
+        format = EnumReferenceFormatTag;
+    }
+
+    return ImageReference{RepositoryReference::Parse(repo.str()), std::move(tagValue), std::move(digestValue), format};
+}
+
+std::string wsl::windows::common::wslutil::ImageReference::GetCanonical() const
+{
+    // Mirror the Docker CLI's client-side reference normalization so the result matches `docker pull` exactly.
+    // See github.com/distribution/reference (normalize.go, reference.go) and github.com/docker/cli
+    // (cli/command/image/pull.go). Docker's canonical string keeps both a tag and a digest when both are present.
 
     // A tag joins with ':' and a digest with '@'. A name-only reference (no tag and no digest) defaults to ":latest";
     // a digest-only reference is not name-only, so it keeps no tag (matching Docker's TagNameOnly).
-    const std::string tag = match[2].matched ? std::format(":{}", match[2].str()) : (match[3].matched ? "" : ":latest");
-    const std::string digest = match[3].matched ? std::format("@{}", match[3].str()) : "";
-    return std::format("{}/{}{}{}", domain, path, tag, digest);
+    const std::string tag = Tag ? std::format(":{}", *Tag) : (Digest ? "" : ":latest");
+    const std::string digest = Digest ? std::format("@{}", *Digest) : "";
+    return std::format("{}{}{}", Repository.GetCanonical(), tag, digest);
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)

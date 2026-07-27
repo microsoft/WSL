@@ -2395,15 +2395,15 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Дублировать параметр драйвера {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Недопустимый параметр драйвера {}; ожидалось key=value.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Неизвестный параметр конечной точки {} для сети {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2411,7 +2411,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>Сетевое соединение не может быть пустым.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Псевдоним сети не может быть пустым.</value>
@@ -3015,7 +3015,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Добавить сетевой псевдоним для контейнера</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Задайте параметры драйвера конечной точки (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
@@ -3057,6 +3057,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Опубликовать все раскрытые порты на случайных портах узла</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Подавление подробного вывода</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Используется тег по умолчанию: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Выводит только идентификаторы контейнеров</value>
@@ -3529,6 +3536,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Не удалось инициализировать переключение</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Не удалось восстановить метку времени для контейнера "{}"</value>

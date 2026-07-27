@@ -3051,6 +3051,13 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Alle weergegeven poorten publiceren naar willekeurige hostpoorten</value>
   </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Geeft alleen de container-id's weer</value>
   </data>
@@ -3522,6 +3529,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Kan wisselen niet initialiseren</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Kan tijdstempel voor container '{}' niet herstellen</value>

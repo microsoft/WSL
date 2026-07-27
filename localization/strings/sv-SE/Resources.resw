@@ -2380,7 +2380,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
-    <value>The primary network mode '{}' does not support connecting or disconnecting additional networks.</value>
+    <value>Det primära nätverksläget {} stöder inte anslutning eller frånkoppling av ytterligare nätverk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
@@ -2388,15 +2388,15 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Duplicera drivrutinsalternativet {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Ogiltigt drivrutinsalternativ {}; förväntade 'key=value'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Okänd slutpunktsinställning {} för nätverket {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2404,7 +2404,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>Nätverkslänken får inte vara tom.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Nätverksalias får inte vara tomt.</value>
@@ -2414,7 +2414,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
-    <value>Endpoint settings are not supported for network mode '{}'.</value>
+    <value>Slutpunktsinställningar stöds inte för nätverksläget {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
@@ -3009,7 +3009,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Lägg till ett nätverksomfattande alias för containern</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Ange alternativ för slutpunktsdrivrutin (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
@@ -3017,7 +3017,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
-    <value>Add link to another container (--link name:alias)</value>
+    <value>Lägg till länk till en annan container (--link name:alias)</value>
     <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
@@ -3051,6 +3051,13 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publicera alla exponerade portar till slumpmässiga värdportar</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Using default tag: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Visar endast container-ID:n</value>
@@ -3523,6 +3530,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Det gick inte att initiera pendling</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Det gick inte att återställa tidsstämpeln för containern {}</value>

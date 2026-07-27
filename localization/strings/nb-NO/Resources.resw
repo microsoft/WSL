@@ -2388,15 +2388,15 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Duplisert driveralternativ «{}».</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Ugyldig driveralternativ «{}» – forventet 'key=value'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Ukjent innstilling for endepunkt «{}» for nettverket «{}».</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2404,7 +2404,7 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>Nettverkskoblingen kan ikke være tom.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Nettverksalias kan ikke være tomt.</value>
@@ -2414,7 +2414,7 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
-    <value>Endpoint settings are not supported for network mode '{}'.</value>
+    <value>Endepunktinnstillinger støttes ikke for nettverksmodusen {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
@@ -3008,7 +3008,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Legg til et alias med nettverksomfang for beholderen</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Angi driveralternativer for endepunkt (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
@@ -3050,6 +3050,13 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publiser alle eksponerte porter til tilfeldige vertsporter</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Undertrykk detaljert utdata</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Bruker standardtagg: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Returnerer kun beholder-ID-er</value>
@@ -3522,6 +3529,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Kan ikke initialisere bytte</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Kan ikke gjenopprette tidsstempel for beholderen {}</value>

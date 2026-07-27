@@ -2395,15 +2395,15 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Option de pilote dupliquée '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Option de pilote non valide '{}'; 'key=value' attendu.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Paramètre de point de terminaison inconnu '{}' pour le réseau '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2411,7 +2411,7 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>Le lien réseau ne peut pas être vide.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>L’alias réseau ne peut pas être vide.</value>
@@ -3015,7 +3015,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Ajouter un alias étendu au réseau pour le conteneur</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Définir les options du pilote de point de terminaison (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
@@ -3023,11 +3023,11 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
-    <value>Ajouter un lien à un autre conteneur (nom --link : alias)</value>
+    <value>Ajouter un lien vers un autre conteneur (--link name:alias)</value>
     <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
-    <value>Ajouter une adresse IPv4 locale au lien pour le conteneur</value>
+    <value>Ajouter une adresse IPv4 link-local pour le conteneur</value>
     <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
@@ -3057,6 +3057,13 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publier tous les ports exposés sur des ports aléatoires de l’hôte</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Masquer le résultat détaillé</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Utilisation de la balise par défaut : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Affiche uniquement les ID des conteneurs</value>
@@ -3529,6 +3536,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Échec de l’initialisation de l’échange</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Échec de la restauration de l’horodatage du conteneur '{}'</value>

@@ -180,7 +180,7 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
 
             reporter.Write(
                 helpLevel, L"{}<{}{}{}{}{}>{}", HelpMetaEmphasis, Format::Default, HelpPlaceholderEmphasis, arg.Name(), Format::Default, HelpMetaEmphasis, Format::Default);
-            if (arg.Limit() > 1)
+            if (arg.IsUnlimited())
             {
                 reporter.Write(helpLevel, L"{}...{}", HelpMetaEmphasis, Format::Default);
             }
@@ -427,11 +427,12 @@ void Command::ParseArguments(
 // Validates the ArgMap produced by ParseArguments. ArgMap is assumed to have
 // been populated and parsed successfully from the invocation and now we are validating
 // that the arguments provided meet the requirements of the command. This includes checking
-// that all required arguments are present and no arguments exceed their count limits.
+// that all required arguments are present. Count limits are enforced during parsing
+// (single-value args are last-wins), so they are not re-checked here.
 // Any defined validation for specific ArgTypes are also run.
 void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
 {
-    if (source.Contains(ArgType::Help))
+    if (source.GetFlag<ArgType::Help>())
     {
         return;
     }
@@ -441,11 +442,6 @@ void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument
         if (arg.Required() && !source.Contains(arg.Type()))
         {
             throw CommandException(Localization::WSLCCLI_RequiredArgumentError(arg.Name()));
-        }
-
-        if ((arg.Limit() > 0) && (arg.Limit() < source.Count(arg.Type())))
-        {
-            throw CommandException(Localization::WSLCCLI_TooManyArgumentsError(arg.Name()));
         }
 
         if (source.Contains(arg.Type()))
@@ -463,7 +459,7 @@ void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument
 void Command::Execute(CLIExecutionContext& context) const
 {
     // If Help was part of the validated argument set, we will output help instead of executing.
-    if (context.Args.Contains(ArgType::Help))
+    if (context.Args.GetFlag<ArgType::Help>())
     {
         OutputHelp(context.Reporter);
     }

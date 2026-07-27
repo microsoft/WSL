@@ -53,7 +53,12 @@ extends:
         credscan:
           enabled: true
       tsa:
-        enabled: false
+        # The 1ES Official governed template force-runs TSA onboarding regardless of this flag.
+        # Without a config file it auto-derives the codebase name "microsoft_Microsoft.WSL_microsoft/WSL",
+        # which contains the illegal characters '.' and '/', so onboarding fails with PreconditionFailed
+        # and breaks every release build. Point TSA at an explicit, sanitized codebase config instead.
+        enabled: true
+        configFile: $(Build.SourcesDirectory)\.config\tsaoptions.json
       evidence:
         enabled: false
     git:
