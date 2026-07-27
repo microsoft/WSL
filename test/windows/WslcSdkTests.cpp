@@ -1561,7 +1561,7 @@ class WslcSdkTests
             }])";
 
         UniqueWebServer apiServer(apiEndpoint, GitHubApiResponse);
-        UniqueWebServer assetServer(assetEndpoint, 404u);
+        UniqueWebServer assetServer(assetEndpoint, L"", 404u);
 
         VERIFY_ARE_EQUAL(
             HTTP_E_STATUS_NOT_FOUND, WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_WSL_PACKAGE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));

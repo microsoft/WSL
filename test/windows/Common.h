@@ -356,10 +356,8 @@ private:
 class UniqueWebServer
 {
 public:
-    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent);
+    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent, UINT StatusCode = 200);
     UniqueWebServer(LPCWSTR Endpoint, const std::filesystem::path& path);
-    // Starts a server that returns the given HTTP status code with an empty body for every request.
-    UniqueWebServer(LPCWSTR Endpoint, UINT StatusCode);
     ~UniqueWebServer();
     UniqueWebServer(const UniqueWebServer&) = delete;
     UniqueWebServer(UniqueWebServer&&) = delete;

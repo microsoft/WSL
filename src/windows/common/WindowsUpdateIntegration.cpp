@@ -340,8 +340,7 @@ void WindowsUpdateContext::RunUpdateFlow(UpdateOptions options, const std::funct
         "RunUpdateFlow",
         TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
         TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
-        TraceLoggingBool(options == UpdateOptions::ResetProductRegistration, "forceInstall"),
-        TraceLoggingBool(options == UpdateOptions::EnsureProductRegistration, "ensureInstall"));
+        TraceLoggingUInt32(static_cast<std::underlying_type_t<UpdateOptions>>(options), "options"));
 
     static_assert(
         DownloadProgressPercent + InstallProgressPercent == 100, "Download and Install progress values must add up to 100.");

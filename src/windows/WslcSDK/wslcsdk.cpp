@@ -1717,12 +1717,6 @@ try
         {
             progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 1, 1, context);
         }
-
-        // If a reboot is required, we need the reboot to happen before attempting to install the WSL package.
-        if (result == HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED))
-        {
-            return result;
-        }
     }
 
     if (WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_WSL_PACKAGE))
