@@ -37,9 +37,9 @@ using namespace wsl::shared::string;
 namespace wsl::windows::wslc {
 
 namespace {
-    // Converts each raw value for argument A using the provided converter and caches the
-    // result on the ArgMap. This is the single point where each argument's string input is
-    // converted; command execution later reads the cached value via ArgMap::GetValidated.
+    // Converts each raw value for argument A using the provided converter and caches the result on
+    // the ArgMap. This is the single point where an argument's string input is converted; execution
+    // later reads the cached value via GetValue/GetAllValues.
     template <ArgType A, typename Converter>
     void CacheConverted(const ArgMap& execArgs, const std::wstring& argName, Converter&& convert)
     {
@@ -59,9 +59,8 @@ namespace {
     }
 } // namespace
 
-// Common argument validation that occurs across multiple commands. For arguments whose raw
-// string input is converted into a typed value, the conversion happens here exactly once and
-// the result is cached on the ArgMap for execution to reuse.
+// Common argument validation that runs across commands. For arguments whose raw string input is
+// converted into a typed value, the conversion happens here once and is cached on the ArgMap.
 void Argument::Validate(const ArgMap& execArgs) const
 {
     switch (m_argType)

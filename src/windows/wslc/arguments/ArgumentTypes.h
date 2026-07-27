@@ -144,24 +144,12 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
         return Contains(E) ? Get<E>() : defaultValue;
     }
 
-    // Validated-value cache.
-    //
-    // Argument validation converts raw string inputs into typed values (memory sizes,
-    // durations, signals, timestamps, ...). Those converted values are cached here during
-    // validation so command execution can reuse them without re-parsing the raw strings.
-    //
-    // The store is type-erased (std::any keyed by ArgType), keeping this base header free of the
-    // domain headers that define the converted types. Access is by a compile-time ArgType: the
-    // value type is derived from the argument's ConvertedType (ArgumentDefinitions.h /
-    // ArgumentConvertedTypes.h), so reads and writes cannot disagree on the type and a wrong-type
-    // access is a compile error, not a runtime failure. A multimap preserves multiplicity and
-    // insertion order for arguments that allow multiple values.
-    //
-    // The cache is a memoization detail, so it is mutable and its accessors are const: an
-    // ArgMap that has been validated is logically unchanged by populating the cache.
-
-    // Caches a converted value for the given argument. The value type is fixed by the argument's
-    // ConvertedType (ArgumentDefinitions.h), so a wrong-type write is a compile error.
+    // Validated-value cache. Argument validation converts raw strings into typed values and caches
+    // them here so execution reuses them without re-parsing. The store is type-erased (std::any keyed
+    // by ArgType) to keep this base header free of the domain headers that define the converted types;
+    // access is by a compile-time ArgType whose value type is derived from the argument's ConvertedType
+    // (ArgumentConvertedTypes.h), so a wrong-type access is a compile error. A multimap preserves order
+    // and multiplicity for arguments that allow multiple values.
     template <ArgType E>
     void AddValidated(typename details::ArgConvertedTypeMapping<E>::value_t value) const
     {
@@ -174,23 +162,19 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
         m_validated.emplace(E, std::any{std::move(value)});
     }
 
-    // Returns whether any converted value is cached for the given argument.
     bool ContainsValidated(ArgType type) const
     {
         return m_validated.find(type) != m_validated.end();
     }
 
-    // Returns the number of cached converted values for the given argument.
     size_t CountValidated(ArgType type) const
     {
         return m_validated.count(type);
     }
 
-    // Reads a value argument's resolved value in one call. If the argument declares a ConvertedType
-    // (ArgumentDefinitions.h), the value converted once during validation is returned from the cache;
-    // otherwise the raw parsed value is returned. Callers do not need to know whether an argument is
-    // converted. Valid for Kind::Value/Positional/Forward; using it on a Kind::Flag is a compile error
-    // (use GetFlag). The return type is fixed at compile time, so a read can never mismatch the type.
+    // Reads a value argument in one call: the cached converted value if the argument declares a
+    // ConvertedType, otherwise the raw parsed value. Valid for Kind::Value/Positional/Forward; using
+    // it on a Kind::Flag is a compile error (use GetFlag).
     template <ArgType E>
     decltype(auto) GetValue() const
     {
@@ -209,8 +193,7 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
     }
 
     // Like GetValue, but returns every value for an argument that may appear multiple times (ArgMap is
-    // a multimap), in insertion order. Converted arguments return their cached converted values; other
-    // arguments return their raw parsed values. Not valid for Kind::Flag; use GetFlag.
+    // a multimap), in insertion order.
     template <ArgType E>
     auto GetAllValues() const
     {
@@ -229,9 +212,7 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
     }
 
 private:
-    // Returns the first cached converted value for the given argument. The return type is fixed by the
-    // argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile error. Private
-    // so callers go through GetValue, which routes converted arguments here and non-converted ones to Get.
+    // Branch helper for GetValue's converted path. Private so callers go through GetValue.
     template <ArgType E>
     const typename details::ArgConvertedTypeMapping<E>::value_t& GetValidated() const
     {
@@ -241,23 +222,22 @@ private:
             "This argument has no converted type (NoConversion); it cannot be read from the cache. "
             "Declare its ConvertedType in ArgumentDefinitions.h to enable caching.");
 
-        // Debug canary: the cache is populated once during validation. If the number of raw values
-        // for this argument no longer matches the number of cached values (e.g. an argument was
-        // added after validation), the cache is stale and execution would read the wrong data.
+        // The cache is populated once during validation; a count mismatch means it is stale (e.g. an
+        // argument was added afterward) and execution would read the wrong data.
         WI_ASSERT_MSG(Count(E) == CountValidated(E), "validated cache is stale: argument count does not match validated count");
 
         auto itr = m_validated.find(E);
         THROW_HR_IF_MSG(E_NOT_SET, itr == m_validated.end(), "GetValidated(%d): argument not validated", static_cast<int>(E));
 
+        // any_cast cannot fail: entries under key E are only ever written by AddValidated<E>, which
+        // stores exactly value_t. A null result is an internal invariant violation, not a runtime case.
         const value_t* value = std::any_cast<value_t>(&itr->second);
-        THROW_HR_IF_MSG(E_UNEXPECTED, value == nullptr, "GetValidated(%d): cached type mismatch", static_cast<int>(E));
+        WI_ASSERT_MSG(value != nullptr, "validated cache holds the wrong type for this argument");
 
         return *value;
     }
 
-    // Returns all cached converted values for the given argument, in insertion order. The element type
-    // is fixed by the argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile
-    // error. Private so callers go through GetAllValues.
+    // Branch helper for GetAllValues's converted path. Private so callers go through GetAllValues.
     template <ArgType E>
     std::vector<typename details::ArgConvertedTypeMapping<E>::value_t> GetAllValidated() const
     {
@@ -274,8 +254,9 @@ private:
         auto range = m_validated.equal_range(E);
         for (auto it = range.first; it != range.second; ++it)
         {
+            // See GetValidated: any_cast cannot fail for a correctly populated cache.
             const value_t* value = std::any_cast<value_t>(&it->second);
-            THROW_HR_IF_MSG(E_UNEXPECTED, value == nullptr, "GetAllValidated(%d): cached type mismatch", static_cast<int>(E));
+            WI_ASSERT_MSG(value != nullptr, "validated cache holds the wrong type for this argument");
             results.push_back(*value);
         }
 
