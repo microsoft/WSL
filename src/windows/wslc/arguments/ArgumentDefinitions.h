@@ -82,6 +82,7 @@ _(Input,            "input",                L"i",             Kind::Value,      
 _(Interactive,      "interactive",          L"i",             Kind::Flag,       NoConversion, Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,         "internal",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkInternalArgDescription()) \
 _(IpAddress,        "ip",                   NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IpAddressArgDescription()) \
+_(IpRange,          "ip-range",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkIpRangeArgDescription()) \
 _(Label,            "label",                L"l",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_LabelArgDescription()) \
 _(Last,             "last",                 L"n",             Kind::Value,      int,          Localization::WSLCCLI_LastArgDescription()) \
 _(Latest,           "latest",               L"l",             Kind::Flag,       NoConversion, Localization::WSLCCLI_LatestArgDescription()) \

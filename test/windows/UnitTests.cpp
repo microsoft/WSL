@@ -3269,6 +3269,60 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
+    // Verifies that VHD-mutating manage operations (--resize, --set-sparse, --move) are rejected while a
+    // long-running conversion/export holds the distribution lock, rather than racing with it on the VHD.
+    WSL2_TEST_METHOD(ManageRejectedWhileLocked)
+    {
+        constexpr auto name = L"manage-locked-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        // Start an export to a pipe we deliberately don't drain. Use a tiny buffer so the export blocks
+        // as soon as it writes any data, regardless of the test distro's size, deterministically holding
+        // the distribution in the "Exporting" locked state.
+        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true, 1);
+
+        std::thread exportThread([&]() { LxsstuLaunchWsl(std::format(L"--export {} -", name), nullptr, writePipe.get()); });
+
+        auto joinExport = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            // Close the read end so the blocked export fails with a broken pipe and returns, then join.
+            readPipe.reset();
+            if (exportThread.joinable())
+            {
+                exportThread.join();
+            }
+        });
+
+        // Wait until the service reports the distribution as Exporting (i.e. the lock is held).
+        bool locked = false;
+        for (int i = 0; i < 100 && !locked; ++i)
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
+            locked = (out.find(name) != std::wstring::npos) && (out.find(L"Exporting") != std::wstring::npos);
+            if (!locked)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
+
+        VERIFY_IS_TRUE(locked);
+
+        // Each VHD-mutating manage operation must be rejected with E_ILLEGAL_STATE_CHANGE while the lock is held.
+        auto verifyRejected = [&](const std::wstring& command) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command, -1);
+            VERIFY_IS_TRUE(out.find(L"E_ILLEGAL_STATE_CHANGE") != std::wstring::npos);
+        };
+
+        verifyRejected(std::format(L"--manage {} --resize 2GB", name));
+        verifyRejected(std::format(L"--manage {} --set-sparse false", name));
+
+        const auto moveTarget = std::filesystem::absolute(L"manage-locked-move-target").wstring();
+        verifyRejected(std::format(L"--manage {} --move \"{}\"", name, moveTarget));
+    }
+
     WSL2_TEST_METHOD(FileOffsets)
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(L"output.txt"); });
