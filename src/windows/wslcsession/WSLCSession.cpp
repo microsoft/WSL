@@ -48,13 +48,12 @@ namespace {
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
 // service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
-// any other COM client). The repo argument must be the parsed repo from
-// wslutil::ParseImage so callers don't pay the regex cost twice.
-void EnforceRegistryAllowlist(const std::string& Repo)
+// any other COM client). Callers pass the parsed repository so no reference is
+// parsed twice.
+void EnforceRegistryAllowlist(const wslutil::RepositoryReference& Repository)
 {
     const auto policiesKey = wsl::windows::policies::OpenPoliciesKey();
-    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(Repo);
-    const auto serverWide = wsl::shared::string::MultiByteToWide(server);
+    const auto serverWide = wsl::shared::string::MultiByteToWide(Repository.Server);
 
     if (wsl::windows::policies::IsRegistryAllowed(policiesKey.get(), serverWide))
     {
@@ -842,7 +841,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    const auto reference = wslutil::ImageReference::Parse(Image);
+    const auto& repo = reference.Repository;
+    auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
     auto lock = m_lock.lock_shared();
@@ -860,7 +861,7 @@ try
         registryAuth = std::string(RegistryAuthenticationInformation);
     }
 
-    auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest, registryAuth);
+    auto requestContext = m_dockerClient->PullImage(repo.Name, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
     OnImageCreated(Image);
@@ -914,7 +915,7 @@ try
     auto unmountFolder =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
-    std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
+    std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
@@ -1259,9 +1260,10 @@ try
     {
         RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
 
-        auto [parsedRepo, tagOrDigest] = wslutil::ParseImage(ImageName);
+        auto reference = wslutil::ImageReference::Parse(ImageName);
+        auto tagOrDigest = reference.TagOrDigest();
         THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
-        repo = parsedRepo;
+        repo = reference.Repository.Name;
         tag = tagOrDigest.value();
     }
 
@@ -1607,7 +1609,7 @@ try
 
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
-                auto repoName = wslutil::ParseImage(tag).first;
+                auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())
                 {
@@ -1761,13 +1763,15 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    const auto reference = wslutil::ImageReference::Parse(Image);
+    const auto& repo = reference.Repository;
+    auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, RegistryAuthenticationInformation);
+    auto requestContext = m_dockerClient->PushImage(repo.Name, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 
     return S_OK;
@@ -2509,6 +2513,9 @@ try
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
 
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcIpRangeRequiresSubnet(), Options->IpRange != nullptr && Options->Subnet == nullptr);
+
     if (Options->Subnet != nullptr)
     {
         docker_schema::IPAMConfig ipamConfig;
@@ -2517,6 +2524,11 @@ try
         if (Options->Gateway != nullptr)
         {
             ipamConfig.Gateway = Options->Gateway;
+        }
+
+        if (Options->IpRange != nullptr)
+        {
+            ipamConfig.IPRange = Options->IpRange;
         }
 
         auto& ipam = request.IPAM.emplace();
@@ -2576,7 +2588,7 @@ try
         auto& cfgs = entry.IPAM.Config.emplace();
         for (const auto& c : *full.IPAM.Config)
         {
-            cfgs.push_back({c.Subnet, c.Gateway});
+            cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
         }
     }
 
@@ -2708,6 +2720,7 @@ try
             wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
             inspectCfg.Gateway = cfg.Gateway;
+            inspectCfg.IPRange = cfg.IPRange;
             configs.push_back(std::move(inspectCfg));
         }
     }
@@ -3533,7 +3546,7 @@ void WSLCSession::RecoverExistingNetworks()
                 auto& cfgs = entry.IPAM.Config.emplace();
                 for (const auto& c : *network.IPAM.Config)
                 {
-                    cfgs.push_back({c.Subnet, c.Gateway});
+                    cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
                 }
             }
 

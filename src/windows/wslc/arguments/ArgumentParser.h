@@ -34,11 +34,11 @@ struct ParseArgumentsStateMachine
     // overridableDefaults:  ArgTypes whose existing entries in execArgs are
     //                       treated as preloaded defaults (e.g. from environment
     //                       variables). The first CLI Add for one of these types
-    //                       clears the preexisting entry first, so a single-value
-    //                       arg can be overridden on the command line even though
-    //                       Limit() == 1. Subsequent Adds in the same parse run
-    //                       behave normally and still enforce Limit, so
-    //                       duplicates on the command line itself are caught.
+    //                       clears the preexisting entry first, so a preloaded
+    //                       default is replaced rather than appended to. Single-value
+    //                       args are last-wins regardless, so a later CLI duplicate
+    //                       simply overwrites; unlimited args accumulate once the
+    //                       preloaded default has been dropped.
     ParseArgumentsStateMachine(
         Invocation& inv,
         ArgMap& execArgs,
@@ -120,20 +120,46 @@ private:
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
 
+    // Strips a single pair of surrounding double quotes from an adjoined value if present
+    // (e.g. --name="value" or --flag="true"). Shared by the value and flag adjoined-value
+    // paths so both treat quoted "=value" tokens identically.
+    static std::wstring_view StripSurroundingQuotes(std::wstring_view value);
+
     void AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const;
 
     // Backs up one token and stops cleanly so Position() points at the unconsumed token.
     State BackUpAndStop();
 
-    // Routes a flag add through the override/idempotency rules:
-    //  - if type is in m_overridableDefaults, the preloaded value is replaced;
-    //  - else if the flag is already set, the add is a no-op (CLI duplicates
-    //    fold to a single entry, matching docker / kubectl / git style).
-    void AddFlag(ArgType type);
+    // Sets a boolean flag by storing its explicit parsed value (true or false). Clearing first
+    // collapses CLI duplicates to a single entry, so a repeated flag is docker-style last-wins
+    // (e.g. "--flag --flag=false" ends up false) and a duplicate "--flag --flag" folds to one
+    // entry. Consumers read the flag with ArgMap::GetFlag (Contains ? stored value : default),
+    // which lets a flag default to on and be disabled with "--flag=false".
+    void SetFlag(ArgType type, bool value);
 
-    // Routes a value add through the override rule. CLI duplicates of value
-    // args still stack, so Validate() will catch exceeding Limit.
+    // Parses an adjoined boolean token for a flag (e.g. the "false" in "--flag=false" or
+    // "-f=false"). A single pair of surrounding double quotes is stripped first (so
+    // "--flag=\"true\"" works like the value path), then the token is parsed as a Docker-style
+    // boolean (true/false/1/0/t/f, case-insensitive) and applied via SetFlag. Returns an error
+    // State if the token is not a recognized boolean. Shared by the alias, alias-chain, and
+    // named-flag paths so all three treat "=value" identically.
+    State ApplyFlagValue(ArgType type, std::wstring_view value, const std::wstring_view& currArg);
+
+    // Removes all entries for an argument and consumes any overridable-default slot,
+    // leaving the argument absent. This is the single-value (last-wins) primitive that
+    // SetFlag builds on; it is written to be reused for other single-value argument
+    // kinds in the future.
+    void ClearArgument(ArgType type);
+
+    // Stores a value for a Kind::Value argument. Single-value args are last-wins
+    // (any previous value, including a preloaded overridable default, is cleared
+    // first); unlimited args accumulate but still let the first CLI value replace a
+    // preloaded default.
     void AddValue(ArgType type, std::wstring value);
+
+    // Returns the defined argument for a type, or nullptr if it is not one of this
+    // parser's arguments. Used to consult an argument's Limit while parsing values.
+    const Argument* FindArgument(ArgType type) const;
 
     // If type is in m_overridableDefaults, removes any existing entry and
     // consumes the override slot. Returns true if an override was consumed.
