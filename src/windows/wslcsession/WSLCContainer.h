@@ -175,6 +175,7 @@ private:
         ContainerEvent ExpectedEvent;
         wil::unique_event Completed{wil::EventOptions::ManualReset};
         std::exception_ptr Exception;
+        // Access under WSLCContainerImpl::m_lock.
         unique_com_disconnect Wrapper;
     };
 

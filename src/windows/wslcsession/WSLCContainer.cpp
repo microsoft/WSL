@@ -890,7 +890,6 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(wil::rwlock_relea
 {
     while (m_transition && (!kind.has_value() || m_transition->Kind != kind.value()))
     {
-        // The transition may own the COM wrapper, so release this reference before reacquiring m_lock.
         {
             auto transition = m_transition;
             lock.reset();
@@ -916,6 +915,14 @@ void WSLCContainerImpl::AttachToTransition(const std::shared_ptr<StateTransition
 {
     WaitForTransitionCompletion(transition);
 
+    unique_com_disconnect wrapper;
+
+    // Take ownership of the deferred COM disconnect after OnEvent leaves its critical section.
+    {
+        auto lock = m_lock.lock_exclusive();
+        wrapper = std::move(transition->Wrapper);
+    }
+
     if (transition->Exception)
     {
         std::rethrow_exception(transition->Exception);
@@ -932,8 +939,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
 
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime) noexcept
 {
-    // The com wrapper can not be disconnected with lock held. Destroy event may transfer ownership of the disconnect
-    // to an awaiting COM caller via the transition object. So both must be destroyed after releasing the lock.
+    // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
 
@@ -975,7 +981,10 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             if (transition)
             {
                 WI_ASSERT(transition->ExpectedEvent == ContainerEvent::Destroy);
+
+                // Let a COM caller waiting on this transition perform the disconnect, avoiding a deadlock with OnEvent.
                 transition->Wrapper = std::move(comWrapper);
+
                 CompleteTransition(transition);
             }
         }
