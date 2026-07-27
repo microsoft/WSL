@@ -19,7 +19,7 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
 // This method should be idempotent.
 void CLIExecutionContext::ApplyGlobalOptions()
 {
-    if (GlobalArgs.Contains(ArgType::NoColor))
+    if (GlobalArgs.GetFlag<ArgType::NoColor>())
     {
         Reporter.SetNoColor(true);
     }
