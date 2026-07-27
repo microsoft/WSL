@@ -565,6 +565,8 @@ std::pair<GUID, wil::unique_cotaskmem_string> wsl::windows::common::SvcComm::Reg
     _In_ LPCWSTR TargetDirectory,
     _In_ ULONG Flags,
     _In_ std::optional<uint64_t> VhdSize,
+    _In_opt_ LPCWSTR FsType,
+    _In_opt_ LPCWSTR FsMountOptions,
     _In_opt_ LPCWSTR PackageFamilyName) const
 {
     ClientExecutionContext context;
@@ -590,6 +592,8 @@ std::pair<GUID, wil::unique_cotaskmem_string> wsl::windows::common::SvcComm::Reg
             TargetDirectory,
             Flags,
             VhdSize.value_or(0),
+            FsType,
+            FsMountOptions,
             PackageFamilyName,
             &installedName,
             context.OutError(),
@@ -605,6 +609,8 @@ std::pair<GUID, wil::unique_cotaskmem_string> wsl::windows::common::SvcComm::Reg
             TargetDirectory,
             Flags,
             VhdSize.value_or(0),
+            FsType,
+            FsMountOptions,
             PackageFamilyName,
             &installedName,
             context.OutError(),
@@ -631,6 +637,13 @@ wsl::windows::common::SvcComm::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOL Spar
     ClientExecutionContext context;
 
     RETURN_HR(m_userSession->SetSparse(DistroGuid, Sparse, AllowUnsafe, context.OutError()));
+}
+
+void wsl::windows::common::SvcComm::SetFsMountOptions(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions) const
+{
+    ClientExecutionContext context;
+
+    THROW_IF_FAILED(m_userSession->SetFsMountOptions(DistroGuid, FsMountOptions, context.OutError()));
 }
 
 HRESULT

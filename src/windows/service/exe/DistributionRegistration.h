@@ -55,6 +55,8 @@ public:
         ULONG DefaultUID,
         LPCWSTR PackageFamilyName,
         LPCWSTR VhdFileName,
+        LPCWSTR FsType,
+        LPCWSTR FsMountOptions,
         bool EnableOobe);
 
     static DistributionRegistration Open(HKEY LxssKey, const GUID& Id);
@@ -91,6 +93,8 @@ namespace Property {
     inline DistributionPropertyWithDefault<LPCWSTR> PackageFamilyName{L"PackageFamilyName", L""};
     inline DistributionPropertyWithDefault<LPCWSTR> KernelCommandLine{L"KernelCommandLine", L""};
     inline DistributionPropertyWithDefault<LPCWSTR> VhdFileName{L"VhdFileName", LXSS_VM_MODE_VHD_NAME};
+    inline DistributionPropertyWithDefault<LPCWSTR> FsType{L"FsType", LXSS_DISTRO_DEFAULT_FS_TYPE};
+    inline DistributionPropertyWithDefault<LPCWSTR> FsMountOptions{L"FsMountOptions", LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS};
     inline ExpectedProperty<LPCWSTR> Name{L"DistributionName"};
     inline ExpectedProperty<LPCWSTR> BasePath{L"BasePath"};
     inline DistributionProperty<LPCWSTR> Flavor{L"Flavor"};
