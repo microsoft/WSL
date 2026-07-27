@@ -50,7 +50,7 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     FormatType format = FormatType::Table;
     if (context.Args.Contains(ArgType::Format))
     {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+        format = context.Args.GetValidated<ArgType::Format>();
     }
 
     switch (format)

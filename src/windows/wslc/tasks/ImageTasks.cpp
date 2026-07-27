@@ -132,19 +132,8 @@ void GetImages(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
-    std::vector<std::pair<std::string, std::string>> filters;
-    if (context.Args.Contains(ArgType::Filter))
-    {
-        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
-        {
-            std::string raw = WideToMultiByte(wideValue);
-            const auto eq = raw.find('=');
-            WI_ASSERT(eq != std::string::npos);
-
-            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
-        }
-    }
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
 
     auto images = ImageService::List(session, filters);
     context.Data.Add<Data::Images>(std::move(images));
@@ -169,7 +158,7 @@ void ListImages(CLIExecutionContext& context)
     FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
     {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+        format = context.Args.GetValidated<ArgType::Format>();
     }
 
     switch (format)
@@ -379,19 +368,8 @@ void PruneImages(CLIExecutionContext& context)
 
     bool all = context.Args.Contains(ArgType::All);
 
-    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
-    std::vector<std::pair<std::string, std::string>> filters;
-    if (context.Args.Contains(ArgType::Filter))
-    {
-        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
-        {
-            std::string raw = WideToMultiByte(wideValue);
-            const auto eq = raw.find('=');
-            WI_ASSERT(eq != std::string::npos);
-
-            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
-        }
-    }
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
 
     auto result = ImageService::Prune(session, all, filters);
 

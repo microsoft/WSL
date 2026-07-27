@@ -25,7 +25,9 @@ Abstract:
 #include <cmath>
 #include <format>
 #include <sstream>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <wslc.h>
 
 using namespace wsl::windows::common;
@@ -33,46 +35,75 @@ using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
-// Common argument validation that occurs across multiple commands.
+
+namespace {
+    // Converts each raw value for argument A using the provided converter and caches the
+    // result on the ArgMap. This is the single point where each argument's string input is
+    // converted; command execution later reads the cached value via ArgMap::GetValidated.
+    template <ArgType A, typename Converter>
+    void CacheConverted(const ArgMap& execArgs, const std::wstring& argName, Converter&& convert)
+    {
+        using value_t = typename details::ArgConvertedTypeMapping<A>::value_t;
+        using converted_t = decltype(convert(std::declval<const std::wstring&>(), std::declval<const std::wstring&>()));
+        static_assert(
+            std::is_same_v<converted_t, value_t>,
+            "converter return type must exactly match the argument's declared ConvertedType in ArgumentDefinitions.h");
+
+        for (const auto& value : execArgs.GetAll<A>())
+        {
+            execArgs.AddValidated<A>(convert(value, argName));
+        }
+
+        // Sanity check: each raw value for this argument must produce exactly one cached value.
+        WI_ASSERT(execArgs.CountValidated(A) == execArgs.Count(A));
+    }
+} // namespace
+
+// Common argument validation that occurs across multiple commands. For arguments whose raw
+// string input is converted into a typed value, the conversion happens here exactly once and
+// the result is cached on the ArgMap for execution to reuse.
 void Argument::Validate(const ArgMap& execArgs) const
 {
     switch (m_argType)
     {
     case ArgType::Format:
-        validation::ValidateFormatTypeFromString(execArgs.GetAll<ArgType::Format>(), m_name);
+        CacheConverted<ArgType::Format>(execArgs, m_name, validation::GetFormatTypeFromString);
         break;
 
     case ArgType::Signal:
-        validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
+        CacheConverted<ArgType::Signal>(execArgs, m_name, validation::GetWSLCSignalFromString);
         break;
 
     case ArgType::StopSignal:
-        validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::StopSignal>(), m_name);
+        CacheConverted<ArgType::StopSignal>(execArgs, m_name, validation::GetWSLCSignalFromString);
         break;
 
     case ArgType::StopTimeout:
-        validation::ValidateIntegerFromString<long>(execArgs.GetAll<ArgType::StopTimeout>(), m_name);
+        CacheConverted<ArgType::StopTimeout>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<int>(value, name);
+        });
         break;
 
     case ArgType::ShmSize:
-        validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
+        CacheConverted<ArgType::ShmSize>(execArgs, m_name, validation::GetMemorySizeFromString);
         break;
 
     case ArgType::HealthInterval:
-        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthInterval>(), m_name);
+        CacheConverted<ArgType::HealthInterval>(execArgs, m_name, validation::GetDurationNanosFromString);
         break;
 
     case ArgType::HealthTimeout:
-        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthTimeout>(), m_name);
+        CacheConverted<ArgType::HealthTimeout>(execArgs, m_name, validation::GetDurationNanosFromString);
         break;
 
     case ArgType::HealthStartPeriod:
-        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthStartPeriod>(), m_name);
+        CacheConverted<ArgType::HealthStartPeriod>(execArgs, m_name, validation::GetDurationNanosFromString);
         break;
 
     case ArgType::HealthRetries:
-        validation::ValidateIntegerFromString<int>(
-            execArgs.GetAll<ArgType::HealthRetries>(), m_name, [](int value) { return value >= 0; });
+        CacheConverted<ArgType::HealthRetries>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<int>(value, name, [](int v) { return v >= 0; });
+        });
         break;
 
     case ArgType::NoHealthcheck:
@@ -84,40 +115,46 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
 
     case ArgType::Memory:
-        validation::ValidateMemorySize(execArgs.GetAll<ArgType::Memory>(), m_name);
+        CacheConverted<ArgType::Memory>(execArgs, m_name, validation::GetMemorySizeFromString);
         break;
 
     case ArgType::Cpus:
-        validation::ValidateNanoCpus(execArgs.GetAll<ArgType::Cpus>(), m_name);
+        CacheConverted<ArgType::Cpus>(execArgs, m_name, validation::GetNanoCpusFromString);
         break;
 
     case ArgType::Ulimit:
-        validation::ValidateUlimit(execArgs.GetAll<ArgType::Ulimit>(), m_name);
+        CacheConverted<ArgType::Ulimit>(execArgs, m_name, validation::ParseUlimit);
         break;
 
     case ArgType::Tail:
-        validation::ValidateIntegerFromString<ULONGLONG>(
-            execArgs.GetAll<ArgType::Tail>(), m_name, [](auto value) { return value != 0; });
+        CacheConverted<ArgType::Tail>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<ULONGLONG>(value, name, [](ULONGLONG v) { return v != 0; });
+        });
         break;
 
     case ArgType::Time:
-        validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
+        CacheConverted<ArgType::Time>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<LONG>(value, name);
+        });
         break;
 
     case ArgType::Since:
-        validation::ValidateTimestamp(execArgs.GetAll<ArgType::Since>(), m_name);
+        CacheConverted<ArgType::Since>(execArgs, m_name, validation::GetTimestampFromString);
         break;
 
     case ArgType::Until:
-        validation::ValidateTimestamp(execArgs.GetAll<ArgType::Until>(), m_name);
+        CacheConverted<ArgType::Until>(execArgs, m_name, validation::GetTimestampFromString);
         break;
 
     case ArgType::Last:
-        validation::ValidateIntegerFromString<int>(execArgs.GetAll<ArgType::Last>(), m_name);
+        CacheConverted<ArgType::Last>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<int>(value, name);
+        });
         break;
 
     case ArgType::Filter:
-        validation::ValidateFilter(execArgs.GetAll<ArgType::Filter>());
+        CacheConverted<ArgType::Filter>(
+            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseFilter(value); });
         break;
 
     case ArgType::Gpus:
@@ -130,11 +167,13 @@ void Argument::Validate(const ArgMap& execArgs) const
 
     case ArgType::WorkDir:
     {
-        const auto& value = execArgs.Get<ArgType::WorkDir>();
-        if (value.empty() ||
-            std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+        for (const auto& value : execArgs.GetAll<ArgType::WorkDir>())
         {
-            throw ArgumentException(Localization::WSLCCLI_WorkingDirEmptyError(m_name));
+            if (value.empty() ||
+                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+            {
+                throw ArgumentException(Localization::WSLCCLI_WorkingDirEmptyError(m_name));
+            }
         }
         break;
     }

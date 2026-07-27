@@ -14,10 +14,13 @@ Abstract:
 #pragma once
 #include "ArgumentDefinitions.h"
 #include "EnumVariantMap.h"
+#include <any>
+#include <map>
 #include <string>
 #include <vector>
 #include <array>
 #include <type_traits>
+#include <utility>
 
 namespace wsl::windows::wslc::argument {
 // General format:  commandname [Flag | Value]* [Positional]* [Forward]
@@ -40,7 +43,7 @@ enum class Kind
 // Generate ArgType enum from X-macro
 enum class ArgType : size_t
 {
-#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, Desc) EnumName,
+#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, ConvertedType, Desc) EnumName,
     WSLC_ARGUMENTS(WSLC_ARG_ENUM)
 #undef WSLC_ARG_ENUM
 
@@ -83,7 +86,7 @@ namespace details {
     };
 
     // Generate data mappings from X-macro - Kind determines the type
-#define WSLC_ARG_MAPPING(EnumName, Name, Alias, ArgumentKind, Desc) \
+#define WSLC_ARG_MAPPING(EnumName, Name, Alias, ArgumentKind, ConvertedType, Desc) \
     template <> \
     struct ArgDataMapping<ArgType::EnumName> \
     { \
@@ -93,11 +96,119 @@ namespace details {
     WSLC_ARGUMENTS(WSLC_ARG_MAPPING)
 #undef WSLC_ARG_MAPPING
 
+    // Sentinel type for arguments that are not converted to a typed value during validation
+    // (their raw string is used directly at execution). Arguments mapped to NoConversion cannot
+    // be read from or written to the validated cache; doing so is a compile error.
+    struct NoConversion
+    {
+    };
+
+    // Maps an ArgType to the type its string value is converted to during validation. Declared here
+    // so ArgMap's cache accessors can name the converted type without depending on the domain headers
+    // that define it; the specializations live in ArgumentConvertedTypes.h.
+    template <ArgType D>
+    struct ArgConvertedTypeMapping;
+
 } // namespace details
 
 // This is the main ArgType map used for storing parsed arguments.
 struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping>
 {
+    // Validated-value cache.
+    //
+    // Argument validation converts raw string inputs into typed values (memory sizes,
+    // durations, signals, timestamps, ...). Those converted values are cached here during
+    // validation so command execution can reuse them without re-parsing the raw strings.
+    //
+    // The store is type-erased (std::any keyed by ArgType), keeping this base header free of the
+    // domain headers that define the converted types. Access is by a compile-time ArgType: the
+    // value type is derived from the argument's ConvertedType (ArgumentDefinitions.h /
+    // ArgumentConvertedTypes.h), so reads and writes cannot disagree on the type and a wrong-type
+    // access is a compile error, not a runtime failure. A multimap preserves multiplicity and
+    // insertion order for arguments that allow multiple values.
+    //
+    // The cache is a memoization detail, so it is mutable and its accessors are const: an
+    // ArgMap that has been validated is logically unchanged by populating the cache.
+
+    // Caches a converted value for the given argument. The value type is fixed by the argument's
+    // ConvertedType (ArgumentDefinitions.h), so a wrong-type write is a compile error.
+    template <ArgType E>
+    void AddValidated(typename details::ArgConvertedTypeMapping<E>::value_t value) const
+    {
+        using value_t = typename details::ArgConvertedTypeMapping<E>::value_t;
+        static_assert(
+            !std::is_same_v<value_t, details::NoConversion>,
+            "This argument has no converted type (NoConversion); it cannot be cached. "
+            "Declare its ConvertedType in ArgumentDefinitions.h to enable caching.");
+
+        m_validated.emplace(E, std::any{std::move(value)});
+    }
+
+    // Returns whether any converted value is cached for the given argument.
+    bool ContainsValidated(ArgType type) const
+    {
+        return m_validated.find(type) != m_validated.end();
+    }
+
+    // Returns the number of cached converted values for the given argument.
+    size_t CountValidated(ArgType type) const
+    {
+        return m_validated.count(type);
+    }
+
+    // Returns the first cached converted value for the given argument. The return type is fixed by
+    // the argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile error.
+    template <ArgType E>
+    const typename details::ArgConvertedTypeMapping<E>::value_t& GetValidated() const
+    {
+        using value_t = typename details::ArgConvertedTypeMapping<E>::value_t;
+        static_assert(
+            !std::is_same_v<value_t, details::NoConversion>,
+            "This argument has no converted type (NoConversion); it cannot be read from the cache. "
+            "Declare its ConvertedType in ArgumentDefinitions.h to enable caching.");
+
+        // Debug canary: the cache is populated once during validation. If the number of raw values
+        // for this argument no longer matches the number of cached values (e.g. an argument was
+        // added after validation), the cache is stale and execution would read the wrong data.
+        WI_ASSERT_MSG(Count(E) == CountValidated(E), "validated cache is stale: argument count does not match validated count");
+
+        auto itr = m_validated.find(E);
+        THROW_HR_IF_MSG(E_NOT_SET, itr == m_validated.end(), "GetValidated(%d): argument not validated", static_cast<int>(E));
+
+        const value_t* value = std::any_cast<value_t>(&itr->second);
+        THROW_HR_IF_MSG(E_UNEXPECTED, value == nullptr, "GetValidated(%d): cached type mismatch", static_cast<int>(E));
+
+        return *value;
+    }
+
+    // Returns all cached converted values for the given argument, in insertion order. The element type
+    // is fixed by the argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile error.
+    template <ArgType E>
+    std::vector<typename details::ArgConvertedTypeMapping<E>::value_t> GetAllValidated() const
+    {
+        using value_t = typename details::ArgConvertedTypeMapping<E>::value_t;
+        static_assert(
+            !std::is_same_v<value_t, details::NoConversion>,
+            "This argument has no converted type (NoConversion); it cannot be read from the cache. "
+            "Declare its ConvertedType in ArgumentDefinitions.h to enable caching.");
+
+        // Debug canary: see GetValidated. The cached count must still match the raw argument count.
+        WI_ASSERT_MSG(Count(E) == CountValidated(E), "validated cache is stale: argument count does not match validated count");
+
+        std::vector<value_t> results;
+        auto range = m_validated.equal_range(E);
+        for (auto it = range.first; it != range.second; ++it)
+        {
+            const value_t* value = std::any_cast<value_t>(&it->second);
+            THROW_HR_IF_MSG(E_UNEXPECTED, value == nullptr, "GetAllValidated(%d): cached type mismatch", static_cast<int>(E));
+            results.push_back(*value);
+        }
+
+        return results;
+    }
+
+private:
+    mutable std::multimap<ArgType, std::any> m_validated;
 };
 
 } // namespace wsl::windows::wslc::argument

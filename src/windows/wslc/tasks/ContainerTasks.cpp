@@ -195,26 +195,15 @@ void GetContainers(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Last))
     {
-        limit = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::Last>(), L"--last");
+        limit = context.Args.GetValidated<ArgType::Last>();
     }
     else if (context.Args.Contains(ArgType::Latest))
     {
         limit = 1;
     }
 
-    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
-    std::vector<std::pair<std::string, std::string>> filters;
-    if (context.Args.Contains(ArgType::Filter))
-    {
-        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
-        {
-            std::string raw = WideToMultiByte(wideValue);
-            const auto eq = raw.find('=');
-            WI_ASSERT(eq != std::string::npos);
-
-            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
-        }
-    }
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
 
     context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.Contains(ArgType::All), limit, filters));
 }
@@ -250,7 +239,7 @@ void KillContainers(CLIExecutionContext& context)
     WSLCSignal signal = WSLCSignalSIGKILL;
     if (context.Args.Contains(ArgType::Signal))
     {
-        signal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::Signal>());
+        signal = context.Args.GetValidated<ArgType::Signal>();
     }
 
     for (const auto& id : containerIds)
@@ -562,7 +551,7 @@ void ListContainers(CLIExecutionContext& context)
     FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
     {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+        format = context.Args.GetValidated<ArgType::Format>();
     }
 
     switch (format)
@@ -709,17 +698,17 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::StopSignal))
     {
-        options.StopSignal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::StopSignal>());
+        options.StopSignal = context.Args.GetValidated<ArgType::StopSignal>();
     }
 
     if (context.Args.Contains(ArgType::StopTimeout))
     {
-        options.StopTimeout = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::StopTimeout>());
+        options.StopTimeout = context.Args.GetValidated<ArgType::StopTimeout>();
     }
 
     if (context.Args.Contains(ArgType::ShmSize))
     {
-        options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
+        options.ShmSize = context.Args.GetValidated<ArgType::ShmSize>();
     }
 
     if (context.Args.Contains(ArgType::HealthCmd))
@@ -729,22 +718,22 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::HealthInterval))
     {
-        options.HealthInterval = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthInterval>());
+        options.HealthInterval = context.Args.GetValidated<ArgType::HealthInterval>();
     }
 
     if (context.Args.Contains(ArgType::HealthTimeout))
     {
-        options.HealthTimeout = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthTimeout>());
+        options.HealthTimeout = context.Args.GetValidated<ArgType::HealthTimeout>();
     }
 
     if (context.Args.Contains(ArgType::HealthStartPeriod))
     {
-        options.HealthStartPeriod = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthStartPeriod>());
+        options.HealthStartPeriod = context.Args.GetValidated<ArgType::HealthStartPeriod>();
     }
 
     if (context.Args.Contains(ArgType::HealthRetries))
     {
-        options.HealthRetries = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::HealthRetries>());
+        options.HealthRetries = context.Args.GetValidated<ArgType::HealthRetries>();
     }
 
     if (context.Args.Contains(ArgType::NoHealthcheck))
@@ -754,21 +743,15 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Memory))
     {
-        options.MemoryBytes = validation::GetMemorySizeFromString(context.Args.Get<ArgType::Memory>());
+        options.MemoryBytes = context.Args.GetValidated<ArgType::Memory>();
     }
 
     if (context.Args.Contains(ArgType::Cpus))
     {
-        options.NanoCpus = validation::GetNanoCpusFromString(context.Args.Get<ArgType::Cpus>());
+        options.NanoCpus = context.Args.GetValidated<ArgType::Cpus>();
     }
 
-    if (context.Args.Contains(ArgType::Ulimit))
-    {
-        for (const auto& value : context.Args.GetAll<ArgType::Ulimit>())
-        {
-            options.Ulimits.emplace_back(validation::ParseUlimit(value));
-        }
-    }
+    options.Ulimits = context.Args.GetAllValidated<ArgType::Ulimit>();
 
     if (context.Args.Contains(ArgType::Command))
     {
@@ -972,7 +955,7 @@ void ShowContainerStats(CLIExecutionContext& context)
     FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
     {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+        format = context.Args.GetValidated<ArgType::Format>();
     }
 
     switch (format)
@@ -1054,12 +1037,12 @@ void StopContainers(CLIExecutionContext& context)
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
-        options.Signal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::Signal>());
+        options.Signal = context.Args.GetValidated<ArgType::Signal>();
     }
 
     if (context.Args.Contains(ArgType::Time))
     {
-        options.Timeout = validation::GetIntegerFromString<LONG>(context.Args.Get<ArgType::Time>());
+        options.Timeout = context.Args.GetValidated<ArgType::Time>();
     }
 
     for (const auto& id : containersToStop)
@@ -1080,7 +1063,7 @@ void ViewContainerLogs(CLIExecutionContext& context)
     ULONGLONG tail = 0;
     if (context.Args.Contains(ArgType::Tail))
     {
-        tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
+        tail = context.Args.GetValidated<ArgType::Tail>();
     }
 
     // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
@@ -1089,13 +1072,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     ULONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
-        since = validation::GetTimestampFromString(context.Args.Get<ArgType::Since>());
+        since = context.Args.GetValidated<ArgType::Since>();
     }
 
     ULONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
-        until = validation::GetTimestampFromString(context.Args.Get<ArgType::Until>());
+        until = context.Args.GetValidated<ArgType::Until>();
     }
 
     ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);

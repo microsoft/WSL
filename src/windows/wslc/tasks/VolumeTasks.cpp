@@ -170,7 +170,7 @@ void ListVolumes(CLIExecutionContext& context)
     FormatType format = FormatType::Table;
     if (context.Args.Contains(ArgType::Format))
     {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+        format = context.Args.GetValidated<ArgType::Format>();
     }
 
     switch (format)
@@ -207,11 +207,8 @@ void PruneVolumes(CLIExecutionContext& context)
 
     const bool all = context.Args.Contains(ArgType::All);
 
-    std::vector<std::pair<std::string, std::string>> filters;
-    for (const auto& value : context.Args.GetAll<ArgType::Filter>())
-    {
-        filters.push_back(validation::ParseFilter(value));
-    }
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
 
     auto result = VolumeService::Prune(context.Reporter, session, all, filters);
 

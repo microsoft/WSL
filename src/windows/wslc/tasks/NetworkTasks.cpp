@@ -178,7 +178,7 @@ void ListNetworks(CLIExecutionContext& context)
     FormatType format = FormatType::Table;
     if (context.Args.Contains(ArgType::Format))
     {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+        format = context.Args.GetValidated<ArgType::Format>();
     }
 
     switch (format)
@@ -214,11 +214,8 @@ void PruneNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    std::vector<std::pair<std::string, std::string>> filters;
-    for (const auto& value : context.Args.GetAll<ArgType::Filter>())
-    {
-        filters.push_back(validation::ParseFilter(value));
-    }
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
 
     auto result = NetworkService::Prune(session, filters);
 
