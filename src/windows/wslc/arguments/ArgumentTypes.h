@@ -186,8 +186,52 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
         return m_validated.count(type);
     }
 
-    // Returns the first cached converted value for the given argument. The return type is fixed by
-    // the argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile error.
+    // Reads a value argument's resolved value in one call. If the argument declares a ConvertedType
+    // (ArgumentDefinitions.h), the value converted once during validation is returned from the cache;
+    // otherwise the raw parsed value is returned. Callers do not need to know whether an argument is
+    // converted. Valid for Kind::Value/Positional/Forward; using it on a Kind::Flag is a compile error
+    // (use GetFlag). The return type is fixed at compile time, so a read can never mismatch the type.
+    template <ArgType E>
+    decltype(auto) GetValue() const
+    {
+        static_assert(
+            !std::is_same_v<mapping_t<E>, bool>,
+            "GetValue is for Kind::Value/Positional/Forward arguments; use GetFlag for Kind::Flag arguments.");
+
+        if constexpr (std::is_same_v<typename details::ArgConvertedTypeMapping<E>::value_t, details::NoConversion>)
+        {
+            return Get<E>();
+        }
+        else
+        {
+            return GetValidated<E>();
+        }
+    }
+
+    // Like GetValue, but returns every value for an argument that may appear multiple times (ArgMap is
+    // a multimap), in insertion order. Converted arguments return their cached converted values; other
+    // arguments return their raw parsed values. Not valid for Kind::Flag; use GetFlag.
+    template <ArgType E>
+    auto GetAllValues() const
+    {
+        static_assert(
+            !std::is_same_v<mapping_t<E>, bool>,
+            "GetAllValues is for Kind::Value/Positional/Forward arguments; use GetFlag for Kind::Flag arguments.");
+
+        if constexpr (std::is_same_v<typename details::ArgConvertedTypeMapping<E>::value_t, details::NoConversion>)
+        {
+            return GetAll<E>();
+        }
+        else
+        {
+            return GetAllValidated<E>();
+        }
+    }
+
+private:
+    // Returns the first cached converted value for the given argument. The return type is fixed by the
+    // argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile error. Private
+    // so callers go through GetValue, which routes converted arguments here and non-converted ones to Get.
     template <ArgType E>
     const typename details::ArgConvertedTypeMapping<E>::value_t& GetValidated() const
     {
@@ -212,7 +256,8 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
     }
 
     // Returns all cached converted values for the given argument, in insertion order. The element type
-    // is fixed by the argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile error.
+    // is fixed by the argument's ConvertedType (ArgumentDefinitions.h), so a wrong-type read is a compile
+    // error. Private so callers go through GetAllValues.
     template <ArgType E>
     std::vector<typename details::ArgConvertedTypeMapping<E>::value_t> GetAllValidated() const
     {
@@ -237,7 +282,6 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
         return results;
     }
 
-private:
     mutable std::multimap<ArgType, std::any> m_validated;
 };
 

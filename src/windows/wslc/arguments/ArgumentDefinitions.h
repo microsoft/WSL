@@ -58,7 +58,7 @@ _(Entrypoint,       "entrypoint",           NO_ALIAS,         Kind::Value,      
 _(Env,              "env",                  L"e",             Kind::Value,      NoConversion, Localization::WSLCCLI_EnvArgDescription()) \
 _(EnvFile,          "env-file",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_EnvFileArgDescription()) \
 _(File,             "file",                 L"f",             Kind::Value,      NoConversion, Localization::WSLCCLI_FileArgDescription()) \
-_(Filter,           "filter",               L"f",             Kind::Value,      FilterValue,  Localization::WSLCCLI_FilterArgDescription()) \
+_(Filter,           "filter",               L"f",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_FilterArgDescription()) \
 _(Follow,           "follow",               L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_FollowArgDescription()) \
 _(Timestamps,       "timestamps",           L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TimestampsArgDescription()) \
 _(Since,            "since",                NO_ALIAS,         Kind::Value,      ULONGLONG,    Localization::WSLCCLI_SinceArgDescription()) \
@@ -82,7 +82,7 @@ _(Input,            "input",                L"i",             Kind::Value,      
 _(Interactive,      "interactive",          L"i",             Kind::Flag,       NoConversion, Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,         "internal",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkInternalArgDescription()) \
 _(IpAddress,        "ip",                   NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IpAddressArgDescription()) \
-_(Label,            "label",                L"l",             Kind::Value,      NoConversion, Localization::WSLCCLI_LabelArgDescription()) \
+_(Label,            "label",                L"l",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_LabelArgDescription()) \
 _(Last,             "last",                 L"n",             Kind::Value,      int,          Localization::WSLCCLI_LastArgDescription()) \
 _(Latest,           "latest",               L"l",             Kind::Flag,       NoConversion, Localization::WSLCCLI_LatestArgDescription()) \
 _(Link,             "link",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_LinkArgDescription()) \
@@ -99,7 +99,7 @@ _(NoHealthcheck,    "no-healthcheck",       NO_ALIAS,         Kind::Flag,       
 _(NoPrune,          "no-prune",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,          "no-trunc",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoTruncArgDescription()) \
 _(ObjectId,         "object-id",            NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ObjectIdArgDescription()) \
-_(Options,          "opt",                  L"o",             Kind::Value,      NoConversion, Localization::WSLCCLI_OptionsArgDescription()) \
+_(Options,          "opt",                  L"o",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_OptionsArgDescription()) \
 _(Output,           "output",               L"o",             Kind::Value,      NoConversion, Localization::WSLCCLI_OutputArgDescription()) \
 _(Password,         "password",             L"p",             Kind::Value,      NoConversion, Localization::WSLCCLI_LoginPasswordArgDescription()) \
 _(PasswordStdin,    "password-stdin",       NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_LoginPasswordStdinArgDescription()) \
@@ -126,7 +126,7 @@ _(Target,           "target",               NO_ALIAS,         Kind::Positional, 
 _(Time,             "time",                 L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
 _(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,              "tty",                  L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TTYArgDescription()) \
-_(Type,             "type",                 L"t",             Kind::Value,      NoConversion, Localization::WSLCCLI_TypeArgDescription()) \
+_(Type,             "type",                 L"t",             Kind::Value,      InspectType,  Localization::WSLCCLI_TypeArgDescription()) \
 _(Ulimit,           "ulimit",               NO_ALIAS,         Kind::Value,      UlimitValue,  Localization::WSLCCLI_UlimitArgDescription()) \
 _(User,             "user",                 L"u",             Kind::Value,      NoConversion, Localization::WSLCCLI_UserArgDescription()) \
 _(Username,         "username",             L"u",             Kind::Value,      NoConversion, Localization::WSLCCLI_LoginUsernameArgDescription()) \

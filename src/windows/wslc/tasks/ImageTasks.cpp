@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #include "Argument.h"
-#include "ArgumentValidation.h"
+#include "ArgumentConvertedTypes.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
 #include "ContainerService.h"
@@ -95,26 +95,23 @@ void BuildImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::Path));
     auto& session = context.Data.Get<Data::Session>();
-    auto& contextPath = context.Args.Get<ArgType::Path>();
+    auto& contextPath = context.Args.GetValue<ArgType::Path>();
 
-    auto tags = context.Args.GetAll<ArgType::Tag>();
-    auto buildArgs = context.Args.GetAll<ArgType::BuildArg>();
+    auto tags = context.Args.GetAllValues<ArgType::Tag>();
+    auto buildArgs = context.Args.GetAllValues<ArgType::BuildArg>();
+    // Labels are validated during argument validation; the build API consumes the raw strings.
     auto labels = context.Args.GetAll<ArgType::Label>();
-    for (const auto& label : labels)
-    {
-        validation::ParseLabel(label);
-    }
 
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
     {
-        dockerfilePath = context.Args.Get<ArgType::File>();
+        dockerfilePath = context.Args.GetValue<ArgType::File>();
     }
 
     std::wstring target;
     if (context.Args.Contains(ArgType::BuildTarget))
     {
-        target = context.Args.Get<ArgType::BuildTarget>();
+        target = context.Args.GetValue<ArgType::BuildTarget>();
     }
 
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
@@ -133,7 +130,7 @@ void GetImages(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
 
     // Filter values are parsed and cached during argument validation.
-    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
     auto images = ImageService::List(session, filters);
     context.Data.Add<Data::Images>(std::move(images));
@@ -158,7 +155,7 @@ void ListImages(CLIExecutionContext& context)
     FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
     {
-        format = context.Args.GetValidated<ArgType::Format>();
+        format = context.Args.GetValue<ArgType::Format>();
     }
 
     switch (format)
@@ -212,7 +209,7 @@ void PullImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    const auto image = WideToMultiByte(context.Args.Get<ArgType::ImageId>());
+    const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     const bool quiet = context.Args.GetFlag<ArgType::Quiet>();
 
     // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
@@ -243,7 +240,7 @@ void PushImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto& imageId = context.Args.GetValue<ArgType::ImageId>();
 
     ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
     services::ImageService::Push(context.Reporter, session, WideToMultiByte(imageId), &callback);
@@ -253,7 +250,7 @@ void DeleteImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    const auto& imageIds = context.Args.GetAll<ArgType::ImageId>();
+    const auto& imageIds = context.Args.GetAllValues<ArgType::ImageId>();
     bool force = context.Args.GetFlag<ArgType::ImageForce>();
     bool noPrune = context.Args.GetFlag<ArgType::NoPrune>();
     for (const auto& id : imageIds)
@@ -269,7 +266,7 @@ void LoadImage(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Input))
     {
-        auto& input = context.Args.Get<ArgType::Input>();
+        auto& input = context.Args.GetValue<ArgType::Input>();
         auto callback = wil::MakeOrThrow<WSLCImageLoadCallback>(context.Reporter);
         services::ImageService::Load(context.Reporter, session, input, callback.Get());
         return;
@@ -288,10 +285,10 @@ void ImportImage(CLIExecutionContext& context)
     std::string imageName;
     if (context.Args.Contains(ArgType::ImageId))
     {
-        imageName = WideToMultiByte(context.Args.Get<ArgType::ImageId>());
+        imageName = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     }
 
-    auto& input = context.Args.Get<ArgType::ImportFile>();
+    auto& input = context.Args.GetValue<ArgType::ImportFile>();
     auto imageId = services::ImageService::Import(context.Reporter, session, input, imageName);
     if (!imageId.empty())
     {
@@ -305,7 +302,7 @@ void InspectImages(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto imageIds = context.Args.GetAll<ArgType::ImageId>();
+    auto imageIds = context.Args.GetAllValues<ArgType::ImageId>();
 
     std::vector<wsl::windows::common::wslc_schema::InspectImage> result;
     for (const auto& id : imageIds)
@@ -330,7 +327,7 @@ void SaveImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto imageIds = context.Args.GetAll<ArgType::ImageId>();
+    auto imageIds = context.Args.GetAllValues<ArgType::ImageId>();
 
     std::vector<std::string> images;
     images.reserve(imageIds.size());
@@ -341,7 +338,7 @@ void SaveImage(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Output))
     {
-        auto& output = context.Args.Get<ArgType::Output>();
+        auto& output = context.Args.GetValue<ArgType::Output>();
         services::ImageService::Save(session, images, output, context.CreateCancelEvent());
     }
     else
@@ -360,8 +357,8 @@ void TagImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto& source = context.Args.Get<ArgType::Source>();
-    auto& target = context.Args.Get<ArgType::Target>();
+    auto& source = context.Args.GetValue<ArgType::Source>();
+    auto& target = context.Args.GetValue<ArgType::Target>();
     services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
 }
 
@@ -373,7 +370,7 @@ void PruneImages(CLIExecutionContext& context)
     bool all = context.Args.GetFlag<ArgType::All>();
 
     // Filter values are parsed and cached during argument validation.
-    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
     auto result = ImageService::Prune(session, all, filters);
 

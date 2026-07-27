@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 #include "VersionCommand.h"
-#include "ArgumentValidation.h"
+#include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
 #include "JsonUtils.h"
 
@@ -50,7 +50,7 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     FormatType format = FormatType::Table;
     if (context.Args.Contains(ArgType::Format))
     {
-        format = context.Args.GetValidated<ArgType::Format>();
+        format = context.Args.GetValue<ArgType::Format>();
     }
 
     switch (format)

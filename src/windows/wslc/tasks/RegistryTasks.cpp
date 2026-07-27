@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "Argument.h"
+#include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
 #include "RegistryService.h"
 #include "RegistryTasks.h"
@@ -33,14 +34,14 @@ void Login(CLIExecutionContext& context)
 
     auto& session = context.Data.Get<Data::Session>();
 
-    auto username = WideToMultiByte(context.Args.Get<ArgType::Username>());
-    auto password = WideToMultiByte(context.Args.Get<ArgType::Password>());
+    auto username = WideToMultiByte(context.Args.GetValue<ArgType::Username>());
+    auto password = WideToMultiByte(context.Args.GetValue<ArgType::Password>());
 
     auto serverAddress = std::string(RegistryService::DefaultServer);
 
     if (context.Args.Contains(ArgType::Server))
     {
-        serverAddress = WideToMultiByte(context.Args.Get<ArgType::Server>());
+        serverAddress = WideToMultiByte(context.Args.GetValue<ArgType::Server>());
     }
 
     auto [credUsername, credSecret] = RegistryService::Authenticate(session, serverAddress, username, password);
@@ -55,7 +56,7 @@ void Logout(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Server))
     {
-        serverAddress = WideToMultiByte(context.Args.Get<ArgType::Server>());
+        serverAddress = WideToMultiByte(context.Args.GetValue<ArgType::Server>());
     }
 
     RegistryService::Erase(serverAddress);

@@ -137,6 +137,15 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
+    // Command-specific validation hook, run after the shared per-argument Argument::Validate pass.
+    // Override to enforce cross-argument rules that per-argument validation cannot express, such as
+    // mutually-exclusive arguments, required combinations, or a command narrowing the set of values
+    // it accepts for an argument (e.g. only "json"/"table" for --format).
+    //
+    // Contract: this hook validates the arguments as provided for consistency and does not convert
+    // them to another type. Read raw values with Get/GetAll and flags with GetFlag; do not read the
+    // validated cache (GetValue/GetAllValues). Conversion happens once, in Argument::Validate, and
+    // is consumed on the execution path.
     virtual void ValidateArgumentsInternal(const ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 

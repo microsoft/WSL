@@ -157,6 +157,20 @@ void Argument::Validate(const ArgMap& execArgs) const
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseFilter(value); });
         break;
 
+    case ArgType::Label:
+        CacheConverted<ArgType::Label>(
+            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseLabel(value); });
+        break;
+
+    case ArgType::Options:
+        CacheConverted<ArgType::Options>(
+            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseDriverOption(value); });
+        break;
+
+    case ArgType::Type:
+        CacheConverted<ArgType::Type>(execArgs, m_name, validation::GetInspectTypeFromString);
+        break;
+
     case ArgType::Gpus:
         validation::ValidateGpus(execArgs.GetAll<ArgType::Gpus>(), m_name);
         break;

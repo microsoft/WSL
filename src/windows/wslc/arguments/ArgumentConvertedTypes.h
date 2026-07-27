@@ -4,6 +4,7 @@
 
 #include "ArgumentTypes.h"
 #include "ContainerModel.h"
+#include "InspectModel.h"
 
 #include <cstdint>
 #include <string>
@@ -17,9 +18,10 @@ namespace wsl::windows::wslc::argument::details {
 // resolve here regardless of include order. Aggregate converted types must be aliased because their
 // commas would otherwise break X-macro argument parsing if written inline in the table.
 using FormatType = wsl::windows::wslc::models::FormatType;
+using InspectType = wsl::windows::wslc::models::InspectType;
 using WSLCSignal = ::WSLCSignal;
 using UlimitValue = std::tuple<std::string, int64_t, int64_t>;
-using FilterValue = std::pair<std::string, std::string>;
+using KeyValuePair = std::pair<std::string, std::string>;
 
 // Generate the ArgType -> converted type mapping from the X-macro. Every ArgType gets a
 // specialization; arguments that are not converted map to NoConversion (their raw string is used

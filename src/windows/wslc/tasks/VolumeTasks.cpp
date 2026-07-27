@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #include "Argument.h"
-#include "ArgumentValidation.h"
+#include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
 #include "VolumeModel.h"
 #include "VolumeService.h"
@@ -79,24 +79,22 @@ void CreateVolume(CLIExecutionContext& context)
     models::CreateVolumeOptions options{};
     if (context.Args.Contains(ArgType::VolumeName))
     {
-        options.Name = WideToMultiByte(context.Args.Get<ArgType::VolumeName>());
+        options.Name = WideToMultiByte(context.Args.GetValue<ArgType::VolumeName>());
     }
 
-    for (const auto& option : context.Args.GetAll<ArgType::Options>())
+    for (const auto& option : context.Args.GetAllValues<ArgType::Options>())
     {
-        auto parsed = validation::ParseDriverOption(option);
-        options.DriverOpts.emplace_back(parsed.first, parsed.second);
+        options.DriverOpts.push_back(option);
     }
 
-    for (const auto& label : context.Args.GetAll<ArgType::Label>())
+    for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
     {
-        auto parsed = validation::ParseLabel(label);
-        options.Labels.emplace_back(parsed.first, parsed.second);
+        options.Labels.push_back(label);
     }
 
     if (context.Args.Contains(ArgType::Driver))
     {
-        options.Driver = WideToMultiByte(context.Args.Get<ArgType::Driver>());
+        options.Driver = WideToMultiByte(context.Args.GetValue<ArgType::Driver>());
     }
 
     auto result = VolumeService::Create(context.Data.Get<Data::Session>(), options);
@@ -107,7 +105,7 @@ void DeleteVolumes(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
+    auto volumeNames = context.Args.GetAllValues<ArgType::VolumeName>();
     const bool force = context.Args.GetFlag<ArgType::Force>();
     for (const auto& name : volumeNames)
     {
@@ -133,7 +131,7 @@ void InspectVolumes(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
+    auto volumeNames = context.Args.GetAllValues<ArgType::VolumeName>();
     std::vector<wsl::windows::common::wslc_schema::InspectVolume> result;
     for (const auto& name : volumeNames)
     {
@@ -170,7 +168,7 @@ void ListVolumes(CLIExecutionContext& context)
     FormatType format = FormatType::Table;
     if (context.Args.Contains(ArgType::Format))
     {
-        format = context.Args.GetValidated<ArgType::Format>();
+        format = context.Args.GetValue<ArgType::Format>();
     }
 
     switch (format)
@@ -208,7 +206,7 @@ void PruneVolumes(CLIExecutionContext& context)
     const bool all = context.Args.GetFlag<ArgType::All>();
 
     // Filter values are parsed and cached during argument validation.
-    auto filters = context.Args.GetAllValidated<ArgType::Filter>();
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
     auto result = VolumeService::Prune(context.Reporter, session, all, filters);
 

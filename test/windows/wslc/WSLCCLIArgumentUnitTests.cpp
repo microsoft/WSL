@@ -244,13 +244,13 @@ class WSLCCLIArgumentUnitTests
         args.AddValidated<ArgType::StopTimeout>(30);
         VERIFY_IS_TRUE(args.ContainsValidated(ArgType::StopTimeout));
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::StopTimeout), static_cast<size_t>(1));
-        VERIFY_ARE_EQUAL(args.GetValidated<ArgType::StopTimeout>(), 30);
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::StopTimeout>(), 30);
 
         // Multiple cached values for one argument preserve insertion order.
         args.AddValidated<ArgType::Filter>(std::pair<std::string, std::string>{"status", "running"});
         args.AddValidated<ArgType::Filter>(std::pair<std::string, std::string>{"label", "env=prod"});
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Filter), static_cast<size_t>(2));
-        auto filters = args.GetAllValidated<ArgType::Filter>();
+        auto filters = args.GetAllValues<ArgType::Filter>();
         VERIFY_ARE_EQUAL(filters.size(), static_cast<size_t>(2));
         VERIFY_ARE_EQUAL(filters[0].first, std::string("status"));
         VERIFY_ARE_EQUAL(filters[0].second, std::string("running"));
@@ -258,13 +258,13 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(filters[1].second, std::string("env=prod"));
 
         // GetAllValidated returns empty when nothing is cached for the argument.
-        auto empty = args.GetAllValidated<ArgType::Signal>();
+        auto empty = args.GetAllValues<ArgType::Signal>();
         VERIFY_IS_TRUE(empty.empty());
 
         // Reading an argument that was never validated throws E_NOT_SET.
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Memory));
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Memory), static_cast<size_t>(0));
-        VERIFY_THROWS_SPECIFIC(args.GetValidated<ArgType::Memory>(), wil::ResultException, [](const wil::ResultException& e) {
+        VERIFY_THROWS_SPECIFIC(args.GetValue<ArgType::Memory>(), wil::ResultException, [](const wil::ResultException& e) {
             return e.GetErrorCode() == E_NOT_SET;
         });
     }
@@ -279,7 +279,7 @@ class WSLCCLIArgumentUnitTests
         args.Add(E, std::wstring(raw));
         Argument::Create(E).Validate(args);
         VERIFY_IS_TRUE(args.ContainsValidated(E));
-        return args.GetValidated<E>();
+        return args.GetValue<E>();
     }
 
     // Helper: run the real validation path for an argument that appears multiple times (ArgMap is
@@ -298,7 +298,7 @@ class WSLCCLIArgumentUnitTests
         // The cache must hold exactly one converted value per raw value in the map.
         VERIFY_ARE_EQUAL(args.CountValidated(E), args.Count(E));
         VERIFY_ARE_EQUAL(args.CountValidated(E), raws.size());
-        return args.GetAllValidated<E>();
+        return args.GetAllValues<E>();
     }
 
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache
@@ -350,12 +350,26 @@ class WSLCCLIArgumentUnitTests
             args.Add(ArgType::Filter, std::wstring(L"status=running"));
             args.Add(ArgType::Filter, std::wstring(L"label=env=prod")); // split on first '='
             Argument::Create(ArgType::Filter).Validate(args);
-            auto filters = args.GetAllValidated<ArgType::Filter>();
+            auto filters = args.GetAllValues<ArgType::Filter>();
             VERIFY_ARE_EQUAL(filters.size(), static_cast<size_t>(2));
             VERIFY_ARE_EQUAL(filters[0].first, std::string("status"));
             VERIFY_ARE_EQUAL(filters[0].second, std::string("running"));
             VERIFY_ARE_EQUAL(filters[1].first, std::string("label"));
             VERIFY_ARE_EQUAL(filters[1].second, std::string("env=prod"));
+        }
+
+        // string -> InspectType (inspect object type)
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Type>(L"container"), InspectType::Container);
+
+        // string -> pair<key, value> (label and driver option share the key=value shape)
+        {
+            auto label = ValidateAndGetCached<ArgType::Label>(L"env=prod");
+            VERIFY_ARE_EQUAL(label.first, std::string("env"));
+            VERIFY_ARE_EQUAL(label.second, std::string("prod"));
+
+            auto option = ValidateAndGetCached<ArgType::Options>(L"com.docker.network.bridge.name=br0");
+            VERIFY_ARE_EQUAL(option.first, std::string("com.docker.network.bridge.name"));
+            VERIFY_ARE_EQUAL(option.second, std::string("br0"));
         }
     }
 
