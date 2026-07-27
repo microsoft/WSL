@@ -1198,6 +1198,10 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
     <value>Nem sikerült lefordítani a következőt: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Hiba történt. Próbálkozzon újra később.</value>
   </data>
@@ -2159,10 +2163,6 @@ Usage:
     <value>Egy kötelező argumentum nincs megadva: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Az argumentum az engedélyezettnél többször van megadva: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>A kiválasztott parancs súgójának megjelenítése</value>
   </data>
@@ -3052,10 +3052,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Az összes közzétett port közzététele véletlenszerű gazdaportokon</value>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
-    <value>Suppress verbose output</value>
+    <value>Részletes kimenet elrejtése</value>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
-    <value>Using default tag: {}</value>
+    <value>Az alapértelmezett címke használata: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
@@ -3531,7 +3531,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Nem sikerült inicializálni a váltást</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>A képfájl által megnyitott UDP-portok nem lettek közzétéve, mert az UDP-porttovábbítás nem támogatott a jelenlegi hálózati módban</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Nem sikerült visszaállítani a(z) {} tároló időbélyegét</value>
