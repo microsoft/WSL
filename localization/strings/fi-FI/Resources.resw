@@ -1198,6 +1198,10 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
     <value>Kääntäminen epäonnistui {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 ei ole yhteensopiva jakelukohtaisen cgroup-eristyksen kanssa. Jos haluat käyttää cgroup v1:tä, määritä isolateDistroCgroup=false tiedoston .wslconfig [wsl2]-osaan ja suorita sitten wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Tapahtui jokin virhe. Yritä myöhemmin uudelleen.</value>
   </data>
@@ -2159,10 +2163,6 @@ Käyttö:
     <value>Pakollista argumenttia ei ole annettu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argumentti annettu sallittua useammin: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Näyttää valitun komennon ohjeen</value>
   </data>
@@ -3052,10 +3052,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Julkaise kaikki paljastetut portit satunnaisiin isäntäportteihin</value>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
-    <value>Suppress verbose output</value>
+    <value>Piilota yksityiskohtainen tulos</value>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
-    <value>Using default tag: {}</value>
+    <value>Käytetään oletustunnistetta: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
@@ -3531,7 +3531,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Vaihdon alustaminen epäonnistui</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>Kuvan paljastamia UDP-portteja ei julkaistu, koska UDP-porttien edelleenohjausta ei tueta nykyisessä verkkotilassa</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Säilön {} aikaleiman palauttaminen epäonnistui</value>
