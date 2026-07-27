@@ -769,7 +769,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
                 EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(*reportedError));
             }
 
-            reportedError = parsed.errorDetail->message;
+            reportedError = FormatDockerEngineError(parsed.errorDetail->message);
             return;
         }
 
@@ -792,7 +792,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         if (httpResponse->isJson)
         {
             // operation failed, parse the error message.
-            errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
+            errorMessage = FormatDockerEngineError(wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message);
         }
         else
         {
@@ -1347,7 +1347,7 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
                 EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(*errorMessage));
             }
 
-            errorMessage = std::move(parsed.errorDetail->message);
+            errorMessage = FormatDockerEngineError(parsed.errorDetail->message);
         }
         else if (parsed.stream.has_value())
         {
@@ -1420,7 +1420,7 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
     {
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(pendingErrorJson->c_str());
 
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, FormatDockerEngineError(error.message));
     }
 
     // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
@@ -1512,8 +1512,9 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         // Save failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message.c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage.c_str());
     }
 }
 
@@ -1670,7 +1671,7 @@ try
         std::string errorMessage;
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
@@ -1742,7 +1743,7 @@ try
         std::string errorMessage;
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
@@ -1810,7 +1811,7 @@ std::string WSLCSession::InspectImageLockHeld(const std::string& NameOrId)
         std::string errorMessage = "Failed to inspect image";
         if (e.HasErrorMessage())
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
@@ -2021,7 +2022,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
         std::string errorMessage;
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);

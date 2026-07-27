@@ -56,6 +56,16 @@ bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_typ
 
 } // namespace
 
+std::string wsl::windows::service::wslc::FormatDockerEngineError(const std::string& EngineMessage)
+{
+    if (EngineMessage.empty() || wsl::shared::Localization::IsCurrentLanguageEnglish())
+    {
+        return EngineMessage;
+    }
+
+    return wsl::shared::string::WideToMultiByte(wsl::shared::Localization::MessageWslcDockerEngineErrorPrefix()) + " " + EngineMessage;
+}
+
 DockerHTTPClient::URL::URL(std::string&& Path) : m_path(std::move(Path))
 {
 }
