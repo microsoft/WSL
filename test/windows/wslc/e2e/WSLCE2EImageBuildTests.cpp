@@ -59,9 +59,9 @@ class WSLCE2EImageBuildTests
     // releases virtiofs shares (see WSLCVirtualMachine::UnmountWindowsFolder), so every distinct
     // mounted directory permanently consumes one of a small number of share slots for the session's
     // lifetime. Giving each secret test its own context directory would exhaust that budget; reusing
-    // one path keeps all secret tests to a single shared slot. The per-test Dockerfile and any secret
-    // source files live under each test's own testRoot and are never mounted (the Dockerfile is
-    // streamed via -f and file secrets are read client-side).
+    // one path keeps all secret tests to a single shared slot. The per-test Dockerfile is streamed via
+    // -f (never mounted); each file secret now causes the server to mount that secret file's parent
+    // directory read-only, but only for the duration of that build (torn down when the build completes).
     static std::filesystem::path SharedSecretBuildContext()
     {
         auto dir = std::filesystem::current_path() / L"wslc-e2e-build-secret-context";
@@ -410,8 +410,8 @@ class WSLCE2EImageBuildTests
         auto contextDir = SharedSecretBuildContext();
         std::error_code ec;
 
-        // Place the secret OUTSIDE the build context; the client reads its bytes and the server exposes
-        // them via its own host virtiofs share, so the secret's directory is never mounted.
+        // Place the secret OUTSIDE the build context; the server mounts the secret file's parent
+        // directory read-only and references the file in place, so its bytes are never copied.
         auto secretDir = testRoot / L"secrets";
         std::filesystem::create_directories(secretDir, ec);
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(secretDir));
@@ -442,8 +442,8 @@ class WSLCE2EImageBuildTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_SrcSymlink_Success)
     {
         // A symlink whose target lives in a separate directory must resolve to the target's content.
-        // The client reads the resolved file's bytes and the server exposes them via its own host
-        // virtiofs share, so neither the link's nor the target's directory is ever mounted.
+        // The client canonicalizes the link to its target; the server mounts the *target's* parent
+        // directory read-only and references the resolved file in place, so its bytes are never copied.
         auto imageCleanup = DeleteImageOnExit(BuiltImageSecretSrcSymlink);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-src-symlink";
         auto cleanup = SetupTestDirectory(testRoot);
@@ -763,8 +763,8 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_OversizeFile_Fails)
     {
-        // One byte over BuildKit's cap (500 KiB + 1) must be rejected client-side, before the bytes are
-        // read into memory or shipped to the daemon.
+        // One byte over BuildKit's cap (500 KiB + 1) must be rejected client-side from the file's
+        // metadata, before it is shipped to the daemon.
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-oversize";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -785,6 +785,56 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
         VERIFY_IS_TRUE(buildResult.Stderr->find(L"exceeds the maximum secret size of 500 KiB") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_MultipleFiles_Success)
+    {
+        // Several file secrets in one build: two share a directory (the server mounts it once, deduped)
+        // and a third lives elsewhere (a second mount). All three must be delivered with their own
+        // content, exercising the multi-mount/dedup path for in-place file secrets.
+        auto imageCleanup = DeleteImageOnExit(BuiltImageSecretMultiple);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-multi";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+        std::error_code ec;
+
+        auto dirA = testRoot / L"a";
+        auto dirB = testRoot / L"b";
+        std::filesystem::create_directories(dirA, ec);
+        std::filesystem::create_directories(dirB, ec);
+        THROW_HR_IF(E_FAIL, !std::filesystem::exists(dirA) || !std::filesystem::exists(dirB));
+
+        auto secret1 = dirA / L"s1.txt";
+        auto secret2 = dirA / L"s2.txt";
+        auto secret3 = dirB / L"s3.txt";
+        WriteTestFileContent(secret1, "multi-secret-one-11111");
+        WriteTestFileContent(secret2, "multi-secret-two-22222");
+        WriteTestFileContent(secret3, "multi-secret-three-33333");
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=s1 --mount=type=secret,id=s2 --mount=type=secret,id=s3 "
+            "[ \"$(cat /run/secrets/s1)\" = \"multi-secret-one-11111\" ] && "
+            "[ \"$(cat /run/secrets/s2)\" = \"multi-secret-two-22222\" ] && "
+            "[ \"$(cat /run/secrets/s3)\" = \"multi-secret-three-33333\" ]\n"
+            "CMD [\"echo\", \"secret-multi-ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=s1,src=\"{}\" --secret id=s2,src=\"{}\" --secret id=s3,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretMultiple.NameAndTag(),
+            secret1.wstring(),
+            secret2.wstring(),
+            secret3.wstring()));
+        buildResult.Verify({.ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageSecretMultiple.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_UnknownType_Fails)
@@ -932,6 +982,7 @@ private:
     const TestImage BuiltImageSecretEmptyFile{L"wslc-e2e-build-secret-empty-file", L"latest", L""};
     const TestImage BuiltImageSecretLarge{L"wslc-e2e-build-secret-large", L"latest", L""};
     const TestImage BuiltImageSecretMaxSize{L"wslc-e2e-build-secret-max-size", L"latest", L""};
+    const TestImage BuiltImageSecretMultiple{L"wslc-e2e-build-secret-multi", L"latest", L""};
 
     // BuildKit's per-secret cap (MaxSecretSize = 500 * 1024). Secrets at or below this size mount; larger ones are rejected.
     static constexpr size_t c_maxSecretSize = 500 * 1024;

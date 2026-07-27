@@ -23,7 +23,13 @@ namespace wsl::windows::wslc::services {
 struct BuildSecret
 {
     std::wstring Id; // value for docker's --secret id= field
-    std::vector<BYTE> Value; // raw secret bytes (may contain NULs); materialized into a host-side temp file mounted read-only into the VM during build
+    // For file (src=) secrets: the resolved absolute host path. The service mounts the file's parent
+    // directory into the build VM read-only and references the file in place, so the bytes are never
+    // copied off their original (possibly EFS-encrypted) location. Empty for env/in-memory secrets.
+    std::wstring SourcePath;
+    // For env/in-memory secrets: the raw secret bytes (may contain NULs), materialized into a host-side
+    // file mounted read-only into the VM during the build. Empty for file secrets.
+    std::vector<BYTE> Value;
 };
 
 class ImageService

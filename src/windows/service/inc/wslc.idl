@@ -172,9 +172,15 @@ typedef struct _WSLCStringArray
 typedef struct _WSLCBuildSecret
 {
     [string] LPCSTR Id; // Value for docker's --secret id= field.
-    // Raw secret bytes (never cross into argv). Carried as a counted byte array so arbitrary binary
-    // content - including embedded NULs - round-trips losslessly; the server writes it to a host file
-    // exposed to the VM read-only over virtiofs and references it with docker's --secret src=.
+    // For file (src=) secrets: the resolved absolute host path of the secret file. The server mounts the
+    // file's parent directory into the build VM read-only over virtiofs and references the file in place,
+    // so the secret bytes are never copied off their original (possibly EFS-encrypted) location. Null for
+    // env/in-memory secrets.
+    [string, unique] LPCWSTR SourcePath;
+    // For env/in-memory secrets: raw secret bytes (never cross into argv). Carried as a counted byte array
+    // so arbitrary binary content - including embedded NULs - round-trips losslessly; the server writes it
+    // to a host file exposed to the VM read-only over virtiofs and references it with docker's --secret
+    // src=. Null for file secrets.
     [unique, size_is(ValueSize)] const byte* Value;
     ULONG ValueSize;
 } WSLCBuildSecret;

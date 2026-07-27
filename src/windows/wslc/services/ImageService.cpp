@@ -171,9 +171,9 @@ void ImageService::Build(
     std::vector<LPCSTR> labelPointers;
     toMultiByte(labels, labelStrings, labelPointers);
 
-    // Keep narrow-encoded id strings alive for the duration of the COM call. The raw secret bytes are
-    // referenced in place from the caller's BuildSecret objects (which outlive this call), so they are
-    // never copied or NUL-truncated.
+    // Keep narrow-encoded id strings alive for the duration of the COM call. The source path and raw
+    // secret bytes are referenced in place from the caller's BuildSecret objects (which outlive this
+    // call), so they are never copied or NUL-truncated.
     std::vector<std::string> secretIdStrings;
     std::vector<WSLCBuildSecret> secretEntries;
     secretIdStrings.reserve(secrets.size());
@@ -183,6 +183,7 @@ void ImageService::Build(
         secretIdStrings.push_back(wsl::windows::common::string::WideToMultiByte(secret.Id));
         secretEntries.push_back(WSLCBuildSecret{
             .Id = secretIdStrings.back().c_str(),
+            .SourcePath = secret.SourcePath.empty() ? nullptr : secret.SourcePath.c_str(),
             .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
             .ValueSize = static_cast<ULONG>(secret.Value.size()),
         });

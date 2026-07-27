@@ -26,7 +26,6 @@ Abstract:
 #include <cmath>
 #include <filesystem>
 #include <format>
-#include <fstream>
 #include <limits>
 #include <optional>
 #include <sstream>
@@ -40,10 +39,10 @@ using namespace wsl::shared::string;
 namespace wsl::windows::wslc::validation {
 
 // BuildKit rejects any single secret larger than 500 KiB (MaxSecretSize == 500 * 1024 == 512000 bytes)
-// when it is mounted inside the build. Enforce the same cap client-side, before sizing and allocating
-// the read buffer, so an oversize --secret,src= file is reported with a friendly error instead of
-// ballooning CLI memory and then being rejected by the daemon after a pointless VM round-trip.
-constexpr std::streamoff c_maxSecretFileSize = 500 * 1024;
+// when it is mounted inside the build. Enforce the same cap client-side using only the file's metadata
+// (no bytes are read), so an oversize --secret,src= file is reported with a friendly error instead of
+// being shipped to the daemon and rejected after a pointless VM round-trip.
+constexpr std::uintmax_t c_maxSecretFileSize = 500 * 1024;
 
 KeyValueSplit SplitKeyValue(const std::wstring& value, wchar_t separator)
 {
@@ -162,8 +161,8 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     if (!srcPath.empty())
     {
         std::error_code ec;
-        // Resolve symlinks (and normalize '..') so we read the file that actually holds the secret's
-        // bytes rather than the link node itself.
+        // Resolve symlinks (and normalize '..') so we mount the directory that actually holds the
+        // secret's bytes rather than a link node's directory.
         auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
         if (ec.value() != 0 || !std::filesystem::is_regular_file(absPath, ec))
         {
@@ -171,53 +170,27 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
                 spec, std::format(L"source file not found or not a regular file: {}", absPath.wstring())));
         }
 
-        // Read the file's raw bytes and forward them verbatim. The server writes them to a host file
-        // exposed to the VM read-only over virtiofs, so file secrets are byte-exact (binary, embedded
-        // NULs, and arbitrary size all round-trip) - matching Docker's type=file semantics.
-        std::ifstream file(absPath, std::ios::binary | std::ios::ate);
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to open source file: {}", absPath.wstring())),
-            !file);
-
-        // Read a known number of bytes rather than draining via istreambuf_iterator: that iterator
-        // cannot distinguish EOF from a mid-stream read error, so a transient I/O failure would
-        // silently truncate the secret. Size the buffer from the stream, read exactly that many
-        // bytes, then verify the full contents were delivered so a short read is surfaced as an
-        // error instead of forwarding a partial secret to the build.
-        const std::streamoff size = file.tellg();
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"unable to determine size of source file: {}", absPath.wstring())),
-            size < 0);
-
-        // Reject oversize files before allocating the buffer (see c_maxSecretFileSize) so a huge src=
-        // file can neither exhaust CLI memory nor be shipped to the daemon only to be rejected there.
-        if (size > c_maxSecretFileSize)
+        // Metadata-only size guard (no bytes are read): keep parity with BuildKit's per-secret cap so an
+        // oversize file is rejected early with a friendly error instead of failing later in the daemon.
+        const auto fileSize = std::filesystem::file_size(absPath, ec);
+        if (ec.value() == 0 && fileSize > c_maxSecretFileSize)
         {
             throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
                 spec,
                 std::format(
                     L"source file is {} bytes, which exceeds the maximum secret size of 500 KiB ({} bytes): {}",
-                    static_cast<long long>(size),
-                    static_cast<long long>(c_maxSecretFileSize),
+                    fileSize,
+                    c_maxSecretFileSize,
                     absPath.wstring())));
         }
 
-        std::vector<BYTE> value(static_cast<size_t>(size));
-        if (size > 0)
-        {
-            file.seekg(0);
-            file.read(reinterpret_cast<char*>(value.data()), size);
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_UNEXPECTED,
-                Localization::MessageWslcSecretInvalidSpec(spec, std::format(L"failed to read source file: {}", absPath.wstring())),
-                file.bad() || file.gcount() != size);
-        }
-
+        // Forward the resolved path rather than the bytes: the server mounts the file's parent directory
+        // into the build VM read-only and references the file in place with docker's --secret src=, so
+        // the secret is never copied off its original (possibly EFS-encrypted) location while still
+        // delivering arbitrary binary content byte-for-byte - matching Docker's type=file semantics.
         return services::BuildSecret{
             .Id = std::move(id),
-            .Value = std::move(value),
+            .SourcePath = absPath.wstring(),
         };
     }
 

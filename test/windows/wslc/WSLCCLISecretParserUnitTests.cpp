@@ -33,9 +33,8 @@ class ScopedTempFile
 public:
     explicit ScopedTempFile(const std::vector<BYTE>& bytes)
     {
-        const auto dir = std::filesystem::temp_directory_path();
-        m_path =
-            dir / (L"wslc_ut_secret_" + std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(++s_counter) + L".bin");
+        m_path = std::filesystem::temp_directory_path() /
+                 (L"wslc_ut_secret_" + std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(++s_counter) + L".bin");
         std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
         if (!bytes.empty())
         {
@@ -97,6 +96,19 @@ class WSLCCLISecretParserUnitTests
         }
     }
 
+    // Parses a spec expected to resolve to a file-backed secret and asserts the resolved id, that no
+    // bytes were read (Value is empty), and that the canonicalized source path is forwarded in place -
+    // file secrets are delivered by mounting the file's directory into the VM, never by copying bytes.
+    static void VerifyValidFileSecret(const std::wstring& spec, const std::wstring& expectedId, const std::wstring& expectedPath)
+    {
+        auto secret = validation::ParseSecretSpec(spec);
+        VERIFY_ARE_EQUAL(expectedId, secret.Id);
+        VERIFY_IS_TRUE(secret.Value.empty());
+        std::error_code ec;
+        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(expectedPath), ec);
+        VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
+    }
+
     // --- Valid: environment-variable backed secrets ---
 
     TEST_METHOD(Secret_Env_BareIdReadsIdNamedVariable)
@@ -152,35 +164,39 @@ class WSLCCLISecretParserUnitTests
 
     // --- Valid: file backed secrets ---
 
-    TEST_METHOD(Secret_File_BareSrcReadsFileBytes)
+    TEST_METHOD(Secret_File_BareSrcForwardsPath)
     {
         ScopedTempFile file(ToBytes("file-content"));
-        VerifyValid(L"id=s,src=" + file.wpath(), L"s", ToBytes("file-content"));
+        VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
     }
 
-    TEST_METHOD(Secret_File_TypeFileReadsFileBytes)
+    TEST_METHOD(Secret_File_TypeFileForwardsPath)
     {
         ScopedTempFile file(ToBytes("typed-file-content"));
-        VerifyValid(L"id=s,type=file,src=" + file.wpath(), L"s", ToBytes("typed-file-content"));
+        VerifyValidFileSecret(L"id=s,type=file,src=" + file.wpath(), L"s", file.wpath());
     }
 
     TEST_METHOD(Secret_File_SourceKeyAlias)
     {
         ScopedTempFile file(ToBytes("aliased"));
-        VerifyValid(L"id=s,source=" + file.wpath(), L"s", ToBytes("aliased"));
+        VerifyValidFileSecret(L"id=s,source=" + file.wpath(), L"s", file.wpath());
     }
 
-    TEST_METHOD(Secret_File_EmptyFileYieldsEmptyValue)
+    TEST_METHOD(Secret_File_EmptyFileForwardsPath)
     {
+        // An empty file is still a valid file secret: its path is forwarded and mounted (docker delivers
+        // an empty /run/secrets/<id>); no bytes are carried in Value.
         ScopedTempFile file({});
-        VerifyValid(L"id=s,src=" + file.wpath(), L"s", {});
+        VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
     }
 
-    TEST_METHOD(Secret_File_BinaryContentRoundTripsExactly)
+    TEST_METHOD(Secret_File_BinaryFileForwardsPath)
     {
+        // Binary content does not affect parsing: the file is referenced by path, not read, so arbitrary
+        // bytes (including embedded NULs) are irrelevant to the client and delivered verbatim via mount.
         const std::vector<BYTE> bytes = {0x00, 0x01, 0x02, 0xFF, 0x00, 0x41, 0x00, 0x7F, 0x80};
         ScopedTempFile file(bytes);
-        VerifyValid(L"id=s,src=" + file.wpath(), L"s", bytes);
+        VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
     }
 
     TEST_METHOD(Secret_File_MaxSizeSucceeds)
@@ -188,7 +204,7 @@ class WSLCCLISecretParserUnitTests
         // A file of exactly BuildKit's cap (500 KiB == 512000 bytes) must be accepted.
         const std::vector<BYTE> bytes(512000, 0x41);
         ScopedTempFile file(bytes);
-        VerifyValid(L"id=s,src=" + file.wpath(), L"s", bytes);
+        VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
     }
 
     // --- Invalid: spec structure ---
@@ -256,7 +272,7 @@ class WSLCCLISecretParserUnitTests
 
     TEST_METHOD(Secret_Invalid_SourceFileTooLarge)
     {
-        // One byte over BuildKit's cap (500 KiB + 1) must be rejected before the bytes are read.
+        // One byte over BuildKit's cap (500 KiB + 1) must be rejected up front from the file's metadata.
         const std::vector<BYTE> bytes(512000 + 1, 0x41);
         ScopedTempFile file(bytes);
         VerifyInvalid(L"id=s,src=" + file.wpath(), L"exceeds the maximum secret size of 500 KiB");
