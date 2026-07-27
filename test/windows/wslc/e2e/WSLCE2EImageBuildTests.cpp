@@ -55,13 +55,12 @@ class WSLCE2EImageBuildTests
         });
     }
 
-    // All secret tests build from this single shared (empty) context directory. The session never
-    // releases virtiofs shares (see WSLCVirtualMachine::UnmountWindowsFolder), so every distinct
-    // mounted directory permanently consumes one of a small number of share slots for the session's
-    // lifetime. Giving each secret test its own context directory would exhaust that budget; reusing
-    // one path keeps all secret tests to a single shared slot. The per-test Dockerfile is streamed via
-    // -f (never mounted); each file secret now causes the server to mount that secret file's parent
-    // directory read-only, but only for the duration of that build (torn down when the build completes).
+    // All secret tests build from this single shared (empty) context directory. Each distinct mounted
+    // directory consumes a virtiofs share slot while it is mounted, so reusing a single context path
+    // helps keep secret tests from exhausting the per-session share budget.
+    //
+    // The per-test Dockerfile is streamed via -f (never mounted); each file secret causes the server to
+    // mount that secret file's parent directory read-only for the duration of that build.
     static std::filesystem::path SharedSecretBuildContext()
     {
         auto dir = std::filesystem::current_path() / L"wslc-e2e-build-secret-context";
