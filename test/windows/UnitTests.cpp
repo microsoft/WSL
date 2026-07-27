@@ -18,6 +18,7 @@ Abstract:
 #include "install.h"
 #include <AclAPI.h>
 #include <fstream>
+#include <sstream>
 #include <filesystem>
 #include "wslservice.h"
 #include "registry.hpp"
@@ -29,6 +30,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
+#include "retryshared.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -3296,19 +3298,27 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             }
         });
 
-        // Wait until the service reports the distribution as Exporting (i.e. the lock is held).
-        bool locked = false;
-        for (int i = 0; i < 100 && !locked; ++i)
-        {
-            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
-            locked = (out.find(name) != std::wstring::npos) && (out.find(L"Exporting") != std::wstring::npos);
-            if (!locked)
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-        }
+        // Wait until the service reports the distribution as Exporting (i.e. the lock is held), retrying for up
+        // to two minutes so a slow machine doesn't flake before the export acquires the lock.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
+                bool locked = false;
+                std::wistringstream stream(out);
+                for (std::wstring line; std::getline(stream, line);)
+                {
+                    if (line.find(name) != std::wstring::npos && line.find(L"Exporting") != std::wstring::npos)
+                    {
+                        locked = true;
+                        break;
+                    }
+                }
 
-        VERIFY_IS_TRUE(locked);
+                THROW_HR_IF(E_ABORT, !locked);
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::minutes(2),
+            [] { return wil::ResultFromCaughtException() == E_ABORT; });
 
         // Each VHD-mutating manage operation must be rejected with E_ILLEGAL_STATE_CHANGE while the lock is held.
         auto verifyRejected = [&](const std::wstring& command) {
