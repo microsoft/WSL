@@ -445,6 +445,7 @@ class WSLCE2EContainerCpTests
         auto cleanup = wil::scope_exit([&] {
             std::error_code ec;
             std::filesystem::remove(linkDir, ec);
+            std::filesystem::remove(L"symfile.txt", ec);
         });
 
         // Creating a symlink requires Administrator privileges, which the E2E tests already run with.
