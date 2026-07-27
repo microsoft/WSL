@@ -1198,6 +1198,10 @@ Se genoprettelsesinstruktioner på: https://aka.ms/wsldiskmountrecovery</value>
     <value>"{}" kunne ikke oversættes</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 er ikke kompatibel med cgroup-isolation pr. distribution. Hvis du vil bruge cgroup v1, skal du angive isolateDistroCgroup=false under [wsl2] i .wslconfig og derefter køre wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Noget gik galt. Prøv igen senere.</value>
   </data>
@@ -2159,10 +2163,6 @@ Brug:
     <value>Det påkrævede argument er ikke angivet: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argument er angivet flere gange end tilladt: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Viser hjælp til den markerede kommando</value>
   </data>
@@ -3051,6 +3051,13 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publicer alle eksponerede porte til tilfældige værtsporte</value>
   </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Undertryk detaljeret output</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Bruger standardmærket: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Udlæser kun objektbeholder-id'er</value>
   </data>
@@ -3522,6 +3529,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Skift kunne ikke initialiseres</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>UDP-porte, der vises af billedet, blev ikke udgivet, fordi videresendelse af UDP-port ikke understøttes i den aktuelle netværkstilstand</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Tidsstemplet for objektbeholderen '{}' blev ikke gendannet</value>

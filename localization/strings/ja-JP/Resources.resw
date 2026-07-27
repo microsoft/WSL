@@ -1204,6 +1204,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>翻訳に失敗しました '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>問題が発生しました。後でやり直してください。</value>
   </data>
@@ -2165,10 +2169,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>必須の引数が指定されていません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>引数に指定された回数が許容回数を超えています: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>選択したコマンドに関するヘルプを表示</value>
   </data>
@@ -3057,6 +3057,13 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>公開されているすべてのポートをランダム ホスト ポートに発行する</value>
   </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>詳細出力を抑制する</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>既定値 ({}) を使用しています</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>コンテナー ID のみを出力します</value>
   </data>
@@ -3528,6 +3535,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>割り込みを初期化できませんでした</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>現在のネットワーク モードでは UDP ポート転送がサポートされていないため、イメージによって公開された UDP ポートは公開されませんでした</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>コンテナー '{}' のタイムスタンプを復元できませんでした</value>

@@ -1198,6 +1198,10 @@ Ver instruções de recuperação em: https://aka.ms/wsldiskmountrecovery</value
     <value>Falha ao traduzir '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>O Cgroup v1 é incompatível com o isolamento de cgroup por distribuição. Para utilizar o cgroup v1, defina isolateDistroCgroup=false em [wsl2] no .wslconfig e, em seguida, execute wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Algo correu mal. Tente novamente mais tarde.</value>
   </data>
@@ -2159,10 +2163,6 @@ Utilização:
     <value>Argumento necessário não fornecido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>O argumento foi fornecido mais vezes do que o permitido: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Mostra ajuda sobre o comando selecionado</value>
   </data>
@@ -2388,15 +2388,15 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
-    <value>Duplicate driver option '{}'.</value>
+    <value>Opção de controlador duplicada '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
-    <value>Invalid driver option '{}'; expected 'key=value'.</value>
+    <value>Opção de controlador inválida '{}'; era esperado 'key=value'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
-    <value>Unknown endpoint setting '{}' for network '{}'.</value>
+    <value>Definição de endpoint desconhecida '{}' para a rede '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
@@ -2404,7 +2404,7 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcLinkEmpty" xml:space="preserve">
-    <value>Network link cannot be empty.</value>
+    <value>A ligação de rede não pode estar vazia.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>O alias de rede não pode estar vazio.</value>
@@ -3008,7 +3008,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Adicionar um alias com âmbito de rede para o contentor</value>
   </data>
   <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
-    <value>Set endpoint driver options (--driver-opt key=value)</value>
+    <value>Definir opções do controlador de endpoint (--driver-opt key=value)</value>
     <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
@@ -3050,6 +3050,13 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publicar todas as portas expostas em portas aleatórias do anfitrião</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Suprimir saída verbosa</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>A utilizar a etiqueta predefinida: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Produz apenas os IDs dos contentores</value>
@@ -3522,6 +3529,9 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Falha ao inicializar troca</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>As portas UDP expostas pela imagem não foram publicadas porque o reencaminhamento de portas UDP não é suportado no modo de rede atual</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Falha ao restaurar o carimbo de data/hora do contentor "{}"</value>
