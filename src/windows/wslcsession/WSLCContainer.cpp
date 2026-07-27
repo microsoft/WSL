@@ -904,7 +904,7 @@ void WSLCContainerImpl::WaitForTransitionCompletion(const std::shared_ptr<StateT
 {
     THROW_HR_IF_MSG(
         E_UNEXPECTED,
-        !m_wslcSession.WaitForEventOrSessionTerminating(transition->Completed.get(), std::chrono::milliseconds{INFINITE}),
+        !m_wslcSession.WaitForEventOrSessionTerminating(transition->Completed.get(), 60s),
         "Unexpected lifecycle transition timeout for container '%hs'",
         m_id.c_str());
 
@@ -1085,8 +1085,8 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     auto transition = m_transition;
 
     // A Stop while expecting Start should not occur normally: Docker emits start before die, and the event stream processes
-    //  them serially. It would indicate external manipulation. Ignoring it avoids applying an old exit code to the newly
-    //  staged init process.
+    // them serially. It would indicate external manipulation. Ignoring it avoids applying an old exit code to the newly
+    // staged init process.
     if (transition && (transition->ExpectedEvent == ContainerEvent::Start))
     {
         WSL_LOG("UnexpectedContainerExit", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(exitCode, "ExitCode"));
