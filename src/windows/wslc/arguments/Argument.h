@@ -105,8 +105,8 @@ struct Argument
         return m_limit == argument::Limit::Unlimited;
     }
 
-    // Validates this argument's value in the provided args
-    void Validate(const ArgMap& execArgs) const;
+    // Validates this argument's value and caches its converted value on the provided args.
+    void Validate(ArgMap& execArgs) const;
 
 private:
     ArgType m_argType;

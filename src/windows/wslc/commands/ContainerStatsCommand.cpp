@@ -44,18 +44,6 @@ std::wstring ContainerStatsCommand::LongDescription() const
     return Localization::WSLCCLI_ContainerStatsLongDesc();
 }
 
-void ContainerStatsCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
-{
-    if (execArgs.Contains(ArgType::Format))
-    {
-        auto format = execArgs.Get<ArgType::Format>();
-        if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
-        {
-            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
-        }
-    }
-}
-
 void ContainerStatsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context               //

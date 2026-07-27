@@ -43,18 +43,6 @@ std::wstring NetworkListCommand::LongDescription() const
     return Localization::WSLCCLI_NetworkListLongDesc();
 }
 
-void NetworkListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
-{
-    if (execArgs.Contains(ArgType::Format))
-    {
-        auto format = execArgs.Get<ArgType::Format>();
-        if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
-        {
-            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
-        }
-    }
-}
-
 void NetworkListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context << ResolveSession //

@@ -250,7 +250,7 @@ void DeleteImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    const auto& imageIds = context.Args.GetAllValues<ArgType::ImageId>();
+    auto imageIds = context.Args.GetAllValues<ArgType::ImageId>();
     bool force = context.Args.GetFlag<ArgType::ImageForce>();
     bool noPrune = context.Args.GetFlag<ArgType::NoPrune>();
     for (const auto& id : imageIds)

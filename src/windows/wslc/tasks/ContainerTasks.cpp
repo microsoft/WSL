@@ -760,7 +760,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::EnvFile))
     {
-        auto const& envFiles = context.Args.GetAllValues<ArgType::EnvFile>();
+        auto envFiles = context.Args.GetAllValues<ArgType::EnvFile>();
         for (const auto& envFile : envFiles)
         {
             auto parsedEnvVars = EnvironmentVariable::ParseFile(envFile);
@@ -773,7 +773,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Env))
     {
-        auto const& envArgs = context.Args.GetAllValues<ArgType::Env>();
+        auto envArgs = context.Args.GetAllValues<ArgType::Env>();
         for (const auto& arg : envArgs)
         {
             auto envVar = EnvironmentVariable::Parse(arg);

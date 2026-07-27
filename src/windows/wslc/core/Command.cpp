@@ -430,7 +430,7 @@ void Command::ParseArguments(
 // that all required arguments are present. Count limits are enforced during parsing
 // (single-value args are last-wins), so they are not re-checked here.
 // Any defined validation for specific ArgTypes are also run.
-void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
+void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
 {
     if (source.GetFlag<ArgType::Help>())
     {

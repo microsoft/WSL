@@ -127,9 +127,9 @@ struct Command
         ParseArguments(inv, target, GetAllArguments());
     }
 
-    void ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
+    void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
 
-    void ValidateArguments(const ArgMap& source) const
+    void ValidateArguments(ArgMap& source) const
     {
         ValidateArguments(source, GetAllArguments(), true);
     }
@@ -139,13 +139,12 @@ struct Command
 protected:
     // Command-specific validation hook, run after the shared per-argument Argument::Validate pass.
     // Override to enforce cross-argument rules that per-argument validation cannot express, such as
-    // mutually-exclusive arguments, required combinations, or a command narrowing the set of values
-    // it accepts for an argument (e.g. only "json"/"table" for --format).
+    // mutually-exclusive arguments or required argument combinations.
     //
-    // Contract: this hook validates the arguments as provided for consistency and does not convert
-    // them to another type. Read raw values with Get/GetAll and flags with GetFlag; do not read the
-    // validated cache (GetValue/GetAllValues). Conversion happens once, in Argument::Validate, and
-    // is consumed on the execution path.
+    // Contract: this hook enforces relationships between already-validated arguments. It receives a
+    // const ArgMap, so it cannot run conversion or write the validated cache (conversion happens once,
+    // in Argument::Validate). Read arguments with the unified accessors GetValue/GetAllValues/GetFlag,
+    // which return the converted value for converted args and the raw value otherwise.
     virtual void ValidateArgumentsInternal(const ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 

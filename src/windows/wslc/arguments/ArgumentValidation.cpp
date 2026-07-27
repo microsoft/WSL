@@ -41,7 +41,7 @@ namespace {
     // the ArgMap. This is the single point where an argument's string input is converted; execution
     // later reads the cached value via GetValue/GetAllValues.
     template <ArgType A, typename Converter>
-    void CacheConverted(const ArgMap& execArgs, const std::wstring& argName, Converter&& convert)
+    void CacheConverted(ArgMap& execArgs, const std::wstring& argName, Converter&& convert)
     {
         using value_t = typename details::ArgConvertedTypeMapping<A>::value_t;
         using converted_t = decltype(convert(std::declval<const std::wstring&>(), std::declval<const std::wstring&>()));
@@ -61,7 +61,7 @@ namespace {
 
 // Common argument validation that runs across commands. For arguments whose raw string input is
 // converted into a typed value, the conversion happens here once and is cached on the ArgMap.
-void Argument::Validate(const ArgMap& execArgs) const
+void Argument::Validate(ArgMap& execArgs) const
 {
     switch (m_argType)
     {

@@ -151,7 +151,7 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
     // (ArgumentConvertedTypes.h), so a wrong-type access is a compile error. A multimap preserves order
     // and multiplicity for arguments that allow multiple values.
     template <ArgType E>
-    void AddValidated(typename details::ArgConvertedTypeMapping<E>::value_t value) const
+    void AddValidated(typename details::ArgConvertedTypeMapping<E>::value_t value)
     {
         using value_t = typename details::ArgConvertedTypeMapping<E>::value_t;
         static_assert(
@@ -263,7 +263,7 @@ private:
         return results;
     }
 
-    mutable std::multimap<ArgType, std::any> m_validated;
+    std::multimap<ArgType, std::any> m_validated;
 };
 
 } // namespace wsl::windows::wslc::argument
