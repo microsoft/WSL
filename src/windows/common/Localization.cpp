@@ -105,10 +105,9 @@ bool wsl::shared::Localization::IsCurrentLanguageEnglish(Options options)
 {
     try
     {
-        const auto languages = GetUserLanguages(options != Options::DontImpersonate && g_runningInService);
         if (!languages.empty() && !languages[0].empty())
         {
-            return languages[0].starts_with(L"en-");
+            return languages[0] == L"en" || languages[0].starts_with(L"en-");
         }
     }
     catch (...)
