@@ -199,9 +199,10 @@ class WSLCCLISecretParserUnitTests
         VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
     }
 
-    TEST_METHOD(Secret_File_MaxSizeSucceeds)
+    TEST_METHOD(Secret_File_LargeFileSucceeds)
     {
-        // A file of exactly BuildKit's cap (500 KiB == 512000 bytes) must be accepted.
+        // The parser no longer caps secret file size (BuildKit enforces its own limit inside the build),
+        // so a large file must still parse into a valid file secret.
         const std::vector<BYTE> bytes(512000, 0x41);
         ScopedTempFile file(bytes);
         VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
@@ -292,17 +293,16 @@ class WSLCCLISecretParserUnitTests
 
     // --- Invalid: value resolution ---
 
-    TEST_METHOD(Secret_Invalid_SourceFileMissing)
+    TEST_METHOD(Secret_File_MissingSourceForwardsPath)
     {
-        VerifyInvalid(L"id=s,src=C:\\wslc-ut\\definitely-missing-secret-file.txt", L"source file not found or not a regular file");
-    }
-
-    TEST_METHOD(Secret_Invalid_SourceFileTooLarge)
-    {
-        // One byte over BuildKit's cap (500 KiB + 1) must be rejected up front from the file's metadata.
-        const std::vector<BYTE> bytes(512000 + 1, 0x41);
-        ScopedTempFile file(bytes);
-        VerifyInvalid(L"id=s,src=" + file.wpath(), L"exceeds the maximum secret size of 500 KiB");
+        // A missing source file is no longer rejected client-side (checking existence here is a TOCTOU
+        // race and the file may only be reachable from the service's context). The path is forwarded as
+        // an absolute SourcePath and the service/BuildKit reports if it can't be mounted or read.
+        const std::wstring missing = L"C:\\wslc-ut\\definitely-missing-secret-file.txt";
+        auto secret = validation::ParseSecretSpec(L"id=s,src=" + missing);
+        VERIFY_ARE_EQUAL(std::wstring(L"s"), secret.Id);
+        VERIFY_IS_TRUE(secret.Value.empty());
+        VERIFY_IS_TRUE(std::filesystem::path(secret.SourcePath).is_absolute());
     }
 
     TEST_METHOD(Secret_Invalid_BareIdVariableNotSet)

@@ -38,12 +38,6 @@ using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc::validation {
 
-// BuildKit rejects any single secret larger than 500 KiB (MaxSecretSize == 500 * 1024 == 512000 bytes)
-// when it is mounted inside the build. Enforce the same cap client-side using only the file's metadata
-// (no bytes are read), so an oversize --secret,src= file is reported with a friendly error instead of
-// being shipped to the daemon and rejected after a pointless VM round-trip.
-constexpr std::uintmax_t c_maxSecretFileSize = 500 * 1024;
-
 KeyValueSplit SplitKeyValue(const std::wstring& value, wchar_t separator)
 {
     const auto pos = value.find(separator);
@@ -161,27 +155,15 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     if (!srcPath.empty())
     {
         std::error_code ec;
-        // Resolve symlinks (and normalize '..') so we mount the directory that actually holds the
-        // secret's bytes rather than a link node's directory.
+        // Normalize to an absolute path (the service requires one to mount the file's directory) but do
+        // not verify the file exists or is a regular file here: that would be a TOCTOU race with the
+        // build, and the file may only be reachable from the service's context. Let the service/BuildKit
+        // reject an unmountable or unreadable file instead. weakly_canonical also collapses '..' and
+        // resolves symlinks for the portion of the path that exists; it succeeds for a missing file.
         auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
-        if (ec.value() != 0 || !std::filesystem::is_regular_file(absPath, ec))
+        if (ec.value() != 0)
         {
-            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
-                spec, std::format(L"source file not found or not a regular file: {}", absPath.wstring())));
-        }
-
-        // Metadata-only size guard (no bytes are read): keep parity with BuildKit's per-secret cap so an
-        // oversize file is rejected early with a friendly error instead of failing later in the daemon.
-        const auto fileSize = std::filesystem::file_size(absPath, ec);
-        if (ec.value() == 0 && fileSize > c_maxSecretFileSize)
-        {
-            throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(
-                spec,
-                std::format(
-                    L"source file is {} bytes, which exceeds the maximum secret size of 500 KiB ({} bytes): {}",
-                    fileSize,
-                    c_maxSecretFileSize,
-                    absPath.wstring())));
+            absPath = std::filesystem::absolute(srcPath);
         }
 
         // Forward the resolved path rather than the bytes: the server mounts the file's parent directory

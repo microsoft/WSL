@@ -1003,14 +1003,18 @@ try
         for (ULONG i = 0; i < Options->Secrets.Count; i++)
         {
             const auto& secret = Options->Secrets.Values[i];
-            RETURN_HR_IF_NULL(E_INVALIDARG, secret.Id);
-            RETURN_HR_IF(E_INVALIDARG, secret.Id[0] == '\0');
-            RETURN_HR_IF(E_INVALIDARG, secret.Id[0] == '-');
+            RETURN_HR_IF_MSG(E_INVALIDARG, secret.Id == nullptr, "Secret %u has a null id", i);
+            RETURN_HR_IF_MSG(E_INVALIDARG, secret.Id[0] == '\0', "Secret %u has an empty id", i);
+            RETURN_HR_IF_MSG(E_INVALIDARG, secret.Id[0] == '-', "Invalid secret id '%hs'", secret.Id);
             // Id is interpolated into docker's comma/'='-delimited --secret spec below, so reject any
             // ',' or '=' a malicious caller could use to inject extra options.
-            RETURN_HR_IF(E_INVALIDARG, std::string_view(secret.Id).find_first_of(",=") != std::string_view::npos);
+            RETURN_HR_IF_MSG(
+                E_INVALIDARG,
+                std::string_view(secret.Id).find_first_of(",=") != std::string_view::npos,
+                "Invalid secret id '%hs'",
+                secret.Id);
 
-            if (secret.SourcePath != nullptr && secret.SourcePath[0] != L'\0')
+            if (secret.SourcePath != nullptr)
             {
                 // File secret: mount the file's parent directory read-only and reference the file in
                 // place - the bytes are never copied. Mounting the whole directory (not just the file) is
@@ -1018,7 +1022,8 @@ try
                 // own build VM read-only for the build's duration only.
                 std::filesystem::path sourcePath(secret.SourcePath);
                 // The client and server may have different current directories, so a relative path is
-                // ambiguous - require an absolute path.
+                // ambiguous - require an absolute path. An empty SourcePath is not absolute, so a
+                // malformed file secret fails here rather than being treated as an env secret.
                 THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(secret.SourcePath), !sourcePath.is_absolute());
                 auto parent = sourcePath.parent_path();
                 auto fileNameUtf8 = sourcePath.filename().string();
@@ -1048,13 +1053,7 @@ try
                 // truncate the secret.
                 RETURN_HR_IF(E_INVALIDARG, value.find('\0') != std::string_view::npos);
 
-                // Random variable name (not derived from the id) so nothing about the id influences it
-                // and it cannot collide with a real environment variable. GUID dashes become '_' to keep
-                // it a conventional identifier.
-                GUID varId{};
-                THROW_IF_FAILED(CoCreateGuid(&varId));
-                auto varName = std::format(
-                    "WSLC_SECRET_{}", wsl::shared::string::GuidToString<char>(varId, wsl::shared::string::GuidToStringFlags::None));
+                auto varName = std::format("WSLC_SECRET_{}", std::to_string(i));
                 std::ranges::replace(varName, '-', '_');
 
                 buildEnv.push_back(std::format("{}={}", varName, value));
