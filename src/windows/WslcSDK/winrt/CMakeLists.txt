@@ -2,6 +2,7 @@ add_idl_winrt(wslcsdkwinrtidl "wslcsdk.idl")
 set_target_properties(wslcsdkwinrtidl PROPERTIES FOLDER windows)
 
 set(SOURCES
+    AuthenticateResult.cpp
     Container.cpp
     ContainerNamedVolume.cpp
     ContainerPortMapping.cpp
@@ -26,6 +27,7 @@ set(SOURCES
 )
 
 set(HEADERS
+    AuthenticateResult.h
     Container.h
     ContainerNamedVolume.h
     ContainerPortMapping.h

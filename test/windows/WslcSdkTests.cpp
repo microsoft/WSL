@@ -2335,19 +2335,27 @@ class WslcSdkTests
         {
             wil::unique_cotaskmem_ansistring token;
             wil::unique_cotaskmem_string errorMsg;
+            WslcIdentityTokenType tokenType{};
             VERIFY_ARE_EQUAL(
-                WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, "wrong-password", &token, &errorMsg), E_FAIL);
+                WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, "wrong-password", &token, &tokenType, &errorMsg),
+                E_FAIL);
             VERIFY_IS_NOT_NULL(errorMsg.get());
+            VERIFY_ARE_EQUAL(tokenType, WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN);
         }
 
-        // Positive: correct credentials must succeed and return a non-null token.
+        // Positive: correct credentials must succeed and return a non-null, registry-auth-ready token.
         {
             wil::unique_cotaskmem_ansistring token;
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_SUCCEEDED(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, c_password, &token, &errorMsg));
+            WslcIdentityTokenType tokenType{};
+            VERIFY_SUCCEEDED(WslcSessionAuthenticate(
+                m_defaultSession, registryAddress.c_str(), c_username, c_password, &token, &tokenType, &errorMsg));
             VERIFY_IS_NOT_NULL(token.get());
+            // The local test registry does not return an identity token, so credentials are embedded.
+            VERIFY_ARE_EQUAL(tokenType, WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS);
         }
 
+        // The local registry requires auth; push the test image for the pull tests below.
         auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password);
         PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
 
@@ -2356,11 +2364,16 @@ class WslcSdkTests
         auto imageCleanup = wil::scope_exit_log(
             WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, image.c_str(), nullptr)); });
 
-        // Pulling with credentials should succeed.
+        // Positive: pulling with the identityToken from WslcSessionAuthenticate directly should succeed,
+        // demonstrating that the output can be passed as registryAuth without any transformation.
         {
+            wil::unique_cotaskmem_ansistring authToken;
+            VERIFY_SUCCEEDED(WslcSessionAuthenticate(
+                m_defaultSession, registryAddress.c_str(), c_username, c_password, &authToken, nullptr, nullptr));
+
             WslcPullImageOptions opts{};
             opts.uri = image.c_str();
-            opts.registryAuth = xRegistryAuth.c_str();
+            opts.registryAuth = authToken.get();
             VERIFY_SUCCEEDED(WslcPullSessionImage(m_defaultSession, &opts, nullptr));
             VERIFY_IS_TRUE(HasImage(image));
         }
@@ -2388,13 +2401,16 @@ class WslcSdkTests
             VERIFY_IS_NOT_NULL(errorMsg.get());
         }
 
-        // Negative: null parameters must fail.
+        // Negative: null parameters must fail; tokenType is optional and may be null.
         {
             wil::unique_cotaskmem_ansistring token;
-            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, nullptr, c_username, c_password, &token, nullptr), E_POINTER);
-            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), nullptr, c_password, &token, nullptr), E_POINTER);
-            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, nullptr, &token, nullptr), E_POINTER);
-            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, c_password, nullptr, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, nullptr, c_username, c_password, &token, nullptr, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(
+                WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), nullptr, c_password, &token, nullptr, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(
+                WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, nullptr, &token, nullptr, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(
+                WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, c_password, nullptr, nullptr, nullptr), E_POINTER);
         }
     }
 
