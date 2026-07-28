@@ -102,49 +102,6 @@ void ValidateName(LPCSTR Name, size_t maxLength)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
-// Root under which each session creates its own per-session build-secret directory. Lives in the
-// session user's private LocalAppData, so only that user can read the secrets stored beneath it.
-std::filesystem::path GetSecretsBaseDir()
-{
-    return wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wslc-secrets";
-}
-
-// Removes build-secret directories under Base that were left behind by crashed sessions. Each live
-// session holds an exclusive lock on its "<dir>\.lock" marker; a directory is removed only when its
-// marker exists and can be opened exclusively (owner gone). Directories with no marker are skipped to
-// avoid racing a session that is still initializing between creating its directory and its lock.
-// Best-effort: any error simply leaves the directory for a later sweep.
-void SweepStaleSecretDirs(const std::filesystem::path& Base)
-{
-    std::error_code ec;
-    for (const auto& entry : std::filesystem::directory_iterator(Base, ec))
-    {
-        if (ec)
-        {
-            break;
-        }
-
-        if (!entry.is_directory(ec))
-        {
-            continue;
-        }
-
-        const auto lockPath = entry.path() / L".lock";
-        wil::unique_hfile probe(CreateFileW(lockPath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        if (!probe)
-        {
-            // The marker could not be opened exclusively: either a live session still owns it (sharing
-            // violation) or the directory is still being initialized and has no marker yet. In both cases
-            // leave it alone to avoid racing a concurrent session; a later sweep reclaims it once stale.
-            continue;
-        }
-
-        probe.reset();
-        std::error_code removeError;
-        std::filesystem::remove_all(entry.path(), removeError);
-    }
-}
-
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
 {
     wslc_schema::InspectImage wslcInspect{};
@@ -404,20 +361,6 @@ try
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
-    // Reclaim build-secret directories orphaned by an earlier session of this user that crashed before
-    // its destructor could remove them. Done unconditionally at session init - not just lazily in
-    // EnsureSecretRoot - so leftovers are cleaned up even by sessions that never run a --secret build,
-    // instead of lingering until the next --secret build (if any). Best-effort: never fails Initialize.
-    try
-    {
-        const auto secretsBase = GetSecretsBaseDir();
-        if (std::filesystem::exists(secretsBase))
-        {
-            SweepStaleSecretDirs(secretsBase);
-        }
-    }
-    CATCH_LOG();
-
     // Create the VM through the factory. The VM produces crash events; the session multiplexes
     // them out to any registered ICrashDumpCallback subscribers via OnCrashDumpWritten.
     wil::com_ptr<IWSLCVirtualMachine> vm;
@@ -479,16 +422,6 @@ WSLCSession::~WSLCSession()
     WSL_LOG("SessionTerminated", TraceLoggingValue(m_id, "SessionId"), TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
     LOG_IF_FAILED(Terminate());
-
-    // Remove this session's host-side build-secret directory. Release the liveness lock first so the
-    // marker file can be deleted; if we crashed before reaching here, the lock is already free and the
-    // next session's sweep reclaims the directory instead.
-    if (!m_secretRoot.empty())
-    {
-        m_secretRootLock.reset();
-        std::error_code ec;
-        std::filesystem::remove_all(m_secretRoot, ec);
-    }
 
     if (m_destructionCallback)
     {
@@ -937,36 +870,6 @@ try
 }
 CATCH_RETURN();
 
-const std::filesystem::path& WSLCSession::EnsureSecretRoot()
-{
-    std::call_once(m_secretRootInit, [this]() {
-        const auto base = GetSecretsBaseDir();
-        std::filesystem::create_directories(base);
-
-        // Reclaim directories from any session that crashed before its destructor ran. Done before we
-        // create our own directory below, so our in-use directory is never a candidate.
-        SweepStaleSecretDirs(base);
-
-        GUID id{};
-        THROW_IF_FAILED(CoCreateGuid(&id));
-        auto root = base / wsl::shared::string::GuidToString<wchar_t>(id, wsl::shared::string::GuidToStringFlags::None);
-        std::filesystem::create_directory(root);
-
-        // Hold an exclusive lock on a marker file for the session's lifetime. While this handle is
-        // open, a concurrent sweep (here or in another process) hits a sharing violation and skips the
-        // directory; once this process exits or crashes, the OS releases the handle and the next sweep
-        // reclaims it.
-        const auto lockPath = root / L".lock";
-        m_secretRootLock.reset(CreateFileW(
-            lockPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_TEMPORARY, nullptr));
-        THROW_LAST_ERROR_IF(!m_secretRootLock);
-
-        m_secretRoot = std::move(root);
-    });
-
-    return m_secretRoot;
-}
-
 HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
@@ -1006,38 +909,14 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    // Registered before unmountAll below so it runs *after* it (scope_exit is LIFO): the per-build
-    // secret directory is removed only once the guest virtiofs mountpoint over the secret root has been
-    // torn down, so the guest can no longer hold the host files open and the removal is far less likely
-    // to fail. secretHostDir is set in the secret block further down; while empty this guard is a no-op.
-    std::filesystem::path secretHostDir;
-    auto removeSecrets = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        if (!secretHostDir.empty())
-        {
-            std::error_code ec;
-            std::filesystem::remove_all(secretHostDir, ec);
-            if (ec)
-            {
-                // A failed removal leaves the secret bytes readable on the host for the session
-                // lifetime, so surface it for diagnosis/security auditing. The error text carries only
-                // the directory path, never secret contents, so it is safe to log.
-                WSL_LOG(
-                    "BuildSecretCleanupFailed",
-                    TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
-                    TraceLoggingValue(ec.value(), "ErrorCode"),
-                    TraceLoggingValue(ec.message().c_str(), "Error"));
-            }
-        }
-    });
-
     // Track every Windows folder we mount into the VM during this build so a single scope_exit
     // unmounts them all on success or on any throw partway through the loop below.
     std::vector<std::string> mountedPaths;
     auto unmountAll = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         for (const auto& path : mountedPaths)
         {
-            // Best-effort but not silent: a failed unmount can leave a share mounted and makes the
-            // secret-directory cleanup (removeSecrets) more likely to fail, so log it. Never throw here.
+            // Best-effort but not silent: a failed unmount can leave a file-secret share mounted in the
+            // guest, so log it. Never throw here.
             LOG_IF_FAILED(m_virtualMachine->UnmountWindowsFolder(path.c_str()));
         }
     });
@@ -1052,12 +931,15 @@ try
 
     // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
     // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. At most the build
-    // context (1), the env-secret host directory (1), and one parent directory per file secret are mounted.
-    mountedPaths.reserve(static_cast<size_t>(2) + Options->Secrets.Count);
+    // context (1) and one parent directory per file secret are mounted.
+    mountedPaths.reserve(static_cast<size_t>(1) + Options->Secrets.Count);
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
+    // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
+    // values never touch disk; kept off telemetry (only buildArgs is logged).
+    std::vector<std::string> buildEnv;
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
@@ -1093,54 +975,30 @@ try
         buildArgs.push_back(Options->Labels.Values[i]);
     }
 
-    // Deliver each secret to the build as a file docker reads over virtiofs (id=<id>,src=<path>), keeping
-    // the value off argv/telemetry and re-readable across RUN steps - matching Docker's type=file
-    // semantics. Two kinds of secret are handled:
+    // Deliver each secret to the build without ever writing the value to disk on host or guest, keeping
+    // it off argv/telemetry and re-readable across RUN steps - matching Docker's secret semantics. Two
+    // kinds of secret are handled:
     //
     //   * File (src=) secrets carry the resolved host path. We mount the file's *parent directory* into
     //     the VM read-only and reference the file in place, so the bytes are never copied off their
     //     original (possibly EFS-encrypted) location. Secrets sharing a directory reuse one mount.
     //
-    //   * Env/in-memory secrets carry raw bytes (there is no source file). We materialize them into a
-    //     per-build subdirectory of the session's stable secret root - created and crash-reclaimed on
-    //     first use, its virtiofs share created once and reused - under the session user's private
-    //     LocalAppData, and remove the subdirectory when the build completes.
+    //   * Env/in-memory secrets carry raw bytes (there is no source file). We hand the value to BuildKit
+    //     through an environment variable of the docker process (id=<id>,env=<var>); nothing is written
+    //     to disk, so there is nothing to clean up.
     if (Options->Secrets.Count > 0)
     {
-        // Guest tmpfs base for secret directory mounts: keeping them under /run means the secret
+        // Guest tmpfs base for file-secret directory mounts: keeping them under /run means the secret
         // contents never hit the guest disk and leave nothing to clean up if the session crashes.
         constexpr std::string_view c_secretMountBase = "/run/build-secrets";
 
-        // (id, guest src path) pairs, emitted as --secret arguments once every secret is prepared.
+        // (id, source spec) pairs - the source spec is docker's "src=<path>" or "env=<var>" token -
+        // emitted as --secret arguments once every secret is prepared.
         std::vector<std::pair<std::string, std::string>> secretArgs;
         secretArgs.reserve(Options->Secrets.Count);
 
         // Dedup file-secret parent-directory mounts: secrets from the same host directory share a mount.
         std::map<std::filesystem::path, std::string> fileSecretDirMounts;
-
-        // Guest path of the per-build subdirectory holding materialized env-secret files. Set lazily on
-        // the first env secret (empty until then); doing so also creates secretHostDir and mounts the root.
-        std::string envSecretGuestDir;
-        auto ensureEnvSecretDir = [&]() -> const std::string& {
-            if (envSecretGuestDir.empty())
-            {
-                // Stable per-session root (created and crash-reclaimed on first use); its virtiofs share
-                // is created once and reused by every build in this session.
-                const auto& secretRoot = EnsureSecretRoot();
-                GUID dirId{};
-                THROW_IF_FAILED(CoCreateGuid(&dirId));
-                secretHostDir =
-                    secretRoot / wsl::shared::string::GuidToString<wchar_t>(dirId, wsl::shared::string::GuidToStringFlags::None);
-                std::filesystem::create_directory(secretHostDir);
-                // Mount the stable root (not the per-build subdir) so the share is reused across builds.
-                // Secret directories are mounted under /run (tmpfs) so they never touch guest disk and
-                // need no cleanup if the session crashes.
-                auto secretMountPath = mountInVm(secretRoot.c_str(), TRUE, c_secretMountBase);
-                envSecretGuestDir = std::format(
-                    "{}/{}", secretMountPath, wsl::shared::string::GuidToString<char>(dirId, wsl::shared::string::GuidToStringFlags::None));
-            }
-            return envSecretGuestDir;
-        };
 
         for (ULONG i = 0; i < Options->Secrets.Count; i++)
         {
@@ -1173,43 +1031,41 @@ try
                 {
                     it = fileSecretDirMounts.emplace(parent, mountInVm(parent.c_str(), TRUE, c_secretMountBase)).first;
                 }
-                secretArgs.emplace_back(secret.Id, std::format("{}/{}", it->second, fileNameUtf8));
+                secretArgs.emplace_back(secret.Id, std::format("src={}/{}", it->second, fileNameUtf8));
             }
             else
             {
-                // Env/in-memory secret: materialize the bytes into a host file mounted read-only.
+                // Env/in-memory secret: hand the value to BuildKit through an environment variable of the
+                // docker process. BuildKit reads it (id=<id>,env=<var>) and streams it to the daemon, so
+                // the value never touches disk on host or guest and needs no cleanup.
                 RETURN_HR_IF(E_INVALIDARG, secret.ValueSize != 0 && secret.Value == nullptr);
-                const auto& guestDir = ensureEnvSecretDir();
-
-                // Use a random filename (not the id) so nothing about the id can influence the path.
-                GUID fileId{};
-                THROW_IF_FAILED(CoCreateGuid(&fileId));
-                auto fileName = wsl::shared::string::GuidToString<char>(fileId, wsl::shared::string::GuidToStringFlags::None);
-                auto hostFile = secretHostDir / wsl::shared::string::MultiByteToWide(fileName);
-
-                // CREATE_NEW (the GUID guarantees uniqueness) with no sharing; the file inherits the
-                // private ACL of the parent directory so only the session user can read the secret.
-                wil::unique_hfile file(CreateFileW(hostFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr));
-                THROW_LAST_ERROR_IF(!file);
-
-                const auto* cursor = static_cast<const BYTE*>(secret.Value);
-                ULONG remaining = secret.ValueSize;
-                while (remaining > 0)
+                std::string_view value;
+                if (secret.ValueSize != 0)
                 {
-                    DWORD written = 0;
-                    THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), cursor, remaining, &written, nullptr));
-                    cursor += written;
-                    remaining -= written;
+                    value = std::string_view(reinterpret_cast<const char*>(secret.Value), secret.ValueSize);
                 }
+                // An environment variable value cannot contain a NUL; reject rather than silently
+                // truncate the secret.
+                RETURN_HR_IF(E_INVALIDARG, value.find('\0') != std::string_view::npos);
 
-                secretArgs.emplace_back(secret.Id, std::format("{}/{}", guestDir, fileName));
+                // Random variable name (not derived from the id) so nothing about the id influences it
+                // and it cannot collide with a real environment variable. GUID dashes become '_' to keep
+                // it a conventional identifier.
+                GUID varId{};
+                THROW_IF_FAILED(CoCreateGuid(&varId));
+                auto varName = std::format(
+                    "WSLC_SECRET_{}", wsl::shared::string::GuidToString<char>(varId, wsl::shared::string::GuidToStringFlags::None));
+                std::ranges::replace(varName, '-', '_');
+
+                buildEnv.push_back(std::format("{}={}", varName, value));
+                secretArgs.emplace_back(secret.Id, std::format("env={}", varName));
             }
         }
 
-        for (const auto& [id, srcPath] : secretArgs)
+        for (const auto& [id, source] : secretArgs)
         {
             buildArgs.push_back("--secret");
-            buildArgs.push_back(std::format("id={},src={}", id, srcPath));
+            buildArgs.push_back(std::format("id={},{}", id, source));
         }
     }
 
@@ -1219,7 +1075,7 @@ try
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
-    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, WSLCProcessFlagsStdin);
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, buildEnv, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     auto io = CreateIOContext();

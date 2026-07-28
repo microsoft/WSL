@@ -270,11 +270,6 @@ private:
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
-    // Returns this session's private host directory for build secrets, creating it on first use.
-    // Creation also reclaims any secret directories left behind by crashed sessions, and takes a
-    // liveness lock (m_secretRootLock) so this session's directory can likewise be reclaimed if we
-    // crash before the destructor removes it.
-    const std::filesystem::path& EnsureSecretRoot();
     void Ext4Format(const std::string& Device);
     _Requires_shared_lock_held_(m_lock)
     std::string InspectImageLockHeld(const std::string& Id);
@@ -315,14 +310,6 @@ private:
     std::filesystem::path m_storageVhdPath;
     std::filesystem::path m_swapVhdPath;
     bool m_storageMounted = false;
-
-    // Per-session host directory holding build secrets, exposed read-only into the VM over virtiofs.
-    // Created lazily on the first build that supplies secrets (see EnsureSecretRoot) and removed by the
-    // destructor. m_secretRootLock is an exclusive lock held on a marker file for the session lifetime
-    // so a later session can detect and reclaim this directory if this process crashes.
-    std::once_flag m_secretRootInit;
-    std::filesystem::path m_secretRoot;
-    wil::unique_hfile m_secretRootLock;
 
     // N.B. m_lock must be acquired before acquiring m_containersLock or m_networksLock.
     // These locks protect m_containers without requiring an exclusive m_lock.
