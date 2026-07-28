@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
+#include "ArgumentValidation.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
 #include "ContainerService.h"
@@ -131,8 +132,24 @@ void BuildImage(CLIExecutionContext& context)
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetValue<ArgType::NoCache>());
     WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.GetValue<ArgType::BuildPull>());
 
+    ProgressMode progressMode = ProgressMode::Auto;
+    if (context.Args.Contains(ArgType::Progress))
+    {
+        progressMode = validation::GetProgressModeFromString(context.Args.GetValue<ArgType::Progress>());
+    }
+
+    // Resolve Auto based on whether progress output (stderr) is an interactive VT console.
+    if (progressMode == ProgressMode::Auto)
+    {
+        progressMode = context.Terminal.IsVTEnabled(Terminal::Level::Info) ? ProgressMode::Tty : ProgressMode::Plain;
+    }
+
+    // rawjson is the only mode that changes what the server sends: it forwards docker's raw progress
+    // output verbatim instead of parsing it into formatted messages.
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsRawJson, progressMode == ProgressMode::RawJson);
+
     auto cancelEvent = context.CreateCancelEvent();
-    BuildImageCallback callback(context.Terminal, cancelEvent, context.Args.GetValue<ArgType::Verbose>());
+    BuildImageCallback callback(context.Terminal, cancelEvent, context.Args.GetValue<ArgType::Verbose>(), progressMode);
     services::ImageService::Build(
         session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, iidFilePath, flags, &callback, cancelEvent);
 }

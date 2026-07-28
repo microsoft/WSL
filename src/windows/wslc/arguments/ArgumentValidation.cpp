@@ -103,6 +103,10 @@ void Argument::Validate(ArgMap& execArgs) const
         CacheConverted<ArgType::Pull>(execArgs, m_name, validation::GetPullPolicyFromString);
         break;
 
+    case ArgType::Progress:
+        validation::ValidateProgressModeFromString(RawArgMapAccess::GetAll<ArgType::Progress>(execArgs), m_name);
+        break;
+
     case ArgType::Signal:
         CacheConverted<ArgType::Signal>(execArgs, m_name, validation::GetWSLCSignalFromString);
         break;
@@ -325,6 +329,14 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetFormatTypeFromString(value, argName);
+    }
+}
+
+void ValidateProgressModeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetProgressModeFromString(value, argName);
     }
 }
 

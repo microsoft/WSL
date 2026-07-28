@@ -162,6 +162,18 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Never);
         VERIFY_THROWS(validation::GetPullPolicyFromString(L"invalid"), ArgumentException);
 
+        // Verify build progress mode
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"auto"), ProgressMode::Auto);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"tty"), ProgressMode::Tty);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"plain"), ProgressMode::Plain);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"quiet"), ProgressMode::Quiet);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"rawjson"), ProgressMode::RawJson);
+        VERIFY_THROWS(validation::GetProgressModeFromString(L"TTY"), ArgumentException); // Case-sensitive: only lowercase accepted
+        VERIFY_THROWS(validation::GetProgressModeFromString(L"fancy"), ArgumentException);
+        VERIFY_NO_THROW(
+            validation::ValidateProgressModeFromString({L"auto", L"tty", L"plain", L"quiet", L"rawjson"}, L"progressArg"));
+        VERIFY_THROWS(validation::ValidateProgressModeFromString({L"tty", L"bogus"}, L"progressArg"), ArgumentException);
+
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
         VERIFY_THROWS(validation::ValidateGpus({L"none"}, L"gpusArg"), ArgumentException);

@@ -75,6 +75,8 @@ void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring&
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 
+void ValidateProgressModeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
+
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values);

@@ -1243,6 +1243,7 @@ try
         });
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
+    bool rawJson = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsRawJson);
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
@@ -1413,6 +1414,27 @@ try
         }
     };
 
+    // rawjson mode: forward each complete JSON object docker writes to stderr verbatim (as newline-delimited
+    // JSON) to the client, bypassing the parsing/formatting done by captureOutput.
+    auto rawJsonPassthrough = [&](const gsl::span<char>& content) {
+        pendingJson.append(content.begin(), content.end());
+
+        if (!nlohmann::json::accept(pendingJson))
+        {
+            // Not yet a complete object; keep accumulating. Drop leading non-JSON noise.
+            if (!pendingJson.empty() && pendingJson[0] != '{')
+            {
+                pendingJson.clear();
+            }
+
+            return;
+        }
+
+        pendingJson.push_back('\n');
+        reportProgress(pendingJson);
+        pendingJson.clear();
+    };
+
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
     // failure).
     //
@@ -1430,7 +1452,14 @@ try
             buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
     }
 
-    io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
+    if (rawJson)
+    {
+        io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), rawJsonPassthrough, false));
+    }
+    else
+    {
+        io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
+    }
 
     // Handle cancellation within the IO loop (NeedNotComplete) so pipes keep draining.
     bool cancelled = false;

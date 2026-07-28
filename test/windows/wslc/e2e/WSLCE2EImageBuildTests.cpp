@@ -1385,6 +1385,108 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_FALSE(contents.starts_with(L"sha256:"), L"a failed iidfile write must not leave an image ID behind");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressInvalid_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-bad";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        // Invalid --progress values are rejected client-side before any build runs.
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --progress=bogus", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"is not a recognized progress type") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressRawJson_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageProgressRawJson);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-rawjson";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"rawjson-ok\"]\n");
+
+        // rawjson forwards docker's raw BuildKit progress JSON to stderr verbatim. BuildKit status
+        // objects contain a "vertexes" array that the formatted (parsed) output never emits.
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --progress=rawjson",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageProgressRawJson.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"\"vertexes\"") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressPlain_NoEscapeSequences_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageProgressPlain);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-plain";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"plain-ok\"]\n");
+
+        // plain emits progress text but never color/cursor VT escape sequences (ESC, 0x1b).
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --progress=plain",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageProgressPlain.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L'\x1b') == std::wstring::npos, L"plain mode must not emit VT escape sequences");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressQuiet_NoProgressOutput_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageProgressQuiet);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-quiet";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"quiet-ok\"]\n");
+
+        // quiet suppresses all progress output on a successful build.
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --progress=quiet",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageProgressQuiet.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        if (buildResult.Stderr.has_value())
+        {
+            VERIFY_IS_TRUE(buildResult.Stderr->empty(), L"quiet mode must not emit build progress on success");
+        }
+    }
+
 private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
@@ -1421,6 +1523,9 @@ private:
     const TestImage BuiltImageOutputCacheOnly{L"wslc-e2e-build-output-cacheonly", L"latest", L""};
     const TestImage BuiltImageIidFile{L"wslc-e2e-build-iidfile", L"latest", L""};
     const TestImage BuiltImageIidFileNotWritable{L"wslc-e2e-build-iidfile-readonly", L"latest", L""};
+    const TestImage BuiltImageProgressRawJson{L"wslc-e2e-build-progress-rawjson", L"latest", L""};
+    const TestImage BuiltImageProgressPlain{L"wslc-e2e-build-progress-plain", L"latest", L""};
+    const TestImage BuiltImageProgressQuiet{L"wslc-e2e-build-progress-quiet", L"latest", L""};
 
     // Runs `tar.exe -tf <path>` and returns the member listing so tests can assert an exporter produced a
     // valid, non-empty archive that contains an expected entry.

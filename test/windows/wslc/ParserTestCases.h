@@ -24,6 +24,7 @@ enum class ArgumentSet
 {
     Run,
     List,
+    Build,
     // RootCommand globals; parsed in optionsOnly mode (stops at first positional).
     Globals,
 };
@@ -71,6 +72,25 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
             Argument::Create(ArgType::ContainerId, false, Limit::Unlimited), // Optional positional
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Verbose),
+        };
+
+    case ArgumentSet::Build:
+        // Mirrors ImageBuildCommand::GetArguments() so the parser tests exercise the
+        // real `wslc build` option set (notably the --progress value option).
+        return {
+            Argument::Create(ArgType::Path, true), // Required positional (build context path)
+            Argument::Create(ArgType::BuildArg, false, Limit::Unlimited),
+            Argument::Create(ArgType::BuildPull),
+            Argument::Create(ArgType::BuildTarget),
+            Argument::Create(ArgType::File),
+            Argument::Create(ArgType::Label, false, Limit::Unlimited),
+            Argument::Create(ArgType::NoCache),
+            Argument::Create(ArgType::Output),
+            Argument::Create(ArgType::Progress),
+            Argument::Create(ArgType::Secret, false, Limit::Unlimited),
+            Argument::Create(ArgType::Tag, false, Limit::Unlimited),
+            Argument::Create(ArgType::Verbose),
+            Argument::Create(ArgType::Help),
         };
 
     case ArgumentSet::Globals:
@@ -222,5 +242,27 @@ WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet --session foo image1)") \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --session foo -q image1)") \
 /* Docker-style idempotency: duplicate global flags collapse to a single entry. */ \
 WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc --quiet --quiet)") \
-WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q -q system list)")
+WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q -q system list)") \
+\
+/* `wslc build` --progress option (Build set mirrors ImageBuildCommand). The build \
+ * context path is the required positional; --progress takes one of auto/tty/plain/ \
+ * quiet/rawjson and is validated by Argument::Validate via GetProgressModeFromString. */ \
+/* Valid modes, separated and adjoined value forms, and case-insensitivity.         */ \
+WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress=auto)") \
+WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress auto)") \
+WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc --progress=tty .)") \
+WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress=plain)") \
+WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress quiet)") \
+WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress=rawjson)") \
+/* Values are case-sensitive (lowercase only), matching Docker and --format.        */ \
+WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress=TTY)") \
+WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress=RawJson)") \
+/* A build with no --progress at all is valid (the option is optional).             */ \
+WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc .)") \
+/* Invalid / unrecognized modes, empty value, and missing value at end of input.    */ \
+WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress=fancy)") \
+WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress bogus)") \
+WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress=json)") \
+WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress=)") \
+WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress)")
 // clang-format on
