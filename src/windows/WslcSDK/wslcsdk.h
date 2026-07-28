@@ -235,11 +235,6 @@ STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSet
 // WSLC_E_CONTAINER_PREFIX_AMBIGUOUS if the given prefix matches more than one container.
 STDAPI WslcOpenContainer(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-// Sets IO callbacks for the init process of a container opened via WslcOpenContainer.
-// Must be called before WslcStartContainer (with WSLC_CONTAINER_START_FLAG_ATTACH).
-// Has no effect on a container that is already running.
-STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
-
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // OPTIONAL CONTAINER SETTINGS
@@ -410,6 +405,11 @@ typedef struct WslcProcessCallbacks
 } WslcProcessCallbacks;
 
 STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
+
+// Sets IO callbacks for the init process of a container opened via WslcOpenContainer.
+// Must be called before WslcStartContainer (with WSLC_CONTAINER_START_FLAG_ATTACH).
+// Has no effect on a container that is already running.
+STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
 
 // PROCESS MANAGEMENT
 
