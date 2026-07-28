@@ -2332,7 +2332,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
     <value>Invalid --output value '{}': {}</value>
-    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcMissingVolumeOption" xml:space = "preserve" >
     <value>Missing required option: '{}'</value>
@@ -2897,7 +2897,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
     <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
-    <comment>{Locked="--output"}{Locked="type=local,dest=path"}{Locked="type=tar,dest=out.tar"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Set the target build stage to build</value>
