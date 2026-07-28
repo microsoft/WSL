@@ -398,7 +398,13 @@ void ContainerCp(CLIExecutionContext& context)
         auto [containerId, srcPath] = parseContainerPath(source);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
 
-        auto absTarget = std::filesystem::absolute(target);
+        // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
+        std::error_code canonicalError;
+        auto absTarget = std::filesystem::weakly_canonical(std::filesystem::absolute(target), canonicalError);
+        if (canonicalError)
+        {
+            absTarget = std::filesystem::absolute(target); // Fall back to absolute if canonicalization fails.
+        }
 
         // Determine if target is a directory or a file destination.
         // Treat as directory if: ends with separator, or already exists as a directory.
