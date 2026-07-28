@@ -93,6 +93,23 @@ winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Mic
     return winrt::make<implementation::Container>(ToHandle(), containerSettings);
 }
 
+winrt::Microsoft::WSL::Containers::Container Session::OpenContainer(hstring const& nameOrId, winrt::Microsoft::WSL::Containers::ProcessOutputMode const& initProcessOutputMode)
+{
+    EnsureStarted();
+
+    if (nameOrId.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"nameOrId cannot be empty");
+    }
+
+    wil::unique_any<WslcContainer, decltype(&WslcReleaseContainer), &WslcReleaseContainer> containerHandle;
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcOpenContainer(ToHandle(), winrt::to_string(nameOrId).c_str(), containerHandle.put(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    return winrt::make<implementation::Container>(containerHandle.release(), initProcessOutputMode);
+}
+
 void Session::PullImage(winrt::Microsoft::WSL::Containers::PullImageOptions const& options)
 {
     if (!options)

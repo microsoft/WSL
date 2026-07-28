@@ -24,6 +24,8 @@ struct Session : SessionT<Session>
     void Start();
     void Terminate();
     winrt::Microsoft::WSL::Containers::Container CreateContainer(winrt::Microsoft::WSL::Containers::ContainerSettings const& containerSettings);
+    winrt::Microsoft::WSL::Containers::Container OpenContainer(
+        hstring const& nameOrId, winrt::Microsoft::WSL::Containers::ProcessOutputMode const& initProcessOutputMode);
     void PullImage(winrt::Microsoft::WSL::Containers::PullImageOptions const& options);
     winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> PullImageAsync(
         winrt::Microsoft::WSL::Containers::PullImageOptions options);
