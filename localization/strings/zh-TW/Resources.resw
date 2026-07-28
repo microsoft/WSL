@@ -451,10 +451,10 @@
 
        選項:
             --enable-wsl1
-                啟用 WSL1 支援。
+                啟用 WSL1 支援。 
 
             --fixed-vhd
-                建立大小固定的磁碟，以儲存發佈。
+                建立大小固定的磁碟，以儲存發佈。 
 
             --from-file &lt;Path&gt;
                 從本機檔案安裝發佈。
@@ -482,8 +482,8 @@
 
             --web-download
                 從網際網路下載發佈，而非從 Microsoft Store 下載。
-
-    --manage &lt;Distro&gt; &lt;Options...&gt;
+ 
+    --manage &lt;Distro&gt; &lt;Options...&gt; 
         變更 distro 指定選項。
 
         選項:
@@ -491,7 +491,7 @@
                 將發佈移動到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
-將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。
+將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。 
 
             --set-default-user &lt;Username&gt;
                 設定發佈的預設使用者。
@@ -531,7 +531,7 @@
         選項:
             --force
                 結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
-
+ 
     --status
         顯示 Linux 版 Windows 子系統的狀態。
 
@@ -558,7 +558,7 @@
         將發行版本匯出至 tar 檔案。
         stdout 的檔案名稱可以是 -。
 
-        選項:
+        選項: 
             --format &lt;Format&gt;
                 指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
 
@@ -2369,6 +2369,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>選項 '--gateway' 也必須同時指定 '--subnet'。</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>網路 '{}' 有作用中的端點。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3290,6 +3294,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
     <value>子網路的 IPv4 或 IPv6 閘道</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>以 CIDR 格式配置子範圍的容器 IP 位址</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>移除一或多個網路。</value>
