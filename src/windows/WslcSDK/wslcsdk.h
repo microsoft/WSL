@@ -229,6 +229,17 @@ STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettin
 
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
+// Opens an existing container by name, full ID, or partial ID prefix.
+// The returned WslcContainer handle is owned by the caller; release it with WslcReleaseContainer.
+// Returns WSLC_E_CONTAINER_NOT_FOUND if no matching container exists, or
+// WSLC_E_CONTAINER_PREFIX_AMBIGUOUS if the given prefix matches more than one container.
+STDAPI WslcOpenContainer(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Sets IO callbacks for the init process of a container opened via WslcOpenContainer.
+// Must be called before WslcStartContainer (with WSLC_CONTAINER_START_FLAG_ATTACH).
+// Has no effect on a container that is already running.
+STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
+
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // OPTIONAL CONTAINER SETTINGS
