@@ -1041,10 +1041,10 @@ try
             LOG_IF_FAILED(m_virtualMachine->UnmountWindowsFolder(path.c_str()));
         }
     });
-    auto mountInVm = [&](LPCWSTR windowsPath, BOOL readOnly) -> std::string {
+    auto mountInVm = [&](LPCWSTR windowsPath, BOOL readOnly, std::string_view guestBase = "/mnt") -> std::string {
         GUID id{};
         THROW_IF_FAILED(CoCreateGuid(&id));
-        auto vmPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(id));
+        auto vmPath = std::format("{}/{}", guestBase, wsl::shared::string::GuidToString<char>(id));
         THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(windowsPath, vmPath.c_str(), readOnly));
         mountedPaths.push_back(std::move(vmPath));
         return mountedPaths.back();
@@ -1107,6 +1107,10 @@ try
     //     LocalAppData, and remove the subdirectory when the build completes.
     if (Options->Secrets.Count > 0)
     {
+        // Guest tmpfs base for secret directory mounts: keeping them under /run means the secret
+        // contents never hit the guest disk and leave nothing to clean up if the session crashes.
+        constexpr std::string_view c_secretMountBase = "/run/build-secrets";
+
         // (id, guest src path) pairs, emitted as --secret arguments once every secret is prepared.
         std::vector<std::pair<std::string, std::string>> secretArgs;
         secretArgs.reserve(Options->Secrets.Count);
@@ -1129,7 +1133,9 @@ try
                     secretRoot / wsl::shared::string::GuidToString<wchar_t>(dirId, wsl::shared::string::GuidToStringFlags::None);
                 std::filesystem::create_directory(secretHostDir);
                 // Mount the stable root (not the per-build subdir) so the share is reused across builds.
-                auto secretMountPath = mountInVm(secretRoot.c_str(), TRUE);
+                // Secret directories are mounted under /run (tmpfs) so they never touch guest disk and
+                // need no cleanup if the session crashes.
+                auto secretMountPath = mountInVm(secretRoot.c_str(), TRUE, c_secretMountBase);
                 envSecretGuestDir = std::format(
                     "{}/{}", secretMountPath, wsl::shared::string::GuidToString<char>(dirId, wsl::shared::string::GuidToStringFlags::None));
             }
@@ -1153,8 +1159,11 @@ try
                 // inherent to virtiofs sharing a directory tree; sibling files are exposed to this user's
                 // own build VM read-only for the build's duration only.
                 std::filesystem::path sourcePath(secret.SourcePath);
+                // The client and server may have different current directories, so a relative path is
+                // ambiguous - require an absolute path.
+                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(secret.SourcePath), !sourcePath.is_absolute());
                 auto parent = sourcePath.parent_path();
-                auto fileNameUtf8 = wsl::shared::string::WideToMultiByte(sourcePath.filename().wstring());
+                auto fileNameUtf8 = sourcePath.filename().string();
                 RETURN_HR_IF(E_INVALIDARG, parent.empty() || fileNameUtf8.empty());
                 // The filename is interpolated into the CSV --secret spec; a ',' or '"' would corrupt it.
                 RETURN_HR_IF(E_INVALIDARG, fileNameUtf8.find_first_of(",\"") != std::string::npos);
@@ -1162,7 +1171,7 @@ try
                 auto it = fileSecretDirMounts.find(parent);
                 if (it == fileSecretDirMounts.end())
                 {
-                    it = fileSecretDirMounts.emplace(parent, mountInVm(parent.c_str(), TRUE)).first;
+                    it = fileSecretDirMounts.emplace(parent, mountInVm(parent.c_str(), TRUE, c_secretMountBase)).first;
                 }
                 secretArgs.emplace_back(secret.Id, std::format("{}/{}", it->second, fileNameUtf8));
             }

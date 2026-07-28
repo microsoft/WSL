@@ -207,6 +207,33 @@ class WSLCCLISecretParserUnitTests
         VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
     }
 
+    TEST_METHOD(Secret_File_RelativeSrcResolvedToAbsolutePath)
+    {
+        // A relative src= must be resolved to an absolute SourcePath. The server rejects non-absolute
+        // secret paths (the client and server may have different current directories), so the parser is
+        // responsible for producing an absolute path before the spec is forwarded.
+        ScopedTempFile file(ToBytes("relative-src"));
+        const std::filesystem::path absPath = file.wpath();
+
+        auto originalDir = std::filesystem::current_path();
+        auto restoreDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::current_path(originalDir, ec);
+        });
+        std::filesystem::current_path(absPath.parent_path());
+
+        const auto relativeSrc = absPath.filename().wstring();
+        VERIFY_IS_FALSE(std::filesystem::path(relativeSrc).is_absolute());
+
+        auto secret = validation::ParseSecretSpec(L"id=s,src=" + relativeSrc);
+        VERIFY_ARE_EQUAL(std::wstring(L"s"), secret.Id);
+        VERIFY_IS_TRUE(std::filesystem::path(secret.SourcePath).is_absolute());
+
+        std::error_code ec;
+        const auto expectedCanonical = std::filesystem::weakly_canonical(absPath, ec);
+        VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
+    }
+
     // --- Invalid: spec structure ---
 
     TEST_METHOD(Secret_Invalid_EmptyId)
