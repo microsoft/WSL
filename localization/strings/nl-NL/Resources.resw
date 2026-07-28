@@ -2363,6 +2363,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Voor de optie --gateway' moet ook --subnet' worden opgegeven.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>De optie '--ip-range' vereist dat '--subnet' ook wordt opgegeven.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Het netwerk {} heeft actieve eindpunten.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3284,6 +3288,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
     <value>IPv4- of IPv6-gateway voor het subnet</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>IP-adressen van containers uit een subbereik toewijzen in CIDR indeling</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Verwijder een of meer netwerken.</value>

@@ -1206,7 +1206,7 @@ Voir les instructions de récupération sur : https://aka.ms/wsldiskmountrecover
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
-    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <value>Cgroup v1 n’est pas compatible avec l’isolation cgroup par distribution. Pour utiliser cgroup v1, définissez isolateDistroCgroup=false sous [wsl2] dans .wslconfig, puis exécutez wsl --shutdown.</value>
     <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
@@ -2370,6 +2370,10 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>L’option '--gateway' nécessite que '--subnet' soit également spécifié.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>L’option '--ip-range' nécessite que '--subnet' soit également spécifié.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Le réseau « {} » a des points de terminaison actifs.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3291,6 +3295,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
     <value>Passerelle IPv4 ou IPv6 pour le sous-réseau</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Allouer des adresses IP de conteneur à partir d’une sous-plage au format CIDR</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Supprimez un ou plusieurs réseaux.</value>
