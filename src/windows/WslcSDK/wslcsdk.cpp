@@ -1572,8 +1572,7 @@ try
             type = WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS;
         }
 
-        auto result = wil::make_unique_ansistring_nothrow<wil::unique_cotaskmem_ansistring>(authHeader.c_str());
-        RETURN_HR_IF_NULL(E_OUTOFMEMORY, result.get());
+        auto result = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(authHeader.c_str());
         *identityToken = result.release();
 
         if (tokenType != nullptr)
