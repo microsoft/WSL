@@ -31,6 +31,7 @@ private:
 };
 
 void CreateContainer(CLIExecutionContext& context);
+void ContainerCp(CLIExecutionContext& context);
 void ExecContainer(CLIExecutionContext& context);
 void ExportContainer(CLIExecutionContext& context);
 void GetContainers(CLIExecutionContext& context);

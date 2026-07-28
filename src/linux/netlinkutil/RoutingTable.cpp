@@ -139,6 +139,12 @@ void RoutingTable::SendMessage(const Route& route, int operation, int flags, con
     message.route.rtm_type = route.IsMulticast() ? RTN_MULTICAST : RTN_UNICAST;
     message.route.rtm_scope = route.IsOnlink() ? RT_SCOPE_LINK : RT_SCOPE_UNIVERSE;
     message.route.rtm_flags = RTM_F_NOTIFY;
+    // Default gateways received from the host are directly reachable through the specified interface,
+    // even when a VPN exposes the interface as a host route and the gateway is outside that prefix.
+    if (route.via.has_value() && (route.defaultRoute || route.via.value().IsLinkLocal()))
+    {
+        message.route.rtm_flags |= RTNH_F_ONLINK;
+    }
     message.route.rtm_dst_len = route.to.has_value() ? route.to.value().PrefixLength() : 0;
 
     utils::InitializeIntegerAttribute(message.tableId, m_table, RTA_TABLE);

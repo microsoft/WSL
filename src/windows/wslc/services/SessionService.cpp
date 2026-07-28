@@ -52,19 +52,19 @@ Session SessionService::OpenDefaultSession()
     return OpenSessionByName(CreateSessionManager(), nullptr);
 }
 
-Session SessionService::OpenOrCreateDefaultSession()
+Session SessionService::OpenOrCreateDefaultSession(Reporter& reporter)
 {
+    WarningCallback warningCallback(reporter);
     auto manager = CreateSessionManager();
 
     // Null Settings = default session with server-determined name and settings.
     wil::com_ptr<IWSLCSession> session;
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, warningCallback.Get(), &session));
+    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
 
-int SessionService::Attach(const Session& session)
+int SessionService::Attach(Reporter& reporter, const Session& session)
 {
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console{};
@@ -113,23 +113,23 @@ int SessionService::Attach(const Session& session)
 
     auto exitCode = process.GetExitCode();
 
-    wslutil::PrintMessage(wsl::shared::Localization::MessageWslcShellExited(string::MultiByteToWide(shell), static_cast<int>(exitCode)), stdout);
+    reporter.Output(L"{}\n", wsl::shared::Localization::MessageWslcShellExited(string::MultiByteToWide(shell), static_cast<int>(exitCode)));
 
     return static_cast<int>(exitCode);
 }
 
-int SessionService::Enter(const std::wstring& storagePath, const std::wstring& displayName)
+int SessionService::Enter(Reporter& reporter, const std::wstring& storagePath, const std::wstring& displayName)
 {
     THROW_HR_IF(E_INVALIDARG, storagePath.empty());
     THROW_HR_IF(E_INVALIDARG, displayName.empty());
 
+    WarningCallback warningCallback(reporter);
     auto sessionManager = CreateSessionManager();
 
     wil::com_ptr<IWSLCSession> session;
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), warningCallback.Get(), &session));
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-    wsl::windows::common::wslutil::PrintMessage(Localization::MessageWslcCreatedSession(displayName), stderr);
+    reporter.Info(L"{}\n", Localization::MessageWslcCreatedSession(displayName));
 
     const std::string shell = "/bin/sh";
     wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};
@@ -138,7 +138,7 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     const auto windowSize = console.GetWindowSize();
     launcher.SetTtySize(windowSize.Y, windowSize.X);
 
-    return ConsoleService::AttachToCurrentConsole(console, launcher.Launch(*session.get()));
+    return ConsoleService::AttachToCurrentConsole(reporter, console, launcher.Launch(*session.get()));
 }
 
 std::vector<SessionInformation> SessionService::List()
@@ -161,7 +161,7 @@ std::vector<SessionInformation> SessionService::List()
     return result;
 }
 
-int SessionService::Run(const Session& session, const std::vector<std::string>& arguments)
+int SessionService::Run(Reporter& reporter, const Session& session, const std::vector<std::string>& arguments)
 {
     WI_ASSERT(!arguments.empty());
 
@@ -175,10 +175,10 @@ int SessionService::Run(const Session& session, const std::vector<std::string>& 
     THROW_IF_FAILED(result);
 
     wsl::windows::common::ConsoleState console{};
-    return ConsoleService::AttachToCurrentConsole(console, std::move(process.value()));
+    return ConsoleService::AttachToCurrentConsole(reporter, console, std::move(process.value()));
 }
 
-int SessionService::TerminateSession(const Session& session)
+int SessionService::TerminateSession(Reporter& reporter, const Session& session)
 {
     HRESULT hr = session.Get()->Terminate();
     if (FAILED(hr))
@@ -188,12 +188,11 @@ int SessionService::TerminateSession(const Session& session)
         wil::unique_cotaskmem_string displayName;
         if (SUCCEEDED(session.Get()->GetDisplayName(&displayName)) && displayName)
         {
-            wslutil::PrintMessage(
-                Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.get()), errorString), stderr);
+            reporter.Error(L"{}\n", Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.get()), errorString));
         }
         else
         {
-            wslutil::PrintMessage(Localization::MessageErrorCode(Localization::MessageWslcTerminateDefaultSessionFailed(), errorString), stderr);
+            reporter.Error(L"{}\n", Localization::MessageErrorCode(Localization::MessageWslcTerminateDefaultSessionFailed(), errorString));
         }
         return 1;
     }

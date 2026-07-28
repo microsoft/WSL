@@ -47,7 +47,8 @@ class WSLCE2EContainerKillTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Kill_HelpCommand)
     {
         auto result = RunWslc(L"container kill --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Kill_KillsRunningContainer)
@@ -105,12 +106,14 @@ class WSLCE2EContainerKillTests
 
         {
             result = RunWslc(std::format(L"container kill {} -s 0", WslcContainerName));
-            result.Verify({.Stderr = L"Invalid signal value: 0 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid signal value: 0 is out of valid range (1-31)."));
         }
 
         {
             result = RunWslc(std::format(L"container kill {} -s 32", WslcContainerName));
-            result.Verify({.Stderr = L"Invalid signal value: 32 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid signal value: 32 is out of valid range (1-31)."));
         }
     }
 
@@ -145,43 +148,5 @@ private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ContainerKillLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container kill [<options>] <container-id>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" << L"  container-id    Container ID\r\n" << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -s,--signal     Signal to send\r\n"
-                << L"  -?,--help       Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

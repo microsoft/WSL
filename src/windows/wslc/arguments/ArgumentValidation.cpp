@@ -19,8 +19,10 @@ Abstract:
 #include "ContainerModel.h"
 #include "Exceptions.h"
 #include "Localization.h"
+#include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <format>
 #include <sstream>
 #include <unordered_map>
@@ -48,8 +50,37 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::StopSignal>(), m_name);
         break;
 
+    case ArgType::StopTimeout:
+        validation::ValidateIntegerFromString<long>(execArgs.GetAll<ArgType::StopTimeout>(), m_name);
+        break;
+
     case ArgType::ShmSize:
         validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
+        break;
+
+    case ArgType::HealthInterval:
+        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthInterval>(), m_name);
+        break;
+
+    case ArgType::HealthTimeout:
+        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthTimeout>(), m_name);
+        break;
+
+    case ArgType::HealthStartPeriod:
+        validation::ValidateDuration(execArgs.GetAll<ArgType::HealthStartPeriod>(), m_name);
+        break;
+
+    case ArgType::HealthRetries:
+        validation::ValidateIntegerFromString<int>(
+            execArgs.GetAll<ArgType::HealthRetries>(), m_name, [](int value) { return value >= 0; });
+        break;
+
+    case ArgType::NoHealthcheck:
+        if (execArgs.Contains(ArgType::HealthCmd) || execArgs.Contains(ArgType::HealthInterval) || execArgs.Contains(ArgType::HealthTimeout) ||
+            execArgs.Contains(ArgType::HealthStartPeriod) || execArgs.Contains(ArgType::HealthRetries))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError());
+        }
         break;
 
     case ArgType::Memory:
@@ -411,6 +442,144 @@ int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& a
     }
 
     return static_cast<int64_t>(parsed.value());
+}
+
+// Parses duration string into nanoseconds.
+static std::optional<int64_t> TryParseDuration(const std::string& input)
+{
+    if (input.empty())
+    {
+        return std::nullopt;
+    }
+
+    size_t pos = 0;
+    bool negative = false;
+    if (input[pos] == '+' || input[pos] == '-')
+    {
+        negative = input[pos] == '-';
+        pos++;
+    }
+
+    // Special case: a bare "0" (with optional sign) is a valid zero duration.
+    if (input.substr(pos) == "0")
+    {
+        return 0;
+    }
+
+    // Accumulate in a long double so fractional units (e.g. "1.5h") are handled, then round.
+    long double totalNanos = 0.0L;
+    bool sawValue = false;
+
+    while (pos < input.size())
+    {
+        // Parse the numeric part (integer and/or fraction).
+        const size_t numberStart = pos;
+        while (pos < input.size() && (std::isdigit(static_cast<unsigned char>(input[pos])) || input[pos] == '.'))
+        {
+            pos++;
+        }
+
+        const std::string numberStr = input.substr(numberStart, pos - numberStart);
+        if (numberStr.empty() || numberStr == "." || std::count(numberStr.begin(), numberStr.end(), '.') > 1)
+        {
+            return std::nullopt;
+        }
+
+        // Parse the unit (everything up to the next digit or '.').
+        const size_t unitStart = pos;
+        while (pos < input.size() && !std::isdigit(static_cast<unsigned char>(input[pos])) && input[pos] != '.')
+        {
+            pos++;
+        }
+
+        const std::string unit = input.substr(unitStart, pos - unitStart);
+
+        long double multiplier{};
+        if (unit == "ns")
+        {
+            multiplier = 1.0L;
+        }
+        else if (unit == "us" || unit == "\xC2\xB5s" /* µs (U+00B5) */ || unit == "\xCE\xBCs" /* μs (U+03BC) */)
+        {
+            multiplier = 1000L;
+        }
+        else if (unit == "ms")
+        {
+            multiplier = 1000000L;
+        }
+        else if (unit == "s")
+        {
+            multiplier = 1000000000L;
+        }
+        else if (unit == "m")
+        {
+            multiplier = 60000000000L;
+        }
+        else if (unit == "h")
+        {
+            multiplier = 3600000000000L;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+
+        long double value{};
+        try
+        {
+            auto [ptr, ec] = std::from_chars(numberStr.data(), numberStr.data() + numberStr.size(), value, std::chars_format::fixed);
+            if (ptr != numberStr.data() + numberStr.size() || ec != std::errc())
+            {
+                return std::nullopt;
+            }
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+
+        totalNanos += value * multiplier;
+        sawValue = true;
+    }
+
+    if (!sawValue)
+    {
+        return std::nullopt;
+    }
+
+    if (negative)
+    {
+        totalNanos = -totalNanos;
+    }
+
+    if (totalNanos > static_cast<long double>(std::numeric_limits<int64_t>::max()) ||
+        totalNanos < static_cast<long double>(std::numeric_limits<int64_t>::min()))
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<int64_t>(std::llroundl(totalNanos));
+}
+
+void ValidateDuration(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetDurationNanosFromString(value, argName);
+    }
+}
+
+int64_t GetDurationNanosFromString(const std::wstring& input, const std::wstring& argName)
+{
+    const std::string narrow = WideToMultiByte(input);
+    const auto parsed = TryParseDuration(narrow);
+
+    if (!parsed.has_value() || parsed.value() < 0)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidDurationError(argName, input));
+    }
+
+    return parsed.value();
 }
 
 void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstring& argName)

@@ -20,6 +20,7 @@ Abstract:
 #include <boost/beast/http.hpp>
 #include "relay.hpp"
 #include "docker_schema.h"
+#include "HttpHeaderEndDetector.h"
 
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
     if ((_Ex).HasErrorMessage()) \
@@ -126,7 +127,7 @@ public:
         bool all = false, int limit = -1, const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
-    void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds);
+    void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<LONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes = false);
     void SignalContainer(const std::string& Id, std::optional<WSLCSignal> Signal);
     common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
@@ -136,6 +137,8 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
+    std::unique_ptr<HTTPRequestContext> PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength);
+    std::tuple<uint32_t, wil::unique_socket, bool> GetArchive(const std::string& ContainerID, const std::string& Path);
     common::docker_schema::PruneContainerResult PruneContainers(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Volume management.
@@ -199,7 +202,7 @@ public:
         std::function<void(const gsl::span<char>&)> OnResponse;
         std::function<void()> OnCompleted;
         boost::beast::http::response_parser<boost::beast::http::buffer_body> Parser;
-        size_t LineFeeds = 0;
+        common::HttpHeaderEndDetector HeaderEnd;
         std::optional<size_t> RemainingContentLength;
         std::optional<common::io::HTTPChunkBasedReadHandle> ResponseParser;
     };

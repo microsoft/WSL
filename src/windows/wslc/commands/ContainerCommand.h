@@ -62,6 +62,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Cp Command
+struct ContainerCpCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"cp";
+    ContainerCpCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Exec Command
 struct ContainerExecCommand final : public Command
 {

@@ -314,8 +314,7 @@ void WSLCVirtualMachine::Initialize()
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
-    // to the service so virtio device-options (virtiofs shares, Consomme networking) can include
-    // the swiotlb token.
+    // to the service before virtiofs shares or Consomme networking devices are created.
     ReadGuestCapabilities();
 
     // Configure GPU mounts if enabled
@@ -433,9 +432,8 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
         TraceLoggingValue(m_hvPciSwiotlbBase, "HvPciSwiotlbBase"),
         TraceLoggingValue(m_hvPciSwiotlbSize, "HvPciSwiotlbSize"));
 
-    // Forward the values to the service so AddShare and ConfigureNetworking can include the
-    // swiotlb device-options token. Passing zero for both means the guest kernel does not
-    // support hv_pci swiotlb; the service then omits the token.
+    // Forward the values to the service so AddShare and ConfigureNetworking can configure
+    // wsldevicehost. Passing zero for both means the guest kernel does not support hv_pci swiotlb.
     WSLCGuestCapabilities capabilities{};
     capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
     capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
@@ -558,6 +556,33 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uin
     auto result = launcher.Launch(*this).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+}
+
+void WSLCVirtualMachine::RemoveDirectory(const std::string& Path)
+{
+    // rmdir only removes an empty directory, so callers can rely on it to leave
+    // a non-empty directory untouched.
+    constexpr auto rmdirPath = "/bin/rmdir";
+
+    std::vector<std::string> args = {rmdirPath, Path};
+
+    ServiceProcessLauncher launcher(rmdirPath, args);
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+}
+
+std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Path)
+{
+    wsl::shared::MessageWriter<WSLC_LISTDIR> message;
+    message.WriteString(Path);
+
+    gsl::span<gsl::byte> responseSpan;
+    const auto& response = m_initChannel.Transaction<WSLC_LISTDIR>(message.Span(), &responseSpan, m_initChannelTimeout);
+
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
+
+    return wsl::shared::string::ArrayFromSpan(responseSpan, response.EntriesIndex);
 }
 
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)
@@ -861,6 +886,30 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
     THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
+void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
+{
+    wsl::shared::MessageWriter<WSLC_MOUNT_VIRTIOFS> message;
+    message.WriteString(message->SourceIndex, Source);
+    message.WriteString(message->ChildNameIndex, ChildName);
+    message.WriteString(message->DestinationIndex, Target);
+    message.WriteString(message->TypeIndex, "virtiofs");
+    message.WriteString(message->OptionsIndex, Options);
+    message->Flags = Flags;
+
+    const auto& response = Channel.Transaction<WSLC_MOUNT_VIRTIOFS>(message.Span());
+
+    WSL_LOG(
+        "WSLCMountVirtioFsChild",
+        TraceLoggingValue(Source, "Source"),
+        TraceLoggingValue(ChildName, "ChildName"),
+        TraceLoggingValue(Target, "Target"),
+        TraceLoggingValue(Options, "Options"),
+        TraceLoggingValue(Flags, "Flags"),
+        TraceLoggingValue(response.Result, "Result"));
+
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+}
+
 int32_t WSLCVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
 {
     auto [response, span] = Channel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
@@ -1052,9 +1101,7 @@ try
     THROW_HR_IF_MSG(E_INVALIDARG, LinuxPath[0] != '/', "Mountpoint is not absolute: '%hs'", LinuxPath);
 
     const bool readOnly = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly);
-    auto normalizedPath = std::filesystem::weakly_canonical(path).wstring();
     GUID shareGuid{};
-    bool reusingShare = false;
 
     {
         std::lock_guard lock(m_lock);
@@ -1063,34 +1110,8 @@ try
         auto it = m_mountedWindowsFolders.find(LinuxPath);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
 
-        // In VirtioFs mode, try to reuse an existing share for the same Windows path and access mode.
-        if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
-        {
-            auto shareIt = m_virtioFsShares.find({normalizedPath, readOnly});
-            if (shareIt != m_virtioFsShares.end())
-            {
-                shareGuid = shareIt->second;
-                reusingShare = true;
-            }
-            else
-            {
-                THROW_HR_WITH_USER_ERROR_IF(
-                    E_OUTOFMEMORY,
-                    shared::Localization::MessageWslcTooManyVirtioFsShares(shared::c_maxVirtioFsShares),
-                    m_virtioFsShares.size() >= shared::c_maxVirtioFsShares);
-            }
-        }
-
-        if (!reusingShare)
-        {
-            // Delegate to IWSLCVirtualMachine for the privileged share creation
-            THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
-
-            if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
-            {
-                m_virtioFsShares[{normalizedPath, readOnly}] = shareGuid;
-            }
-        }
+        // Delegate to IWSLCVirtualMachine for the privileged share creation.
+        THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
 
         m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
     }
@@ -1101,11 +1122,7 @@ try
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
             m_mountedWindowsFolders.erase(mountIt);
-            if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
-            {
-                m_virtioFsShares.erase({normalizedPath, readOnly});
-                LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
-            }
+            LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
         }
     });
 
@@ -1129,7 +1146,7 @@ try
     else
     {
         std::string options = readOnly ? "ro" : "rw";
-        Mount(m_initChannel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
+        MountVirtioFsChild(m_initChannel, LX_INIT_DRVFS_VIRTIO_TAG, shareName.c_str(), LinuxPath, options.c_str(), Flags);
     }
 
     deleteOnFailure.release();
@@ -1153,13 +1170,8 @@ try
 
     auto shareId = it->second;
 
-    // Keep the share mounted in virtiofs mode to avoid accumulating devices, which can cause a hang when reached.
-    // TODO: Actually remove the device once this is supported by the device host.
-    if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
-    {
-        // Delegate to IWSLCVirtualMachine for the privileged share removal
-        THROW_IF_FAILED(m_vm->RemoveShare(shareId));
-    }
+    // Delegate to IWSLCVirtualMachine for the privileged share removal.
+    THROW_IF_FAILED(m_vm->RemoveShare(shareId));
 
     m_mountedWindowsFolders.erase(it);
 
@@ -1200,19 +1212,26 @@ void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
 
 #endif
 
-    auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
-    THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
-
-    // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
-    std::string options = "lowerdir=" + packagedLibMountPoint;
     if (inboxLibMountPoint.has_value())
     {
-        options += ":" + inboxLibMountPoint.value();
+        // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
+        auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
+        THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLCMountFlagsReadOnly));
+
+        Mount(
+            m_initChannel,
+            "none",
+            LibrariesMountPoint,
+            "overlay",
+            std::format("lowerdir={}:{}", packagedLibMountPoint, inboxLibMountPoint.value()).c_str(),
+            0);
     }
-
-    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), 0);
+    else
+    {
+        // If the inbox libraries are not present, mount the packaged libraries directly at final location (no overlay needed).
+        THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), LibrariesMountPoint, WSLCMountFlagsReadOnly));
+    }
 }
-
 void WSLCVirtualMachine::OnProcessReleased(int Pid)
 {
     std::lock_guard lock{m_trackedProcessesLock};
