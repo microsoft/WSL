@@ -2332,7 +2332,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
     <value>Invalid --output value '{}': {}</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcMissingVolumeOption" xml:space = "preserve" >
     <value>Missing required option: '{}'</value>
