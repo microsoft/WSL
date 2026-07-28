@@ -853,6 +853,18 @@ void WSLCSessionRuntime::Shutdown(
     // runtimeLock is an exclusive hold on m_lock, guaranteeing no operation is running.
     WI_VERIFY(runtimeLock);
 
+    // Permanently disable idle teardown and drain any in-flight timer callback on every exit path,
+    // including an exception escaping the teardown below. The timer callback captures this runtime,
+    // but IdleState outlives it (activity tokens hold shared_ptr copies), so skipping the disarm
+    // would leave a late 1->0 transition able to re-arm a timer that references freed memory.
+    //
+    // The exclusive lock is released first: a timer callback already blocked acquiring it must be
+    // able to obtain it, observe m_terminating, and return, otherwise the drain below deadlocks.
+    auto disarmIdleState = wil::scope_exit([&]() {
+        runtimeLock.reset();
+        m_idleState->Disarm();
+    });
+
     // Notify with m_lock dropped, then re-lock for the teardown. The handler may call back into the
     // session (e.g. WSLCCreateProcess) which takes a VM lease and this lock; firing under it would
     // deadlock. m_terminating is set, so any such reentrant lease fails at EnsureVmRunning's gate
@@ -873,16 +885,6 @@ void WSLCSessionRuntime::Shutdown(
     // Signal completion last so any observer of the terminated event sees a fully torn-down
     // session and a populated termination reason.
     m_sessionTerminatedEvent.SetEvent();
-
-    // Release the exclusive lock before disarming the idle timer. If a timer callback is currently
-    // blocked acquiring the exclusive lock (about to evaluate idle teardown), it must be able to
-    // obtain it, observe m_terminating, and return — otherwise Disarm()'s wait for in-flight
-    // callbacks below would deadlock.
-    runtimeLock.reset();
-
-    // Permanently disable idle teardown and drain any in-flight timer callback so it cannot
-    // reference this session after it is destroyed.
-    m_idleState->Disarm();
 }
 
 } // namespace wsl::windows::service::wslc

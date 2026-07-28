@@ -12262,6 +12262,65 @@ class WSLCTests
         }
     }
 
+    // A container that outlives an idle teardown still owns VM-scoped state (bind mounts, port
+    // relays) that is released from ~WSLCContainerImpl when the session is finally torn down. By
+    // then the VM object is gone, and a graceful idle teardown leaves VmExited() false, so the
+    // release path must key off "no VM" as well; a throw out of the destructor is unrecoverable
+    // because destructors are noexcept and would terminate the session host.
+    WSLC_TEST_METHOD(SessionTerminationAfterIdleTerminationWithContainer)
+    {
+        SKIP_TEST_SERVER();
+
+        const auto hostFolder = std::filesystem::current_path() / "test-idle-terminate-volume";
+        std::filesystem::create_directories(hostFolder);
+        auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+        });
+
+        WSLCContainerLauncher launcher("debian:latest", "wslc-idle-terminate-session", {"/bin/sleep", "600"});
+        launcher.AddVolume(hostFolder.wstring(), "/data", true);
+
+        {
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+            // Stop the container so it releases its activity hold on the VM.
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+
+            // Drop the client reference without deleting: the session keeps the only remaining
+            // reference in m_containers, so the impl is destroyed by the session teardown below
+            // rather than here (where the VM is still alive and the release path is trivially safe).
+            container.SetDeleteOnClose(false);
+        }
+
+        // Tear the VM down. The container metadata (including its mounted-volume state) deliberately
+        // survives, while the VM object is released without the exit event ever being signaled.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Terminating clears m_containers, running ~WSLCContainerImpl with no VM to unmount from.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        WaitForSessionTermination(m_defaultSession.get());
+
+        {
+            auto restore = ResetTestSession();
+        }
+
+        // The session host must still be alive and usable: if the destructor threw, the per-user
+        // host process died and this fails.
+        WSLCProcessLauncher processLauncher("/bin/echo", {"/bin/echo", "OK"});
+        auto process = processLauncher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(process.Wait(), 0);
+        PruneResult pruneResult;
+        LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &pruneResult.result));
+    }
+
     // Hammer the idle-teardown path concurrently with VM-level operations to surface deadlocks or
     // stale-state races. Operations may fail while the VM is being torn down; that is tolerated, but
     // the workers must never hang and the session must remain usable afterwards.

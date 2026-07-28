@@ -635,47 +635,53 @@ WSLCContainerImpl::WSLCContainerImpl(
 
 WSLCContainerImpl::~WSLCContainerImpl()
 {
-    WSL_LOG(
-        "~WSLCContainerImpl",
-        TraceLoggingValue(m_name.c_str(), "Name"),
-        TraceLoggingValue(m_id.c_str(), "Id"),
-        TraceLoggingValue((int)m_state, "State"));
-
-    // Snapshot and clear process references under the lock.
-    // Callbacks are then invoked without holding m_lock.
-    decltype(m_processes) processes;
-    decltype(m_initProcessControl) initProcessControl = nullptr;
-
+    // Destructors are implicitly noexcept, so any escaping exception terminates the session host.
+    // Everything below touches VM-scoped state that may already be gone.
+    try
     {
-        auto lock = m_lock.lock_exclusive();
-        std::lock_guard processesLock{m_processesLock};
-        initProcessControl = std::exchange(m_initProcessControl, nullptr);
-        processes = std::exchange(m_processes, {});
-    }
+        WSL_LOG(
+            "~WSLCContainerImpl",
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(m_id.c_str(), "Id"),
+            TraceLoggingValue((int)m_state, "State"));
 
-    if (initProcessControl)
-    {
-        initProcessControl->OnContainerReleased();
-    }
+        // Snapshot and clear process references under the lock.
+        // Callbacks are then invoked without holding m_lock.
+        decltype(m_processes) processes;
+        decltype(m_initProcessControl) initProcessControl = nullptr;
 
-    for (auto& process : processes)
-    {
-        if (auto control = process.lock())
         {
-            control->OnContainerReleased();
+            auto lock = m_lock.lock_exclusive();
+            std::lock_guard processesLock{m_processesLock};
+            initProcessControl = std::exchange(m_initProcessControl, nullptr);
+            processes = std::exchange(m_processes, {});
+        }
+
+        if (initProcessControl)
+        {
+            initProcessControl->OnContainerReleased();
+        }
+
+        for (auto& process : processes)
+        {
+            if (auto control = process.lock())
+            {
+                control->OnContainerReleased();
+            }
+        }
+
+        m_containerEvents.Reset();
+
+        // Release resources under m_lock, but extract the COM wrapper so Disconnect()
+        // can be called without holding m_lock. Calling Disconnect() under m_lock can
+        // deadlock if an in-flight COM caller is waiting for m_lock.
+        unique_com_disconnect wrapper;
+        {
+            auto lock = m_lock.lock_exclusive();
+            wrapper = ReleaseResources();
         }
     }
-
-    m_containerEvents.Reset();
-
-    // Release resources under m_lock, but extract the COM wrapper so Disconnect()
-    // can be called without holding m_lock. Calling Disconnect() under m_lock can
-    // deadlock if an in-flight COM caller is waiting for m_lock.
-    unique_com_disconnect wrapper;
-    {
-        auto lock = m_lock.lock_exclusive();
-        wrapper = ReleaseResources();
-    }
+    CATCH_LOG()
 }
 
 void WSLCContainerImpl::Initialize()
@@ -2484,7 +2490,11 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
     // A VM that already exited (crash / external kill) has dropped every guest mount, so calling
     // UnmountWindowsFolder would only block on the RPC timeout and emit spurious unmount-failed
     // warnings. Mark the mounts inactive without touching the dead VM.
-    if (m_runtime.VmExited())
+    //
+    // The same applies when there is no VM at all: after a graceful idle teardown the VM object is
+    // released without the exit event ever being signaled, so VmExited() is false while HasVm() is
+    // false too. Vm() would throw on that state, and this runs from ~WSLCContainerImpl.
+    if (m_runtime.VmExited() || !m_runtime.HasVm())
     {
         for (auto& volume : m_mountedVolumes)
         {
