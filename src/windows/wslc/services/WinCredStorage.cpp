@@ -82,8 +82,7 @@ void WinCredStorage::Erase(const std::string& serverAddress)
     if (!CredDeleteW(targetName.c_str(), CRED_TYPE_GENERIC, 0))
     {
         auto error = GetLastError();
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_NOT_SET, Localization::WSLCCLI_LogoutNotFound(wsl::shared::string::MultiByteToWide(serverAddress)), error == ERROR_NOT_FOUND);
+        THROW_HR_WITH_USER_ERROR_IF(E_NOT_SET, Localization::WSLCCLI_LogoutNotFound(serverAddress), error == ERROR_NOT_FOUND);
 
         THROW_WIN32(error);
     }

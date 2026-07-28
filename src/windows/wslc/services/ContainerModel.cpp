@@ -27,20 +27,20 @@ PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& 
             // Ensure the value is not empty and contains only digits before parsing
             if (value.empty() || !std::all_of(value.begin(), value.end(), ::isdigit))
             {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide(errorMessage));
             }
 
             // Parse the port number and validate the range
             auto port = std::stoul(value, nullptr, 10);
             if (!PublishPort::IsValidPort(port))
             {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide(errorMessage));
             }
             return static_cast<uint16_t>(port);
         }
         catch (const std::exception&)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, MultiByteToWide(errorMessage));
         }
     };
 
@@ -84,7 +84,7 @@ PublishPort PublishPort::Parse(const std::string& value)
         else
         {
             THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG, "Invalid protocol specified in port mapping. Only 'tcp' and 'udp' are supported.");
+                E_INVALIDARG, L"Invalid protocol specified in port mapping. Only 'tcp' and 'udp' are supported.");
         }
     }
 
@@ -128,24 +128,24 @@ void PublishPort::Validate() const
 {
     if (m_containerPort.Count() == 0)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must specify at least one port.");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Container port must specify at least one port.");
     }
 
     if (!m_containerPort.IsValid())
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must be a valid port number (1-65535).");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Container port must be a valid port number (1-65535).");
     }
 
     if (!m_hostPort.IsEphemeral())
     {
         if (!m_hostPort.IsValid())
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port must be a valid port number (1-65535).");
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Host port must be a valid port number (1-65535).");
         }
 
         if (m_hostPort.Count() != m_containerPort.Count())
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port range must match the container port range.");
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Host port range must match the container port range.");
         }
     }
 }

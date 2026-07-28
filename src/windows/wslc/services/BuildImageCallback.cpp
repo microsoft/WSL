@@ -41,7 +41,7 @@ try
     {
         for (const auto& line : m_allLines)
         {
-            m_reporter.Info(L"{}", line);
+            m_reporter.Info(L"{}", wsl::shared::string::MultiByteToWide(line));
         }
     }
 }
@@ -100,7 +100,7 @@ try
         // Skip pull progress updates when output is redirected, show only major steps
         if (!isPullProgress)
         {
-            m_reporter.Info(L"{}", status);
+            m_reporter.Info(L"{}", wsl::shared::string::MultiByteToWide(status));
         }
         return S_OK;
     }

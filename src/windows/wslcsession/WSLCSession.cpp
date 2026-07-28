@@ -802,21 +802,21 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
 
         if (httpResponse->result == boost::beast::http::status::not_found)
         {
-            THROW_HR_WITH_USER_ERROR(WSLC_E_IMAGE_NOT_FOUND, errorMessage);
+            THROW_HR_WITH_USER_ERROR(WSLC_E_IMAGE_NOT_FOUND, wsl::shared::string::MultiByteToWide(errorMessage));
         }
         else if (httpResponse->result == boost::beast::http::status::bad_request)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::string::MultiByteToWide(errorMessage));
         }
         else
         {
-            THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::string::MultiByteToWide(errorMessage));
         }
     }
     else if (reportedError.has_value())
     {
         // Can happen if an error is returned during progress after receiving an OK status.
-        THROW_HR_WITH_USER_ERROR(E_FAIL, reportedError.value().c_str());
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::string::MultiByteToWide(reportedError.value()));
     }
 }
 
@@ -1222,7 +1222,7 @@ try
     // Stripping \r normalizes to plain \n which becomes \r\n once via text-mode
     // translation.
     std::erase(allOutput, '\r');
-    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, wsl::shared::string::MultiByteToWide(allOutput), exitCode != 0);
 
     return S_OK;
 }
@@ -1420,11 +1420,11 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
     {
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(pendingErrorJson->c_str());
 
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::string::MultiByteToWide(error.message));
     }
 
     // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
-    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, wsl::shared::string::MultiByteToWide(errorMessage.value()), errorMessage.has_value());
 
     return imageId;
 }
@@ -1512,8 +1512,9 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         // Save failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message.c_str());
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(error.message);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, wideErrorMessage, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 }
 
@@ -1673,9 +1674,10 @@ try
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), errorMessage, e.StatusCode() == 409);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(errorMessage);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, wideErrorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), wideErrorMessage, e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 
     THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Options->Image);
@@ -1745,10 +1747,11 @@ try
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
 
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), errorMessage, e.StatusCode() == 409);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(errorMessage);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), wideErrorMessage, e.StatusCode() == 400);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, wideErrorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), wideErrorMessage, e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 
     return S_OK;
@@ -1813,9 +1816,10 @@ std::string WSLCSession::InspectImageLockHeld(const std::string& NameOrId)
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(errorMessage);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, wideErrorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), wideErrorMessage, e.StatusCode() == 400);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 
     // Convert to WSLC schema
@@ -2024,9 +2028,10 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), errorMessage, e.StatusCode() == 409);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+        const auto wideErrorMessage = wsl::shared::string::MultiByteToWide(errorMessage);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, wideErrorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wideErrorMessage, e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wideErrorMessage);
     }
 }
 
@@ -3499,8 +3504,7 @@ void WSLCSession::RecoverExistingContainers()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container: %hs", dockerContainer.Id.c_str());
-            EMIT_USER_WARNING(
-                Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+            EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverContainer(dockerContainer.Id));
         }
     }
 
@@ -3556,7 +3560,7 @@ void WSLCSession::RecoverExistingNetworks()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION_MSG("Failed to recover network: %hs", network.Name.c_str());
-            EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverNetwork(wsl::shared::string::MultiByteToWide(network.Name)));
+            EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverNetwork(network.Name));
         }
     }
 

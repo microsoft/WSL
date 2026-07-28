@@ -217,7 +217,7 @@ void PruneVolumes(CLIExecutionContext& context)
 
     for (const auto& volumeName : result.PrunedVolumes)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_VolumePruneDeleted(MultiByteToWide(volumeName)));
+        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_VolumePruneDeleted(volumeName));
     }
 
     context.Reporter.Output(L"\n");

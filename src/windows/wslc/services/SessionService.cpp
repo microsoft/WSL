@@ -113,7 +113,7 @@ int SessionService::Attach(Reporter& reporter, const Session& session)
 
     auto exitCode = process.GetExitCode();
 
-    reporter.Output(L"{}\n", wsl::shared::Localization::MessageWslcShellExited(string::MultiByteToWide(shell), static_cast<int>(exitCode)));
+    reporter.Output(L"{}\n", wsl::shared::Localization::MessageWslcShellExited(shell, static_cast<int>(exitCode)));
 
     return static_cast<int>(exitCode);
 }
