@@ -985,8 +985,7 @@ private:
     const TestImage BuiltImageSecretMaxSize{L"wslc-e2e-build-secret-max-size", L"latest", L""};
     const TestImage BuiltImageSecretMultiple{L"wslc-e2e-build-secret-multi", L"latest", L""};
 
-    // A representative large secret size (500 KiB). Secrets at this size mount and build normally; the
-    // client no longer rejects larger files (BuildKit enforces its own limit inside the build).
+    // Maximum secret size allowed by BuildKit (500kb)
     static constexpr size_t c_maxSecretSize = 500 * 1024;
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)

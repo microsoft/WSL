@@ -201,8 +201,7 @@ class WSLCCLISecretParserUnitTests
 
     TEST_METHOD(Secret_File_LargeFileSucceeds)
     {
-        // The parser no longer caps secret file size (BuildKit enforces its own limit inside the build),
-        // so a large file must still parse into a valid file secret.
+        // A large file must parse into a valid file secret.
         const std::vector<BYTE> bytes(512000, 0x41);
         ScopedTempFile file(bytes);
         VerifyValidFileSecret(L"id=s,src=" + file.wpath(), L"s", file.wpath());
@@ -295,8 +294,7 @@ class WSLCCLISecretParserUnitTests
 
     TEST_METHOD(Secret_File_MissingSourceForwardsPath)
     {
-        // A missing source file is no longer rejected client-side (checking existence here is a TOCTOU
-        // race and the file may only be reachable from the service's context). The path is forwarded as
+        // A missing source file is not rejected client-side. The path is forwarded as
         // an absolute SourcePath and the service/BuildKit reports if it can't be mounted or read.
         const std::wstring missing = L"C:\\wslc-ut\\definitely-missing-secret-file.txt";
         auto secret = validation::ParseSecretSpec(L"id=s,src=" + missing);
