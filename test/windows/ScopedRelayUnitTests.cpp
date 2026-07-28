@@ -93,13 +93,7 @@ namespace {
         THROW_LAST_ERROR_IF(GetTempFileNameW(tempPath, L"rly", 0, tempFile) == 0);
 
         wil::unique_handle file{CreateFileW(
-            tempFile,
-            GENERIC_READ | GENERIC_WRITE,
-            FILE_SHARE_READ,
-            nullptr,
-            CREATE_ALWAYS,
-            FILE_FLAG_OVERLAPPED | FILE_FLAG_DELETE_ON_CLOSE,
-            nullptr)};
+            tempFile, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_FLAG_OVERLAPPED | FILE_FLAG_DELETE_ON_CLOSE, nullptr)};
         THROW_LAST_ERROR_IF(!file);
 
         return file;

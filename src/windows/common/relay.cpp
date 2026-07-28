@@ -454,9 +454,8 @@ void ScopedRelay::Sync(std::chrono::milliseconds Timeout)
     }
 
     // Keep the wait bounded and below INFINITE.
-    const DWORD timeoutMs = Timeout.count() <= 0
-                                ? 0
-                                : static_cast<DWORD>(std::min<long long>(Timeout.count(), static_cast<long long>(INFINITE) - 1));
+    const DWORD timeoutMs =
+        Timeout.count() <= 0 ? 0 : static_cast<DWORD>(std::min<long long>(Timeout.count(), static_cast<long long>(INFINITE) - 1));
 
     if (!m_completed.wait(timeoutMs))
     {
