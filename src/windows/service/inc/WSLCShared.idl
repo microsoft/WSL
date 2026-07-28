@@ -220,9 +220,10 @@ typedef enum _WSLCBuildImageFlags
     WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps.
     WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
     WSLCBuildImageFlagsPull = 4,    // Always attempt to pull a newer version of the image.
+    WSLCBuildImageFlagsRawJson = 8, // Forward docker's raw --progress=rawjson output to the callback verbatim instead of parsing it into formatted progress messages.
 } WSLCBuildImageFlags;
 
-cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull)")
+cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull | WSLCBuildImageFlagsRawJson)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
 

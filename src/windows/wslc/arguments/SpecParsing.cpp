@@ -626,6 +626,38 @@ models::FormatType GetFormatTypeFromString(const std::wstring& input, const std:
     }
 }
 
+models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (IsEqual(input, L"auto"))
+    {
+        return models::ProgressMode::Auto;
+    }
+    else if (IsEqual(input, L"tty"))
+    {
+        return models::ProgressMode::Tty;
+    }
+    else if (IsEqual(input, L"plain"))
+    {
+        return models::ProgressMode::Plain;
+    }
+    else if (IsEqual(input, L"quiet"))
+    {
+        return models::ProgressMode::Quiet;
+    }
+    else if (IsEqual(input, L"rawjson"))
+    {
+        return models::ProgressMode::RawJson;
+    }
+    else
+    {
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized progress type. Supported progress types are: auto, tty, plain, "
+            L"quiet, rawjson.",
+            argName,
+            input));
+    }
+}
+
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
     if (IsEqual(input, L"image"))

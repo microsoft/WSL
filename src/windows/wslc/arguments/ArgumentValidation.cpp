@@ -37,6 +37,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateFormatTypeFromString(execArgs.GetAll<ArgType::Format>(), m_name);
         break;
 
+    case ArgType::Progress:
+        validation::ValidateProgressModeFromString(execArgs.GetAll<ArgType::Progress>(), m_name);
+        break;
+
     case ArgType::Signal:
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
@@ -221,6 +225,14 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetFormatTypeFromString(value, argName);
+    }
+}
+
+void ValidateProgressModeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetProgressModeFromString(value, argName);
     }
 }
 

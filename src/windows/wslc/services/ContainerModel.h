@@ -27,6 +27,17 @@ enum class FormatType
     Json,
 };
 
+// Progress output style for `wslc build`. Auto resolves to Tty when progress output is an
+// interactive VT console and Plain otherwise.
+enum class ProgressMode
+{
+    Auto,
+    Tty,
+    Plain,
+    Quiet,
+    RawJson,
+};
+
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
