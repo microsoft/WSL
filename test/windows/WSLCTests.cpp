@@ -12187,8 +12187,6 @@ class WSLCTests
     // A running container pins the VM via its activity hold, matching the production idle timer.
     WSLC_TEST_METHOD(TriggerIdleTerminationDefersForRunningContainer)
     {
-        SKIP_TEST_SERVER();
-
         WSLCContainerLauncher launcher("debian:latest", "wslc-idle-active", {"/bin/sleep", "600"});
         auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
 
@@ -12207,8 +12205,6 @@ class WSLCTests
     // usable after each idle teardown and lazy VM restart.
     WSLC_TEST_METHOD(TriggerIdleTerminationRecoversStoppedContainerResources)
     {
-        SKIP_TEST_SERVER();
-
         const auto hostFolder = std::filesystem::current_path() / "test-idle-container-volume";
         std::filesystem::create_directories(hostFolder);
         VERIFY_IS_TRUE((std::ofstream(hostFolder / "marker.txt") << "idle-recovery").good());
@@ -12269,8 +12265,6 @@ class WSLCTests
     // because destructors are noexcept and would terminate the session host.
     WSLC_TEST_METHOD(SessionTerminationAfterIdleTerminationWithContainer)
     {
-        SKIP_TEST_SERVER();
-
         const auto hostFolder = std::filesystem::current_path() / "test-idle-terminate-volume";
         std::filesystem::create_directories(hostFolder);
         auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {

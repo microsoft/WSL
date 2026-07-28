@@ -164,6 +164,14 @@ public:
     void StartVmLockHeld();
     _Requires_exclusive_lock_held_(m_lock)
     void StopVmLockHeld();
+
+    // Open and close the stop-pending window that gates leases from other threads across the
+    // OnVmStopping notification. Begin must be called under an exclusive m_lock hold with the
+    // activity count at zero; End must run on every exit path, or waiters never wake.
+    _Requires_exclusive_lock_held_(m_lock)
+    void BeginVmStopLockHeld() noexcept;
+    void EndVmStop() noexcept;
+    bool VmStopPendingOnOtherThread() const noexcept;
     _Requires_exclusive_lock_held_(m_lock)
     void TearDownVmLockHeld(bool CaptureTerminationReason = false);
     void EnsureVmRunning();
@@ -231,6 +239,18 @@ private:
     wil::srwlock m_lock;
     std::atomic<VmState> m_vmState{VmState::None};
     std::atomic<VmExitDisposition> m_vmExitDisposition{VmExitDisposition::Active};
+
+    // Gates VM leases across the OnVmStopping notification window. Idle teardown drops m_lock to fire
+    // OnVmStopping (so a plugin handler may take a lease without deadlocking), which would otherwise
+    // let an unrelated thread lease a VM that is about to be destroyed -- forcing the teardown to be
+    // abandoned and a second OnVmStarted to be re-paired onto the very same VM instance, so plugins
+    // observe a stop/start pair the VM never actually performed. While a stop is pending,
+    // EnsureVmRunning() holds every other thread off until the teardown completes; each waiter then
+    // starts, and is notified about, a genuinely new VM. The notifying thread is exempt, since its
+    // reentrant leases are the reason m_lock is dropped in the first place.
+    std::atomic<bool> m_vmStopPending{false};
+    std::atomic<DWORD> m_vmStopThreadId{0};
+    wil::unique_event m_vmStopComplete{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
 
     // Set when OnVmStarted has fired for the current VM; gates the paired OnVmStopping so a VM that
     // never finished starting (or had no started notification) does not emit a spurious stopping.
