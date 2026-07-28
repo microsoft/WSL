@@ -2568,7 +2568,7 @@ void ScopedEnvVariable::Clear()
     VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
 }
 
-UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content)
+UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content, UINT StatusCode)
 {
     auto cmd = std::format(
         LR"(Powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
@@ -2579,12 +2579,13 @@ $server.Start()
 while ($true)
 {{
     $context = $server.GetContext()
-    $context.Response.StatusCode
+    $context.Response.StatusCode = {}
     $content = [Text.Encoding]::UTF8.GetBytes('{}')
     $context.Response.OutputStream.Write($content , 0, $content.length)
     $context.Response.close()
 }}")",
         Endpoint,
+        StatusCode,
         Content);
 
     m_process = LxsstuStartProcess(cmd.data());
