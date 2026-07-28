@@ -115,7 +115,7 @@ _(Remove,           "rm",                   NO_ALIAS,         Kind::Flag,       
 _(Server,           "server",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,          "session",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SessionIdArgDescription()) \
 _(ShmSize,          "shm-size",             NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_ShmSizeArgDescription()) \
-_(StoragePath,      "storage-path",         NO_ALIAS,         Kind::Positional, NoConversion, L"Path to the session storage directory") \
+_(StoragePath,      "storage-path",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_StoragePathArgDescription()) \
 _(Signal,           "signal",               L"s",             Kind::Value,      WSLCSignal,   Localization::WSLCCLI_SignalArgDescription()) \
 _(Source,           "source",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_SourceArgDescription()) \
 _(StopSignal,       "stop-signal",          NO_ALIAS,         Kind::Value,      WSLCSignal,   Localization::WSLCCLI_StopSignalArgDescription()) \

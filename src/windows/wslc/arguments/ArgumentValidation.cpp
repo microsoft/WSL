@@ -426,19 +426,33 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
 
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (IsEqual(input, L"json"))
+    // Single source of truth for the accepted format values. It drives both parsing and the error
+    // message's supported-values list, so adding a type here updates both automatically.
+    static constexpr std::pair<std::wstring_view, FormatType> c_formatTypes[] = {
+        {L"json", FormatType::Json},
+        {L"table", FormatType::Table},
+    };
+
+    for (const auto& [name, type] : c_formatTypes)
     {
-        return FormatType::Json;
+        if (IsEqual(input, name))
+        {
+            return type;
+        }
     }
-    else if (IsEqual(input, L"table"))
+
+    std::wstring supportedValues;
+    for (const auto& formatType : c_formatTypes)
     {
-        return FormatType::Table;
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += formatType.first;
     }
-    else
-    {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
-    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidFormatError(argName, input, supportedValues));
 }
 
 InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
