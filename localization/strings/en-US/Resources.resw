@@ -2155,6 +2155,9 @@ Usage:
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Network name cannot be empty.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Error information from the engine:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Unrecognized command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
