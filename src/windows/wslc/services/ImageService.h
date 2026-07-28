@@ -18,6 +18,7 @@ Abstract:
 #include "Reporter.h"
 #include <map>
 #include <optional>
+#include <vector>
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {

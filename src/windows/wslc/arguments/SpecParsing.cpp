@@ -277,8 +277,9 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         }
         else
         {
-            // Remaining attributes (name, push, compression, annotations, ...) are stored verbatim.
-            output.Attributes[kv.Key] = kv.Value;
+            // Remaining attributes (name, push, compression, annotations, ...) are matched
+            // case-insensitively by buildx, so normalize their keys to lowercase like type/dest above.
+            output.Attributes[toLower(kv.Key)] = kv.Value;
         }
     }
 

@@ -959,6 +959,10 @@ try
     // after a successful build, a streamer process relays that path to the client handle. Without a
     // handle the spec is forwarded verbatim and the build runs entirely in the VM.
     const bool streamOutput = Options->OutputHandle.Type != WSLCHandleTypeUnknown;
+    // When an OutputHandle is provided the exporter output must be streamed back, which requires a
+    // non-empty Output spec to route from. Reject the mismatched combination at the boundary rather
+    // than later failing to stream an unassigned dest path.
+    RETURN_HR_IF(E_INVALIDARG, streamOutput && (Options->Output == nullptr || Options->Output[0] == '\0'));
     const bool outputIsDirectory = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsOutputIsDirectory);
     std::string outputDestPath;
     auto removeOutput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -968,7 +972,18 @@ try
             auto cleanupResult = cleanup.LaunchNoThrow(*m_virtualMachine);
             if (auto& process = std::get<2>(cleanupResult); process)
             {
-                std::ignore = process->WaitAndCaptureOutput(60000UL);
+                auto result = process->WaitAndCaptureOutput(60000UL);
+                if (result.Code != 0)
+                {
+                    WSL_LOG(
+                        "BuildOutputCleanupFailed",
+                        TraceLoggingValue(outputDestPath.c_str(), "Path"),
+                        TraceLoggingValue(result.Code, "ExitCode"));
+                }
+            }
+            else
+            {
+                WSL_LOG("BuildOutputCleanupLaunchFailed", TraceLoggingValue(outputDestPath.c_str(), "Path"));
             }
         }
     });

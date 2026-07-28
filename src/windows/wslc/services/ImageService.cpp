@@ -252,11 +252,18 @@ void ImageService::Build(
             std::filesystem::create_directories(std::filesystem::absolute(spec.Dest), dirError);
             THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", spec.Dest.c_str());
 
-            // Strip any trailing separator so the CRT does not parse '\"' as an escaped quote.
+            // Strip a trailing separator so the CRT does not parse '\"' as an escaped quote.
             auto destDir = std::filesystem::absolute(spec.Dest).wstring();
             while (destDir.size() > 1 && (destDir.back() == L'\\' || destDir.back() == L'/'))
             {
                 destDir.pop_back();
+            }
+
+            // A drive root like "C:\\" collapses to "C:" above, which tar treats as the current
+            // directory on that drive rather than its root; restore a rooted path in that case.
+            if (destDir.size() == 2 && destDir[1] == L':')
+            {
+                destDir += L"\\.";
             }
 
             auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);

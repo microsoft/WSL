@@ -2896,7 +2896,8 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Always attempt to pull a newer version of the image</value>
   </data>
   <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
-    <value>Output destination (format: type=local,dest=path)</value>
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output"}{Locked="type=local,dest=path"}{Locked="type=tar,dest=out.tar"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Set the target build stage to build</value>
