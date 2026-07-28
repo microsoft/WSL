@@ -2370,6 +2370,10 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <value>A opção '--gateway' requer que '--subnet' também seja especificado.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>A opção '--ip-range' requer que '--subnet' também seja especificado.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>A rede '{}' tem pontos de extremidade ativos.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3291,6 +3295,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
     <value>Gateway IPv4 ou IPv6 para a sub-rede</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Alocar endereços IP de contêiner de um subintervalo no formato CIDR</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Remova uma ou mais redes.</value>
