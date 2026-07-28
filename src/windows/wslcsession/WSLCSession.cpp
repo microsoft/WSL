@@ -1054,7 +1054,6 @@ try
                 RETURN_HR_IF(E_INVALIDARG, value.find('\0') != std::string_view::npos);
 
                 auto varName = std::format("WSLC_SECRET_{}", std::to_string(i));
-                std::ranges::replace(varName, '-', '_');
 
                 buildEnv.push_back(std::format("{}={}", varName, value));
                 secretArgs.emplace_back(secret.Id, std::format("env={}", varName));

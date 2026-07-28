@@ -496,8 +496,7 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
 
-        // The client no longer validates that the source file exists; the path is forwarded and the
-        // service/BuildKit rejects the missing file, so the build still fails with a non-zero exit.
+        // Build should fail if the src file does not exist
         auto missingFile = testRoot / L"does-not-exist.txt";
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" --secret id=x,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), missingFile.wstring()));
@@ -758,8 +757,35 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_MaxSizeFile_Success)
     {
-        // A 500 KiB secret still mounts and builds; the client no longer caps secret file size.
+        // Exactly BuildKit's per-secret cap (500 KiB == 512000 bytes) must still succeed.
         RunSizedFileSecretSuccess(BuiltImageSecretMaxSize, L"wslc-e2e-build-secret-max-size", c_maxSecretSize);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_OversizeFile_Fails)
+    {
+        // One byte over BuildKit's per-secret cap (500 KiB + 1). The file is forwarded and mounted, and
+        // BuildKit enforces its MaxSecretSize limit when the secret is consumed, so the build fails.
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-secret-oversize";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedSecretBuildContext();
+
+        auto secretFile = testRoot / L"secret.bin";
+        WriteTestFileContent(secretFile, std::string(c_maxSecretSize + 1, 'A'));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "# syntax=docker/dockerfile:1\n"
+            "FROM debian:latest\n"
+            "RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret > /dev/null\n"
+            "CMD [\"echo\", \"secret-oversize\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --secret id=mysecret,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), secretFile.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_FALSE(buildResult.Stderr->empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Secret_MultipleFiles_Success)
