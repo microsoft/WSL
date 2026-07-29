@@ -329,7 +329,7 @@ try
         if (isHostEphemeralPort)
         {
             const auto cap = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortCap : m_hostTcpEphemeralPortCap;
-            auto& portsInUse = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse;
+            const auto portsInUse = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse;
             if (portsInUse >= cap)
             {
                 WSL_LOG(
@@ -363,7 +363,8 @@ try
 
             if (isHostEphemeralPort)
             {
-                ((Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse)++;
+                auto& portsInUse = Protocol == IPPROTO_UDP ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse;
+                portsInUse++;
             }
         }
         // if the port was reserved, we successfully handed over ownership
