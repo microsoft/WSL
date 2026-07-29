@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ExecutionContextData.h"
 #include "Reporter.h"
 #include <optional>

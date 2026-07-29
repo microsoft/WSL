@@ -17,7 +17,7 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "Argument.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ArgumentParser.h"
 #include "Invocation.h"
 #include "ParserTestCases.h"

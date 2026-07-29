@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 #include "Argument.h"
 #include "Exceptions.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
@@ -142,9 +142,9 @@ protected:
     // mutually-exclusive arguments or required argument combinations.
     //
     // Contract: this hook enforces relationships between already-validated arguments. It receives a
-    // const ArgMap, so it cannot run conversion or write the validated cache (conversion happens once,
-    // in Argument::Validate). Read arguments with the unified accessors GetValue/GetAllValues/GetFlag,
-    // which return the converted value for converted args and the raw value otherwise.
+    // const ArgMap, so it cannot add or remove raw arguments; read them with the unified accessors
+    // GetValue/GetAllValues/GetFlag, which return the converted value for converted args and the raw
+    // value otherwise (validating on demand if needed).
     virtual void ValidateArgumentsInternal(const ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 

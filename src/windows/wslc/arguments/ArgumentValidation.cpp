@@ -14,7 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Argument.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "Exceptions.h"
@@ -54,8 +54,9 @@ namespace {
     }
 } // namespace
 
-// Common argument validation that runs across commands. For arguments whose raw string input is
-// converted into a typed value, the conversion happens here once and is cached on the ArgMap.
+// Common per-argument validation, run both by the up-front pass and on demand from ArgMap's read
+// path. Arguments with a converted type are converted and cached here; the type is recorded as
+// validated on success.
 void Argument::Validate(ArgMap& execArgs) const
 {
     switch (m_argType)
@@ -225,8 +226,25 @@ void Argument::Validate(ArgMap& execArgs) const
     default:
         break;
     }
+
+    // Mark validated only on success: a throw above (invalid value) skips this, so the next read
+    // re-validates and reports the same error again.
+    execArgs.MarkValidated(m_argType);
 }
 } // namespace wsl::windows::wslc
+
+namespace wsl::windows::wslc::argument {
+
+// On-demand validation for ArgMap's read path. Clears any stale converted cache first (idempotent),
+// then Argument::Validate re-checks the raw values, throwing for an invalid one and recording the
+// type as validated on success.
+void EnsureArgumentValidated(ArgMap& map, ArgType type)
+{
+    map.InvalidateValidated(type);
+    Argument::Create(type).Validate(map);
+}
+
+} // namespace wsl::windows::wslc::argument
 
 namespace wsl::windows::wslc::validation {
 

@@ -17,7 +17,7 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "Argument.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ArgumentValidation.h"
 #include "ImageService.h"
 #include "Exceptions.h"
@@ -270,36 +270,58 @@ class WSLCCLIArgumentUnitTests
         });
     }
 
-    // Helper: run the real validation path for a single-value argument and return the cached,
-    // converted result. The result type is fixed by the argument's ConvertedType. Also asserts
-    // that validation populated the cache for that argument.
+    // Helper: run validation for a single-value argument and return the converted result (type fixed
+    // by the argument's ConvertedType). Drives both paths for every converted ArgType its callers
+    // exercise: the eager path (an explicit validation pass) and the on-demand path (a converted read
+    // with no prior validation pass, which must self-validate). The returned value is the on-demand
+    // result, so callers' expected-value assertions verify the on-demand output equals what the
+    // validation pass produces. Both paths run the same Argument::Validate, so their results match by
+    // construction; this asserts the on-demand trigger fires and caches an equal number of values.
     template <ArgType E>
     static auto ValidateAndGetCached(const std::wstring& raw)
     {
-        ArgMap args;
-        args.Add(E, std::wstring(raw));
-        Argument::Create(E).Validate(args);
-        VERIFY_IS_TRUE(args.ContainsValidated(E));
-        return args.GetValue<E>();
+        ArgMap eager;
+        eager.Add(E, std::wstring(raw));
+        Argument::Create(E).Validate(eager);
+        VERIFY_IS_TRUE(eager.ContainsValidated(E));
+
+        ArgMap onDemand;
+        onDemand.Add(E, std::wstring(raw));
+        VERIFY_IS_FALSE(onDemand.ContainsValidated(E)); // no validation pass ran
+        auto value = onDemand.GetValue<E>();            // triggers on-demand validation
+        VERIFY_IS_TRUE(onDemand.ContainsValidated(E));
+        VERIFY_ARE_EQUAL(onDemand.CountValidated(E), eager.CountValidated(E));
+        return value;
     }
 
-    // Helper: run the real validation path for an argument that appears multiple times (ArgMap is
-    // a multimap) and return every cached, converted value in insertion order.
+    // Helper: as ValidateAndGetCached, for an argument that appears multiple times (ArgMap is a
+    // multimap). Runs the eager and on-demand paths and returns every on-demand converted value in
+    // insertion order.
     template <ArgType E>
     static auto ValidateAndGetAllCached(const std::vector<std::wstring>& raws)
     {
-        ArgMap args;
+        ArgMap eager;
         for (const auto& raw : raws)
         {
-            args.Add(E, std::wstring(raw));
+            eager.Add(E, std::wstring(raw));
         }
 
-        Argument::Create(E).Validate(args);
+        Argument::Create(E).Validate(eager);
 
         // The cache must hold exactly one converted value per raw value in the map.
-        VERIFY_ARE_EQUAL(args.CountValidated(E), args.Count(E));
-        VERIFY_ARE_EQUAL(args.CountValidated(E), raws.size());
-        return args.GetAllValues<E>();
+        VERIFY_ARE_EQUAL(eager.CountValidated(E), eager.Count(E));
+        VERIFY_ARE_EQUAL(eager.CountValidated(E), raws.size());
+
+        ArgMap onDemand;
+        for (const auto& raw : raws)
+        {
+            onDemand.Add(E, std::wstring(raw));
+        }
+
+        VERIFY_IS_FALSE(onDemand.ContainsValidated(E)); // no validation pass ran
+        auto values = onDemand.GetAllValues<E>();       // triggers on-demand validation
+        VERIFY_ARE_EQUAL(onDemand.CountValidated(E), eager.CountValidated(E));
+        return values;
     }
 
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache
@@ -487,6 +509,82 @@ class WSLCCLIArgumentUnitTests
         args.Add(ArgType::Format, std::wstring(L"xml"));
         VERIFY_THROWS(Argument::Create(ArgType::Format).Validate(args), ArgumentException);
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
+    }
+
+    // Note: on-demand validation for every converted ArgType (reading with no prior validation pass
+    // and getting the same result the pass produces) is covered by the tests above:
+    // ValidateAndGetCached / ValidateAndGetAllCached drive both the eager and on-demand paths and
+    // return the on-demand value, so those tests' expected-value assertions verify on-demand output
+    // for all converted shapes. The tests below cover the behaviors unique to the on-demand trigger:
+    // a bad value fails the same way as on the command line, a value added after the validation pass
+    // is re-validated, and validate-only arguments (no converted value) are checked on demand too.
+
+    // Test: An invalid value read on demand (no prior validation pass) throws ArgumentException --
+    // the same failure the up-front validation pass raises for that value. This proves an argument
+    // populated during execution routes to the same user error path as a bad command-line value,
+    // and that a failed on-demand validation leaves nothing cached.
+    TEST_METHOD(ArgumentValidate_OnDemandInvalidValueThrows)
+    {
+        ArgMap args;
+        args.Add(ArgType::Format, std::wstring(L"xml")); // not a valid FormatType
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
+        VERIFY_THROWS(args.GetValue<ArgType::Format>(), ArgumentException);
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
+    }
+
+    // Test: Adding a raw value after the up-front validation pass invalidates that argument's cache
+    // (via the map-action callback) so the next converted read re-validates on demand and reflects
+    // the new value. This is the execution-time scenario -- e.g. credentials gathered while a command
+    // runs -- where a stale cache would otherwise return pre-mutation data.
+    TEST_METHOD(ArgumentValidate_PostValidationAddSelfHeals)
+    {
+        ArgMap args;
+        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
+        Argument::Create(ArgType::Signal).Validate(args);
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(1));
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::Signal>(), WSLCSignalSIGTERM);
+
+        // Add a second raw value after validation. The map-action callback drops the cached values
+        // for Signal so the memoized cache cannot outlive the raw data it was computed from.
+        args.Add(ArgType::Signal, std::wstring(L"SIGKILL"));
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(0));
+
+        // The next read re-validates both raw values on demand, in insertion order.
+        auto signals = args.GetAllValues<ArgType::Signal>();
+        VERIFY_ARE_EQUAL(signals.size(), static_cast<size_t>(2));
+        VERIFY_ARE_EQUAL(signals[0], WSLCSignalSIGTERM);
+        VERIFY_ARE_EQUAL(signals[1], WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(2));
+    }
+
+    // Test: A validate-only argument (checked during validation but not converted into a cached
+    // value) is validated on demand when read, so a value added after the up-front pass is checked
+    // exactly as a command-line value. These arguments have no converted cache, so the earlier
+    // converted-path tests do not cover them; the read path still runs their range/format checks.
+    // Network rejects "host" mode and unsupported values.
+    TEST_METHOD(ArgumentValidate_OnDemandValidateOnlyArgIsChecked)
+    {
+        // Valid value, no prior validation pass: the read validates on demand and returns the raw value.
+        ArgMap valid;
+        valid.Add(ArgType::Network, std::wstring(L"bridge"));
+        auto networks = valid.GetAllValues<ArgType::Network>();
+        VERIFY_ARE_EQUAL(networks.size(), static_cast<size_t>(1));
+        VERIFY_ARE_EQUAL(networks[0], std::wstring(L"bridge"));
+
+        // Invalid value, no prior validation pass: the read validates on demand and throws, matching
+        // the failure the up-front pass raises for the same value.
+        ArgMap invalid;
+        invalid.Add(ArgType::Network, std::wstring(L"host"));
+        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ArgumentException);
+
+        // Valid up-front, then an unsupported value added after the pass: the map-action callback
+        // clears the validated record, so the next read re-validates on demand and throws.
+        ArgMap added;
+        added.Add(ArgType::Network, std::wstring(L"bridge"));
+        Argument::Create(ArgType::Network).Validate(added);
+        VERIFY_ARE_EQUAL(added.GetAllValues<ArgType::Network>().size(), static_cast<size_t>(1));
+        added.Add(ArgType::Network, std::wstring(L"host"));
+        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ArgumentException);
     }
 
     // Timestamp parsing unit tests (exercises TryParseRfc3339 and integer path via GetTimestampFromString)
