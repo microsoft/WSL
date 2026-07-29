@@ -105,6 +105,15 @@ void BuildImage(CLIExecutionContext& context)
         validation::ParseLabel(label);
     }
 
+    std::vector<services::BuildSecret> secrets;
+    if (context.Args.Contains(ArgType::Secret))
+    {
+        for (const auto& spec : context.Args.GetAll<ArgType::Secret>())
+        {
+            secrets.push_back(validation::ParseSecretSpec(spec));
+        }
+    }
+
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
     {
@@ -118,13 +127,13 @@ void BuildImage(CLIExecutionContext& context)
     }
 
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.Contains(ArgType::Verbose));
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.Contains(ArgType::BuildPull));
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.GetFlag<ArgType::Verbose>());
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetFlag<ArgType::NoCache>());
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.GetFlag<ArgType::BuildPull>());
 
     auto cancelEvent = context.CreateCancelEvent();
-    BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.Contains(ArgType::Verbose));
-    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, dockerfilePath, target, flags, &callback, cancelEvent);
+    BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.GetFlag<ArgType::Verbose>());
+    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -155,9 +164,9 @@ void ListImages(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Images));
     auto& images = context.Data.Get<Data::Images>();
 
-    if (context.Args.Contains(ArgType::Quiet))
+    if (context.Args.GetFlag<ArgType::Quiet>())
     {
-        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
         for (const auto& image : images)
         {
             context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
@@ -182,7 +191,7 @@ void ListImages(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
@@ -223,10 +232,30 @@ void PullImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    const auto image = WideToMultiByte(context.Args.Get<ArgType::ImageId>());
+    const bool quiet = context.Args.GetFlag<ArgType::Quiet>();
 
-    ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
-    services::ImageService::Pull(context.Reporter, session, WideToMultiByte(imageId), &callback);
+    // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
+    // the client reports this on stdout before contacting the registry.
+    const auto reference = ImageReference::Parse(image);
+    if (!quiet && reference.Format == EnumReferenceFormatNone)
+    {
+        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
+    }
+
+    // Match `docker pull`: in quiet mode, suppress progress output by passing no progress callback. Warnings are
+    // unaffected because the warning callback is built internally by ImageService::Pull from the Reporter.
+    std::optional<ImageProgressCallback> callback;
+    if (!quiet)
+    {
+        callback.emplace(context.Reporter, Reporter::Level::Output);
+    }
+
+    IProgressCallback* progress = callback ? &*callback : nullptr;
+    services::ImageService::Pull(context.Reporter, session, image, progress);
+
+    // Match `docker pull`: always print the resolved canonical image reference as the final line.
+    context.Reporter.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
 }
 
 void PushImage(CLIExecutionContext& context)
@@ -245,8 +274,8 @@ void DeleteImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     const auto& imageIds = context.Args.GetAll<ArgType::ImageId>();
-    bool force = context.Args.Contains(ArgType::ImageForce);
-    bool noPrune = context.Args.Contains(ArgType::NoPrune);
+    bool force = context.Args.GetFlag<ArgType::ImageForce>();
+    bool noPrune = context.Args.GetFlag<ArgType::NoPrune>();
     for (const auto& id : imageIds)
     {
         services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
@@ -286,7 +315,7 @@ void ImportImage(CLIExecutionContext& context)
     auto imageId = services::ImageService::Import(context.Reporter, session, input, imageName);
     if (!imageId.empty())
     {
-        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
         context.Reporter.Output(L"{}\n", MultiByteToWide(TruncateId(imageId, trunc)));
     }
 }
@@ -361,7 +390,7 @@ void PruneImages(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    bool all = context.Args.Contains(ArgType::All);
+    bool all = context.Args.GetFlag<ArgType::All>();
 
     // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
     std::vector<std::pair<std::string, std::string>> filters;

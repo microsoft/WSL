@@ -366,7 +366,10 @@ std::vector<ContainerPortMapping> BuildPortMappings(std::vector<_WSLCPortMapping
     const bool allocateVmPorts = NetworkModeAllocatesVmPorts(primary);
     for (auto& e : requestedPorts)
     {
-        if (e.HostPort == WSLC_EPHEMERAL_PORT && vm.NetworkingMode() == WSLCNetworkingModeNAT)
+        // Pre-allocate a concrete host port whenever the wslrelay relay path will be used: that path
+        // maps the host port verbatim and has no ephemeral writeback (unlike the virtioNet path), so
+        // an unresolved WSLC_EPHEMERAL_PORT (0) would otherwise be mapped as port 0 and fail.
+        if (e.HostPort == WSLC_EPHEMERAL_PORT && vm.UseWslRelayPortForwarding())
         {
             e.HostPort = AllocateEphemeralPort(e.Family, e.BindingAddress);
         }
@@ -1189,9 +1192,10 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     {
         // Export failed, parse the error message.
         auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, errorMessage, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 
@@ -1250,9 +1254,10 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     if (pendingErrorJson.has_value())
     {
         auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
 
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, httpStatusCode == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), errorMessage, httpStatusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 
@@ -1297,9 +1302,10 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
     if (statusCode != 200)
     {
         auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
 
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, statusCode == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), errorMessage, statusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 
@@ -1885,22 +1891,39 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
         if (imageInfo.Config.has_value() && imageInfo.Config->ExposedPorts.has_value())
         {
+            // The userspace wslrelay port relay only forwards TCP. When it's active, adding a UDP
+            // mapping would fail the whole container (MapPort throws ERROR_NOT_SUPPORTED), so skip
+            // UDP exposed ports and warn once. UDP is published normally on the virtioNet path.
+            const bool relayForwarding = virtualMachine.UseWslRelayPortForwarding();
+            bool warnedUdpSkipped = false;
+
             for (const auto& [portKey, _] : imageInfo.Config->ExposedPorts.value())
             {
                 auto [port, protocol] = ParseExposedPortKey(portKey);
 
-                // Only TCP localhost mappings are currently supported by the relay path.
-                if (protocol != IPPROTO_TCP)
+                if (relayForwarding && protocol == IPPROTO_UDP)
                 {
+                    if (!warnedUdpSkipped)
+                    {
+                        EMIT_USER_WARNING(Localization::MessageWslcPublishAllUdpNotSupported());
+                        warnedUdpSkipped = true;
+                    }
+
                     continue;
                 }
 
-                auto& createdPort = ports.emplace_back();
-                createdPort.HostPort = WSLC_EPHEMERAL_PORT;
-                createdPort.Family = AF_INET;
-                createdPort.ContainerPort = port;
-                createdPort.Protocol = protocol;
-                strcpy_s(createdPort.BindingAddress, "127.0.0.1");
+                // Exposed ports carry only a port and protocol (tcp/udp), never an address family.
+                // Mirror Docker's dual-stack default by publishing each exposed port on both the IPv4
+                // and IPv6 loopback, while keeping wslc's loopback-only default binding convention.
+                for (const auto& [family, address] : {std::pair{AF_INET, "127.0.0.1"}, std::pair{AF_INET6, "::1"}})
+                {
+                    auto& createdPort = ports.emplace_back();
+                    createdPort.HostPort = WSLC_EPHEMERAL_PORT;
+                    createdPort.Family = family;
+                    createdPort.ContainerPort = port;
+                    createdPort.Protocol = protocol;
+                    strcpy_s(createdPort.BindingAddress, address);
+                }
             }
         }
     }

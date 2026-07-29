@@ -30,6 +30,7 @@ struct NetworkIPAMConfig
 {
     std::string Subnet;
     std::string Gateway;
+    std::string IPRange;
 };
 
 struct NetworkIPAM
