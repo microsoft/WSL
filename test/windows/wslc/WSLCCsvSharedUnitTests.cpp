@@ -110,6 +110,12 @@ class WSLCCsvSharedUnitTests
         VerifyMalformed(L"\"a\"b");
     }
 
+    TEST_METHOD(Split_BareQuoteInUnquotedFieldIsMalformed)
+    {
+        // Go's encoding/csv (non-lazy) rejects a bare double quote in an unquoted field (ErrBareQuote).
+        VerifyMalformed(L"a\"b,c");
+    }
+
     // --- CsvEscapeField ---
 
     TEST_METHOD(Escape_PlainFieldUnchanged)

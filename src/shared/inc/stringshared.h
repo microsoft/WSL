@@ -130,12 +130,18 @@ inline std::vector<std::basic_string<T>> SplitByMultipleSeparators(const std::ba
     return Output;
 }
 
-// Splits a single CSV record (RFC 4180) into its fields, matching Go's encoding/csv (which docker
-// buildx uses via go-csvvalue): fields are comma separated, a field may be wrapped in double quotes,
-// a doubled quote inside a quoted field is a literal quote, and a comma inside a quoted field is part
-// of the value. Returns std::nullopt when the record is malformed (an unterminated quoted field, or
-// unexpected text immediately after a closing quote). Note this parses a *single* record; embedded
-// CR/LF are treated as ordinary field characters, not record separators.
+// Splits a single CSV record into fields using the grammar Go's encoding/csv applies to one record
+// (which docker buildx relies on via go-csvvalue), so a spec is parsed the way buildx would:
+//   - fields are separated by commas;
+//   - a field may be wrapped in double quotes, in which case a comma is a literal character and a
+//     doubled quote ("") is a single literal quote;
+//   - an unquoted field may not contain a double quote (Go's non-lazy ErrBareQuote).
+// Returns std::nullopt when the record is malformed: an unterminated quoted field, text immediately
+// after a closing quote, or a bare quote in an unquoted field.
+//
+// Deviation from Go/RFC 4180: this parses exactly one record. Go would treat an unquoted CR/LF as a
+// record separator; here CR/LF are always ordinary field characters (never a record separator), which
+// is what a single-line command-line spec needs.
 template <class T>
 inline std::optional<std::vector<std::basic_string<T>>> SplitCsvFields(const std::basic_string<T>& Record)
 {
@@ -190,6 +196,12 @@ inline std::optional<std::vector<std::basic_string<T>>> SplitCsvFields(const std
         {
             while (Index < Length && Record[Index] != Comma)
             {
+                // Go (non-lazy) rejects a bare double quote in an unquoted field (ErrBareQuote).
+                if (Record[Index] == Quote)
+                {
+                    return std::nullopt;
+                }
+
                 Field.push_back(Record[Index]);
                 ++Index;
             }
@@ -207,9 +219,11 @@ inline std::optional<std::vector<std::basic_string<T>>> SplitCsvFields(const std
     return Fields;
 }
 
-// CSV-escapes a single field: if it contains a comma, double quote, CR, LF, or a leading/trailing
-// space, it is wrapped in double quotes with each embedded quote doubled (matching Go's encoding/csv
-// writer). Otherwise it is returned unchanged. The result parses back via SplitCsvFields.
+// CSV-escapes a single field for round-tripping through JoinCsvFields/SplitCsvFields: if the field
+// contains a comma, a double quote, CR, LF, or a leading/trailing space it is wrapped in double quotes
+// with each embedded quote doubled; otherwise it is returned unchanged. This is not a byte-for-byte
+// match of Go's encoding/csv writer (which quotes only a leading space and leaves an empty field
+// unquoted); it is the minimal quoting needed for every field to parse back via SplitCsvFields.
 template <class T>
 inline std::basic_string<T> CsvEscapeField(const std::basic_string<T>& Field)
 {
