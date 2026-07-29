@@ -88,9 +88,6 @@ private:
     std::pair<uint16_t, uint16_t> m_hostTcpEphemeralPortRange{};
     std::pair<uint16_t, uint16_t> m_hostUdpEphemeralPortRange{};
 
-    uint16_t m_hostTcpEphemeralPortCap{};
-    uint16_t m_hostUdpEphemeralPortCap{};
-
     _Guarded_by_(m_dataLock) uint16_t m_hostTcpEphemeralPortsInUse {};
     _Guarded_by_(m_dataLock) uint16_t m_hostUdpEphemeralPortsInUse {};
 };

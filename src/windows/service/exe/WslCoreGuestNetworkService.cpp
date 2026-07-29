@@ -68,9 +68,6 @@ void wsl::core::networking::GuestNetworkService::CreateGuestNetworkService(
         TraceLoggingValue(m_hostUdpEphemeralPortRange.first, "udpStartPort"),
         TraceLoggingValue(m_hostUdpEphemeralPortRange.second, "udpEndPort"));
 
-    m_hostTcpEphemeralPortCap = ComputeHostEphemeralPortCap(IPPROTO_TCP);
-    m_hostUdpEphemeralPortCap = ComputeHostEphemeralPortCap(IPPROTO_UDP);
-
     hns::GuestNetworkService request{};
     request.VirtualMachineId = VmId;
     request.MirrorHostNetworking = true;
@@ -328,7 +325,7 @@ try
         // New reservation for a port in the host ephemeral range: enforce the cap.
         if (isHostEphemeralPort)
         {
-            const auto cap = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortCap : m_hostTcpEphemeralPortCap;
+            const auto cap = ComputeHostEphemeralPortCap(Protocol);
             const auto portsInUse = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse;
             if (portsInUse >= cap)
             {
