@@ -112,6 +112,7 @@ _(PublishAll,       "publish-all",          L"P",             Kind::Flag,       
 _(Quiet,            "quiet",                L"q",             Kind::Flag,       NoConversion, Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,           "rm",                   NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,           "scheme",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SchemeArgDescription())*/ \
+_(Secret,           "secret",               NO_ALIAS,         Kind::Value,      BuildSecret,  Localization::WSLCCLI_SecretArgDescription()) \
 _(Server,           "server",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,          "session",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SessionIdArgDescription()) \
 _(ShmSize,          "shm-size",             NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_ShmSizeArgDescription()) \

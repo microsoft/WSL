@@ -102,6 +102,8 @@ void BuildImage(CLIExecutionContext& context)
     // Labels are validated during argument validation; the build API consumes the raw strings.
     auto labels = context.Args.GetAll<ArgType::Label>();
 
+    auto secrets = context.Args.GetAllValues<ArgType::Secret>();
+
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
     {
@@ -121,7 +123,7 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.GetFlag<ArgType::Verbose>());
-    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, dockerfilePath, target, flags, &callback, cancelEvent);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

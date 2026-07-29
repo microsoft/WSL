@@ -19,6 +19,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentTypes.h"
 #include "ArgumentValidation.h"
+#include "ImageService.h"
 #include "Exceptions.h"
 #include <wslc.h>
 
@@ -371,6 +372,15 @@ class WSLCCLIArgumentUnitTests
             VERIFY_ARE_EQUAL(option.first, std::string("com.docker.network.bridge.name"));
             VERIFY_ARE_EQUAL(option.second, std::string("br0"));
         }
+
+        // string -> BuildSecret (docker-style --secret spec resolved to an id and value bytes)
+        {
+            ScopedEnvVariable env(L"WSLC_UT_CONV_SECRET", L"conv-value");
+            auto secret = ValidateAndGetCached<ArgType::Secret>(L"id=convtest,env=WSLC_UT_CONV_SECRET");
+            VERIFY_ARE_EQUAL(secret.Id, std::wstring(L"convtest"));
+            const std::string expected = "conv-value";
+            VERIFY_IS_TRUE(std::vector<BYTE>(expected.begin(), expected.end()) == secret.Value);
+        }
     }
 
     // Test: Because ArgMap is a multimap and any command may allow an argument to repeat, a single
@@ -418,6 +428,21 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(filters[1].second, std::string("web"));
         VERIFY_ARE_EQUAL(filters[2].first, std::string("label"));
         VERIFY_ARE_EQUAL(filters[2].second, std::string("env=prod"));
+
+        // BuildSecret converter (secret specs), multiple values -> all cached in order.
+        {
+            ScopedEnvVariable envA(L"WSLC_UT_CONV_SECRET_A", L"value-a");
+            ScopedEnvVariable envB(L"WSLC_UT_CONV_SECRET_B", L"value-b");
+            auto secrets = ValidateAndGetAllCached<ArgType::Secret>(
+                {L"id=seca,env=WSLC_UT_CONV_SECRET_A", L"id=secb,env=WSLC_UT_CONV_SECRET_B"});
+            VERIFY_ARE_EQUAL(secrets.size(), static_cast<size_t>(2));
+            VERIFY_ARE_EQUAL(secrets[0].Id, std::wstring(L"seca"));
+            VERIFY_ARE_EQUAL(secrets[1].Id, std::wstring(L"secb"));
+            const std::string expectedA = "value-a";
+            const std::string expectedB = "value-b";
+            VERIFY_IS_TRUE(std::vector<BYTE>(expectedA.begin(), expectedA.end()) == secrets[0].Value);
+            VERIFY_IS_TRUE(std::vector<BYTE>(expectedB.begin(), expectedB.end()) == secrets[1].Value);
+        }
     }
 
     // Test: Every validate-only ArgType (checked during validation but not converted into a

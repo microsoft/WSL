@@ -12,6 +12,10 @@
 #include <utility>
 #include <wslc.h>
 
+namespace wsl::windows::wslc::services {
+struct BuildSecret;
+}
+
 namespace wsl::windows::wslc::argument::details {
 
 // Local aliases so the ConvertedType tokens in the WSLC_ARGUMENTS X-macro (ArgumentDefinitions.h)
@@ -22,6 +26,7 @@ using InspectType = wsl::windows::wslc::models::InspectType;
 using WSLCSignal = ::WSLCSignal;
 using UlimitValue = std::tuple<std::string, int64_t, int64_t>;
 using KeyValuePair = std::pair<std::string, std::string>;
+using BuildSecret = wsl::windows::wslc::services::BuildSecret;
 
 // Generate the ArgType -> converted type mapping from the X-macro. Every ArgType gets a
 // specialization; arguments that are not converted map to NoConversion (their raw string is used
