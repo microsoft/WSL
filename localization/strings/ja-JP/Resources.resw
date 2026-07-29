@@ -1204,6 +1204,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>翻訳に失敗しました '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>問題が発生しました。後でやり直してください。</value>
   </data>
@@ -2165,10 +2169,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>必須の引数が指定されていません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>引数に指定された回数が許容回数を超えています: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>選択したコマンドに関するヘルプを表示</value>
   </data>
@@ -2368,6 +2368,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
     <value>'--gateway' オプションには '--subnet' の指定も必要です。</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>ネットワーク '{}' にはアクティブなエンドポイントがあります。</value>
@@ -3291,6 +3295,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>サブネットの IPv4 または IPv6 ゲートウェイ</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>CIDR 形式のサブ範囲からコンテナー IP アドレスを割り当てる</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>ネットワークを 1 つ以上削除します。</value>
   </data>
@@ -3537,7 +3545,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>割り込みを初期化できませんでした</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>現在のネットワーク モードでは UDP ポート転送がサポートされていないため、イメージによって公開された UDP ポートは公開されませんでした</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>コンテナー '{}' のタイムスタンプを復元できませんでした</value>

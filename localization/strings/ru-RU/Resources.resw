@@ -1205,6 +1205,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Не удалось перевести "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 несовместим с изоляцией cgroup для каждого дистрибутива. Для использования cgroup v1 установите параметр isolateDistroCgroup=false в разделе [wsl2] файла .wslconfig, затем выполните команду wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Произошла ошибка. Повторите попытку позже.</value>
   </data>
@@ -2166,10 +2170,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Обязательный аргумент не указан: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Аргумент предоставлен больше раз, чем разрешено: "{}"</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Отображает справку по выбранной команде</value>
   </data>
@@ -2369,6 +2369,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
     <value>Для опции '--gateway' также требуется указать '--subnet'.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Сеть "{}" содержит активные конечные точки.</value>
@@ -3292,6 +3296,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Шлюз IPv4 или IPv6 для подсети</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Выделить IP-адреса контейнеров из поддиапазона в формате CIDR</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Удалите одну или несколько сетей.</value>
   </data>
@@ -3538,7 +3546,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Не удалось инициализировать переключение</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>UDP-порты, отображаемые в образе, не были опубликованы, поскольку переадресация UDP-портов не поддерживается в текущем сетевом режиме</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Не удалось восстановить метку времени для контейнера "{}"</value>

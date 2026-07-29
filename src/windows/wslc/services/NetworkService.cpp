@@ -62,6 +62,11 @@ void NetworkService::Create(Reporter& reporter, models::Session& session, const 
         options.Gateway = createOptions.Gateway->c_str();
     }
 
+    if (createOptions.IpRange.has_value())
+    {
+        options.IpRange = createOptions.IpRange->c_str();
+    }
+
     THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &warningCallback));
 }
 

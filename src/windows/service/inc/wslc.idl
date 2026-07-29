@@ -169,6 +169,28 @@ typedef struct _WSLCStringArray
     ULONG Count;
 } WSLCStringArray;
 
+typedef struct _WSLCBuildSecret
+{
+    [string] LPCSTR Id; // Value for docker's --secret id= field.
+    // For file (src=) secrets: the resolved absolute host path of the secret file. The server mounts the
+    // file's parent directory into the build VM read-only over virtiofs and references the file in place,
+    // so the secret bytes are never copied off their original (possibly EFS-encrypted) location. Null for
+    // env/in-memory secrets.
+    [string, unique] LPCWSTR SourcePath;
+    // For env/in-memory secrets: raw secret bytes (never cross into argv). Carried as a counted byte array
+    // so arbitrary binary content - including embedded NULs - round-trips losslessly; the server writes it
+    // to a host file exposed to the VM read-only over virtiofs and references it with docker's --secret
+    // src=. Null for file secrets.
+    [unique, size_is(ValueSize)] const byte* Value;
+    ULONG ValueSize;
+} WSLCBuildSecret;
+
+typedef struct _WSLCBuildSecretArray
+{
+    [unique, size_is(Count)] const WSLCBuildSecret* Values;
+    ULONG Count;
+} WSLCBuildSecretArray;
+
 typedef struct _WSLCProcessOptions
 {
     [unique] LPCSTR CurrentDirectory;
@@ -526,6 +548,7 @@ typedef struct _WSLCBuildImageOptions
     LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
     WSLCStringArray Labels;    // KEY=VALUE pairs passed as --label to docker.
+    WSLCBuildSecretArray Secrets; // --secret entries; the server writes each secret's bytes to a host file exposed to the VM read-only over virtiofs and emits the corresponding id=...,src=... spec.
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
@@ -564,6 +587,7 @@ typedef struct _WSLCNetworkOptions
     BOOL Internal;
     [unique] LPCSTR Subnet;
     [unique] LPCSTR Gateway;
+    [unique] LPCSTR IpRange;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
