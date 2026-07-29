@@ -62,7 +62,7 @@ void ReleaseContainerHandle(WslcContainer container)
 {
     if (container)
     {
-        WslcReleaseContainer(container);
+        THROW_IF_FAILED(WslcReleaseContainer(container));
     }
 }
 

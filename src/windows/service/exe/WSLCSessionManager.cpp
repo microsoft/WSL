@@ -581,11 +581,11 @@ try
         TraceLoggingValue(ClientVersion->Minor, "Minor"),
         TraceLoggingValue(ClientVersion->Revision, "Revision"));
 
-    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 0};
+    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 5};
 
     const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{ClientVersion->Major, ClientVersion->Minor, ClientVersion->Revision};
 
-    // For now set 2.9.0 as the floor version. Also support if the client version exactly matches ours to cover builds before 2.9.0.
+    // Support anything at or above the minimum and when the client version exactly matches ours to cover dev builds before the break is released.
     *IsSupported = (clientVersion >= c_minClientVersion || wsl::shared::PackageVersion == clientVersion);
 
     return S_OK;

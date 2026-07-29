@@ -406,7 +406,7 @@ typedef struct WslcProcessCallbacks
 
 STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
 
-// Sets IO callbacks for the init process of a container opened via WslcOpenContainer.
+// Sets IO callbacks for the init process of a container.
 // Must be called before WslcStartContainer (with WSLC_CONTAINER_START_FLAG_ATTACH).
 // Has no effect on a container that is already running.
 STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
