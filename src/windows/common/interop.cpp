@@ -440,33 +440,11 @@ ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* R
 
             const COORD Size{static_cast<SHORT>(WindowSizeMessage.Columns), static_cast<SHORT>(WindowSizeMessage.Rows)};
             THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), Size));
-            continue;
         }
-
-        const auto LastError = GetLastError();
-        if ((LastError == ERROR_BROKEN_PIPE) || (LastError == ERROR_HANDLE_EOF))
+        else
         {
-            if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
-            {
-                THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(Result->Process.get(), 1));
-            }
-
-            break;
-        }
-
-        THROW_LAST_ERROR_IF(LastError != ERROR_IO_PENDING);
-
-        auto CancelIo = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            CancelIoEx(MessageHandle, &Overlapped);
-            GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, TRUE);
-        });
-
-        const DWORD WaitStatus = WaitForMultipleObjects(RTL_NUMBER_OF(WaitHandles), WaitHandles, FALSE, INFINITE);
-        if (WaitStatus == WAIT_OBJECT_0)
-        {
-            Success = GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, FALSE);
-            CancelIo.release();
-            if ((!Success) || (BytesRead == 0))
+            const auto LastError = GetLastError();
+            if ((LastError == ERROR_BROKEN_PIPE) || (LastError == ERROR_HANDLE_EOF))
             {
                 if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
                 {
@@ -476,22 +454,45 @@ ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* R
                 break;
             }
 
-            WI_ASSERT((BytesRead == sizeof(WindowSizeMessage)) && (WindowSizeMessage.Header.MessageType == LxInitMessageWindowSizeChanged));
+            THROW_LAST_ERROR_IF(LastError != ERROR_IO_PENDING);
 
-            const COORD Size{static_cast<SHORT>(WindowSizeMessage.Columns), static_cast<SHORT>(WindowSizeMessage.Rows)};
-            THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), Size));
-        }
-        else if (WaitStatus == (WAIT_OBJECT_0 + 1))
-        {
-            THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(Result->Process.get(), &ExitCode));
+            auto CancelIo = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                CancelIoEx(MessageHandle, &Overlapped);
+                GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, TRUE);
+            });
 
-            // Close the pseudoconsole, this causes all pending data to be flushed.
-            Result->PseudoConsole.reset();
-            break;
-        }
-        else
-        {
-            THROW_HR(E_UNEXPECTED);
+            const DWORD WaitStatus = WaitForMultipleObjects(RTL_NUMBER_OF(WaitHandles), WaitHandles, FALSE, INFINITE);
+            if (WaitStatus == WAIT_OBJECT_0)
+            {
+                Success = GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, FALSE);
+                CancelIo.release();
+                if ((!Success) || (BytesRead == 0))
+                {
+                    if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
+                    {
+                        THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(Result->Process.get(), 1));
+                    }
+
+                    break;
+                }
+
+                WI_ASSERT((BytesRead == sizeof(WindowSizeMessage)) && (WindowSizeMessage.Header.MessageType == LxInitMessageWindowSizeChanged));
+
+                const COORD Size{static_cast<SHORT>(WindowSizeMessage.Columns), static_cast<SHORT>(WindowSizeMessage.Rows)};
+                THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), Size));
+            }
+            else if (WaitStatus == (WAIT_OBJECT_0 + 1))
+            {
+                THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(Result->Process.get(), &ExitCode));
+
+                // Close the pseudoconsole, this causes all pending data to be flushed.
+                Result->PseudoConsole.reset();
+                break;
+            }
+            else
+            {
+                THROW_HR(E_UNEXPECTED);
+            }
         }
     }
 
