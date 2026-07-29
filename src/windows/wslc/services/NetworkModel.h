@@ -28,6 +28,7 @@ struct CreateNetworkOptions
     bool Internal{false};
     std::optional<std::string> Subnet;
     std::optional<std::string> Gateway;
+    std::optional<std::string> IpRange;
 };
 
 struct NetworkEndpointOptions

@@ -197,7 +197,7 @@ void GetContainers(CLIExecutionContext& context)
     {
         limit = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::Last>(), L"--last");
     }
-    else if (context.Args.Contains(ArgType::Latest))
+    else if (context.Args.GetFlag<ArgType::Latest>())
     {
         limit = 1;
     }
@@ -216,7 +216,7 @@ void GetContainers(CLIExecutionContext& context)
         }
     }
 
-    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.Contains(ArgType::All), limit, filters));
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetFlag<ArgType::All>(), limit, filters));
 }
 
 void InspectContainers(CLIExecutionContext& context)
@@ -398,7 +398,13 @@ void ContainerCp(CLIExecutionContext& context)
         auto [containerId, srcPath] = parseContainerPath(source);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
 
-        auto absTarget = std::filesystem::absolute(target);
+        // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
+        std::error_code canonicalError;
+        auto absTarget = std::filesystem::weakly_canonical(std::filesystem::absolute(target), canonicalError);
+        if (canonicalError)
+        {
+            absTarget = std::filesystem::absolute(target); // Fall back to absolute if canonicalization fails.
+        }
 
         // Determine if target is a directory or a file destination.
         // Treat as directory if: ends with separator, or already exists as a directory.
@@ -548,7 +554,7 @@ void ListContainers(CLIExecutionContext& context)
     // Note: --all and --filter status= are honored by the Docker daemon when
     // GetContainers ran; no post-filtering needed here.
 
-    if (context.Args.Contains(ArgType::Quiet))
+    if (context.Args.GetFlag<ArgType::Quiet>())
     {
         // Print only the container ids
         for (const auto& container : containers)
@@ -575,7 +581,7 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table with or without column limits based on --no-trunc flag
@@ -623,7 +629,7 @@ void RemoveContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    bool force = context.Args.Contains(ArgType::Force);
+    bool force = context.Args.GetFlag<ArgType::Force>();
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force);
@@ -657,17 +663,17 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Name = WideToMultiByte(context.Args.Get<ArgType::Name>());
     }
 
-    if (context.Args.Contains(ArgType::TTY))
+    if (context.Args.GetFlag<ArgType::TTY>())
     {
         options.TTY = true;
     }
 
-    if (context.Args.Contains(ArgType::Detach))
+    if (context.Args.GetFlag<ArgType::Detach>())
     {
         options.Detach = true;
     }
 
-    if (context.Args.Contains(ArgType::Interactive))
+    if (context.Args.GetFlag<ArgType::Interactive>())
     {
         options.Interactive = true;
     }
@@ -682,7 +688,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.Contains(ArgType::PublishAll))
+    if (context.Args.GetFlag<ArgType::PublishAll>())
     {
         options.PublishAll = true;
     }
@@ -702,7 +708,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.Contains(ArgType::Remove))
+    if (context.Args.GetFlag<ArgType::Remove>())
     {
         options.Remove = true;
     }
@@ -747,7 +753,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.HealthRetries = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::HealthRetries>());
     }
 
-    if (context.Args.Contains(ArgType::NoHealthcheck))
+    if (context.Args.GetFlag<ArgType::NoHealthcheck>())
     {
         options.NoHealthcheck = true;
     }
@@ -928,7 +934,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         for (const auto& container : allContainers)
         {
             // Skip non-running containers unless --all is specified.
-            if (!context.Args.Contains(ArgType::All) && container.State != WSLCContainerState::WslcContainerStateRunning)
+            if (!context.Args.GetFlag<ArgType::All>() && container.State != WSLCContainerState::WslcContainerStateRunning)
             {
                 continue;
             }
@@ -988,7 +994,7 @@ void ShowContainerStats(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
@@ -1041,7 +1047,7 @@ void StartContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     const auto& containerId = context.Args.Get<ArgType::ContainerId>();
-    const bool attach = context.Args.Contains(ArgType::Attach);
+    const bool attach = context.Args.GetFlag<ArgType::Attach>();
     context.ExitCode = ContainerService::Start(context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
 
     if (!attach)
@@ -1078,8 +1084,8 @@ void ViewContainerLogs(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerId = context.Args.Get<ArgType::ContainerId>();
-    bool follow = context.Args.Contains(ArgType::Follow);
-    bool timestamps = context.Args.Contains(ArgType::Timestamps);
+    bool follow = context.Args.GetFlag<ArgType::Follow>();
+    bool timestamps = context.Args.GetFlag<ArgType::Timestamps>();
 
     ULONGLONG tail = 0;
     if (context.Args.Contains(ArgType::Tail))

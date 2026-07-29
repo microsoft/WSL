@@ -914,6 +914,11 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     // Fail if the distribution is running.
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
+    // Fail if a conversion or export is in progress for this distribution. Those operations release
+    // m_instanceLock while running but keep the distribution in m_lockedDistributions, so mutating
+    // the VHD here would race with them.
+    _EnsureNotLocked(DistroGuid);
+
     // Lookup the distribution configuration
     const auto lxssKey = s_OpenLxssUserKey();
     _ValidateDistributionNameAndPathNotInUse(lxssKey.get(), Location, nullptr);
@@ -1774,6 +1779,10 @@ try
     // Don't attempt if running
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
+    // Don't attempt while a conversion or export holds this distribution; those operations release
+    // m_instanceLock while running but keep the entry in m_lockedDistributions.
+    _EnsureNotLocked(DistroGuid);
+
     const wil::unique_hfile vhd{::CreateFileW(configuration.VhdFilePath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
     if (!vhd)
     {
@@ -1802,6 +1811,11 @@ try
     const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
     const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+    // Fail if a conversion or export is in progress; those operations release m_instanceLock while
+    // running but keep this distribution in m_lockedDistributions, so resizing its VHD now would
+    // race with them.
+    _EnsureNotLocked(DistroGuid);
 
     const auto& vhdPath = configuration.VhdFilePath;
     if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str()))
@@ -3005,7 +3019,16 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
-                LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str()));
+                // The VHD might be in use so try to delete it for up to 10 seconds.
+                try
+                {
+                    wsl::shared::retry::RetryWithTimeout<void>(
+                        [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
+                        std::chrono::milliseconds(100),
+                        std::chrono::seconds(10),
+                        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+                }
+                CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
             }
         }
     }

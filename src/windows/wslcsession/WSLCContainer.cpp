@@ -1202,9 +1202,10 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     {
         // Export failed, parse the error message.
         auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
 
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, errorMessage, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 
@@ -1263,9 +1264,10 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     if (pendingErrorJson.has_value())
     {
         auto error = wsl::shared::FromJson<ErrorResponse>(pendingErrorJson->c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
 
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, httpStatusCode == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), errorMessage, httpStatusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 
@@ -1310,9 +1312,10 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
     if (statusCode != 200)
     {
         auto error = wsl::shared::FromJson<ErrorResponse>(errorJson.c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
 
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), error.message, statusCode == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), errorMessage, statusCode == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 
