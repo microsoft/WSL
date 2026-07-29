@@ -18,6 +18,7 @@ Abstract:
 #include "install.h"
 #include <AclAPI.h>
 #include <fstream>
+#include <sstream>
 #include <filesystem>
 #include "wslservice.h"
 #include "registry.hpp"
@@ -29,6 +30,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
+#include "retryshared.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -3267,6 +3269,68 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
+    }
+
+    // Verifies that VHD-mutating manage operations (--resize, --set-sparse, --move) are rejected while a
+    // long-running conversion/export holds the distribution lock, rather than racing with it on the VHD.
+    WSL2_TEST_METHOD(ManageRejectedWhileLocked)
+    {
+        constexpr auto name = L"manage-locked-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        // Start an export to a pipe we deliberately don't drain. Use a tiny buffer so the export blocks
+        // as soon as it writes any data, regardless of the test distro's size, deterministically holding
+        // the distribution in the "Exporting" locked state.
+        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true, 1);
+
+        std::thread exportThread([&]() { LxsstuLaunchWsl(std::format(L"--export {} -", name), nullptr, writePipe.get()); });
+
+        auto joinExport = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            // Close the read end so the blocked export fails with a broken pipe and returns, then join.
+            readPipe.reset();
+            if (exportThread.joinable())
+            {
+                exportThread.join();
+            }
+        });
+
+        // Wait until the service reports the distribution as Exporting (i.e. the lock is held), retrying for up
+        // to two minutes so a slow machine doesn't flake before the export acquires the lock.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
+                bool locked = false;
+                std::wistringstream stream(out);
+                for (std::wstring line; std::getline(stream, line);)
+                {
+                    if (line.find(name) != std::wstring::npos && line.find(L"Exporting") != std::wstring::npos)
+                    {
+                        locked = true;
+                        break;
+                    }
+                }
+
+                THROW_HR_IF(E_ABORT, !locked);
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::minutes(2),
+            [] { return wil::ResultFromCaughtException() == E_ABORT; });
+
+        // Each VHD-mutating manage operation must be rejected with E_ILLEGAL_STATE_CHANGE while the lock is held.
+        auto verifyRejected = [&](const std::wstring& command) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command, -1);
+            VERIFY_IS_TRUE(out.find(L"E_ILLEGAL_STATE_CHANGE") != std::wstring::npos);
+        };
+
+        verifyRejected(std::format(L"--manage {} --resize 2GB", name));
+        verifyRejected(std::format(L"--manage {} --set-sparse false", name));
+
+        const auto moveTarget = std::filesystem::absolute(L"manage-locked-move-target").wstring();
+        verifyRejected(std::format(L"--manage {} --move \"{}\"", name, moveTarget));
     }
 
     WSL2_TEST_METHOD(FileOffsets)

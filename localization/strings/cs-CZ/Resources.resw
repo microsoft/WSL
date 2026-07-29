@@ -1198,6 +1198,10 @@ Zobrazit pokyny pro obnovení: https://aka.ms/wsldiskmountrecovery</value>
     <value>Překlad '{}' se nezdařil</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 není kompatibilní s izolací cgroup pro jednotlivé distribuce. Pokud chcete použít cgroup v1, nastavte isolateDistroCgroup=false v části [wsl2] v .wslconfig a pak spusťte wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Něco se nepovedlo. Zkuste to znovu později.</value>
   </data>
@@ -2159,10 +2163,6 @@ Využití:
     <value>Nebyl zadán požadovaný argument: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argument byl zadán víckrát, než je povoleno: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Zobrazí nápovědu k vybranému příkazu</value>
   </data>
@@ -2362,6 +2362,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
     <value>Možnost '--gateway' vyžaduje, aby byla zadaná také možnost '--subnet'.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>Možnost '--ip-range' vyžaduje také zadání '--subnet'.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Síť {} má aktivní koncové body.</value>
@@ -3285,6 +3289,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Brána IPv4 nebo IPv6 pro podsíť</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Přidělit IP adresy kontejneru z podoblasti ve formátu CIDR</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Odeberte jednu nebo více sítí.</value>
   </data>
@@ -3531,7 +3539,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Inicializace prohození se nezdařila</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>Porty UDP zveřejněné bitovou kopií nebyly publikovány, protože přesměrování portů UDP není v aktuálním síťovém režimu podporováno.</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Nepodařilo se obnovit časové razítko pro kontejner '{}'</value>

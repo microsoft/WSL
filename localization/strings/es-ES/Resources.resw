@@ -1204,6 +1204,10 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Error al traducir "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 no es compatible con el aislamiento de cgroup por distribución. Para usar cgroup v1, establezca isolateDistroCgroup=false en [wsl2] en .wslconfig y, a continuación, ejecute wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Hubo un problema. Inténtelo de nuevo más tarde.</value>
   </data>
@@ -2165,10 +2169,6 @@ Uso:
     <value>No se proporcionó el argumento requerido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argumento proporcionado más veces de lo permitido: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Muestra la ayuda sobre el comando seleccionado</value>
   </data>
@@ -2368,6 +2368,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
     <value>La opción '--gateway' requiere que también se especifique '--subnet'.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>La opción '--ip-range' requiere que también se especifique '--subnet'.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>La red “{}” tiene puntos de conexión activos.</value>
@@ -3291,6 +3295,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Puerta de enlace IPv4 o IPv6 para la subred</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Asignar direcciones IP de contenedor de un subintervalo en formato CIDR</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Quita una o varias redes.</value>
   </data>
@@ -3537,7 +3545,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se pudo inicializar el intercambio</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>Los puertos UDP expuestos por la imagen no se publicaron porque no se admite el reenvío de puertos UDP en el modo de red actual</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>No se pudo restaurar la marca de tiempo del contenedor '{}'</value>

@@ -310,6 +310,7 @@ private:
     void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
+
     void Ext4Format(const std::string& Device);
     std::string InspectImageLockHeld(const std::string& Id);
     void OnContainerDeleted(const WSLCContainerImpl* Container);

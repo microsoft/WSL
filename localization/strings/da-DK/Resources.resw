@@ -1198,6 +1198,10 @@ Se genoprettelsesinstruktioner på: https://aka.ms/wsldiskmountrecovery</value>
     <value>"{}" kunne ikke oversættes</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 er ikke kompatibel med cgroup-isolation pr. distribution. Hvis du vil bruge cgroup v1, skal du angive isolateDistroCgroup=false under [wsl2] i .wslconfig og derefter køre wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Noget gik galt. Prøv igen senere.</value>
   </data>
@@ -2159,10 +2163,6 @@ Brug:
     <value>Det påkrævede argument er ikke angivet: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argument er angivet flere gange end tilladt: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Viser hjælp til den markerede kommando</value>
   </data>
@@ -2362,6 +2362,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
     <value>Indstillingen '--gateway' kræver, at '--subnet' også angives.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>Muligheden '--ip-range' kræver, at '--subnet' også angives.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Netværket '{}' har aktive slutpunkter.</value>
@@ -3052,10 +3056,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Publicer alle eksponerede porte til tilfældige værtsporte</value>
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
-    <value>Suppress verbose output</value>
+    <value>Undertryk detaljeret output</value>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
-    <value>Using default tag: {}</value>
+    <value>Bruger standardmærket: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
@@ -3284,6 +3288,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
     <value>IPv4- eller IPv6-gateway for undernettet</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Alloker objektbeholder-IP-adresser fra et underområde i CIDR format</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Fjern ét eller flere netværk.</value>
@@ -3531,7 +3539,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Skift kunne ikke initialiseres</value>
   </data>
   <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
-    <value>UDP ports exposed by the image were not published because UDP port forwarding is not supported in the current networking mode</value>
+    <value>UDP-porte, der vises af billedet, blev ikke udgivet, fordi videresendelse af UDP-port ikke understøttes i den aktuelle netværkstilstand</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Tidsstemplet for objektbeholderen '{}' blev ikke gendannet</value>
