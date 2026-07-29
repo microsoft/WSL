@@ -200,4 +200,66 @@ inline bool HasRegistryAllowlist(HKEY policiesKey)
     return subKey && !EnumerateRegistryAllowlist(subKey.get()).empty();
 }
 
+// Atomic snapshot of the WSLContainerRegistryAllowlist policy. Unlike EnumerateRegistryAllowlist,
+// this distinguishes an unreadable policy from an unconfigured one so callers can fail closed.
+enum class RegistryAllowlistState
+{
+    NotConfigured,
+    Configured,
+    ReadFailed
+};
+
+struct RegistryAllowlistSnapshot
+{
+    RegistryAllowlistState State{RegistryAllowlistState::NotConfigured};
+    std::vector<std::wstring> Hosts{};
+};
+
+// Reads the allowlist in one shot. Empty entries are skipped (matches EnumerateRegistryAllowlist).
+// Returns ReadFailed on registry errors so enforcement callers can fail closed.
+inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY policiesKey)
+try
+{
+    if (policiesKey == nullptr)
+    {
+        return {};
+    }
+
+    wil::unique_hkey subKey;
+    const auto openResult = RegOpenKeyExW(policiesKey, c_wslContainerRegistryAllowlist, 0, KEY_READ, &subKey);
+    if (openResult == ERROR_PATH_NOT_FOUND || openResult == ERROR_FILE_NOT_FOUND)
+    {
+        return {};
+    }
+
+    if (openResult != ERROR_SUCCESS)
+    {
+        LOG_HR(HRESULT_FROM_WIN32(openResult));
+        return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
+    }
+
+    RegistryAllowlistSnapshot snapshot;
+    for (auto& [name, value] : wsl::windows::common::registry::EnumStringValues(subKey.get()))
+    {
+        if (value.empty())
+        {
+            continue;
+        }
+
+        snapshot.Hosts.emplace_back(std::move(value));
+    }
+
+    if (!snapshot.Hosts.empty())
+    {
+        snapshot.State = RegistryAllowlistState::Configured;
+    }
+
+    return snapshot;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
+}
+
 } // namespace wsl::windows::policies
