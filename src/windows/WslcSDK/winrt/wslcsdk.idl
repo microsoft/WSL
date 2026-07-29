@@ -34,6 +34,19 @@ namespace Microsoft.WSL.Containers
 
     delegate void ProcessCrashHandler(ProcessCrashInformation information);
 
+    enum IdentityTokenType
+    {
+        Unknown = 0,
+        Token = 1,
+        Credentials = 2,
+    };
+
+    runtimeclass AuthenticateResult
+    {
+        String IdentityToken { get; };
+        IdentityTokenType TokenType { get; };
+    };
+
     runtimeclass SessionSettings
     {
         SessionSettings(String name, String storagePath);
@@ -73,7 +86,7 @@ namespace Microsoft.WSL.Containers
         void CreateVhdVolume(VhdOptions options);
         void DeleteVhdVolume(String name);
 
-        String Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
+        AuthenticateResult Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
 
         IVectorView<ImageInfo> GetImages();
 

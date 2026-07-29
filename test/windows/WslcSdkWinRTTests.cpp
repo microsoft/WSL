@@ -1624,8 +1624,13 @@ class WslcSdkWinRtTests
         // Negative: wrong password must fail.
         VERIFY_THROWS_HR(m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), L"wrong-password"), E_FAIL);
 
-        // Positive: correct credentials
-        VERIFY_NO_THROW(m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password)));
+        // Positive: correct credentials must return a non-null token of the expected type.
+        {
+            const auto result = m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password));
+            VERIFY_IS_FALSE(result.IdentityToken().empty());
+            // The local test registry does not return an identity token, so credentials are embedded.
+            VERIFY_ARE_EQUAL(result.TokenType(), WSLCSDK::IdentityTokenType::Credentials);
+        }
 
         const auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password);
         PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
@@ -1634,11 +1639,12 @@ class WslcSdkWinRtTests
 
         auto cleanup = SCOPE_CLEANUP(m_defaultSession.DeleteImage(image));
 
-        // Positive: pulling with correct credentials must succeed.
+        // Positive: the IdentityToken from Authenticate can be passed directly as RegistryAuth.
         {
+            const auto authResult = m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password));
             auto opts = WSLCSDK::PullImageOptions(image);
-            opts.RegistryAuth(winrt::to_hstring(xRegistryAuth));
-            m_defaultSession.PullImageAsync(opts).get();
+            opts.RegistryAuth(authResult.IdentityToken());
+            VERIFY_NO_THROW(m_defaultSession.PullImageAsync(opts).get());
             VERIFY_IS_TRUE(HasImage(image));
         }
 
