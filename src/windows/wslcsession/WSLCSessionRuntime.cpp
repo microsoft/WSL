@@ -242,18 +242,6 @@ void WSLCSessionRuntime::EnsureVmRunning()
     // Running must fail here rather than run work against a VM being permanently torn down.
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent.is_signaled());
 
-    // A stop is pending: the VM is still alive, but its OnVmStopping has already been delivered and
-    // the teardown is about to run. Wait it out instead of running work against a VM that is going
-    // away (or racing StartVmLockHeld into a second instance behind the stopping thread's back). The
-    // wait ends with the VM stopped, so the retry below brings up a fresh one with its own paired
-    // OnVmStarted. The notifying thread is exempt: a plugin's OnVmStopping handler leasing the dying
-    // VM is exactly why m_lock is dropped around the notification, and blocking it would deadlock.
-    while (VmStopPendingOnOtherThread())
-    {
-        m_vmStopComplete.wait();
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_terminating->load() || m_sessionTerminatedEvent.is_signaled());
-    }
-
     if (m_vmState.load() == VmState::Running)
     {
         return;
@@ -438,25 +426,6 @@ void WSLCSessionRuntime::StopVmLockHeld()
     m_vmState.store(VmState::None);
 }
 
-void WSLCSessionRuntime::BeginVmStopLockHeld() noexcept
-{
-    m_vmStopComplete.ResetEvent();
-    m_vmStopThreadId.store(GetCurrentThreadId());
-    m_vmStopPending.store(true);
-}
-
-void WSLCSessionRuntime::EndVmStop() noexcept
-{
-    m_vmStopPending.store(false);
-    m_vmStopThreadId.store(0);
-    m_vmStopComplete.SetEvent();
-}
-
-bool WSLCSessionRuntime::VmStopPendingOnOtherThread() const noexcept
-{
-    return m_vmStopPending.load() && m_vmStopThreadId.load() != GetCurrentThreadId();
-}
-
 void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
 {
     // Latch whether the guest is already dead before running session-state cleanup so container
@@ -622,26 +591,44 @@ try
         return;
     }
 
-    // Publish the pending stop before dropping m_lock. From here until the teardown completes,
-    // EnsureVmRunning() holds off leases from every other thread, so nothing can start using this VM
-    // behind our back. That is what lets the notification be unconditional: the teardown always
-    // follows, and a lease that arrives during the window is released afterwards onto a freshly
-    // started VM with its own paired OnVmStarted -- instead of the stop being abandoned and a second
-    // OnVmStarted re-paired onto the very same VM instance, which would have plugins observe a
-    // stop/start pair the VM never performed.
-    BeginVmStopLockHeld();
-    auto stopCleanup = wil::scope_exit([this]() { EndVmStop(); });
-
     // Fire OnVmStopping with m_lock dropped so a plugin handler may take a VM lease without
-    // deadlocking; that handler runs on this thread and is exempt from the gate above.
+    // deadlocking. A lease that races in during this window finds the VM still Running (StopVmLockHeld
+    // has not run yet), so it does not restart and may leave a long-lived activity token (e.g. a
+    // process keep-alive). Re-check the activity count after reacquiring the lock: if it is non-zero,
+    // abandon the teardown and re-pair the notification with a fresh OnVmStarted (with m_lock dropped,
+    // same reentrancy reason) rather than tearing down a VM that is in use again. StopVmLockHeld no-ops
+    // if a concurrent Terminate already tore the VM down, and TearDownVmLockHeld handles a VM that died
+    // in the window.
     lock.reset();
     NotifyVmStopping();
     lock = m_lock.lock_exclusive();
 
-    // The VM may have died while the lock was dropped: OnVmExited() declined the teardown because we
-    // hold the expected-stop claim, and its exit handle is one-shot. StopVmLockHeld no-ops if a
-    // concurrent Terminate already tore the VM down, and TearDownVmLockHeld skips the
-    // guest-dependent calls on a VM that has exited.
+    // If the VM crashed while the lock was dropped, OnVmExited() declined the teardown (we hold the
+    // expected-stop claim) and its exit handle is one-shot. Do not re-pair OnVmStarted onto a dead VM;
+    // tear it down so a waiting lease restarts a fresh instance. StopVmLockHeld skips guest-dependent
+    // calls on a dead VM.
+    if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
+    {
+        StopVmLockHeld();
+        return;
+    }
+
+    if (m_idleState->ActivityCount() != 0)
+    {
+        // Release the expected-stop claim before dropping the lock again for NotifyVmStarted(): that
+        // call runs with m_lock dropped, and a VM crash in that window must be claimable by
+        // OnVmExited() as a normal spontaneous exit. Leaving the claim held here would make
+        // OnVmExited() silently decline the crash (disposition mismatch) while m_vmState stays
+        // Running, wedging the session until an explicit Terminate/Shutdown. dispositionCleanup's
+        // CAS on return is then a harmless no-op.
+        auto stopRequested = VmExitDisposition::StopRequested;
+        m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
+
+        lock.reset();
+        NotifyVmStarted();
+        return;
+    }
+
     StopVmLockHeld();
 }
 CATCH_LOG();
@@ -692,16 +679,27 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
                 m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
             });
 
-            // Gate leases from other threads across the notification, then fire OnVmStopping without
-            // holding m_lock (see OnIdleTimer) so a plugin handler can acquire a VM lease without
-            // deadlocking. The teardown below is unconditional: nothing else can have started using
-            // the VM in the window.
-            BeginVmStopLockHeld();
-            auto stopCleanup = wil::scope_exit([this]() { EndVmStop(); });
-
+            // Fire OnVmStopping without holding m_lock (see OnIdleTimer) so a plugin handler can
+            // acquire a VM lease without deadlocking.
             lock.reset();
             NotifyVmStopping();
             lock = m_lock.lock_exclusive();
+
+            if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
+            {
+                StopVmLockHeld();
+                return;
+            }
+
+            if (m_idleState->ActivityCount() != 0)
+            {
+                auto stopRequested = VmExitDisposition::StopRequested;
+                m_vmExitDisposition.compare_exchange_strong(stopRequested, VmExitDisposition::Active);
+
+                lock.reset();
+                NotifyVmStarted();
+                return;
+            }
 
             StopVmLockHeld();
         }
