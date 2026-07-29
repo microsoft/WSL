@@ -8,14 +8,15 @@ Module Name:
 
 Abstract:
 
-    Level-filtered, std::format-style user-facing output for the WSLC CLI.
-    Sequence arguments are stripped when VT is off; color Sequences are also
-    stripped when color is disabled, while cursor-move Sequences still pass
-    through.
+    Level-filtered, std::format-style user-facing output for the WSLC CLI, plus
+    line-oriented user input (prompts). Sequence arguments are stripped when VT is
+    off; color Sequences are also stripped when color is disabled, while cursor-move
+    Sequences still pass through.
 
 --*/
 #pragma once
 
+#include "InputChannel.h"
 #include "OutputChannel.h"
 #include "VTSupport.h"
 
@@ -67,7 +68,7 @@ struct Reporter
     };
 
     Reporter();
-    Reporter(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled);
+    Reporter(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled, FILE* inFile = nullptr, bool inInteractive = false);
 
     NON_COPYABLE(Reporter);
     NON_MOVABLE(Reporter);
@@ -101,6 +102,30 @@ struct Reporter
     {
         EmitFormatted(Level::Error, std::move(fmt), std::forward<Args>(args)...);
     }
+
+    // True when user input is attached to an interactive console (a prompt can be
+    // shown and echo can be masked); false when input is redirected from a file or pipe.
+    bool IsInputInteractive() const noexcept
+    {
+        return m_in.IsInteractive();
+    }
+
+    // Reads a single line of user input, stripping the trailing CR and/or LF. Returns
+    // nullopt at end of input with nothing read. When mask is true and input is an
+    // interactive console, echo is disabled for the duration of the read.
+    std::optional<std::wstring> ReadLine(bool mask = false)
+    {
+        return m_in.ReadLine(mask);
+    }
+
+    // Writes label (no trailing newline) at the given level, then reads a line of input.
+    // When mask is true and input is interactive, echo is disabled during the read and a
+    // trailing newline is emitted afterward (the un-echoed Enter). Returns the line, or an
+    // empty string at end of input.
+    //
+    // By convention WSLC prompts pass Level::Output (stdout): Docker, containerd/nerdctl,
+    // and Apple container all prompt on stdout, so WSLC follows that container-CLI norm.
+    std::wstring PromptForLine(Level level, std::wstring_view label, bool mask);
 
     bool IsVTEnabled(Level level) const noexcept;
 
@@ -159,6 +184,7 @@ private:
 
     OutputChannel m_out;
     OutputChannel m_err;
+    InputChannel m_in;
     bool m_noColor = false;
 };
 
