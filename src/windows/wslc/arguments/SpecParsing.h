@@ -50,6 +50,16 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec);
 // Serializes a BuildOutput back into a canonical buildx --output spec ("type=...,dest=...,<attr>=...").
 std::wstring FormatOutputSpec(const services::BuildOutput& output);
 
+// True when the exporter produces a destination (file, directory, or stdout stream) that the client
+// must materialize, versus running entirely in the build VM. Mirrors `docker buildx build --output`:
+// local/tar/oci always stream a result back; docker streams only when a 'dest=' is given (an omitted
+// dest loads the image into the VM store); image/registry/cacheonly never stream.
+bool OutputStreamsToClient(const services::BuildOutput& output);
+
+// True when the exporter writes a directory tree rather than a single file/stream. The local exporter
+// is always a directory; oci/docker export an OCI layout directory when 'tar=false' is set.
+bool OutputIsDirectory(const services::BuildOutput& output);
+
 // Parses a --ulimit spec ("<name>=<soft>[:<hard>]") into (name, soft, hard). -1 means unlimited.
 std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName = {});
 

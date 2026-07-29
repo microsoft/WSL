@@ -998,8 +998,8 @@ try
             constexpr auto c_outputBaseDir = "/var/lib/docker/tmp/wslc-build-output";
             outputDestPath = std::format("{}/{}", c_outputBaseDir, wsl::shared::string::GuidToString<char>(id));
 
-            // buildx creates the leaf dest (a file for tar/oci/docker, a directory for local) but not
-            // the parent, so ensure the base directory exists first.
+            // buildx creates the leaf dest (a file for tar/oci/docker tarballs, a directory for local
+            // or oci/docker with tar=false) but not the parent, so ensure the base directory exists first.
             ServiceProcessLauncher mkdir("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("mkdir -p '{}'", c_outputBaseDir)}, {}, WSLCProcessFlagsNone);
             auto mkdirResult = mkdir.Launch(*m_virtualMachine).WaitAndCaptureOutput(60000UL);
             THROW_HR_IF_MSG(E_FAIL, mkdirResult.Code != 0, "failed to create build output directory");
@@ -1396,9 +1396,10 @@ try
     std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 
-    // Stream the exporter output back to the client. For file exporters (tar/oci/docker) cat the temp
-    // file; for the directory exporter (type=local) tar the export directory so the client can extract
-    // it into the destination directory. The streamer's stdout is relayed to the client OutputHandle.
+    // Stream the exporter output back to the client. For file exporters (tar/oci/docker tarballs) cat
+    // the temp file; for directory exporters (type=local, or oci/docker with tar=false) tar the export
+    // directory so the client can extract it into the destination directory. The streamer's stdout is
+    // relayed to the client OutputHandle.
     if (streamOutput)
     {
         auto userHandle = OpenUserHandle(Options->OutputHandle);

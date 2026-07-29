@@ -27,20 +27,25 @@ Abstract:
         }
 
     Grammar / behavior (docker buildx parity):
-      * A single token with no '=' is shorthand for the destination:
+      * The spec is parsed as a single CSV record (RFC 4180, as buildx does via go-csvvalue): fields
+        are comma separated, a field may be double-quoted, "" inside a quoted field is a literal quote,
+        and a comma inside a quoted field is part of the value.
+      * A single field that equals the whole input and does not start with "type=" is shorthand for the
+        destination:
           - L"-"            -> {type=tar, dest=-} (stream a tarball to stdout, matching docker)
           - any other path  -> {type=local, dest=<path>}
-      * Otherwise the spec is a comma separated list of key=value pairs. Keys are matched
-        case-insensitively. 'type' and 'dest' populate the struct fields; every other key is
-        stored verbatim in Attributes (values may themselves contain '=').
-      * Validation:
-          - 'type' is required once any key=value pair is present.
-          - 'type' must be one of: local, tar, oci, docker, image, registry, cacheonly.
-          - local / tar / oci require 'dest='.
-          - local may not target stdout ('dest=-'); tar / oci / docker may (they stream to stdout),
-            and image / registry / cacheonly ignore 'dest' entirely (matching docker).
-          - registry requires 'name='.
-          - docker / image / cacheonly do not require a destination.
+      * Otherwise each field is split on its FIRST '=' into key/value (two parts required). The key is
+        trimmed and lowercased; the value is kept verbatim (may itself contain '='). 'type' and 'dest'
+        populate the struct fields; every other key is stored in Attributes.
+      * Validation / destination resolution:
+          - 'type' is required and must be one of: local, tar, oci, docker, image, registry, cacheonly.
+          - Directory exporters (local, or oci/docker with tar=false) require a directory 'dest=' and
+            may not stream to stdout ('dest=-').
+          - tar / oci with no 'dest=' default to streaming a tarball to stdout ('dest=-'), matching buildx.
+          - docker with no 'dest=' loads the image into the store; 'dest=-' streams a tarball to stdout;
+            a path writes a file.
+          - image / registry / cacheonly run in the build VM and ignore 'dest'; 'name=' is optional
+            (buildx only enforces it at export time, not at parse time).
       * On rejection the parser throws ArgumentException whose message is the standard
         "Invalid --output value '<spec>': <reason>" wrapper (Localization::MessageWslcOutputInvalidSpec).
 
@@ -137,10 +142,16 @@ class WSLCCLIOutputParserUnitTests
         VerifyValid(L"type=tar,dest=-", L"tar", L"-");
     }
 
+    TEST_METHOD(Output_Tar_NoDest_DefaultsToStdout)
+    {
+        // tar with no destination streams a tarball to stdout ('dest=-'), matching buildx.
+        VerifyValid(L"type=tar", L"tar", L"-");
+    }
+
     TEST_METHOD(Output_Local_ToStdout_Rejected)
     {
         // The local exporter writes a directory tree, so it cannot stream to stdout.
-        VerifyInvalid(L"type=local,dest=-", L"dest cannot be stdout for local exporter");
+        VerifyInvalid(L"type=local,dest=-", L"writes a directory tree");
     }
 
     TEST_METHOD(Output_Oci_ToFile)
@@ -148,9 +159,40 @@ class WSLCCLIOutputParserUnitTests
         VerifyValid(L"type=oci,dest=image.tar", L"oci", L"image.tar");
     }
 
+    TEST_METHOD(Output_Oci_NoDest_DefaultsToStdout)
+    {
+        // oci with no destination streams a tarball to stdout ('dest=-'), matching buildx.
+        VerifyValid(L"type=oci", L"oci", L"-");
+    }
+
+    TEST_METHOD(Output_Oci_TarFalse_Directory)
+    {
+        // oci with tar=false exports an OCI layout directory, so a directory 'dest=' is required.
+        VerifyValid(L"type=oci,dest=./layout,tar=false", L"oci", L"./layout", AttrMap{{L"tar", L"false"}});
+    }
+
+    TEST_METHOD(Output_Oci_TarFalse_RequiresDest)
+    {
+        // A directory exporter cannot stream to stdout, so tar=false with no dest is rejected.
+        VerifyInvalid(L"type=oci,tar=false", L"writes a directory tree");
+    }
+
+    TEST_METHOD(Output_Docker_TarFalse_Directory)
+    {
+        // docker with tar=false likewise exports an OCI layout directory.
+        VerifyValid(L"type=docker,dest=./layout,tar=false", L"docker", L"./layout", AttrMap{{L"tar", L"false"}});
+    }
+
     TEST_METHOD(Output_Docker_ToFile)
     {
         VerifyValid(L"type=docker,dest=image.tar", L"docker", L"image.tar");
+    }
+
+    TEST_METHOD(Output_Docker_ToStdout)
+    {
+        // docker with dest=- streams the image tarball to stdout (matching docker), which the client
+        // routes to the redirected stdout handle.
+        VerifyValid(L"type=docker,dest=-", L"docker", L"-");
     }
 
     TEST_METHOD(Output_Docker_NoDestLoadsIntoStore)
@@ -176,6 +218,12 @@ class WSLCCLIOutputParserUnitTests
     TEST_METHOD(Output_Registry_Name)
     {
         VerifyValid(L"type=registry,name=myrepo/app:latest", L"registry", L"", AttrMap{{L"name", L"myrepo/app:latest"}});
+    }
+
+    TEST_METHOD(Output_Registry_NoName_Valid)
+    {
+        // buildx only enforces 'name=' at export time, not at parse time, so parsing must accept it.
+        VerifyValid(L"type=registry", L"registry", L"");
     }
 
     TEST_METHOD(Output_Registry_PushAttributes)
@@ -290,7 +338,16 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Invalid_MissingType)
     {
-        VerifyInvalid(L"dest=./out", L"type is required");
+        // With two or more fields no shorthand applies, so a spec without 'type=' is rejected.
+        VerifyInvalid(L"dest=./out,compression=gzip", L"type is required");
+    }
+
+    TEST_METHOD(Output_Shorthand_SingleFieldWithEqualsIsLocalPath)
+    {
+        // buildx parity quirk: a single field equal to the whole input that does not start with
+        // "type=" is shorthand for a local path, even if it happens to contain '=' (so '--output
+        // dest=./out' exports to a directory literally named "dest=./out", it is NOT 'dest=./out').
+        VerifyValid(L"dest=./out", L"local", L"dest=./out");
     }
 
     TEST_METHOD(Output_Invalid_UnsupportedType)
@@ -298,26 +355,39 @@ class WSLCCLIOutputParserUnitTests
         VerifyInvalid(L"type=bogus", L"unsupported output type 'bogus'");
     }
 
-    // --- Invalid: destination / name requirements ---
+    // --- Invalid: destination requirements ---
 
     TEST_METHOD(Output_Invalid_LocalRequiresDest)
     {
-        VerifyInvalid(L"type=local", L"'type=local' requires 'dest='");
+        // The local exporter writes a directory tree, so an omitted dest is rejected.
+        VerifyInvalid(L"type=local", L"writes a directory tree");
     }
 
-    TEST_METHOD(Output_Invalid_TarRequiresDest)
+    // --- CSV grammar (buildx go-csvvalue parity) ---
+
+    TEST_METHOD(Output_Csv_QuotedValueWithComma)
     {
-        VerifyInvalid(L"type=tar", L"'type=tar' requires 'dest='");
+        // A comma inside a double-quoted field is part of the value, not a field separator.
+        VerifyValid(
+            L"type=image,name=x,\"annotation.foo=a,b,c\"", L"image", L"", AttrMap{{L"name", L"x"}, {L"annotation.foo", L"a,b,c"}});
     }
 
-    TEST_METHOD(Output_Invalid_OciRequiresDest)
+    TEST_METHOD(Output_Csv_QuotedValueWithEscapedQuote)
     {
-        VerifyInvalid(L"type=oci", L"'type=oci' requires 'dest='");
+        // A doubled quote inside a quoted field is a single literal quote.
+        VerifyValid(
+            L"type=image,name=x,\"annotation.foo=a\"\"b\"", L"image", L"", AttrMap{{L"name", L"x"}, {L"annotation.foo", L"a\"b"}});
     }
 
-    TEST_METHOD(Output_Invalid_RegistryRequiresName)
+    TEST_METHOD(Output_Csv_LeadingSpaceAfterCommaTrimmedFromKey)
     {
-        VerifyInvalid(L"type=registry", L"'type=registry' requires 'name='");
+        // buildx TrimSpace's the key, so a space after a comma is accepted (the value is untrimmed).
+        VerifyValid(L"type=local, dest=./out", L"local", L"./out");
+    }
+
+    TEST_METHOD(Output_Csv_UnterminatedQuoteRejected)
+    {
+        VerifyInvalid(L"type=image,\"name=x", L"malformed quoting");
     }
 
     // --- Round-trip: FormatOutputSpec re-serializes a BuildOutput into a canonical buildx spec ---
@@ -380,6 +450,19 @@ class WSLCCLIOutputParserUnitTests
         VerifyFormat(
             L"type=registry,name=myrepo/app:latest,push-by-digest=true",
             L"type=registry,name=myrepo/app:latest,push-by-digest=true");
+    }
+
+    TEST_METHOD(Format_QuotesValueContainingComma)
+    {
+        // An attribute value containing a comma is CSV-quoted so it round-trips through the parser.
+        // std::map orders attributes, so 'annotation.foo' precedes 'name'.
+        VerifyFormat(L"type=image,name=x,\"annotation.foo=a,b,c\"", L"type=image,\"annotation.foo=a,b,c\",name=x");
+    }
+
+    TEST_METHOD(Format_TarNoDestDefaultsToStdout)
+    {
+        // tar with no dest resolves to dest=- and serializes back to that canonical form.
+        VerifyFormat(L"type=tar", L"type=tar,dest=-");
     }
 };
 

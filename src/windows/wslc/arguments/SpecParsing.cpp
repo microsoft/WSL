@@ -199,29 +199,126 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     };
 }
 
+namespace {
+
+    // Splits a single CSV record (RFC 4180) as buildx does via go-csvvalue / encoding/csv: fields are
+    // comma separated, a field may be wrapped in double quotes, a doubled quote inside a quoted field is
+    // a literal quote, and a comma inside a quoted field is part of the value. Returns std::nullopt when
+    // the record is malformed (an unterminated quoted field, or extra text right after a closing quote).
+    std::optional<std::vector<std::wstring>> SplitCsvRecord(const std::wstring& input)
+    {
+        std::vector<std::wstring> fields;
+        std::wstring field;
+        const size_t length = input.size();
+        size_t i = 0;
+
+        while (true)
+        {
+            field.clear();
+            if (i < length && input[i] == L'"')
+            {
+                ++i;
+                bool closed = false;
+                while (i < length)
+                {
+                    if (input[i] == L'"')
+                    {
+                        if (i + 1 < length && input[i + 1] == L'"')
+                        {
+                            field.push_back(L'"');
+                            i += 2;
+                            continue;
+                        }
+
+                        ++i;
+                        closed = true;
+                        break;
+                    }
+
+                    field.push_back(input[i]);
+                    ++i;
+                }
+
+                if (!closed)
+                {
+                    return std::nullopt; // unterminated quoted field
+                }
+
+                // After a closing quote only a comma (end of field) or end of input is valid.
+                if (i < length && input[i] != L',')
+                {
+                    return std::nullopt;
+                }
+            }
+            else
+            {
+                while (i < length && input[i] != L',')
+                {
+                    field.push_back(input[i]);
+                    ++i;
+                }
+            }
+
+            fields.push_back(field);
+            if (i >= length)
+            {
+                break;
+            }
+
+            ++i; // consume the ',' and start the next field
+        }
+
+        return fields;
+    }
+
+    // CSV-quotes a "key=value" token when it contains a comma, quote, CR, LF, or a leading space, doubling
+    // any embedded quote. Mirrors Go's encoding/csv writer that buildx uses, so the emitted spec parses
+    // back to the same fields.
+    std::wstring CsvQuoteField(const std::wstring& field)
+    {
+        const bool needsQuote = field.find_first_of(L",\"\r\n") != std::wstring::npos ||
+                                (!field.empty() && (field.front() == L' ' || field.back() == L' '));
+        if (!needsQuote)
+        {
+            return field;
+        }
+
+        std::wstring quoted;
+        quoted.reserve(field.size() + 2);
+        quoted.push_back(L'"');
+        for (const auto ch : field)
+        {
+            if (ch == L'"')
+            {
+                quoted.push_back(L'"');
+            }
+
+            quoted.push_back(ch);
+        }
+
+        quoted.push_back(L'"');
+        return quoted;
+    }
+
+} // namespace
+
 services::BuildOutput ParseOutputSpec(const std::wstring& spec)
 {
     // Mirrors `docker buildx build --output`. A bare token is shorthand for a destination; otherwise
-    // the spec is a comma separated list of key=value pairs where 'type'/'dest' are structural and
-    // every other key is forwarded verbatim to buildx as an exporter attribute.
+    // the spec is a single CSV record of key=value pairs where 'type'/'dest' are structural and every
+    // other key is forwarded verbatim to buildx as an exporter attribute.
     if (spec.empty())
     {
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"the value may not be empty"));
     }
 
-    // Split on ',' preserving empty fields. Unlike the shared Split helper (which drops them), an
-    // empty field such as in "type=local,,dest=x" is a malformed spec that must be rejected.
-    std::vector<std::wstring> fields;
-    for (size_t start = 0;;)
+    // buildx parses the spec as one CSV record (go-csvvalue / encoding/csv): fields are comma
+    // separated, a field may be double-quoted, "" inside a quoted field is a literal quote, and a
+    // comma inside quotes is part of the value. This lets a value such as an annotation contain commas.
+    const auto fields = SplitCsvRecord(spec);
+    if (!fields.has_value())
     {
-        const auto pos = spec.find(L',', start);
-        if (pos == std::wstring::npos)
-        {
-            fields.emplace_back(spec.substr(start));
-            break;
-        }
-        fields.emplace_back(spec.substr(start, pos - start));
-        start = pos + 1;
+        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"malformed quoting"));
     }
 
     // Keys are ASCII and matched case-insensitively; lowercase them without touching values.
@@ -236,50 +333,67 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         return value;
     };
 
-    // Shorthand: a single token with no '=' names the destination. Matching Docker, '-' streams a
-    // tarball to stdout ('type=tar,dest=-'); anything else exports the final stage's filesystem to
-    // that local path ('type=local,dest=<path>').
-    if (fields.size() == 1 && fields[0].find(L'=') == std::wstring::npos)
+    // Trim ASCII spaces/tabs (buildx TrimSpace's the key so " dest=x" after a comma is accepted).
+    const auto trim = [](const std::wstring& value) {
+        const auto first = value.find_first_not_of(L" \t");
+        if (first == std::wstring::npos)
+        {
+            return std::wstring{};
+        }
+        const auto last = value.find_last_not_of(L" \t");
+        return value.substr(first, last - first + 1);
+    };
+
+    // Shorthand: a single field that is exactly the input and does not start with "type=" names the
+    // destination. Matching Docker, '-' streams a tarball to stdout ('type=tar,dest=-'); anything else
+    // exports the final stage's filesystem to that local path ('type=local,dest=<path>').
+    if (fields->size() == 1 && fields->front() == spec && spec.compare(0, 5, L"type=") != 0)
     {
-        if (fields[0] == L"-")
+        if (fields->front() == L"-")
         {
             return services::BuildOutput{.Type = L"tar", .Dest = L"-"};
         }
 
-        return services::BuildOutput{.Type = L"local", .Dest = fields[0]};
+        return services::BuildOutput{.Type = L"local", .Dest = fields->front()};
     }
 
     services::BuildOutput output;
     std::wstring rawType;
     bool hasType = false;
-    bool hasDest = false;
 
-    for (const auto& field : fields)
+    for (const auto& field : *fields)
     {
-        const auto kv = SplitKeyValue(field);
-        if (!kv.HadSeparator || kv.Key.empty())
+        // buildx splits each field on the FIRST '=' and requires two parts; the value is not trimmed.
+        const auto pos = field.find(L'=');
+        if (pos == std::wstring::npos)
         {
             throw ArgumentException(
                 Localization::MessageWslcOutputInvalidSpec(spec, L"expected key=value pairs separated by ','"));
         }
 
-        const auto key = toLower(kv.Key);
+        const auto key = toLower(trim(field.substr(0, pos)));
+        auto value = field.substr(pos + 1);
+        if (key.empty())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcOutputInvalidSpec(spec, L"expected key=value pairs separated by ','"));
+        }
+
         if (key == L"type")
         {
-            rawType = kv.Value;
-            output.Type = toLower(kv.Value);
+            rawType = value;
+            output.Type = toLower(value);
             hasType = true;
         }
         else if (key == L"dest")
         {
-            output.Dest = kv.Value;
-            hasDest = true;
+            output.Dest = std::move(value);
         }
         else
         {
-            // Remaining attributes (name, push, compression, annotations, ...) are matched
-            // case-insensitively by buildx, so normalize their keys to lowercase like type/dest above.
-            output.Attributes[toLower(kv.Key)] = kv.Value;
+            // Remaining attributes (name, push, compression, tar, annotations, ...) are matched
+            // case-insensitively by buildx, so their keys are already lowercased above.
+            output.Attributes[key] = std::move(value);
         }
     }
 
@@ -288,6 +402,8 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"type is required"));
     }
 
+    // buildx forwards the type to buildkit and only rejects it there; we route the exporter ourselves,
+    // so an unroutable type has to be rejected up front. Every real exporter is in this list.
     const bool supportedType = output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci" ||
                                output.Type == L"docker" || output.Type == L"image" || output.Type == L"registry" ||
                                output.Type == L"cacheonly";
@@ -296,49 +412,92 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"unsupported output type '{}'", rawType)));
     }
 
-    // Filesystem/tarball exporters write to a caller-provided location, so 'dest=' is mandatory.
-    if ((output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci") && (!hasDest || output.Dest.empty()))
+    // Destination resolution, mirroring `docker buildx build --output`:
+    const bool destIsStdout = output.Dest == L"-";
+    if (OutputIsDirectory(output))
     {
-        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'dest='", output.Type)));
-    }
-
-    // Mirroring Docker: the local exporter writes a directory tree and so cannot stream to stdout.
-    // tar/oci/docker stream fine and image/registry/cacheonly ignore 'dest', so only local is rejected.
-    if (output.Type == L"local" && output.Dest == L"-")
-    {
-        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
-            spec,
-            L"dest cannot be stdout for local exporter; the local exporter writes a directory tree, so pass a directory "
-            L"path via 'dest=' (or use 'type=tar,dest=-' to stream a tarball to stdout)"));
-    }
-
-    // The registry exporter pushes to a named reference, so 'name=' is mandatory.
-    if (output.Type == L"registry")
-    {
-        const auto it = output.Attributes.find(L"name");
-        if (it == output.Attributes.end() || it->second.empty())
+        // Directory exporters (local, or oci/docker with tar=false) write a tree, so they need a path
+        // and cannot stream to stdout.
+        if (output.Dest.empty() || destIsStdout)
         {
-            throw ArgumentException(
-                Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"'type={}' requires 'name='", output.Type)));
+            throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
+                spec,
+                L"this exporter writes a directory tree, so pass a directory path via 'dest=' (use 'type=tar,dest=-' "
+                L"to stream a tarball to stdout instead)"));
         }
     }
+    else if (output.Type == L"tar" || output.Type == L"oci")
+    {
+        // Single-tarball exporters stream to stdout when no destination is given (buildx default).
+        if (output.Dest.empty())
+        {
+            output.Dest = L"-";
+        }
+    }
+    // docker: no dest -> load into the VM image store (leave empty); dest='-' streams a tarball to
+    //         stdout; a path writes a file. image/registry/cacheonly run in the VM and ignore 'dest'.
 
     return output;
 }
 
+bool OutputStreamsToClient(const services::BuildOutput& output)
+{
+    if (output.Type == L"local" || output.Type == L"tar" || output.Type == L"oci")
+    {
+        return true;
+    }
+
+    if (output.Type == L"docker")
+    {
+        // An omitted destination loads the image into the store in the VM; any destination (a file or
+        // stdout '-') is produced in the VM and streamed back to the client.
+        return !output.Dest.empty();
+    }
+
+    // image / registry / cacheonly run entirely in the build VM.
+    return false;
+}
+
+bool OutputIsDirectory(const services::BuildOutput& output)
+{
+    if (output.Type == L"local")
+    {
+        return true;
+    }
+
+    if (output.Type == L"oci" || output.Type == L"docker")
+    {
+        // oci/docker default to a single tarball but export an OCI layout directory when tar=false.
+        const auto it = output.Attributes.find(L"tar");
+        return it != output.Attributes.end() && it->second == L"false";
+    }
+
+    return false;
+}
+
 std::wstring FormatOutputSpec(const services::BuildOutput& output)
 {
-    // buildx consumes the same comma separated key=value form we parsed, so we round-trip the parsed
-    // struct back into a canonical spec. This is what actually reaches `docker build --output <spec>`.
-    std::wstring spec = std::format(L"type={}", output.Type);
+    // buildx consumes the same CSV key=value form we parsed, so we round-trip the parsed struct back
+    // into a canonical spec. This is what actually reaches `docker build --output <spec>`. Each token
+    // is CSV-quoted so a value containing a comma or quote survives the trip.
+    std::wstring spec;
+    const auto append = [&](const std::wstring& token) {
+        if (!spec.empty())
+        {
+            spec.push_back(L',');
+        }
+        spec += CsvQuoteField(token);
+    };
+
+    append(std::format(L"type={}", output.Type));
     if (!output.Dest.empty())
     {
-        spec += std::format(L",dest={}", output.Dest);
+        append(std::format(L"dest={}", output.Dest));
     }
 
     for (const auto& [key, value] : output.Attributes)
     {
-        spec += std::format(L",{}={}", key, value);
+        append(std::format(L"{}={}", key, value));
     }
 
     return spec;

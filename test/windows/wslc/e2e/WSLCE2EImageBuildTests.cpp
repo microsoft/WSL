@@ -874,7 +874,7 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --secret value 'id=x,type=bogus': unsupported secret type 'bogus'") != std::wstring::npos);
     }
 
-    // Tier 1: an invalid --output spec is rejected client-side before any build runs. This exercises the
+    // An invalid --output spec is rejected client-side before any build runs. This exercises the
     // full parser through the real binary and asserts the localized "Invalid --output value" wrapper.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_UnsupportedType_Fails)
     {
@@ -893,7 +893,7 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --output value 'type=bogus': unsupported output type 'bogus'") != std::wstring::npos);
     }
 
-    // Tier 2: the docker exporter loads the built image into the engine's image store, so the result is
+    // The docker exporter loads the built image into the engine's image store, so the result is
     // host-observable via inspect. The -t flag supplies the tag; the default docker builder does not
     // honor the exporter 'name=' attribute for tagging (that requires the docker-container driver), so
     // these tests deliberately tag with -t rather than name=.
@@ -921,7 +921,7 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(BuiltImageOutputDockerTag.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
     }
 
-    // Tier 2: the docker exporter produces a complete, correct image (not just a tag). Build with a
+    // The docker exporter produces a complete, correct image (not just a tag). Build with a
     // distinctive CMD and verify it round-trips through inspect, proving --output built a real image.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeDocker_ProducesImageWithConfig_Success)
     {
@@ -948,7 +948,7 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(expectedCmd, inspectData.Config.value().Cmd.value());
     }
 
-    // Tier 2: the tar exporter streams a filesystem tarball out of the VM to a client-side file. Verify
+    // The tar exporter streams a filesystem tarball out of the VM to a client-side file. Verify
     // the file is a valid, non-empty tar that contains the marker written by the build. Asserting the
     // file is non-empty guards the regression where the streamed tarball once came back with 0 bytes.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeTarToFile_ProducesValidTarball_Success)
@@ -971,7 +971,7 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(ListTarEntries(tarPath).find(L"wslc-build-marker.txt") != std::wstring::npos);
     }
 
-    // Tier 2: dest=- streams the tarball to the client's stdout (matching docker). This is the exact path
+    // dest=- streams the tarball to the client's stdout (matching docker). This is the exact path
     // that once regressed to an empty tarball, so it redirects stdout to a file and asserts the result is
     // a non-empty tar containing the build marker.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeTarToStdout_ProducesValidTarball_Success)
@@ -994,7 +994,7 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(ListTarEntries(tarPath).find(L"wslc-build-marker.txt") != std::wstring::npos);
     }
 
-    // Tier 2: the local exporter streams a directory tree out of the VM; the client extracts it into the
+    // The local exporter streams a directory tree out of the VM; the client extracts it into the
     // destination directory. Verify the marker file lands on disk under the dest directory.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeLocalToDirectory_ExtractsTree_Success)
     {
@@ -1016,7 +1016,7 @@ class WSLCE2EImageBuildTests
             L"the local exporter must extract the build tree to disk");
     }
 
-    // Tier 1: the local exporter writes a directory tree, so dest=- (stdout) is rejected client-side
+    // The local exporter writes a directory tree, so dest=- (stdout) is rejected client-side
     // before any build runs, mirroring docker.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeLocalToStdout_Rejected_Fails)
     {
@@ -1033,11 +1033,10 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
         VERIFY_IS_TRUE(
-            buildResult.Stderr->find(L"Invalid --output value 'type=local,dest=-': dest cannot be stdout for local exporter") !=
-            std::wstring::npos);
+            buildResult.Stderr->find(L"Invalid --output value 'type=local,dest=-': this exporter writes a directory tree") != std::wstring::npos);
     }
 
-    // Tier 2: the image exporter loads the built image into the engine's image store (like the docker
+    // The image exporter loads the built image into the engine's image store (like the docker
     // exporter with no dest), so the result is host-observable via inspect. Tag with -t.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeImage_LoadsIntoStore_Success)
     {
@@ -1063,7 +1062,7 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(BuiltImageOutputImage.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
     }
 
-    // Tier 2: the cacheonly exporter runs the build only to populate the build cache, producing no image
+    // The cacheonly exporter runs the build only to populate the build cache, producing no image
     // artifact. Verify the build succeeds and, because nothing is exported, the tag is not in the store.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeCacheOnly_ProducesNoImage_Success)
     {
@@ -1090,28 +1089,9 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_NOT_EQUAL(0u, inspectResult.ExitCode.value_or(0u), L"cacheonly must not load an image into the store");
     }
 
-    // Tier 1: the registry exporter pushes to a named reference, so 'name=' is mandatory and its absence
-    // is rejected client-side before any build runs.
-    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeRegistryMissingName_Fails)
-    {
-        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-registry-noname";
-        auto cleanup = SetupTestDirectory(testRoot);
-
-        auto contextDir = SharedOutputBuildContext();
-
-        auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
-
-        auto buildResult =
-            RunWslc(std::format(L"build \"{}\" -f \"{}\" --output type=registry", contextDir.wstring(), dockerfilePath.wstring()));
-        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
-        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
-        VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --output value 'type=registry': 'type=registry' requires 'name='") != std::wstring::npos);
-    }
-
-    // Tier 1: the tar exporter writes a tarball to a caller-provided location, so 'dest=' is mandatory
-    // and its absence is rejected client-side before any build runs.
-    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeTarMissingDest_Fails)
+    // tar with no 'dest=' defaults to streaming a tarball to stdout ('dest=-'), matching buildx.
+    // Redirect stdout to a file and assert the result is a non-empty tar containing the build marker.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeTarNoDest_StreamsToStdout_Success)
     {
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-output-tar-nodest";
         auto cleanup = SetupTestDirectory(testRoot);
@@ -1119,16 +1099,19 @@ class WSLCE2EImageBuildTests
         auto contextDir = SharedOutputBuildContext();
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-tar-nodest-marker > /wslc-build-marker.txt\n");
 
-        auto buildResult =
-            RunWslc(std::format(L"build \"{}\" -f \"{}\" --output type=tar", contextDir.wstring(), dockerfilePath.wstring()));
-        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
-        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
-        VERIFY_IS_TRUE(buildResult.Stderr->find(L"Invalid --output value 'type=tar': 'type=tar' requires 'dest='") != std::wstring::npos);
+        auto tarPath = testRoot / L"stdout.tar";
+        auto buildResult = RunWslcAndRedirectToFile(
+            std::format(L"build \"{}\" -f \"{}\" --output type=tar", contextDir.wstring(), dockerfilePath.wstring()), tarPath);
+        buildResult.Verify({.ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(tarPath));
+        VERIFY_IS_TRUE(std::filesystem::file_size(tarPath) > 0, L"the streamed tarball must not be empty");
+        VERIFY_IS_TRUE(ListTarEntries(tarPath).find(L"wslc-build-marker.txt") != std::wstring::npos);
     }
 
-    // Tier 2: a failing build step must surface as a non-zero exit with the image exporter, and the tag
+    // A failing build step must surface as a non-zero exit with the image exporter, and the tag
     // must not be left in the store. This is the failing counterpart to TypeImage_LoadsIntoStore.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeImage_BuildFailure_Fails)
     {
@@ -1153,7 +1136,7 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_NOT_EQUAL(0u, inspectResult.ExitCode.value_or(0u), L"a failed build must not leave an image in the store");
     }
 
-    // Tier 2: a failing build step must surface as a non-zero exit with the cacheonly exporter. This is
+    // A failing build step must surface as a non-zero exit with the cacheonly exporter. This is
     // the failing counterpart to TypeCacheOnly_ProducesNoImage.
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Output_TypeCacheOnly_BuildFailure_Fails)
     {

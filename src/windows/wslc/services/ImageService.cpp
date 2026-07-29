@@ -203,19 +203,37 @@ void ImageService::Build(
     HANDLE outputHandle = nullptr;
     wil::unique_hfile outputFile;
 
-    // For type=local the server streams a tarball of the export directory; the client extracts it into
-    // the destination directory by feeding the stream to `tar.exe -xf -`. These stay alive until after
-    // the (synchronous) BuildImage call so the pipe keeps draining while the server writes.
+    // For directory exporters (type=local, or oci/docker with tar=false) the server streams a tarball of
+    // the export directory; the client extracts it into the destination directory by feeding the stream
+    // to `tar.exe -xf -`. These stay alive until after the (synchronous) BuildImage call so the pipe
+    // keeps draining while the server writes.
     wil::unique_hfile extractPipeWrite;
     wil::unique_handle extractProcess;
+
+    // Failsafe for the directory (tar.exe) path: if the build throws before we drain tar.exe below,
+    // signal EOF by closing the pipe and, if the process is still running, wait briefly and terminate
+    // it so it cannot leak or block indefinitely on a full pipe. Released on the success path.
+    auto tarCleanup = wil::scope_exit([&] {
+        if (extractProcess)
+        {
+            extractPipeWrite.reset();
+            if (WaitForSingleObject(extractProcess.get(), 30000) != WAIT_OBJECT_0)
+            {
+                TerminateProcess(extractProcess.get(), 1);
+            }
+        }
+    });
 
     if (output.has_value())
     {
         const auto& spec = output.value();
-        const bool isFileExporter = spec.Type == L"tar" || spec.Type == L"oci" || (spec.Type == L"docker" && !spec.Dest.empty());
-        const bool isDirExporter = spec.Type == L"local";
+        // Route the exporter the same way `docker buildx build --output` does: some exporters produce a
+        // result the client must materialize (a file, a stdout stream, or a directory tree), while
+        // others run entirely in the build VM. See OutputStreamsToClient / OutputIsDirectory.
+        const bool streamsBack = validation::OutputStreamsToClient(spec);
+        const bool isDirExporter = validation::OutputIsDirectory(spec);
 
-        if (isFileExporter)
+        if (streamsBack && !isDirExporter)
         {
             if (spec.Dest == L"-")
             {
@@ -306,14 +324,16 @@ void ImageService::Build(
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
 
-    // For type=local, signal EOF to tar.exe (the server has finished writing) and confirm it extracted
-    // the stream cleanly. The write end must be reset before waiting so tar sees end-of-input.
+    // Signal EOF to tar.exe (the server has finished writing) and confirm it extracted the stream
+    // cleanly. The write end must be reset before waiting so tar sees end-of-input.
     if (extractProcess)
     {
         extractPipeWrite.reset();
         auto exitCode = wsl::windows::common::SubProcess::GetExitCode(extractProcess.get());
         THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
     }
+
+    tarCleanup.release();
 }
 
 std::vector<ImageInformation> ImageService::List(
