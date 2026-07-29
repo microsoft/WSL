@@ -438,7 +438,7 @@ models::FormatType GetFormatTypeFromString(const std::wstring& input, const std:
         supportedValues += formatType.first;
     }
 
-    throw ArgumentException(Localization::WSLCCLI_InvalidFormatError(argName, input, supportedValues));
+    throw ArgumentException(Localization::WSLCCLI_InvalidFormatTypeError(argName, input, supportedValues));
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
