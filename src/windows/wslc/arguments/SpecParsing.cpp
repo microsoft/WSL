@@ -56,7 +56,15 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     std::wstring envName;
     std::wstring srcPath;
 
-    for (const auto& part : Split(spec, L','))
+    // Docker parity: buildx parses --secret as a single CSV record (go-csvvalue), so a quoted field
+    // may contain commas (e.g. a 'src=' path). Malformed quoting is rejected like any other bad spec.
+    const auto parts = SplitCsvFields(spec);
+    if (!parts.has_value())
+    {
+        throw ArgumentException(Localization::MessageWslcSecretInvalidSpec(spec, L"malformed quoting"));
+    }
+
+    for (const auto& part : *parts)
     {
         const auto kv = SplitKeyValue(part);
         if (!kv.HadSeparator || kv.Key.empty())

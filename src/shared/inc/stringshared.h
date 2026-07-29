@@ -18,6 +18,7 @@ Abstract:
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <optional>
 #include <gsl/gsl>
 #include <format>
 #include <source_location>
@@ -127,6 +128,135 @@ inline std::vector<std::basic_string<T>> SplitByMultipleSeparators(const std::ba
     }
 
     return Output;
+}
+
+// Splits a single CSV record (RFC 4180) into its fields, matching Go's encoding/csv (which docker
+// buildx uses via go-csvvalue): fields are comma separated, a field may be wrapped in double quotes,
+// a doubled quote inside a quoted field is a literal quote, and a comma inside a quoted field is part
+// of the value. Returns std::nullopt when the record is malformed (an unterminated quoted field, or
+// unexpected text immediately after a closing quote). Note this parses a *single* record; embedded
+// CR/LF are treated as ordinary field characters, not record separators.
+template <class T>
+inline std::optional<std::vector<std::basic_string<T>>> SplitCsvFields(const std::basic_string<T>& Record)
+{
+    constexpr T Quote = static_cast<T>('"');
+    constexpr T Comma = static_cast<T>(',');
+
+    std::vector<std::basic_string<T>> Fields;
+    std::basic_string<T> Field;
+    const size_t Length = Record.size();
+    size_t Index = 0;
+
+    while (true)
+    {
+        Field.clear();
+        if (Index < Length && Record[Index] == Quote)
+        {
+            ++Index;
+            bool Closed = false;
+            while (Index < Length)
+            {
+                if (Record[Index] == Quote)
+                {
+                    // A doubled quote inside a quoted field is a single literal quote.
+                    if (Index + 1 < Length && Record[Index + 1] == Quote)
+                    {
+                        Field.push_back(Quote);
+                        Index += 2;
+                        continue;
+                    }
+
+                    ++Index;
+                    Closed = true;
+                    break;
+                }
+
+                Field.push_back(Record[Index]);
+                ++Index;
+            }
+
+            if (!Closed)
+            {
+                return std::nullopt; // unterminated quoted field
+            }
+
+            // After a closing quote only a comma (end of field) or end of record is valid.
+            if (Index < Length && Record[Index] != Comma)
+            {
+                return std::nullopt;
+            }
+        }
+        else
+        {
+            while (Index < Length && Record[Index] != Comma)
+            {
+                Field.push_back(Record[Index]);
+                ++Index;
+            }
+        }
+
+        Fields.push_back(Field);
+        if (Index >= Length)
+        {
+            break;
+        }
+
+        ++Index; // consume the ',' and start the next field
+    }
+
+    return Fields;
+}
+
+// CSV-escapes a single field: if it contains a comma, double quote, CR, LF, or a leading/trailing
+// space, it is wrapped in double quotes with each embedded quote doubled (matching Go's encoding/csv
+// writer). Otherwise it is returned unchanged. The result parses back via SplitCsvFields.
+template <class T>
+inline std::basic_string<T> CsvEscapeField(const std::basic_string<T>& Field)
+{
+    constexpr T Quote = static_cast<T>('"');
+    const T Special[] = {static_cast<T>(','), Quote, static_cast<T>('\r'), static_cast<T>('\n'), static_cast<T>(0)};
+
+    const bool NeedsQuote = Field.find_first_of(Special) != std::basic_string<T>::npos ||
+                            (!Field.empty() && (Field.front() == static_cast<T>(' ') || Field.back() == static_cast<T>(' ')));
+    if (!NeedsQuote)
+    {
+        return Field;
+    }
+
+    std::basic_string<T> Result;
+    Result.reserve(Field.size() + 2);
+    Result.push_back(Quote);
+    for (const T Ch : Field)
+    {
+        if (Ch == Quote)
+        {
+            Result.push_back(Quote);
+        }
+
+        Result.push_back(Ch);
+    }
+
+    Result.push_back(Quote);
+    return Result;
+}
+
+// Joins fields into a single CSV record, escaping each field as needed (see CsvEscapeField). The
+// result parses back to the original fields via SplitCsvFields.
+template <class T>
+inline std::basic_string<T> JoinCsvFields(const std::vector<std::basic_string<T>>& Fields)
+{
+    std::basic_string<T> Record;
+    for (size_t Index = 0; Index < Fields.size(); ++Index)
+    {
+        if (Index != 0)
+        {
+            Record.push_back(static_cast<T>(','));
+        }
+
+        Record += CsvEscapeField(Fields[Index]);
+    }
+
+    return Record;
 }
 
 inline const char* FromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
