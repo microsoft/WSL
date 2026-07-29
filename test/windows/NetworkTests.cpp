@@ -4283,6 +4283,147 @@ class MirroredTests
         VERIFY_IS_TRUE(canBindUdp);
     }
 
+    static std::pair<int, int> QueryHostEphemeralRange(LPCWSTR ProtocolSettingCmdlet)
+    {
+        const auto startQuery =
+            std::wstring(L"(") + ProtocolSettingCmdlet +
+            L" | Where-Object { $_.DynamicPortRangeStartPort -gt 0 } | Select-Object -First 1).DynamicPortRangeStartPort";
+        auto [startStr, _1] = LxsstuLaunchPowershellAndCaptureOutput(startQuery, 0);
+        const auto start = std::stoi(startStr);
+
+        const auto countQuery =
+            std::wstring(L"(") + ProtocolSettingCmdlet +
+            L" | Where-Object { $_.DynamicPortRangeNumberOfPorts -gt 0 } | Select-Object -First 1).DynamicPortRangeNumberOfPorts";
+        auto [countStr, _2] = LxsstuLaunchPowershellAndCaptureOutput(countQuery, 0);
+        const auto count = std::stoi(countStr);
+
+        return {start, count};
+    }
+
+    static void SetHostEphemeralRange(LPCWSTR Protocol, int Start, int NumberOfPorts)
+    {
+        // Note: setting the range for v4 also sets the same range for v6, so we only need to set one of them.
+        auto cmd = std::format(L"netsh int ipv4 set dynamicportrange {} startport={} numberofports={}", Protocol, Start, NumberOfPorts);
+        VERIFY_ARE_EQUAL(LxsstuRunCommand(cmd.data()), 0L);
+    }
+
+    // Attempt every host-ephemeral port from the guest and verify exactly the service-enforced cap
+    // (half of the host ephemeral range size) can be reserved.
+    static void VerifyHostEphemeralRangeCap(int Protocol, int HostEphemeralStart, int HostEphemeralEnd, int Cap)
+    {
+        WslKeepAlive keepAlive;
+
+        auto [guestStartStr, err1] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f1", 0);
+        guestStartStr.pop_back();
+        const auto guestStart = std::stoi(guestStartStr);
+
+        auto [guestEndStr, err2] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f2", 0);
+        guestEndStr.pop_back();
+        const auto guestEnd = std::stoi(guestEndStr);
+
+        const int overlapStart = std::max(HostEphemeralStart, guestStart);
+        const int overlapEnd = std::min(HostEphemeralEnd, guestEnd);
+        const int overlap = (overlapStart <= overlapEnd) ? (overlapEnd - overlapStart + 1) : 0;
+
+        const int expectedSuccesses = Cap - overlap;
+        VERIFY_IS_GREATER_THAN(expectedSuccesses, 0);
+
+        // Repeat the pattern a couple of times: verify the cap, release every socket, then verify the
+        // reservations drain and the full capacity becomes available again.
+        constexpr int c_cycles = 2;
+
+        for (int cycle = 0; cycle < c_cycles; cycle++)
+        {
+            // Bind every candidate from one guest process so the test does not launch wsl.exe once per port.
+            std::wstring perlCommand = L"perl -MSocket -MErrno=EADDRINUSE -e '";
+            perlCommand += L"$|=1;";
+            perlCommand += L"my @sockets;";
+            perlCommand += L"my $candidate=0;";
+            perlCommand +=
+                L"for my $port (" + std::to_wstring(HostEphemeralStart) + L".." + std::to_wstring(HostEphemeralEnd) + L"){";
+            perlCommand += L"next if $port>=" + std::to_wstring(guestStart) + L" && $port<=" + std::to_wstring(guestEnd) + L";";
+            perlCommand += L"my $family=(($candidate++ % 2)==0) ? AF_INET : AF_INET6;";
+            perlCommand += L"socket(my $socket,$family," + std::wstring(Protocol == IPPROTO_TCP ? L"SOCK_STREAM" : L"SOCK_DGRAM") +
+                           L",0) or die \"socket port=$port: $!\\n\";";
+            perlCommand +=
+                L"my $address=$family==AF_INET ? sockaddr_in($port,INADDR_ANY) : "
+                L"Socket::sockaddr_in6($port,Socket::inet_pton(AF_INET6,\"::\"));";
+            perlCommand += L"if(bind($socket,$address)){";
+            perlCommand += L"push @sockets,$socket;";
+            perlCommand += L"}elsif($!{EADDRINUSE}){}else{die \"bind port=$port: $!\\n\";}";
+            perlCommand += L"}";
+            perlCommand += L"print \"successes=\",scalar(@sockets),\"\\nready\\n\";";
+            perlCommand += L"while(1){sleep 1000}'";
+
+            auto cmd = LxssGenerateWslCommandLine(perlCommand.data());
+            auto [readPipe, writePipe] = CreateSubprocessPipe(false, true);
+            NetworkTests::unique_kill_process process(LxsstuStartProcess(cmd.data(), nullptr, writePipe.get(), writePipe.get()));
+            writePipe.reset();
+
+            std::string output;
+            VERIFY_IS_TRUE(NetworkTests::FindSubstring(readPipe, "ready", output));
+
+            constexpr std::string_view c_successPrefix = "successes=";
+            const auto successOffset = output.find(c_successPrefix);
+            THROW_HR_IF(E_FAIL, successOffset == std::string::npos);
+            const auto successEnd = output.find('\n', successOffset);
+            THROW_HR_IF(E_FAIL, successEnd == std::string::npos);
+            const auto successes =
+                std::stoi(output.substr(successOffset + c_successPrefix.size(), successEnd - successOffset - c_successPrefix.size()));
+            VERIFY_ARE_EQUAL(expectedSuccesses, successes, L"Expected exactly the service-enforced number of reservations");
+
+            // Release every reservation so usage drops back below the cap.
+            process.reset();
+
+            // The Linux port tracker only releases a reservation c_bind_timeout_seconds (60s) after the
+            // socket is closed (see GnsPortTracker.cpp), so wait for the reservations to drain before the
+            // next iteration reserves the same ports again.
+            if (cycle + 1 < c_cycles)
+            {
+                std::this_thread::sleep_for(std::chrono::seconds(90));
+            }
+        }
+    }
+
+    WSL2_TEST_METHOD(GuestBindToHostEphemeralRangeCapped)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        // The service caps the number of host-ephemeral ports the guest can reserve at half the host
+        // ephemeral range size, so it cannot exhaust the host's ephemeral ports. Shrink the host
+        // TCP/UDP ephemeral ranges to the smallest allowed size (255 ports) so the cap is a small,
+        // deterministic number (255 / 2 = 127), then verify the guest is denied once it reaches it.
+        constexpr int c_ephemeralRangeSize = 255;
+        constexpr int c_expectedCap = c_ephemeralRangeSize / 2;
+
+        // Save the current host ephemeral ranges so they can be restored at the end of the test.
+        int originalTcpStart = 0, originalTcpCount = 0, originalUdpStart = 0, originalUdpCount = 0;
+        std::tie(originalTcpStart, originalTcpCount) = QueryHostEphemeralRange(L"Get-NetTCPSetting");
+        std::tie(originalUdpStart, originalUdpCount) = QueryHostEphemeralRange(L"Get-NetUDPSetting");
+
+        auto restoreRanges = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            SetHostEphemeralRange(L"tcp", originalTcpStart, originalTcpCount);
+            SetHostEphemeralRange(L"udp", originalUdpStart, originalUdpCount);
+        });
+
+        // Use a low start port so the small host ephemeral window is less likely to overlap the
+        // guest's reserved ephemeral range, which HNS assigns from the high port space.
+        constexpr int c_hostEphemeralStart = 10000;
+        constexpr int c_hostEphemeralEnd = c_hostEphemeralStart + c_ephemeralRangeSize - 1;
+        SetHostEphemeralRange(L"tcp", c_hostEphemeralStart, c_ephemeralRangeSize);
+        SetHostEphemeralRange(L"udp", c_hostEphemeralStart, c_ephemeralRangeSize);
+
+        // Force a restart of WSL so that it queries the new host ephemeral ranges.
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        RestartWslService();
+
+        WaitForMirroredStateInLinux();
+
+        // TCP and UDP are capped independently, but each cap is shared by IPv4 and IPv6.
+        VerifyHostEphemeralRangeCap(IPPROTO_TCP, c_hostEphemeralStart, c_hostEphemeralEnd, c_expectedCap);
+        VerifyHostEphemeralRangeCap(IPPROTO_UDP, c_hostEphemeralStart, c_hostEphemeralEnd, c_expectedCap);
+    }
+
     WSL2_TEST_METHOD(NonRootNamespaceEphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();

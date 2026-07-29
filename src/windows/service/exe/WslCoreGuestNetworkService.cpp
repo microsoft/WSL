@@ -57,6 +57,10 @@ void wsl::core::networking::GuestNetworkService::CreateGuestNetworkService(
 
     m_hostTcpEphemeralPortRange = QueryHostEphemeralPortRange(L"MSFT_NetTCPSetting");
     m_hostUdpEphemeralPortRange = QueryHostEphemeralPortRange(L"MSFT_NetUDPSetting");
+
+    WI_ASSERT(m_hostTcpEphemeralPortRange.first <= m_hostTcpEphemeralPortRange.second);
+    WI_ASSERT(m_hostUdpEphemeralPortRange.first <= m_hostUdpEphemeralPortRange.second);
+
     WSL_LOG(
         "GuestNetworkService::CreateGuestNetworkService - host ephemeral port ranges",
         TraceLoggingValue(m_hostTcpEphemeralPortRange.first, "tcpStartPort"),
@@ -233,30 +237,23 @@ bool wsl::core::networking::GuestNetworkService::IsPortInGuestEphemeralRange(uin
     return PortNumber >= m_reservedPortRange.startingPort && PortNumber <= m_reservedPortRange.endingPort;
 }
 
-uint32_t wsl::core::networking::GuestNetworkService::ComputeHostEphemeralPortCap(int Protocol) const noexcept
+uint16_t wsl::core::networking::GuestNetworkService::ComputeHostEphemeralPortCap(int Protocol) const noexcept
 {
     const auto& range = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortRange : m_hostTcpEphemeralPortRange;
-    if (range.second < range.first)
-    {
-        return 0;
-    }
 
-    // Cap the guest at (at most) half of the host ephemeral range so it can't exhaust the host's ports.
-    return (static_cast<uint32_t>(range.second) - range.first + 1) / 2;
+    // Cap the guest at half of the host ephemeral range so it can't exhaust the host's ports. The
+    // host range is always at least 255, so the cap will fit in uint16_t, no risk of overflow.
+    return static_cast<uint16_t>((range.second - range.first + 1) / 2);
 }
 
-uint32_t wsl::core::networking::GuestNetworkService::ComputeHostEphemeralOverlap(int Protocol) const noexcept
+uint16_t wsl::core::networking::GuestNetworkService::ComputeHostEphemeralOverlap(int Protocol) const noexcept
 {
     const auto& range = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortRange : m_hostTcpEphemeralPortRange;
-    if (range.second < range.first)
-    {
-        return 0;
-    }
 
     // Number of guest reserved ports that fall within the host ephemeral range.
-    const uint32_t overlapStart = std::max<uint32_t>(m_reservedPortRange.startingPort, range.first);
-    const uint32_t overlapEnd = std::min<uint32_t>(m_reservedPortRange.endingPort, range.second);
-    return (overlapStart <= overlapEnd) ? (overlapEnd - overlapStart + 1) : 0;
+    const uint16_t overlapStart = std::max<uint16_t>(m_reservedPortRange.startingPort, range.first);
+    const uint16_t overlapEnd = std::min<uint16_t>(m_reservedPortRange.endingPort, range.second);
+    return (overlapStart <= overlapEnd) ? static_cast<uint16_t>(overlapEnd - overlapStart + 1) : 0;
 }
 
 int wsl::core::networking::GuestNetworkService::OnPortAllocationRequest(const SOCKADDR_INET& Address, _In_ int Protocol, _In_ bool Allocate) noexcept
@@ -392,13 +389,14 @@ try
             result = m_releasePort.value()(it->second.Handle);
             m_reservedPorts.erase(it);
 
-            if (isHostEphemeralPort)
+            // Only decrement the in-use counter when the release actually succeeded. If the release
+            // failed the reservation may still exist on the host, and undercounting would let the
+            // guest exceed the intended cap.
+            if (isHostEphemeralPort && SUCCEEDED(result))
             {
                 auto& portsInUse = (Protocol == IPPROTO_UDP) ? m_hostUdpEphemeralPortsInUse : m_hostTcpEphemeralPortsInUse;
-                if (portsInUse > 0)
-                {
-                    portsInUse--;
-                }
+                WI_ASSERT(portsInUse > 0);
+                portsInUse--;
             }
 
             WSL_LOG(
