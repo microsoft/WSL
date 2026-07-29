@@ -5790,6 +5790,7 @@ class WSLCTests
         options.IpRange = "10.0.0.0/24";
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
+        ValidateCOMErrorMessageContains(L"invalid ip-range");
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
