@@ -199,109 +199,6 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
     };
 }
 
-namespace {
-
-    // Splits a single CSV record (RFC 4180) as buildx does via go-csvvalue / encoding/csv: fields are
-    // comma separated, a field may be wrapped in double quotes, a doubled quote inside a quoted field is
-    // a literal quote, and a comma inside a quoted field is part of the value. Returns std::nullopt when
-    // the record is malformed (an unterminated quoted field, or extra text right after a closing quote).
-    std::optional<std::vector<std::wstring>> SplitCsvRecord(const std::wstring& input)
-    {
-        std::vector<std::wstring> fields;
-        std::wstring field;
-        const size_t length = input.size();
-        size_t i = 0;
-
-        while (true)
-        {
-            field.clear();
-            if (i < length && input[i] == L'"')
-            {
-                ++i;
-                bool closed = false;
-                while (i < length)
-                {
-                    if (input[i] == L'"')
-                    {
-                        if (i + 1 < length && input[i + 1] == L'"')
-                        {
-                            field.push_back(L'"');
-                            i += 2;
-                            continue;
-                        }
-
-                        ++i;
-                        closed = true;
-                        break;
-                    }
-
-                    field.push_back(input[i]);
-                    ++i;
-                }
-
-                if (!closed)
-                {
-                    return std::nullopt; // unterminated quoted field
-                }
-
-                // After a closing quote only a comma (end of field) or end of input is valid.
-                if (i < length && input[i] != L',')
-                {
-                    return std::nullopt;
-                }
-            }
-            else
-            {
-                while (i < length && input[i] != L',')
-                {
-                    field.push_back(input[i]);
-                    ++i;
-                }
-            }
-
-            fields.push_back(field);
-            if (i >= length)
-            {
-                break;
-            }
-
-            ++i; // consume the ',' and start the next field
-        }
-
-        return fields;
-    }
-
-    // CSV-quotes a "key=value" token when it contains a comma, quote, CR, LF, or a leading space, doubling
-    // any embedded quote. Mirrors Go's encoding/csv writer that buildx uses, so the emitted spec parses
-    // back to the same fields.
-    std::wstring CsvQuoteField(const std::wstring& field)
-    {
-        const bool needsQuote = field.find_first_of(L",\"\r\n") != std::wstring::npos ||
-                                (!field.empty() && (field.front() == L' ' || field.back() == L' '));
-        if (!needsQuote)
-        {
-            return field;
-        }
-
-        std::wstring quoted;
-        quoted.reserve(field.size() + 2);
-        quoted.push_back(L'"');
-        for (const auto ch : field)
-        {
-            if (ch == L'"')
-            {
-                quoted.push_back(L'"');
-            }
-
-            quoted.push_back(ch);
-        }
-
-        quoted.push_back(L'"');
-        return quoted;
-    }
-
-} // namespace
-
 services::BuildOutput ParseOutputSpec(const std::wstring& spec)
 {
     // Mirrors `docker buildx build --output`. A bare token is shorthand for a destination; otherwise
@@ -315,7 +212,7 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
     // buildx parses the spec as one CSV record (go-csvvalue / encoding/csv): fields are comma
     // separated, a field may be double-quoted, "" inside a quoted field is a literal quote, and a
     // comma inside quotes is part of the value. This lets a value such as an annotation contain commas.
-    const auto fields = SplitCsvRecord(spec);
+    const auto fields = SplitCsvFields(spec);
     if (!fields.has_value())
     {
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"malformed quoting"));
@@ -479,28 +376,20 @@ std::wstring FormatOutputSpec(const services::BuildOutput& output)
 {
     // buildx consumes the same CSV key=value form we parsed, so we round-trip the parsed struct back
     // into a canonical spec. This is what actually reaches `docker build --output <spec>`. Each token
-    // is CSV-quoted so a value containing a comma or quote survives the trip.
-    std::wstring spec;
-    const auto append = [&](const std::wstring& token) {
-        if (!spec.empty())
-        {
-            spec.push_back(L',');
-        }
-        spec += CsvQuoteField(token);
-    };
-
-    append(std::format(L"type={}", output.Type));
+    // is CSV-escaped so a value containing a comma or quote survives the trip.
+    std::vector<std::wstring> fields;
+    fields.push_back(std::format(L"type={}", output.Type));
     if (!output.Dest.empty())
     {
-        append(std::format(L"dest={}", output.Dest));
+        fields.push_back(std::format(L"dest={}", output.Dest));
     }
 
     for (const auto& [key, value] : output.Attributes)
     {
-        append(std::format(L"{}={}", key, value));
+        fields.push_back(std::format(L"{}={}", key, value));
     }
 
-    return spec;
+    return JoinCsvFields(fields);
 }
 
 std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName)
