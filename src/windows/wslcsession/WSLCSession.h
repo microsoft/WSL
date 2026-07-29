@@ -169,6 +169,7 @@ public:
         _In_ const WSLCProcessOptions* Options,
         _In_ ULONG TtyRows,
         _In_ ULONG TtyColumns,
+        _In_ BOOL FromVmLifecycleCallback,
         _Out_ IWSLCProcess** VirtualMachine,
         _Out_ int* Errno) override;
 
@@ -211,8 +212,8 @@ public:
     IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
 
     // Testing.
-    IFACEMETHOD(MountWindowsFolder)(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly) override;
-    IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
+    IFACEMETHOD(MountWindowsFolder)(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ BOOL FromVmLifecycleCallback) override;
+    IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath, _In_ BOOL FromVmLifecycleCallback) override;
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(TriggerIdleTermination)(_Out_ BOOL* WasAlreadyIdle) override;
@@ -302,7 +303,15 @@ private:
     void PersistSettings(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
     using VmLease = WSLCSessionRuntime::VmLease;
-    [[nodiscard]] VmLease AcquireVmLease();
+    [[nodiscard]] VmLease AcquireVmLease(WSLCSessionRuntime::VmStopWindow StopWindow = WSLCSessionRuntime::VmStopWindow::Wait);
+
+    // Maps the FromVmLifecycleCallback flag that plugin-reachable methods carry onto the lease policy.
+    // The service sets it only for calls made from inside a VM lifecycle callback, which must be
+    // served by the VM that is stopping rather than waiting for the teardown they are blocking.
+    [[nodiscard]] static constexpr WSLCSessionRuntime::VmStopWindow StopWindowFor(BOOL FromVmLifecycleCallback) noexcept
+    {
+        return FromVmLifecycleCallback ? WSLCSessionRuntime::VmStopWindow::Serve : WSLCSessionRuntime::VmStopWindow::Wait;
+    }
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();

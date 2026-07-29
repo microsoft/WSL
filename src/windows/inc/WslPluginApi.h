@@ -148,10 +148,21 @@ typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation
 typedef HRESULT (*WSLPluginAPI_OnWslcVmStarted)(const struct WSLCSessionInformation* Session);
 
 // Called when the VM backing a WSLC session is about to stop (idle teardown, explicit termination,
-// or unexpected exit). Fires every time a VM is torn down, paired with a prior OnWslcVmStarted.
-// Errors are logged but ignored. On an idle teardown the session remains alive, so a callback that
-// needs the VM (e.g. WSLCCreateProcess) transparently restarts it; during a permanent session
-// termination the same call fails cleanly because the session is being torn down.
+// or unexpected exit). Fires exactly once per OnWslcVmStarted. Errors are logged but ignored.
+//
+// The VM is still alive for the duration of this call, so a callback may run last-minute work in it
+// (e.g. WSLCCreateProcess) to react to the VM going away. During a permanent session termination
+// such a call fails cleanly, because the session itself is being torn down.
+//
+// The stop is guaranteed: the VM is torn down as soon as this call returns, and nothing the callback
+// does can keep it alive. Any work the callback leaves running in the VM -- a process it did not wait
+// for, for example -- dies with it. Calls made by other threads while this callback is running do not
+// keep the VM alive either; they block and are served by the next VM, which is reported by a new
+// OnWslcVmStarted.
+//
+// The callback must therefore not block waiting on another thread that is calling into this session:
+// that thread is waiting for the teardown, and the teardown is waiting for this callback to return.
+// Last-minute work in the VM must be done synchronously, on the callback's own thread.
 typedef HRESULT (*WSLPluginAPI_OnWslcVmStopping)(const struct WSLCSessionInformation* Session);
 
 //

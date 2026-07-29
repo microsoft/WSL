@@ -547,9 +547,9 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
     m_userSid.assign(bytes, bytes + length);
 }
 
-WSLCSession::VmLease WSLCSession::AcquireVmLease()
+WSLCSession::VmLease WSLCSession::AcquireVmLease(WSLCSessionRuntime::VmStopWindow StopWindow)
 {
-    return m_runtime.AcquireVmLease();
+    return m_runtime.AcquireVmLease(StopWindow);
 }
 
 WSLCSession::~WSLCSession()
@@ -2516,7 +2516,7 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::CreateRootNamespaceProcess(
-    LPCSTR Executable, const WSLCProcessOptions* Options, ULONG TtyRows, ULONG TtyColumns, IWSLCProcess** Process, int* Errno)
+    LPCSTR Executable, const WSLCProcessOptions* Options, ULONG TtyRows, ULONG TtyColumns, BOOL FromVmLifecycleCallback, IWSLCProcess** Process, int* Errno)
 try
 {
     WSLCExecutionContext context(this);
@@ -2531,7 +2531,7 @@ try
         *Errno = -1; // Make sure not to return 0 if something fails.
     }
 
-    auto runtime = m_runtime.Acquire();
+    auto runtime = m_runtime.Acquire(StopWindowFor(FromVmLifecycleCallback));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     auto process = runtime.Vm().CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno);
@@ -3196,7 +3196,7 @@ try
 }
 CATCH_LOG();
 
-HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly)
+HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly, BOOL FromVmLifecycleCallback)
 try
 {
     WSLCExecutionContext context(this);
@@ -3204,21 +3204,21 @@ try
     RETURN_HR_IF_NULL(E_POINTER, WindowsPath);
     RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireVmLease(StopWindowFor(FromVmLifecycleCallback));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     return m_runtime.Vm().MountWindowsFolder(WindowsPath, LinuxPath, ReadOnly);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::UnmountWindowsFolder(LPCSTR LinuxPath)
+HRESULT WSLCSession::UnmountWindowsFolder(LPCSTR LinuxPath, BOOL FromVmLifecycleCallback)
 try
 {
     WSLCExecutionContext context(this);
 
     RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireVmLease(StopWindowFor(FromVmLifecycleCallback));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     return m_runtime.Vm().UnmountWindowsFolder(LinuxPath);

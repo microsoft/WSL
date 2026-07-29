@@ -30,6 +30,43 @@ constexpr WSLVersion Version = {wsl::shared::VersionMajor, wsl::shared::VersionM
 thread_local std::optional<std::wstring> g_pluginErrorMessage;
 thread_local bool g_inWslcPluginNotification = false;
 
+// Set while this thread is inside a plugin's OnWslcVmStopping handler for the given session.
+//
+// Plugins are in-proc and their handlers are invoked synchronously, so a plugin calling back into
+// the WSLC plugin API does it on this very thread. That is what lets the entry points below tag the
+// call, which in turn lets the session serve it from the VM that is stopping instead of making it
+// wait for the teardown the handler is holding up. A plugin that dispatches to a thread of its own
+// simply is not tagged: that call waits for the next VM instead. It is served rather than deadlocked,
+// but only as long as the handler does not block waiting on that thread -- if it does, the thread is
+// waiting for the teardown and the teardown is waiting for the handler. WslPluginApi.h documents that
+// last-minute work must be done synchronously on the handler's own thread.
+thread_local std::optional<WSLCSessionId> g_wslcVmStoppingSession;
+
+class WslcVmStoppingContext
+{
+public:
+    explicit WslcVmStoppingContext(WSLCSessionId Session) : m_previous(std::exchange(g_wslcVmStoppingSession, Session))
+    {
+    }
+
+    ~WslcVmStoppingContext()
+    {
+        g_wslcVmStoppingSession = m_previous;
+    }
+
+    WslcVmStoppingContext(const WslcVmStoppingContext&) = delete;
+    WslcVmStoppingContext& operator=(const WslcVmStoppingContext&) = delete;
+
+private:
+    std::optional<WSLCSessionId> m_previous;
+};
+
+// True if the caller is a plugin reentering from the OnWslcVmStopping handler for this same session.
+BOOL FromVmLifecycleCallback(WSLCSessionId Session) noexcept
+{
+    return (g_wslcVmStoppingSession.has_value() && *g_wslcVmStoppingSession == Session) ? TRUE : FALSE;
+}
+
 class WslcPluginNotificationContext
 {
 public:
@@ -145,7 +182,7 @@ try
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
 
     auto session = ResolveWslcSession(Session);
-    auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly);
+    auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly, FromVmLifecycleCallback(Session));
 
     WSL_LOG(
         "WslcPluginMountFolderCall",
@@ -167,7 +204,7 @@ try
 
     auto session = ResolveWslcSession(Session);
 
-    auto result = session->UnmountWindowsFolder(Mountpoint);
+    auto result = session->UnmountWindowsFolder(Mountpoint, FromVmLifecycleCallback(Session));
 
     WSL_LOG(
         "WslcPluginUnmountFolderCall",
@@ -215,7 +252,7 @@ try
 
     wil::com_ptr<IWSLCProcess> process;
     int errnoValue = 0;
-    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, &process, &errnoValue);
+    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, FromVmLifecycleCallback(Session), &process, &errnoValue);
 
     if (Errno != nullptr)
     {
@@ -737,6 +774,10 @@ void PluginManager::OnWslcVmStarted(const WSLCSessionInformation* Session) const
 void PluginManager::OnWslcVmStopping(const WSLCSessionInformation* Session) const
 {
     WslcPluginNotificationContext context;
+
+    // Lets a handler that calls back into this session be served by the VM that is stopping; see
+    // g_wslcVmStoppingSession.
+    WslcVmStoppingContext stoppingContext(Session->SessionId);
 
     for (const auto& e : m_plugins)
     {

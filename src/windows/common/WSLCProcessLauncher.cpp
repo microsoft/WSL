@@ -180,7 +180,8 @@ std::tuple<HRESULT, std::optional<ClientRunningWSLCProcess>, int> WSLCProcessLau
 
     wil::com_ptr<IWSLCProcess> process;
     int error = -1;
-    auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, m_rows, m_columns, &process, &error);
+    auto result = Session.CreateRootNamespaceProcess(
+        m_executable.c_str(), &options, m_rows, m_columns, /* FromVmLifecycleCallback */ FALSE, &process, &error);
     if (FAILED(result))
     {
         return std::make_tuple(result, std::optional<ClientRunningWSLCProcess>(), error);

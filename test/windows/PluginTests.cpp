@@ -843,6 +843,65 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    // Validates that an announced VM teardown always happens. The plugin leaves a process running when
+    // OnWslcVmStopping returns -- which under the previous design made the runtime abandon the
+    // teardown -- and starts a call from a thread of its own during the notification window. The VM
+    // must stop anyway, the leaked process must die with it, and the windowed call must be served by
+    // the next VM rather than by the one that was going away.
+    WSL2_TEST_METHOD(WslcVmStopCommitted)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmStopCommitted);
+
+        // Idle termination only tears down storage-backed sessions (see WslcVmRestart).
+        const auto storageDir = std::filesystem::current_path() / "test-storage-wslc-vm-stop-committed";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-stop-committed", WSLCNetworkingModeNone, storageDir.c_str());
+
+            // Bring the VM up -> OnWslcVmStarted.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // The teardown is announced and then carried out, even though the plugin's callback left a
+            // process running. The session is genuinely idle afterwards.
+            BOOL wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+
+            // The VM is gone, so this starts a fresh one -> a second OnWslcVmStarted.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+        }
+
+        // "leaked process died: yes" is the assertion that the announced stop actually happened: the
+        // process the callback left running was killed by the teardown rather than keeping the VM
+        // alive. "stop-window caller: ok" landing after the second "VM started" is what shows that
+        // call waited for the new VM instead of being served by the one that was going away.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=23
+            WSLC Session created, name=plugin-wslc-vm-stop-committed, id=*, pid=*, token=set, sid=set
+            WSLC VM started, session=*
+            WSLC VM stopping, session=*
+            WSLC VM stopping leaked process: ok
+            WSLC VM started, session=*
+            WSLC stop-window caller: ok
+            WSLC leaked process died: yes
+            WSLC Session stopping, name=plugin-wslc-vm-stop-committed, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // This test must run last so it doesn't break test cases that depends on plugin signature.
     WSL2_TEST_METHOD(InvalidPluginSignature)
     {

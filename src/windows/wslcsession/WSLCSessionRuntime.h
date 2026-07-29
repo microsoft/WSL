@@ -73,9 +73,11 @@ public:
 
         // Fired when a VM is about to be torn down (best-effort), while the VM is still alive. Invoked
         // without the runtime lock held so the handler may call back into the session or into a plugin
-        // that acquires a VM lease. Paired once with a prior OnVmStarted -- fires on both idle and
-        // permanent teardown. On a permanent teardown the session is terminating, so a callback that
-        // resolves this session (e.g. to create a process) fails cleanly instead of restarting the VM.
+        // that acquires a VM lease. Fires exactly once per OnVmStarted -- on both idle and permanent
+        // teardown -- and the teardown always follows: once this is raised the VM is committed to
+        // stopping, and any lease that is not part of this callback waits for the next VM. On a
+        // permanent teardown the session is terminating, so a callback that resolves this session
+        // (e.g. to create a process) fails cleanly instead of restarting the VM.
         std::function<void()> OnVmStopping;
     };
 
@@ -88,11 +90,24 @@ public:
         wil::shared_event SessionTerminatedEvent;
     };
 
+    // Whether a lease may be served by a VM that is already committed to stopping.
+    //
+    // Wait is correct for every ordinary caller: once a stop is announced it always happens, so the
+    // lease releases the shared lock, waits for the teardown to finish, and is then served by a fresh
+    // VM. Serve exists only for calls that originate from inside a plugin VM-lifecycle callback --
+    // they are the reason the stop window is open at all, and making them wait would deadlock them
+    // against the very callback the teardown is waiting on.
+    enum class VmStopWindow
+    {
+        Wait,
+        Serve,
+    };
+
     class VmLease
     {
     public:
         VmLease() = default;
-        explicit VmLease(WSLCSessionRuntime& Runtime);
+        explicit VmLease(WSLCSessionRuntime& Runtime, VmStopWindow StopWindow = VmStopWindow::Wait);
         VmLease(VmLease&& Other) noexcept;
         VmLease& operator=(VmLease&& Other) noexcept;
         ~VmLease();
@@ -109,7 +124,7 @@ public:
     {
     public:
         LockedRuntime() = default;
-        explicit LockedRuntime(WSLCSessionRuntime& Runtime);
+        explicit LockedRuntime(WSLCSessionRuntime& Runtime, VmStopWindow StopWindow = VmStopWindow::Wait);
 
         WSLCVirtualMachine& Vm();
         IORelay* Relay();
@@ -170,8 +185,8 @@ public:
     void OnIdleTimer();
     void OnVmExited();
     void InitializeDockerRuntime(const std::filesystem::path& storagePath);
-    [[nodiscard]] VmLease AcquireVmLease();
-    [[nodiscard]] LockedRuntime Acquire();
+    [[nodiscard]] VmLease AcquireVmLease(VmStopWindow StopWindow = VmStopWindow::Wait);
+    [[nodiscard]] LockedRuntime Acquire(VmStopWindow StopWindow = VmStopWindow::Wait);
 
     [[nodiscard]] bool TriggerIdleTerminationForTest();
 
@@ -183,16 +198,26 @@ private:
     bool IdleTerminationEnabled() const noexcept;
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
 
-    // Fires the OnVmStarted hook. Must be called without the runtime lock held (the handler may
-    // call back into the session), with an activity reference held so idle teardown cannot race the
-    // VM down before the notification is delivered.
-    void NotifyVmStarted();
+    // Fires the OnVmStarted hook for the VM instance identified by 'Generation'. Must be called
+    // without the runtime lock held (the handler may call back into the session), with an activity
+    // reference held so idle teardown cannot race the VM down before the notification is delivered.
+    void NotifyVmStarted(uint64_t Generation);
 
-    // Fires the OnVmStopping hook (paired once with a prior OnVmStarted via m_vmStartNotified). Must
-    // be called without the runtime lock held: the handler may call into a plugin that acquires a VM
-    // lease (which takes m_lock), so firing under the lock would deadlock. Called while the VM is
-    // still running so the handler can still operate on it.
-    void NotifyVmStopping();
+    // Fires the OnVmStopping hook, if OnVmStarted was delivered for 'Generation' and that instance is
+    // still the one running. Must be called without the runtime lock held: the handler may call into a
+    // plugin that acquires a VM lease (which takes m_lock), so firing under the lock would deadlock.
+    // Called while the VM is still running so the handler can still operate on it, and only after
+    // BeginVmStopLockHeld has committed the VM to stopping, so the announcement is always true.
+    void NotifyVmStopping(uint64_t Generation);
+
+    // Commits the current VM to stopping. Ordinary leases arriving from here until EndVmStop() release
+    // the shared lock and wait for the teardown rather than being served by a VM that is going away.
+    _Requires_exclusive_lock_held_(m_lock)
+    void BeginVmStopLockHeld() noexcept;
+
+    // Releases waiting leases, which then start (or wait for) the next VM. Safe to call when no stop
+    // is pending, so it can be run unconditionally from a scope_exit.
+    void EndVmStop() noexcept;
 
     WSLCSession* m_session{};
     RuntimeHooks m_hooks;
@@ -209,6 +234,11 @@ private:
     const WSLCSessionInitSettings* m_settings{};
 
     std::optional<WSLCVirtualMachine> m_virtualMachine;
+    // Lock-free mirror of m_virtualMachine.has_value(): written under the runtime lock immediately
+    // after the VM object is constructed and immediately before it is destroyed, read without the
+    // lock by container teardown (~WSLCContainerImpl runs without a VM lease). Reading the optional
+    // itself there would race with the reset() performed by an idle teardown on another thread.
+    std::atomic<bool> m_hasVm{false};
     std::optional<IORelay> m_ioRelay;
     std::optional<DockerEventTracker> m_eventTracker;
     std::optional<DockerHTTPClient> m_dockerClient;
@@ -232,14 +262,35 @@ private:
     std::atomic<VmState> m_vmState{VmState::None};
     std::atomic<VmExitDisposition> m_vmExitDisposition{VmExitDisposition::Active};
 
-    // Set when OnVmStarted has fired for the current VM; gates the paired OnVmStopping so a VM that
-    // never finished starting (or had no started notification) does not emit a spurious stopping.
-    // The gate flip and the hook invocation both happen under m_notifyLock, so a start and a stop
-    // racing on different threads cannot interleave (which would otherwise let a stale OnVmStarted be
-    // delivered after the OnVmStopping it should have preceded). Recursive because the handler may
-    // reentrantly restart the VM, re-entering these notifications on the same thread.
+    // Identifies the current VM instance. Bumped under m_lock by StartVmLockHeld, so a notification
+    // whose delivery had to drop the runtime lock can still tell whether it is describing the VM it
+    // was raised for, or one that has since been torn down and replaced.
+    std::atomic<uint64_t> m_vmGeneration{0};
+
+    // The VM instance whose OnVmStarted has been delivered and not yet retired (0 = none). Set by
+    // NotifyVmStarted, retired by NotifyVmStopping as it announces the stop, and also cleared by
+    // TearDownVmLockHeld to cover a VM that goes away without a stop ever being announced. Retiring
+    // it on the announcement is what makes OnVmStopping exactly-once: the stop is committed before it
+    // is announced, so the instance can never come back and a second stop for the same generation
+    // (Terminate() racing an idle teardown) finds nothing to retire and stays silent.
+    //
+    // The generation check and the hook invocation both happen under m_notifyLock, so a start and a
+    // stop racing on different threads cannot interleave (which would otherwise let a stale
+    // OnVmStarted be delivered after the OnVmStopping it should have preceded), and a notification
+    // that lost such a race is dropped rather than misattributed to whichever VM is running by the
+    // time it is delivered. Recursive because the handler may reentrantly restart the VM, re-entering
+    // these notifications on the same thread.
     std::recursive_mutex m_notifyLock;
-    std::atomic<bool> m_vmStartNotified{false};
+    std::atomic<uint64_t> m_notifiedGeneration{0};
+
+    // Published under m_lock once a stop is decided and cleared when the teardown has finished. While
+    // it is set the VM is going away no matter what, so an ordinary lease must not be served by it;
+    // it waits on m_vmStopCompleteEvent (holding no lock, or the teardown could never reacquire the
+    // exclusive lock) and is then served by the next VM. Manual-reset and initially signaled so a
+    // lease that never sees a stop pending never blocks.
+    std::atomic<bool> m_vmStopPending{false};
+    wil::unique_event m_vmStopCompleteEvent{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
+
     std::shared_ptr<IdleState> m_idleState{std::make_shared<IdleState>()};
 
     WSLCVirtualMachineTerminationReason m_lastTerminationReason{WSLCVirtualMachineTerminationReasonUnknown};

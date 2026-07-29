@@ -130,7 +130,9 @@ interface IWSLCPluginNotifier : IUnknown
     // teardown). Errors are logged but ignored.
     HRESULT OnVmStarted();
 
-    // Called when the VM backing the session is about to stop. Errors are logged but ignored.
+    // Called when the VM backing the session is about to stop. The VM is still running, and is
+    // committed to stopping: session calls made from this callback are served by it, while any other
+    // caller waits for the teardown and is served by the next VM. Errors are logged but ignored.
     HRESULT OnVmStopping();
 };
 
@@ -680,7 +682,10 @@ interface IWSLCSession : IUnknown
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [out] IWSLCProcess** Process, [out] int* Errno);
+    // 'FromVmLifecycleCallback' must be set only by the service, and only for a call issued from
+    // within a VM lifecycle plugin callback (see IWSLCPluginNotifier::OnVmStopping): such a call is
+    // served by a VM that is already stopping, instead of waiting for the teardown it is blocking.
+    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [in] BOOL FromVmLifecycleCallback, [out] IWSLCProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
@@ -690,9 +695,10 @@ interface IWSLCSession : IUnknown
     // Terminate the VM and containers.
     HRESULT Terminate();
 
-    // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
-    HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath);
+    // Used only for testing (and by the plugin API). TODO: Think about moving them to a dedicated
+    // testing-only interface. See CreateRootNamespaceProcess for 'FromVmLifecycleCallback'.
+    HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly, [in] BOOL FromVmLifecycleCallback);
+    HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath, [in] BOOL FromVmLifecycleCallback);
     HRESULT MapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
