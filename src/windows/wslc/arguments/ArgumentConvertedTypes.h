@@ -1,5 +1,18 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
+/*++
 
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ArgumentConvertedTypes.h
+
+Abstract:
+
+    Declaration of the converted-value type aliases and ArgConvertedTypeMapping specializations that
+    back ArgMap's typed value cache. Types only; the validation:: converter functions that produce
+    these values live in ArgumentValidation.h.
+
+--*/
 #pragma once
 
 #include "ArgumentTypes.h"
