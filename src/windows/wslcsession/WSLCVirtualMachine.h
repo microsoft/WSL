@@ -160,6 +160,8 @@ public:
     void DetachDisk(_In_ ULONG Lun);
     void Ext4Format(_In_ const std::string& Device, _In_ std::optional<uint32_t> Uid = std::nullopt, _In_ std::optional<uint32_t> Gid = std::nullopt);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    void RemoveDirectory(_In_ const std::string& Path);
+    std::vector<std::string> ListDirectory(_In_ const std::string& Path);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
@@ -186,20 +188,24 @@ public:
 
     WSLCNetworkingMode NetworkingMode() const;
 
+    // True when port forwarding goes through the userspace wslrelay path (NAT mode, or Consomme with
+    // the wslrelay feature flag). That relay only supports TCP localhost mappings.
+    bool UseWslRelayPortForwarding() const;
+
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
-
-    bool UseWslRelayPortForwarding() const;
 
     // Initial setup during Connect()
     void ConfigureNetworking();
 
     // Queries the guest kernel for per-VM capabilities (currently the hv_pci swiotlb pool
-    // reserved at boot) and forwards them to the service so that subsequent virtio device-options
-    // can include the swiotlb token. Called after the root filesystem is mounted.
+    // reserved at boot) and forwards them to the service before virtio devices are created.
+    // Called after the root filesystem is mounted.
     void ReadGuestCapabilities();
 
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    static void MountVirtioFsChild(
+        wsl::shared::SocketChannel& Channel, _In_ LPCSTR Source, _In_ LPCSTR ChildName, _In_ LPCSTR Target, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
 
     Microsoft::WRL::ComPtr<WSLCProcess> CreateLinuxProcessImpl(
@@ -275,10 +281,6 @@ private:
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::map<std::string, GUID> m_mountedWindowsFolders;
-
-    // VirtioFs share cache: maps (normalized WindowsPath, readOnly) to share GUID.
-    // Shares are kept alive after unmount for reuse on subsequent mounts of the same folder.
-    std::map<std::pair<std::wstring, bool>, GUID> m_virtioFsShares;
 
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;

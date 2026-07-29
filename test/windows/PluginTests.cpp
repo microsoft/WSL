@@ -666,6 +666,7 @@ class PluginTests
             WSLCMountFolder(nonexistent): {}
             WSLCMountFolder(relative): {}
             Test completed
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
             WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
             WSLC Container stopping, session=*, id=*
             WSLC Image deleted, session=*, id=*
@@ -716,6 +717,8 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=21
             WSLC Session created, name=plugin-wslc-pull-test, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Image created, session=*, id=sha256:*, name=wslc-registry:latest
             WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
             WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
@@ -769,6 +772,7 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=20
             WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
             WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
             OnWslcContainerStarted: ERROR_ACCESS_DENIED
             WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";

@@ -21,6 +21,7 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
+#include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
 
@@ -38,7 +39,7 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
-constexpr auto c_storageVhdFilename = L"storage.vhdx";
+constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -47,13 +48,12 @@ namespace {
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
 // service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
-// any other COM client). The repo argument must be the parsed repo from
-// wslutil::ParseImage so callers don't pay the regex cost twice.
-void EnforceRegistryAllowlist(const std::string& Repo)
+// any other COM client). Callers pass the parsed repository so no reference is
+// parsed twice.
+void EnforceRegistryAllowlist(const wslutil::RepositoryReference& Repository)
 {
     const auto policiesKey = wsl::windows::policies::OpenPoliciesKey();
-    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(Repo);
-    const auto serverWide = wsl::shared::string::MultiByteToWide(server);
+    const auto serverWide = wsl::shared::string::MultiByteToWide(Repository.Server);
 
     if (wsl::windows::policies::IsRegistryAllowed(policiesKey.get(), serverWide))
     {
@@ -63,14 +63,14 @@ void EnforceRegistryAllowlist(const std::string& Repo)
     THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
 }
 
-std::string IndentLines(const std::string& input, const std::string& prefix)
+std::string IndentLines(const std::string& input, const std::string& prefix, bool prefixFirstLine = true)
 {
     if (input.empty())
     {
         return {};
     }
 
-    std::string result = prefix;
+    std::string result = prefixFirstLine ? prefix : "";
     for (size_t i = 0; i < input.size(); i++)
     {
         result.push_back(input[i]);
@@ -504,6 +504,11 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
 
+        if (WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsWarnCustomLocation))
+        {
+            EMIT_USER_WARNING(Localization::MessageWslcSessionStorageCustomLocation(storagePath.c_str()));
+        }
+
         std::filesystem::create_directories(storagePath);
         wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, false, false);
         vhdCreated = true;
@@ -764,7 +769,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
                 EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(*reportedError));
             }
 
-            reportedError = parsed.errorDetail->message;
+            reportedError = FormatDockerEngineError(parsed.errorDetail->message);
             return;
         }
 
@@ -787,7 +792,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         if (httpResponse->isJson)
         {
             // operation failed, parse the error message.
-            errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
+            errorMessage = FormatDockerEngineError(wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message);
         }
         else
         {
@@ -836,7 +841,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    const auto reference = wslutil::ImageReference::Parse(Image);
+    const auto& repo = reference.Repository;
+    auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
     auto lock = m_lock.lock_shared();
@@ -854,7 +861,7 @@ try
         registryAuth = std::string(RegistryAuthenticationInformation);
     }
 
-    auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest, registryAuth);
+    auto requestContext = m_dockerClient->PullImage(repo.Name, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
     OnImageCreated(Image);
@@ -874,6 +881,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->Labels.Count > 0 && Options->Labels.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Options->Secrets.Count > 0 && Options->Secrets.Values == nullptr);
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         WI_IsAnyFlagSet(static_cast<WSLCBuildImageFlags>(Options->Flags), ~WSLCBuildImageFlagsValid),
@@ -901,14 +909,37 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    GUID volumeId{};
-    THROW_IF_FAILED(CoCreateGuid(&volumeId));
-    auto mountPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
-    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(Options->ContextPath, mountPath.c_str(), TRUE));
-    auto unmountFolder =
-        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
+    // Track every Windows folder we mount into the VM during this build so a single scope_exit
+    // unmounts them all on success or on any throw partway through the loop below.
+    std::vector<std::string> mountedPaths;
+    auto unmountAll = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        for (const auto& path : mountedPaths)
+        {
+            // Best-effort but not silent: a failed unmount can leave a file-secret share mounted in the
+            // guest, so log it. Never throw here.
+            LOG_IF_FAILED(m_virtualMachine->UnmountWindowsFolder(path.c_str()));
+        }
+    });
+    auto mountInVm = [&](LPCWSTR windowsPath, BOOL readOnly, std::string_view guestBase = "/mnt") -> std::string {
+        GUID id{};
+        THROW_IF_FAILED(CoCreateGuid(&id));
+        auto vmPath = std::format("{}/{}", guestBase, wsl::shared::string::GuidToString<char>(id));
+        THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(windowsPath, vmPath.c_str(), readOnly));
+        mountedPaths.push_back(std::move(vmPath));
+        return mountedPaths.back();
+    };
 
-    std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
+    // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
+    // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. At most the build
+    // context (1) and one parent directory per file secret are mounted.
+    mountedPaths.reserve(static_cast<size_t>(1) + Options->Secrets.Count);
+
+    auto mountPath = mountInVm(Options->ContextPath, TRUE);
+
+    std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
+    // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
+    // values never touch disk; kept off telemetry (only buildArgs is logged).
+    std::vector<std::string> buildEnv;
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
@@ -944,13 +975,105 @@ try
         buildArgs.push_back(Options->Labels.Values[i]);
     }
 
+    // Deliver each secret to the build without ever writing the value to disk on host or guest, keeping
+    // it off argv/telemetry and re-readable across RUN steps - matching Docker's secret semantics. Two
+    // kinds of secret are handled:
+    //
+    //   * File (src=) secrets carry the resolved host path. We mount the file's *parent directory* into
+    //     the VM read-only and reference the file in place, so the bytes are never copied off their
+    //     original (possibly EFS-encrypted) location. Secrets sharing a directory reuse one mount.
+    //
+    //   * Env/in-memory secrets carry raw bytes (there is no source file). We hand the value to BuildKit
+    //     through an environment variable of the docker process (id=<id>,env=<var>); nothing is written
+    //     to disk, so there is nothing to clean up.
+    if (Options->Secrets.Count > 0)
+    {
+        // Guest tmpfs base for file-secret directory mounts: keeping them under /run means the secret
+        // contents never hit the guest disk and leave nothing to clean up if the session crashes.
+        constexpr std::string_view c_secretMountBase = "/run/build-secrets";
+
+        // (id, source spec) pairs - the source spec is docker's "src=<path>" or "env=<var>" token -
+        // emitted as --secret arguments once every secret is prepared.
+        std::vector<std::pair<std::string, std::string>> secretArgs;
+        secretArgs.reserve(Options->Secrets.Count);
+
+        // Dedup file-secret parent-directory mounts: secrets from the same host directory share a mount.
+        std::map<std::filesystem::path, std::string> fileSecretDirMounts;
+
+        for (ULONG i = 0; i < Options->Secrets.Count; i++)
+        {
+            const auto& secret = Options->Secrets.Values[i];
+            RETURN_HR_IF_MSG(E_INVALIDARG, secret.Id == nullptr, "Secret %u has a null id", i);
+            RETURN_HR_IF_MSG(E_INVALIDARG, secret.Id[0] == '\0', "Secret %u has an empty id", i);
+            RETURN_HR_IF_MSG(E_INVALIDARG, secret.Id[0] == '-', "Invalid secret id '%hs'", secret.Id);
+            // Id is interpolated into docker's comma/'='-delimited --secret spec below, so reject any
+            // ',' or '=' a malicious caller could use to inject extra options.
+            RETURN_HR_IF_MSG(
+                E_INVALIDARG,
+                std::string_view(secret.Id).find_first_of(",=") != std::string_view::npos,
+                "Invalid secret id '%hs'",
+                secret.Id);
+
+            if (secret.SourcePath != nullptr)
+            {
+                // File secret: mount the file's parent directory read-only and reference the file in
+                // place - the bytes are never copied. Mounting the whole directory (not just the file) is
+                // inherent to virtiofs sharing a directory tree; sibling files are exposed to this user's
+                // own build VM read-only for the build's duration only.
+                std::filesystem::path sourcePath(secret.SourcePath);
+                // The client and server may have different current directories, so a relative path is
+                // ambiguous - require an absolute path. An empty SourcePath is not absolute, so a
+                // malformed file secret fails here rather than being treated as an env secret.
+                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(secret.SourcePath), !sourcePath.is_absolute());
+                auto parent = sourcePath.parent_path();
+                auto fileNameUtf8 = sourcePath.filename().string();
+                RETURN_HR_IF(E_INVALIDARG, parent.empty() || fileNameUtf8.empty());
+                // The filename is interpolated into the CSV --secret spec; a ',' or '"' would corrupt it.
+                RETURN_HR_IF(E_INVALIDARG, fileNameUtf8.find_first_of(",\"") != std::string::npos);
+
+                auto it = fileSecretDirMounts.find(parent);
+                if (it == fileSecretDirMounts.end())
+                {
+                    it = fileSecretDirMounts.emplace(parent, mountInVm(parent.c_str(), TRUE, c_secretMountBase)).first;
+                }
+                secretArgs.emplace_back(secret.Id, std::format("src={}/{}", it->second, fileNameUtf8));
+            }
+            else
+            {
+                // Env/in-memory secret: hand the value to BuildKit through an environment variable of the
+                // docker process. BuildKit reads it (id=<id>,env=<var>) and streams it to the daemon, so
+                // the value never touches disk on host or guest and needs no cleanup.
+                RETURN_HR_IF(E_INVALIDARG, secret.ValueSize != 0 && secret.Value == nullptr);
+                std::string_view value;
+                if (secret.ValueSize != 0)
+                {
+                    value = std::string_view(reinterpret_cast<const char*>(secret.Value), secret.ValueSize);
+                }
+                // An environment variable value cannot contain a NUL; reject rather than silently
+                // truncate the secret.
+                RETURN_HR_IF(E_INVALIDARG, value.find('\0') != std::string_view::npos);
+
+                auto varName = std::format("WSLC_SECRET_{}", std::to_string(i));
+
+                buildEnv.push_back(std::format("{}={}", varName, value));
+                secretArgs.emplace_back(secret.Id, std::format("env={}", varName));
+            }
+        }
+
+        for (const auto& [id, source] : secretArgs)
+        {
+            buildArgs.push_back("--secret");
+            buildArgs.push_back(std::format("id={},{}", id, source));
+        }
+    }
+
     buildArgs.push_back("-f");
     buildArgs.push_back("-");
     buildArgs.push_back(mountPath);
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
-    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, WSLCProcessFlagsStdin);
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, buildEnv, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     auto io = CreateIOContext();
@@ -1085,6 +1208,10 @@ try
                 std::string decoded = wslutil::Base64Decode(log.data);
                 if (!decoded.empty())
                 {
+                    // The first character of this chunk begins a new line (and so needs a stage prefix) unless it
+                    // continues an unterminated line from the same vertex.
+                    bool continuingLine = needsNewline && log.vertex == lastLogVertex;
+
                     if (log.vertex != lastLogVertex && decoded[0] != '\n')
                     {
                         flushLine();
@@ -1096,11 +1223,13 @@ try
                     {
                         reportProgress(decoded.substr(0, 1), c_logId);
                         decoded.erase(0, 1);
+
+                        continuingLine = false;
                     }
 
                     if (!decoded.empty())
                     {
-                        reportProgress(IndentLines(decoded, logPrefix(it->second)), c_logId);
+                        reportProgress(IndentLines(decoded, logPrefix(it->second), !continuingLine), c_logId);
                     }
 
                     needsNewline = !decoded.empty() && decoded.back() != '\n';
@@ -1215,11 +1344,9 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, ULONGLONG ContentSize, IWarningCallback* WarningCallback, IImageLoadCallback* LoadCallback)
 try
 {
-    UNREFERENCED_PARAMETER(ProgressCallback);
-
     WSLCExecutionContext context(this, WarningCallback);
 
     auto lock = m_lock.lock_shared();
@@ -1228,18 +1355,15 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    std::ignore = ImportImageImpl(*requestContext, ImageHandle);
+    std::ignore = ImportImageImpl(*requestContext, ImageHandle, LoadCallback);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(
-    const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
+HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, ULONGLONG ContentSize, IWarningCallback* WarningCallback, LPSTR* ImageId)
 try
 {
-    UNREFERENCED_PARAMETER(ProgressCallback);
-
     WSLCExecutionContext context(this, WarningCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, ImageId);
@@ -1252,9 +1376,10 @@ try
     {
         RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
 
-        auto [parsedRepo, tagOrDigest] = wslutil::ParseImage(ImageName);
+        auto reference = wslutil::ImageReference::Parse(ImageName);
+        auto tagOrDigest = reference.TagOrDigest();
         THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
-        repo = parsedRepo;
+        repo = reference.Repository.Name;
         tag = tagOrDigest.value();
     }
 
@@ -1282,9 +1407,15 @@ try
 }
 CATCH_RETURN();
 
-std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
+std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback)
 {
     auto userHandle = OpenUserHandle(ImageHandle);
+
+    std::optional<UserCOMCallback> comCall;
+    if (LoadCallback != nullptr)
+    {
+        comCall = RegisterUserCOMCallback();
+    }
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1332,11 +1463,42 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
                 EMIT_USER_WARNING(wsl::shared::string::MultiByteToWide(*errorMessage));
             }
 
-            errorMessage = std::move(parsed.errorDetail->message);
+            errorMessage = FormatDockerEngineError(parsed.errorDetail->message);
         }
         else if (parsed.stream.has_value())
         {
             WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
+
+            {
+                static constexpr std::string_view c_loadedImagePrefix = "Loaded image: ";
+                static constexpr std::string_view c_loadedImageIdPrefix = "Loaded image ID: ";
+
+                for (const auto& entry : shared::string::Split(*parsed.stream, '\n'))
+                {
+                    std::string name;
+                    EnumReferenceFormat format = EnumReferenceFormatNone;
+                    if (entry.starts_with(c_loadedImagePrefix))
+                    {
+                        name = entry.substr(c_loadedImagePrefix.size());
+                        format = EnumReferenceFormatTag;
+                    }
+                    else if (entry.starts_with(c_loadedImageIdPrefix))
+                    {
+                        name = entry.substr(c_loadedImageIdPrefix.size());
+                        format = EnumReferenceFormatDigest;
+                    }
+
+                    if (!name.empty())
+                    {
+                        OnImageCreated(name);
+
+                        if (LoadCallback != nullptr)
+                        {
+                            THROW_IF_FAILED(LoadCallback->OnImageLoaded(name.c_str(), format));
+                        }
+                    }
+                }
+            }
         }
         else if (parsed.status.has_value())
         {
@@ -1374,7 +1536,7 @@ std::optional<std::string> WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRe
     {
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(pendingErrorJson->c_str());
 
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, FormatDockerEngineError(error.message));
     }
 
     // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
@@ -1466,8 +1628,9 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         // Save failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message.c_str());
+        const auto errorMessage = FormatDockerEngineError(error.message);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 
@@ -1563,7 +1726,7 @@ try
 
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
-                auto repoName = wslutil::ParseImage(tag).first;
+                auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())
                 {
@@ -1624,7 +1787,7 @@ try
         std::string errorMessage;
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
@@ -1696,7 +1859,7 @@ try
         std::string errorMessage;
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
@@ -1717,13 +1880,15 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Image);
     RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    const auto reference = wslutil::ImageReference::Parse(Image);
+    const auto& repo = reference.Repository;
+    auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, RegistryAuthenticationInformation);
+    auto requestContext = m_dockerClient->PushImage(repo.Name, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 
     return S_OK;
@@ -1762,7 +1927,7 @@ std::string WSLCSession::InspectImageLockHeld(const std::string& NameOrId)
         std::string errorMessage = "Failed to inspect image";
         if (e.HasErrorMessage())
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
@@ -1973,7 +2138,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
         std::string errorMessage;
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            errorMessage = FormatDockerEngineError(e.DockerMessage<docker_schema::ErrorResponse>().message);
         }
 
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
@@ -2437,7 +2602,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
 
     std::string name = Options->Name;
-    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCBridgeNetworkDriver;
+    std::string driver = Options->Driver != nullptr ? Options->Driver : WSLCBridgeNetworkDriver;
 
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
@@ -2446,17 +2611,6 @@ try
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
-
-    static constexpr std::array<std::string_view, 3> c_supportedDriverOpts{"Internal", "Subnet", "Gateway"};
-    for (const auto& [key, _] : driverOpts)
-    {
-        const bool supported = std::any_of(
-            c_supportedDriverOpts.begin(), c_supportedDriverOpts.end(), [&](std::string_view opt) { return key == opt; });
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriverOption(key), !supported);
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), driverOpts.contains("Gateway") && !driverOpts.contains("Subnet"));
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -2471,25 +2625,37 @@ try
     request.Labels = labels;
     request.Labels[WSLCNetworkManagedLabel] = "true";
 
-    if (auto it = driverOpts.find("Internal"); it != driverOpts.end())
-    {
-        request.Internal = (it->second == "true");
-    }
+    request.Internal = static_cast<bool>(Options->Internal);
 
-    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcIpRangeRequiresSubnet(), Options->IpRange != nullptr && Options->Subnet == nullptr);
+
+    if (Options->Subnet != nullptr)
     {
         docker_schema::IPAMConfig ipamConfig;
-        ipamConfig.Subnet = it->second;
+        ipamConfig.Subnet = Options->Subnet;
 
-        auto gatewayIt = driverOpts.find("Gateway");
-        if (gatewayIt != driverOpts.end())
+        if (Options->Gateway != nullptr)
         {
-            ipamConfig.Gateway = gatewayIt->second;
+            ipamConfig.Gateway = Options->Gateway;
+        }
+
+        if (Options->IpRange != nullptr)
+        {
+            ipamConfig.IPRange = Options->IpRange;
         }
 
         auto& ipam = request.IPAM.emplace();
         ipam.Driver = "default";
         ipam.Config.emplace().push_back(std::move(ipamConfig));
+    }
+
+    if (!driverOpts.empty())
+    {
+        request.Options = std::move(driverOpts);
     }
 
     docker_schema::CreateNetworkResponse createResult;
@@ -2529,13 +2695,17 @@ try
     entry.Scope = full.Scope;
     entry.Internal = full.Internal;
     entry.Labels = full.Labels;
+    if (full.Options)
+    {
+        entry.Options = *full.Options;
+    }
     entry.IPAM.Driver = full.IPAM.Driver;
     if (full.IPAM.Config)
     {
         auto& cfgs = entry.IPAM.Config.emplace();
         for (const auto& c : *full.IPAM.Config)
         {
-            cfgs.push_back({c.Subnet, c.Gateway});
+            cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
         }
     }
 
@@ -2653,6 +2823,10 @@ try
     result.Scope = entry.Scope;
     result.Internal = entry.Internal;
     result.Labels = entry.Labels;
+    if (!entry.Options.empty())
+    {
+        result.Options = entry.Options;
+    }
 
     result.IPAM.Driver = entry.IPAM.Driver;
     if (entry.IPAM.Config)
@@ -2663,6 +2837,7 @@ try
             wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
             inspectCfg.Gateway = cfg.Gateway;
+            inspectCfg.IPRange = cfg.IPRange;
             configs.push_back(std::move(inspectCfg));
         }
     }
@@ -3090,28 +3265,21 @@ HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
 }
 
-HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback* ProgressCallback, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
+HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback*, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
 {
     const auto handle = apicompat::Convert(ImageHandle);
-    const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return LoadImage(handle, progress.Get(), ContentLength, warning.Get());
+    return LoadImage(handle, ContentLength, warning.Get(), nullptr);
 }
 
 HRESULT WSLCSession::ImportImage(
-    WSLCCompatHandle ImageHandle,
-    LPCSTR ImageName,
-    IWSLCCompatProgressCallback* ProgressCallback,
-    ULONGLONG ContentLength,
-    IWSLCCompatWarningCallback* WarningCallback,
-    LPSTR* ImageId)
+    WSLCCompatHandle ImageHandle, LPCSTR ImageName, IWSLCCompatProgressCallback*, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback, LPSTR* ImageId)
 {
     const auto handle = apicompat::Convert(ImageHandle);
-    const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return ImportImage(handle, ImageName, progress.Get(), ContentLength, warning.Get(), ImageId);
+    return ImportImage(handle, ImageName, ContentLength, warning.Get(), ImageId);
 }
 
 HRESULT WSLCSession::ListImages(const WSLCCompatListImagesOptions* Options, WSLCCompatImageInformation** Images, ULONG* Count)
@@ -3373,7 +3541,9 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock(m_containersLock);
 
-    WI_VERIFY(m_containers.erase(Container->ID()) == 1);
+    // N.B. once a container transitions to a 'Deleted' state, a call to ListContainers() can remove it from m_containers.
+    // Therefore it's possible that the container is already removed when the callback from Delete() is invoked.
+    m_containers.erase(Container->ID());
 }
 
 HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
@@ -3483,13 +3653,17 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Scope = network.Scope;
             entry.Internal = network.Internal;
             entry.Labels = network.Labels;
+            if (network.Options)
+            {
+                entry.Options = *network.Options;
+            }
             entry.IPAM.Driver = network.IPAM.Driver;
             if (network.IPAM.Config)
             {
                 auto& cfgs = entry.IPAM.Config.emplace();
                 for (const auto& c : *network.IPAM.Config)
                 {
-                    cfgs.push_back({c.Subnet, c.Gateway});
+                    cfgs.push_back({c.Subnet, c.Gateway, c.IPRange});
                 }
             }
 

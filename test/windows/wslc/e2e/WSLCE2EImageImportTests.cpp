@@ -57,9 +57,8 @@ class WSLCE2EImageImportTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_MissingFile)
     {
         const auto result = RunWslc(L"image import");
-        result.Verify({.ExitCode = 1});
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_TRUE(result.Stderr->find(L"Required argument not provided: 'file'") != std::wstring::npos);
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'file'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_Success)

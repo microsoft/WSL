@@ -15,6 +15,8 @@ Abstract:
 
 #include "SessionModel.h"
 #include "VolumeModel.h"
+#include "Reporter.h"
+#include <wslc.h>
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
@@ -24,6 +26,7 @@ struct VolumeService
     static void Delete(models::Session& session, const std::string& name);
     static std::vector<WSLCVolumeInformation> List(models::Session& session);
     static wsl::windows::common::wslc_schema::InspectVolume Inspect(models::Session& session, const std::string& name);
-    static models::PruneVolumesResult Prune(models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters = {});
+    static models::PruneVolumesResult Prune(
+        Reporter& reporter, models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters = {});
 };
 } // namespace wsl::windows::wslc::services

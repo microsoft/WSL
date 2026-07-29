@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #pragma once
+#include "Reporter.h"
 #include "SessionService.h"
 #include "VTSupport.h"
 #include <deque>
@@ -23,7 +24,8 @@ class DECLSPEC_UUID("3EDD5DBF-CA6C-4CF7-923A-AD94B6A732E5") BuildImageCallback
 {
 public:
     // The cancel event handle must remain valid for the lifetime of this callback.
-    BuildImageCallback(HANDLE cancelEvent, bool verbose) : m_verbose(verbose), m_cancelEvent(cancelEvent)
+    BuildImageCallback(Reporter& reporter, HANDLE cancelEvent, bool verbose) :
+        m_reporter(reporter), m_verbose(verbose), m_cancelEvent(cancelEvent)
     {
     }
     ~BuildImageCallback();
@@ -37,16 +39,12 @@ private:
     void CollapseWindow();
     void Redraw();
     void RedrawIfNeeded();
-    // Use WriteConsoleW directly rather than wprintf: wprintf is noticeably slower for
-    // the per-redraw scrolling display and produces visible flicker.
-    void WriteTerminal(std::wstring_view content) const;
     bool IsCancelled() const;
 
+    Reporter& m_reporter;
     const bool m_verbose;
     const HANDLE m_cancelEvent;
-    HANDLE m_console = GetStdHandle(STD_OUTPUT_HANDLE);
-    bool m_isConsole = wsl::windows::common::wslutil::IsConsoleHandle(m_console);
-    wsl::windows::common::vt::EnableVirtualTerminal m_vtMode{m_console};
+    bool m_isConsole = m_reporter.IsVTEnabled(Reporter::Level::Info);
     std::deque<std::string> m_lines;
     // Each entry already contains the trailing newline so the bytes match what's replayed.
     // TODO: Track logs per step so the destructor can replay only the failing step's

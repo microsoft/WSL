@@ -82,13 +82,10 @@ private:
     ULONG m_bootTimeoutMs{};
 
     wil::shared_handle m_userToken;
-    GUID m_virtioFsClassId{};
-
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
 
-    // Swiotlb device-options token sized to fit inside the VM's RAM (empty when too small).
-    std::wstring m_swiotlbOption;
+    bool m_swiotlbConfigured = false;
 
     wil::unique_socket m_listenSocket;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
@@ -100,8 +97,9 @@ private:
     std::map<ULONG, DiskInfo> m_attachedDisks;
     std::bitset<MAX_VHD_COUNT> m_lunBitmap;
 
-    // Shares: key is ShareId, value is nullopt for Plan9 or DeviceInstanceId for VirtioFS
+    // Shares: key is ShareId, value is nullopt for Plan9 or the aggregate DeviceInstanceId for VirtioFS.
     std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;
+    std::optional<GUID> m_virtioFsDevice;
 
     std::filesystem::path m_vmSavedStateFile;
     std::filesystem::path m_crashDumpFolder;

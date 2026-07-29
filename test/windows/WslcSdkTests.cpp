@@ -1513,6 +1513,60 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(missing, WSLC_COMPONENT_FLAG_NONE);
     }
 
+    WSLC_TEST_METHOD(InstallWithDependencies_NoComponents_Succeeds)
+    {
+        // Passing WSLC_COMPONENT_FLAG_NONE must return S_OK immediately without requiring elevation.
+        VERIFY_SUCCEEDED(WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_NONE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
+    WSLC_TEST_METHOD(InstallWithDependencies_SdkNeedsUpdate_ReturnsError)
+    {
+        // Passing SDK_NEEDS_UPDATE must always return WSLC_E_SDK_UPDATE_NEEDED — the caller must update their SDK.
+        VERIFY_ARE_EQUAL(
+            WSLC_E_SDK_UPDATE_NEEDED,
+            WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
+    WSLC_TEST_METHOD(InstallWithDependencies_WslPackage_GhFallback404)
+    {
+        // Without repair semantics, DCAT uses EnsureProductRegistration so it should find no update
+        // (the product is already registered at the current version). The code then falls back to the
+        // GitHub release endpoint. This test intercepts that fallback: the fake API server returns a
+        // release whose asset URL points at a second local server that always responds with HTTP 404,
+        // so the download fails and WslcInstallWithDependencies surfaces an error HRESULT.
+        constexpr auto apiEndpoint = L"http://127.0.0.1:12345/";
+        constexpr auto assetEndpoint = L"http://127.0.0.1:12346/";
+
+        RegistryKeyChange<std::wstring> urlOverride(
+            HKEY_LOCAL_MACHINE,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss",
+            wsl::windows::common::wslutil::c_githubUrlOverrideRegistryValue,
+            apiEndpoint);
+
+        // Version 1.0.0 is below the current package version, so without repair=true the version
+        // check in UpdatePackageImpl would short-circuit and return early. Using a sub-2.0 version
+        // here confirms that the repair flag (always set in the GH fallback) is what drives the
+        // download attempt rather than the version being newer than the installed one.
+        constexpr auto GitHubApiResponse =
+            LR"([{
+                \"name\": \"1.0.0\",
+                \"created_at\": \"2023-06-14T16:56:30Z\",
+                \"assets\": [
+                    {
+                        \"url\": \"http://127.0.0.1:12346/fake.msixbundle\",
+                        \"id\": 1,
+                        \"name\": \"Microsoft.WSL_1.0.0.0_x64_ARM64.msixbundle\"
+                    }
+                ]
+            }])";
+
+        UniqueWebServer apiServer(apiEndpoint, GitHubApiResponse);
+        UniqueWebServer assetServer(assetEndpoint, L"", 404u);
+
+        VERIFY_ARE_EQUAL(
+            HTTP_E_STATUS_NOT_FOUND, WslcInstallWithDependencies(WSLC_COMPONENT_FLAG_WSL_PACKAGE, WSLC_INSTALL_OPTION_NONE, nullptr, nullptr));
+    }
+
     // -----------------------------------------------------------------------
     // WslcSetProcessSettingsCallbacks tests
     // -----------------------------------------------------------------------
@@ -2753,6 +2807,58 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcPullSessionImage(m_defaultSession, &opts, nullptr));
             VERIFY_IS_TRUE(HasImage(registryImage));
             VERIFY_IS_TRUE(ctx.sawKnownStatus);
+        }
+    }
+
+    WSLC_TEST_METHOD(ResourceReuseAfterCleanup)
+    {
+        // Each iteration exercises the complete lifecycle: create session → load image → run container
+        // → terminate session → release session. Running 10 times on the same storage path verifies
+        // that all resources (VHD locks, image store, container overlays, process handles, VM) are
+        // fully freed by the time WslcReleaseSession returns, so the next iteration can reuse them
+        // without errors.
+        std::filesystem::path sessionStorage = m_storagePath / "wslc-resource-reuse-storage";
+
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(sessionStorage, ec);
+        });
+
+        WslcSessionSettings sessionSettings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-resource-reuse", sessionStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsCpuCount(&sessionSettings, 2));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsMemory(&sessionSettings, 1024));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
+
+        WslcVhdRequirements vhdReqs{};
+        vhdReqs.sizeBytes = 2048ull * 1024 * 1024; // 2 GB
+        vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
+
+        constexpr auto c_imageName = "hello-world:latest";
+        constexpr int c_iterationCount = 10;
+
+        for (int i = 0; i < c_iterationCount; ++i)
+        {
+            LogInfo("ResourceReuseAfterCleanup: iteration %d / %d", i + 1, c_iterationCount);
+
+            // Create the session, reusing the same storage path every iteration.
+            UniqueSession session;
+            VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+            VERIFY_IS_NOT_NULL(session.get());
+
+            // Load the test image into the session.
+            VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), GetTestImagePath(c_imageName).c_str(), nullptr, nullptr));
+
+            // Run a container using the image's default entrypoint and capture its output.
+            auto output = RunContainerAndCapture(session.get(), c_imageName, {});
+            VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
+
+            // Terminate the session, then release it. WslcReleaseSession must return only after all
+            // resources are freed so that the next iteration can reopen the same storage without error.
+            VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
+            VERIFY_SUCCEEDED(WslcReleaseSession(session.get()));
+            session.release(); // explicit calls above
         }
     }
 

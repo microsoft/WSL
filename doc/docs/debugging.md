@@ -15,6 +15,7 @@ wpr -stop logs.ETL
 ```
 
 The consolidated `wsl.wprp` file includes multiple profiles for different scenarios:
+
 - `WSL` - General WSL tracing (default)
 - `WSL-Storage` - Enhanced storage tracing
 - `WSL-Networking` - Comprehensive networking tracing
@@ -49,6 +50,30 @@ debugConsole=true
 ```
 
 to `%USERPROFILE%/.wslconfig` and restarting WSL
+
+
+## WSLg (graphical and audio applications) logs
+
+[WSLg](https://github.com/microsoft/wslg) runs graphical and audio Linux applications. It runs a
+system distro that hosts the `weston` Wayland compositor (with an RDP backend), `Xwayland`,
+`pulseaudio`, and `FreeRDP`. WSLg's source lives in a separate repository:
+[microsoft/wslg](https://github.com/microsoft/wslg).
+
+WSLg writes its logs to `/mnt/wslg` (accessible from Windows via `\\wsl$\<Distro>\mnt\wslg`):
+
+- `weston.log` - Weston compositor and RDP backend log
+- `wlog.log` - FreeRDP log
+- `pulseaudio.log` - PulseAudio log
+- `stderr.log` - `WSLGd` and child-process stderr
+- `versions.txt` - WSLg version and component git hashes
+
+Crash dumps (e.g. `core.weston`) are written to `%TEMP%\wsl-crashes` on newer builds, or
+`/mnt/wslg/dumps` on older ones.
+
+The [collect-wsl-logs.ps1](https://github.com/microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1)
+script gathers the logs above automatically into a `wslg/` folder (crash dumps are included when run
+with `-Dump`). Note that `weston.log` is truncated on every system-distro boot, so it only contains
+the most recent boot.
 
 
 ## Attaching debuggers

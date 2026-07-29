@@ -151,16 +151,61 @@ struct CaptureReporter
 template <size_t N>
 struct TableOutputCapture
 {
-    std::vector<std::wstring> lines;
+    CaptureReporter capture;
     wsl::windows::wslc::TableOutput<N> table;
 
-    // Forwards constructor arguments straight to TableOutput.
-    template <typename... Args>
-    explicit TableOutputCapture(Args&&... args) : table(std::forward<Args>(args)...)
+    // Header + optional config + optional VT flag.
+    explicit TableOutputCapture(
+        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
+        size_t sizingBuffer = 50,
+        size_t columnPadding = wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding,
+        bool vtEnabled = false) :
+        capture(vtEnabled), table(capture.reporter, std::move(header), sizingBuffer, columnPadding)
     {
-        table.SetOutputFunction([this](const std::wstring& line) { lines.push_back(line); });
-        // Pin the console width so shrinking tests are deterministic.
         table.SetConsoleWidthOverride(120);
+    }
+
+    // Header + column configs + optional VT flag.
+    explicit TableOutputCapture(
+        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
+        typename wsl::windows::wslc::TableOutput<N>::column_config_t&& configs,
+        bool vtEnabled = false) :
+        capture(vtEnabled),
+        table(capture.reporter, std::move(header), std::move(configs), 50, wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding)
+    {
+        table.SetConsoleWidthOverride(120);
+    }
+
+    // Column definitions.
+    explicit TableOutputCapture(typename wsl::windows::wslc::TableOutput<N>::column_def_t&& defs, bool vtEnabled = false) :
+        capture(vtEnabled), table(capture.reporter, std::move(defs))
+    {
+        table.SetConsoleWidthOverride(120);
+    }
+
+    // Returns captured output split into lines.
+    std::vector<std::wstring> lines()
+    {
+        auto raw = capture.captured();
+        std::vector<std::wstring> result;
+        size_t pos = 0;
+        while (pos < raw.size())
+        {
+            auto nl = raw.find(L'\n', pos);
+            if (nl == std::wstring::npos)
+            {
+                result.emplace_back(raw.substr(pos));
+                break;
+            }
+            result.emplace_back(raw.substr(pos, nl - pos));
+            pos = nl + 1;
+        }
+        // Remove trailing empty entry from final newline.
+        if (!result.empty() && result.back().empty())
+        {
+            result.pop_back();
+        }
+        return result;
     }
 };
 } // namespace WSLCTestHelpers

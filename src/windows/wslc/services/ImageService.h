@@ -15,9 +15,23 @@ Abstract:
 
 #include "SessionModel.h"
 #include "ImageModel.h"
+#include "Reporter.h"
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
+
+struct BuildSecret
+{
+    std::wstring Id; // value for docker's --secret id= field
+    // For file (src=) secrets: the resolved absolute host path. The service mounts the file's parent
+    // directory into the build VM read-only and references the file in place, so the bytes are never
+    // copied off their original (possibly EFS-encrypted) location. Empty for env/in-memory secrets.
+    std::wstring SourcePath;
+    // For env/in-memory secrets: the raw secret bytes (may contain NULs), materialized into a host-side
+    // file mounted read-only into the VM during the build. Empty for file secrets.
+    std::vector<BYTE> Value;
+};
+
 class ImageService
 {
 public:
@@ -27,6 +41,7 @@ public:
         const std::vector<std::wstring>& tags,
         const std::vector<std::wstring>& buildArgs,
         const std::vector<std::wstring>& labels,
+        const std::vector<BuildSecret>& secrets,
         const std::wstring& dockerfilePath,
         const std::wstring& target,
         WSLCBuildImageFlags flags,
@@ -35,12 +50,12 @@ public:
 
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(
         wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
-    static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
-    static std::string Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
+    static void Load(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback = nullptr);
+    static std::string Import(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
     static wsl::windows::common::wslc_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
-    static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
-    static void Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    static void Pull(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    static void Push(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent = nullptr);
     static void Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, HANDLE outputHandle, HANDLE cancelEvent = nullptr);
     static void Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage);
