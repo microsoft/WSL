@@ -41,8 +41,12 @@ private:
     wil::unique_hfile m_OutputHandle;
     bool m_interactiveModeConfigured{false};
     std::optional<DWORD> m_SavedInputMode{};
+    std::optional<DWORD> m_ConfiguredInputMode{};
     std::optional<UINT> m_SavedInputCodePage{};
+    std::optional<UINT> m_ConfiguredInputCodePage{};
     std::optional<DWORD> m_SavedOutputMode{};
+    std::optional<DWORD> m_ConfiguredOutputMode{};
     std::optional<UINT> m_SavedOutputCodePage{};
+    std::optional<UINT> m_ConfiguredOutputCodePage{};
 };
 } // namespace wsl::windows::common
