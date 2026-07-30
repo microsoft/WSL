@@ -902,6 +902,27 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
+    WSL2_TEST_METHOD(WslcVmNeverStarted)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmNeverStarted);
+
+        // A session whose VM is never needed. VM bring-up is lazy, so creating and destroying the
+        // session must not produce either VM notification: OnWslcVmStopping is documented to fire
+        // exactly once per OnWslcVmStarted, and a stop for a VM that never existed would break the
+        // pairing every plugin relies on to track VM lifetime.
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-never-started");
+            VERIFY_IS_NOT_NULL(session.get());
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=24
+            WSLC Session created, name=plugin-wslc-vm-never-started, id=*, pid=*, token=set, sid=set
+            WSLC Session stopping, name=plugin-wslc-vm-never-started, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // This test must run last so it doesn't break test cases that depends on plugin signature.
     WSL2_TEST_METHOD(InvalidPluginSignature)
     {

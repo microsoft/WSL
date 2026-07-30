@@ -157,8 +157,9 @@ typedef HRESULT (*WSLPluginAPI_OnWslcVmStarted)(const struct WSLCSessionInformat
 // The stop is guaranteed: the VM is torn down as soon as this call returns, and nothing the callback
 // does can keep it alive. Any work the callback leaves running in the VM -- a process it did not wait
 // for, for example -- dies with it. Calls made by other threads while this callback is running do not
-// keep the VM alive either; they block and are served by the next VM, which is reported by a new
-// OnWslcVmStarted.
+// keep the VM alive either; they block until the teardown completes and are then served by the next
+// VM, reported by a new OnWslcVmStarted. If the session itself is terminating there is no next VM and
+// those calls fail once the teardown completes.
 //
 // The callback must therefore not block waiting on another thread that is calling into this session:
 // that thread is waiting for the teardown, and the teardown is waiting for this callback to return.

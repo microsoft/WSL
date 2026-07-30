@@ -2541,7 +2541,15 @@ try
     // container, so attach an activity token bound to the process's lifetime; this keeps the VM
     // alive for as long as the client holds the process, preventing the idle worker from tearing
     // the VM down and killing the process out from under the client.
-    process->SetKeepAliveToken(CreateActivityToken());
+    //
+    // Not for a call from the OnVmStopping handler: that VM is already committed to stopping, so the
+    // token cannot protect the process (it dies with the VM, as documented). Attaching one anyway
+    // would keep counting activity for as long as the plugin holds the proxy and would block idle
+    // termination of every subsequent VM in this session.
+    if (!FromVmLifecycleCallback)
+    {
+        process->SetKeepAliveToken(CreateActivityToken());
+    }
 
     THROW_IF_FAILED(process.CopyTo(Process));
 

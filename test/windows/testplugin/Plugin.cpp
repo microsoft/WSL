@@ -574,6 +574,13 @@ try
         return S_OK;
     }
 
+    // The VM-never-started test asserts these hooks stay silent for a session that never needs a VM.
+    if (g_testType == PluginTestType::WslcVmNeverStarted)
+    {
+        g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
+        return S_OK;
+    }
+
     // Only log/exercise for the dedicated VM-restart test so other WSLC plugin tests (which start
     // and stop VMs incidentally) are not affected by extra log lines.
     if (g_testType != PluginTestType::WslcVmRestart)
@@ -615,6 +622,12 @@ CATCH_RETURN();
 HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
 try
 {
+    if (g_testType == PluginTestType::WslcVmNeverStarted)
+    {
+        g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+        return S_OK;
+    }
+
     if (g_testType == PluginTestType::WslcVmStopCommitted)
     {
         // Only the idle teardown is interesting here. The session's final teardown races with the
@@ -642,11 +655,6 @@ try
 
             g_logfile << "WSLC stop-window caller: " << (SUCCEEDED(g_stopWindowCallerResult) ? "ok" : "failed") << std::endl;
 
-            // This thread was released by the teardown, so the VM that was stopping is gone and it
-            // took the leaked process with it. Prove that directly instead of inferring it from the
-            // fact that a new VM started -- a process that outlived the stop is the exact symptom of
-            // an announced stop that did not happen. Logged from this thread so it stays ordered
-            // against the line above.
             // This thread was released by the teardown, so the VM that was stopping is gone and it
             // took the leaked process with it. Prove that directly instead of inferring it from the
             // fact that a new VM started -- a process that outlived the stop is the exact symptom of
@@ -733,7 +741,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmStopCommitted));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmNeverStarted));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

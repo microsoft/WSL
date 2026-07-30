@@ -682,9 +682,13 @@ interface IWSLCSession : IUnknown
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
-    // 'FromVmLifecycleCallback' must be set only by the service, and only for a call issued from
-    // within a VM lifecycle plugin callback (see IWSLCPluginNotifier::OnVmStopping): such a call is
-    // served by a VM that is already stopping, instead of waiting for the teardown it is blocking.
+    // 'FromVmLifecycleCallback' is set by the service for a call issued from within a VM lifecycle
+    // plugin callback (see IWSLCPluginNotifier::OnVmStopping): such a call is served by a VM that is
+    // already stopping, instead of waiting for the teardown it is blocking. The session cannot verify
+    // this -- the callback runs in the service, in another process -- so the flag is advisory. Setting
+    // it outside that context is self-defeating rather than dangerous: it opts the caller into a VM
+    // that is about to be torn down, so its work is destroyed and only that caller's session is
+    // affected.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [in] BOOL FromVmLifecycleCallback, [out] IWSLCProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.

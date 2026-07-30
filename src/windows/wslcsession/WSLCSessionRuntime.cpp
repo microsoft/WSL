@@ -318,10 +318,14 @@ void WSLCSessionRuntime::NotifyVmStopping(uint64_t Generation)
     // same VM (e.g. Terminate() racing an idle teardown that has dropped the lock across its
     // notification) cannot deliver OnVmStopping twice. This is safe because the stop is committed
     // before it is announced: the VM cannot come back, so nothing needs the generation afterwards.
+    //
+    // Generation 0 is the sentinel for "no VM has been announced": both counters start there, so a
+    // session that is torn down without ever starting a VM must not match, or Shutdown would deliver
+    // an OnVmStopping that no OnVmStarted ever paired with.
     auto lock = std::lock_guard(m_notifyLock);
 
     auto expected = Generation;
-    if (m_notifiedGeneration.compare_exchange_strong(expected, 0) && m_hooks.OnVmStopping)
+    if (Generation != 0 && m_notifiedGeneration.compare_exchange_strong(expected, 0) && m_hooks.OnVmStopping)
     {
         m_hooks.OnVmStopping();
     }
@@ -471,8 +475,10 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
     // the notified instance up front, before any step below can throw, also covers the case where the
     // VM is torn down without an OnVmStopping ever being announced (e.g. bring-up failed). Written
     // under the runtime lock; NotifyVmStarted/NotifyVmStopping read it under m_notifyLock without the
-    // runtime lock, but both of those run with the VM either fully started or fully torn down, never
-    // mid-teardown.
+    // runtime lock, so this store can land while one of them is inside a plugin handler. That is
+    // benign: both compare against a generation they captured earlier, so a store of 0 can only make
+    // them decline to notify, and by this point either the stop has already been announced (its CAS
+    // ran first) or the instance is gone and must not be announced at all.
     m_notifiedGeneration.store(0);
 
     // Latch whether the guest is already dead before running session-state cleanup so container
@@ -657,10 +663,18 @@ try
 
     // Fire OnVmStopping with m_lock dropped so a plugin handler may take a VM lease without
     // deadlocking, and while the VM is still running so the handler can still use it.
+    //
+    // The notification cannot be allowed to abort the teardown: the stop is already published and its
+    // generation retired, so bailing out here would leave waiters to be served by the VM they were
+    // promised would die, and its eventual teardown would be silent.
     const auto generation = m_vmGeneration.load();
 
     lock.reset();
-    NotifyVmStopping(generation);
+    try
+    {
+        NotifyVmStopping(generation);
+    }
+    CATCH_LOG();
     lock = m_lock.lock_exclusive();
 
     // Unconditional: the stop was announced, so it happens. Reacquiring the exclusive lock first
@@ -734,7 +748,11 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
             const auto generation = m_vmGeneration.load();
 
             lock.reset();
-            NotifyVmStopping(generation);
+            try
+            {
+                NotifyVmStopping(generation);
+            }
+            CATCH_LOG();
             lock = m_lock.lock_exclusive();
 
             StopVmLockHeld();
@@ -926,9 +944,14 @@ void WSLCSessionRuntime::Shutdown(
     // Notify with m_lock dropped, then re-lock for the teardown. The handler may call back into the
     // session (e.g. WSLCCreateProcess) which takes a VM lease and this lock; firing under it would
     // deadlock. m_terminating is set, so any such reentrant lease fails at EnsureVmRunning's gate
-    // rather than restarting the VM, and the reacquire can't block on it.
+    // rather than restarting the VM, and the reacquire can't block on it. A throwing handler must not
+    // skip the teardown below -- the session is terminating either way.
     runtimeLock.reset();
-    NotifyVmStopping(m_vmGeneration.load());
+    try
+    {
+        NotifyVmStopping(m_vmGeneration.load());
+    }
+    CATCH_LOG();
     runtimeLock = m_lock.lock_exclusive();
 
     // Tear down the VM (if running) and all VM-scoped state, capturing the termination reason; the
