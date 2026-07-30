@@ -3,13 +3,38 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    paths: ['doc/**']
+  pull_request:
+    paths: ['doc/**']
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  Build:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: read
+    steps:
+      - name: Checkout actions
+        uses: actions/checkout@v4
+
+      - name: Install packages
+        run: pip install -r doc/requirements.txt --break-system-packages
+        shell: bash
+
+      - name: Build documentation
+        run: mkdocs build -f doc/mkdocs.yml
+        shell: bash
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: doc/site
+
   DeployDocs:
+    needs: Build
+    if: github.event_name == 'push'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -19,21 +44,6 @@ jobs:
         pages: write
         id-token: write
     steps:
-      - name: Checkout actions
-        uses: actions/checkout@v4
-
-      - name: Install packages
-        run: pip install mkdocs-mermaid2-plugin mkdocs --break-system-packages
-        shell: bash
-
-      - name: Build documentation
-        run:  mkdocs build -f doc/mkdocs.yml
-        shell: bash
-
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: doc/site
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

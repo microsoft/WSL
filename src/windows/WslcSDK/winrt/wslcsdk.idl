@@ -34,6 +34,19 @@ namespace Microsoft.WSL.Containers
 
     delegate void ProcessCrashHandler(ProcessCrashInformation information);
 
+    enum IdentityTokenType
+    {
+        Unknown = 0,
+        Token = 1,
+        Credentials = 2,
+    };
+
+    runtimeclass AuthenticateResult
+    {
+        String IdentityToken { get; };
+        IdentityTokenType TokenType { get; };
+    };
+
     runtimeclass SessionSettings
     {
         SessionSettings(String name, String storagePath);
@@ -73,7 +86,7 @@ namespace Microsoft.WSL.Containers
         void CreateVhdVolume(VhdOptions options);
         void DeleteVhdVolume(String name);
 
-        String Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
+        AuthenticateResult Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
 
         IVectorView<ImageInfo> GetImages();
 
@@ -249,6 +262,14 @@ namespace Microsoft.WSL.Containers
         UInt32 Revision { get; };
     };
 
+    runtimeclass InstallOptions
+    {
+        InstallOptions();
+
+        IVectorView<Component> Components;
+        Boolean Repair;
+    };
+
     runtimeclass InstallProgress
     {
         Component Component { get; };
@@ -260,8 +281,8 @@ namespace Microsoft.WSL.Containers
     {
         static IVectorView<Component> GetMissingComponents();
         static ServiceVersion GetVersion();
-        static void InstallWithDependencies();
-        static Windows.Foundation.IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync();
+        static void InstallWithDependencies(InstallOptions options);
+        static Windows.Foundation.IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync(InstallOptions options);
     };
 
     enum VhdType

@@ -50,9 +50,7 @@ class WSLCCLIEnvVarParserUnitTests
     TEST_METHOD(WSLCCLIEnvVarParser_UsesProcessEnvWhenValueMissing)
     {
         constexpr const auto key = L"WSLC_TEST_ENV_FROM_PROCESS";
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(key, L"process_value"));
-
-        auto cleanup = wil::scope_exit([&] { SetEnvironmentVariableW(key, nullptr); });
+        ScopedEnvVariable env(key, L"process_value");
 
         const auto parsed = models::EnvironmentVariable::Parse(key);
         VERIFY_IS_TRUE(parsed.has_value());
@@ -64,7 +62,7 @@ class WSLCCLIEnvVarParserUnitTests
         const auto whitespaceOnly = models::EnvironmentVariable::Parse(L"   \t  ");
         VERIFY_IS_FALSE(whitespaceOnly.has_value());
 
-        SetEnvironmentVariableA("WSLC_TEST_ENV_UNSET", nullptr);
+        ScopedEnvVariable env(L"WSLC_TEST_ENV_UNSET");
         const auto missingFromProcess = models::EnvironmentVariable::Parse(L"WSLC_TEST_ENV_UNSET");
         VERIFY_IS_FALSE(missingFromProcess.has_value());
     }
@@ -96,9 +94,7 @@ class WSLCCLIEnvVarParserUnitTests
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileParsesAndSkipsExpectedLines)
     {
         constexpr const auto key = L"WSLC_TEST_ENV_FROM_FILE";
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(key, L"file_process_value") == TRUE);
-
-        auto envCleanup = wil::scope_exit([&] { SetEnvironmentVariableW(key, nullptr); });
+        ScopedEnvVariable env(key, L"file_process_value");
 
         std::ofstream file(EnvTestFile);
         VERIFY_IS_TRUE(file.is_open());
@@ -158,9 +154,7 @@ class WSLCCLIEnvVarParserUnitTests
     TEST_METHOD(WSLCCLIEnvVarParser_UsesProcessEnvWhenValueIsExplicitlyEmpty)
     {
         constexpr const auto key = L"WSLC_TEST_ENV_EMPTY_VALUE";
-        VERIFY_IS_TRUE(SetEnvironmentVariableW(key, L""));
-
-        auto cleanup = wil::scope_exit([&] { SetEnvironmentVariableW(key, nullptr); });
+        ScopedEnvVariable env(key, L"");
 
         const auto parsed = models::EnvironmentVariable::Parse(key);
         VERIFY_IS_TRUE(parsed.has_value());

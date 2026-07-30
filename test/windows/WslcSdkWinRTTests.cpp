@@ -1164,8 +1164,44 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(InstallWithDependencies)
     {
-        WSLCSDK::WslcService::InstallWithDependenciesAsync().get();
+        // Pass null options to auto-detect and install any missing components (same behavior as the old no-arg call).
+        WSLCSDK::WslcService::InstallWithDependenciesAsync(nullptr).get();
         VERIFY_ARE_EQUAL(WSLCSDK::WslcService::GetMissingComponents().Size(), 0u);
+    }
+
+    WSLC_TEST_METHOD(InstallOptions_DefaultValues)
+    {
+        // Default-constructed InstallOptions must have null Components and Repair=false.
+        auto options = WSLCSDK::InstallOptions();
+        VERIFY_IS_NULL(options.Components());
+        VERIFY_IS_FALSE(options.Repair());
+    }
+
+    WSLC_TEST_METHOD(InstallOptions_SetRepair)
+    {
+        auto options = WSLCSDK::InstallOptions();
+        options.Repair(true);
+        VERIFY_IS_TRUE(options.Repair());
+        options.Repair(false);
+        VERIFY_IS_FALSE(options.Repair());
+    }
+
+    WSLC_TEST_METHOD(InstallOptions_SetComponents)
+    {
+        auto options = WSLCSDK::InstallOptions();
+        auto components = winrt::single_threaded_vector<WSLCSDK::Component>({WSLCSDK::Component::WslPackage});
+        options.Components(components.GetView());
+        VERIFY_ARE_EQUAL(1u, options.Components().Size());
+        VERIFY_ARE_EQUAL(WSLCSDK::Component::WslPackage, options.Components().GetAt(0));
+    }
+
+    WSLC_TEST_METHOD(InstallWithDependencies_SdkNeedsUpdate_Throws)
+    {
+        // Passing SdkNeedsUpdate in the component list must throw WSLC_E_SDK_UPDATE_NEEDED.
+        auto options = WSLCSDK::InstallOptions();
+        auto components = winrt::single_threaded_vector<WSLCSDK::Component>({WSLCSDK::Component::SdkNeedsUpdate});
+        options.Components(components.GetView());
+        VERIFY_THROWS_HR(WSLCSDK::WslcService::InstallWithDependenciesAsync(options).get(), WSLC_E_SDK_UPDATE_NEEDED);
     }
 
     // -----------------------------------------------------------------------
@@ -1588,8 +1624,13 @@ class WslcSdkWinRtTests
         // Negative: wrong password must fail.
         VERIFY_THROWS_HR(m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), L"wrong-password"), E_FAIL);
 
-        // Positive: correct credentials
-        VERIFY_NO_THROW(m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password)));
+        // Positive: correct credentials must return a non-null token of the expected type.
+        {
+            const auto result = m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password));
+            VERIFY_IS_FALSE(result.IdentityToken().empty());
+            // The local test registry does not return an identity token, so credentials are embedded.
+            VERIFY_ARE_EQUAL(result.TokenType(), WSLCSDK::IdentityTokenType::Credentials);
+        }
 
         const auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password);
         PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
@@ -1598,11 +1639,12 @@ class WslcSdkWinRtTests
 
         auto cleanup = SCOPE_CLEANUP(m_defaultSession.DeleteImage(image));
 
-        // Positive: pulling with correct credentials must succeed.
+        // Positive: the IdentityToken from Authenticate can be passed directly as RegistryAuth.
         {
+            const auto authResult = m_defaultSession.Authenticate(serverUri, winrt::to_hstring(c_username), winrt::to_hstring(c_password));
             auto opts = WSLCSDK::PullImageOptions(image);
-            opts.RegistryAuth(winrt::to_hstring(xRegistryAuth));
-            m_defaultSession.PullImageAsync(opts).get();
+            opts.RegistryAuth(authResult.IdentityToken());
+            VERIFY_NO_THROW(m_defaultSession.PullImageAsync(opts).get());
             VERIFY_IS_TRUE(HasImage(image));
         }
 

@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37027.9 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WSLCNeofetch", "WSLCNeofetch.vcxproj", "{35158918-896E-42B7-B4E8-CF98816259AA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM64 = Debug|ARM64
+		Debug|x64 = Debug|x64
+		Release|ARM64 = Release|ARM64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Debug|ARM64.Build.0 = Debug|ARM64
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Debug|x64.ActiveCfg = Debug|x64
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Debug|x64.Build.0 = Debug|x64
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Release|ARM64.ActiveCfg = Release|ARM64
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Release|ARM64.Build.0 = Release|ARM64
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Release|x64.ActiveCfg = Release|x64
+		{35158918-896E-42B7-B4E8-CF98816259AA}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FA34E683-A12E-41FE-9821-9474CBF6DD1E}
+	EndGlobalSection
+EndGlobal

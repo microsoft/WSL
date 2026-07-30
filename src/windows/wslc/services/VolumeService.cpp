@@ -83,8 +83,10 @@ wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::
     return FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
 }
 
-models::PruneVolumesResult VolumeService::Prune(models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
+models::PruneVolumesResult VolumeService::Prune(
+    Reporter& reporter, models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    WarningCallback warningCallback(reporter);
     const bool hasExplicitAll = std::any_of(filters.begin(), filters.end(), [](const auto& f) { return f.first == "all"; });
 
     std::vector<WSLCFilter> filterEntries;
@@ -99,13 +101,12 @@ models::PruneVolumesResult VolumeService::Prune(models::Session& session, bool a
         filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
     }
 
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
     wil::unique_cotaskmem_array_ptr<WSLCVolumeName> volumes;
     ULONGLONG spaceReclaimed = 0;
     THROW_IF_FAILED(session.Get()->PruneVolumes(
         filterEntries.empty() ? nullptr : filterEntries.data(),
         static_cast<ULONG>(filterEntries.size()),
-        warningCallback.Get(),
+        &warningCallback,
         &volumes,
         volumes.size_address<ULONG>(),
         &spaceReclaimed));

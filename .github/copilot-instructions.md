@@ -140,7 +140,7 @@ When modifying service interfaces (`src/windows/service/inc/`):
 - String params: `[in, unique] LPCWSTR` with `[string]` for marshaled strings
 - Handle params: `[in, system_handle(sh_file)] HANDLE`
 - User-facing errors: pass `[in, out] LXSS_ERROR_INFO* Error`
-- **Adding methods to an existing interface is an ABI break** — create a new versioned interface with a new IID
+- **ABI stability applies only to SDK-facing and public surfaces.** `WSLCCompat.idl` (the WSLC SDK-facing layer) and the public plugin API (`WslPluginApi.h`) must stay backward compatible: do not add, remove, or reorder methods on their existing interfaces, and do not change struct layouts. Introduce a new versioned interface with a new IID instead. Every other interface (`IWSLCSession` in `wslc.idl`, the interfaces in `wslservice.idl`, etc.) is internal and non-stable: rebuilt and shipped in lockstep with its only clients, so appending new methods to those is fine.
 - Custom error codes: `WSL_E_xxx` via `MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + N)`
 
 ### Config File (.wslconfig) Conventions
@@ -347,6 +347,7 @@ wpr -stop logs.ETL
 ### Log Analysis Tools
 - Use WPA (Windows Performance Analyzer) for ETL traces
 - Key providers: `Microsoft.Windows.Lxss.Manager`, `Microsoft.Windows.Subsystem.Lxss`
+- For graphical/audio (WSLg) issues, see `.github/copilot/wslg-logs.md`. `collect-wsl-logs.ps1` gathers WSLg logs (`/mnt/wslg`: weston.log, pulseaudio.log, wlog.log, stderr.log, versions.txt) into a `wslg/` folder using `wsl.exe --system --user root`; crash dumps (`%TEMP%\wsl-crashes`, legacy `/mnt/wslg/dumps`) are only collected with `-Dump`. WSLg code lives in https://github.com/microsoft/wslg, not this repo.
 
 ### Debug Console (Linux)
 Add to `%USERPROFILE%\.wslconfig`:

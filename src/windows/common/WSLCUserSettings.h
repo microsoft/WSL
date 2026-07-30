@@ -44,6 +44,7 @@ enum class Setting : size_t
     CredentialStore,
     SessionPortRelay,
     SessionDefaultBindingAddress,
+    SessionStoragePath,
 
     Max
 };
@@ -99,6 +100,7 @@ namespace details {
     DEFINE_SETTING_MAPPING(CredentialStore,          std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
     DEFINE_SETTING_MAPPING(SessionPortRelay,         std::string, PortRelayType,       PortRelayType::VirtioNet,      "experimental.portRelay")
     DEFINE_SETTING_MAPPING(SessionDefaultBindingAddress, std::string, std::string,     std::string{},                 "session.defaultBindingAddress")
+    DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::string,         std::string{},                 "session.storagePath")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on

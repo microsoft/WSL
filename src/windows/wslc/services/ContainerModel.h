@@ -38,7 +38,14 @@ struct ContainerOptions
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;
+    std::optional<int> StopTimeout{};
     std::optional<int64_t> ShmSize{};
+    std::optional<std::string> HealthCmd{};
+    std::optional<int64_t> HealthInterval{};    // nanoseconds
+    std::optional<int64_t> HealthTimeout{};     // nanoseconds
+    std::optional<int64_t> HealthStartPeriod{}; // nanoseconds
+    std::optional<int> HealthRetries{};
+    bool NoHealthcheck = false;
     bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
@@ -67,10 +74,8 @@ struct CreateContainerResult
 
 struct StopContainerOptions
 {
-    static constexpr LONG DefaultTimeout = -1;
-
     WSLCSignal Signal = WSLCSignalNone;
-    LONG Timeout = DefaultTimeout;
+    LONG Timeout = WSLC_STOP_TIMEOUT_DEFAULT;
 };
 
 struct PruneContainersResult

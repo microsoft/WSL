@@ -98,9 +98,12 @@ typedef enum _WSLCContainerFlags
     WSLCContainerFlagsGpu = 2, // Enable GPU access.
     WSLCContainerFlagsInit = 4, // Run the container under an init process.
     WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
+    WSLCContainerFlagsStopTimeout = 16, // The StopTimeout field is set and should be honored (otherwise StopTimeout is ignored).
+    WSLCContainerFlagsHealthCheck = 32, // The Health* fields are set and should be honored (otherwise they are ignored).
+    WSLCContainerFlagsNoHealthCheck = 64, // Disable any container/image-specified health check.
 } WSLCContainerFlags;
 
-cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll)")
+cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll | WSLCContainerFlagsStopTimeout | WSLCContainerFlagsHealthCheck | WSLCContainerFlagsNoHealthCheck)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
 
@@ -165,7 +168,8 @@ typedef enum _WSLCSessionStorageFlags
 {
     WSLCSessionStorageFlagsNone = 0,
     WSLCSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
-    WSLCSessionStorageFlagsValid = WSLCSessionStorageFlagsNoCreate
+    WSLCSessionStorageFlagsWarnCustomLocation = 2, // Warn when creating a new VHD at a session.storagePath-configured location.
+    WSLCSessionStorageFlagsValid = WSLCSessionStorageFlagsNoCreate | WSLCSessionStorageFlagsWarnCustomLocation
 } WSLCSessionStorageFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionStorageFlags);")

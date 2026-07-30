@@ -103,12 +103,12 @@ std::wstring RootCommand::LongDescription() const
 
 void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    if (context.Args.Contains(ArgType::Version))
+    if (context.Args.GetFlag<ArgType::Version>())
     {
-        VersionCommand::PrintVersion();
+        VersionCommand::PrintVersion(context.Reporter);
         return;
     }
 
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 } // namespace wsl::windows::wslc
