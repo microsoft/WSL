@@ -96,8 +96,8 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     // but WSLC follows Docker's CLI semantics.
     if (!context.Args.Contains(ArgType::Username))
     {
-        context.Args.Add(
-            ArgType::Username, context.Reporter.PromptForLine(Reporter::Level::Output, Localization::WSLCCLI_LoginUsernamePrompt(), false));
+        auto username = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
+        context.Args.Add(ArgType::Username, std::move(username));
     }
 
     // Resolve password: --password, --password-stdin, or interactive prompt.
@@ -109,9 +109,8 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
         }
         else
         {
-            context.Args.Add(
-                ArgType::Password,
-                context.Reporter.PromptForLine(Reporter::Level::Output, Localization::WSLCCLI_LoginPasswordPrompt(), true));
+            auto password = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
+            context.Args.Add(ArgType::Password, std::move(password));
         }
     }
 

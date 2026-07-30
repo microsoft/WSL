@@ -127,6 +127,11 @@ struct Reporter
     // and Apple container all prompt on stdout, so WSLC follows that container-CLI norm.
     std::wstring PromptForLine(Level level, std::wstring_view label, bool mask);
 
+    std::wstring PromptForLine(std::wstring_view label, bool mask = false)
+    {
+        return PromptForLine(Level::Output, label, mask);
+    }
+
     bool IsVTEnabled(Level level) const noexcept;
 
     bool IsColorEnabled(Level level) const noexcept;
