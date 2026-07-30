@@ -933,7 +933,9 @@ try
     {
         wil::unique_handle file{CreateFileW(policyFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
         THROW_LAST_ERROR_IF(!file);
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), policyJson.data(), gsl::narrow_cast<DWORD>(policyJson.size()), nullptr, nullptr));
+        DWORD bytesWritten{};
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), policyJson.data(), gsl::narrow_cast<DWORD>(policyJson.size()), &bytesWritten, nullptr));
+        THROW_HR_IF_MSG(E_FAIL, bytesWritten != policyJson.size(), "Short write for BuildKit policy.json at '%ls'", policyFile.c_str());
     }
 
     {
