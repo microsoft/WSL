@@ -2156,7 +2156,7 @@ Utilização:
     <value>O nome da rede não pode estar vazio.</value>
   </data>
   <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
-    <value>Error information from the engine:</value>
+    <value>Informações de erro do motor:</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando não reconhecido: '{}'</value>
