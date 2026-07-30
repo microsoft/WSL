@@ -1268,7 +1268,13 @@ std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::TryAllocatePort(uint16_t P
         return {};
     }
 
-    return std::make_shared<VmPortAllocation>(Port, Family, Protocol, m_reservations);
+    // Roll the reservation back if the allocation object can't be created: nothing owns the port
+    // until the shared_ptr exists, so it would otherwise stay marked in use for the VM's lifetime.
+    auto reservationCleanup = wil::scope_exit([&]() { m_reservations->Ports.erase(Port); });
+    auto allocation = std::make_shared<VmPortAllocation>(Port, Family, Protocol, m_reservations);
+    reservationCleanup.release();
+
+    return allocation;
 }
 
 std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::AllocatePort(int Family, int Protocol)
@@ -1281,7 +1287,12 @@ std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::AllocatePort(int Family, i
         if (!m_reservations->Ports.contains(port))
         {
             WI_VERIFY(m_reservations->Ports.insert(port).second);
-            return std::make_shared<VmPortAllocation>(port, Family, Protocol, m_reservations);
+
+            auto reservationCleanup = wil::scope_exit([&]() { m_reservations->Ports.erase(port); });
+            auto allocation = std::make_shared<VmPortAllocation>(port, Family, Protocol, m_reservations);
+            reservationCleanup.release();
+
+            return allocation;
         }
     }
 

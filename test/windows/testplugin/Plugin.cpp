@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include <atomic>
+#include <mutex>
 #include <thread>
 #include "WslPluginApi.h"
 #include "wslc_schema.h"
@@ -39,6 +40,12 @@ PluginTestType g_testType = PluginTestType::Invalid;
 // cannot call methods on it (RPC_E_WRONG_THREAD), but it can wait on the handle.
 std::atomic<WSLCProcessHandle> g_leakedProcess = nullptr;
 std::atomic<HANDLE> g_leakedProcessExitEvent = nullptr;
+
+// Serializes writes to g_logfile. Every other write in this file happens on the service's
+// notification thread, which the service serializes; the stop-window thread below is the one writer
+// that runs concurrently with a notification (the next VM's started hook), and an unsynchronized
+// std::ofstream shared by two threads can interleave mid-line and make the expected output flaky.
+std::mutex g_logfileLock;
 
 // Set by the WslcVmStopCommitted test: a call issued from a thread the plugin owns while
 // OnWslcVmStopping is running. It is not part of the callback, so it must not be served by the VM
@@ -580,11 +587,14 @@ try
 {
     if (g_testType == PluginTestType::WslcVmStopCommitted)
     {
+        // Locked: the stop-window thread logs its own result concurrently with this hook.
+        auto lock = std::lock_guard(g_logfileLock);
         g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
         return S_OK;
     }
 
-    // The VM-never-started test asserts these hooks stay silent for a session that never needs a VM.
+    // The VM-never-started test expects no VM hook to fire at all. Logging here is the diagnostic
+    // that makes a regression visible: any line from this hook fails the expected output.
     if (g_testType == PluginTestType::WslcVmNeverStarted)
     {
         g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
@@ -648,7 +658,10 @@ try
             return S_OK;
         }
 
-        g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+        {
+            auto lock = std::lock_guard(g_logfileLock);
+            g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+        }
 
         // A call from a thread this plugin owns is not part of the callback, so it must not be served
         // by the VM that is going away: it blocks until the teardown completes and is then served by
@@ -663,7 +676,10 @@ try
                 g_api->WSLCReleaseProcess(process);
             }
 
-            g_logfile << "WSLC stop-window caller: " << (SUCCEEDED(g_stopWindowCallerResult) ? "ok" : "failed") << std::endl;
+            {
+                auto lock = std::lock_guard(g_logfileLock);
+                g_logfile << "WSLC stop-window caller: " << (SUCCEEDED(g_stopWindowCallerResult) ? "ok" : "failed") << std::endl;
+            }
 
             // This thread was released by the teardown, so the VM that was stopping is gone and it
             // took the leaked process with it. Prove that directly instead of inferring it from the
@@ -680,7 +696,10 @@ try
                 CloseHandle(exitEvent);
             }
 
-            g_logfile << "WSLC leaked process died: " << (leakedProcessDied ? "yes" : "no") << std::endl;
+            {
+                auto lock = std::lock_guard(g_logfileLock);
+                g_logfile << "WSLC leaked process died: " << (leakedProcessDied ? "yes" : "no") << std::endl;
+            }
         });
 
         // Give the thread time to reach the lease and block on the pending stop. If it has not, the
@@ -706,7 +725,11 @@ try
             }
         }
 
-        g_logfile << "WSLC VM stopping leaked process: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+        {
+            auto lock = std::lock_guard(g_logfileLock);
+            g_logfile << "WSLC VM stopping leaked process: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+        }
+
         return S_OK;
     }
 
