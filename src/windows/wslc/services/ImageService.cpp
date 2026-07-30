@@ -254,17 +254,13 @@ void ImageService::Build(
                 // dest=- streams the exporter tarball to the client's stdout, matching docker.
                 outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-                // Refuse to dump the binary exporter stream onto an interactive console (matching docker);
-                // stdout must be redirected to a file or pipe. Otherwise ToCOMInputHandle would fail the
-                // marshal with a cryptic ERROR_NOT_SUPPORTED for the console handle. A redirected character
-                // device such as NUL is not a console, so IsConsoleHandle (which also checks
-                // GetConsoleMode) still lets those through.
+                // Refuse to dump the binary exporter stream onto an interactive console (matching docker).
+                // Otherwise ToCOMInputHandle would fail the marshal with a cryptic ERROR_NOT_SUPPORTED for
+                // the console handle. A redirected character device such as NUL is not a console, so
+                // IsConsoleHandle (which also checks GetConsoleMode) still lets those through.
                 THROW_HR_WITH_USER_ERROR_IF(
                     E_INVALIDARG,
-                    Localization::MessageWslcOutputInvalidSpec(
-                        validation::FormatOutputSpec(spec),
-                        L"refusing to write build output to the console; redirect stdout to a file or pipe (for example "
-                        L"'> out.tar') or pass 'dest=' with a file path"),
+                    Localization::MessageWslcOutputConsoleNotSupported(validation::FormatOutputSpec(spec)),
                     IsConsoleHandle(outputHandle));
             }
             else
