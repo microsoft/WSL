@@ -95,11 +95,9 @@ std::string EscapeRegexMetacharacters(std::string_view input)
     return escaped;
 }
 
-// Serialises the BuildKit source-policy JSON handed to `docker buildx build` via
-// EXPERIMENTAL_BUILDKIT_SOURCE_POLICY. Emits DENY-all first, then a per-host ALLOW; BuildKit
-// applies rules in order and last match wins. Hosts are lowercased because BuildKit
-// normalises source identifiers to lowercase before matching against the regex.
-// Reference: https://github.com/moby/buildkit/blob/master/docs/sourcepolicy.md
+// DENY-all first, then per-host ALLOW: BuildKit evaluates rules in order and last match wins.
+// Hosts are lowercased because BuildKit normalises identifiers before regex matching.
+// https://github.com/moby/buildkit/blob/master/docs/sourcepolicy.md
 std::string BuildBuildKitSourcePolicyJson(const std::vector<std::string>& allowedHosts)
 {
     nlohmann::json rules = nlohmann::json::array();
@@ -916,9 +914,8 @@ try
 
     const auto policyJson = BuildBuildKitSourcePolicyJson(hosts);
 
-    // Materialise in %SystemRoot%\Temp under a GUID-named folder. The DACL grants the user token
-    // read+traverse (needed because the plan9/virtiofs file server impersonates the user when
-    // opening the file from the guest) while denying write, so the user cannot overwrite policy.json
+    // User token gets read+traverse (plan9/virtiofs impersonates the user when opening the file
+    // from the guest) but no write, so a compromised user process cannot overwrite policy.json
     // between our write and BuildKit's read.
     GUID folderId{};
     THROW_IF_FAILED(CoCreateGuid(&folderId));

@@ -548,9 +548,6 @@ class PolicyTest
         }
     }
 
-    // Bare `FROM alpine:latest` resolves to docker.io/library/alpine -- must still be denied.
-    // The assertion accepts either "docker.io" or "alpine" in the error so we don't pin exact
-    // BuildKit wording; either substring proves BuildKit named the blocked reference.
     WSLC_TEST_METHOD(RegistryAllowlistBlocksImageBuildImplicitDockerIo)
     {
         auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
@@ -687,10 +684,6 @@ class PolicyTest
         }
     }
 
-    // ReadRegistryAllowlistSnapshotFromPoliciesRoot is the SYSTEM-side entry point; it opens
-    // HKLM\Software\Policies\WSL itself so it can distinguish "key absent" from "key present but
-    // unreadable". Only the not-configured / configured branches are covered here: ACCESS_DENIED
-    // is hard to induce from an admin-run test process.
     TEST_METHOD(ReadRegistryAllowlistSnapshotFromPoliciesRoot_Logic)
     {
         {

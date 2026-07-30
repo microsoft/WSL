@@ -263,11 +263,8 @@ catch (...)
     return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
 }
 
-// Opens HKLM\Software\Policies\WSL directly and returns a snapshot of the registry allowlist.
-// Returns NotConfigured when the parent key does not exist (no policy is in effect) and
-// ReadFailed when it exists but cannot be opened (e.g. ACCESS_DENIED) so enforcement callers
-// can fail closed. Used by SYSTEM-side callers that do not already hold an open policies key
-// handle.
+// Convenience for SYSTEM-side callers with no open policies key. Returns ReadFailed (not
+// NotConfigured) when the key exists but can't be opened, so callers can fail closed.
 inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshotFromPoliciesRoot()
 try
 {

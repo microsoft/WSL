@@ -458,15 +458,11 @@ interface IWSLCVirtualMachine : IUnknown
     // termination event has been signaled; before that the call fails.
     HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
 
-    // Materialises the BuildKit source-policy JSON reflecting the WSLContainerRegistryAllowlist
-    // policy in a SYSTEM-owned folder so the per-user session cannot tamper with it between
-    // write and BuildKit read. Returns S_OK with WindowsPath=nullptr when no allowlist is
-    // configured (no gating needed) and a failure HRESULT when the policy is configured but
-    // cannot be evaluated. Callers must pair a non-null WindowsPath with a later
-    // CleanupBuildKitSourcePolicy call and free the string via CoTaskMemFree.
+    // Materialises the BuildKit source-policy JSON in a SYSTEM-owned folder.
+    // WindowsPath=nullptr on S_OK means no allowlist is configured. Non-null paths must be
+    // freed with CoTaskMemFree and released via CleanupBuildKitSourcePolicy.
     HRESULT PrepareBuildKitSourcePolicy([out, string] LPWSTR* WindowsPath);
 
-    // Removes a policy folder previously returned by PrepareBuildKitSourcePolicy.
     HRESULT CleanupBuildKitSourcePolicy([in, string] LPCWSTR WindowsPath);
 }
 

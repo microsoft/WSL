@@ -900,15 +900,8 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    // Ask the SYSTEM-side service to materialise the BuildKit source-policy JSON in a folder we
-    // can't tamper with. A null path means no allowlist is configured (skip the env var below).
-    // WSLC_E_REGISTRY_BLOCKED_BY_POLICY is the fail-closed path (policy is set but couldn't be
-    // evaluated); surface the localized user-facing message for it.
-    //
-    // The policy folder cleanup is declared BEFORE unmountAll on purpose. C++ destroys scope-exits
-    // in reverse declaration order, so unmountAll runs first and the plan9/virtiofs share is torn
-    // down before the SYSTEM service tries to remove the host folder — avoiding a sharing violation
-    // that would orphan the folder.
+    // Declared before unmountAll: scope_exits run in reverse order, so the plan9/virtiofs share
+    // is torn down before we ask the service to delete the host folder.
     wil::unique_cotaskmem_string policyHostPath;
     const auto policyHr = m_virtualMachine->PrepareBuildKitSourcePolicy(&policyHostPath);
     if (policyHr == WSLC_E_REGISTRY_BLOCKED_BY_POLICY)
