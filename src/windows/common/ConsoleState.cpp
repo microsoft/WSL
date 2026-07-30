@@ -63,7 +63,12 @@ std::optional<DWORD> TryGetConsoleMode(_In_ HANDLE Handle)
     DWORD mode{};
     if (!GetConsoleMode(Handle, &mode))
     {
-        LOG_LAST_ERROR_MSG("GetConsoleMode failed");
+        const auto error = GetLastError();
+        if ((error != ERROR_PIPE_NOT_CONNECTED) && (error != ERROR_INVALID_HANDLE))
+        {
+            LOG_WIN32_MSG(error, "GetConsoleMode failed");
+        }
+
         return std::nullopt;
     }
 

@@ -47,9 +47,10 @@ static std::wstring ResolveWslExecutablePath()
             &currentModule))
     {
         std::array<wchar_t, MAX_PATH> modulePath{};
-        if (GetModuleFileNameW(currentModule, modulePath.data(), static_cast<DWORD>(modulePath.size())) > 0)
+        const auto modulePathLength = GetModuleFileNameW(currentModule, modulePath.data(), static_cast<DWORD>(modulePath.size()));
+        if ((modulePathLength > 0) && (modulePathLength < modulePath.size()))
         {
-            std::wstring candidate{modulePath.data()};
+            std::wstring candidate{modulePath.data(), modulePathLength};
             const auto separator = candidate.find_last_of(L"\\/");
             if (separator != std::wstring::npos)
             {
@@ -704,7 +705,8 @@ class WSLCCLIVTSupportUnitTests
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &afterA));
         VERIFY_IS_TRUE(
             (afterA == baseline) || (afterA == configured),
-            L"Out-of-order process teardown may restore baseline early; only the final mode after all clients exit is guaranteed");
+            L"Out-of-order process teardown may restore baseline early; "
+            L"only the final mode after all clients exit is guaranteed");
 
         VERIFY_ARE_EQUAL(0u, WaitForProcessExit(processB.get(), 20000));
 
@@ -786,7 +788,8 @@ class WSLCCLIVTSupportUnitTests
         VERIFY_ARE_EQUAL(
             configured,
             finalMode,
-            L"If an overlapping shared-console client crashes before restore, the surviving client can only restore to the mode it observed at entry");
+            L"If an overlapping shared-console client crashes before restore, "
+            L"the surviving client can only restore to the mode it observed at entry");
     }
 
     TEST_METHOD(VT_PrimaryDeviceAttributes)
