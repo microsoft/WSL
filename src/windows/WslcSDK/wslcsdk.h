@@ -530,7 +530,15 @@ typedef struct WslcPushImageOptions
 
 STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-// Authenticates with a container registry and returns an identity token.
+typedef enum WslcIdentityTokenType
+{
+    WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN = 0,
+    WSLC_IDENTITY_TOKEN_TYPE_TOKEN = 1,
+    WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS = 2,
+} WslcIdentityTokenType;
+
+// Authenticates with a container registry and returns an identity token suitable for use as
+// the registryAuth value in WslcPullSessionImage and WslcPushSessionImage.
 //
 // Parameters:
 //   session
@@ -546,21 +554,42 @@ STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOp
 //       The password for authentication.
 //
 //   identityToken
-//       On success, receives a pointer to a null-terminated ANSI string
-//       containing the identity token.
+//       On success, receives a pointer to a null-terminated ANSI string containing a
+//       base64-encoded JSON object that can be passed directly as the registryAuth value to
+//       WslcPullSessionImage or WslcPushSessionImage.
 //
-//       The string is allocated using CoTaskMemAlloc. The caller takes
-//       ownership of the returned memory and must free it by calling
-//       CoTaskMemFree when it is no longer needed.
+//       The string is allocated using CoTaskMemAlloc. The caller takes ownership of the
+//       returned memory and must free it by calling CoTaskMemFree when it is no longer needed.
+//
+//   tokenType
+//       Optional. On success, receives the type of credential embedded in identityToken:
+//         WSLC_IDENTITY_TOKEN_TYPE_TOKEN      - the server returned an identity token;
+//                                               identityToken encodes {"identitytoken": ...}
+//         WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS - the server returned no token; the supplied
+//                                               username/password are embedded instead as
+//                                               {"username": ..., "password": ...}
+//       On failure, set to WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN.
+//       May be null if the caller does not need the token type.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
 //
 // Return Value:
 //   S_OK on success. Otherwise, an HRESULT error code indicating the failure.
+//
+// Outcome table:
+//   Outcome                       | HRESULT | identityToken                        | tokenType
+//   ------------------------------|---------|--------------------------------------|----------
+//   Failure                       | FAILED  | nullptr                              | UNKNOWN
+//   Success, server returns token | S_OK    | base64({"identitytoken": "<token>"}) | TOKEN
+//   Success, no token returned    | S_OK    | base64({"username":..,"password":..})| CREDENTIALS
 STDAPI WslcSessionAuthenticate(
     _In_ WslcSession session,
     _In_z_ PCSTR serverAddress,
     _In_z_ PCSTR username,
     _In_z_ PCSTR password,
     _Outptr_result_z_ PSTR* identityToken,
+    _Out_opt_ WslcIdentityTokenType* tokenType,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Retrieves the list of container images

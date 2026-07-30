@@ -2155,6 +2155,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>网络名称不可为空。</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>来自引擎的错误信息:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>无法识别的命令:“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2323,6 +2326,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>未找到映像 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>无效的 --secret 值“{}”: {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>缺少必需选项: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2364,7 +2371,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
-    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <value>'--ip-range' 选项要求同时指定 '--subnet'。</value>
     <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2885,6 +2892,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>设置要生成的目标生成阶段</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>向构建公开机密(id=NAME[,type=env|file][,env=VAR|,src=PATH]；默认为 env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>要运行的命令</value>

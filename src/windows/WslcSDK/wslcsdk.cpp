@@ -1536,6 +1536,7 @@ STDAPI WslcSessionAuthenticate(
     _In_z_ PCSTR username,
     _In_z_ PCSTR password,
     _Outptr_result_z_ PSTR* identityToken,
+    _Out_opt_ WslcIdentityTokenType* tokenType,
     _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
@@ -1548,12 +1549,36 @@ try
     RETURN_HR_IF_NULL(E_POINTER, identityToken);
 
     *identityToken = nullptr;
+    if (tokenType != nullptr)
+    {
+        *tokenType = WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN;
+    }
 
-    wil::unique_cotaskmem_ansistring token;
-    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &token));
+    wil::unique_cotaskmem_ansistring rawToken;
+    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &rawToken));
     if (SUCCEEDED(hr))
     {
-        *identityToken = token.release();
+        std::string authHeader;
+        WslcIdentityTokenType type;
+
+        if (rawToken && strlen(rawToken.get()) > 0)
+        {
+            authHeader = BuildRegistryAuthHeader(std::string{rawToken.get()});
+            type = WSLC_IDENTITY_TOKEN_TYPE_TOKEN;
+        }
+        else
+        {
+            authHeader = BuildRegistryAuthHeader(std::string{username}, std::string{password});
+            type = WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS;
+        }
+
+        auto result = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(authHeader.c_str());
+        *identityToken = result.release();
+
+        if (tokenType != nullptr)
+        {
+            *tokenType = type;
+        }
     }
 
     return errorInfoWrapper;
