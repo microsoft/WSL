@@ -122,11 +122,13 @@ struct Reporter
     // When mask is true and input is interactive, echo is disabled during the read and a
     // trailing newline is emitted afterward (the un-echoed Enter). Returns the line, or an
     // empty string at end of input.
-    //
-    // By convention WSLC prompts pass Level::Output (stdout): Docker, containerd/nerdctl,
-    // and Apple container all prompt on stdout, so WSLC follows that container-CLI norm.
     std::wstring PromptForLine(Level level, std::wstring_view label, bool mask);
 
+    // Convenience overload that defaults prompts to stdout (Level::Output) to align with the
+    // container CLI ecosystem: Docker (cli.Out()), containerd/nerdctl (cmd.OutOrStdout()), and
+    // Apple container (Swift print) all prompt on stdout. This diverges from general Unix tools
+    // (sudo, ssh, git, gh) that prompt on stderr/tty to keep stdout pipeable, but WSLC follows
+    // Docker's CLI semantics.
     std::wstring PromptForLine(std::wstring_view label, bool mask = false)
     {
         return PromptForLine(Level::Output, label, mask);

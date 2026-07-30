@@ -64,8 +64,9 @@ std::optional<int> Reporter::GetConsoleWidth(Level level) const
 std::wstring Reporter::PromptForLine(Level level, std::wstring_view label, bool mask)
 {
     // Write the label without a trailing newline so the cursor stays inline (matching
-    // Docker's prompt behavior).
+    // Docker's prompt behavior), then flush so it reaches the user before the blocking read.
     Write(level, L"{}", label);
+    ChannelFor(level).Flush();
 
     const bool willMask = mask && m_in.IsInteractive();
     auto line = m_in.ReadLine(mask);

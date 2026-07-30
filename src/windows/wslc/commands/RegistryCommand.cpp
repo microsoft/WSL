@@ -89,11 +89,6 @@ void RegistryLoginCommand::ValidateArgumentsInternal(const ArgMap& execArgs) con
 
 void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    // Interactive prompts write to stdout (Level::Output) to align with the container
-    // CLI ecosystem: Docker (cli.Out()), containerd/nerdctl (cmd.OutOrStdout()), and
-    // Apple container (Swift print) all prompt on stdout. This diverges from general
-    // Unix tools (sudo, ssh, git, gh) that prompt on stderr/tty to keep stdout pipeable,
-    // but WSLC follows Docker's CLI semantics.
     if (!context.Args.Contains(ArgType::Username))
     {
         auto username = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
