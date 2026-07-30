@@ -686,4 +686,24 @@ class PolicyTest
             VERIFY_ARE_EQUAL(size_t{2}, snapshot.Hosts.size());
         }
     }
+
+    // ReadRegistryAllowlistSnapshotFromPoliciesRoot is the SYSTEM-side entry point; it opens
+    // HKLM\Software\Policies\WSL itself so it can distinguish "key absent" from "key present but
+    // unreadable". Only the not-configured / configured branches are covered here: ACCESS_DENIED
+    // is hard to induce from an admin-run test process.
+    TEST_METHOD(ReadRegistryAllowlistSnapshotFromPoliciesRoot_Logic)
+    {
+        {
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::NotConfigured);
+            VERIFY_IS_TRUE(snapshot.Hosts.empty());
+        }
+
+        {
+            auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::Configured);
+            VERIFY_ARE_EQUAL(size_t{1}, snapshot.Hosts.size());
+        }
+    }
 };

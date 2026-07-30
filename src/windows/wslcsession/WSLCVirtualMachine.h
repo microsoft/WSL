@@ -139,6 +139,10 @@ public:
 
     HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);
     HRESULT UnmountWindowsFolder(_In_ LPCSTR LinuxPath);
+
+    // Delegates to the SYSTEM-side IWSLCVirtualMachine implementation. See wslc.idl.
+    HRESULT PrepareBuildKitSourcePolicy(_Outptr_result_maybenull_ LPWSTR* WindowsPath);
+    HRESULT CleanupBuildKitSourcePolicy(_In_ LPCWSTR WindowsPath);
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
     void OnProcessReleased(int Pid);

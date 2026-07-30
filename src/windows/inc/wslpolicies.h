@@ -200,8 +200,9 @@ inline bool HasRegistryAllowlist(HKEY policiesKey)
     return subKey && !EnumerateRegistryAllowlist(subKey.get()).empty();
 }
 
-// Atomic snapshot of the WSLContainerRegistryAllowlist policy. Unlike EnumerateRegistryAllowlist,
-// this distinguishes an unreadable policy from an unconfigured one so callers can fail closed.
+// Snapshot of the WSLContainerRegistryAllowlist policy captured in a single read. The State
+// field lets callers distinguish an unconfigured policy (fail open) from a registry read
+// failure (fail closed).
 enum class RegistryAllowlistState
 {
     NotConfigured,
@@ -255,6 +256,35 @@ try
     }
 
     return snapshot;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
+}
+
+// Opens HKLM\Software\Policies\WSL directly and returns a snapshot of the registry allowlist.
+// Returns NotConfigured when the parent key does not exist (no policy is in effect) and
+// ReadFailed when it exists but cannot be opened (e.g. ACCESS_DENIED) so enforcement callers
+// can fail closed. Used by SYSTEM-side callers that do not already hold an open policies key
+// handle.
+inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshotFromPoliciesRoot()
+try
+{
+    wil::unique_hkey policiesKey;
+    const auto openResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE, c_registryKey, 0, KEY_READ, &policiesKey);
+    if (openResult == ERROR_PATH_NOT_FOUND || openResult == ERROR_FILE_NOT_FOUND)
+    {
+        return {};
+    }
+
+    if (openResult != ERROR_SUCCESS)
+    {
+        LOG_HR(HRESULT_FROM_WIN32(openResult));
+        return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
+    }
+
+    return ReadRegistryAllowlistSnapshot(policiesKey.get());
 }
 catch (...)
 {

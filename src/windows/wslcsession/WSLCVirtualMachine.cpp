@@ -1179,6 +1179,16 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCVirtualMachine::PrepareBuildKitSourcePolicy(_Outptr_result_maybenull_ LPWSTR* WindowsPath)
+{
+    return m_vm->PrepareBuildKitSourcePolicy(WindowsPath);
+}
+
+HRESULT WSLCVirtualMachine::CleanupBuildKitSourcePolicy(_In_ LPCWSTR WindowsPath)
+{
+    return m_vm->CleanupBuildKitSourcePolicy(WindowsPath);
+}
+
 void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {
     if (!FeatureEnabled(WslcFeatureFlagsGPU))

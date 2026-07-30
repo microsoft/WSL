@@ -14,13 +14,17 @@ Abstract:
 
 #include "HcsVirtualMachine.h"
 #include <format>
+#include <fstream>
 #include <string>
 #include <string_view>
+#include <sddl.h>
+#include <nlohmann/json.hpp>
 #include "hcs_schema.h"
 #include "ConsommeNetworking.h"
 #include "NatNetworking.h"
 #include "wslsecurity.h"
 #include "wslutil.h"
+#include "wslpolicies.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
 #include "string.hpp"
@@ -71,6 +75,76 @@ std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
     }
 
     return sanitized;
+}
+
+// Escapes regex metacharacters in `input` so a literal hostname can be safely embedded into a
+// BuildKit source-policy regex identifier (e.g. `myreg:5000` stays a literal match).
+std::string EscapeRegexMetacharacters(std::string_view input)
+{
+    static constexpr std::string_view c_metacharacters = R"(\.+*?()|[]{}^$)";
+    std::string escaped;
+    escaped.reserve(input.size());
+    for (const char ch : input)
+    {
+        if (c_metacharacters.find(ch) != std::string_view::npos)
+        {
+            escaped.push_back('\\');
+        }
+        escaped.push_back(ch);
+    }
+    return escaped;
+}
+
+// Serialises the BuildKit source-policy JSON handed to `docker buildx build` via
+// EXPERIMENTAL_BUILDKIT_SOURCE_POLICY. Emits DENY-all first, then a per-host ALLOW; BuildKit
+// applies rules in order and last match wins. Hosts are lowercased because BuildKit
+// normalises source identifiers to lowercase before matching against the regex.
+// Reference: https://github.com/moby/buildkit/blob/master/docs/sourcepolicy.md
+std::string BuildBuildKitSourcePolicyJson(const std::vector<std::string>& allowedHosts)
+{
+    nlohmann::json rules = nlohmann::json::array();
+    rules.push_back({{"action", "DENY"}, {"selector", {{"identifier", "docker-image://.*"}, {"match_type", "REGEX"}}}});
+
+    for (const auto& host : allowedHosts)
+    {
+        std::string lowered;
+        lowered.reserve(host.size());
+        std::transform(host.begin(), host.end(), std::back_inserter(lowered), [](unsigned char ch) {
+            return static_cast<char>(std::tolower(ch));
+        });
+
+        const auto identifier = "docker-image://" + EscapeRegexMetacharacters(lowered) + "/.*";
+        rules.push_back({{"action", "ALLOW"}, {"selector", {{"identifier", identifier}, {"match_type", "REGEX"}}}});
+    }
+
+    nlohmann::json document;
+    document["rules"] = std::move(rules);
+    return document.dump();
+}
+
+// Creates `folder` with a DACL that grants full control to SYSTEM + Administrators, and read+traverse
+// to the given user token. Write access is deliberately withheld from the user so the folder cannot
+// be tampered with between materialisation and BuildKit consumption (C1). Read is required because
+// the plan9/virtiofs file server backing the guest mount impersonates the user token to open the
+// file — see UseShareRootIdentity in hcs::AddPlan9Share.
+void CreatePolicyFolder(const std::filesystem::path& folder, HANDLE userToken)
+{
+    auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken);
+    wil::unique_hlocal_string userSidString;
+    THROW_LAST_ERROR_IF(!ConvertSidToStringSidW(tokenUser->User.Sid, &userSidString));
+
+    // O:SY = owner SYSTEM. D:PAI = protected + auto-inherited DACL. ACEs:
+    //   SYSTEM (SY)  : FA        — full control (writes and later cleans up policy.json).
+    //   Admins (BA)  : FA        — administrative access.
+    //   User (SID)   : FRFX      — file_generic_read + file_generic_execute (traverse). Deliberately
+    //                              no FW so a compromised user process cannot overwrite policy.json
+    //                              between our write and BuildKit's read.
+    const auto sddl = std::format(L"O:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FRFX;;;{})", userSidString.get());
+    wil::unique_hlocal_security_descriptor sd;
+    THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &sd, nullptr));
+
+    SECURITY_ATTRIBUTES sa{sizeof(sa), sd.get(), FALSE};
+    THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(folder.c_str(), &sa));
 }
 
 } // namespace
@@ -349,6 +423,17 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 HcsVirtualMachine::~HcsVirtualMachine()
 {
     std::lock_guard lock(m_lock);
+
+    // Sweep any BuildKit source-policy folders that were prepared but never cleaned up (e.g. the
+    // client crashed between PrepareBuildKitSourcePolicy and CleanupBuildKitSourcePolicy). The
+    // DACL is SYSTEM-only, so a leak is not exploitable, but folders would otherwise accumulate
+    // in %SystemRoot%\Temp across crashes.
+    for (const auto& folder : m_preparedPolicyFolders)
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(folder, ec);
+    }
+    m_preparedPolicyFolders.clear();
 
     // Wait up to 5 seconds for the VM to terminate gracefully.
     bool forceTerminate = false;
@@ -799,6 +884,100 @@ try
     *Reason = m_terminationReason;
     *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
 
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::PrepareBuildKitSourcePolicy(_Outptr_result_maybenull_ LPWSTR* WindowsPath)
+try
+{
+    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr);
+    *WindowsPath = nullptr;
+
+    const auto snapshot = wsl::windows::policies::ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+    if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::ReadFailed)
+    {
+        // Fail closed: policy is configured but we couldn't evaluate it. Return the specific
+        // policy-blocked HRESULT so the caller can surface the localized user-facing message.
+        return WSLC_E_REGISTRY_BLOCKED_BY_POLICY;
+    }
+
+    if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::NotConfigured)
+    {
+        // No allowlist: caller skips the source-policy plumbing entirely.
+        return S_OK;
+    }
+
+    std::vector<std::string> hosts;
+    hosts.reserve(snapshot.Hosts.size());
+    std::ranges::transform(snapshot.Hosts, std::back_inserter(hosts), [](const std::wstring& host) {
+        return wsl::shared::string::WideToMultiByte(host);
+    });
+
+    const auto policyJson = BuildBuildKitSourcePolicyJson(hosts);
+
+    // Materialise in %SystemRoot%\Temp under a GUID-named folder. The DACL grants the user token
+    // read+traverse (needed because the plan9/virtiofs file server impersonates the user when
+    // opening the file from the guest) while denying write, so the user cannot overwrite policy.json
+    // between our write and BuildKit's read.
+    GUID folderId{};
+    THROW_IF_FAILED(CoCreateGuid(&folderId));
+    wchar_t systemRoot[MAX_PATH]{};
+    THROW_LAST_ERROR_IF(GetSystemWindowsDirectoryW(systemRoot, ARRAYSIZE(systemRoot)) == 0);
+    const auto folder = std::filesystem::path(systemRoot) / L"Temp" /
+                        (L"wslc-buildkit-policy-" + wsl::shared::string::GuidToString<wchar_t>(folderId));
+    CreatePolicyFolder(folder, m_userToken.get());
+    auto cleanup = wil::scope_exit([&]() {
+        std::error_code ec;
+        std::filesystem::remove_all(folder, ec);
+    });
+
+    const auto policyFile = folder / L"policy.json";
+    {
+        wil::unique_handle file{CreateFileW(policyFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!file);
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), policyJson.data(), gsl::narrow_cast<DWORD>(policyJson.size()), nullptr, nullptr));
+    }
+
+    {
+        std::lock_guard lock(m_lock);
+        m_preparedPolicyFolders.insert(folder);
+    }
+
+    *WindowsPath = wil::make_cotaskmem_string(folder.c_str()).release();
+    cleanup.release();
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::CleanupBuildKitSourcePolicy(_In_ LPCWSTR WindowsPath)
+try
+{
+    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr);
+
+    // Only accept paths this VM instance handed out from PrepareBuildKitSourcePolicy so a caller
+    // can't ask us to remove an arbitrary directory (e.g. via a crafted string over COM).
+    const std::filesystem::path folder{WindowsPath};
+    {
+        std::lock_guard lock(m_lock);
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !m_preparedPolicyFolders.contains(folder));
+    }
+
+    std::error_code ec;
+    std::filesystem::remove_all(folder, ec);
+    if (ec)
+    {
+        // Leave the entry in m_preparedPolicyFolders so ~HcsVirtualMachine's sweep can retry the
+        // delete once the VM's file handles on the share are released (common cause: the plan9/
+        // virtiofs share was still holding the file open at cleanup time).
+        LOG_HR_MSG(E_FAIL, "Failed to remove policy folder '%ls': %hs", folder.c_str(), ec.message().c_str());
+        return S_OK;
+    }
+
+    {
+        std::lock_guard lock(m_lock);
+        m_preparedPolicyFolders.erase(folder);
+    }
     return S_OK;
 }
 CATCH_RETURN()

@@ -63,51 +63,6 @@ void EnforceRegistryAllowlist(const wslutil::RepositoryReference& Repository)
     THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageRegistryBlockedByPolicy(serverWide));
 }
 
-// Escapes regex metacharacters in `input` so a literal hostname can be safely embedded
-// into a BuildKit source-policy regex identifier (e.g. `myreg:5000` stays a literal match).
-std::string EscapeRegexMetacharacters(std::string_view input)
-{
-    static constexpr std::string_view c_metacharacters = R"(\.+*?()|[]{}^$)";
-    std::string escaped;
-    escaped.reserve(input.size());
-    for (const char ch : input)
-    {
-        if (c_metacharacters.find(ch) != std::string_view::npos)
-        {
-            escaped.push_back('\\');
-        }
-        escaped.push_back(ch);
-    }
-    return escaped;
-}
-
-// Serialises the BuildKit source-policy JSON handed to `docker buildx build` via
-// EXPERIMENTAL_BUILDKIT_SOURCE_POLICY. Emits DENY-all first, then a per-host ALLOW; BuildKit
-// applies rules in order and last match wins. Hosts are lowercased because BuildKit
-// normalises source identifiers to lowercase before matching against the regex.
-// Reference: https://github.com/moby/buildkit/blob/master/docs/sourcepolicy.md
-std::string BuildBuildKitSourcePolicyJson(const std::vector<std::string>& allowedHosts)
-{
-    nlohmann::json rules = nlohmann::json::array();
-    rules.push_back({{"action", "DENY"}, {"selector", {{"identifier", "docker-image://.*"}, {"match_type", "REGEX"}}}});
-
-    for (const auto& host : allowedHosts)
-    {
-        std::string lowered;
-        lowered.reserve(host.size());
-        std::transform(host.begin(), host.end(), std::back_inserter(lowered), [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
-
-        const auto identifier = "docker-image://" + EscapeRegexMetacharacters(lowered) + "/.*";
-        rules.push_back({{"action", "ALLOW"}, {"selector", {{"identifier", identifier}, {"match_type", "REGEX"}}}});
-    }
-
-    nlohmann::json document;
-    document["rules"] = std::move(rules);
-    return document.dump();
-}
-
 std::string IndentLines(const std::string& input, const std::string& prefix, bool prefixFirstLine = true)
 {
     if (input.empty())
@@ -933,15 +888,6 @@ try
         "Invalid flags: 0x%x",
         Options->Flags);
 
-    // Read the allowlist up-front so we can fail closed on registry errors before touching
-    // the VM. Enforcement is done by handing BuildKit a source policy that denies every image
-    // reference and re-allows the configured hostnames (mounted in below).
-    const auto policySnapshot = wsl::windows::policies::ReadRegistryAllowlistSnapshot(wsl::windows::policies::OpenPoliciesKey().get());
-    if (policySnapshot.State == wsl::windows::policies::RegistryAllowlistState::ReadFailed)
-    {
-        THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
-    }
-
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
     std::optional<UserCOMCallback> comCall;
@@ -953,6 +899,29 @@ try
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    // Ask the SYSTEM-side service to materialise the BuildKit source-policy JSON in a folder we
+    // can't tamper with. A null path means no allowlist is configured (skip the env var below).
+    // WSLC_E_REGISTRY_BLOCKED_BY_POLICY is the fail-closed path (policy is set but couldn't be
+    // evaluated); surface the localized user-facing message for it.
+    //
+    // The policy folder cleanup is declared BEFORE unmountAll on purpose. C++ destroys scope-exits
+    // in reverse declaration order, so unmountAll runs first and the plan9/virtiofs share is torn
+    // down before the SYSTEM service tries to remove the host folder — avoiding a sharing violation
+    // that would orphan the folder.
+    wil::unique_cotaskmem_string policyHostPath;
+    const auto policyHr = m_virtualMachine->PrepareBuildKitSourcePolicy(&policyHostPath);
+    if (policyHr == WSLC_E_REGISTRY_BLOCKED_BY_POLICY)
+    {
+        THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
+    }
+    THROW_IF_FAILED_MSG(policyHr, "Failed to prepare BuildKit source policy for allowlist enforcement");
+    auto policyCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (policyHostPath)
+        {
+            LOG_IF_FAILED(m_virtualMachine->CleanupBuildKitSourcePolicy(policyHostPath.get()));
+        }
+    });
 
     // Track every Windows folder we mount into the VM during this build so a single scope_exit
     // unmounts them all on success or on any throw partway through the loop below.
@@ -983,58 +952,9 @@ try
     // values never touch disk; kept off telemetry (only buildArgs is logged).
     std::vector<std::string> buildEnv;
 
-    // Materialise the BuildKit source-policy JSON in a temp folder when the registry allowlist is
-    // configured, then mount it into the VM via mountInVm. The temp folder is cleaned up by the
-    // scope_exit below; the mount itself is unmounted by unmountAll.
-    // TODO(follow-up): restrict the temp folder DACL to SYSTEM + service SID.
-    std::optional<std::filesystem::path> policyHostFolder;
-    auto deletePolicyFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        if (policyHostFolder)
-        {
-            std::error_code ec;
-            std::filesystem::remove_all(*policyHostFolder, ec);
-            if (ec)
-            {
-                LOG_HR_MSG(E_FAIL, "Failed to remove policy folder '%ls': %hs", policyHostFolder->c_str(), ec.message().c_str());
-            }
-        }
-    });
-
-    if (policySnapshot.State == wsl::windows::policies::RegistryAllowlistState::Configured)
+    if (policyHostPath)
     {
-        std::vector<std::string> hosts;
-        hosts.reserve(policySnapshot.Hosts.size());
-        std::ranges::transform(policySnapshot.Hosts, std::back_inserter(hosts), [](const std::wstring& host) {
-            return wsl::shared::string::WideToMultiByte(host);
-        });
-
-        std::string policyJson;
-        try
-        {
-            policyJson = BuildBuildKitSourcePolicyJson(hosts);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
-        }
-
-        GUID policyFolderId{};
-        THROW_IF_FAILED(CoCreateGuid(&policyFolderId));
-        policyHostFolder = std::filesystem::temp_directory_path() /
-                           (L"wslc-buildkit-policy-" + wsl::shared::string::GuidToString<wchar_t>(policyFolderId));
-        std::filesystem::create_directories(*policyHostFolder);
-
-        const auto policyFile = *policyHostFolder / L"policy.json";
-        {
-            std::ofstream out(policyFile, std::ios::binary | std::ios::trunc);
-            THROW_HR_IF_MSG(E_FAIL, !out.is_open(), "Failed to open policy file for writing at '%ls'", policyFile.c_str());
-            out.write(policyJson.data(), policyJson.size());
-            out.close();
-            THROW_HR_IF_MSG(E_FAIL, !out.good(), "Failed to write policy file at '%ls'", policyFile.c_str());
-        }
-
-        auto policyMountPath = mountInVm(policyHostFolder->c_str(), TRUE);
+        auto policyMountPath = mountInVm(policyHostPath.get(), TRUE);
         buildEnv.emplace_back("EXPERIMENTAL_BUILDKIT_SOURCE_POLICY=" + policyMountPath + "/policy.json");
     }
 
