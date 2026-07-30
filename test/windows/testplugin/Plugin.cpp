@@ -661,9 +661,13 @@ try
             // an announced stop that did not happen. Logged from this thread so it stays ordered
             // against the line above.
             auto leakedProcessDied = false;
-            if (auto* exitEvent = g_leakedProcessExitEvent.load(); exitEvent != nullptr)
+            if (auto* exitEvent = g_leakedProcessExitEvent.exchange(nullptr); exitEvent != nullptr)
             {
                 leakedProcessDied = WaitForSingleObject(exitEvent, 30 * 1000) == WAIT_OBJECT_0;
+
+                // GetExitEvent is marshalled as an [out, system_handle(sh_event)] parameter, so this
+                // is a duplicate owned by this process.
+                CloseHandle(exitEvent);
             }
 
             g_logfile << "WSLC leaked process died: " << (leakedProcessDied ? "yes" : "no") << std::endl;
