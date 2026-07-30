@@ -2162,7 +2162,7 @@ Verwendung:
     <value>Der Netzwerkname darf nicht leer sein.</value>
   </data>
   <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
-    <value>Error information from the engine:</value>
+    <value>Fehlerinformationen von der Engine:</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Nicht erkannter Befehl: „{}“</value>
@@ -2333,7 +2333,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
-    <value>Invalid --secret value '{}': {}</value>
+    <value>Ungültiger --secret value '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">

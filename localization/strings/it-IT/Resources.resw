@@ -2162,7 +2162,7 @@ Utilizzo:
     <value>Il nome della rete non può essere vuoto.</value>
   </data>
   <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
-    <value>Error information from the engine:</value>
+    <value>Informazioni sull'errore dal motore:</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando non riconosciuto: '{}'</value>
@@ -2333,7 +2333,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
-    <value>Invalid --secret value '{}': {}</value>
+    <value>Valore --secret non valido '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2901,7 +2901,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Imposta la fase di compilazione target su build</value>
   </data>
   <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
-    <value>Expose secret to the build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; defaults to env var NAME)</value>
+    <value>Esporre il segreto alla build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; valore predefinito: variabile d'ambiente NAME)</value>
     <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
