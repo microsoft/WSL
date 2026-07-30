@@ -58,7 +58,7 @@ std::optional<std::wstring> InputChannel::ReadLine(bool mask) const
     auto restoreEcho = wil::scope_exit([&]() {
         if (echoDisabled)
         {
-            SetConsoleMode(m_consoleHandle, previousMode);
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(m_consoleHandle, previousMode));
         }
     });
 
