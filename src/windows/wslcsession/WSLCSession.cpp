@@ -1424,7 +1424,18 @@ try
         streamIo.AddHandle(std::make_unique<io::ReadHandle>(streamProcess.GetStdHandle(2), [&](const gsl::span<char>& content) {
             streamError.append(content.data(), content.size());
         }));
-        streamIo.Run({});
+
+        try
+        {
+            streamIo.Run({});
+        }
+        catch (...)
+        {
+            // Tear the streamer down so a cancelled or failed relay cannot leave it running (and
+            // holding the temp path open) while removeOutput deletes it on scope exit.
+            StopProcess(streamProcess, 10 * 1000, 10 * 1000);
+            throw;
+        }
 
         std::erase(streamError, '\r');
         int streamCode = streamProcess.Wait();

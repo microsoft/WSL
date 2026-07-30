@@ -224,6 +224,20 @@ void ImageService::Build(
         }
     });
 
+    // For a single-file exporter the server streams into a client handle. We point that handle at a
+    // sibling temp file and rename it over the destination only after the build succeeds, so a failed
+    // build leaves any existing file intact (buildx uses a lazy writer that never truncates on failure).
+    // These track the pending rename; outputFileTemp is cleared once committed to disarm the cleanup.
+    std::filesystem::path outputFileDest;
+    std::filesystem::path outputFileTemp;
+    auto outputFileCleanup = wil::scope_exit([&] {
+        if (!outputFileTemp.empty())
+        {
+            outputFile.reset();
+            DeleteFileW(outputFileTemp.c_str());
+        }
+    });
+
     if (output.has_value())
     {
         const auto& spec = output.value();
@@ -242,19 +256,34 @@ void ImageService::Build(
 
                 // Refuse to dump the binary exporter stream onto an interactive console (matching docker);
                 // stdout must be redirected to a file or pipe. Otherwise ToCOMInputHandle would fail the
-                // marshal with a cryptic ERROR_NOT_SUPPORTED for the FILE_TYPE_CHAR console handle.
+                // marshal with a cryptic ERROR_NOT_SUPPORTED for the console handle. A redirected character
+                // device such as NUL is not a console, so IsConsoleHandle (which also checks
+                // GetConsoleMode) still lets those through.
                 THROW_HR_WITH_USER_ERROR_IF(
                     E_INVALIDARG,
                     Localization::MessageWslcOutputInvalidSpec(
                         validation::FormatOutputSpec(spec),
                         L"refusing to write build output to the console; redirect stdout to a file or pipe (for example "
                         L"'> out.tar') or pass 'dest=' with a file path"),
-                    GetFileType(outputHandle) == FILE_TYPE_CHAR);
+                    IsConsoleHandle(outputHandle));
             }
             else
             {
+                // Create the destination's parent directory (buildx creates missing parents) and stream
+                // into a sibling temp file that is renamed over the destination only on success (below).
+                auto destPath = std::filesystem::absolute(spec.Dest);
+                std::error_code dirError;
+                std::filesystem::create_directories(destPath.parent_path(), dirError);
+
+                GUID tempGuid{};
+                THROW_IF_FAILED(CoCreateGuid(&tempGuid));
+                const auto tempSuffix = string::GuidToString<wchar_t>(tempGuid, string::GuidToStringFlags::None);
+                outputFileDest = destPath;
+                outputFileTemp = destPath;
+                outputFileTemp += std::format(L".{}.wslctmp", tempSuffix);
+
                 outputFile.reset(CreateFileW(
-                    spec.Dest.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+                    outputFileTemp.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
                 THROW_LAST_ERROR_IF_MSG(!outputFile, "Failed to create output file: %ls", spec.Dest.c_str());
                 outputHandle = outputFile.get();
             }
@@ -331,6 +360,18 @@ void ImageService::Build(
         extractPipeWrite.reset();
         auto exitCode = wsl::windows::common::SubProcess::GetExitCode(extractProcess.get());
         THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+    }
+
+    // The build succeeded, so atomically move the streamed temp file over the destination. The temp
+    // file is a sibling of the destination, so the rename stays on one volume and replaces in place.
+    if (!outputFileTemp.empty())
+    {
+        outputFile.reset();
+        THROW_IF_WIN32_BOOL_FALSE_MSG(
+            MoveFileExW(outputFileTemp.c_str(), outputFileDest.c_str(), MOVEFILE_REPLACE_EXISTING),
+            "Failed to write build output to %ls",
+            outputFileDest.c_str());
+        outputFileTemp.clear();
     }
 
     tarCleanup.release();

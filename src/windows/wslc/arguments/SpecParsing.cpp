@@ -218,28 +218,8 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, L"malformed quoting"));
     }
 
-    // Keys are ASCII and matched case-insensitively; lowercase them without touching values.
-    const auto toLower = [](std::wstring value) {
-        for (auto& ch : value)
-        {
-            if (ch >= L'A' && ch <= L'Z')
-            {
-                ch = static_cast<wchar_t>(ch - L'A' + L'a');
-            }
-        }
-        return value;
-    };
-
-    // Trim ASCII spaces/tabs (buildx TrimSpace's the key so " dest=x" after a comma is accepted).
-    const auto trim = [](const std::wstring& value) {
-        const auto first = value.find_first_not_of(L" \t");
-        if (first == std::wstring::npos)
-        {
-            return std::wstring{};
-        }
-        const auto last = value.find_last_not_of(L" \t");
-        return value.substr(first, last - first + 1);
-    };
+    // Keys are ASCII and matched case-insensitively, and buildx TrimSpace's each key so " dest=x" after
+    // a comma is accepted; values are left untouched. AsciiToLower/TrimAscii live in stringshared.h.
 
     // Shorthand: a single field that is exactly the input and does not start with "type=" names the
     // destination. Matching Docker, '-' streams a tarball to stdout ('type=tar,dest=-'); anything else
@@ -268,7 +248,7 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
                 Localization::MessageWslcOutputInvalidSpec(spec, L"expected key=value pairs separated by ','"));
         }
 
-        const auto key = toLower(trim(field.substr(0, pos)));
+        const auto key = AsciiToLower(TrimAscii(std::wstring_view(field).substr(0, pos)));
         auto value = field.substr(pos + 1);
         if (key.empty())
         {
@@ -279,7 +259,7 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         if (key == L"type")
         {
             rawType = value;
-            output.Type = toLower(value);
+            output.Type = AsciiToLower(std::wstring_view(value));
             hasType = true;
         }
         else if (key == L"dest")
@@ -307,6 +287,19 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
     if (!supportedType)
     {
         throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"unsupported output type '{}'", rawType)));
+    }
+
+    // The 'tar' attribute selects a single tarball vs. an OCI layout directory for oci/docker, and it
+    // drives file-vs-directory routing here. buildx parses it with Go's ParseBool and errors on
+    // anything else, so reject an invalid value up front rather than failing confusingly in the VM.
+    if (output.Type == L"oci" || output.Type == L"docker")
+    {
+        const auto tarIt = output.Attributes.find(L"tar");
+        if (tarIt != output.Attributes.end() && !ParseBool(tarIt->second.c_str(), true).has_value())
+        {
+            throw ArgumentException(
+                Localization::MessageWslcOutputInvalidSpec(spec, std::format(L"invalid boolean value '{}' for 'tar'", tarIt->second)));
+        }
     }
 
     // Destination resolution, mirroring `docker buildx build --output`:
@@ -364,9 +357,13 @@ bool OutputIsDirectory(const services::BuildOutput& output)
 
     if (output.Type == L"oci" || output.Type == L"docker")
     {
-        // oci/docker default to a single tarball but export an OCI layout directory when tar=false.
+        // oci/docker default to a single tarball but export an OCI layout directory when tar is false.
         const auto it = output.Attributes.find(L"tar");
-        return it != output.Attributes.end() && it->second == L"false";
+        if (it != output.Attributes.end())
+        {
+            const auto tar = ParseBool(it->second.c_str(), true);
+            return tar.has_value() && !tar.value();
+        }
     }
 
     return false;

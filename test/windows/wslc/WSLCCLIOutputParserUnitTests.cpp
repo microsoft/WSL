@@ -183,6 +183,69 @@ class WSLCCLIOutputParserUnitTests
         VerifyValid(L"type=docker,dest=./layout,tar=false", L"docker", L"./layout", AttrMap{{L"tar", L"false"}});
     }
 
+    // --- Valid: 'tar' accepts every spelling Go's strconv.ParseBool does (buildx parity) ---
+
+    TEST_METHOD(Output_Oci_TarFalse_CapitalizedIsDirectory)
+    {
+        // buildx parses 'tar' with Go's ParseBool, so "False" is a directory exporter just like "false".
+        // The attribute value is preserved verbatim (only routing is case-insensitive).
+        VerifyValid(L"type=oci,dest=./layout,tar=False", L"oci", L"./layout", AttrMap{{L"tar", L"False"}});
+    }
+
+    TEST_METHOD(Output_Oci_TarZeroIsDirectory)
+    {
+        // "0" is false for Go's ParseBool, so it selects the OCI layout directory exporter.
+        VerifyValid(L"type=oci,dest=./layout,tar=0", L"oci", L"./layout", AttrMap{{L"tar", L"0"}});
+    }
+
+    TEST_METHOD(Output_Oci_TarShortFalseIsDirectory)
+    {
+        // "f" is the short false form accepted by Go's ParseBool.
+        VerifyValid(L"type=oci,dest=./layout,tar=f", L"oci", L"./layout", AttrMap{{L"tar", L"f"}});
+    }
+
+    TEST_METHOD(Output_Oci_TarCapitalizedFalse_RequiresDest)
+    {
+        // A directory exporter cannot stream to stdout regardless of the boolean spelling, so tar=False
+        // with no dest is rejected the same as tar=false.
+        VerifyInvalid(L"type=oci,tar=False", L"writes a directory tree");
+    }
+
+    TEST_METHOD(Output_Docker_TarZeroIsDirectory)
+    {
+        // docker with tar=0 likewise exports an OCI layout directory.
+        VerifyValid(L"type=docker,dest=./layout,tar=0", L"docker", L"./layout", AttrMap{{L"tar", L"0"}});
+    }
+
+    TEST_METHOD(Output_Oci_TarTrue_IsSingleTarballToStdout)
+    {
+        // "True" is true for Go's ParseBool, so oci stays a single tarball and defaults to stdout.
+        VerifyValid(L"type=oci,tar=True", L"oci", L"-", AttrMap{{L"tar", L"True"}});
+    }
+
+    TEST_METHOD(Output_Oci_TarOne_IsSingleTarballToFile)
+    {
+        // "1" is true, so this is a single-tarball export to a file (not a directory).
+        VerifyValid(L"type=oci,dest=image.tar,tar=1", L"oci", L"image.tar", AttrMap{{L"tar", L"1"}});
+    }
+
+    TEST_METHOD(Output_Docker_TarTrue_LoadsIntoStore)
+    {
+        // docker with tar=true is a single tarball; with no dest it loads into the VM store (dest empty).
+        VerifyValid(L"type=docker,tar=t", L"docker", L"", AttrMap{{L"tar", L"t"}});
+    }
+
+    TEST_METHOD(Output_Oci_TarInvalidBool_Rejected)
+    {
+        // A non-boolean 'tar' value is rejected up front, matching buildx (which errors in ParseBool).
+        VerifyInvalid(L"type=oci,dest=./layout,tar=yes", L"invalid boolean value 'yes' for 'tar'");
+    }
+
+    TEST_METHOD(Output_Docker_TarInvalidBool_Rejected)
+    {
+        VerifyInvalid(L"type=docker,dest=./layout,tar=maybe", L"invalid boolean value 'maybe' for 'tar'");
+    }
+
     TEST_METHOD(Output_Docker_ToFile)
     {
         VerifyValid(L"type=docker,dest=image.tar", L"docker", L"image.tar");
