@@ -521,6 +521,16 @@ HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
         g_stopWindowCaller.join();
     }
 
+    // Close the duplicated exit event if the stop-window thread did not get far enough to claim it.
+    // The leaked process wrapper is deliberately not released: it holds a COM proxy marshalled to the
+    // OnWslcVmStopping callback's thread, and releasing it from this one risks the same
+    // RPC_E_WRONG_THREAD hazard that forced the exit event to be cached as a plain handle. It is one
+    // wrapper for the lifetime of a test process, so leaking it is the safer trade.
+    if (auto* exitEvent = g_leakedProcessExitEvent.exchange(nullptr); exitEvent != nullptr)
+    {
+        CloseHandle(exitEvent);
+    }
+
     g_logfile << "WSLC Session stopping, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
               << ", id=" << Session->SessionId << std::endl;
 

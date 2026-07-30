@@ -109,11 +109,11 @@ class WSLCE2EWarningTests
         const auto recoveryWarning =
             wsl::shared::Localization::MessageWslcFailedToRecoverContainer(string::MultiByteToWide(corruptContainerId));
 
-        // Assert unconditionally: guarding on has_value() would let the test pass vacuously if stderr
-        // capture ever broke, which is precisely when it would stop proving anything. No stderr at all
-        // trivially satisfies "the warning was not printed".
-        const auto stderrText = result.Stderr.value_or(std::wstring{});
-        VERIFY_IS_TRUE(stderrText.find(recoveryWarning) == std::wstring::npos);
+        // Assert that capture actually worked before searching it, matching the other e2e tests:
+        // RunWslc always populates Stderr, so a missing value means capture broke and the search
+        // below would pass without proving anything.
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(recoveryWarning) == std::wstring::npos);
     }
 };
 
