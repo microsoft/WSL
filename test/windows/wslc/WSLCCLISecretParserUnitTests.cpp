@@ -182,6 +182,35 @@ class WSLCCLISecretParserUnitTests
         VerifyValidFileSecret(L"id=s,source=" + file.wpath(), L"s", file.wpath());
     }
 
+    TEST_METHOD(Secret_File_QuotedFieldWithCommaInSrcPath)
+    {
+        // Docker parity: buildx parses --secret as a single CSV record, so a whole 'src=' field can be
+        // double-quoted to carry a path containing commas; the comma must stay part of the value rather
+        // than splitting into bogus extra key=value parts. This exercises SplitCsvFields end-to-end
+        // through secret parsing. Note the entire "src=<path>" field is quoted (Go's CSV grammar), not
+        // just the value - a bare quote after 'src=' would be an unquoted-field bare quote (malformed).
+        const auto path =
+            std::filesystem::temp_directory_path() / (L"wslc_ut_secret_" + std::to_wstring(GetCurrentProcessId()) + L"_a,b,c.bin");
+        {
+            std::ofstream file(path, std::ios::binary | std::ios::trunc);
+            VERIFY_IS_TRUE(file.is_open());
+            file << 'x';
+        }
+        auto cleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove(path, ec);
+        });
+
+        const std::wstring spec = L"id=s,\"src=" + path.wstring() + L"\"";
+        auto secret = validation::ParseSecretSpec(spec);
+        VERIFY_ARE_EQUAL(std::wstring(L"s"), secret.Id);
+        VERIFY_IS_TRUE(secret.Value.empty());
+
+        std::error_code ec;
+        const auto expectedCanonical = std::filesystem::weakly_canonical(path, ec);
+        VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
+    }
+
     TEST_METHOD(Secret_File_EmptyFileForwardsPath)
     {
         // An empty file is still a valid file secret: its path is forwarded and mounted (docker delivers

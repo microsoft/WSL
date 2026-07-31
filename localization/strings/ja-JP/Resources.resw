@@ -2161,6 +2161,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>ネットワーク名を空にすることはできません。</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>エンジンからのエラー情報:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>認識されないコマンド: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2329,6 +2332,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>イメージ '{}' が見つかりません。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>無効な --secret value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>必須のオプションがありません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2370,7 +2377,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
-    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <value>'--ip-range' オプションには '--subnet' の指定も必要です。</value>
     <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2892,6 +2899,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>ビルドするターゲット ビルド ステージを設定します</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>ビルドにシークレットを公開します (id=NAME[,type=env|file][,env=VAR|,src=PATH]; 既定値は env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>実行するコマンド</value>
