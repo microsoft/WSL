@@ -69,7 +69,7 @@ inline bool EndsWith(const std::basic_string<T>& String, const std::basic_string
 // locale-independent (no Turkish-'I' surprises) and has no signed-char UB, which is what you want when
 // normalizing ASCII protocol tokens such as buildx CSV keys.
 template <class T>
-inline std::basic_string<T> AsciiToLower(const std::basic_string_view<T> &String)
+inline std::basic_string<T> AsciiToLower(const std::basic_string_view<T>& String)
 {
     std::basic_string<T> Result(String);
     for (auto& Ch : Result)
@@ -87,7 +87,7 @@ inline std::basic_string<T> AsciiToLower(const std::basic_string_view<T> &String
 // the ASCII subset of Go's strings.TrimSpace. Returns a view into the input, so the input must outlive
 // the result. The stdlib has no trim, so this centralizes the find_first/last_not_of idiom.
 template <class T>
-inline std::basic_string_view<T> TrimAscii(const std::basic_string_view<T> &String)
+inline std::basic_string_view<T> TrimAscii(const std::basic_string_view<T>& String)
 {
     constexpr T Whitespace[] = {
         static_cast<T>(' '), static_cast<T>('\t'), static_cast<T>('\r'), static_cast<T>('\n'), static_cast<T>('\v'), static_cast<T>('\f'), static_cast<T>('\0')};
