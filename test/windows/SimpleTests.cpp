@@ -147,45 +147,11 @@ class SimpleTests
         VerifySparse(vhdPath.c_str(), false);
     }
 
-    static std::wstring ResolveWslExecutablePath()
-    {
-        // Use the co-located test-built wsl.exe so the test exercises this change.
-        HMODULE currentModule = nullptr;
-        if (GetModuleHandleExW(
-                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                reinterpret_cast<LPCWSTR>(&ResolveWslExecutablePath),
-                &currentModule))
-        {
-            std::array<wchar_t, MAX_PATH> modulePath{};
-            const auto modulePathLength = GetModuleFileNameW(currentModule, modulePath.data(), static_cast<DWORD>(modulePath.size()));
-            if ((modulePathLength > 0) && (modulePathLength < modulePath.size()))
-            {
-                std::wstring candidate{modulePath.data(), modulePathLength};
-                const auto separator = candidate.find_last_of(L"\\/");
-                if (separator != std::wstring::npos)
-                {
-                    candidate.resize(separator + 1);
-                    candidate += L"wsl.exe";
-
-                    const auto attributes = GetFileAttributesW(candidate.c_str());
-                    if ((attributes != INVALID_FILE_ATTRIBUTES) && !WI_IsFlagSet(attributes, FILE_ATTRIBUTE_DIRECTORY))
-                    {
-                        return candidate;
-                    }
-                }
-            }
-        }
-
-        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), "Could not find the co-located test-built wsl.exe");
-    }
-
     static std::wstring BuildControllableWslCommandLine()
     {
         // The child prints "ready" as soon as the Linux process is running,
         // then blocks on stdin so the parent can deterministically control its lifetime.
-        const std::wstring arguments = L"-- sh -c \"printf ready; IFS= read -r _\"";
-        const std::wstring wslPath = ResolveWslExecutablePath();
-        return std::format(L"\"{}\" {}", wslPath, arguments);
+        return LxssGenerateWslCommandLine(L"-- sh -c \"printf ready; IFS= read -r _\"");
     }
 
     static DWORD WaitForProcessExit(HANDLE process, DWORD timeoutMs)
@@ -193,10 +159,7 @@ class SimpleTests
         return wsl::windows::common::SubProcess::GetExitCode(process, timeoutMs);
     }
 
-    static wil::unique_handle StartControllableWslProcess(
-        HANDLE standardInput,
-        HANDLE standardOutput,
-        DWORD createFlags = CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT)
+    static wil::unique_handle StartControllableWslProcess(HANDLE standardInput, HANDLE standardOutput, DWORD createFlags = CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT)
     {
         std::wstring commandLine = BuildControllableWslCommandLine();
         return LxsstuStartProcess(commandLine.data(), standardInput, standardOutput, standardOutput, nullptr, createFlags);
