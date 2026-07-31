@@ -18,6 +18,7 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
     private int _defaultVMIdleTimeout;
     private IWslConfigSetting? _instanceIdleTimeout;
     private int _defaultInstanceIdleTimeout;
+    private int _previousInstanceIdleTimeout;
 
     public OptionalFeaturesViewModel()
     {
@@ -40,6 +41,9 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
 
         _defaultVMIdleTimeout = wslConfigService.GetWslConfigSetting(WslConfigEntry.VMIdleTimeout, true).Int32Value;
         _defaultInstanceIdleTimeout = wslConfigService.GetWslConfigSetting(WslConfigEntry.InstanceIdleTimeout, true).Int32Value;
+
+        var configuredInstanceIdleTimeout = _instanceIdleTimeout!.Int32Value;
+        _previousInstanceIdleTimeout = configuredInstanceIdleTimeout < 0 ? _defaultInstanceIdleTimeout : configuredInstanceIdleTimeout;
     }
 
     public List<string> MemoryReclaimModes
@@ -77,15 +81,29 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
         set { Set(ref _sparseVHD!, value); }
     }
 
-    // Keeping WSL alive is driven by the distribution idle timeout: a negative value tells the
+    // Keeping WSL running is driven by the distribution idle timeout: a negative value tells the
     // service to never idle-terminate a distribution, and because the VM is only considered idle
     // once every distribution has stopped, this keeps the WSL VM running as well.
-    public bool IsOnKeepVMAlive
+    public bool IsOnKeepWslRunning
     {
         get { return _instanceIdleTimeout!.Int32Value < 0; }
         set
         {
-            Set(ref _instanceIdleTimeout!, value ? -1 : _defaultInstanceIdleTimeout, nameof(IsOnKeepVMAlive));
+            if (value)
+            {
+                var currentInstanceIdleTimeout = _instanceIdleTimeout!.Int32Value;
+                if (currentInstanceIdleTimeout >= 0)
+                {
+                    _previousInstanceIdleTimeout = currentInstanceIdleTimeout;
+                }
+
+                Set(ref _instanceIdleTimeout!, -1, nameof(IsOnKeepWslRunning));
+            }
+            else
+            {
+                Set(ref _instanceIdleTimeout!, _previousInstanceIdleTimeout, nameof(IsOnKeepWslRunning));
+            }
+
             OnPropertyChanged(nameof(InstanceIdleTimeout));
             OnPropertyChanged(nameof(InstanceIdleTimeoutEnabled));
             OnPropertyChanged(nameof(VMIdleTimeoutEnabled));
@@ -95,12 +113,12 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
 
     public bool VMIdleTimeoutEnabled
     {
-        get { return !IsOnKeepVMAlive; }
+        get { return !IsOnKeepWslRunning; }
     }
 
     public bool InstanceIdleTimeoutEnabled
     {
-        get { return !IsOnKeepVMAlive; }
+        get { return !IsOnKeepWslRunning; }
     }
 
     public string VMIdleTimeout
@@ -165,7 +183,12 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
                 if (Int32.TryParse(value, out int parsedValue))
                 {
                     Set(ref _instanceIdleTimeout!, parsedValue);
-                    OnPropertyChanged(nameof(IsOnKeepVMAlive));
+                    if (parsedValue >= 0)
+                    {
+                        _previousInstanceIdleTimeout = parsedValue;
+                    }
+
+                    OnPropertyChanged(nameof(IsOnKeepWslRunning));
                     OnPropertyChanged(nameof(InstanceIdleTimeoutEnabled));
                     OnPropertyChanged(nameof(VMIdleTimeoutEnabled));
                 }

@@ -66,12 +66,11 @@ public sealed partial class OptionalFeaturesPage : Page
 
     private void InstanceIdleTimeoutTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (sender == null)
+        if (sender is not TextBox textBox)
         {
             return;
         }
 
-        TextBox? textBox = sender as TextBox;
-        ViewModel.SetInstanceIdleTimeout_ResetEnabled(textBox!.Text);
+        ViewModel.SetInstanceIdleTimeout_ResetEnabled(textBox.Text);
     }
 }
