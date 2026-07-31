@@ -264,9 +264,7 @@ void ImageService::Build(
                 // destination in place.
                 auto destPath = std::filesystem::absolute(spec.Dest);
                 auto destDir = destPath.parent_path();
-                std::error_code dirError;
-                std::filesystem::create_directories(destDir, dirError);
-                THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destDir.c_str());
+                std::filesystem::create_directories(destDir);
 
                 outputMountPath = destDir.wstring();
                 outputMountFile = destPath.filename().wstring();
@@ -279,9 +277,7 @@ void ImageService::Build(
         }
         else if (isDirExporter)
         {
-            std::error_code dirError;
-            std::filesystem::create_directories(std::filesystem::absolute(spec.Dest), dirError);
-            THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", spec.Dest.c_str());
+            std::filesystem::create_directories(std::filesystem::absolute(spec.Dest));
 
             // Strip a trailing separator so the CRT does not parse '\"' as an escaped quote.
             auto destDir = std::filesystem::absolute(spec.Dest).wstring();
