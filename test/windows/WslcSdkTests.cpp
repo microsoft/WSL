@@ -56,6 +56,18 @@ void CloseContainer(WslcContainer container)
 
 using UniqueContainer = wil::unique_any<WslcContainer, decltype(CloseContainer), CloseContainer>;
 
+// Release-only handle: does not stop or delete the container.
+// Used when a second handle to the same container is needed (e.g., OpenContainer tests).
+void ReleaseContainerHandle(WslcContainer container)
+{
+    if (container)
+    {
+        THROW_IF_FAILED(WslcReleaseContainer(container));
+    }
+}
+
+using UniqueContainerReleaseOnly = wil::unique_any<WslcContainer, decltype(ReleaseContainerHandle), ReleaseContainerHandle>;
+
 void CloseProcess(WslcProcess process)
 {
     if (process)
@@ -2913,5 +2925,136 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcGetContainerState(container.get(), &state));
             VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_EXITED);
         }
+    }
+
+    WSLC_TEST_METHOD(OpenContainer)
+    {
+        constexpr auto c_containerName = "wslc-sdk-open-test";
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsName(&containerSettings, c_containerName));
+
+        UniqueContainer created;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &created, nullptr));
+
+        CHAR createdId[WSLC_CONTAINER_ID_BUFFER_SIZE]{};
+        VERIFY_SUCCEEDED(WslcGetContainerID(created.get(), createdId));
+
+        // Positive: open by name — IDs must match.
+        {
+            UniqueContainerReleaseOnly opened;
+            VERIFY_SUCCEEDED(WslcOpenContainer(m_defaultSession, c_containerName, &opened, nullptr));
+            VERIFY_IS_NOT_NULL(opened.get());
+
+            CHAR openedId[WSLC_CONTAINER_ID_BUFFER_SIZE]{};
+            VERIFY_SUCCEEDED(WslcGetContainerID(opened.get(), openedId));
+
+            VERIFY_ARE_EQUAL(strcmp(createdId, openedId), 0);
+        }
+
+        // Positive: open by full 64-character ID.
+        {
+            UniqueContainerReleaseOnly opened;
+            VERIFY_SUCCEEDED(WslcOpenContainer(m_defaultSession, createdId, &opened, nullptr));
+            VERIFY_IS_NOT_NULL(opened.get());
+        }
+
+        // Positive: open by partial ID prefix (12 hex chars — standard short ID).
+        {
+            createdId[12] = '\0';
+
+            UniqueContainerReleaseOnly opened;
+            VERIFY_SUCCEEDED(WslcOpenContainer(m_defaultSession, createdId, &opened, nullptr));
+            VERIFY_IS_NOT_NULL(opened.get());
+        }
+
+        // Negative: non-existent name must fail with WSLC_E_CONTAINER_NOT_FOUND.
+        {
+            UniqueContainerReleaseOnly opened;
+            VERIFY_ARE_EQUAL(WslcOpenContainer(m_defaultSession, "no-such-container", &opened, nullptr), WSLC_E_CONTAINER_NOT_FOUND);
+            VERIFY_IS_NULL(opened.get());
+        }
+
+        // Negative: null session must fail with E_POINTER.
+        {
+            UniqueContainerReleaseOnly opened;
+            VERIFY_ARE_EQUAL(WslcOpenContainer(nullptr, c_containerName, &opened, nullptr), E_POINTER);
+        }
+
+        // Negative: null nameOrId must fail with E_POINTER.
+        {
+            UniqueContainerReleaseOnly opened;
+            VERIFY_ARE_EQUAL(WslcOpenContainer(m_defaultSession, nullptr, &opened, nullptr), E_POINTER);
+        }
+
+        // Negative: null container output pointer must fail with E_POINTER.
+        VERIFY_ARE_EQUAL(WslcOpenContainer(m_defaultSession, c_containerName, nullptr, nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(OpenContainerIOCallbacks)
+    {
+        // Verify that IO callbacks installed via WslcSetContainerInitProcessIOCallbacks fire when
+        // the opened container is started with WSLC_CONTAINER_START_FLAG_ATTACH.
+        constexpr auto c_containerName = "wslc-sdk-opencb-test";
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sh", "-c", "echo STDOUT && echo STDERR >&2"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsName(&containerSettings, c_containerName));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer created;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &created, nullptr));
+
+        UniqueContainerReleaseOnly opened;
+        VERIFY_SUCCEEDED(WslcOpenContainer(m_defaultSession, c_containerName, &opened, nullptr));
+
+        struct Context
+        {
+            std::string stdoutData;
+            std::string stderrData;
+            wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle ioHandle, const BYTE* data, uint32_t size, PVOID c) {
+            auto& target = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? static_cast<Context*>(c)->stdoutData
+                                                                       : static_cast<Context*>(c)->stderrData;
+            target.append(reinterpret_cast<const char*>(data), size);
+        };
+
+        auto exitCb = [](INT32, PVOID c) { static_cast<Context*>(c)->exitEvent.SetEvent(); };
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        callbacks.onStdErr = ioCb;
+        callbacks.onExit = exitCb;
+        VERIFY_SUCCEEDED(WslcSetContainerInitProcessIOCallbacks(opened.get(), &callbacks, &ctx));
+
+        VERIFY_SUCCEEDED(WslcStartContainer(opened.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(ctx.exitEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        // Release the opened handle first to flush all pending IO callbacks before asserting output.
+        opened.reset();
+
+        VERIFY_ARE_EQUAL(ctx.stdoutData, "STDOUT\n");
+        VERIFY_ARE_EQUAL(ctx.stderrData, "STDERR\n");
+    }
+
+    WSLC_TEST_METHOD(SetContainerInitProcessIOCallbacksNullCallbacks)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+
+        // Null callbacks pointer must fail with E_POINTER.
+        VERIFY_ARE_EQUAL(WslcSetContainerInitProcessIOCallbacks(container.get(), nullptr, nullptr), E_POINTER);
     }
 };
