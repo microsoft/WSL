@@ -334,10 +334,8 @@ endif()
 # cost of statically linking the UCRT. See https://aka.ms/hybridcrt for details.
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE}    /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
-set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
 set(CMAKE_SHARED_LINKER_FLAGS_DEBUG   "${CMAKE_SHARED_LINKER_FLAGS_DEBUG}   /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG      "${CMAKE_EXE_LINKER_FLAGS_DEBUG}      /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
-set(CMAKE_STATIC_LINKER_FLAGS_DEBUG   "${CMAKE_STATIC_LINKER_FLAGS_DEBUG}   /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
