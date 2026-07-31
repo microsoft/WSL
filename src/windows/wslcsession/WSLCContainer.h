@@ -187,9 +187,10 @@ private:
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
     // Returns with both locks held when no transition is active or the active transition matches kind.
-    template <typename TLifecycleLock>
     void WaitForConflictingTransitionToComplete(
-        wil::rwlock_release_exclusive_scope_exit& lock, TLifecycleLock& lifecycleLock, std::optional<TransitionKind> kind = std::nullopt);
+        wil::rwlock_release_exclusive_scope_exit& lock,
+        wil::rwlock_release_shared_scope_exit& lifecycleLock,
+        std::optional<TransitionKind> kind = std::nullopt);
 
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
     void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
@@ -216,8 +217,8 @@ private:
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
-    // Stop request setup holds this shared; state-changing operations and event delivery hold it exclusively.
-    wil::srwlock m_lifecycleGate;
+    // Lifecycle requests hold this shared until their transitions are published; event delivery holds it exclusively.
+    wil::srwlock m_lifecycleLock;
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;

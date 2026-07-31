@@ -743,7 +743,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
     std::shared_ptr<StateTransition> transition;
-    auto lifecycleLock = m_lifecycleGate.lock_exclusive();
+    auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
     WaitForConflictingTransitionToComplete(lock, lifecycleLock);
 
@@ -886,9 +886,8 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     AttachToTransition(transition);
 }
 
-template <typename TLifecycleLock>
 void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
-    wil::rwlock_release_exclusive_scope_exit& lock, TLifecycleLock& lifecycleLock, std::optional<TransitionKind> kind)
+    wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock, std::optional<TransitionKind> kind)
 {
     while (m_transition && (!kind.has_value() || m_transition->Kind != kind.value()))
     {
@@ -899,16 +898,7 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
             WaitForTransitionCompletion(transition);
         }
 
-        if constexpr (std::is_same_v<TLifecycleLock, wil::rwlock_release_shared_scope_exit>)
-        {
-            lifecycleLock = m_lifecycleGate.lock_shared();
-        }
-        else
-        {
-            static_assert(std::is_same_v<TLifecycleLock, wil::rwlock_release_exclusive_scope_exit>);
-            lifecycleLock = m_lifecycleGate.lock_exclusive();
-        }
-
+        lifecycleLock = m_lifecycleLock.lock_shared();
         lock = m_lock.lock_exclusive();
     }
 }
@@ -964,7 +954,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     std::shared_ptr<StateTransition> transition;
 
     {
-        auto lifecycleLock = m_lifecycleGate.lock_exclusive();
+        auto lifecycleLock = m_lifecycleLock.lock_exclusive();
         auto lock = m_lock.lock_exclusive();
         transition = m_transition;
 
@@ -1023,7 +1013,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     std::shared_ptr<StateTransition> transition;
 
     {
-        auto lifecycleLock = m_lifecycleGate.lock_shared();
+        auto lifecycleLock = m_lifecycleLock.lock_shared();
         auto lock = m_lock.lock_exclusive();
         WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop);
 
@@ -1186,7 +1176,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 {
     std::shared_ptr<StateTransition> transition;
-    auto lifecycleLock = m_lifecycleGate.lock_exclusive();
+    auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
     WaitForConflictingTransitionToComplete(lock, lifecycleLock);
 
