@@ -194,14 +194,22 @@ void ImageService::Build(
 
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
-    // Route the docker-style --output exporter. Exporters that write to a caller-provided destination
-    // (tar/oci/docker with dest=, and local) are streamed back out of the VM: the client opens the
-    // destination here, forwards the spec with dest= stripped, and the server writes the exporter
-    // output to a VM temp path then streams it to OutputHandle. Exporters with no client destination
-    // (docker load, image, registry, cacheonly) run entirely in the VM and the spec is forwarded as-is.
+    // Route the docker-style --output exporter. A single-file exporter with a real destination (tar/oci/
+    // docker with dest=) has the destination's parent directory mounted read-write into the VM, so buildx
+    // writes the output file straight to the destination in place. dest=- (stdout) and directory exporters
+    // (type=local) are instead streamed back out of the VM to OutputHandle: dest=- to stdout, and
+    // type=local as a tarball the client feeds to tar.exe to extract into the destination directory (a
+    // Linux tree cannot be written faithfully to a Windows-backed mount). Exporters with no client
+    // destination (docker load, image, registry, cacheonly) run entirely in the VM and the spec is
+    // forwarded as-is.
     std::string outputStr;
     HANDLE outputHandle = nullptr;
-    wil::unique_hfile outputFile;
+
+    // For a single-file exporter with a real destination the server writes the exporter output into a
+    // read-write virtiofs mount of the destination's parent directory rather than streaming it back:
+    // outputMountPath is that parent directory and outputMountFile the destination file's leaf name.
+    std::wstring outputMountPath;
+    std::wstring outputMountFile;
 
     // For directory exporters (type=local, or oci/docker with tar=false) the server streams a tarball of
     // the export directory; the client extracts it into the destination directory by feeding the stream
@@ -221,20 +229,6 @@ void ImageService::Build(
             {
                 TerminateProcess(extractProcess.get(), 1);
             }
-        }
-    });
-
-    // For a single-file exporter the server streams into a client handle. We point that handle at a
-    // sibling temp file and rename it over the destination only after the build succeeds, so a failed
-    // build leaves any existing file intact (buildx uses a lazy writer that never truncates on failure).
-    // These track the pending rename; outputFileTemp is cleared once committed to disarm the cleanup.
-    std::filesystem::path outputFileDest;
-    std::filesystem::path outputFileTemp;
-    auto outputFileCleanup = wil::scope_exit([&] {
-        if (!outputFileTemp.empty())
-        {
-            outputFile.reset();
-            DeleteFileW(outputFileTemp.c_str());
         }
     });
 
@@ -265,23 +259,17 @@ void ImageService::Build(
             }
             else
             {
-                // Create the destination's parent directory (buildx creates missing parents) and stream
-                // into a sibling temp file that is renamed over the destination only on success (below).
+                // Single-file exporter with a real destination: mount the destination's parent directory
+                // read-write into the VM so buildx writes the exporter output file straight to the
+                // destination in place.
                 auto destPath = std::filesystem::absolute(spec.Dest);
+                auto destDir = destPath.parent_path();
                 std::error_code dirError;
-                std::filesystem::create_directories(destPath.parent_path(), dirError);
+                std::filesystem::create_directories(destDir, dirError);
+                THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", destDir.c_str());
 
-                GUID tempGuid{};
-                THROW_IF_FAILED(CoCreateGuid(&tempGuid));
-                const auto tempSuffix = string::GuidToString<wchar_t>(tempGuid, string::GuidToStringFlags::None);
-                outputFileDest = destPath;
-                outputFileTemp = destPath;
-                outputFileTemp += std::format(L".{}.wslctmp", tempSuffix);
-
-                outputFile.reset(CreateFileW(
-                    outputFileTemp.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-                THROW_LAST_ERROR_IF_MSG(!outputFile, "Failed to create output file: %ls", spec.Dest.c_str());
-                outputHandle = outputFile.get();
+                outputMountPath = destDir.wstring();
+                outputMountFile = destPath.filename().wstring();
             }
 
             // The server picks the VM-side dest, so forward the spec without the client's dest.
@@ -345,6 +333,8 @@ void ImageService::Build(
         .Secrets = {secretEntries.data(), static_cast<ULONG>(secretEntries.size())},
         .Output = outputStr.empty() ? nullptr : outputStr.c_str(),
         .OutputHandle = outputHandle != nullptr ? ToCOMInputHandle(outputHandle) : WSLCHandle{.Type = WSLCHandleTypeUnknown},
+        .OutputMountPath = outputMountPath.empty() ? nullptr : outputMountPath.c_str(),
+        .OutputMountFile = outputMountFile.empty() ? nullptr : outputMountFile.c_str(),
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
@@ -356,18 +346,6 @@ void ImageService::Build(
         extractPipeWrite.reset();
         auto exitCode = wsl::windows::common::SubProcess::GetExitCode(extractProcess.get());
         THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
-    }
-
-    // The build succeeded, so atomically move the streamed temp file over the destination. The temp
-    // file is a sibling of the destination, so the rename stays on one volume and replaces in place.
-    if (!outputFileTemp.empty())
-    {
-        outputFile.reset();
-        THROW_IF_WIN32_BOOL_FALSE_MSG(
-            MoveFileExW(outputFileTemp.c_str(), outputFileDest.c_str(), MOVEFILE_REPLACE_EXISTING),
-            "Failed to write build output to %ls",
-            outputFileDest.c_str());
-        outputFileTemp.clear();
     }
 
     tarCleanup.release();

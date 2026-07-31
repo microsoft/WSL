@@ -931,8 +931,9 @@ try
 
     // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
     // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. At most the build
-    // context (1) and one parent directory per file secret are mounted.
-    mountedPaths.reserve(static_cast<size_t>(1) + Options->Secrets.Count);
+    // context (1), the single-file exporter output destination (1), and one parent directory per file
+    // secret are mounted.
+    mountedPaths.reserve(static_cast<size_t>(2) + Options->Secrets.Count);
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
@@ -953,16 +954,22 @@ try
         buildArgs.push_back("--target");
         buildArgs.push_back(Options->Target);
     }
-    // Docker-style --output routing. When the client provides an OutputHandle it has stripped dest=
-    // from the spec and expects the exporter output streamed back: the exporter writes to a VM temp
-    // path (disk-backed under the docker storage root to avoid buffering large outputs in tmpfs) and,
-    // after a successful build, a streamer process relays that path to the client handle. Without a
-    // handle the spec is forwarded verbatim and the build runs entirely in the VM.
+    // Docker-style --output routing. Three cases, distinguished by what the client set:
+    //   * OutputHandle set (dest=- stdout, or a type=local directory): the client stripped dest= and
+    //     expects the exporter output streamed back. The exporter writes to a VM temp path (disk-backed
+    //     under the docker storage root to avoid buffering large outputs in tmpfs) and, after a
+    //     successful build, a streamer relays it to the client handle (cat for a file, tar for a tree).
+    //   * OutputMountPath set (single-file exporter with a real destination): the client stripped dest=
+    //     and passed the destination file's parent directory, mounted read-write into the VM so buildx
+    //     writes the file (at OutputMountFile within the mount) in place - nothing is streamed back.
+    //   * Neither set: the spec is forwarded verbatim and the build runs entirely in the VM.
     const bool streamOutput = Options->OutputHandle.Type != WSLCHandleTypeUnknown;
-    // When an OutputHandle is provided the exporter output must be streamed back, which requires a
-    // non-empty Output spec to route from. Reject the mismatched combination at the boundary rather
-    // than later failing to stream an unassigned dest path.
-    RETURN_HR_IF(E_INVALIDARG, streamOutput && (Options->Output == nullptr || Options->Output[0] == '\0'));
+    const bool mountOutput = Options->OutputMountPath != nullptr && Options->OutputMountPath[0] != L'\0';
+    // Streaming or mounting the exporter output requires a non-empty Output spec to route from, and the
+    // two destinations are mutually exclusive. Reject the mismatched combinations at the boundary rather
+    // than later failing to assign a dest path.
+    RETURN_HR_IF(E_INVALIDARG, (streamOutput || mountOutput) && (Options->Output == nullptr || Options->Output[0] == '\0'));
+    RETURN_HR_IF(E_INVALIDARG, streamOutput && mountOutput);
     const bool outputIsDirectory = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsOutputIsDirectory);
     std::string outputDestPath;
     auto removeOutput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1005,6 +1012,19 @@ try
             THROW_HR_IF_MSG(E_FAIL, mkdirResult.Code != 0, "failed to create build output directory");
 
             outputSpec += std::format(",dest={}", outputDestPath);
+        }
+        else if (mountOutput)
+        {
+            // Mount the client's destination directory read-write and point the exporter at the temp file
+            // to write within it, so buildx writes the single-file output straight to the Windows target.
+            auto guestMountPath = mountInVm(Options->OutputMountPath, FALSE);
+            std::string dest = guestMountPath;
+            if (Options->OutputMountFile != nullptr && Options->OutputMountFile[0] != L'\0')
+            {
+                dest += '/';
+                dest += wsl::shared::string::WideToMultiByte(Options->OutputMountFile);
+            }
+            outputSpec += std::format(",dest={}", dest);
         }
         buildArgs.push_back("--output");
         buildArgs.push_back(outputSpec);
