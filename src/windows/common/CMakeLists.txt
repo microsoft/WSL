@@ -51,7 +51,6 @@ set(SOURCES
     WslInstall.cpp
     WslSecurity.cpp
     SlowOperationWatcher.cpp
-    TimedOperationOutcomeReporter.cpp
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
@@ -140,7 +139,6 @@ set(HEADERS
     WslInstall.h
     WslSecurity.h
     SlowOperationWatcher.h
-    TimedOperationOutcomeReporter.h
     WslTelemetry.h
     wslutil.h
     EnumVariantMap.h

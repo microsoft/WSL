@@ -17,7 +17,6 @@ Abstract:
 #include "LxssUserSession.h"
 #include "LxssInstance.h"
 #include "LxssSecurity.h"
-#include "TimedOperationOutcomeReporter.h"
 #include "WslCoreInstance.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
@@ -2561,55 +2560,8 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             GUID instanceId;
             THROW_IF_FAILED(CoCreateGuid(&instanceId));
 
-            // Log telemetry to determine how long instance creation takes.
-            WSL_LOG_TELEMETRY(
-                "CreateInstanceBegin",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(configuration.Name.c_str(), "distroName"),
-                TraceLoggingValue(version, "version"),
-                TraceLoggingValue(instanceId, "instanceId"));
-
-            HRESULT result = E_UNEXPECTED;
-            constexpr auto createInstanceTimeout = std::chrono::minutes{3};
-            constexpr auto createInstanceTimeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(createInstanceTimeout).count();
-            const auto distroName = configuration.Name;
-            std::atomic<HRESULT> outcomeResult{result};
-            TimedOperationOutcomeReporter outcomeReporter{
-                createInstanceTimeout,
-                [distroName, version, instanceId, createInstanceTimeoutMs, &outcomeResult](
-                    TimedOperationOutcome Outcome, std::chrono::milliseconds Elapsed) {
-                    const auto outcome = Outcome == TimedOperationOutcome::Success
-                                             ? "Success"
-                                             : (Outcome == TimedOperationOutcome::Failure ? "Failure" : "Timeout");
-                    const auto error =
-                        Outcome == TimedOperationOutcome::Timeout ? HRESULT_FROM_WIN32(ERROR_TIMEOUT) : outcomeResult.load();
-                    WSL_LOG_TELEMETRY(
-                        "CreateInstanceOutcome",
-                        PDT_ProductAndServicePerformance,
-                        TraceLoggingValue(distroName.c_str(), "distroName"),
-                        TraceLoggingValue(version, "version"),
-                        TraceLoggingValue(instanceId, "instanceId"),
-                        TraceLoggingValue(outcome, "outcome"),
-                        TraceLoggingValue(Elapsed.count(), "elapsedMs"),
-                        TraceLoggingValue(createInstanceTimeoutMs, "timeoutMs"),
-                        TraceLoggingValue(error, "error"));
-                }};
-
-            auto createEnd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-                outcomeResult.store(result);
-                outcomeReporter.Complete(SUCCEEDED(result));
-                WSL_LOG_TELEMETRY(
-                    "CreateInstanceEnd",
-                    PDT_ProductAndServicePerformance,
-                    TraceLoggingValue(configuration.Name.c_str(), "distroName"),
-                    TraceLoggingValue(version, "version"),
-                    TraceLoggingValue(instanceId, "instanceId"),
-                    TraceLoggingValue(SUCCEEDED(result), "success"),
-                    TraceLoggingValue(result, "error"));
-            });
-
-            try
-            {
+            wsl::windows::common::wslutil::StopWatch stopWatch;
+            const auto result = wil::ResultFromException([&]() {
                 auto clientKey = m_lifetimeManager.GetRegistrationId();
                 if (version == LXSS_WSL_VERSION_1)
                 {
@@ -2694,14 +2646,21 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     m_pluginManager.OnDistributionStarted(&m_session, instance->DistributionInformation());
                     cleanupOnFailure.release();
                 }
+            });
 
-                result = S_OK;
-            }
-            catch (...)
-            {
-                result = wil::ResultFromCaughtException();
-                throw;
-            }
+            // This telemetry event is used to keep track of instance creation performance (via CreationTimeMs) and failure reasons (via Result).
+            WSL_LOG(
+                "CreateInstanceOutcome",
+                TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+                TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
+                TraceLoggingValue(configuration.Name.c_str(), "Name"),
+                TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
+                TraceLoggingValue(version, "Version"),
+                TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
+                TraceLoggingValue(result, "Result"),
+                TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+
+            THROW_IF_FAILED(result);
         }
     }
 
