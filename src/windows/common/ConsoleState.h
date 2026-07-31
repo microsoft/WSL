@@ -20,11 +20,21 @@ Abstract:
 
 namespace wsl::windows::common {
 
+// Controls when ConsoleState attempts to restore the original console state.
+enum class RestorePolicy
+{
+    // Always restore to the original state captured by this instance.
+    Always,
+
+    // Restore only when the state still matches what this instance configured.
+    OnlyIfUnchanged,
+};
+
 // RAII wrapper for console state configuration and restoration
 class ConsoleState
 {
 public:
-    ConsoleState();
+    explicit ConsoleState(RestorePolicy Policy = RestorePolicy::Always);
     ~ConsoleState();
     ConsoleState(const ConsoleState&) = delete;
     ConsoleState& operator=(const ConsoleState&) = delete;
@@ -39,6 +49,7 @@ private:
 
     wil::unique_hfile m_InputHandle;
     wil::unique_hfile m_OutputHandle;
+    RestorePolicy m_restorePolicy;
     bool m_interactiveModeConfigured{false};
     std::optional<DWORD> m_SavedInputMode{};
     std::optional<DWORD> m_ConfiguredInputMode{};

@@ -278,7 +278,8 @@ wsl::windows::common::SvcComm::LaunchProcess(
     _In_ ULONG LaunchFlags,
     _In_opt_ PCWSTR Username,
     _In_opt_ PCWSTR CurrentWorkingDirectory,
-    _In_ DWORD Timeout) const
+    _In_ DWORD Timeout,
+    _In_ RestorePolicy RestorePolicySetting) const
 {
     ClientExecutionContext context;
 
@@ -293,7 +294,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
     // Create the process.
     //
 
-    ConsoleState Io;
+    ConsoleState Io{RestorePolicySetting};
     Io.SetInteractiveMode();
     COORD WindowSize = Io.GetWindowSize();
     ULONG Flags = LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;

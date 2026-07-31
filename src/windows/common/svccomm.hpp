@@ -17,6 +17,7 @@ Abstract:
 #include <vector>
 #include <memory>
 #include "helpers.hpp"
+#include "ConsoleState.h"
 #include "SocketChannel.h"
 
 namespace wsl::windows::common {
@@ -64,7 +65,8 @@ public:
         _In_ ULONG LaunchFlags = 0,
         _In_opt_ PCWSTR Username = nullptr,
         _In_opt_ PCWSTR CurrentWorkingDirectory = nullptr,
-        _In_ DWORD Timeout = INFINITE) const;
+        _In_ DWORD Timeout = INFINITE,
+        _In_ RestorePolicy RestorePolicySetting = RestorePolicy::Always) const;
 
     GUID GetDefaultDistribution() const;
 
