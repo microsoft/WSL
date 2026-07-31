@@ -3539,9 +3539,9 @@ class WSLCTests
             constexpr auto c_mountPoint = "/testdata";
             auto mountSource = std::filesystem::absolute(g_testDataPath);
 
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true, TRUE));
             auto unmount = wil::scope_exit_log(
-                WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint, FALSE)); });
+                WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint, TRUE)); });
 
             const auto installCommand = std::format("tdnf install -y --disablerepo='*' --nogpgcheck {}/packages/*.rpm", c_mountPoint);
             auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", installCommand}).Launch(*session);
@@ -3718,35 +3718,35 @@ class WSLCTests
 
         // Validate writeable mount.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(false));
 
             // Validate that mount can't be stacked on each other
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, FALSE), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, TRUE), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that folder is writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt && sync"}, 0);
             VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate read-only mount.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Validate that folder is not writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate that a read-only share cannot be made writeable via mount -o remount,rw.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Attempt an in-place remount to read-write from the guest.
@@ -3755,14 +3755,14 @@ class WSLCTests
             // Verify the folder is still not writeable.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate that the device host enforces read-only even if the guest tries to bypass mount options.
         if (enableVirtioFs)
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Remount a bind of the share as read-write to ensure the device host still enforces read-only access.
@@ -3780,25 +3780,25 @@ class WSLCTests
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path-rw/file.txt"}, 1);
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "umount /win-path-rw && rmdir /win-path-rw"}, 0);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate various error paths
         {
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true, FALSE), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true, FALSE), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "relative-mountpoint", true, FALSE), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "", true, FALSE), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/not-mounted", FALSE), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/proc", FALSE), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true, TRUE), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true, TRUE), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "relative-mountpoint", true, TRUE), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "", true, TRUE), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/not-mounted", TRUE), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/proc", TRUE), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             // Validate that folders that are manually unmounted from the guest are handled properly
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             ExpectCommandResult(session.get(), {"/usr/bin/umount", "/win-path"}, 0);
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
         }
     }
 
@@ -3834,8 +3834,8 @@ class WSLCTests
 
         // Concurrent mounts of the same host path use distinct children on the same aggregate device.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-1", false, FALSE));
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-2", false, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-1", false, TRUE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-2", false, TRUE));
 
             auto firstDevice = getMountField("/win-path-1", "MAJ:MIN");
             auto secondDevice = getMountField("/win-path-2", "MAJ:MIN");
@@ -3853,19 +3853,19 @@ class WSLCTests
             const auto firstChild = std::format("/run/wsl/virtiofs-mounts/{}{}", LX_INIT_DRVFS_VIRTIO_TAG, firstRoot);
             const auto secondChild = std::format("/run/wsl/virtiofs-mounts/{}{}", LX_INIT_DRVFS_VIRTIO_TAG, secondRoot);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-1", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-1", TRUE));
             ExpectCommandResult(session.get(), {"/bin/cat", "/win-path-2/marker.txt"}, 0);
             ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", firstChild}, 0);
             ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-2", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-2", TRUE));
             ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", secondChild}, 0);
         }
 
         // Verify that read-write and read-only shares use different children on the same aggregate device.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-rw", false, FALSE));
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-ro", true, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-rw", false, TRUE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-ro", true, TRUE));
 
             auto rwDevice = getMountField("/win-path-rw", "MAJ:MIN");
             auto roDevice = getMountField("/win-path-ro", "MAJ:MIN");
@@ -3875,8 +3875,8 @@ class WSLCTests
             VERIFY_ARE_EQUAL(rwDevice, roDevice);
             VERIFY_ARE_NOT_EQUAL(rwRoot, roRoot);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-rw", FALSE));
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-ro", FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-rw", TRUE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-ro", TRUE));
         }
     }
 
@@ -3904,8 +3904,8 @@ class WSLCTests
             return root;
         };
 
-        VERIFY_SUCCEEDED(session->MountWindowsFolder(firstFolder.c_str(), "/remove-child-first", false, FALSE));
-        VERIFY_SUCCEEDED(session->MountWindowsFolder(secondFolder.c_str(), "/remove-child-second", false, FALSE));
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(firstFolder.c_str(), "/remove-child-first", false, TRUE));
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(secondFolder.c_str(), "/remove-child-second", false, TRUE));
 
         const auto firstRoot = getMountRoot("/remove-child-first");
         const auto secondRoot = getMountRoot("/remove-child-second");
@@ -3917,12 +3917,12 @@ class WSLCTests
         ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", firstChild}, 0);
         ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
 
-        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-first", FALSE));
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-first", TRUE));
         ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", firstChild}, 0);
         ExpectCommandResult(session.get(), {"/bin/cat", "/remove-child-second/marker.txt"}, 0);
         ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
 
-        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-second", FALSE));
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-second", TRUE));
         ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", secondChild}, 0);
     }
 
@@ -3948,7 +3948,7 @@ class WSLCTests
             std::ofstream(folder / "marker.txt") << index;
 
             const auto mountPoint = std::format("/vfs-many-{}", index);
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false, FALSE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false, TRUE));
             mountPoints.emplace_back(mountPoint);
 
             const auto command = std::format("cat {}/marker.txt", mountPoint);
@@ -3958,7 +3958,7 @@ class WSLCTests
 
         for (const auto& mountPoint : mountPoints)
         {
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint.c_str(), FALSE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint.c_str(), TRUE));
         }
     }
 

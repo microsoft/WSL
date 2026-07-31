@@ -90,24 +90,29 @@ public:
         wil::shared_event SessionTerminatedEvent;
     };
 
-    // Whether a lease may be served by a VM that is already committed to stopping.
+    // Whether a lease may bring a VM up, or must be served by whatever VM is already running.
     //
-    // Wait is correct for every ordinary caller: once a stop is announced it always happens, so the
-    // lease releases the shared lock, waits for the teardown to finish, and is then served by a fresh
-    // VM. Serve exists only for calls that originate from inside a plugin VM-lifecycle callback --
-    // they are the reason the stop window is open at all, and making them wait would deadlock them
-    // against the very callback the teardown is waiting on.
-    enum class VmStopWindow
+    // Acquire is correct for every ordinary caller: it starts the VM if there is none, and because an
+    // announced stop always happens, a VM with one pending is unusable even though it is still
+    // running -- the lease waits for the teardown and is then served by a fresh VM.
+    //
+    // ExistingOnly is for plugins. A plugin call is a side effect of the session's own activity, never
+    // a reason to create a VM, so it neither starts one nor waits for a teardown: it is served by the
+    // running VM, including one committed to stopping, and fails with WSLC_E_VM_NOT_RUNNING when there
+    // is none. Waiting is not an option for the calls that matter -- a plugin reentering from its
+    // OnWslcVmStopping handler is the reason the teardown is blocked, so it would deadlock against
+    // itself.
+    enum class VmLeasePolicy
     {
-        Wait,
-        Serve,
+        Acquire,
+        ExistingOnly,
     };
 
     class VmLease
     {
     public:
         VmLease() = default;
-        explicit VmLease(WSLCSessionRuntime& Runtime, VmStopWindow StopWindow = VmStopWindow::Wait);
+        explicit VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy Policy = VmLeasePolicy::Acquire);
         VmLease(VmLease&& Other) noexcept;
         VmLease& operator=(VmLease&& Other) noexcept;
         ~VmLease();
@@ -124,7 +129,7 @@ public:
     {
     public:
         LockedRuntime() = default;
-        explicit LockedRuntime(WSLCSessionRuntime& Runtime, VmStopWindow StopWindow = VmStopWindow::Wait);
+        explicit LockedRuntime(WSLCSessionRuntime& Runtime, VmLeasePolicy Policy = VmLeasePolicy::Acquire);
 
         WSLCVirtualMachine& Vm();
         IORelay* Relay();
@@ -185,8 +190,8 @@ public:
     void OnIdleTimer();
     void OnVmExited();
     void InitializeDockerRuntime(const std::filesystem::path& storagePath);
-    [[nodiscard]] VmLease AcquireVmLease(VmStopWindow StopWindow = VmStopWindow::Wait);
-    [[nodiscard]] LockedRuntime Acquire(VmStopWindow StopWindow = VmStopWindow::Wait);
+    [[nodiscard]] VmLease AcquireVmLease(VmLeasePolicy Policy = VmLeasePolicy::Acquire);
+    [[nodiscard]] LockedRuntime Acquire(VmLeasePolicy Policy = VmLeasePolicy::Acquire);
 
     [[nodiscard]] bool TriggerIdleTerminationForTest();
 

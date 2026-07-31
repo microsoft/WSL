@@ -14,7 +14,6 @@ Abstract:
 
 #include "precomp.h"
 #include <atomic>
-#include <mutex>
 #include <thread>
 #include "WslPluginApi.h"
 #include "wslc_schema.h"
@@ -41,17 +40,13 @@ PluginTestType g_testType = PluginTestType::Invalid;
 std::atomic<WSLCProcessHandle> g_leakedProcess = nullptr;
 std::atomic<HANDLE> g_leakedProcessExitEvent = nullptr;
 
-// Serializes writes to g_logfile. Every other write in this file happens on the service's
-// notification thread, which the service serializes; the stop-window thread below is the one writer
-// that runs concurrently with a notification (the next VM's started hook), and an unsynchronized
-// std::ofstream shared by two threads can interleave mid-line and make the expected output flaky.
-std::mutex g_logfileLock;
-
 // Set by the WslcVmStopCommitted test: a call issued from a thread the plugin owns while
-// OnWslcVmStopping is running. It is not part of the callback, so it must not be served by the VM
-// that is stopping; it blocks until the teardown completes and is then served by the next VM.
+// OnWslcVmStopping is running. Like the callback itself it is served by the VM that is stopping, and
+// must not block on the teardown. It deliberately logs nothing of its own -- its results are written
+// when it is joined -- so g_logfile keeps a single writer and the expected output stays ordered.
 std::thread g_stopWindowCaller;
 HRESULT g_stopWindowCallerResult = E_PENDING;
+std::atomic<bool> g_leakedProcessDied = false;
 
 std::optional<uint32_t> g_previousInitPid;
 
@@ -373,13 +368,36 @@ try
               << ", pid=" << Session->ApplicationPid << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
               << ", sid=" << (Session->UserSid != nullptr ? "set" : "null") << std::endl;
 
+    if (g_testType == PluginTestType::WslcVmNeverStarted)
+    {
+        // A plugin call is never a reason to create a VM. This one has to be rejected rather than
+        // bringing one up, which the absence of any VM notification in the expected output confirms.
+        std::vector<const char*> args = {"/bin/true", nullptr};
+        WSLCProcessHandle process = nullptr;
+        const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+        if (SUCCEEDED(hr))
+        {
+            g_api->WSLCReleaseProcess(process);
+        }
+
+        g_logfile << "WSLC no-vm caller: " << (hr == WSLC_E_VM_NOT_RUNNING ? "rejected" : "unexpected") << std::endl;
+        return S_OK;
+    }
+
     if (g_testType == PluginTestType::WslcSessionRejected)
     {
         g_logfile << "OnWslcSessionCreated: ERROR_ACCESS_DENIED" << std::endl;
         return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
     }
 
-    if (g_testType == PluginTestType::WslcSuccess)
+    return S_OK;
+}
+CATCH_RETURN();
+
+// These checks need a running VM, and a plugin call never creates one, so they run from the VM-started
+// hook rather than from session creation.
+void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
+{
     {
         // Helper: run a command in the root namespace and return (status, stdout, stderr).
         auto runCommand = [&](const char* cmd,
@@ -512,20 +530,19 @@ try
 
         g_logfile << "Test completed" << std::endl;
     }
-
-    return S_OK;
 }
-CATCH_RETURN();
 
 HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
 {
-    // Drain the stop-window thread first so its lines are ordered before this one deterministically,
-    // rather than relying on the test having slept long enough. Safe here because that thread was
-    // released by the idle teardown long before the session started stopping, and this is the last
-    // event of the session, so the join cannot run inside a VM notification.
+    // Drain the stop-window thread first, then report what it observed. Logging from here rather than
+    // from that thread keeps the log single-writer and the expected output deterministic. Safe
+    // because this is the last event of the session, so the join cannot run inside a VM notification.
     if (g_stopWindowCaller.joinable())
     {
         g_stopWindowCaller.join();
+
+        g_logfile << "WSLC stop-window caller: " << (SUCCEEDED(g_stopWindowCallerResult) ? "ok" : "failed") << std::endl;
+        g_logfile << "WSLC leaked process died: " << (g_leakedProcessDied.load() ? "yes" : "no") << std::endl;
     }
 
     // Close the duplicated exit event if the stop-window thread did not get far enough to claim it.
@@ -535,7 +552,7 @@ HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
     // wrapper for the lifetime of a test process, so leaking it is the safer trade.
     if (auto* exitEvent = g_leakedProcessExitEvent.exchange(nullptr); exitEvent != nullptr)
     {
-        CloseHandle(exitEvent);
+        const wil::unique_handle owned{exitEvent};
     }
 
     g_logfile << "WSLC Session stopping, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
@@ -585,10 +602,20 @@ HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId
 HRESULT OnWslcVmStarted(const WSLCSessionInformation* Session)
 try
 {
+    if (g_testType == PluginTestType::WslcSuccess)
+    {
+        // Run once: the checks are written against the first VM of the session.
+        static std::atomic<bool> done = false;
+        if (!done.exchange(true))
+        {
+            RunWslcSuccessChecks(Session);
+        }
+
+        return S_OK;
+    }
+
     if (g_testType == PluginTestType::WslcVmStopCommitted)
     {
-        // Locked: the stop-window thread logs its own result concurrently with this hook.
-        auto lock = std::lock_guard(g_logfileLock);
         g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
         return S_OK;
     }
@@ -658,58 +685,15 @@ try
             return S_OK;
         }
 
-        {
-            auto lock = std::lock_guard(g_logfileLock);
-            g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
-        }
-
-        // A call from a thread this plugin owns is not part of the callback, so it must not be served
-        // by the VM that is going away: it blocks until the teardown completes and is then served by
-        // the next VM. It reports its own result, which orders it after that VM's started hook.
-        const auto sessionId = Session->SessionId;
-        g_stopWindowCaller = std::thread([sessionId]() {
-            std::vector<const char*> args = {"/bin/true", nullptr};
-            WSLCProcessHandle process = nullptr;
-            g_stopWindowCallerResult = g_api->WSLCCreateProcess(sessionId, args[0], args.data(), nullptr, &process, nullptr);
-            if (SUCCEEDED(g_stopWindowCallerResult))
-            {
-                g_api->WSLCReleaseProcess(process);
-            }
-
-            {
-                auto lock = std::lock_guard(g_logfileLock);
-                g_logfile << "WSLC stop-window caller: " << (SUCCEEDED(g_stopWindowCallerResult) ? "ok" : "failed") << std::endl;
-            }
-
-            // This thread was released by the teardown, so the VM that was stopping is gone and it
-            // took the leaked process with it. Prove that directly instead of inferring it from the
-            // fact that a new VM started -- a process that outlived the stop is the exact symptom of
-            // an announced stop that did not happen. Logged from this thread so it stays ordered
-            // against the line above.
-            auto leakedProcessDied = false;
-            if (auto* exitEvent = g_leakedProcessExitEvent.exchange(nullptr); exitEvent != nullptr)
-            {
-                leakedProcessDied = WaitForSingleObject(exitEvent, 30 * 1000) == WAIT_OBJECT_0;
-
-                // GetExitEvent is marshalled as an [out, system_handle(sh_event)] parameter, so this
-                // is a duplicate owned by this process.
-                CloseHandle(exitEvent);
-            }
-
-            {
-                auto lock = std::lock_guard(g_logfileLock);
-                g_logfile << "WSLC leaked process died: " << (leakedProcessDied ? "yes" : "no") << std::endl;
-            }
-        });
-
-        // Give the thread time to reach the lease and block on the pending stop. If it has not, the
-        // test still passes -- it just proves less.
-        std::this_thread::sleep_for(500ms);
+        g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
 
         // Deliberately leave a live process behind when this callback returns. Its handle holds an
         // activity reference, which under the old design abandoned the announced teardown. The stop is
         // now committed before it is announced, so the VM goes away regardless and this process dies
         // with it -- which is exactly what the callback was just told would happen.
+        //
+        // Created before the thread below is started so its exit event is published first: that thread
+        // claims the event and must not race ahead of it.
         std::vector<const char*> args = {"/bin/sleep", "60", nullptr};
         WSLCProcessHandle leaked = nullptr;
         const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &leaked, nullptr);
@@ -725,10 +709,37 @@ try
             }
         }
 
-        {
-            auto lock = std::lock_guard(g_logfileLock);
-            g_logfile << "WSLC VM stopping leaked process: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
-        }
+        g_logfile << "WSLC VM stopping leaked process: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+
+        // A call from a thread this plugin owns is served on the same terms as the callback itself:
+        // by the VM that is stopping, not by a future one and not by a new one. It must not block on
+        // the teardown, which is exactly the deadlock the old "wait for the next VM" behaviour risked.
+        // Results are logged when this thread is joined, so the output stays deterministic.
+        const auto sessionId = Session->SessionId;
+        g_stopWindowCaller = std::thread([sessionId]() {
+            std::vector<const char*> processArgs = {"/bin/true", nullptr};
+            WSLCProcessHandle process = nullptr;
+            g_stopWindowCallerResult = g_api->WSLCCreateProcess(sessionId, processArgs[0], processArgs.data(), nullptr, &process, nullptr);
+            if (SUCCEEDED(g_stopWindowCallerResult))
+            {
+                g_api->WSLCReleaseProcess(process);
+            }
+
+            // The announced stop takes the VM away and the leaked process with it. Prove that
+            // directly instead of inferring it from the fact that a new VM started -- a process that
+            // outlived the stop is the exact symptom of an announced stop that did not happen.
+            if (auto* exitEvent = g_leakedProcessExitEvent.exchange(nullptr); exitEvent != nullptr)
+            {
+                // GetExitEvent is marshalled as an [out, system_handle(sh_event)] parameter, so this
+                // is a duplicate owned by this process.
+                const wil::unique_handle owned{exitEvent};
+                g_leakedProcessDied = WaitForSingleObject(owned.get(), 30 * 1000) == WAIT_OBJECT_0;
+            }
+        });
+
+        // Give the thread time to issue its call inside the stop window. If it has not, the test still
+        // passes -- it just proves less.
+        std::this_thread::sleep_for(500ms);
 
         return S_OK;
     }

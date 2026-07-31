@@ -690,31 +690,6 @@ void WSLCContainerImpl::Initialize()
     m_comWrapper->Initialize(weak_from_this());
 }
 
-WSLCVirtualMachine& WSLCContainerImpl::Vm() const
-{
-    return m_runtime.Vm();
-}
-
-DockerHTTPClient& WSLCContainerImpl::Docker() const
-{
-    return m_runtime.Docker();
-}
-
-WSLCVolumes& WSLCContainerImpl::Volumes() const
-{
-    return m_runtime.Volumes();
-}
-
-DockerEventTracker& WSLCContainerImpl::Events() const
-{
-    return m_runtime.Events();
-}
-
-IORelay& WSLCContainerImpl::Relay() const
-{
-    return *m_runtime.Relay();
-}
-
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
 {
     std::lock_guard processesLock{m_processesLock};
@@ -791,7 +766,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     try
     {
-        ioHandle = Docker().AttachContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
+        ioHandle = m_runtime.Docker().AttachContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
@@ -822,7 +797,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     handles.emplace_back(std::make_unique<DockerIORelayHandle>(
         std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
-    Relay().AddHandles(std::move(handles));
+    m_runtime.Relay()->AddHandles(std::move(handles));
 
     *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE, WSLCHandleTypePipe);
 
@@ -869,11 +844,11 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
             if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
             {
                 io = std::make_unique<TTYProcessIO>(TypedHandle{
-                    wil::unique_handle{(HANDLE)Docker().AttachContainer(m_id, detachKeys).release()}, WSLCHandleTypeSocket});
+                    wil::unique_handle{(HANDLE)m_runtime.Docker().AttachContainer(m_id, detachKeys).release()}, WSLCHandleTypeSocket});
             }
             else
             {
-                wil::unique_handle stream{reinterpret_cast<HANDLE>(Docker().AttachContainer(m_id, detachKeys).release())};
+                wil::unique_handle stream{reinterpret_cast<HANDLE>(m_runtime.Docker().AttachContainer(m_id, detachKeys).release())};
                 io = CreateRelayedProcessIO(std::move(stream), m_initProcessFlags);
             }
         }
@@ -884,7 +859,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to attach to container '%hs' during start", m_id.c_str());
     }
 
-    auto control = std::make_unique<DockerContainerProcessControl>(*this, Docker());
+    auto control = std::make_unique<DockerContainerProcessControl>(*this, m_runtime.Docker());
 
     std::lock_guard processesLock{m_processesLock};
     m_initProcessControl = control.get();
@@ -900,7 +875,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     std::vector<std::string> unavailableVolumes;
     for (const auto& volumeName : m_namedVolumes)
     {
-        const auto [code, message] = Volumes().GetVolumeStatus(volumeName);
+        const auto [code, message] = m_runtime.Volumes().GetVolumeStatus(volumeName);
         if (FAILED(code))
         {
             EMIT_USER_WARNING(Localization::MessageWslcVolumeNotAvailableReason(volumeName, message));
@@ -913,7 +888,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
         !unavailableVolumes.empty());
 
-    auto volumeCleanup = MountVolumes(m_mountedVolumes, Vm());
+    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_runtime.Vm());
 
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
     MapPorts();
@@ -923,7 +898,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
 
     try
     {
-        Docker().StartContainer(m_id, detachKeys);
+        m_runtime.Docker().StartContainer(m_id, detachKeys);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
@@ -931,7 +906,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     {
         try
         {
-            Docker().ResizeContainerTty(m_id, StartOptions->TtyRows, StartOptions->TtyColumns);
+            m_runtime.Docker().ResizeContainerTty(m_id, StartOptions->TtyRows, StartOptions->TtyColumns);
         }
         CATCH_LOG();
     }
@@ -946,7 +921,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         LOG_HR_MSG(pluginResult, "Plugin rejected start of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
         try
         {
-            Docker().StopContainer(m_id.c_str(), {}, {});
+            m_runtime.Docker().StopContainer(m_id.c_str(), {}, {});
         }
         catch (...)
         {
@@ -1060,7 +1035,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     {
         if (Kill)
         {
-            Docker().SignalContainer(m_id, SignalArg);
+            m_runtime.Docker().SignalContainer(m_id, SignalArg);
 
             if (!waitForStop)
             {
@@ -1075,7 +1050,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
                 TimeoutArg = TimeoutSeconds;
             }
 
-            Docker().StopContainer(m_id, SignalArg, TimeoutArg);
+            m_runtime.Docker().StopContainer(m_id, SignalArg, TimeoutArg);
         }
     }
     catch (const DockerHTTPException& e)
@@ -1171,7 +1146,7 @@ void WSLCContainerImpl::RecoverPorts(const common::docker_schema::ContainerInfo&
     {
         auto& inserted = ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-        auto allocation = Vm().TryAllocatePort(e.VmPort, e.Family, e.Protocol);
+        auto allocation = m_runtime.Vm().TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
         THROW_HR_IF_MSG(
             HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), !allocation, "Port %hu is in use, cannot recover container %hs", e.VmPort, m_id.c_str());
@@ -1214,7 +1189,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
 
     try
     {
-        Docker().DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
+        m_runtime.Docker().DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
@@ -1230,7 +1205,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
 
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
-    SocketCodePair = Docker().ExportContainer(m_id);
+    SocketCodePair = m_runtime.Docker().ExportContainer(m_id);
 
     auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
@@ -1279,7 +1254,7 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
         contentLength = ContentSize;
     }
 
-    auto requestContext = Docker().PutArchive(m_id, DestPath, contentLength);
+    auto requestContext = m_runtime.Docker().PutArchive(m_id, DestPath, contentLength);
 
     auto userHandle = m_wslcSession.OpenUserHandle(TarHandle);
 
@@ -1335,7 +1310,7 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
 {
     auto lock = m_lock.lock_shared();
 
-    auto [statusCode, socket, isChunked] = Docker().GetArchive(m_id, SrcPath);
+    auto [statusCode, socket, isChunked] = m_runtime.Docker().GetArchive(m_id, SrcPath);
 
     auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
@@ -1457,12 +1432,12 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
 
     try
     {
-        auto result = Docker().CreateExec(m_id, request);
+        auto result = m_runtime.Docker().CreateExec(m_id, request);
 
         // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
 
         wil::unique_handle stream{
-            (HANDLE)Docker()
+            (HANDLE)m_runtime.Docker()
                 .StartExec(result.Id, common::docker_schema::StartExec{.Tty = request.Tty, .ConsoleSize = request.ConsoleSize})
                 .release()};
 
@@ -1476,7 +1451,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
             io = CreateRelayedProcessIO(std::move(stream), Options->Flags);
         }
 
-        auto control = std::make_shared<DockerExecProcessControl>(*this, result.Id, Docker(), Events());
+        auto control = std::make_shared<DockerExecProcessControl>(*this, result.Id, m_runtime.Docker(), m_runtime.Events());
 
         {
             std::lock_guard processesLock{m_processesLock};
@@ -1499,7 +1474,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
 
         do
         {
-            auto state = Docker().InspectExec(result.Id);
+            auto state = m_runtime.Docker().InspectExec(result.Id);
             if (state.Running && state.Pid > 0)
             {
                 control->SetPid(state.Pid);
@@ -2291,7 +2266,7 @@ void WSLCContainerImpl::Inspect(LPSTR* Output) const
 std::string WSLCContainerImpl::InspectLockHeld() const
 {
     // Get Docker inspect data
-    auto dockerInspect = Docker().InspectContainer(m_id);
+    auto dockerInspect = m_runtime.Docker().InspectContainer(m_id);
 
     // Convert to WSLC schema
     auto wslcInspect = BuildInspectContainer(dockerInspect);
@@ -2307,7 +2282,7 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle
     wil::unique_socket socket;
     try
     {
-        socket = Docker().ContainerLogs(m_id, Flags, Since, Until, Tail);
+        socket = m_runtime.Docker().ContainerLogs(m_id, Flags, Since, Until, Tail);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to get logs from '%hs'", m_id.c_str());
 
@@ -2317,7 +2292,7 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle
         auto [ttyRead, ttyWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
 
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
-        Relay().AddHandle(std::move(handle));
+        m_runtime.Relay()->AddHandle(std::move(handle));
 
         *Stdout = common::wslutil::ToCOMOutputHandle(ttyRead.get(), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
     }
@@ -2330,7 +2305,7 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle
         auto handle = std::make_unique<DockerIORelayHandle>(
             std::move(socket), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::HttpChunked);
 
-        Relay().AddHandle(std::move(handle));
+        m_runtime.Relay()->AddHandle(std::move(handle));
 
         *Stdout = common::wslutil::ToCOMOutputHandle(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
         *Stderr = common::wslutil::ToCOMOutputHandle(stderrRead.get(), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
@@ -2343,7 +2318,7 @@ void WSLCContainerImpl::Stats(LPSTR* Output) const
 
     try
     {
-        auto stats = Docker().ContainerStats(m_id);
+        auto stats = m_runtime.Docker().ContainerStats(m_id);
 
         // Always inject the authoritative id and name from this instance.
         // The response may omit them or use inconsistent casing.
@@ -2390,7 +2365,7 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
         std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
-    Relay().AddHandles(std::move(ioHandles));
+    m_runtime.Relay()->AddHandles(std::move(ioHandles));
 
     return std::make_unique<RelayedProcessIO>(std::move(fds));
 }
@@ -2414,7 +2389,8 @@ void WSLCContainerImpl::MapPorts()
             }
             else
             {
-                auto allocatedPort = Vm().TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
+                auto allocatedPort =
+                    m_runtime.Vm().TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
 
                 THROW_HR_WITH_USER_ERROR_IF(
                     HRESULT_FROM_WIN32(WSAEADDRINUSE), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id), !allocatedPort);
@@ -2427,7 +2403,7 @@ void WSLCContainerImpl::MapPorts()
 
         try
         {
-            Vm().MapPort(e.VmMapping);
+            m_runtime.Vm().MapPort(e.VmMapping);
         }
         catch (...)
         {
@@ -2496,7 +2472,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
     //
     // The same applies when there is no VM at all: after a graceful idle teardown the VM object is
     // released without the exit event ever being signaled, so VmExited() is false while HasVm() is
-    // false too. Vm() would throw on that state, and this runs from ~WSLCContainerImpl.
+    // false too. m_runtime.Vm() would throw on that state, and this runs from ~WSLCContainerImpl.
     if (m_runtime.VmExited() || !m_runtime.HasVm())
     {
         for (auto& volume : m_mountedVolumes)
@@ -2506,7 +2482,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
     }
     else
     {
-        UnmountVolumes(m_mountedVolumes, Vm());
+        UnmountVolumes(m_mountedVolumes, m_runtime.Vm());
     }
 }
 
@@ -2931,7 +2907,7 @@ void WSLCContainerImpl::ConnectToNetwork(const WSLCNetworkConnectionOptions* Opt
 
     try
     {
-        Docker().ConnectContainerToNetwork(Options->NetworkName, request);
+        m_runtime.Docker().ConnectContainerToNetwork(Options->NetworkName, request);
     }
     catch (const DockerHTTPException& e)
     {
@@ -2961,7 +2937,7 @@ void WSLCContainerImpl::DisconnectFromNetwork(LPCSTR NetworkName)
 
     try
     {
-        Docker().DisconnectContainerFromNetwork(NetworkName, request);
+        m_runtime.Docker().DisconnectContainerFromNetwork(NetworkName, request);
     }
     catch (const DockerHTTPException& e)
     {

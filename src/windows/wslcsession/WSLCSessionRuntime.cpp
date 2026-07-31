@@ -773,17 +773,17 @@ bool WSLCSessionRuntime::TriggerIdleTerminationForTest()
     return wasAlreadyIdle;
 }
 
-WSLCSessionRuntime::VmLease WSLCSessionRuntime::AcquireVmLease(VmStopWindow StopWindow)
+WSLCSessionRuntime::VmLease WSLCSessionRuntime::AcquireVmLease(VmLeasePolicy Policy)
 {
-    return VmLease(*this, StopWindow);
+    return VmLease(*this, Policy);
 }
 
-WSLCSessionRuntime::LockedRuntime WSLCSessionRuntime::Acquire(VmStopWindow StopWindow)
+WSLCSessionRuntime::LockedRuntime WSLCSessionRuntime::Acquire(VmLeasePolicy Policy)
 {
-    return LockedRuntime(*this, StopWindow);
+    return LockedRuntime(*this, Policy);
 }
 
-WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmStopWindow StopWindow) : m_runtime(&Runtime)
+WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy Policy) : m_runtime(&Runtime)
 {
     // Record an in-flight operation before bringing the VM up so idle teardown cannot tear it down
     // between EnsureVmRunning() and acquiring the shared lock. AddActivity cancels any pending idle
@@ -798,16 +798,19 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmStopWindow S
     // Activity increment may race with idle teardown. Retry until we hold the lock with VM running.
     for (;;)
     {
-        m_runtime->EnsureVmRunning();
+        if (Policy == VmLeasePolicy::Acquire)
+        {
+            m_runtime->EnsureVmRunning();
+        }
 
         m_lock = m_runtime->m_lock.lock_shared();
 
         if (m_runtime->m_vmState.load() == VmState::Running)
         {
             // An announced stop always happens, so a VM with one pending is unusable even though it is
-            // still Running: wait for the teardown, then retry, which brings up a fresh VM. Callers
-            // that originate from inside the OnVmStopping callback are exempt -- see VmStopWindow.
-            if (StopWindow == VmStopWindow::Serve || !m_runtime->m_vmStopPending.load())
+            // still Running: wait for the teardown, then retry, which brings up a fresh VM. ExistingOnly
+            // callers are exempt and are served by the stopping VM -- see VmLeasePolicy.
+            if (Policy == VmLeasePolicy::ExistingOnly || !m_runtime->m_vmStopPending.load())
             {
                 break;
             }
@@ -828,6 +831,9 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmStopWindow S
 
             continue;
         }
+
+        // ExistingOnly never starts a VM, so retrying could only spin. Reject the caller instead.
+        THROW_HR_IF(WSLC_E_VM_NOT_RUNNING, Policy == VmLeasePolicy::ExistingOnly);
 
         WSL_LOG(
             "WslcVmLeaseRetry",
@@ -875,8 +881,8 @@ WSLCSessionRuntime::VmLease::~VmLease()
     }
 }
 
-WSLCSessionRuntime::LockedRuntime::LockedRuntime(WSLCSessionRuntime& Runtime, VmStopWindow StopWindow) :
-    m_runtime(&Runtime), m_lease(Runtime.AcquireVmLease(StopWindow))
+WSLCSessionRuntime::LockedRuntime::LockedRuntime(WSLCSessionRuntime& Runtime, VmLeasePolicy Policy) :
+    m_runtime(&Runtime), m_lease(Runtime.AcquireVmLease(Policy))
 {
 }
 

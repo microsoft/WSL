@@ -847,7 +847,7 @@ class PluginTests
     // OnWslcVmStopping returns -- which under the previous design made the runtime abandon the
     // teardown -- and starts a call from a thread of its own during the notification window. The VM
     // must stop anyway, the leaked process must die with it, and the windowed call must be served by
-    // the next VM rather than by the one that was going away.
+    // the stopping VM rather than blocking on the teardown it cannot influence.
     WSL2_TEST_METHOD(WslcVmStopCommitted)
     {
         ConfigurePlugin(PluginTestType::WslcVmStopCommitted);
@@ -886,8 +886,9 @@ class PluginTests
 
         // "leaked process died: yes" is the assertion that the announced stop actually happened: the
         // process the callback left running was killed by the teardown rather than keeping the VM
-        // alive. "stop-window caller: ok" landing after the second "VM started" is what shows that
-        // call waited for the new VM instead of being served by the one that was going away.
+        // alive. "stop-window caller: ok" shows a plugin call from another thread was served by the
+        // stopping VM instead of deadlocking against the teardown that callback was holding up. Both
+        // are reported when that thread is joined, at session teardown.
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=23
             WSLC Session created, name=plugin-wslc-vm-stop-committed, id=*, pid=*, token=set, sid=set
@@ -909,7 +910,8 @@ class PluginTests
         // A session whose VM is never needed. VM bring-up is lazy, so creating and destroying the
         // session must not produce either VM notification: OnWslcVmStopping is documented to fire
         // exactly once per OnWslcVmStarted, and a stop for a VM that never existed would break the
-        // pairing every plugin relies on to track VM lifetime.
+        // pairing every plugin relies on to track VM lifetime. The plugin also issues a call from
+        // OnWslcSessionCreated, which must be rejected rather than bring a VM up.
         {
             auto session = CreateWslcSession(L"plugin-wslc-vm-never-started");
             VERIFY_IS_NOT_NULL(session.get());
@@ -918,6 +920,7 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=24
             WSLC Session created, name=plugin-wslc-vm-never-started, id=*, pid=*, token=set, sid=set
+            WSLC no-vm caller: rejected
             WSLC Session stopping, name=plugin-wslc-vm-never-started, id=*)";
 
         ValidateLogFile(ExpectedOutput);

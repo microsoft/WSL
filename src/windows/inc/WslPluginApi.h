@@ -156,18 +156,18 @@ typedef HRESULT (*WSLPluginAPI_OnWslcVmStarted)(const struct WSLCSessionInformat
 //
 // The stop is guaranteed: the VM is torn down as soon as this call returns, and nothing the callback
 // does can keep it alive. Any work the callback leaves running in the VM -- a process it did not wait
-// for, for example -- dies with it. Calls made by other threads while this callback is running do not
-// keep the VM alive either; they block until the teardown completes and are then served by the next
-// VM, reported by a new OnWslcVmStarted. If the session itself is terminating there is no next VM and
-// those calls fail once the teardown completes.
-//
-// The callback must therefore not block waiting on another thread that is calling into this session:
-// that thread is waiting for the teardown, and the teardown is waiting for this callback to return.
-// Last-minute work in the VM must be done synchronously, on the callback's own thread.
+// for, for example -- dies with it. Calls made by other threads while this callback is running are
+// served by the same stopping VM, on the same terms; once the teardown starts they fail with
+// WSLC_E_VM_NOT_RUNNING rather than waiting for or creating another VM.
 typedef HRESULT (*WSLPluginAPI_OnWslcVmStopping)(const struct WSLCSessionInformation* Session);
 
 //
 // WSLC plugin API calls.
+//
+// These operate on the VM that is currently backing the session; they never create one. A call made
+// while the session has no running VM fails with WSLC_E_VM_NOT_RUNNING, so a plugin that needs a VM
+// should do its work from OnWslcVmStarted (or before OnWslcVmStopping returns) rather than from a
+// session-level callback.
 //
 
 // Mount a Windows folder into the WSLC session VM at the given 'Mountpoint' path. If the 'Mountpoint' doesn't exist, it will be created.

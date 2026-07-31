@@ -179,16 +179,6 @@ private:
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
-    // Accessors for the session's VM-scoped resources. The container outlives any single VM: it
-    // survives idle-termination and is reused when the VM restarts. These fetch the current VM's
-    // objects from the (stable) runtime rather than caching references that would dangle across a
-    // restart. They are only valid while a VM lease is held (i.e. the VM is running).
-    WSLCVirtualMachine& Vm() const;
-    DockerHTTPClient& Docker() const;
-    WSLCVolumes& Volumes() const;
-    DockerEventTracker& Events() const;
-    IORelay& Relay() const;
-
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
@@ -212,6 +202,10 @@ private:
     // Must be acquired before m_lock when both are needed.
     std::mutex m_stopLock;
 
+    // The container outlives any single VM: it survives idle-termination and is reused when the VM
+    // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
+    // fetched from the (stable) runtime at each use rather than cached, since a cached reference
+    // would dangle across a restart. They are only valid while a VM lease is held.
     WSLCSessionRuntime& m_runtime;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};

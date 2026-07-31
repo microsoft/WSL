@@ -547,9 +547,9 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
     m_userSid.assign(bytes, bytes + length);
 }
 
-WSLCSession::VmLease WSLCSession::AcquireVmLease(WSLCSessionRuntime::VmStopWindow StopWindow)
+WSLCSession::VmLease WSLCSession::AcquireLease(WSLCSessionRuntime::VmLeasePolicy Policy)
 {
-    return m_runtime.AcquireVmLease(StopWindow);
+    return m_runtime.AcquireVmLease(Policy);
 }
 
 WSLCSession::~WSLCSession()
@@ -1432,7 +1432,7 @@ try
 {
     WSLCExecutionContext context(this, WarningCallback);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -1466,7 +1466,7 @@ try
         tag = tagOrDigest.value();
     }
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -1637,7 +1637,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrID) > WSLC_MAX_IMAGE_NAME_LENGTH);
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -1670,7 +1670,7 @@ try
         names.emplace_back(ImageNames->Values[i]);
     }
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -1746,7 +1746,7 @@ try
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -1855,7 +1855,7 @@ try
     *DeletedImages = nullptr;
     *Count = 0;
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -1929,7 +1929,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
     RETURN_HR_IF(E_INVALIDARG, strlen(Options->Repo) + strlen(Options->Tag) + 1 > WSLC_MAX_IMAGE_NAME_LENGTH);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
@@ -1968,7 +1968,7 @@ try
     auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     auto requestContext = m_runtime.Docker().PushImage(repo.Name, tagOrDigest, RegistryAuthenticationInformation);
@@ -1989,7 +1989,7 @@ try
 
     *Output = nullptr;
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectImageLockHeld(ImageNameOrId).c_str()).release();
@@ -2037,7 +2037,7 @@ try
 
     *IdentityToken = nullptr;
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     wil::unique_cotaskmem_ansistring token;
@@ -2069,7 +2069,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     docker_schema::PruneImageResult pruneResult;
@@ -2130,7 +2130,7 @@ try
         "Invalid process flags: 0x%x",
         containerOptions->InitProcessOptions.Flags);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
 
     auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
 
@@ -2237,7 +2237,7 @@ try
     ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH);
 
     // Look for an exact ID match first.
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     std::lock_guard containersLock{m_containersLock};
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
@@ -2381,7 +2381,7 @@ try
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     std::vector<docker_schema::ContainerInfo> dockerContainers;
@@ -2460,7 +2460,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     std::lock_guard containersLock{m_containersLock};
@@ -2516,7 +2516,7 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSession::CreateRootNamespaceProcess(
-    LPCSTR Executable, const WSLCProcessOptions* Options, ULONG TtyRows, ULONG TtyColumns, BOOL FromVmLifecycleCallback, IWSLCProcess** Process, int* Errno)
+    LPCSTR Executable, const WSLCProcessOptions* Options, ULONG TtyRows, ULONG TtyColumns, BOOL AcquireVmLease, IWSLCProcess** Process, int* Errno)
 try
 {
     WSLCExecutionContext context(this);
@@ -2531,7 +2531,7 @@ try
         *Errno = -1; // Make sure not to return 0 if something fails.
     }
 
-    auto runtime = m_runtime.Acquire(StopWindowFor(FromVmLifecycleCallback));
+    auto runtime = m_runtime.Acquire(LeasePolicyFor(AcquireVmLease));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     auto process = runtime.Vm().CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno);
@@ -2542,11 +2542,11 @@ try
     // alive for as long as the client holds the process, preventing the idle worker from tearing
     // the VM down and killing the process out from under the client.
     //
-    // Not for a call from the OnVmStopping handler: that VM is already committed to stopping, so the
-    // token cannot protect the process (it dies with the VM, as documented). Attaching one anyway
-    // would keep counting activity for as long as the plugin holds the proxy and would block idle
-    // termination of every subsequent VM in this session.
-    if (!FromVmLifecycleCallback)
+    // Not for a plugin-originated call: it was served by whatever VM was already running, possibly
+    // one already committed to stopping, and a plugin must never extend a VM's life. Attaching a
+    // token anyway would keep counting activity for as long as the plugin holds the proxy and would
+    // block idle termination of every subsequent VM in this session.
+    if (AcquireVmLease)
     {
         process->SetKeepAliveToken(CreateActivityToken());
     }
@@ -2573,7 +2573,7 @@ try
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Path), !std::filesystem::path(Path).is_absolute());
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
@@ -2601,7 +2601,7 @@ try
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCVolumeMetadataLabel);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVolumes());
 
     if (Options->Name != nullptr && Options->Name[0] != '\0')
@@ -2621,7 +2621,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVolumes());
 
     m_runtime.Volumes().DeleteVolume(Name);
@@ -2642,7 +2642,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVolumes());
 
     auto volumeList = m_runtime.Volumes().ListVolumes(std::move(filters));
@@ -2674,7 +2674,7 @@ try
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_VOLUME_NAME_LENGTH);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVolumes());
 
     std::string json = m_runtime.Volumes().InspectVolume(name);
@@ -2699,7 +2699,7 @@ try
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVolumes());
 
     WSLCVolumes::PruneVolumesResult pruneResult;
@@ -2752,7 +2752,7 @@ try
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
@@ -2870,7 +2870,7 @@ try
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
@@ -2910,7 +2910,7 @@ try
     *Networks = nullptr;
     *Count = 0;
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     std::lock_guard networksLock(m_networksLock);
 
     if (m_networks.empty())
@@ -2949,7 +2949,7 @@ try
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     std::lock_guard networksLock(m_networksLock);
 
     auto it = m_networks.find(name);
@@ -3005,7 +3005,7 @@ try
     // Scope the prune to WSLC-managed networks.
     filters["label"].push_back(WSLCNetworkManagedLabel);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
@@ -3204,7 +3204,7 @@ try
 }
 CATCH_LOG();
 
-HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly, BOOL FromVmLifecycleCallback)
+HRESULT WSLCSession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly, BOOL AcquireVmLease)
 try
 {
     WSLCExecutionContext context(this);
@@ -3212,21 +3212,21 @@ try
     RETURN_HR_IF_NULL(E_POINTER, WindowsPath);
     RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
-    auto lock = AcquireVmLease(StopWindowFor(FromVmLifecycleCallback));
+    auto lock = AcquireLease(LeasePolicyFor(AcquireVmLease));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     return m_runtime.Vm().MountWindowsFolder(WindowsPath, LinuxPath, ReadOnly);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::UnmountWindowsFolder(LPCSTR LinuxPath, BOOL FromVmLifecycleCallback)
+HRESULT WSLCSession::UnmountWindowsFolder(LPCSTR LinuxPath, BOOL AcquireVmLease)
 try
 {
     WSLCExecutionContext context(this);
 
     RETURN_HR_IF_NULL(E_POINTER, LinuxPath);
 
-    auto lock = AcquireVmLease(StopWindowFor(FromVmLifecycleCallback));
+    auto lock = AcquireLease(LeasePolicyFor(AcquireVmLease));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     return m_runtime.Vm().UnmountWindowsFolder(LinuxPath);
@@ -3238,7 +3238,7 @@ try
 {
     WSLCExecutionContext context(this);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::lock_guard allocatedPortsLock(m_runtime.AllocatedPortsLock());
@@ -3285,7 +3285,7 @@ try
 {
     WSLCExecutionContext context(this);
 
-    auto lock = AcquireVmLease();
+    auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::lock_guard allocatedPortsLock(m_runtime.AllocatedPortsLock());
