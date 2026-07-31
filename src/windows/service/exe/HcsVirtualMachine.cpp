@@ -131,12 +131,8 @@ void CreatePolicyFolder(const std::filesystem::path& folder, HANDLE userToken)
     wil::unique_hlocal_string userSidString;
     THROW_LAST_ERROR_IF(!ConvertSidToStringSidW(tokenUser->User.Sid, &userSidString));
 
-    // O:SY = owner SYSTEM. D:PAI = protected + auto-inherited DACL. ACEs:
-    //   SYSTEM (SY)  : FA        — full control (writes and later cleans up policy.json).
-    //   Admins (BA)  : FA        — administrative access.
-    //   User (SID)   : FRFX      — file_generic_read + file_generic_execute (traverse). Deliberately
-    //                              no FW so a compromised user process cannot overwrite policy.json
-    //                              between our write and BuildKit's read.
+    // OICI propagates ACEs to policy.json inside the folder; D:PAI blocks parent inheritance
+    // so the DACL is exactly what we set.
     const auto sddl = std::format(L"O:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FRFX;;;{})", userSidString.get());
     wil::unique_hlocal_security_descriptor sd;
     THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &sd, nullptr));
