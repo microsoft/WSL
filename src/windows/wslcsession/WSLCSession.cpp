@@ -45,6 +45,75 @@ constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
 namespace {
 
+// Minimal parse of a docker buildx --output spec to detect directory exporters (type=local, or
+// oci/docker with tar=false), which cannot be written faithfully to a Windows destination. The
+// authoritative parser lives in the client (wslclib); this is a defensive check for direct COM callers.
+bool IsDirectoryExporterSpec(std::string_view spec)
+{
+    const auto trim = [](std::string_view value) {
+        while (!value.empty() && (value.front() == ' ' || value.front() == '\t'))
+        {
+            value.remove_prefix(1);
+        }
+        while (!value.empty() && (value.back() == ' ' || value.back() == '\t'))
+        {
+            value.remove_suffix(1);
+        }
+        return value;
+    };
+    const auto toLower = [](std::string_view value) {
+        std::string result(value);
+        std::transform(
+            result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return result;
+    };
+
+    std::string type;
+    std::optional<bool> tar;
+    for (size_t pos = 0; pos <= spec.size();)
+    {
+        const auto comma = spec.find(',', pos);
+        const auto field = spec.substr(pos, comma == std::string_view::npos ? spec.size() - pos : comma - pos);
+
+        if (const auto eq = field.find('='); eq != std::string_view::npos)
+        {
+            // buildx trims spaces around the key and matches it case-insensitively.
+            const auto key = toLower(trim(field.substr(0, eq)));
+            const auto value = field.substr(eq + 1);
+            if (key == "type")
+            {
+                type = toLower(value);
+            }
+            else if (key == "tar")
+            {
+                // Go's ParseBool: 1/t/true and 0/f/false (case-insensitive).
+                const auto boolValue = toLower(value);
+                if (boolValue == "0" || boolValue == "f" || boolValue == "false")
+                {
+                    tar = false;
+                }
+                else if (boolValue == "1" || boolValue == "t" || boolValue == "true")
+                {
+                    tar = true;
+                }
+            }
+        }
+
+        if (comma == std::string_view::npos)
+        {
+            break;
+        }
+        pos = comma + 1;
+    }
+
+    if (type == "local")
+    {
+        return true;
+    }
+
+    return (type == "oci" || type == "docker") && tar.has_value() && !tar.value();
+}
+
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
 // service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
@@ -630,11 +699,13 @@ ServiceRunningProcess WSLCSession::StartProcess(
 
     auto process = launcher.Launch(*m_virtualMachine);
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(
+        std::make_unique<windows::common::io::LineBasedReadHandle>(
+            process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
-    m_ioRelay.AddHandle(std::make_unique<windows::common::io::LineBasedReadHandle>(
-        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+    m_ioRelay.AddHandle(
+        std::make_unique<windows::common::io::LineBasedReadHandle>(
+            process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
     m_ioRelay.AddHandle(std::make_unique<windows::common::io::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
@@ -955,14 +1026,16 @@ try
         buildArgs.push_back(Options->Target);
     }
     // Docker-style --output routing. Three cases, distinguished by what the client set:
-    //   * OutputHandle set (dest=- stdout, or a type=local directory): the client stripped dest= and
-    //     expects the exporter output streamed back. The exporter writes to a VM temp path (disk-backed
-    //     under the docker storage root to avoid buffering large outputs in tmpfs) and, after a
-    //     successful build, a streamer relays it to the client handle (cat for a file, tar for a tree).
+    //   * OutputHandle set (dest=- stdout): the client stripped dest= and expects the exporter output
+    //     streamed back. The exporter writes to a VM temp path (disk-backed under the docker storage
+    //     root to avoid buffering large outputs in tmpfs) and, after a successful build, a streamer
+    //     cats it to the client handle.
     //   * OutputMountPath set (single-file exporter with a real destination): the client stripped dest=
     //     and passed the destination file's parent directory, mounted read-write into the VM so buildx
     //     writes the file (at OutputMountFile within the mount) in place - nothing is streamed back.
     //   * Neither set: the spec is forwarded verbatim and the build runs entirely in the VM.
+    // Directory exporters (type=local, or oci/docker with tar=false) are rejected below: a Linux tree
+    // cannot be written faithfully to a Windows destination.
     const bool streamOutput = Options->OutputHandle.Type != WSLCHandleTypeUnknown;
     const bool mountOutput = Options->OutputMountPath != nullptr && Options->OutputMountPath[0] != L'\0';
     // Streaming or mounting the exporter output requires a non-empty Output spec to route from, and the
@@ -970,7 +1043,9 @@ try
     // than later failing to assign a dest path.
     RETURN_HR_IF(E_INVALIDARG, (streamOutput || mountOutput) && (Options->Output == nullptr || Options->Output[0] == '\0'));
     RETURN_HR_IF(E_INVALIDARG, streamOutput && mountOutput);
-    const bool outputIsDirectory = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsOutputIsDirectory);
+    // Directory exporters cannot be materialized faithfully on a Windows destination and are unsupported.
+    // The client rejects them while parsing --output; reject them here too for direct COM callers.
+    RETURN_HR_IF(E_INVALIDARG, Options->Output != nullptr && IsDirectoryExporterSpec(Options->Output));
     std::string outputDestPath;
     auto removeOutput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         if (!outputDestPath.empty())
@@ -1340,8 +1415,9 @@ try
 
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
     // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
-    io.AddHandle(std::make_unique<io::ReadHandle>(
-        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
+    io.AddHandle(std::make_unique<io::ReadHandle>(buildProcess.GetStdHandle(1), [&](const auto& content) {
+        allOutput.append(content.begin(), content.end());
+    }));
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
@@ -1416,31 +1492,21 @@ try
     std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 
-    // Stream the exporter output back to the client. For file exporters (tar/oci/docker tarballs) cat
-    // the temp file; for directory exporters (type=local, or oci/docker with tar=false) tar the export
-    // directory so the client can extract it into the destination directory. The streamer's stdout is
-    // relayed to the client OutputHandle.
+    // Stream the exporter output back to the client by cat-ing the temp file (tar/oci/docker single-file
+    // tarballs, or dest=- stdout). The streamer's stdout is relayed to the client OutputHandle.
     if (streamOutput)
     {
         auto userHandle = OpenUserHandle(Options->OutputHandle);
 
-        std::vector<std::string> streamArgs;
-        if (outputIsDirectory)
-        {
-            streamArgs = {"/usr/bin/tar", "-C", outputDestPath, "-cf", "-", "."};
-        }
-        else
-        {
-            streamArgs = {"/bin/cat", outputDestPath};
-        }
+        std::vector<std::string> streamArgs = {"/bin/cat", outputDestPath};
 
         ServiceProcessLauncher streamLauncher(streamArgs[0], streamArgs, {}, WSLCProcessFlagsNone);
         auto streamProcess = streamLauncher.Launch(*m_virtualMachine);
 
         auto streamIo = CreateIOContext(CancelEvent);
         std::string streamError;
-        streamIo.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-            common::io::HandleWrapper{streamProcess.GetStdHandle(1)}, userHandle.Get()));
+        streamIo.AddHandle(
+            std::make_unique<io::RelayHandle<io::ReadHandle>>(common::io::HandleWrapper{streamProcess.GetStdHandle(1)}, userHandle.Get()));
         streamIo.AddHandle(std::make_unique<io::ReadHandle>(streamProcess.GetStdHandle(2), [&](const gsl::span<char>& content) {
             streamError.append(content.data(), content.size());
         }));
@@ -1740,8 +1806,9 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
     else
     {
-        io.AddHandle(std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
-            common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
+        io.AddHandle(
+            std::make_unique<io::RelayHandle<io::HTTPChunkBasedReadHandle>>(
+                common::io::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()));
     }
 
     io.Run({});

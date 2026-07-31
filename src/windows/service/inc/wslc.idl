@@ -549,8 +549,8 @@ typedef struct _WSLCBuildImageOptions
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
     WSLCStringArray Labels;    // KEY=VALUE pairs passed as --label to docker.
     WSLCBuildSecretArray Secrets; // --secret entries; the server writes each secret's bytes to a host file exposed to the VM read-only over virtiofs and emits the corresponding id=...,src=... spec.
-    [unique, string] LPCSTR Output; // buildx exporter spec passed as --output to docker build (e.g. type=local, type=tar). The client omits dest= for exporters with a client destination; the server rewrites it to a VM temp path (streamed back over OutputHandle) or into the OutputMountPath mount (single-file exporters with a real destination).
-    WSLCHandle OutputHandle; // When Type != WSLCHandleTypeUnknown, the server streams the build exporter output to this handle after a successful build: a raw stream for dest=- (stdout), or a tar stream of the export directory for type=local (indicated by WSLCBuildImageFlagsOutputIsDirectory).
+    [unique, string] LPCSTR Output; // buildx exporter spec passed as --output to docker build (e.g. type=tar, type=oci). The client omits dest= for exporters with a client destination; the server rewrites it to a VM temp path (streamed back over OutputHandle) or into the OutputMountPath mount (single-file exporters with a real destination). Directory exporters (type=local, or oci/docker with tar=false) are not supported.
+    WSLCHandle OutputHandle; // When Type != WSLCHandleTypeUnknown, the server streams the single-file exporter output (a tar/oci/docker tarball, or dest=- stdout) to this handle after a successful build.
     [unique, string] LPCWSTR OutputMountPath; // When set, the server mounts this Windows directory read-write into the VM and points the exporter's dest at it (plus OutputMountFile). Used for single-file exporters with a real destination; mutually exclusive with OutputHandle.
     [unique, string] LPCWSTR OutputMountFile; // Leaf filename within OutputMountPath that a single-file exporter writes to.
 } WSLCBuildImageOptions;

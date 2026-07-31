@@ -223,7 +223,7 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
 
     // Shorthand: a single field that is exactly the input and does not start with "type=" names the
     // destination. Matching Docker, '-' streams a tarball to stdout ('type=tar,dest=-'); anything else
-    // exports the final stage's filesystem to that local path ('type=local,dest=<path>').
+    // is the local (directory) exporter ('type=local,dest=<path>'), which is not supported.
     if (fields->size() == 1 && fields->front() == spec && spec.compare(0, 5, L"type=") != 0)
     {
         if (fields->front() == L"-")
@@ -231,7 +231,11 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
             return services::BuildOutput{.Type = L"tar", .Dest = L"-"};
         }
 
-        return services::BuildOutput{.Type = L"local", .Dest = fields->front()};
+        throw ArgumentException(
+            Localization::MessageWslcOutputInvalidSpec(
+                spec,
+                L"directory exporters are not supported; write a single file with 'dest=<file>' (type=tar/oci/docker) "
+                L"or stream a tarball to stdout with 'type=tar,dest=-'"));
     }
 
     services::BuildOutput output;
@@ -303,20 +307,19 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
     }
 
     // Destination resolution, mirroring `docker buildx build --output`:
-    const bool destIsStdout = output.Dest == L"-";
     if (OutputIsDirectory(output))
     {
-        // Directory exporters (local, or oci/docker with tar=false) write a tree, so they need a path
-        // and cannot stream to stdout.
-        if (output.Dest.empty() || destIsStdout)
-        {
-            throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
+        // Directory exporters (local, or oci/docker with tar=false) write a Linux directory tree, which
+        // cannot be materialized faithfully on a Windows destination, so they are not supported. Point
+        // users at the single-file exporters instead.
+        throw ArgumentException(
+            Localization::MessageWslcOutputInvalidSpec(
                 spec,
-                L"this exporter writes a directory tree, so pass a directory path via 'dest=' (use 'type=tar,dest=-' "
-                L"to stream a tarball to stdout instead)"));
-        }
+                L"directory exporters are not supported; write a single file with 'dest=<file>' (type=tar/oci/docker) "
+                L"or stream a tarball to stdout with 'type=tar,dest=-'"));
     }
-    else if (output.Type == L"tar" || output.Type == L"oci")
+
+    if (output.Type == L"tar" || output.Type == L"oci")
     {
         // Single-tarball exporters stream to stdout when no destination is given (buildx default).
         if (output.Dest.empty())
@@ -620,8 +623,8 @@ models::FormatType GetFormatTypeFromString(const std::wstring& input, const std:
     }
     else
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        throw ArgumentException(
+            std::format(L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
     }
 }
 

@@ -33,14 +33,13 @@ Abstract:
       * A single field that equals the whole input and does not start with "type=" is shorthand for the
         destination:
           - L"-"            -> {type=tar, dest=-} (stream a tarball to stdout, matching docker)
-          - any other path  -> {type=local, dest=<path>}
+          - any other path  -> {type=local, dest=<path>} (rejected: directory exporters are unsupported)
       * Otherwise each field is split on its FIRST '=' into key/value (two parts required). The key is
         trimmed and lowercased; the value is kept verbatim (may itself contain '='). 'type' and 'dest'
         populate the struct fields; every other key is stored in Attributes.
       * Validation / destination resolution:
           - 'type' is required and must be one of: local, tar, oci, docker, image, registry, cacheonly.
-          - Directory exporters (local, or oci/docker with tar=false) require a directory 'dest=' and
-            may not stream to stdout ('dest=-').
+          - Directory exporters (local, or oci/docker with tar=false) are not supported and are rejected.
           - tar / oci with no 'dest=' default to streaming a tarball to stdout ('dest=-'), matching buildx.
           - docker with no 'dest=' loads the image into the store; 'dest=-' streams a tarball to stdout;
             a path writes a file.
@@ -109,13 +108,14 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Shorthand_LocalDirectory)
     {
-        // A bare path is shorthand for exporting the final stage's filesystem to that directory.
-        VerifyValid(L"./out", L"local", L"./out");
+        // A bare path is shorthand for the local (directory) exporter, which is not supported.
+        VerifyInvalid(L"./out", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Shorthand_WindowsPath)
     {
-        VerifyValid(L"C:\\build\\artifacts", L"local", L"C:\\build\\artifacts");
+        // A bare Windows path is likewise the local (directory) exporter, which is not supported.
+        VerifyInvalid(L"C:\\build\\artifacts", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Shorthand_DashIsTarToStdout)
@@ -128,7 +128,8 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Local_ExplicitDest)
     {
-        VerifyValid(L"type=local,dest=./out", L"local", L"./out");
+        // The local exporter writes a directory tree and is not supported.
+        VerifyInvalid(L"type=local,dest=./out", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Tar_ToFile)
@@ -150,8 +151,8 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Local_ToStdout_Rejected)
     {
-        // The local exporter writes a directory tree, so it cannot stream to stdout.
-        VerifyInvalid(L"type=local,dest=-", L"writes a directory tree");
+        // The local exporter writes a directory tree and is not supported.
+        VerifyInvalid(L"type=local,dest=-", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Oci_ToFile)
@@ -167,54 +168,54 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Oci_TarFalse_Directory)
     {
-        // oci with tar=false exports an OCI layout directory, so a directory 'dest=' is required.
-        VerifyValid(L"type=oci,dest=./layout,tar=false", L"oci", L"./layout", AttrMap{{L"tar", L"false"}});
+        // oci with tar=false exports an OCI layout directory, which is not supported.
+        VerifyInvalid(L"type=oci,dest=./layout,tar=false", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Oci_TarFalse_RequiresDest)
     {
-        // A directory exporter cannot stream to stdout, so tar=false with no dest is rejected.
-        VerifyInvalid(L"type=oci,tar=false", L"writes a directory tree");
+        // A directory exporter is not supported regardless of dest.
+        VerifyInvalid(L"type=oci,tar=false", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Docker_TarFalse_Directory)
     {
-        // docker with tar=false likewise exports an OCI layout directory.
-        VerifyValid(L"type=docker,dest=./layout,tar=false", L"docker", L"./layout", AttrMap{{L"tar", L"false"}});
+        // docker with tar=false likewise exports an OCI layout directory, which is not supported.
+        VerifyInvalid(L"type=docker,dest=./layout,tar=false", L"directory exporters are not supported");
     }
 
     // --- Valid: 'tar' accepts every spelling Go's strconv.ParseBool does (buildx parity) ---
 
     TEST_METHOD(Output_Oci_TarFalse_CapitalizedIsDirectory)
     {
-        // buildx parses 'tar' with Go's ParseBool, so "False" is a directory exporter just like "false".
-        // The attribute value is preserved verbatim (only routing is case-insensitive).
-        VerifyValid(L"type=oci,dest=./layout,tar=False", L"oci", L"./layout", AttrMap{{L"tar", L"False"}});
+        // buildx parses 'tar' with Go's ParseBool, so "False" is a directory exporter just like "false",
+        // and is rejected the same way.
+        VerifyInvalid(L"type=oci,dest=./layout,tar=False", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Oci_TarZeroIsDirectory)
     {
-        // "0" is false for Go's ParseBool, so it selects the OCI layout directory exporter.
-        VerifyValid(L"type=oci,dest=./layout,tar=0", L"oci", L"./layout", AttrMap{{L"tar", L"0"}});
+        // "0" is false for Go's ParseBool, so it selects the OCI layout directory exporter, which is not
+        // supported.
+        VerifyInvalid(L"type=oci,dest=./layout,tar=0", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Oci_TarShortFalseIsDirectory)
     {
-        // "f" is the short false form accepted by Go's ParseBool.
-        VerifyValid(L"type=oci,dest=./layout,tar=f", L"oci", L"./layout", AttrMap{{L"tar", L"f"}});
+        // "f" is the short false form accepted by Go's ParseBool, so it too is a directory exporter.
+        VerifyInvalid(L"type=oci,dest=./layout,tar=f", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Oci_TarCapitalizedFalse_RequiresDest)
     {
-        // A directory exporter cannot stream to stdout regardless of the boolean spelling, so tar=False
-        // with no dest is rejected the same as tar=false.
-        VerifyInvalid(L"type=oci,tar=False", L"writes a directory tree");
+        // A directory exporter is not supported regardless of the boolean spelling.
+        VerifyInvalid(L"type=oci,tar=False", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Docker_TarZeroIsDirectory)
     {
-        // docker with tar=0 likewise exports an OCI layout directory.
-        VerifyValid(L"type=docker,dest=./layout,tar=0", L"docker", L"./layout", AttrMap{{L"tar", L"0"}});
+        // docker with tar=0 likewise exports an OCI layout directory, which is not supported.
+        VerifyInvalid(L"type=docker,dest=./layout,tar=0", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Oci_TarTrue_IsSingleTarballToStdout)
@@ -343,10 +344,10 @@ class WSLCCLIOutputParserUnitTests
             AttrMap{{L"annotation-manifest.org.opencontainers.image.title", L"app"}});
     }
 
-    TEST_METHOD(Output_Local_PlatformSplit)
+    TEST_METHOD(Output_Tar_PlatformSplit)
     {
-        // platform-split controls per-platform subdirectories for the local/tar exporters.
-        VerifyValid(L"type=local,dest=./out,platform-split=false", L"local", L"./out", AttrMap{{L"platform-split", L"false"}});
+        // platform-split is forwarded verbatim as an exporter attribute for the tar exporter.
+        VerifyValid(L"type=tar,dest=out.tar,platform-split=false", L"tar", L"out.tar", AttrMap{{L"platform-split", L"false"}});
     }
 
     TEST_METHOD(Output_Attributes_AnnotationValueMayContainEquals)
@@ -367,7 +368,7 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Keys_AreCaseInsensitive)
     {
-        VerifyValid(L"TYPE=local,DEST=./out", L"local", L"./out");
+        VerifyValid(L"TYPE=tar,DEST=out.tar", L"tar", L"out.tar");
     }
 
     // --- Invalid: spec structure ---
@@ -409,8 +410,8 @@ class WSLCCLIOutputParserUnitTests
     {
         // buildx parity quirk: a single field equal to the whole input that does not start with
         // "type=" is shorthand for a local path, even if it happens to contain '=' (so '--output
-        // dest=./out' exports to a directory literally named "dest=./out", it is NOT 'dest=./out').
-        VerifyValid(L"dest=./out", L"local", L"dest=./out");
+        // dest=./out' names a local directory "dest=./out"). The local exporter is not supported.
+        VerifyInvalid(L"dest=./out", L"directory exporters are not supported");
     }
 
     TEST_METHOD(Output_Invalid_UnsupportedType)
@@ -422,8 +423,8 @@ class WSLCCLIOutputParserUnitTests
 
     TEST_METHOD(Output_Invalid_LocalRequiresDest)
     {
-        // The local exporter writes a directory tree, so an omitted dest is rejected.
-        VerifyInvalid(L"type=local", L"writes a directory tree");
+        // The local exporter writes a directory tree and is not supported.
+        VerifyInvalid(L"type=local", L"directory exporters are not supported");
     }
 
     // --- CSV grammar (buildx go-csvvalue parity) ---
@@ -445,7 +446,7 @@ class WSLCCLIOutputParserUnitTests
     TEST_METHOD(Output_Csv_LeadingSpaceAfterCommaTrimmedFromKey)
     {
         // buildx TrimSpace's the key, so a space after a comma is accepted (the value is untrimmed).
-        VerifyValid(L"type=local, dest=./out", L"local", L"./out");
+        VerifyValid(L"type=tar, dest=out.tar", L"tar", L"out.tar");
     }
 
     TEST_METHOD(Output_Csv_UnterminatedQuoteRejected)
@@ -478,12 +479,6 @@ class WSLCCLIOutputParserUnitTests
         }
     }
 
-    TEST_METHOD(Format_Shorthand_LocalNormalizedToCanonical)
-    {
-        // Shorthand paths are normalized to their explicit type=local,dest= form for buildx.
-        VerifyFormat(L"./out", L"type=local,dest=./out");
-    }
-
     TEST_METHOD(Format_TypeOnly_NoDestOrAttributes)
     {
         // docker/cacheonly need neither dest nor attributes, so the canonical form is just the type.
@@ -499,7 +494,7 @@ class WSLCCLIOutputParserUnitTests
     TEST_METHOD(Format_CaseInsensitiveKeysNormalizedToLower)
     {
         // 'type'/'dest' keys are lowercased; the type value is lowercased too.
-        VerifyFormat(L"TYPE=LOCAL,DEST=./out", L"type=local,dest=./out");
+        VerifyFormat(L"TYPE=TAR,DEST=out.tar", L"type=tar,dest=out.tar");
     }
 
     TEST_METHOD(Format_AttributesAppendedAfterDest)
