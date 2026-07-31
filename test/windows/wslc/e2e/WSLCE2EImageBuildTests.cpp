@@ -135,13 +135,12 @@ class WSLCE2EImageBuildTests
             "COPY hello.txt /hello.txt\n"
             "CMD [\"cat\", \"/hello.txt\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} -t {} --build-arg TEST_LABEL=wslc_e2e_test",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageTag1.NameAndTag(),
-                BuiltImageTag2.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} -t {} --build-arg TEST_LABEL=wslc_e2e_test",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageTag1.NameAndTag(),
+            BuiltImageTag2.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         // Verify both tags are present by inspecting each one
@@ -181,9 +180,8 @@ class WSLCE2EImageBuildTests
         // Build with --pull --verbose. When --pull causes docker to resolve the base image
         // from the registry, the FROM step includes a @sha256: digest (e.g.
         // "FROM docker.io/library/debian:latest@sha256:..."). Build progress goes to stderr.
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
@@ -211,12 +209,8 @@ class WSLCE2EImageBuildTests
             "COPY --from=build-stage /stage.txt /stage.txt\n"
             "CMD [\"cat\", \"/stage.txt\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --target build-stage",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageTarget.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --target build-stage", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageTarget.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageTarget.NameAndTag());
@@ -246,12 +240,11 @@ class WSLCE2EImageBuildTests
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"label-ok\"]\n");
 
         // Use both the short alias (-l) and long form (--label) to confirm both parse paths.
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} -l first=one --label second=two",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageLabel.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} -l first=one --label second=two",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageLabel.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabel.NameAndTag());
@@ -283,12 +276,11 @@ class WSLCE2EImageBuildTests
         WriteTestFileContent(
             dockerfilePath, "FROM debian:latest\nLABEL conflict=from-dockerfile\nCMD [\"echo\", \"label-override-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --label conflict=from-cli",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageLabelOverride.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --label conflict=from-cli",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageLabelOverride.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageLabelOverride.NameAndTag());
@@ -323,12 +315,11 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/mysecret)\" = \"expected-secret-content-12345\" ]\n"
             "CMD [\"echo\", \"secret-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_VALUE",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecret.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_VALUE",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecret.NameAndTag()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecret.NameAndTag());
@@ -358,12 +349,11 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/WSLC_E2E_BARE_SECRET)\" = \"bare-id-secret-content-67890\" ]\n"
             "CMD [\"echo\", \"secret-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=WSLC_E2E_BARE_SECRET",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretBareId.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=WSLC_E2E_BARE_SECRET",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretBareId.NameAndTag()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretBareId.NameAndTag());
@@ -388,8 +378,8 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
 
-        auto buildResult = RunWslc(
-            std::format(L"build \"{}\" -f \"{}\" --secret id=WSLC_E2E_SECRET_BARE_ID_UNSET", contextDir.wstring(), dockerfilePath.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --secret id=WSLC_E2E_SECRET_BARE_ID_UNSET", contextDir.wstring(), dockerfilePath.wstring()));
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
         VERIFY_IS_FALSE(buildResult.Stderr->empty());
@@ -415,12 +405,11 @@ class WSLCE2EImageBuildTests
             "RUN --mount=type=secret,id=mysecret [ -z \"$(cat /run/secrets/mysecret)\" ]\n"
             "CMD [\"echo\", \"secret-empty-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_UNSET_VAR",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretMissingEnv.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_UNSET_VAR",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretMissingEnv.NameAndTag()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretMissingEnv.NameAndTag());
@@ -453,13 +442,12 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/mysecret)\" = \"file-secret-content-67890\" ]\n"
             "CMD [\"echo\", \"secret-src-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretSrc.NameAndTag(),
-                secretFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretSrc.NameAndTag(),
+            secretFile.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretSrc.NameAndTag());
@@ -499,13 +487,12 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/mysecret)\" = \"symlinked-secret-content-44444\" ]\n"
             "CMD [\"echo\", \"secret-symlink-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretSrcSymlink.NameAndTag(),
-                linkFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretSrcSymlink.NameAndTag(),
+            linkFile.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretSrcSymlink.NameAndTag());
@@ -527,9 +514,8 @@ class WSLCE2EImageBuildTests
 
         // Build should fail if the src file does not exist
         auto missingFile = testRoot / L"does-not-exist.txt";
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" --secret id=x,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), missingFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --secret id=x,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), missingFile.wstring()));
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
         VERIFY_IS_FALSE(buildResult.Stderr->empty());
@@ -562,13 +548,12 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/mysecret)\" = \"env-wins-content-55555\" ]\n"
             "CMD [\"echo\", \"secret-env-wins-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_ENV_WINS_VALUE,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretEnvWins.NameAndTag(),
-                secretFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_ENV_WINS_VALUE,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretEnvWins.NameAndTag(),
+            secretFile.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretEnvWins.NameAndTag());
@@ -596,12 +581,11 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-content-11111\" ]\n"
             "CMD [\"echo\", \"secret-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,env=WSLC_E2E_TYPE_ENV_VALUE",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretTypeEnv.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,env=WSLC_E2E_TYPE_ENV_VALUE",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretTypeEnv.NameAndTag()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretTypeEnv.NameAndTag());
@@ -630,12 +614,11 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-src-content-22222\" ]\n"
             "CMD [\"echo\", \"secret-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,src=WSLC_E2E_TYPE_ENV_SRC_VALUE",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretTypeEnvSrc.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,src=WSLC_E2E_TYPE_ENV_SRC_VALUE",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretTypeEnvSrc.NameAndTag()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretTypeEnvSrc.NameAndTag());
@@ -662,13 +645,12 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/mysecret)\" = \"type-file-content-33333\" ]\n"
             "CMD [\"echo\", \"secret-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretTypeFile.NameAndTag(),
-                secretFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretTypeFile.NameAndTag(),
+            secretFile.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretTypeFile.NameAndTag());
@@ -700,13 +682,12 @@ class WSLCE2EImageBuildTests
             "[ \"$(tr -d '\\000' < /run/secrets/mysecret | tr -d '\\377')\" = \"beforeafter\" ]\n"
             "CMD [\"echo\", \"secret-binary-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretBinary.NameAndTag(),
-                secretFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretBinary.NameAndTag(),
+            secretFile.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretBinary.NameAndTag());
@@ -739,13 +720,12 @@ class WSLCE2EImageBuildTests
                 "CMD [\"echo\", \"secret-size-ok\"]\n",
                 size));
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                image.NameAndTag(),
-                secretFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            image.NameAndTag(),
+            secretFile.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(image.NameAndTag());
@@ -773,13 +753,12 @@ class WSLCE2EImageBuildTests
             "[ -f /run/secrets/mysecret ] && [ \"$(wc -c < /run/secrets/mysecret)\" = \"0\" ]\n"
             "CMD [\"echo\", \"secret-empty-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretEmptyFile.NameAndTag(),
-                secretFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretEmptyFile.NameAndTag(),
+            secretFile.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretEmptyFile.NameAndTag());
@@ -818,12 +797,8 @@ class WSLCE2EImageBuildTests
             "RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret > /dev/null\n"
             "CMD [\"echo\", \"secret-oversize\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" --secret id=mysecret,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                secretFile.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --secret id=mysecret,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), secretFile.wstring()));
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
         VERIFY_IS_FALSE(buildResult.Stderr->empty());
@@ -865,15 +840,14 @@ class WSLCE2EImageBuildTests
             "[ \"$(cat /run/secrets/s3)\" = \"multi-secret-three-33333\" ]\n"
             "CMD [\"echo\", \"secret-multi-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --secret id=s1,src=\"{}\" --secret id=s2,src=\"{}\" --secret id=s3,src=\"{}\"",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageSecretMultiple.NameAndTag(),
-                secret1.wstring(),
-                secret2.wstring(),
-                secret3.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --secret id=s1,src=\"{}\" --secret id=s2,src=\"{}\" --secret id=s3,src=\"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageSecretMultiple.NameAndTag(),
+            secret1.wstring(),
+            secret2.wstring(),
+            secret3.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageSecretMultiple.NameAndTag());
@@ -934,12 +908,11 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-docker-tag-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --output type=docker",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageOutputDockerTag.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=docker",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputDockerTag.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageOutputDockerTag.NameAndTag());
@@ -961,12 +934,11 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-docker-config-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --output type=docker",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageOutputDockerConfig.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=docker",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputDockerConfig.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageOutputDockerConfig.NameAndTag());
@@ -990,9 +962,8 @@ class WSLCE2EImageBuildTests
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-tar-marker > /wslc-build-marker.txt\n");
 
         auto tarPath = testRoot / L"out.tar";
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" --output type=tar,dest=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), tarPath.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --output type=tar,dest=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), tarPath.wstring()));
         buildResult.Verify({.ExitCode = 0});
 
         VERIFY_IS_TRUE(std::filesystem::exists(tarPath));
@@ -1036,9 +1007,8 @@ class WSLCE2EImageBuildTests
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-local-marker > /wslc-build-marker.txt\n");
 
         auto destDir = testRoot / L"export";
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" --output type=local,dest=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), destDir.wstring()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --output type=local,dest=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), destDir.wstring()));
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.Stderr.has_value());
         VERIFY_IS_TRUE(buildResult.Stderr->find(L"directory exporters are not supported") != std::wstring::npos);
@@ -1077,12 +1047,11 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"output-image-ok\"]\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --output type=image",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageOutputImage.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=image",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputImage.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
         auto inspectData = InspectImage(BuiltImageOutputImage.NameAndTag());
@@ -1106,12 +1075,11 @@ class WSLCE2EImageBuildTests
         // Guard against a leaked image if cacheonly ever regresses to loading into the store.
         auto imageCleanup = DeleteImageOnExit(BuiltImageOutputCacheOnly);
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --output type=cacheonly",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageOutputCacheOnly.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=cacheonly",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputCacheOnly.NameAndTag()));
         buildResult.Verify({.ExitCode = 0});
 
         // cacheonly exports nothing, so the tag must not resolve in the image store.
@@ -1154,12 +1122,11 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN exit 7\n");
 
-        auto buildResult = RunWslc(
-            std::format(
-                L"build \"{}\" -f \"{}\" -t {} --output type=image",
-                contextDir.wstring(),
-                dockerfilePath.wstring(),
-                BuiltImageOutputImageFail.NameAndTag()));
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --output type=image",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageOutputImageFail.NameAndTag()));
         VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
         VERIFY_IS_TRUE(buildResult.StderrContainsSubstring(L"failed to solve"));
 

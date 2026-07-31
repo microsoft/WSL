@@ -183,13 +183,12 @@ void ImageService::Build(
     for (const auto& secret : secrets)
     {
         secretIdStrings.push_back(wsl::windows::common::string::WideToMultiByte(secret.Id));
-        secretEntries.push_back(
-            WSLCBuildSecret{
-                .Id = secretIdStrings.back().c_str(),
-                .SourcePath = secret.SourcePath.empty() ? nullptr : secret.SourcePath.c_str(),
-                .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
-                .ValueSize = static_cast<ULONG>(secret.Value.size()),
-            });
+        secretEntries.push_back(WSLCBuildSecret{
+            .Id = secretIdStrings.back().c_str(),
+            .SourcePath = secret.SourcePath.empty() ? nullptr : secret.SourcePath.c_str(),
+            .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
+            .ValueSize = static_cast<ULONG>(secret.Value.size()),
+        });
     }
 
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
