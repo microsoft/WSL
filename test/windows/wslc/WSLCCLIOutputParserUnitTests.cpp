@@ -60,6 +60,8 @@ Abstract:
 #include <string>
 
 using namespace wsl::windows::wslc;
+using namespace WEX::Logging;
+using namespace WEX::Common;
 
 namespace WSLCCLIOutputParserUnitTests {
 
@@ -91,6 +93,7 @@ class WSLCCLIOutputParserUnitTests
     // the standard "Invalid --output value '<spec>': <reason>" wrapper and contains the expected reason.
     static void VerifyInvalid(const std::wstring& spec, const std::wstring& expectedReasonSubstr)
     {
+        Log::Comment(String().Format(L"Rejecting: %ls", spec.c_str()));
         try
         {
             (void)validation::ParseOutputSpec(spec);
@@ -106,31 +109,46 @@ class WSLCCLIOutputParserUnitTests
 
     // --- Valid: shorthand (single token, no key=value pairs) ---
 
-    TEST_METHOD(Output_Shorthand_LocalDirectory)
-    {
-        // A bare path is shorthand for the local (directory) exporter, which is not supported.
-        VerifyInvalid(L"./out", L"directory exporters are not supported");
-    }
-
-    TEST_METHOD(Output_Shorthand_WindowsPath)
-    {
-        // A bare Windows path is likewise the local (directory) exporter, which is not supported.
-        VerifyInvalid(L"C:\\build\\artifacts", L"directory exporters are not supported");
-    }
-
     TEST_METHOD(Output_Shorthand_DashIsTarToStdout)
     {
         // '-' is docker's shorthand for streaming a tarball to stdout ('type=tar,dest=-').
         VerifyValid(L"-", L"tar", L"-");
     }
 
-    // --- Valid: explicit local / tar / oci / docker exporters ---
+    // --- Invalid: directory exporters are not supported ---
 
-    TEST_METHOD(Output_Local_ExplicitDest)
+    TEST_METHOD(Output_LocalExporter_Rejected)
     {
-        // The local exporter writes a directory tree and is not supported.
-        VerifyInvalid(L"type=local,dest=./out", L"directory exporters are not supported");
+        // The local exporter - a bare-path shorthand or an explicit type=local - writes a Linux
+        // directory tree, which is not supported, so every form is rejected regardless of destination.
+        // 'dest=./out' is buildx's single-field shorthand quirk: a lone field containing '=' that does
+        // not start with 'type=' still names a local path.
+        for (const auto* spec :
+             {L"./out", L"C:\\build\\artifacts", L"dest=./out", L"type=local", L"type=local,dest=./out", L"type=local,dest=-"})
+        {
+            VerifyInvalid(spec, L"directory exporters are not supported");
+        }
     }
+
+    TEST_METHOD(Output_OciDockerTarFalse_Rejected)
+    {
+        // oci/docker export an OCI layout directory when 'tar' is false; buildx parses 'tar' with Go's
+        // ParseBool, so every false spelling (false/False/0/f) is a directory exporter and is rejected
+        // the same way, with or without a destination.
+        for (const auto* spec :
+             {L"type=oci,dest=./layout,tar=false",
+              L"type=oci,tar=false",
+              L"type=oci,dest=./layout,tar=False",
+              L"type=oci,dest=./layout,tar=0",
+              L"type=oci,dest=./layout,tar=f",
+              L"type=docker,dest=./layout,tar=false",
+              L"type=docker,dest=./layout,tar=0"})
+        {
+            VerifyInvalid(spec, L"directory exporters are not supported");
+        }
+    }
+
+    // --- Valid: explicit tar / oci / docker exporters ---
 
     TEST_METHOD(Output_Tar_ToFile)
     {
@@ -149,12 +167,6 @@ class WSLCCLIOutputParserUnitTests
         VerifyValid(L"type=tar", L"tar", L"-");
     }
 
-    TEST_METHOD(Output_Local_ToStdout_Rejected)
-    {
-        // The local exporter writes a directory tree and is not supported.
-        VerifyInvalid(L"type=local,dest=-", L"directory exporters are not supported");
-    }
-
     TEST_METHOD(Output_Oci_ToFile)
     {
         VerifyValid(L"type=oci,dest=image.tar", L"oci", L"image.tar");
@@ -166,57 +178,7 @@ class WSLCCLIOutputParserUnitTests
         VerifyValid(L"type=oci", L"oci", L"-");
     }
 
-    TEST_METHOD(Output_Oci_TarFalse_Directory)
-    {
-        // oci with tar=false exports an OCI layout directory, which is not supported.
-        VerifyInvalid(L"type=oci,dest=./layout,tar=false", L"directory exporters are not supported");
-    }
-
-    TEST_METHOD(Output_Oci_TarFalse_RequiresDest)
-    {
-        // A directory exporter is not supported regardless of dest.
-        VerifyInvalid(L"type=oci,tar=false", L"directory exporters are not supported");
-    }
-
-    TEST_METHOD(Output_Docker_TarFalse_Directory)
-    {
-        // docker with tar=false likewise exports an OCI layout directory, which is not supported.
-        VerifyInvalid(L"type=docker,dest=./layout,tar=false", L"directory exporters are not supported");
-    }
-
-    // --- Valid: 'tar' accepts every spelling Go's strconv.ParseBool does (buildx parity) ---
-
-    TEST_METHOD(Output_Oci_TarFalse_CapitalizedIsDirectory)
-    {
-        // buildx parses 'tar' with Go's ParseBool, so "False" is a directory exporter just like "false",
-        // and is rejected the same way.
-        VerifyInvalid(L"type=oci,dest=./layout,tar=False", L"directory exporters are not supported");
-    }
-
-    TEST_METHOD(Output_Oci_TarZeroIsDirectory)
-    {
-        // "0" is false for Go's ParseBool, so it selects the OCI layout directory exporter, which is not
-        // supported.
-        VerifyInvalid(L"type=oci,dest=./layout,tar=0", L"directory exporters are not supported");
-    }
-
-    TEST_METHOD(Output_Oci_TarShortFalseIsDirectory)
-    {
-        // "f" is the short false form accepted by Go's ParseBool, so it too is a directory exporter.
-        VerifyInvalid(L"type=oci,dest=./layout,tar=f", L"directory exporters are not supported");
-    }
-
-    TEST_METHOD(Output_Oci_TarCapitalizedFalse_RequiresDest)
-    {
-        // A directory exporter is not supported regardless of the boolean spelling.
-        VerifyInvalid(L"type=oci,tar=False", L"directory exporters are not supported");
-    }
-
-    TEST_METHOD(Output_Docker_TarZeroIsDirectory)
-    {
-        // docker with tar=0 likewise exports an OCI layout directory, which is not supported.
-        VerifyInvalid(L"type=docker,dest=./layout,tar=0", L"directory exporters are not supported");
-    }
+    // --- Valid: 'tar' true spellings keep oci/docker a single tarball (buildx parity) ---
 
     TEST_METHOD(Output_Oci_TarTrue_IsSingleTarballToStdout)
     {
@@ -406,25 +368,9 @@ class WSLCCLIOutputParserUnitTests
         VerifyInvalid(L"dest=./out,compression=gzip", L"type is required");
     }
 
-    TEST_METHOD(Output_Shorthand_SingleFieldWithEqualsIsLocalPath)
-    {
-        // buildx parity quirk: a single field equal to the whole input that does not start with
-        // "type=" is shorthand for a local path, even if it happens to contain '=' (so '--output
-        // dest=./out' names a local directory "dest=./out"). The local exporter is not supported.
-        VerifyInvalid(L"dest=./out", L"directory exporters are not supported");
-    }
-
     TEST_METHOD(Output_Invalid_UnsupportedType)
     {
         VerifyInvalid(L"type=bogus", L"unsupported output type 'bogus'");
-    }
-
-    // --- Invalid: destination requirements ---
-
-    TEST_METHOD(Output_Invalid_LocalRequiresDest)
-    {
-        // The local exporter writes a directory tree and is not supported.
-        VerifyInvalid(L"type=local", L"directory exporters are not supported");
     }
 
     // --- CSV grammar (buildx go-csvvalue parity) ---
