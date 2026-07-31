@@ -184,8 +184,13 @@ private:
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime) noexcept;
 
-    // Returns with lock held when no transition is active or the active transition matches kind.
-    void WaitForConflictingTransitionToComplete(wil::rwlock_release_exclusive_scope_exit& lock, std::optional<TransitionKind> kind = std::nullopt);
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
+
+    // Returns with both locks held when no transition is active or the active transition matches kind.
+    template <typename TLifecycleLock>
+    void WaitForConflictingTransitionToComplete(
+        wil::rwlock_release_exclusive_scope_exit& lock, TLifecycleLock& lifecycleLock, std::optional<TransitionKind> kind = std::nullopt);
+
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
     void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
 
@@ -211,6 +216,8 @@ private:
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
+    // Stop request setup holds this shared; state-changing operations and event delivery hold it exclusively.
+    wil::srwlock m_lifecycleGate;
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
