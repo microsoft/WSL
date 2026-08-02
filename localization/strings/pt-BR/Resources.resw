@@ -2334,7 +2334,7 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
-    <value>Invalid --secret value '{}': {}</value>
+    <value>Valor inválido para --secret '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2902,7 +2902,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Defina o estágio de compilação de destino para compilar</value>
   </data>
   <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
-    <value>Expose secret to the build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; defaults to env var NAME)</value>
+    <value>Expor segredo para a compilação (id=NAME[,type=env|file][,env=VAR|,src=PATH]; padrão para a variável de ambiente NAME)</value>
     <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
