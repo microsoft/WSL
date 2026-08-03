@@ -2560,8 +2560,28 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             GUID instanceId;
             THROW_IF_FAILED(CoCreateGuid(&instanceId));
 
+            // Log telemetry to determine how long instance creation takes.
+            WSL_LOG_TELEMETRY(
+                "CreateInstanceBegin",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(configuration.Name.c_str(), "distroName"),
+                TraceLoggingValue(version, "version"),
+                TraceLoggingValue(instanceId, "instanceId"));
+
+            HRESULT result = E_UNEXPECTED;
+            auto createEnd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                WSL_LOG_TELEMETRY(
+                    "CreateInstanceEnd",
+                    PDT_ProductAndServicePerformance,
+                    TraceLoggingValue(configuration.Name.c_str(), "distroName"),
+                    TraceLoggingValue(version, "version"),
+                    TraceLoggingValue(instanceId, "instanceId"),
+                    TraceLoggingValue(SUCCEEDED(result), "success"),
+                    TraceLoggingValue(result, "error"));
+            });
+
             wsl::windows::common::wslutil::StopWatch stopWatch;
-            const auto result = wil::ResultFromException([&]() {
+            result = wil::ResultFromException([&]() {
                 auto clientKey = m_lifetimeManager.GetRegistrationId();
                 if (version == LXSS_WSL_VERSION_1)
                 {
@@ -2649,16 +2669,14 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             });
 
             // This telemetry event is used to keep track of instance creation performance (via CreationTimeMs) and failure reasons (via Result).
-            WSL_LOG(
+            WSL_LOG_TELEMETRY(
                 "CreateInstanceOutcome",
-                TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
-                TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
-                TraceLoggingValue(configuration.Name.c_str(), "Name"),
-                TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
-                TraceLoggingValue(version, "Version"),
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(configuration.Name.c_str(), "distroName"),
+                TraceLoggingValue(version, "version"),
+                TraceLoggingValue(instanceId, "instanceId"),
                 TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
-                TraceLoggingValue(result, "Result"),
-                TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+                TraceLoggingValue(result, "Result"));
 
             THROW_IF_FAILED(result);
         }
