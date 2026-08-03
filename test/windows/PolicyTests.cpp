@@ -566,6 +566,12 @@ class PolicyTest
     // plus combined stdout/stderr. Extracted to keep the allowlist matrix above readable.
     static std::tuple<int, std::wstring> RunImageBuild(std::wstring_view dockerfile, std::wstring_view folder)
     {
+        // Terminate any existing session so ConfigureBuildKitPolicy re-snapshots the registry.
+        {
+            std::wstring terminateCmd = L"\"" + GetWslcExePath() + L"\" session terminate";
+            LxsstuLaunchCommandAndCaptureOutputWithResult(terminateCmd.data(), nullptr, nullptr);
+        }
+
         const auto contextDir = std::filesystem::temp_directory_path() / folder;
         std::error_code ec;
         std::filesystem::remove_all(contextDir, ec);
