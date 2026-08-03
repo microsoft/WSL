@@ -34,6 +34,28 @@ Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::Con
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
+Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::ProcessOutputMode initProcessOutputMode) :
+    m_opened(true)
+{
+    m_container.reset(handle);
+
+    m_initProcess = winrt::make_self<implementation::Process>(initProcessOutputMode);
+
+    if (initProcessOutputMode == ProcessOutputMode::Event)
+    {
+        auto callbacks = m_initProcess->GetEventCallbacks();
+        winrt::check_hresult(WslcSetContainerInitProcessIOCallbacks(m_container.get(), &callbacks, m_initProcess.get()));
+    }
+
+    // Best-effort: attach the init process handle if one is available. The container may not
+    // have been started yet, or may not have an init process at all.
+    WslcProcess initHandle{};
+    if (SUCCEEDED(WslcGetContainerInitProcess(m_container.get(), &initHandle)) && initHandle)
+    {
+        m_initProcess->AttachHandle(initHandle);
+    }
+}
+
 void Container::Start()
 {
     auto startFlags = WSLC_CONTAINER_START_FLAG_NONE;
@@ -51,9 +73,13 @@ void Container::Start()
 
     if (m_initProcess)
     {
-        WslcProcess initHandle;
-        winrt::check_hresult(WslcGetContainerInitProcess(ToHandle(), &initHandle));
-        m_initProcess->AttachHandle(initHandle);
+        WslcProcess initHandle{};
+        hr = WslcGetContainerInitProcess(ToHandle(), &initHandle);
+        THROW_HR_IF(hr, !m_opened && FAILED(hr));
+        if (SUCCEEDED(hr) && initHandle)
+        {
+            m_initProcess->AttachHandle(initHandle);
+        }
     }
 }
 

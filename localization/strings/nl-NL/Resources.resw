@@ -2155,6 +2155,9 @@ Gebruik:
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Netwerknaam mag niet leeg zijn.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Foutinformatie van de engine:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Niet-herkende opdracht: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2322,6 +2325,10 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="MessageWslcImageNotFound" xml:space="preserve">
     <value>Installatiekopie {} niet gevonden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Ongeldige --secret waarde '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Ontbrekende vereiste optie: '{}'</value>
@@ -2886,6 +2893,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>De doelbuildfase instellen op build</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Geheim beschikbaar maken voor de build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; standaard env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>De opdracht om uit te voeren</value>

@@ -236,6 +236,7 @@ public:
         _In_ const WSLCCompatContainerOptions* Options,
         _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
         _Out_ IWSLCCompatContainer** Container) override;
+    IFACEMETHOD(OpenContainer)(_In_ LPCSTR NameOrId, _Out_ IWSLCCompatContainer** Container) override;
     IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
 

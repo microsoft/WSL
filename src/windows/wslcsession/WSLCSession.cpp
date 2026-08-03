@@ -3391,6 +3391,21 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::OpenContainer(LPCSTR NameOrId, IWSLCCompatContainer** Container)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, NameOrId);
+    RETURN_HR_IF_NULL(E_POINTER, Container);
+    *Container = nullptr;
+
+    Microsoft::WRL::ComPtr<IWSLCContainer> container;
+    RETURN_IF_FAILED(OpenContainer(NameOrId, &container));
+    RETURN_HR_IF_NULL(E_UNEXPECTED, container);
+
+    return container.CopyTo(Container);
+}
+CATCH_RETURN();
+
 HRESULT WSLCSession::CreateVolume(const WSLCCompatVolumeOptions* Options, WSLCCompatVolumeInformation* VolumeInfo)
 try
 {

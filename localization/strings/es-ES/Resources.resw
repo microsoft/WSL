@@ -2161,6 +2161,9 @@ Uso:
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>El nombre de red no puede estar vacío.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Información de error del motor:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando no reconocido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2328,6 +2331,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
   <data name="MessageWslcImageNotFound" xml:space="preserve">
     <value>Imagen “{}” no encontrada.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Valor --secret '{}' no válido: {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Falta la opción obligatoria: '{}'</value>
@@ -2892,6 +2899,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Establece la etapa de compilación objetivo para compilar</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Exponer el secreto a la compilación (id=NAME[,type=env|file][,env=VAR|,src=PATH]; el valor predeterminado es la variable de entorno NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Comando que se va a ejecutar</value>
