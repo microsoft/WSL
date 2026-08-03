@@ -108,12 +108,18 @@ WslVirtioNetConfig BuildVirtioNetConfig(
 } // namespace
 
 ConsommeNetworking::ConsommeNetworking(
-    GnsChannel&& gnsChannel, ConsommeNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel,
+    ConsommeNetworkingFlags flags,
+    LPCWSTR dnsOptions,
+    LPCSTR hostLoopback,
+    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+    wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
-    m_dnsOptions(dnsOptions)
+    m_dnsOptions(dnsOptions),
+    m_hostLoopback(hostLoopback ? hostLoopback : "")
 {
 }
 
@@ -130,6 +136,7 @@ void ConsommeNetworking::Initialize()
 {
     // Initialize adapter state.
     RefreshGuestConnection();
+    SetupHostLoopback();
 
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
     {
@@ -346,6 +353,35 @@ void ConsommeNetworking::RefreshGuestConnection()
     UpdateMtu(minMtu);
 
     m_networkSettings = std::move(networkSettings);
+}
+
+void ConsommeNetworking::SetupHostLoopback()
+{
+    if (m_hostLoopback.empty())
+    {
+        return;
+    }
+
+    const auto device = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
+
+    SOCKADDR_INET loopback{};
+    loopback.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    loopback.Ipv4.sin_family = AF_INET;
+    auto loopbackIp = ToIpAddress(loopback);
+
+    IpAddress virtualAddress;
+    THROW_IF_FAILED(device->CreateVirtualAddress(&loopbackIp, &virtualAddress));
+
+    std::string virtualAddressString(INET_ADDRSTRLEN, '\0');
+    RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(&virtualAddress.bytes[0]), virtualAddressString.data());
+    virtualAddressString.resize(std::strlen(virtualAddressString.data()));
+
+    THROW_IF_FAILED(device->CreateDNSRecord(DnsRecordType_A, m_hostLoopback.c_str(), virtualAddressString.c_str()));
+
+    WSL_LOG(
+        "SetupHostLoopback",
+        TraceLoggingValue(m_hostLoopback.c_str(), "DnsName"),
+        TraceLoggingValue(virtualAddressString.c_str(), "VirtualAddress"));
 }
 
 void ConsommeNetworking::SetupLoopbackDevice()

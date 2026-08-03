@@ -89,6 +89,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_featureFlags = Settings->FeatureFlags;
     m_networkingMode = Settings->NetworkingMode;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
     m_bootTimeoutMs = Settings->BootTimeoutMs;
 
     // Build HCS settings
@@ -501,7 +502,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_hostLoopback.c_str(), m_guestDeviceManager, m_userToken);
     }
     else
     {
@@ -951,6 +952,7 @@ WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSetti
     m_bootTimeoutMs = Settings->BootTimeoutMs;
     m_networkingMode = Settings->NetworkingMode;
     m_featureFlags = Settings->FeatureFlags;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
     m_storageFlags = Settings->StorageFlags;
 }
 
@@ -965,6 +967,7 @@ WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
     settings.BootTimeoutMs = m_bootTimeoutMs;
     settings.NetworkingMode = m_networkingMode;
     settings.FeatureFlags = m_featureFlags;
+    settings.HostLoopback = m_hostLoopback.empty() ? nullptr : m_hostLoopback.c_str();
     settings.StorageFlags = m_storageFlags;
     settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;
     settings.RootVhdTypeOverride = m_rootVhdTypeOverride ? m_rootVhdTypeOverride->c_str() : nullptr;

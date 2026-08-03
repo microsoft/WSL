@@ -57,6 +57,10 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # used without an explicit address (default: 127.0.0.1)\n"
     "  # defaultBindingAddress: default\n"
     "\n"
+    "  # DNS name that resolves to the host loopback address (default: host.wslc.internal).\n"
+    "  # Set to \"none\" to disable the entry.\n"
+    "  # hostLoopback: default\n"
+    "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
 
@@ -124,6 +128,16 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionDnsTunneling)
     {
         return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionHostLoopback)
+    {
+        if (value == "none")
+        {
+            return std::string{};
+        }
+
+        return !value.empty() ? std::optional{value} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(SessionPortRelay)

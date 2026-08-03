@@ -572,6 +572,16 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HostLoopback_DefaultName)
+    {
+        VerifyHostLoopback("default", "host.wslc.internal");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HostLoopback_CustomName)
+    {
+        VerifyHostLoopback("host.containers.internal", "host.containers.internal");
+    }
+
     // Verifies that 'session.defaultBindingAddress: default' resolves to the built-in
     // loopback default (127.0.0.1) for a published port specified without an explicit host IP.
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_DefaultBindingAddress_Default)
@@ -1336,6 +1346,31 @@ class WSLCE2EContainerRunTests
     }
 
 private:
+    void VerifyHostLoopback(std::string_view setting, std::string_view dnsName)
+    {
+        EnsureSessionIsTerminated();
+        auto terminateSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { EnsureSessionIsTerminated(); });
+
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(settingsPath, std::format("session:\n  hostLoopback: \"{}\"\n", setting));
+
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", HostLoopbackTestPort);
+        UniqueWebServer server(endpoint.c_str(), L"host-loopback-ok");
+        ExpectHttpResponse(endpoint.c_str(), HTTP_STATUS_OK, true);
+
+        const auto command = std::format(
+            L"python3 -c \"import http.client,socket;"
+            L"a=socket.getaddrinfo('{}',{},socket.AF_INET,socket.SOCK_STREAM)[0][4];"
+            L"c=http.client.HTTPConnection(*a,timeout=60);"
+            L"c.request('GET','/');"
+            L"assert c.getresponse().read()==b'host-loopback-ok'\"",
+            std::string(dnsName),
+            HostLoopbackTestPort);
+
+        auto result = RunWslc(std::format(L"container run --rm --name {} {} {}", WslcContainerName, PythonImage.NameAndTag(), command));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
@@ -1358,6 +1393,7 @@ private:
     const uint16_t ContainerTestPort = 8080;
     const uint16_t HostTestPort1 = 1234;
     const uint16_t HostTestPort2 = 1235;
+    const uint16_t HostLoopbackTestPort = 1236;
 
     // Test named volume
     const std::wstring WslcVolumeName = L"wslc-test-volume";

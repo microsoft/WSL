@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 #include "defs.h"
 #include "EnumVariantMap.h"
+#include "WSLCSessionDefaults.h"
 #include "wslc.h"
 #include <cstdint>
 #include <filesystem>
@@ -41,6 +42,7 @@ enum class Setting : size_t
     SessionNetworkingMode,
     SessionHostFileShareMode,
     SessionDnsTunneling,
+    SessionHostLoopback,
     CredentialStore,
     SessionPortRelay,
     SessionDefaultBindingAddress,
@@ -97,6 +99,7 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode,  WSLCNetworkingModeConsomme,    "session.networkingMode")
     DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,   HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
     DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,                true,                          "session.dnsTunneling")
+    DEFINE_SETTING_MAPPING(SessionHostLoopback,      std::string, std::string,         DefaultHostLoopback,           "session.hostLoopback")
     DEFINE_SETTING_MAPPING(CredentialStore,          std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
     DEFINE_SETTING_MAPPING(SessionPortRelay,         std::string, PortRelayType,       PortRelayType::VirtioNet,      "experimental.portRelay")
     DEFINE_SETTING_MAPPING(SessionDefaultBindingAddress, std::string, std::string,     std::string{},                 "session.defaultBindingAddress")
