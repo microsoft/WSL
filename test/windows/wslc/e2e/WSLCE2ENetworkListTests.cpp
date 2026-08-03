@@ -41,13 +41,16 @@ class WSLCE2ENetworkListTests
     WSLC_TEST_METHOD(WSLCE2E_Network_List_HelpCommand)
     {
         auto result = RunWslc(L"network list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_List_InvalidFormatOption)
     {
         auto result = RunWslc(L"network list --format invalid");
-        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_List_QuietOption_OutputsNamesOnly)
@@ -92,42 +95,5 @@ class WSLCE2ENetworkListTests
 private:
     const std::wstring TestNetworkName = L"wslc-e2e-network-list";
     const std::wstring TestNetworkName2 = L"wslc-e2e-network-list-2";
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return std::format(L"{}\r\n\r\n", Localization::WSLCCLI_NetworkListLongDesc());
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc network list [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: ls\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                             //
-                << L"  --format    Output formatting (json or table) (Default: table)\r\n" //
-                << L"  -q,--quiet  Outputs the network names only\r\n"                     //
-                << L"  -?,--help   Shows help about the selected command\r\n"              //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

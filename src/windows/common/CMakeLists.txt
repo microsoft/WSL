@@ -147,7 +147,7 @@ set(HEADERS
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl yaml-cpp)
+add_dependencies(common wslserviceidl wsldevicehostidl localization wslservicemc wslinstalleridl yaml-cpp)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)

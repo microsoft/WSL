@@ -36,6 +36,23 @@ try
     wslutil::ConfigureCrt();
     wslutil::InitializeWil();
 
+    // Extract the executable name from argv[0] for use in help/usage output.
+    if (argc > 0 && argv[0])
+    {
+        std::wstring_view exe{argv[0]};
+        auto lastSlash = exe.find_last_of(L"\\/");
+        if (lastSlash != std::wstring_view::npos)
+        {
+            exe = exe.substr(lastSlash + 1);
+        }
+        auto dot = exe.rfind(L'.');
+        if (dot != std::wstring_view::npos)
+        {
+            exe = exe.substr(0, dot);
+        }
+        s_ExecutableName = exe;
+    }
+
     WslTraceLoggingInitialize(WslcTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
 
@@ -121,7 +138,7 @@ try
     catch (const CommandException& ce)
     {
         // Input failure: show help alongside the error so the user can correct it.
-        command->OutputHelp(&ce);
+        command->OutputHelp(context.Reporter, &ce);
         return 1;
     }
     catch (...)

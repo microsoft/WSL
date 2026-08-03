@@ -199,7 +199,9 @@ class WSLCTests
 
     std::string PushImageToRegistry(const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
     {
-        auto [repo, tag] = ParseImage(imageName);
+        auto reference = ImageReference::Parse(imageName);
+        const auto& repo = reference.Repository.Name;
+        auto tag = reference.TagOrDigest();
         auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
         auto registryRepo = std::format("{}/{}", registryAddress, repo);
         auto registryTag = tag.value_or("latest");
@@ -3532,11 +3534,19 @@ class WSLCTests
         auto createNewSession = networkingMode != m_defaultSessionSettings.NetworkingMode;
         auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
-        // Install socat in the container.
-        //
-        // TODO: revisit this in the future to avoid pulling packages from the network.
-        auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", "tdnf install socat -y"}).Launch(*session);
-        ValidateProcessOutput(installSocat, {}, 0, 300 * 1000);
+        // Install socat in the VM.
+        {
+            constexpr auto c_mountPoint = "/testdata";
+            auto mountSource = std::filesystem::absolute(g_testDataPath);
+
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true));
+            auto unmount =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint)); });
+
+            const auto installCommand = std::format("tdnf install -y --disablerepo='*' --nogpgcheck {}/packages/*.rpm", c_mountPoint);
+            auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", installCommand}).Launch(*session);
+            ValidateProcessOutput(installSocat, {}, 0, 120 * 1000);
+        }
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
@@ -3755,19 +3765,20 @@ class WSLCTests
             VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
-            // Capture the mount source and type, unmount, then remount without read-only.
+            // Remount a bind of the share as read-write to ensure the device host still enforces read-only access.
             ExpectCommandResult(
                 session.get(),
                 {"/bin/sh",
                  "-c",
-                 "src=$(findmnt -n -o SOURCE /win-path) && "
-                 "fstype=$(findmnt -n -o FSTYPE /win-path) && "
-                 "umount /win-path && "
-                 "mount -t $fstype $src /win-path"},
+                 "mkdir -p /win-path-rw && "
+                 "mount --bind /win-path /win-path-rw && "
+                 "mount -o remount,bind,rw /win-path-rw && "
+                 "findmnt -n -o VFS-OPTIONS /win-path-rw | grep -qE '(^|,)rw(,|$)'"},
                 0);
 
-            // Verify the folder is still not writeable.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
+            // Verify the folder is still not writeable through the read-write bind.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path-rw/file.txt"}, 1);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "umount /win-path-rw && rmdir /win-path-rw"}, 0);
 
             VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
             ExpectMount(session.get(), "/win-path", {});
@@ -3801,107 +3812,154 @@ class WSLCTests
         ValidateWindowsMounts(true);
     }
 
-    // Validates that VirtioFs shares are reused across mount/unmount cycles for the same Windows folder.
-    WSLC_TEST_METHOD(WindowsMountsVirtioFsShareReuse)
+    // Validates that each mount owns an independent child on the shared aggregate device.
+    WSLC_TEST_METHOD(WindowsMountsVirtioFsIndependentShares)
     {
-        auto settings = GetDefaultSessionSettings(L"virtiofs-share-reuse-test");
+        auto settings = GetDefaultSessionSettings(L"virtiofs-independent-shares-test");
         WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
 
         auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
         auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
-        auto testFolder = std::filesystem::current_path() / "test-folder-share-reuse";
+        auto testFolder = std::filesystem::current_path() / "test-folder-independent-shares";
         std::filesystem::create_directories(testFolder);
+        std::ofstream(testFolder / "marker.txt") << "content";
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
 
-        auto getMountSource = [&](const char* mountPoint) -> std::string {
-            auto cmd = std::format("findmnt -n -o SOURCE {}", mountPoint);
+        auto getMountField = [&](const char* mountPoint, const char* field) -> std::string {
+            auto cmd = std::format("findmnt -n -o {} {}", field, mountPoint);
             auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", cmd}, 0);
             return result.Output[1];
         };
 
-        // Mount, capture the source (share GUID), unmount, remount, verify same GUID is reused.
+        // Concurrent mounts of the same host path use distinct children on the same aggregate device.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
-            auto firstSource = getMountSource("/win-path");
-            VERIFY_IS_FALSE(firstSource.empty());
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-1", false));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-2", false));
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
-            ExpectMount(session.get(), "/win-path", {});
+            auto firstDevice = getMountField("/win-path-1", "MAJ:MIN");
+            auto secondDevice = getMountField("/win-path-2", "MAJ:MIN");
+            auto firstRoot = getMountField("/win-path-1", "FSROOT");
+            auto secondRoot = getMountField("/win-path-2", "FSROOT");
+            VERIFY_ARE_EQUAL(firstDevice, secondDevice);
+            VERIFY_ARE_NOT_EQUAL(firstRoot, secondRoot);
+            VERIFY_IS_TRUE(firstRoot.starts_with('/'));
+            VERIFY_IS_TRUE(firstRoot.ends_with('\n'));
+            VERIFY_IS_TRUE(secondRoot.starts_with('/'));
+            VERIFY_IS_TRUE(secondRoot.ends_with('\n'));
+            firstRoot.pop_back();
+            secondRoot.pop_back();
 
-            // Remount the same folder - should reuse the same share GUID.
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
-            auto secondSource = getMountSource("/win-path");
+            const auto firstChild = std::format("/run/wsl/virtiofs-mounts/{}{}", LX_INIT_DRVFS_VIRTIO_TAG, firstRoot);
+            const auto secondChild = std::format("/run/wsl/virtiofs-mounts/{}{}", LX_INIT_DRVFS_VIRTIO_TAG, secondRoot);
 
-            VERIFY_ARE_EQUAL(firstSource, secondSource);
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-1"));
+            ExpectCommandResult(session.get(), {"/bin/cat", "/win-path-2/marker.txt"}, 0);
+            ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", firstChild}, 0);
+            ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-2"));
+            ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", secondChild}, 0);
         }
 
-        // Verify that changing the read-only flag produces a different share GUID.
+        // Verify that read-write and read-only shares use different children on the same aggregate device.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
-            auto rwSource = getMountSource("/win-path");
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-rw", false));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-ro", true));
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            auto rwDevice = getMountField("/win-path-rw", "MAJ:MIN");
+            auto roDevice = getMountField("/win-path-ro", "MAJ:MIN");
+            auto rwRoot = getMountField("/win-path-rw", "FSROOT");
+            auto roRoot = getMountField("/win-path-ro", "FSROOT");
 
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
-            auto roSource = getMountSource("/win-path");
+            VERIFY_ARE_EQUAL(rwDevice, roDevice);
+            VERIFY_ARE_NOT_EQUAL(rwRoot, roRoot);
 
-            VERIFY_ARE_NOT_EQUAL(rwSource, roSource);
-
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-rw"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-ro"));
         }
     }
 
-    // Validate that the correct error is returned when too many virtiofs shares are mounted.
-    WSLC_TEST_METHOD(VirtiofsVolumesLimit)
+    WSLC_TEST_METHOD(WindowsMountsVirtioFsRemoveChild)
     {
-        constexpr size_t c_maxVirtioFsShares = wsl::shared::c_maxVirtioFsShares;
-
-        auto settings = GetDefaultSessionSettings(L"virtiofs-share-limit-test");
+        auto settings = GetDefaultSessionSettings(L"virtiofs-remove-child-test");
         WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
-
-        // Use a dedicated session so the share count starts at zero (no GPU libraries are mounted).
         auto session = CreateSession(settings);
 
-        auto testRoot = std::filesystem::current_path() / "test-folder-share-limit";
-        std::filesystem::create_directories(testRoot);
+        const auto testRoot = std::filesystem::current_path() / "test-folder-remove-child";
+        const auto firstFolder = testRoot / "first";
+        const auto secondFolder = testRoot / "second";
+        std::filesystem::create_directories(firstFolder);
+        std::filesystem::create_directories(secondFolder);
+        std::ofstream(firstFolder / "marker.txt") << "first";
+        std::ofstream(secondFolder / "marker.txt") << "second";
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testRoot); });
 
-        auto folderForIndex = [&](size_t index) {
-            auto folder = testRoot / std::to_string(index);
-            std::filesystem::create_directories(folder);
-            return folder;
+        auto getMountRoot = [&](const char* mountPoint) {
+            const auto command = std::format("findmnt -n -o FSROOT {}", mountPoint);
+            auto root = ExpectCommandResult(session.get(), {"/bin/sh", "-c", command}, 0).Output.at(1);
+            VERIFY_IS_TRUE(root.starts_with('/'));
+            VERIFY_IS_TRUE(root.ends_with('\n'));
+            root.pop_back();
+            return root;
         };
 
-        // Mount distinct Windows folders (each creates a new share) until the limit is reached.
-        size_t mounted = 0;
-        HRESULT lastResult = S_OK;
-        for (size_t i = 0; i <= c_maxVirtioFsShares; ++i)
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(firstFolder.c_str(), "/remove-child-first", false));
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(secondFolder.c_str(), "/remove-child-second", false));
+
+        const auto firstRoot = getMountRoot("/remove-child-first");
+        const auto secondRoot = getMountRoot("/remove-child-second");
+        VERIFY_ARE_NOT_EQUAL(firstRoot, secondRoot);
+
+        const auto aggregateRoot = std::format("/run/wsl/virtiofs-mounts/{}", LX_INIT_DRVFS_VIRTIO_TAG);
+        const auto firstChild = aggregateRoot + firstRoot;
+        const auto secondChild = aggregateRoot + secondRoot;
+        ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", firstChild}, 0);
+        ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
+
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-first"));
+        ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", firstChild}, 0);
+        ExpectCommandResult(session.get(), {"/bin/cat", "/remove-child-second/marker.txt"}, 0);
+        ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
+
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-second"));
+        ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", secondChild}, 0);
+    }
+
+    // Validate that enough VirtioFs shares can be mounted to exceed the old per-device aperture limit.
+    WSLC_TEST_METHOD(VirtiofsMountManyVolumes)
+    {
+        constexpr size_t c_shareCount = 32;
+
+        auto settings = GetDefaultSessionSettings(L"virtiofs-many-shares-test");
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+
+        auto session = CreateSession(settings);
+
+        auto testRoot = std::filesystem::current_path() / "test-folder-many-shares";
+        std::filesystem::create_directories(testRoot);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testRoot); });
+        std::vector<std::string> mountPoints;
+
+        for (size_t index = 0; index < c_shareCount; ++index)
         {
-            auto folder = folderForIndex(i);
-            auto mountPoint = std::format("/vfs-limit-{}", i);
+            const auto folder = testRoot / std::to_string(index);
+            std::filesystem::create_directories(folder);
+            std::ofstream(folder / "marker.txt") << index;
 
-            lastResult = session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false);
-            if (FAILED(lastResult))
-            {
-                break;
-            }
+            const auto mountPoint = std::format("/vfs-many-{}", index);
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false));
+            mountPoints.emplace_back(mountPoint);
 
-            mounted++;
+            const auto command = std::format("cat {}/marker.txt", mountPoint);
+            const auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", command}, 0);
+            VERIFY_ARE_EQUAL(std::to_string(index), result.Output.at(1));
         }
 
-        VERIFY_ARE_EQUAL(mounted, c_maxVirtioFsShares);
-        VERIFY_ARE_EQUAL(lastResult, E_OUTOFMEMORY);
-        ValidateCOMErrorMessage(
-            L"Too many volumes have been mounted (limit: 15). Restart the session to mount more volumes. This will be fixed in a "
-            L"future release.");
-
-        // Reusing an already-created share must still succeed.
-        auto reusedFolder = folderForIndex(0);
-        VERIFY_SUCCEEDED(session->MountWindowsFolder(reusedFolder.c_str(), "/vfs-limit-reuse", false));
-        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/vfs-limit-reuse"));
+        for (const auto& mountPoint : mountPoints)
+        {
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint.c_str()));
+        }
     }
 
     // This test case validates that no file descriptors are leaked to user processes.
@@ -5552,7 +5610,16 @@ class WSLCTests
             options.Driver = "bridge";
             options.Subnet = nullptr;
             options.Gateway = "172.44.0.1";
-            verifyInvalid(L"--subnet");
+            verifyInvalid(L"--gateway");
+        }
+
+        // IpRange specified without Subnet
+        {
+            options.Driver = "bridge";
+            options.Subnet = nullptr;
+            options.Gateway = nullptr;
+            options.IpRange = "172.44.10.0/24";
+            verifyInvalid(L"--ip-range");
         }
     }
 
@@ -5677,6 +5744,87 @@ class WSLCTests
         VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
         VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
         VERIFY_ARE_EQUAL(gateway, inspect.IPAM.Config->at(0).Gateway);
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateWithIpRangeTest)
+    {
+        const std::string networkName = "ip-range-test-net";
+        const std::string subnet = "172.32.0.0/16";
+        const std::string ipRange = "172.32.10.0/24";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = ipRange.c_str();
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
+        VERIFY_ARE_EQUAL(ipRange, inspect.IPAM.Config->at(0).IPRange);
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInvalidIpRangeTest)
+    {
+        const std::string networkName = "bad-ip-range-net";
+        const std::string subnet = "172.33.0.0/16";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = "10.0.0.0/24";
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
+        ValidateCOMErrorMessageContains(L"invalid ip-range");
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+    }
+
+    WSLC_TEST_METHOD(NetworkSessionRecoveryWithIpRangeTest)
+    {
+        const std::string networkName = "recovery-ip-range-net";
+        const std::string subnet = "172.34.0.0/16";
+        const std::string ipRange = "172.34.20.0/24";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.Subnet = subnet.c_str();
+        options.IpRange = ipRange.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        // Reset the session (simulates session restart).
+        ResetTestSession();
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(subnet, inspect.IPAM.Config->at(0).Subnet);
+        VERIFY_ARE_EQUAL(ipRange, inspect.IPAM.Config->at(0).IPRange);
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithArbitraryDriverOptsTest)
@@ -7151,12 +7299,10 @@ class WSLCTests
         ValidateCOMErrorMessageContains(L"Network name");
     }
 
-    WSLC_TEST_METHOD(ContainerNetworkEndpointSettingsNotImplementedTest)
+    WSLC_TEST_METHOD(ContainerNetworkEndpointSettingsUnknownKeyTest)
     {
-        // Per-endpoint Settings (Aliases, IPAMConfig, etc.) are reserved for a future PR.
-        // Until that lands, any non-empty Settings payload must be rejected with E_NOTIMPL
-        // so callers don't silently lose data.
-        const std::string networkName = "custom-net-settings";
+        // Unknown endpoint setting keys must be rejected at container creation time.
+        const std::string networkName = "custom-net-settings-unknown";
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
         WSLCNetworkOptions networkOptions{};
@@ -7166,7 +7312,7 @@ class WSLCTests
         auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         LPCSTR args[] = {"sleep", "99999"};
-        KeyValuePair settings[] = {{"Aliases", "my-alias"}};
+        KeyValuePair settings[] = {{"BogusKey", "value"}};
         WSLCNetworkConnection connection{};
         connection.NetworkName = networkName.c_str();
         connection.Settings = settings;
@@ -7174,7 +7320,7 @@ class WSLCTests
 
         WSLCContainerOptions options{};
         options.Image = "debian:latest";
-        options.Name = "test-endpoint-settings";
+        options.Name = "test-endpoint-settings-unknown";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
         options.ContainerNetwork.NetworkMode = "bridge";
         options.ContainerNetwork.Networks = &connection;
@@ -7182,8 +7328,10 @@ class WSLCTests
 
         wil::com_ptr<IWSLCContainer> container;
         auto hr = m_defaultSession->CreateContainer(&options, nullptr, &container);
-        VERIFY_ARE_EQUAL(E_NOTIMPL, hr);
-        ValidateCOMErrorMessage(L"Endpoint settings are not yet supported (network 'custom-net-settings').");
+        VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
+        const auto expectedError =
+            std::format(L"Unknown endpoint setting 'BogusKey' for network '{}'.", std::wstring(networkName.begin(), networkName.end()));
+        ValidateCOMErrorMessage(expectedError);
     }
 
     WSLC_TEST_METHOD(ContainerUnsupportedColonNetworkModeRejectedTest)
@@ -7536,34 +7684,36 @@ class WSLCTests
             expectBothReject(container, nonExistentNetwork.c_str(), WSLC_E_NETWORK_NOT_FOUND, expectedError.c_str());
         }
 
-        // Host and none mode rejection.
+        // Host, none, and container:* mode rejection.
         {
             const std::string networkName = "test-connect-mode-net";
             createNetwork(networkName, "172.52.0.0/16");
             auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-            auto expectModeRejection = [&](const std::string& name, std::string mode) {
-                auto container = launchContainer(name, std::move(mode));
-                expectBothReject(
-                    container,
-                    networkName.c_str(),
-                    E_INVALIDARG,
-                    L"Additional networks are not allowed when the primary network mode is 'host' or 'none'.");
+            auto expectModeRejection = [&](const std::string& name, const std::string& mode) {
+                auto container = launchContainer(name, mode);
+                const auto expected = std::format(
+                    L"The primary network mode '{}' does not support connecting or disconnecting additional networks.",
+                    std::wstring(mode.begin(), mode.end()));
+                expectBothReject(container, networkName.c_str(), E_INVALIDARG, expected.c_str());
             };
 
             expectModeRejection("test-connect-host-ctr", "host");
             expectModeRejection("test-connect-none-ctr", "none");
-        }
 
-        // ContainerIpAddress not supported.
-        {
-            auto container = launchContainer("test-connect-ip-ctr");
+            // container:<name> is resolved to container:<id> internally, so the emitted mode string
+            // contains the target's container ID rather than its name. Verify HRESULT + a stable substring.
+            const std::string ctrModeTarget = "test-connect-ctrmode-target";
+            auto target = launchContainer(ctrModeTarget);
+            auto ctrModeContainer = launchContainer("test-connect-ctrmode-ctr", "container:" + ctrModeTarget);
+            const std::wstring expectedSubstring = L"does not support connecting or disconnecting additional networks";
 
             WSLCNetworkConnectionOptions options{};
-            options.NetworkName = "bridge";
-            options.ContainerIpAddress = "10.0.0.5";
-            VERIFY_ARE_EQUAL(E_NOTIMPL, container.Get().ConnectToNetwork(&options));
-            ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
+            options.NetworkName = networkName.c_str();
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ctrModeContainer.Get().ConnectToNetwork(&options));
+            ValidateCOMErrorMessageContains(expectedSubstring);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ctrModeContainer.Get().DisconnectFromNetwork(networkName.c_str()));
+            ValidateCOMErrorMessageContains(expectedSubstring);
         }
 
         // Connect and disconnect from the container's primary network.
@@ -7606,6 +7756,221 @@ class WSLCTests
                 std::wstring(containerName.begin(), containerName.end()),
                 std::wstring(networkName.begin(), networkName.end()));
             ValidateCOMErrorMessage(expectedError);
+        }
+    }
+
+    WSLC_TEST_METHOD(NetworkConnectEndpointSettingsTest)
+    {
+        const std::string networkName = "connect-endpoint-net";
+        const std::string subnet = "172.70.0.0/16";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        WSLCNetworkOptions netOpts{};
+        netOpts.Name = networkName.c_str();
+        netOpts.Driver = "bridge";
+        netOpts.Subnet = subnet.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&netOpts, nullptr));
+        auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        auto launchContainer = [&](const std::string& name) {
+            WSLCContainerLauncher launcher("debian:latest", name, {"sleep", "99999"}, {}, "bridge");
+            return launcher.Launch(*m_defaultSession);
+        };
+
+        auto expectConnectReject =
+            [&](auto& container, const std::vector<KeyValuePair>& settings, HRESULT expectedResult, const std::wstring& expectedMessage) {
+                WSLCNetworkConnectionOptions options{};
+                options.NetworkName = networkName.c_str();
+                options.Settings = settings.data();
+                options.SettingsCount = static_cast<ULONG>(settings.size());
+                VERIFY_ARE_EQUAL(expectedResult, container.Get().ConnectToNetwork(&options));
+                ValidateCOMErrorMessage(expectedMessage);
+            };
+
+        // Unknown endpoint setting key rejected.
+        {
+            auto container = launchContainer("connect-endpoint-unknown");
+            const std::string unknownKey = "BogusKey";
+            const std::string unknownValue = "value";
+            const auto expected = std::format(
+                L"Unknown endpoint setting '{}' for network '{}'.",
+                std::wstring(unknownKey.begin(), unknownKey.end()),
+                std::wstring(networkName.begin(), networkName.end()));
+            expectConnectReject(container, {{unknownKey.c_str(), unknownValue.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Malformed IPv4 address rejected.
+        {
+            auto container = launchContainer("connect-endpoint-badip");
+            const std::string badIp = "not-an-ip";
+            const auto expected = std::format(L"Invalid IP address '{}'", std::wstring(badIp.begin(), badIp.end()));
+            expectConnectReject(container, {{"IPAddress", badIp.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Multiple IPAddress values rejected.
+        {
+            auto container = launchContainer("connect-endpoint-dupip");
+            const std::string firstIp = "172.70.0.5";
+            const std::string secondIp = "172.70.0.6";
+            const auto expected = std::format(
+                L"Only one IP address may be specified for network '{}'.", std::wstring(networkName.begin(), networkName.end()));
+            expectConnectReject(container, {{"IPAddress", firstIp.c_str()}, {"IPAddress", secondIp.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Empty link rejected.
+        {
+            auto container = launchContainer("connect-endpoint-emptylink");
+            expectConnectReject(container, {{"Links", ""}}, E_INVALIDARG, L"Network link cannot be empty.");
+        }
+
+        // Malformed driver option (missing '=') rejected.
+        {
+            auto container = launchContainer("connect-endpoint-badopt");
+            const std::string badEntry = "no-equals";
+            const auto expected =
+                std::format(L"Invalid driver option '{}'; expected 'key=value'.", std::wstring(badEntry.begin(), badEntry.end()));
+            expectConnectReject(container, {{"DriverOpts", badEntry.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Duplicate driver option key rejected.
+        {
+            auto container = launchContainer("connect-endpoint-dupopt");
+            const std::string dupKey = "mtu";
+            const std::string firstEntry = "mtu=1500";
+            const std::string secondEntry = "mtu=1400";
+            const auto expected = std::format(L"Duplicate driver option '{}'.", std::wstring(dupKey.begin(), dupKey.end()));
+            expectConnectReject(container, {{"DriverOpts", firstEntry.c_str()}, {"DriverOpts", secondEntry.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Malformed link-local IPv4 address rejected.
+        {
+            auto container = launchContainer("connect-endpoint-badlli");
+            const std::string badIp = "not-a-link-local";
+            const auto expected = std::format(L"Invalid IP address '{}'", std::wstring(badIp.begin(), badIp.end()));
+            expectConnectReject(container, {{"LinkLocalIPs", badIp.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Empty/whitespace-only alias rejected.
+        {
+            auto container = launchContainer("connect-endpoint-emptyalias");
+            expectConnectReject(container, {{"Aliases", "   "}}, E_INVALIDARG, L"Network alias cannot be empty.");
+        }
+
+        // Driver option with empty key ('=value') rejected.
+        {
+            auto container = launchContainer("connect-endpoint-emptykey");
+            const std::string badEntry = "=value";
+            const auto expected =
+                std::format(L"Invalid driver option '{}'; expected 'key=value'.", std::wstring(badEntry.begin(), badEntry.end()));
+            expectConnectReject(container, {{"DriverOpts", badEntry.c_str()}}, E_INVALIDARG, expected);
+        }
+
+        // Driver option value containing '=' — everything after the first '=' is preserved verbatim.
+        {
+            auto container = launchContainer("connect-endpoint-eqvalue");
+            const std::string driverOptKey = "com.docker.network.endpoint.custom";
+            const std::string driverOptValue = "a=b=c";
+            const std::string driverOptEntry = driverOptKey + "=" + driverOptValue;
+
+            const std::vector<KeyValuePair> settings{{"DriverOpts", driverOptEntry.c_str()}};
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            const auto opt = endpoint.DriverOpts.find(driverOptKey);
+            VERIFY_IS_TRUE(opt != endpoint.DriverOpts.end());
+            VERIFY_ARE_EQUAL(driverOptValue, opt->second);
+        }
+
+        // Aliases + IPAddress + LinkLocalIPs + DriverOpts together — success, inspect verifies every field.
+        {
+            auto container = launchContainer("connect-endpoint-combo");
+            const std::string alias1 = "primary-alias";
+            const std::string alias2 = "secondary-alias";
+            const std::string ipAddress = "172.70.0.42";
+            const std::string linkLocal = "169.254.10.5";
+            const std::string driverOptEntry = "com.docker.network.endpoint.custom=verify";
+            const std::string driverOptKey = "com.docker.network.endpoint.custom";
+            const std::string driverOptValue = "verify";
+
+            const std::vector<KeyValuePair> settings{
+                {"Aliases", alias1.c_str()},
+                {"Aliases", alias2.c_str()},
+                {"IPAddress", ipAddress.c_str()},
+                {"LinkLocalIPs", linkLocal.c_str()},
+                {"DriverOpts", driverOptEntry.c_str()},
+            };
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias1) != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias2) != endpoint.Aliases.end());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAddress);
+            VERIFY_IS_TRUE(endpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAMConfig->IPv4Address);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.IPAMConfig->LinkLocalIPs, linkLocal) != endpoint.IPAMConfig->LinkLocalIPs.end());
+            const auto opt = endpoint.DriverOpts.find(driverOptKey);
+            VERIFY_IS_TRUE(opt != endpoint.DriverOpts.end());
+            VERIFY_ARE_EQUAL(driverOptValue, opt->second);
+        }
+
+        // Links: connect two containers to the same user-defined bridge, verify Links echoes back in inspect.
+        {
+            const std::string targetName = "connect-endpoint-link-target";
+            const std::string targetAlias = "db";
+            auto target = launchContainer(targetName);
+            WSLCNetworkConnectionOptions targetOptions{};
+            targetOptions.NetworkName = networkName.c_str();
+            const std::vector<KeyValuePair> targetSettings{{"Aliases", targetAlias.c_str()}};
+            targetOptions.Settings = targetSettings.data();
+            targetOptions.SettingsCount = static_cast<ULONG>(targetSettings.size());
+            VERIFY_SUCCEEDED(target.Get().ConnectToNetwork(&targetOptions));
+
+            auto source = launchContainer("connect-endpoint-link-source");
+            const std::string linkEntry = targetName + ":" + targetAlias;
+            const std::vector<KeyValuePair> sourceSettings{{"Links", linkEntry.c_str()}};
+            WSLCNetworkConnectionOptions sourceOptions{};
+            sourceOptions.NetworkName = networkName.c_str();
+            sourceOptions.Settings = sourceSettings.data();
+            sourceOptions.SettingsCount = static_cast<ULONG>(sourceSettings.size());
+            VERIFY_SUCCEEDED(source.Get().ConnectToNetwork(&sourceOptions));
+
+            auto inspect = source.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Links, linkEntry) != endpoint.Links.end());
+        }
+
+        // Connecting a stopped container succeeds — Docker allows attach in created/exited state.
+        {
+            auto container = launchContainer("connect-endpoint-stopped");
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            const std::string alias = "stopped-alias";
+            const std::vector<KeyValuePair> settings{{"Aliases", alias.c_str()}};
+
+            WSLCNetworkConnectionOptions options{};
+            options.NetworkName = networkName.c_str();
+            options.Settings = settings.data();
+            options.SettingsCount = static_cast<ULONG>(settings.size());
+            VERIFY_SUCCEEDED(container.Get().ConnectToNetwork(&options));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias) != endpoint.Aliases.end());
         }
     }
 
@@ -7721,14 +8086,16 @@ class WSLCTests
             expectError("alias-ctr-empty", networkName, {""}, E_INVALIDARG, L"Network alias cannot be empty.");
         }
 
-        // Unknown KVP key on primary settings — rejected with E_NOTIMPL.
+        // Unknown KVP key on primary settings — rejected with the unified endpoint-settings error.
         {
             const std::string networkName = "alias-net-unknown";
+            const std::string unknownKey = "BogusKey";
+            const std::string unknownValue = "value";
             createNetwork(networkName, "172.63.0.0/16");
             auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
             LPCSTR args[] = {"sleep", "99999"};
-            const KeyValuePair settings[] = {{"IPAddress", "10.0.0.5"}};
+            const KeyValuePair settings[] = {{unknownKey.c_str(), unknownValue.c_str()}};
             WSLCContainerOptions options{};
             options.Image = "debian:latest";
             options.Name = "alias-ctr-unknown";
@@ -7738,11 +8105,92 @@ class WSLCTests
             options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
 
             wil::com_ptr<IWSLCContainer> container;
-            VERIFY_ARE_EQUAL(E_NOTIMPL, m_defaultSession->CreateContainer(&options, nullptr, &container));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
             ValidateCOMErrorMessage(std::format(
-                                        L"Endpoint settings are not yet supported (network '{}').",
-                                        std::wstring(networkName.begin(), networkName.end()))
-                                        .c_str());
+                L"Unknown endpoint setting '{}' for network '{}'.",
+                std::wstring(unknownKey.begin(), unknownKey.end()),
+                std::wstring(networkName.begin(), networkName.end())));
+        }
+
+        // Primary endpoint settings (IPAddress + Aliases + LinkLocalIPs + DriverOpts) round-trip via inspect at create time.
+        {
+            const std::string networkName = "alias-net-combo";
+            createNetwork(networkName, "172.64.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            const std::string alias1 = "primary-alias";
+            const std::string alias2 = "secondary-alias";
+            const std::string ipAddress = "172.64.0.42";
+            const std::string linkLocal = "169.254.11.5";
+            const std::string driverOptEntry = "com.docker.network.endpoint.custom=verify";
+            const std::string driverOptKey = "com.docker.network.endpoint.custom";
+            const std::string driverOptValue = "verify";
+
+            LPCSTR args[] = {"sleep", "99999"};
+            const KeyValuePair settings[] = {
+                {"Aliases", alias1.c_str()},
+                {"Aliases", alias2.c_str()},
+                {"IPAddress", ipAddress.c_str()},
+                {"LinkLocalIPs", linkLocal.c_str()},
+                {"DriverOpts", driverOptEntry.c_str()},
+            };
+            WSLCContainerOptions options{};
+            options.Image = "debian:latest";
+            options.Name = "alias-ctr-combo";
+            options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+            options.ContainerNetwork.NetworkMode = networkName.c_str();
+            options.ContainerNetwork.Settings = settings;
+            options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
+
+            wil::com_ptr<IWSLCContainer> containerCom;
+            VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, nullptr, &containerCom));
+            RunningWSLCContainer container(std::move(containerCom), WSLCProcessFlagsNone);
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias1) != endpoint.Aliases.end());
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias2) != endpoint.Aliases.end());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAddress);
+            VERIFY_IS_TRUE(endpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAMConfig->IPv4Address);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.IPAMConfig->LinkLocalIPs, linkLocal) != endpoint.IPAMConfig->LinkLocalIPs.end());
+            const auto opt = endpoint.DriverOpts.find(driverOptKey);
+            VERIFY_IS_TRUE(opt != endpoint.DriverOpts.end());
+            VERIFY_ARE_EQUAL(driverOptValue, opt->second);
+        }
+
+        // Primary endpoint Links: launch a target container with an alias, then a source with --link at create time.
+        {
+            const std::string networkName = "alias-net-link";
+            const std::string targetName = "alias-ctr-link-target";
+            const std::string targetAlias = "db";
+            createNetwork(networkName, "172.65.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            auto target = launchWithAliases(targetName, networkName, {targetAlias});
+
+            const std::string linkEntry = targetName + ":" + targetAlias;
+            LPCSTR args[] = {"sleep", "99999"};
+            const KeyValuePair settings[] = {{"Links", linkEntry.c_str()}};
+            WSLCContainerOptions options{};
+            options.Image = "debian:latest";
+            options.Name = "alias-ctr-link-source";
+            options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+            options.ContainerNetwork.NetworkMode = networkName.c_str();
+            options.ContainerNetwork.Settings = settings;
+            options.ContainerNetwork.SettingsCount = ARRAYSIZE(settings);
+
+            wil::com_ptr<IWSLCContainer> sourceCom;
+            VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, nullptr, &sourceCom));
+            RunningWSLCContainer source(std::move(sourceCom), WSLCProcessFlagsNone);
+            VERIFY_SUCCEEDED(source.Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
+
+            auto inspect = source.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Links, linkEntry) != endpoint.Links.end());
         }
     }
 
@@ -8770,22 +9218,48 @@ class WSLCTests
             VERIFY_IS_TRUE(inspectData.Ports.contains("8080/tcp"));
             VERIFY_IS_TRUE(inspectData.Ports.contains("9090/tcp"));
 
-            // Verify we can connect to the 8080 exposed port from the host.
-            auto portBindings8080 = inspectData.Ports["8080/tcp"];
-            VERIFY_ARE_EQUAL(1u, portBindings8080.size());
-            auto hostPort8080 = std::stoi(portBindings8080[0].HostPort);
-            VERIFY_IS_TRUE(hostPort8080 > 0);
+            // Each exposed port is published dual-stack: one IPv4 (127.0.0.1) and one IPv6 (::1)
+            // loopback binding. Verify both are present and return both host ports.
+            struct DualStackHostPorts
+            {
+                int ipv4 = 0;
+                int ipv6 = 0;
+            };
 
-            ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort8080).c_str(), 200);
+            auto getDualStackHostPorts = [](const auto& bindings) -> DualStackHostPorts {
+                VERIFY_ARE_EQUAL(2u, bindings.size());
 
-            // Verify the second exposed port got a mapping too.
-            auto portBindings9090 = inspectData.Ports["9090/tcp"];
-            VERIFY_ARE_EQUAL(1u, portBindings9090.size());
-            auto hostPort9090 = std::stoi(portBindings9090[0].HostPort);
-            VERIFY_IS_TRUE(hostPort9090 > 0);
+                DualStackHostPorts ports;
+                for (const auto& binding : bindings)
+                {
+                    auto hostPort = std::stoi(binding.HostPort);
+                    VERIFY_IS_TRUE(hostPort > 0);
+                    if (binding.HostIp == "127.0.0.1")
+                    {
+                        ports.ipv4 = hostPort;
+                    }
+                    else if (binding.HostIp == "::1")
+                    {
+                        ports.ipv6 = hostPort;
+                    }
+                }
 
-            // The two host ports must be different.
-            VERIFY_ARE_NOT_EQUAL(hostPort8080, hostPort9090);
+                VERIFY_IS_TRUE(ports.ipv4 > 0);
+                VERIFY_IS_TRUE(ports.ipv6 > 0);
+                return ports;
+            };
+
+            // Verify we can reach the 8080 exposed port over both IPv4 and IPv6 loopback.
+            auto ports8080 = getDualStackHostPorts(inspectData.Ports["8080/tcp"]);
+            ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", ports8080.ipv4).c_str(), 200);
+            ExpectHttpResponse(std::format(L"http://[::1]:{}", ports8080.ipv6).c_str(), 200);
+
+            // Verify the second exposed port got a dual-stack mapping too.
+            auto ports9090 = getDualStackHostPorts(inspectData.Ports["9090/tcp"]);
+
+            // Each exposed port must map to distinct host ports on both loopback families.
+            VERIFY_ARE_NOT_EQUAL(ports8080.ipv4, ports9090.ipv4);
+            VERIFY_ARE_NOT_EQUAL(ports8080.ipv6, ports9090.ipv6);
         }
     }
 
@@ -11487,12 +11961,37 @@ class WSLCTests
 
     TEST_METHOD(ImageParsing)
     {
-        using wsl::windows::common::wslutil::ParseImage;
+        auto ValidateImageParsing = [](const std::string& input,
+                                       const std::string& expectedRepo,
+                                       const std::optional<std::string>& expectedTag,
+                                       const std::optional<std::string>& expectedDigest = std::nullopt) {
+            auto reference = ImageReference::Parse(input);
 
-        auto ValidateImageParsing = [](const std::string& input, const std::string& expectedRepo, const std::optional<std::string>& expectedTag) {
-            auto [repo, tag] = ParseImage(input);
-            VERIFY_ARE_EQUAL(repo, expectedRepo);
-            VERIFY_ARE_EQUAL(tag.value_or("<empty>"), expectedTag.value_or("<empty>"));
+            // The repository is parsed into a RepositoryReference; Name preserves the original token while Server and
+            // Path hold its normalized form.
+            const auto expectedRepository = RepositoryReference::Parse(expectedRepo);
+            VERIFY_ARE_EQUAL(reference.Repository.Name, expectedRepository.Name);
+            VERIFY_ARE_EQUAL(reference.Repository.Server, expectedRepository.Server);
+            VERIFY_ARE_EQUAL(reference.Repository.Path, expectedRepository.Path);
+            VERIFY_ARE_EQUAL(reference.Tag.value_or("<empty>"), expectedTag.value_or("<empty>"));
+            VERIFY_ARE_EQUAL(reference.Digest.value_or("<empty>"), expectedDigest.value_or("<empty>"));
+
+            // TagOrDigest() collapses to a single field where a digest takes precedence over a tag.
+            const std::optional<std::string> expectedTagOrDigest = expectedDigest.has_value() ? expectedDigest : expectedTag;
+            VERIFY_ARE_EQUAL(reference.TagOrDigest().value_or("<empty>"), expectedTagOrDigest.value_or("<empty>"));
+
+            // Format mirrors that same classification.
+            EnumReferenceFormat expectedFormat = EnumReferenceFormatNone;
+            if (expectedDigest.has_value())
+            {
+                expectedFormat = EnumReferenceFormatDigest;
+            }
+            else if (expectedTag.has_value())
+            {
+                expectedFormat = EnumReferenceFormatTag;
+            }
+
+            VERIFY_ARE_EQUAL(reference.Format, expectedFormat);
         };
 
         ValidateImageParsing("ubuntu:22.04", "ubuntu", "22.04");
@@ -11507,47 +12006,54 @@ class WSLCTests
         ValidateImageParsing("localhost:5000/myimage:latest", "localhost:5000/myimage", "latest");
         ValidateImageParsing("ghcr.io/owner/repo:sha-abc123", "ghcr.io/owner/repo", "sha-abc123");
 
+        // A digest-only reference populates the digest field and leaves the tag empty.
         ValidateImageParsing(
             "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "ubuntu",
+            {},
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
-        // Validate that the digest takes precedence over the tag.
+        // A reference with both a tag and a digest captures each in its own field.
         ValidateImageParsing(
             "ubuntu:latest@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "ubuntu",
+            "latest",
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         ValidateImageParsing(
             "myregistry.io:5000/myimage@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "myregistry.io:5000/myimage",
+            {},
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         ValidateImageParsing(
             "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
             "ubuntu",
+            "22.04",
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         ValidateImageParsing("pytorch/pytorch", "pytorch/pytorch", {});
 
         // Invalid inputs
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":debian:latest"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian:latest@"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("a:"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":b"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(""); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":debian:latest"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse("debian:latest@"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(""); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse("a:"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":b"); }), E_INVALIDARG);
     }
 
     TEST_METHOD(RepoParsing)
     {
-        using wsl::windows::common::wslutil::NormalizeRepo;
-
         auto ValidateRepoParsing = [](const std::string& input, const std::string& expectedServer, const std::string& expectedPath) {
-            auto [server, path] = NormalizeRepo(input);
-            VERIFY_ARE_EQUAL(server, expectedServer);
-            VERIFY_ARE_EQUAL(path, expectedPath);
+            auto repository = RepositoryReference::Parse(input);
+            VERIFY_ARE_EQUAL(repository.Name, input);
+            VERIFY_ARE_EQUAL(repository.Server, expectedServer);
+            VERIFY_ARE_EQUAL(repository.Path, expectedPath);
+
+            // GetCanonical() rejoins the normalized server and path.
+            VERIFY_ARE_EQUAL(repository.GetCanonical(), std::format("{}/{}", expectedServer, expectedPath));
         };
 
         ValidateRepoParsing("ubuntu", "docker.io", "library/ubuntu");
@@ -11563,6 +12069,39 @@ class WSLCTests
         ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "path");
         ValidateRepoParsing(
             "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80", "path");
+    }
+
+    TEST_METHOD(CanonicalImageReference)
+    {
+        auto Validate = [](const std::string& input, const std::string& expected) {
+            VERIFY_ARE_EQUAL(ImageReference::Parse(input).GetCanonical(), expected);
+        };
+
+        // Name-only references default to ":latest" and the docker.io/library prefix (matches `docker pull` output).
+        Validate("ubuntu", "docker.io/library/ubuntu:latest");
+        Validate("ubuntu:22.04", "docker.io/library/ubuntu:22.04");
+        Validate("library/ubuntu", "docker.io/library/ubuntu:latest");
+        Validate("pytorch/pytorch", "docker.io/pytorch/pytorch:latest");
+        Validate("docker.io/ubuntu", "docker.io/library/ubuntu:latest");
+        Validate("index.docker.io/library/ubuntu:latest", "docker.io/library/ubuntu:latest");
+
+        // Custom registries keep their domain and path.
+        Validate("ghcr.io/owner/repo:sha-abc123", "ghcr.io/owner/repo:sha-abc123");
+        Validate("myregistry.io:5000/myimage", "myregistry.io:5000/myimage:latest");
+        Validate("localhost:5000/myimage:latest", "localhost:5000/myimage:latest");
+
+        // A mixed-case registry domain is preserved verbatim, matching Docker (which never lowercases the domain).
+        Validate("Example.COM/owner/repo", "Example.COM/owner/repo:latest");
+
+        // Digest references are preserved.
+        Validate(
+            "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "docker.io/library/ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        // A tag and digest are both preserved when both are present, matching Docker's canonical reference.
+        Validate(
+            "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "docker.io/library/ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
     }
 
     WSLC_TEST_METHOD(ElevatedTokenCanOpenNonElevatedHandles)

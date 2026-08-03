@@ -273,6 +273,7 @@ Abstract:
 #define LX_WSL2_DISTRO_READ_ONLY_ENV "WSL_DISTRO_READ_ONLY"
 #define LX_WSL2_NETWORKING_MODE_ENV "WSL2_NETWORKING_MODE"
 #define LX_WSL2_DISTRO_INIT_PID "WSL2_DISTRO_INIT_PID"
+#define LX_WSL2_DISTRO_CGROUP_PATH "WSL2_DISTRO_CGROUP_PATH"
 
 //
 // Command line arguments shared between init & mini_init
@@ -412,6 +413,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCGetGuestCapabilitiesResult,
     LxMessageWSLCListDir,
     LxMessageWSLCListDirResult,
+    LxMessageWSLCMountVirtioFs,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -526,6 +528,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCGetGuestCapabilitiesResult)
         X(LxMessageWSLCListDir)
         X(LxMessageWSLCListDirResult)
+        X(LxMessageWSLCMountVirtioFs)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1159,10 +1162,11 @@ typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE
     MESSAGE_HEADER Header;
     int Result;
     unsigned int TagOffset;
+    unsigned int ChildNameOffset;
     unsigned int SourceOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(SourceOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(ChildNameOffset), STRING_FIELD(SourceOffset));
 } LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, *PLX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE;
 
 typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE
@@ -1274,6 +1278,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
     bool EnableDnsTunneling;
     bool EnableSafeMode;
     bool DefaultKernel;
+    bool IsolateDistroCgroup;
     unsigned int KernelModulesDeviceId;
     unsigned int HostnameOffset;
     unsigned int KernelModulesListOffset;
@@ -1290,6 +1295,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
         FIELD(EnableDnsTunneling),
         FIELD(EnableSafeMode),
         FIELD(DefaultKernel),
+        FIELD(IsolateDistroCgroup),
         FIELD(KernelModulesDeviceId),
         STRING_FIELD(HostnameOffset),
         STRING_FIELD(KernelModulesListOffset));
@@ -1651,6 +1657,25 @@ struct WSLC_MOUNT
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
+};
+
+struct WSLC_MOUNT_VIRTIOFS
+{
+    static inline auto Type = LxMessageWSLCMountVirtioFs;
+    using TResponse = WSLC_MOUNT_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_MOUNT_VIRTIOFS);
+
+    MESSAGE_HEADER Header{};
+    unsigned int SourceIndex{};
+    unsigned int DestinationIndex{};
+    unsigned int TypeIndex{};
+    unsigned int OptionsIndex{};
+    unsigned int Flags{};
+    unsigned int ChildNameIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex), STRING_FIELD(ChildNameIndex));
 };
 
 struct WSLC_EXEC

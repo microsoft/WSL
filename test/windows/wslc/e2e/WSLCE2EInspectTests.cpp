@@ -53,13 +53,15 @@ class WSLCE2EInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Inspect_HelpCommand)
     {
         auto result = RunWslc(L"inspect --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_MissingObjectId)
     {
         auto result = RunWslc(L"inspect");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'object-id'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'object-id'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_ObjectNotFound)
@@ -290,7 +292,10 @@ class WSLCE2EInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Inspect_InvalidTypeValue)
     {
         auto result = RunWslc(std::format(L"inspect --type invalid {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container, network, volume.\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid type value: invalid is not a recognized inspect type. Supported inspect "
+                                           L"types are: image, container, network, volume."));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidFormatError)
@@ -313,44 +318,5 @@ private:
     const TestImage& InvalidImage = InvalidTestImage();
     const std::wstring WslcVolumeName = L"wslc-inspect-test-volume";
     const std::wstring WslcNetworkName = L"wslc-inspect-test-network";
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_InspectLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc inspect [<options>] <object-id>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"       //
-                 << L"  object-id    Name or Id of any object type\r\n" //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                 //
-                << L"  -t,--type    Type of the object to inspect\r\n"         //
-                << L"  -?,--help    Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

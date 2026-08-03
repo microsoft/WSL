@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Session.h"
+#include "AuthenticateResult.h"
 #include "ProcessCrashInformation.h"
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.Session.g.cpp"
@@ -91,6 +92,23 @@ winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Mic
     }
 
     return winrt::make<implementation::Container>(ToHandle(), containerSettings);
+}
+
+winrt::Microsoft::WSL::Containers::Container Session::OpenContainer(hstring const& nameOrId, winrt::Microsoft::WSL::Containers::ProcessOutputMode const& initProcessOutputMode)
+{
+    EnsureStarted();
+
+    if (nameOrId.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"nameOrId cannot be empty");
+    }
+
+    wil::unique_any<WslcContainer, decltype(&WslcReleaseContainer), &WslcReleaseContainer> containerHandle;
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcOpenContainer(ToHandle(), winrt::to_string(nameOrId).c_str(), containerHandle.put(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    return winrt::make<implementation::Container>(containerHandle.release(), initProcessOutputMode);
 }
 
 void Session::PullImage(winrt::Microsoft::WSL::Containers::PullImageOptions const& options)
@@ -319,7 +337,7 @@ void Session::DeleteVhdVolume(hstring const& name)
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
-hstring Session::Authenticate(Uri const& serverAddress, hstring const& username, hstring const& password)
+winrt::Microsoft::WSL::Containers::AuthenticateResult Session::Authenticate(Uri const& serverAddress, hstring const& username, hstring const& password)
 {
     if (!serverAddress)
     {
@@ -335,15 +353,18 @@ hstring Session::Authenticate(Uri const& serverAddress, hstring const& username,
 
     wil::unique_cotaskmem_string errorMessage;
     wil::unique_cotaskmem_ansistring token;
+    WslcIdentityTokenType tokenType{};
     auto hr = WslcSessionAuthenticate(
         ToHandle(),
         winrt::to_string(serverAddress.ToString()).c_str(),
         winrt::to_string(username).c_str(),
         winrt::to_string(password).c_str(),
         token.put(),
+        &tokenType,
         errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
-    return winrt::to_hstring(token.get());
+    return winrt::make<implementation::AuthenticateResult>(
+        winrt::to_hstring(token.get()), static_cast<winrt::Microsoft::WSL::Containers::IdentityTokenType>(tokenType));
 }
 
 winrt::event_token Session::Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler)

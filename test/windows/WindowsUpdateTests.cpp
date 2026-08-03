@@ -830,7 +830,7 @@ class WindowsUpdateTests
     TEST_METHOD(SearchForUpdates_NoUpdates)
     {
         auto factory = std::make_unique<MockWindowsUpdateClassFactory>();
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
         VERIFY_ARE_EQUAL(0u, ctx.SearchForUpdates());
         VERIFY_ARE_EQUAL(0u, ctx.GetUpdateCount());
@@ -845,7 +845,7 @@ class WindowsUpdateTests
         AddMockUpdate(col, VARIANT_FALSE);
         AddMockUpdate(col, VARIANT_FALSE);
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
         VERIFY_ARE_EQUAL(3u, ctx.SearchForUpdates());
         VERIFY_ARE_EQUAL(3u, ctx.GetUpdateCount());
@@ -858,7 +858,7 @@ class WindowsUpdateTests
         fp->session->searcher->searchResult->resultCode = OperationResultCode::orcSucceededWithErrors;
         AddMockUpdate(fp->session->searcher->searchResult->updates.get(), VARIANT_FALSE);
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
         // orcSucceededWithErrors must succeed — the update count is still returned.
         VERIFY_ARE_EQUAL(1u, ctx.SearchForUpdates());
@@ -869,7 +869,7 @@ class WindowsUpdateTests
         auto factory = std::make_unique<MockWindowsUpdateClassFactory>();
         factory->session->searcher->searchResult->resultCode = OperationResultCode::orcFailed;
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
         VERIFY_ARE_EQUAL(WSLC_E_WU_SEARCH_FAILED, CaptureHResult([&] { ctx.SearchForUpdates(); }));
     }
@@ -886,7 +886,7 @@ class WindowsUpdateTests
         AddMockUpdate(col, VARIANT_TRUE);
         AddMockUpdate(col, VARIANT_TRUE);
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
         ctx.SearchForUpdates();
 
         std::vector<uint32_t> progressCalls;
@@ -909,7 +909,7 @@ class WindowsUpdateTests
         AddMockUpdate(col, VARIANT_FALSE); // needs download
         AddMockUpdate(col, VARIANT_FALSE); // needs download
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
         ctx.SearchForUpdates();
         ctx.DownloadUpdates();
 
@@ -924,7 +924,7 @@ class WindowsUpdateTests
         AddMockUpdate(fp->session->searcher->searchResult->updates.get(), VARIANT_FALSE);
         fp->session->downloader->downloadResult->downloadHResult = E_FAIL;
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
         ctx.SearchForUpdates();
 
         VERIFY_ARE_EQUAL(E_FAIL, CaptureHResult([&] { ctx.DownloadUpdates(); }));
@@ -940,7 +940,7 @@ class WindowsUpdateTests
         auto* fp = factory.get();
         AddMockUpdate(fp->session->searcher->searchResult->updates.get(), VARIANT_TRUE);
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
         ctx.SearchForUpdates();
 
         // Should not throw.
@@ -957,7 +957,7 @@ class WindowsUpdateTests
         AddMockUpdate(fp->session->searcher->searchResult->updates.get(), VARIANT_TRUE);
         fp->session->installer->installResult->installHResult = E_ACCESSDENIED;
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
         ctx.SearchForUpdates();
 
         VERIFY_ARE_EQUAL(E_ACCESSDENIED, CaptureHResult([&] { ctx.InstallUpdates(); }));
@@ -972,10 +972,10 @@ class WindowsUpdateTests
         auto factory = std::make_unique<MockWindowsUpdateClassFactory>();
         auto* fp = factory.get();
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
         std::vector<uint32_t> progressCalls;
-        ctx.RunUpdateFlow(false, [&](uint32_t p) { progressCalls.push_back(p); });
+        ctx.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::None, [&](uint32_t p) { progressCalls.push_back(p); });
 
         // progress(0) at the start, progress(100) because there are no updates.
         VERIFY_ARE_EQUAL(2u, progressCalls.size());
@@ -993,10 +993,10 @@ class WindowsUpdateTests
         auto* fp = factory.get();
         AddMockUpdate(fp->session->searcher->searchResult->updates.get(), VARIANT_FALSE);
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
         std::vector<uint32_t> progressCalls;
-        ctx.RunUpdateFlow(false, [&](uint32_t p) { progressCalls.push_back(p); });
+        ctx.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::None, [&](uint32_t p) { progressCalls.push_back(p); });
 
         // progress(0) is emitted at the start.
         VERIFY_IS_FALSE(progressCalls.empty());
@@ -1027,9 +1027,9 @@ class WindowsUpdateTests
         AddMockUpdate(fp->session->searcher->searchResult->updates.get(), VARIANT_FALSE);
         fp->session->downloader->downloadResult->downloadHResult = E_FAIL;
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
-        VERIFY_ARE_EQUAL(E_FAIL, CaptureHResult([&] { ctx.RunUpdateFlow(); }));
+        VERIFY_ARE_EQUAL(E_FAIL, CaptureHResult([&] { ctx.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::None); }));
 
         // Install should not have been called after download failure.
         VERIFY_IS_FALSE(fp->session->installer->beginInstallCalled);
@@ -1041,9 +1041,9 @@ class WindowsUpdateTests
         auto factory = std::make_unique<MockWindowsUpdateClassFactory>();
         AddMockUpdate(factory->session->searcher->searchResult->updates.get(), VARIANT_TRUE);
 
-        WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
+        WindowsUpdateContext ctx(std::move(factory));
 
         // Should complete without crashing even with no progress callback.
-        ctx.RunUpdateFlow();
+        ctx.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::None);
     }
 };

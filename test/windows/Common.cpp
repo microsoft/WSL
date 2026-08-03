@@ -1460,9 +1460,9 @@ std::wstring LxssWriteWslConfig(const std::wstring& Content)
 }
 
 // writes distro specific settings /etc/wsl.conf
-std::string LxssWriteWslDistroConfig(const std::string& Content)
+std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName)
 {
-    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", LXSS_DISTRO_NAME_TEST);
+    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", DistributionName);
 
     std::ifstream distroConfigRead(path);
     auto previousContent = std::string{std::istreambuf_iterator<char>(distroConfigRead), {}};
@@ -1645,8 +1645,20 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"[wsl2]\n";
     }
 
+    if (Default.virtioFsAggregateShares.has_value())
+    {
+        newConfig += L"\n[experimental]\n";
+        newConfig += boolOptionToString(L"virtioFsAggregateShares", Default.virtioFsAggregateShares, true);
+        newConfig += L"[wsl2]\n";
+    }
+
     // TODO: Remove once SetVersion() truncated archive error is root caused.
     newConfig += L"\n[experimental]\nSetVersionDebug=true\n[wsl2]\n";
+
+    if (Default.isolateDistroCgroup.has_value())
+    {
+        newConfig += boolOptionToString(L"isolateDistroCgroup", Default.isolateDistroCgroup, true);
+    }
 
     return newConfig;
 }
@@ -2556,7 +2568,7 @@ void ScopedEnvVariable::Clear()
     VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
 }
 
-UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content)
+UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content, UINT StatusCode)
 {
     auto cmd = std::format(
         LR"(Powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
@@ -2567,12 +2579,13 @@ $server.Start()
 while ($true)
 {{
     $context = $server.GetContext()
-    $context.Response.StatusCode
+    $context.Response.StatusCode = {}
     $content = [Text.Encoding]::UTF8.GetBytes('{}')
     $context.Response.OutputStream.Write($content , 0, $content.length)
     $context.Response.close()
 }}")",
         Endpoint,
+        StatusCode,
         Content);
 
     m_process = LxsstuStartProcess(cmd.data());

@@ -2,6 +2,7 @@ add_idl_winrt(wslcsdkwinrtidl "wslcsdk.idl")
 set_target_properties(wslcsdkwinrtidl PROPERTIES FOLDER windows)
 
 set(SOURCES
+    AuthenticateResult.cpp
     Container.cpp
     ContainerNamedVolume.cpp
     ContainerPortMapping.cpp
@@ -9,6 +10,7 @@ set(SOURCES
     ContainerVolume.cpp
     ImageInfo.cpp
     ImageProgress.cpp
+    InstallOptions.cpp
     InstallProgress.cpp
     Process.cpp
     ProcessCrashInformation.cpp
@@ -25,6 +27,7 @@ set(SOURCES
 )
 
 set(HEADERS
+    AuthenticateResult.h
     Container.h
     ContainerNamedVolume.h
     ContainerPortMapping.h
@@ -33,6 +36,7 @@ set(HEADERS
     Helpers.h
     ImageInfo.h
     ImageProgress.h
+    InstallOptions.h
     InstallProgress.h
     Process.h
     ProcessCrashInformation.h

@@ -110,6 +110,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::InstanceIdleTimeout, InstanceIdleTimeout),
         ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &LoadKernelModulesPresence),
         ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &LoadKernelModulesPresence),
+        ConfigKey(ConfigSetting::IsolateDistroCgroup, IsolateDistroCgroup),
 
         // Features that were previously experimental (the old header is maintained for compatibility).
         ConfigKey({ConfigSetting::NetworkingMode, ConfigSetting::Experimental::NetworkingMode}, wsl::core::NetworkingModes, NetworkingMode, &NetworkingModePresence),
@@ -126,7 +127,8 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
-        ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes))};
+        ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
+        ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares)};
 
     wil::unique_file ConfigFile;
     if (ConfigFilePath != nullptr)

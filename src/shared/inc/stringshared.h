@@ -18,6 +18,7 @@ Abstract:
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <optional>
 #include <gsl/gsl>
 #include <format>
 #include <source_location>
@@ -127,6 +128,149 @@ inline std::vector<std::basic_string<T>> SplitByMultipleSeparators(const std::ba
     }
 
     return Output;
+}
+
+// Splits a single CSV record into fields using the grammar Go's encoding/csv applies to one record
+// (which docker buildx relies on via go-csvvalue), so a spec is parsed the way buildx would:
+//   - fields are separated by commas;
+//   - a field may be wrapped in double quotes, in which case a comma is a literal character and a
+//     doubled quote ("") is a single literal quote;
+//   - an unquoted field may not contain a double quote (Go's non-lazy ErrBareQuote).
+// Returns std::nullopt when the record is malformed: an unterminated quoted field, text immediately
+// after a closing quote, or a bare quote in an unquoted field.
+//
+// Deviation from Go/RFC 4180: this parses exactly one record. Go would treat an unquoted CR/LF as a
+// record separator; here CR/LF are always ordinary field characters (never a record separator), which
+// is what a single-line command-line spec needs.
+template <class T>
+inline std::optional<std::vector<std::basic_string<T>>> SplitCsvFields(const std::basic_string<T>& Record)
+{
+    constexpr T Quote = static_cast<T>('"');
+    constexpr T Comma = static_cast<T>(',');
+
+    std::vector<std::basic_string<T>> Fields;
+    std::basic_string<T> Field;
+    const size_t Length = Record.size();
+    size_t Index = 0;
+
+    while (true)
+    {
+        Field.clear();
+        if (Index < Length && Record[Index] == Quote)
+        {
+            ++Index;
+            bool Closed = false;
+            while (Index < Length)
+            {
+                if (Record[Index] == Quote)
+                {
+                    // A doubled quote inside a quoted field is a single literal quote.
+                    if (Index + 1 < Length && Record[Index + 1] == Quote)
+                    {
+                        Field.push_back(Quote);
+                        Index += 2;
+                        continue;
+                    }
+
+                    ++Index;
+                    Closed = true;
+                    break;
+                }
+
+                Field.push_back(Record[Index]);
+                ++Index;
+            }
+
+            if (!Closed)
+            {
+                return std::nullopt; // unterminated quoted field
+            }
+
+            // After a closing quote only a comma (end of field) or end of record is valid.
+            if (Index < Length && Record[Index] != Comma)
+            {
+                return std::nullopt;
+            }
+        }
+        else
+        {
+            while (Index < Length && Record[Index] != Comma)
+            {
+                // Go (non-lazy) rejects a bare double quote in an unquoted field (ErrBareQuote).
+                if (Record[Index] == Quote)
+                {
+                    return std::nullopt;
+                }
+
+                Field.push_back(Record[Index]);
+                ++Index;
+            }
+        }
+
+        Fields.push_back(Field);
+        if (Index >= Length)
+        {
+            break;
+        }
+
+        ++Index; // consume the ',' and start the next field
+    }
+
+    return Fields;
+}
+
+// CSV-escapes a single field for round-tripping through JoinCsvFields/SplitCsvFields: if the field
+// contains a comma, a double quote, CR, LF, or a leading/trailing space it is wrapped in double quotes
+// with each embedded quote doubled; otherwise it is returned unchanged. This is not a byte-for-byte
+// match of Go's encoding/csv writer (which quotes only a leading space and leaves an empty field
+// unquoted); it is the minimal quoting needed for every field to parse back via SplitCsvFields.
+template <class T>
+inline std::basic_string<T> CsvEscapeField(const std::basic_string<T>& Field)
+{
+    constexpr T Quote = static_cast<T>('"');
+    const T Special[] = {static_cast<T>(','), Quote, static_cast<T>('\r'), static_cast<T>('\n'), static_cast<T>(0)};
+
+    const bool NeedsQuote = Field.find_first_of(Special) != std::basic_string<T>::npos ||
+                            (!Field.empty() && (Field.front() == static_cast<T>(' ') || Field.back() == static_cast<T>(' ')));
+    if (!NeedsQuote)
+    {
+        return Field;
+    }
+
+    std::basic_string<T> Result;
+    Result.reserve(Field.size() + 2);
+    Result.push_back(Quote);
+    for (const T Ch : Field)
+    {
+        if (Ch == Quote)
+        {
+            Result.push_back(Quote);
+        }
+
+        Result.push_back(Ch);
+    }
+
+    Result.push_back(Quote);
+    return Result;
+}
+
+// Joins fields into a single CSV record, escaping each field as needed (see CsvEscapeField). The
+// result parses back to the original fields via SplitCsvFields.
+template <class T>
+inline std::basic_string<T> JoinCsvFields(const std::vector<std::basic_string<T>>& Fields)
+{
+    std::basic_string<T> Record;
+    for (size_t Index = 0; Index < Fields.size(); ++Index)
+    {
+        if (Index != 0)
+        {
+            Record.push_back(static_cast<T>(','));
+        }
+
+        Record += CsvEscapeField(Fields[Index]);
+    }
+
+    return Record;
 }
 
 inline const char* FromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
@@ -311,8 +455,12 @@ inline bool IsEqual(const std::wstring_view String1, const std::wstring_view Str
     return (Compare(String1, String2, CaseInsensitive) == String1.size());
 }
 
+// Parses a boolean from a string. By default only "1"/"0" and "true"/"false"
+// (case-insensitive) are recognized. When AllowExtendedForms is true the single
+// character forms "t"/"f" (case-insensitive) are also accepted, matching the full
+// set understood by Go's strconv.ParseBool (and therefore the Docker CLI).
 template <typename T>
-inline std::optional<bool> ParseBool(const T* String)
+inline std::optional<bool> ParseBool(const T* String, bool AllowExtendedForms = false)
 {
     if (!String)
     {
@@ -322,14 +470,16 @@ inline std::optional<bool> ParseBool(const T* String)
     const std::basic_string_view<T> StringView(String);
     constexpr T One[] = {T('1'), T('\0')};
     constexpr T True[] = {T('t'), T('r'), T('u'), T('e'), T('\0')};
-    if (IsEqual(StringView, One) || IsEqual(StringView, True, true))
+    constexpr T ShortTrue[] = {T('t'), T('\0')};
+    if (IsEqual(StringView, One) || IsEqual(StringView, True, true) || (AllowExtendedForms && IsEqual(StringView, ShortTrue, true)))
     {
         return true;
     }
 
     constexpr T Zero[] = {T('0'), T('\0')};
     constexpr T False[] = {T('f'), T('a'), T('l'), T('s'), T('e'), T('\0')};
-    if (IsEqual(StringView, Zero) || IsEqual(StringView, False, true))
+    constexpr T ShortFalse[] = {T('f'), T('\0')};
+    if (IsEqual(StringView, Zero) || IsEqual(StringView, False, true) || (AllowExtendedForms && IsEqual(StringView, ShortFalse, true)))
     {
         return false;
     }
@@ -931,6 +1081,11 @@ struct std::formatter<std::source_location, wchar_t>
     }
 };
 
+// char -> wchar_t formatting is only used by the Windows components. libc++ (used to
+// build the Linux components) now provides these as deleted specializations per C++23
+// [format.formatter.spec], which would collide, so restrict them to Windows.
+#ifdef WIN32
+
 template <>
 struct std::formatter<char*, wchar_t>
 {
@@ -994,6 +1149,8 @@ struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
         return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
+
+#endif // WIN32
 
 template <>
 struct std::formatter<std::filesystem::path, wchar_t>

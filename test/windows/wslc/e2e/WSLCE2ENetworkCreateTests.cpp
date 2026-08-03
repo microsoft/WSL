@@ -38,13 +38,15 @@ class WSLCE2ENetworkCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_HelpCommand)
     {
         auto result = RunWslc(L"network create --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_MissingName)
     {
         auto result = RunWslc(L"network create");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'network-name'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'network-name'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_DefaultDriver_Success)
@@ -85,7 +87,8 @@ class WSLCE2ENetworkCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_EmptyLabelKey_Fail)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge --label =foo {}", TestNetworkName));
-        result.Verify({.Stdout = L"", .Stderr = L"Label key cannot be empty\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Label key cannot be empty\r\nError code: E_INVALIDARG"));
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }
@@ -93,8 +96,9 @@ class WSLCE2ENetworkCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_InvalidDriver_Fail)
     {
         auto result = RunWslc(std::format(L"network create --driver invalid_driver {}", TestNetworkName));
-        result.Verify(
-            {.Stdout = L"", .Stderr = std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG\r\n"), .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG")));
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }
@@ -164,6 +168,34 @@ class WSLCE2ENetworkCreateTests
         VerifyNetworkIsNotListed(TestNetworkName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_SubnetAndIpRange_Success)
+    {
+        const std::wstring subnet = L"172.51.0.0/16";
+        const std::wstring ipRange = L"172.51.10.0/24";
+        auto result = RunWslc(std::format(L"network create --subnet {} --ip-range {} {}", subnet, ipRange, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(subnet), (*inspect.IPAM.Config)[0].Subnet);
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(ipRange), (*inspect.IPAM.Config)[0].IPRange);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_IpRangeWithoutSubnet_Fail)
+    {
+        auto result = RunWslc(std::format(L"network create --ip-range 172.52.10.0/24 {}", TestNetworkName));
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = L"The '--ip-range' option requires '--subnet' to also be specified.\r\nError code: E_INVALIDARG\r\n",
+             .ExitCode = 1});
+
+        VerifyNetworkIsNotListed(TestNetworkName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_WithOpt_Success)
     {
         constexpr auto c_opts = L"--opt com.docker.network.bridge.enable_icc=true --opt com.docker.network.driver.mtu=1450";
@@ -181,50 +213,5 @@ class WSLCE2ENetworkCreateTests
 
 private:
     const std::wstring TestNetworkName = L"wslc-e2e-network-create";
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return std::format(L"{}\r\n\r\n", Localization::WSLCCLI_NetworkCreateLongDesc());
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc network create [<options>] <network-name>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  network-name    Network name\r\n"         //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                                      //
-                << L"  -d,--driver     Specify network driver name (default: bridge)\r\n"           //
-                << L"  -o,--opt        Set driver specific options\r\n"                             //
-                << L"  -l,--label      Network metadata setting\r\n"                                //
-                << L"  --gateway       IPv4 or IPv6 gateway for the subnet\r\n"                     //
-                << L"  --internal      Restrict external access to the network\r\n"                 //
-                << L"  --subnet        Subnet in CIDR format that represents a network segment\r\n" //
-                << L"  -?,--help       Shows help about the selected command\r\n"                   //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

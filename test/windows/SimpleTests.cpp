@@ -193,6 +193,36 @@ class SimpleTests
             VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(wideString.c_str()));
         }
 
+        // With AllowExtendedForms the single-letter "t"/"f" forms (case-insensitive) are also
+        // recognized, matching Go's strconv.ParseBool (and therefore the Docker CLI). Every
+        // form accepted by default must still parse identically in extended mode.
+        std::vector<std::pair<LPCSTR, std::optional<bool>>> extendedBoolTests = {
+            {"1", true},
+            {"0", false},
+            {"true", true},
+            {"false", false},
+            {"True", true},
+            {"False", false},
+            {"t", true},
+            {"T", true},
+            {"f", false},
+            {"F", false},
+            {nullptr, std::nullopt},
+            {"", std::nullopt},
+            {"2", std::nullopt},
+            {"tr", std::nullopt},
+            {"true_", std::nullopt},
+            {"false_", std::nullopt},
+        };
+
+        for (const auto& [input, expected] : extendedBoolTests)
+        {
+            VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(input, true));
+
+            std::wstring wideString = wsl::shared::string::MultiByteToWide(input);
+            VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(wideString.c_str(), true));
+        }
+
         // Test wsl::shared::string::ParseMemoryString
         const std::vector<std::pair<LPCSTR, std::optional<uint64_t>>> testCases{
             {"0", 0},
