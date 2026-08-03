@@ -457,13 +457,6 @@ interface IWSLCVirtualMachine : IUnknown
     // Returns the cached termination reason and details. These are only available after the
     // termination event has been signaled; before that the call fails.
     HRESULT GetTerminationReason([out] WSLCVirtualMachineTerminationReason* Reason, [out] LPWSTR* Details);
-
-    // Materialises the BuildKit source-policy JSON in a SYSTEM-owned folder.
-    // WindowsPath=nullptr on S_OK means no allowlist is configured. Non-null paths must be
-    // freed with CoTaskMemFree and released via CleanupBuildKitSourcePolicy.
-    HRESULT PrepareBuildKitSourcePolicy([out, string] LPWSTR* WindowsPath);
-
-    HRESULT CleanupBuildKitSourcePolicy([in, string] LPCWSTR WindowsPath);
 }
 
 //

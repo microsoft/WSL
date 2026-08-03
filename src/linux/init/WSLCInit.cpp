@@ -897,6 +897,25 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transac
 }
 
 void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_SET_BUILDKIT_POLICY&, const gsl::span<gsl::byte>& Buffer)
+{
+    // Write the BuildKit source-policy JSON to a tmpfs path so it disappears on VM shutdown.
+    // The file is root-owned inside the VM, so the container user cannot overwrite it.
+    auto* json = wsl::shared::string::FromMessageBuffer<WSLC_SET_BUILDKIT_POLICY>(Buffer);
+    int result = 0;
+    if (mkdir("/run/wsl", 0755) < 0 && errno != EEXIST)
+    {
+        result = errno;
+    }
+    else if (WriteToFile("/run/wsl/buildkit-policy.json", json) < 0)
+    {
+        result = errno;
+    }
+
+    Transaction.SendResultMessage<int32_t>(result);
+}
+
+void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sync();
@@ -1045,7 +1064,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_SET_BUILDKIT_POLICY>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

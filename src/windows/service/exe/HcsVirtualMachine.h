@@ -25,7 +25,6 @@ Abstract:
 #include <filesystem>
 #include <map>
 #include <optional>
-#include <set>
 #include <string>
 
 #define MAX_VHD_COUNT 254
@@ -54,8 +53,6 @@ public:
     IFACEMETHOD(UnmapVirtioNetPort)
     (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
-    IFACEMETHOD(PrepareBuildKitSourcePolicy)(_Outptr_result_maybenull_ LPWSTR* WindowsPath) override;
-    IFACEMETHOD(CleanupBuildKitSourcePolicy)(_In_ LPCWSTR WindowsPath) override;
 
 private:
     struct DiskInfo
@@ -116,10 +113,6 @@ private:
     // callback is drained.
     WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
     std::wstring m_terminationDetails;
-
-    // Guarded by m_lock. Tracks the SYSTEM-owned folders currently holding BuildKit source-policy
-    // documents so CleanupBuildKitSourcePolicy can validate the caller's path before deleting.
-    std::set<std::filesystem::path> m_preparedPolicyFolders;
 };
 
 //

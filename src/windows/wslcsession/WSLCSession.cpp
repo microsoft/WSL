@@ -900,21 +900,13 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    // Declared before unmountAll: scope_exits run in reverse order, so the plan9/virtiofs share
-    // is torn down before we ask the service to delete the host folder.
-    wil::unique_cotaskmem_string policyHostPath;
-    const auto policyHr = m_virtualMachine->PrepareBuildKitSourcePolicy(&policyHostPath);
-    if (policyHr == WSLC_E_REGISTRY_BLOCKED_BY_POLICY)
+    // The container-registry allowlist is snapshotted at VM boot. Fail closed when the read failed
+    // so a misconfigured/inaccessible registry cannot let a build slip past enforcement.
+    const auto policyState = m_virtualMachine->GetBuildKitPolicyState();
+    if (policyState == WSLCVirtualMachine::BuildKitPolicyState::ReadFailed)
     {
         THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
     }
-    THROW_IF_FAILED_MSG(policyHr, "Failed to prepare BuildKit source policy for allowlist enforcement");
-    auto policyCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        if (policyHostPath)
-        {
-            LOG_IF_FAILED(m_virtualMachine->CleanupBuildKitSourcePolicy(policyHostPath.get()));
-        }
-    });
 
     // Track every Windows folder we mount into the VM during this build so a single scope_exit
     // unmounts them all on success or on any throw partway through the loop below.
@@ -938,17 +930,16 @@ try
 
     // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
     // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. At most the build
-    // context (1), one BuildKit source-policy folder (1), and one parent directory per file secret are mounted.
-    mountedPaths.reserve(static_cast<size_t>(2) + Options->Secrets.Count);
+    // context (1) and one parent directory per file secret are mounted.
+    mountedPaths.reserve(static_cast<size_t>(1) + Options->Secrets.Count);
 
     // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
     // values never touch disk; kept off telemetry (only buildArgs is logged).
     std::vector<std::string> buildEnv;
 
-    if (policyHostPath)
+    if (policyState == WSLCVirtualMachine::BuildKitPolicyState::Configured)
     {
-        auto policyMountPath = mountInVm(policyHostPath.get(), TRUE);
-        buildEnv.emplace_back("EXPERIMENTAL_BUILDKIT_SOURCE_POLICY=" + policyMountPath + "/policy.json");
+        buildEnv.emplace_back(std::string{"EXPERIMENTAL_BUILDKIT_SOURCE_POLICY="} + WSLCVirtualMachine::c_buildKitPolicyPath);
     }
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);

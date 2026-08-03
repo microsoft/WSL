@@ -18,8 +18,10 @@ Abstract:
 #include "WSLCVirtualMachine.h"
 #include <format>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 #include "ServiceProcessLauncher.h"
 #include "wslutil.h"
+#include "wslpolicies.h"
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
@@ -33,6 +35,53 @@ namespace wslutil = wsl::windows::common::wslutil;
 constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
+
+namespace {
+
+// Escapes regex metacharacters in `input` so a literal hostname can be embedded into a BuildKit
+// source-policy regex identifier (e.g. `myreg:5000` stays a literal match).
+std::string EscapeRegexMetacharacters(std::string_view input)
+{
+    static constexpr std::string_view c_metacharacters = R"(\.+*?()|[]{}^$)";
+    std::string escaped;
+    escaped.reserve(input.size());
+    for (const char ch : input)
+    {
+        if (c_metacharacters.find(ch) != std::string_view::npos)
+        {
+            escaped.push_back('\\');
+        }
+        escaped.push_back(ch);
+    }
+    return escaped;
+}
+
+// DENY-all first, then per-host ALLOW: BuildKit evaluates rules in order and last match wins.
+// Hosts are lowercased because BuildKit normalises identifiers before regex matching.
+// https://github.com/moby/buildkit/blob/master/docs/sourcepolicy.md
+std::string BuildBuildKitSourcePolicyJson(const std::vector<std::string>& allowedHosts)
+{
+    nlohmann::json rules = nlohmann::json::array();
+    rules.push_back({{"action", "DENY"}, {"selector", {{"identifier", "docker-image://.*"}, {"match_type", "REGEX"}}}});
+
+    for (const auto& host : allowedHosts)
+    {
+        std::string lowered;
+        lowered.reserve(host.size());
+        std::transform(host.begin(), host.end(), std::back_inserter(lowered), [](unsigned char ch) {
+            return static_cast<char>(std::tolower(ch));
+        });
+
+        const auto identifier = "docker-image://" + EscapeRegexMetacharacters(lowered) + "/.*";
+        rules.push_back({{"action", "ALLOW"}, {"selector", {{"identifier", identifier}, {"match_type", "REGEX"}}}});
+    }
+
+    nlohmann::json document;
+    document["rules"] = std::move(rules);
+    return document.dump();
+}
+
+} // namespace
 
 VmPortAllocation::VmPortAllocation(uint16_t port, int family, int protocol, WSLCVirtualMachine& vm) :
     m_port(port), m_family(family), m_protocol(protocol), m_vm(&vm)
@@ -320,6 +369,11 @@ void WSLCVirtualMachine::Initialize()
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
 
+    // Snapshot the container-registry allowlist and, if configured, hand the BuildKit source-policy
+    // JSON to init. Done at boot rather than per build so a compromised user process cannot bypass
+    // enforcement by racing the write.
+    ConfigureBuildKitPolicy();
+
     // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
     ConfigureNetworking();
 }
@@ -438,6 +492,38 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
     capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
     capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
     THROW_IF_FAILED(m_vm->ApplyGuestCapabilities(&capabilities));
+}
+
+void WSLCVirtualMachine::ConfigureBuildKitPolicy()
+{
+    const auto snapshot = wsl::windows::policies::ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+    if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::ReadFailed)
+    {
+        // Fail closed: `BuildImage` refuses new builds when it sees this state.
+        m_buildKitPolicyState = BuildKitPolicyState::ReadFailed;
+        return;
+    }
+
+    if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::NotConfigured)
+    {
+        m_buildKitPolicyState = BuildKitPolicyState::NotConfigured;
+        return;
+    }
+
+    std::vector<std::string> hosts;
+    hosts.reserve(snapshot.Hosts.size());
+    std::ranges::transform(snapshot.Hosts, std::back_inserter(hosts), [](const std::wstring& host) {
+        return wsl::shared::string::WideToMultiByte(host);
+    });
+
+    const auto policyJson = BuildBuildKitSourcePolicyJson(hosts);
+
+    auto message = wsl::shared::MessageWriter<WSLC_SET_BUILDKIT_POLICY>{};
+    message.WriteString(policyJson);
+    const auto& response = m_initChannel.Transaction<WSLC_SET_BUILDKIT_POLICY>(message.Span(), nullptr, m_initChannelTimeout);
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Guest failed to write BuildKit policy: %d", response.Result);
+
+    m_buildKitPolicyState = BuildKitPolicyState::Configured;
 }
 
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
@@ -1178,16 +1264,6 @@ try
     return S_OK;
 }
 CATCH_RETURN();
-
-HRESULT WSLCVirtualMachine::PrepareBuildKitSourcePolicy(_Outptr_result_maybenull_ LPWSTR* WindowsPath)
-{
-    return m_vm->PrepareBuildKitSourcePolicy(WindowsPath);
-}
-
-HRESULT WSLCVirtualMachine::CleanupBuildKitSourcePolicy(_In_ LPCWSTR WindowsPath)
-{
-    return m_vm->CleanupBuildKitSourcePolicy(WindowsPath);
-}
 
 void WSLCVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {

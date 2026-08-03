@@ -414,6 +414,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCListDir,
     LxMessageWSLCListDirResult,
     LxMessageWSLCMountVirtioFs,
+    LxMessageWSLCSetBuildKitPolicy,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -529,6 +530,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCListDir)
         X(LxMessageWSLCListDirResult)
         X(LxMessageWSLCMountVirtioFs)
+        X(LxMessageWSLCSetBuildKitPolicy)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1923,6 +1925,21 @@ struct WSLC_GET_GUEST_CAPABILITIES
 
     MESSAGE_HEADER Header{};
 
+    PRETTY_PRINT(FIELD(Header));
+};
+
+struct WSLC_SET_BUILDKIT_POLICY
+{
+    static inline auto Type = LxMessageWSLCSetBuildKitPolicy;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(WSLC_SET_BUILDKIT_POLICY);
+    MESSAGE_HEADER Header;
+
+    char Buffer[];
+
+    // Buffer carries the registry-allowlist JSON — kept out of PRETTY_PRINT so the trace channel
+    // doesn't record the enterprise's configured registries.
     PRETTY_PRINT(FIELD(Header));
 };
 
