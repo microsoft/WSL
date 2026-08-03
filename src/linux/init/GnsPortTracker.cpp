@@ -15,6 +15,12 @@
 #include "lxinitshared.h"
 #include "seccomp_defs.h"
 
+// TODO: Include <sys/pidfd.h> and remove this once musl provides it.
+// <linux/pidfd.h> cannot be used because it conflicts with musl's <fcntl.h>.
+#ifndef PIDFD_THREAD
+#define PIDFD_THREAD O_EXCL
+#endif
+
 constexpr size_t c_bind_timeout_seconds = 60;
 constexpr auto c_sock_diag_refresh_delay = std::chrono::milliseconds(500);
 constexpr auto c_sock_diag_poll_timeout = std::chrono::milliseconds(10);
