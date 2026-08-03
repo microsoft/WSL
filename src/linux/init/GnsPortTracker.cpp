@@ -15,11 +15,6 @@
 #include "lxinitshared.h"
 #include "seccomp_defs.h"
 
-// TODO: Remove this once Microsoft.WSL.LinuxSdk provides PIDFD_THREAD.
-#ifndef PIDFD_THREAD
-#define PIDFD_THREAD O_EXCL
-#endif
-
 constexpr size_t c_bind_timeout_seconds = 60;
 constexpr auto c_sock_diag_refresh_delay = std::chrono::milliseconds(500);
 constexpr auto c_sock_diag_poll_timeout = std::chrono::milliseconds(10);
