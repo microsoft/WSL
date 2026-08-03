@@ -672,6 +672,10 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
 
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 
+    // Container output is UTF-8.
+    wsl::windows::common::ConsoleState console;
+    console.SetOutputCodePageUtf8();
+
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
         stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));

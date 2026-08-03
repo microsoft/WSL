@@ -24,6 +24,7 @@ Abstract:
 #include "registry.hpp"
 #include "helpers.hpp"
 #include "svccomm.hpp"
+#include "ConsoleState.h"
 #include "lxfsshares.h"
 #include <userenv.h>
 #include <nlohmann/json.hpp>
@@ -7765,6 +7766,40 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             exists.pop_back();
         }
         VERIFY_ARE_EQUAL(exists, std::wstring(L"no"));
+    }
+
+    TEST_METHOD(ConsoleState_SetOutputCodePageUtf8)
+    {
+        // 437 (OEM-US) and 850 (OEM Multilingual) are built-in Windows code pages that are always
+        // available. 437 is the baseline the helper must restore; 850 stands in for another
+        // component changing the code page after the helper first ran.
+        constexpr UINT baselineCodePage = 437;
+        constexpr UINT intermediateCodePage = 850;
+
+        const UINT originalCodePage = GetConsoleOutputCP();
+        auto restore = wil::scope_exit([originalCodePage]() { SetConsoleOutputCP(originalCodePage); });
+
+        VERIFY_IS_TRUE(
+            static_cast<bool>(SetConsoleOutputCP(baselineCodePage)),
+            L"Test requires an attached console with a settable output code page");
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP());
+
+        {
+            wsl::windows::common::ConsoleState console;
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8),
+                GetConsoleOutputCP(),
+                L"SetOutputCodePageUtf8 sets the console output code page to UTF-8");
+
+            // Another component changes the code page; a repeated call must re-assert UTF-8.
+            VERIFY_IS_TRUE(static_cast<bool>(SetConsoleOutputCP(intermediateCodePage)));
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8), GetConsoleOutputCP(), L"A repeated call re-asserts UTF-8 after the code page changed");
+        }
+
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
 }; // namespace UnitTests

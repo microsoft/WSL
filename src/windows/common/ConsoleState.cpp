@@ -126,6 +126,21 @@ void ConsoleState::SetInteractiveMode()
     cleanup.release();
 }
 
+void ConsoleState::SetOutputCodePageUtf8()
+{
+    if (!m_OutputHandle)
+    {
+        return;
+    }
+
+    if (!m_SavedOutputCodePage.has_value())
+    {
+        m_SavedOutputCodePage = GetConsoleOutputCP();
+    }
+
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
+}
+
 ConsoleState::~ConsoleState()
 {
     RestoreConsoleState();
