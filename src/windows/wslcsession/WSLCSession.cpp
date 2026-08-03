@@ -45,75 +45,6 @@ constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
 namespace {
 
-// Minimal parse of a docker buildx --output spec to detect directory exporters (type=local, or
-// oci/docker with tar=false), which cannot be written faithfully to a Windows destination. The
-// authoritative parser lives in the client (wslclib); this is a defensive check for direct COM callers.
-bool IsDirectoryExporterSpec(std::string_view spec)
-{
-    const auto trim = [](std::string_view value) {
-        while (!value.empty() && (value.front() == ' ' || value.front() == '\t'))
-        {
-            value.remove_prefix(1);
-        }
-        while (!value.empty() && (value.back() == ' ' || value.back() == '\t'))
-        {
-            value.remove_suffix(1);
-        }
-        return value;
-    };
-    const auto toLower = [](std::string_view value) {
-        std::string result(value);
-        std::transform(
-            result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return result;
-    };
-
-    std::string type;
-    std::optional<bool> tar;
-    for (size_t pos = 0; pos <= spec.size();)
-    {
-        const auto comma = spec.find(',', pos);
-        const auto field = spec.substr(pos, comma == std::string_view::npos ? spec.size() - pos : comma - pos);
-
-        if (const auto eq = field.find('='); eq != std::string_view::npos)
-        {
-            // buildx trims spaces around the key and matches it case-insensitively.
-            const auto key = toLower(trim(field.substr(0, eq)));
-            const auto value = field.substr(eq + 1);
-            if (key == "type")
-            {
-                type = toLower(value);
-            }
-            else if (key == "tar")
-            {
-                // Go's ParseBool: 1/t/true and 0/f/false (case-insensitive).
-                const auto boolValue = toLower(value);
-                if (boolValue == "0" || boolValue == "f" || boolValue == "false")
-                {
-                    tar = false;
-                }
-                else if (boolValue == "1" || boolValue == "t" || boolValue == "true")
-                {
-                    tar = true;
-                }
-            }
-        }
-
-        if (comma == std::string_view::npos)
-        {
-            break;
-        }
-        pos = comma + 1;
-    }
-
-    if (type == "local")
-    {
-        return true;
-    }
-
-    return (type == "oci" || type == "docker") && tar.has_value() && !tar.value();
-}
-
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
 // service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
@@ -1025,15 +956,14 @@ try
     }
     // Docker-style --output routing. Three cases, distinguished by what the client set:
     //   * OutputHandle set (dest=- stdout): the client stripped dest= and expects the exporter output
-    //     streamed back. The exporter writes to a VM temp path (disk-backed under the docker storage
-    //     root to avoid buffering large outputs in tmpfs) and, after a successful build, a streamer
-    //     cats it to the client handle.
+    //     streamed back. The exporter writes to the build process's stdout, which is relayed to the
+    //     client handle as the build runs, so the output never touches the VM's disk.
     //   * OutputMountPath set (single-file exporter with a real destination): the client stripped dest=
     //     and passed the destination file's parent directory, mounted read-write into the VM so buildx
     //     writes the file (at OutputMountFile within the mount) in place - nothing is streamed back.
     //   * Neither set: the spec is forwarded verbatim and the build runs entirely in the VM.
-    // Directory exporters (type=local, or oci/docker with tar=false) are rejected below: a Linux tree
-    // cannot be written faithfully to a Windows destination.
+    // Directory exporters (type=local, or oci/docker with tar=false) are rejected by the client while
+    // parsing --output: a Linux tree cannot be written faithfully to a Windows destination.
     const bool streamOutput = Options->OutputHandle.Type != WSLCHandleTypeUnknown;
     const bool mountOutput = Options->OutputMountPath != nullptr && Options->OutputMountPath[0] != L'\0';
     // Streaming or mounting the exporter output requires a non-empty Output spec to route from, and the
@@ -1041,50 +971,16 @@ try
     // than later failing to assign a dest path.
     RETURN_HR_IF(E_INVALIDARG, (streamOutput || mountOutput) && (Options->Output == nullptr || Options->Output[0] == '\0'));
     RETURN_HR_IF(E_INVALIDARG, streamOutput && mountOutput);
-    // Directory exporters cannot be materialized faithfully on a Windows destination and are unsupported.
-    // The client rejects them while parsing --output; reject them here too for direct COM callers.
-    RETURN_HR_IF(E_INVALIDARG, Options->Output != nullptr && IsDirectoryExporterSpec(Options->Output));
-    std::string outputDestPath;
-    auto removeOutput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        if (!outputDestPath.empty())
-        {
-            ServiceProcessLauncher cleanup("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("rm -rf '{}'", outputDestPath)}, {}, WSLCProcessFlagsNone);
-            auto cleanupResult = cleanup.LaunchNoThrow(*m_virtualMachine);
-            if (auto& process = std::get<2>(cleanupResult); process)
-            {
-                auto result = process->WaitAndCaptureOutput(60000UL);
-                if (result.Code != 0)
-                {
-                    WSL_LOG(
-                        "BuildOutputCleanupFailed",
-                        TraceLoggingValue(outputDestPath.c_str(), "Path"),
-                        TraceLoggingValue(result.Code, "ExitCode"));
-                }
-            }
-            else
-            {
-                WSL_LOG("BuildOutputCleanupLaunchFailed", TraceLoggingValue(outputDestPath.c_str(), "Path"));
-            }
-        }
-    });
 
     if (Options->Output != nullptr && Options->Output[0] != '\0')
     {
         std::string outputSpec = Options->Output;
         if (streamOutput)
         {
-            GUID id{};
-            THROW_IF_FAILED(CoCreateGuid(&id));
-            constexpr auto c_outputBaseDir = "/var/lib/docker/tmp/wslc-build-output";
-            outputDestPath = std::format("{}/{}", c_outputBaseDir, wsl::shared::string::GuidToString<char>(id));
-
-            // buildx creates the leaf dest (a file for tar/oci/docker tarballs, a directory for local
-            // or oci/docker with tar=false) but not the parent, so ensure the base directory exists first.
-            ServiceProcessLauncher mkdir("/bin/sh", {"/bin/sh", "--norc", "-c", std::format("mkdir -p '{}'", c_outputBaseDir)}, {}, WSLCProcessFlagsNone);
-            auto mkdirResult = mkdir.Launch(*m_virtualMachine).WaitAndCaptureOutput(60000UL);
-            THROW_HR_IF_MSG(E_FAIL, mkdirResult.Code != 0, "failed to create build output directory");
-
-            outputSpec += std::format(",dest={}", outputDestPath);
+            // buildx writes the exporter tarball to stdout for dest=-, which is relayed to the client
+            // handle below. With no image to load, buildx prints no image ID, so stdout carries only
+            // the tarball.
+            outputSpec += ",dest=-";
         }
         else if (mountOutput)
         {
@@ -1224,6 +1120,13 @@ try
 
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, buildEnv, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
+
+    // Opened before the IO context so it outlives the relay registered on it below.
+    std::optional<UserHandle> userHandle;
+    if (streamOutput)
+    {
+        userHandle.emplace(OpenUserHandle(Options->OutputHandle));
+    }
 
     auto io = CreateIOContext();
 
@@ -1412,9 +1315,21 @@ try
     };
 
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
-    io.AddHandle(std::make_unique<io::ReadHandle>(
-        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
+    // failure). Stdout's EOF signals build completion.
+    //
+    // For dest=- the exporter tarball is written to stdout instead, so it is relayed straight to the
+    // client handle as the build runs rather than being collected. RelayHandle is an overlapped handle,
+    // so a slow client only marks the relay pending and stderr keeps draining in the same IO loop.
+    if (streamOutput)
+    {
+        io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+            common::io::HandleWrapper{buildProcess.GetStdHandle(1)}, userHandle->Get()));
+    }
+    else
+    {
+        io.AddHandle(std::make_unique<io::ReadHandle>(
+            buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
+    }
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
@@ -1488,42 +1403,6 @@ try
     // translation.
     std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
-
-    // Stream the exporter output back to the client by cat-ing the temp file (tar/oci/docker single-file
-    // tarballs, or dest=- stdout). The streamer's stdout is relayed to the client OutputHandle.
-    if (streamOutput)
-    {
-        auto userHandle = OpenUserHandle(Options->OutputHandle);
-
-        std::vector<std::string> streamArgs = {"/bin/cat", outputDestPath};
-
-        ServiceProcessLauncher streamLauncher(streamArgs[0], streamArgs, {}, WSLCProcessFlagsNone);
-        auto streamProcess = streamLauncher.Launch(*m_virtualMachine);
-
-        auto streamIo = CreateIOContext(CancelEvent);
-        std::string streamError;
-        streamIo.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
-            common::io::HandleWrapper{streamProcess.GetStdHandle(1)}, userHandle.Get()));
-        streamIo.AddHandle(std::make_unique<io::ReadHandle>(streamProcess.GetStdHandle(2), [&](const gsl::span<char>& content) {
-            streamError.append(content.data(), content.size());
-        }));
-
-        try
-        {
-            streamIo.Run({});
-        }
-        catch (...)
-        {
-            // Tear the streamer down so a cancelled or failed relay cannot leave it running (and
-            // holding the temp path open) while removeOutput deletes it on scope exit.
-            StopProcess(streamProcess, 10 * 1000, 10 * 1000);
-            throw;
-        }
-
-        std::erase(streamError, '\r');
-        int streamCode = streamProcess.Wait();
-        THROW_HR_IF_MSG(E_FAIL, streamCode != 0, "failed to stream build output: %hs", streamError.c_str());
-    }
 
     return S_OK;
 }
