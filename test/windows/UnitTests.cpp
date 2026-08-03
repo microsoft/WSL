@@ -7779,9 +7779,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         const UINT originalCodePage = GetConsoleOutputCP();
         auto restore = wil::scope_exit([originalCodePage]() { SetConsoleOutputCP(originalCodePage); });
 
-        VERIFY_IS_TRUE(
-            static_cast<bool>(SetConsoleOutputCP(baselineCodePage)),
-            L"Test requires an attached console with a settable output code page");
+        // A settable console output code page requires an attached console, which CI and service
+        // contexts often lack. Skip the test when the code page cannot be set so the suite stays stable.
+        if (!SetConsoleOutputCP(baselineCodePage))
+        {
+            LogSkipped("Skipping test: no attached console with a settable output code page");
+            return;
+        }
         VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP());
 
         {
