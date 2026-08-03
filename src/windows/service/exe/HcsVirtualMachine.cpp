@@ -90,6 +90,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     m_featureFlags = Settings->FeatureFlags;
     m_networkingMode = Settings->NetworkingMode;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
+    m_cpuCount = Settings->CpuCount;
 
     // Build HCS settings
     hcs::ComputeSystem systemSettings{};
@@ -501,7 +502,12 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)),
+            flags,
+            nullptr,
+            m_guestDeviceManager,
+            m_userToken,
+            gsl::narrow<UINT16>(m_cpuCount));
     }
     else
     {

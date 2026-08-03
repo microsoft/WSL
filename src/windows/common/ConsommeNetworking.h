@@ -23,7 +23,13 @@ DEFINE_ENUM_FLAG_OPERATORS(ConsommeNetworkingFlags);
 class ConsommeNetworking : public INetworkingEngine
 {
 public:
-    ConsommeNetworking(GnsChannel&& gnsChannel, ConsommeNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
+    ConsommeNetworking(
+        GnsChannel&& gnsChannel,
+        ConsommeNetworkingFlags flags,
+        LPCWSTR dnsOptions,
+        std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+        wil::shared_handle userToken,
+        UINT16 maxQueuePairs = 0);
 
     ~ConsommeNetworking() override;
 
@@ -68,6 +74,7 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     ConsommeNetworkingFlags m_flags = ConsommeNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
+    UINT16 m_maxQueuePairs = 0;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
 

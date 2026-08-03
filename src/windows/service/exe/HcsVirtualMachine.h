@@ -80,6 +80,7 @@ private:
     GUID m_vmId{};
     std::wstring m_vmIdString;
     ULONG m_bootTimeoutMs{};
+    ULONG m_cpuCount{};
 
     wil::shared_handle m_userToken;
     WSLCFeatureFlags m_featureFlags{};

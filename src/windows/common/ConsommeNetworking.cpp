@@ -85,7 +85,10 @@ std::vector<IpAddress> ToIpAddresses(const DnsInfo& dns)
 }
 
 WslVirtioNetConfig BuildVirtioNetConfig(
-    const std::shared_ptr<NetworkSettings>& networkSettings, bool enableIpv6, std::optional<wsl::shared::string::MacAddress> clientMacAddress = {})
+    const std::shared_ptr<NetworkSettings>& networkSettings,
+    bool enableIpv6,
+    std::optional<wsl::shared::string::MacAddress> clientMacAddress = {},
+    UINT16 maxQueuePairs = 0)
 {
     ULONG netmask{};
     if (networkSettings->PreferredIpAddress.Address.si_family == AF_INET)
@@ -102,18 +105,25 @@ WslVirtioNetConfig BuildVirtioNetConfig(
     config.gatewayMac = ToEthernetAddress(c_gatewayMacAddress);
     config.gatewayMacIpv6 = ToEthernetAddress(c_gatewayMacAddress);
     config.netmask.value = netmask;
+    config.maxQueuePairs = maxQueuePairs;
     return config;
 }
 
 } // namespace
 
 ConsommeNetworking::ConsommeNetworking(
-    GnsChannel&& gnsChannel, ConsommeNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel,
+    ConsommeNetworkingFlags flags,
+    LPCWSTR dnsOptions,
+    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+    wil::shared_handle userToken,
+    UINT16 maxQueuePairs) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
-    m_dnsOptions(dnsOptions)
+    m_dnsOptions(dnsOptions),
+    m_maxQueuePairs(maxQueuePairs)
 {
 }
 
@@ -316,7 +326,8 @@ void ConsommeNetworking::RefreshGuestConnection()
     }
 
     const auto minMtu = GetMinimumConnectedInterfaceMtu();
-    const auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
+    const auto virtioNetConfig =
+        BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6), {}, m_maxQueuePairs);
 
     // Acquire the lock and perform device updates.
     auto lock = m_lock.lock_exclusive();
