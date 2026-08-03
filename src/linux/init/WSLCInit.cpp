@@ -901,15 +901,28 @@ void HandleMessageImpl(
 {
     // Write the BuildKit source-policy JSON to a tmpfs path so it disappears on VM shutdown.
     // The file is root-owned inside the VM, so the container user cannot overwrite it.
+    // Not WriteToFile: it logs the payload on failure, which would leak registry hostnames.
     auto* json = wsl::shared::string::FromMessageBuffer<WSLC_SET_BUILDKIT_POLICY>(Buffer);
     int result = 0;
     if (mkdir("/run/wsl", 0755) < 0 && errno != EEXIST)
     {
         result = errno;
     }
-    else if (WriteToFile("/run/wsl/buildkit-policy.json", json) < 0)
+    else
     {
-        result = errno;
+        wil::unique_fd fd{open("/run/wsl/buildkit-policy.json", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC | O_NOFOLLOW, 0644)};
+        if (!fd)
+        {
+            result = errno;
+        }
+        else
+        {
+            std::string_view content{json};
+            if (static_cast<size_t>(UtilWriteStringView(fd.get(), content)) != content.size())
+            {
+                result = errno;
+            }
+        }
     }
 
     Transaction.SendResultMessage<int32_t>(result);
