@@ -23,13 +23,7 @@ DEFINE_ENUM_FLAG_OPERATORS(ConsommeNetworkingFlags);
 class ConsommeNetworking : public INetworkingEngine
 {
 public:
-    ConsommeNetworking(
-        GnsChannel&& gnsChannel,
-        ConsommeNetworkingFlags flags,
-        LPCWSTR dnsOptions,
-        std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-        wil::shared_handle userToken,
-        std::wstring swiotlbConfig);
+    ConsommeNetworking(GnsChannel&& gnsChannel, ConsommeNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
 
     ~ConsommeNetworking() override;
 
@@ -74,12 +68,10 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     ConsommeNetworkingFlags m_flags = ConsommeNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
-    std::wstring m_swiotlbOption;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
 
     ULONG m_networkMtu = 0;
-    std::wstring m_trackedDeviceOptions;
     networking::EndpointIpAddress m_trackedIpv4Address{};
     networking::EndpointIpAddress m_trackedIpv6Address{};
     std::wstring m_trackedDefaultRoute;

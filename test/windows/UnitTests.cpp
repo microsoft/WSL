@@ -18,6 +18,7 @@ Abstract:
 #include "install.h"
 #include <AclAPI.h>
 #include <fstream>
+#include <sstream>
 #include <filesystem>
 #include "wslservice.h"
 #include "registry.hpp"
@@ -29,6 +30,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
+#include "retryshared.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -514,6 +516,49 @@ class UnitTests
             auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
             VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
         }
+    }
+
+    WSL2_TEST_METHOD(SharedMountSurvivesDistroTermination)
+    {
+        constexpr auto peerDistroName = L"mount-guard-peer-test";
+
+        auto validate = [&](const std::string& automountRoot) {
+            const auto extraConfig = automountRoot.empty() ? "" : std::format("[automount]\nroot={}\n", automountRoot);
+            const auto effectiveAutomountRoot = automountRoot.empty() ? "/mnt" : automountRoot;
+            const auto mountPoint = std::format(L"{}/wsl/mount-guard-test", wsl::shared::string::MultiByteToWide(effectiveAutomountRoot));
+
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+            auto cleanupSystemd = EnableSystemd(extraConfig);
+
+            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+            auto cleanupPeer = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+
+            auto cleanupPeerSystemd = EnableSystemd(extraConfig, peerDistroName);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)), 0L);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
+                0L);
+            auto cleanupMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"sh -c 'umount {0} 2>/dev/null || true; rmdir {0} 2>/dev/null || true'", mountPoint));
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- findmnt -n {}", peerDistroName, mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- grep -qx survived {}/marker", peerDistroName, mountPoint)), 0L);
+
+            TerminateDistribution(peerDistroName);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"findmnt -n {}", mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"grep -qx survived {}/marker", mountPoint)), 0L);
+        };
+
+        validate("");
+        validate("/wsl-test-mount");
     }
 
     WSL2_TEST_METHOD(ConfigUpdateLanguage)
@@ -2526,8 +2571,18 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Keys that are only created by the MSI.
         const std::vector<LPCWSTR> serviceKeys{
             L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns\\WSLDVC_PACKAGE",
-            L"SOFTWARE\\Classes\\CLSID\\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}",
-            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"};
+            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}",
+            L"SOFTWARE\\Classes\\CLSID\\{2C3E9A41-7B5D-4F18-93D6-A8C2E4F7B1D9}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{E3146082-A0DA-43A7-813B-A89EEE8C7628}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{4F9C8B23-D6E1-4A85-BF2A-E7C5D8F931A6}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{9C9C7131-D756-48FA-BD49-734E75AF37C0}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}\\InProcServer32",
+            L"SOFTWARE\\Classes\\Interface\\{27394DCF-6383-4E4E-BB0A-C13D4E5F6071}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{D2F47B8A-1E3C-4D9F-A6B5-7C8E9F0A1B2C}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{E3F58C9B-2F4D-4E0A-B7C6-8D9F0A1B2C3D}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{F406DACB-3050-4F1B-A8D7-9E0A1B2C3D4E}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{05172EBD-4161-4C2C-99E8-AF1B2C3D4E5F}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}\\ProxyStubClsid32"};
 
         for (const auto* keyName : serviceKeys)
         {
@@ -3257,6 +3312,68 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
+    }
+
+    // Verifies that VHD-mutating manage operations (--resize, --set-sparse, --move) are rejected while a
+    // long-running conversion/export holds the distribution lock, rather than racing with it on the VHD.
+    WSL2_TEST_METHOD(ManageRejectedWhileLocked)
+    {
+        constexpr auto name = L"manage-locked-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        // Start an export to a pipe we deliberately don't drain. Use a tiny buffer so the export blocks
+        // as soon as it writes any data, regardless of the test distro's size, deterministically holding
+        // the distribution in the "Exporting" locked state.
+        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true, 1);
+
+        std::thread exportThread([&]() { LxsstuLaunchWsl(std::format(L"--export {} -", name), nullptr, writePipe.get()); });
+
+        auto joinExport = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            // Close the read end so the blocked export fails with a broken pipe and returns, then join.
+            readPipe.reset();
+            if (exportThread.joinable())
+            {
+                exportThread.join();
+            }
+        });
+
+        // Wait until the service reports the distribution as Exporting (i.e. the lock is held), retrying for up
+        // to two minutes so a slow machine doesn't flake before the export acquires the lock.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
+                bool locked = false;
+                std::wistringstream stream(out);
+                for (std::wstring line; std::getline(stream, line);)
+                {
+                    if (line.find(name) != std::wstring::npos && line.find(L"Exporting") != std::wstring::npos)
+                    {
+                        locked = true;
+                        break;
+                    }
+                }
+
+                THROW_HR_IF(E_ABORT, !locked);
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::minutes(2),
+            [] { return wil::ResultFromCaughtException() == E_ABORT; });
+
+        // Each VHD-mutating manage operation must be rejected with E_ILLEGAL_STATE_CHANGE while the lock is held.
+        auto verifyRejected = [&](const std::wstring& command) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command, -1);
+            VERIFY_IS_TRUE(out.find(L"E_ILLEGAL_STATE_CHANGE") != std::wstring::npos);
+        };
+
+        verifyRejected(std::format(L"--manage {} --resize 2GB", name));
+        verifyRejected(std::format(L"--manage {} --set-sparse false", name));
+
+        const auto moveTarget = std::filesystem::absolute(L"manage-locked-move-target").wstring();
+        verifyRejected(std::format(L"--manage {} --move \"{}\"", name, moveTarget));
     }
 
     WSL2_TEST_METHOD(FileOffsets)

@@ -432,6 +432,34 @@ class WSLCE2EContainerCpTests
         VERIFY_IS_TRUE(std::filesystem::exists(extractedFile));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_ThroughSymlink)
+    {
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto execResult = RunWslc(std::format(L"container exec {} touch /tmp/symfile.txt", WslcContainerName));
+        execResult.Verify({.ExitCode = 0});
+
+        auto linkDir = std::filesystem::current_path() / L"wslc-cp-symlink-link";
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code ec;
+            std::filesystem::remove(linkDir, ec);
+            std::filesystem::remove(L"symfile.txt", ec);
+        });
+
+        // Creating a symlink requires Administrator privileges, which the E2E tests already run with.
+        THROW_LAST_ERROR_IF(!CreateSymbolicLinkW(linkDir.c_str(), std::filesystem::current_path().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY));
+
+        // Copy from the container into the symlink.
+        const auto cpResult = RunWslc(std::format(L"container cp {}:/tmp/symfile.txt {}", WslcContainerName, linkDir.wstring()));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // The file must land in the real directory (and therefore be visible through the symlink).
+        VERIFY_IS_TRUE(std::filesystem::exists(std::filesystem::current_path() / L"symfile.txt"));
+        VERIFY_IS_TRUE(std::filesystem::exists(linkDir / L"symfile.txt"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_ContainerToLocal_FileDestination)
     {
         // When the local target doesn't end with a separator and isn't an existing directory,

@@ -325,6 +325,7 @@ interface IWSLCCompatSession : IUnknown
 
     // Container management.
     HRESULT CreateContainer([in] const WSLCCompatContainerOptions* Options, [in, unique] IWSLCCompatWarningCallback* WarningCallback, [out] IWSLCCompatContainer** Container);
+    HRESULT OpenContainer([in] LPCSTR NameOrId, [out] IWSLCCompatContainer** Container);
 
     // Terminate the VM and containers.
     HRESULT Terminate();

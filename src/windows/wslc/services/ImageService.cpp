@@ -68,9 +68,7 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
 
 std::string GetServerFromImage(const std::string& image)
 {
-    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
-    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
-    return server;
+    return wsl::windows::common::wslutil::ImageReference::Parse(image).Repository.Server;
 }
 
 struct InputSource
@@ -120,6 +118,7 @@ void ImageService::Build(
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
     const std::vector<std::wstring>& labels,
+    const std::vector<BuildSecret>& secrets,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
     WSLCBuildImageFlags flags,
@@ -172,6 +171,24 @@ void ImageService::Build(
     std::vector<LPCSTR> labelPointers;
     toMultiByte(labels, labelStrings, labelPointers);
 
+    // Keep narrow-encoded id strings alive for the duration of the COM call. The source path and raw
+    // secret bytes are referenced in place from the caller's BuildSecret objects (which outlive this
+    // call), so they are never copied or NUL-truncated.
+    std::vector<std::string> secretIdStrings;
+    std::vector<WSLCBuildSecret> secretEntries;
+    secretIdStrings.reserve(secrets.size());
+    secretEntries.reserve(secrets.size());
+    for (const auto& secret : secrets)
+    {
+        secretIdStrings.push_back(wsl::windows::common::string::WideToMultiByte(secret.Id));
+        secretEntries.push_back(WSLCBuildSecret{
+            .Id = secretIdStrings.back().c_str(),
+            .SourcePath = secret.SourcePath.empty() ? nullptr : secret.SourcePath.c_str(),
+            .Value = secret.Value.empty() ? nullptr : secret.Value.data(),
+            .ValueSize = static_cast<ULONG>(secret.Value.size()),
+        });
+    }
+
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
     auto contextPathStr = absolutePath.wstring();
@@ -183,6 +200,7 @@ void ImageService::Build(
         .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
         .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
+        .Secrets = {secretEntries.data(), static_cast<ULONG>(secretEntries.size())},
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
@@ -217,9 +235,9 @@ std::vector<ImageInformation> ImageService::List(
         std::string imageRef = image.Image;
         if (imageRef != "<none>:<none>")
         {
-            auto parsed = wsl::windows::common::wslutil::ParseImage(imageRef);
-            info.Repository = parsed.first;
-            info.Tag = parsed.second;
+            auto parsed = wsl::windows::common::wslutil::ImageReference::Parse(imageRef);
+            info.Repository = parsed.Repository.Name;
+            info.Tag = parsed.TagOrDigest();
         }
 
         info.Id = image.Hash;
@@ -231,24 +249,20 @@ std::vector<ImageInformation> ImageService::List(
     return result;
 }
 
-void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
+void ImageService::Load(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
 {
+    WarningCallback warningCallback(reporter);
     auto source = OpenImageInput(input);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, warningCallback.Get(), callback));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, &warningCallback, callback));
 }
 
-std::string ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
+std::string ImageService::Import(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
+    WarningCallback warningCallback(reporter);
     auto source = OpenImageInput(input);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
     wil::unique_cotaskmem_ansistring imageId;
     THROW_IF_FAILED(session.Get()->ImportImage(
-        ToCOMInputHandle(source.Handle.Get()),
-        imageName.empty() ? nullptr : imageName.c_str(),
-        source.ContentLength,
-        warningCallback.Get(),
-        &imageId));
+        ToCOMInputHandle(source.Handle.Get()), imageName.empty() ? nullptr : imageName.c_str(), source.ContentLength, &warningCallback, &imageId));
     return imageId.get() ? std::string(imageId.get()) : std::string();
 }
 
@@ -271,27 +285,26 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 }
 
-void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
+    WarningCallback warningCallback(reporter);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, &warningCallback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
 {
-    EnumReferenceFormat format;
-    auto [repo, tag] = ParseImage(targetImage, &format);
-    if (format == EnumReferenceFormatDigest)
+    auto reference = ImageReference::Parse(targetImage);
+    if (reference.Format == EnumReferenceFormatDigest)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
     }
 
     WSLCTagImageOptions options{};
     options.Image = sourceImage.c_str();
-    options.Repo = repo.c_str();
-    options.Tag = tag ? tag->c_str() : "";
+    options.Repo = reference.Repository.Name.c_str();
+    options.Tag = reference.Tag ? reference.Tag->c_str() : "";
 
     THROW_IF_FAILED(session.Get()->TagImage(&options));
 }
@@ -303,12 +316,12 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Push(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
+    WarningCallback warningCallback(reporter);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, warningCallback.Get()));
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, &warningCallback));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent)

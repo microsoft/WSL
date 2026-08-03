@@ -356,7 +356,7 @@ private:
 class UniqueWebServer
 {
 public:
-    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent);
+    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent, UINT StatusCode = 200);
     UniqueWebServer(LPCWSTR Endpoint, const std::filesystem::path& path);
     ~UniqueWebServer();
     UniqueWebServer(const UniqueWebServer&) = delete;
@@ -555,6 +555,7 @@ struct TestConfigDefaults
     std::optional<bool> earlyBootLogging;
     std::optional<std::wstring> debugConsoleLogFile;
     std::optional<DrvFsMode> drvFsMode;
+    std::optional<bool> virtioFsAggregateShares;
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;
     const std::optional<std::wstring> macAddress;
