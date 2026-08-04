@@ -114,7 +114,8 @@ class WSLCE2EInspectTests
 
         // Config.Labels must be present in the emitted JSON even when empty.
         auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
-        VERIFY_IS_TRUE(json.at(0).at("Config").contains("Labels"));
+        VERIFY_IS_TRUE(json.is_array() && !json.empty());
+        VERIFY_IS_TRUE(json[0].contains("Config") && json[0]["Config"].contains("Labels"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_InheritsImageLabels)

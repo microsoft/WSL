@@ -10658,8 +10658,12 @@ class WSLCTests
         auto verifyUserLabelsPresent = [&](const std::map<std::string, std::string>& observed) {
             for (const auto& [key, value] : labels)
             {
-                VERIFY_IS_TRUE(observed.contains(key));
-                VERIFY_ARE_EQUAL(value, observed.at(key));
+                auto it = observed.find(key);
+                VERIFY_IS_TRUE(it != observed.end());
+                if (it != observed.end())
+                {
+                    VERIFY_ARE_EQUAL(value, it->second);
+                }
             }
         };
 
