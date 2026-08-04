@@ -111,6 +111,50 @@ class WSLCE2EInspectTests
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         VERIFY_ARE_EQUAL(WslcContainerName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+
+        // Config.Labels must be present in the emitted JSON even when empty; consumers do `.Config.Labels // {}`
+        // and would silently break if the key went missing.
+        VERIFY_IS_TRUE(result.Stdout.value().find(L"\"Labels\":") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_InheritsImageLabels)
+    {
+        auto imageCleanup = wil::scope_exit([&]() { EnsureImageIsDeleted(LabelInheritImage); });
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-inspect-inherit-labels";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "FROM debian:latest\n"
+            "LABEL com.microsoft.wsl.test.inherit-me=from-image\n"
+            "CMD [\"echo\", \"ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), LabelInheritImage.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        EnsureContainerDoesNotExist(WslcContainerName);
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, LabelInheritImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto result = RunWslc(std::format(L"inspect {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+
+        const auto& configLabels = inspectData[0].Config.Labels;
+        auto inheritedIt = configLabels.find("com.microsoft.wsl.test.inherit-me");
+        VERIFY_IS_TRUE(inheritedIt != configLabels.end());
+        VERIFY_ARE_EQUAL(std::string("from-image"), inheritedIt->second);
+
+        VERIFY_IS_TRUE(configLabels.find("com.microsoft.wsl.container.metadata") == configLabels.end());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Volume_Success)
@@ -318,5 +362,6 @@ private:
     const TestImage& InvalidImage = InvalidTestImage();
     const std::wstring WslcVolumeName = L"wslc-inspect-test-volume";
     const std::wstring WslcNetworkName = L"wslc-inspect-test-network";
+    const TestImage LabelInheritImage{L"wslc-e2e-inspect-inherit-labels", L"latest", L""};
 };
 } // namespace WSLCE2ETests

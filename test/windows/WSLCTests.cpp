@@ -10654,6 +10654,15 @@ class WSLCTests
         // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
         std::map<std::string, std::string> labels = {{"key1", "value1"}, {"key2", std::string(10000, 'a')}};
 
+        // Contains-style rather than exact-equality so the test stays green if the base image ever ships with its own labels.
+        auto verifyUserLabelsPresent = [&](const std::map<std::string, std::string>& observed) {
+            for (const auto& [key, value] : labels)
+            {
+                VERIFY_IS_TRUE(observed.contains(key));
+                VERIFY_ARE_EQUAL(value, observed.at(key));
+            }
+        };
+
         // Test valid labels
         {
             WSLCContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
@@ -10664,7 +10673,7 @@ class WSLCTests
             }
 
             auto container = launcher.Launch(*m_defaultSession);
-            VERIFY_ARE_EQUAL(labels, container.Labels());
+            verifyUserLabelsPresent(container.Labels());
 
             // Keep the container alive after the handle is dropped so we can validate labels are persisted across sessions.
             container.SetDeleteOnClose(false);
@@ -10676,7 +10685,14 @@ class WSLCTests
 
             // Validate that labels are correctly loaded.
             auto container = OpenContainer(m_defaultSession.get(), "test-labels");
-            VERIFY_ARE_EQUAL(labels, container.Labels());
+            verifyUserLabelsPresent(container.Labels());
+
+            const std::string c_metadataLabel = "com.microsoft.wsl.container.metadata";
+            const auto inspect = container.Inspect();
+            verifyUserLabelsPresent(inspect.Config.Labels);
+            verifyUserLabelsPresent(inspect.Labels);
+            VERIFY_ARE_EQUAL(inspect.Config.Labels, inspect.Labels);
+            VERIFY_IS_TRUE(inspect.Config.Labels.find(c_metadataLabel) == inspect.Config.Labels.end());
         }
 
         // Test nullptr key
@@ -10733,6 +10749,99 @@ class WSLCTests
 
             auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+    }
+
+    // Regression: containers must inherit their base image's LABEL entries (Docker parity), with user --label
+    // winning on key conflict. The dockerd daemon does the merge; wslc reads it back from InspectContainer.
+    WSLC_TEST_METHOD(ContainerLabelsInheritedFromImage)
+    {
+        const std::string c_imageTag = "wslc-test-labels-inherited:latest";
+        const std::string c_imageLabelKey = "com.microsoft.wsl.test.image-label";
+        const std::string c_imageLabelValue = "from-image";
+        const std::string c_sharedLabelKey = "com.microsoft.wsl.test.shared";
+        const std::string c_sharedImageValue = "image-wins-if-no-override";
+        const std::string c_sharedUserValue = "user-wins";
+        const std::string c_userOnlyLabelKey = "com.microsoft.wsl.test.user-only";
+        const std::string c_userOnlyLabelValue = "from-user";
+        const std::string c_metadataLabel = "com.microsoft.wsl.container.metadata";
+        const std::string c_userOverrideContainerName = "test-labels-inherited-user-override";
+
+        auto contextDir = std::filesystem::current_path() / "build-context-labels-inherited";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow(c_imageTag.c_str(), WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "LABEL " << c_imageLabelKey << "=" << c_imageLabelValue << "\n";
+            dockerfile << "LABEL " << c_sharedLabelKey << "=" << c_sharedImageValue << "\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, c_imageTag.c_str()));
+        ExpectImagePresent(*m_defaultSession, c_imageTag.c_str());
+
+        // Image-only label survives on the container (bug repro).
+        {
+            WSLCContainerLauncher launcher(c_imageTag.c_str(), "test-labels-inherited-image-only", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            const auto containerLabels = container.Labels();
+            const auto inspect = container.Inspect();
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, containerLabels.at(c_imageLabelKey));
+            VERIFY_IS_TRUE(inspect.Config.Labels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, inspect.Config.Labels.at(c_imageLabelKey));
+
+            VERIFY_IS_TRUE(containerLabels.find(c_metadataLabel) == containerLabels.end());
+        }
+
+        // Persist across a session reset so the second block exercises the Open() codepath, which reads labels
+        // from the /containers/json list-API — a different deserialization than InspectContainer.Config.Labels.
+        {
+            WSLCContainerLauncher launcher(c_imageTag.c_str(), c_userOverrideContainerName.c_str(), {"echo", "OK"});
+            launcher.AddLabel(c_sharedLabelKey, c_sharedUserValue);
+            launcher.AddLabel(c_userOnlyLabelKey, c_userOnlyLabelValue);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            const auto containerLabels = container.Labels();
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, containerLabels.at(c_imageLabelKey));
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_sharedLabelKey));
+            VERIFY_ARE_EQUAL(c_sharedUserValue, containerLabels.at(c_sharedLabelKey));
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_userOnlyLabelKey));
+            VERIFY_ARE_EQUAL(c_userOnlyLabelValue, containerLabels.at(c_userOnlyLabelKey));
+
+            container.SetDeleteOnClose(false);
+        }
+
+        {
+            ResetTestSession();
+
+            auto reopened = OpenContainer(m_defaultSession.get(), c_userOverrideContainerName.c_str());
+            const auto reopenedLabels = reopened.Labels();
+
+            VERIFY_IS_TRUE(reopenedLabels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, reopenedLabels.at(c_imageLabelKey));
+            VERIFY_IS_TRUE(reopenedLabels.contains(c_sharedLabelKey));
+            VERIFY_ARE_EQUAL(c_sharedUserValue, reopenedLabels.at(c_sharedLabelKey));
+            VERIFY_IS_TRUE(reopenedLabels.contains(c_userOnlyLabelKey));
+            VERIFY_ARE_EQUAL(c_userOnlyLabelValue, reopenedLabels.at(c_userOnlyLabelKey));
+
+            VERIFY_IS_TRUE(reopenedLabels.find(c_metadataLabel) == reopenedLabels.end());
+
+            const auto reopenedInspect = reopened.Inspect();
+            VERIFY_IS_TRUE(reopenedInspect.Config.Labels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, reopenedInspect.Config.Labels.at(c_imageLabelKey));
         }
     }
 
