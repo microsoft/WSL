@@ -38,6 +38,10 @@ public:
 
     void WriteString(std::wstring_view text) const;
 
+    // Flushes buffered output so a prompt is visible before a blocking read. No-op for
+    // console destinations (WriteConsoleW is unbuffered); flushes the CRT stream otherwise.
+    void Flush() const;
+
     // Console write width minus one (autowrap guard), or nullopt when redirected.
     std::optional<int> GetConsoleWidth() const;
 

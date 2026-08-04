@@ -139,6 +139,10 @@
                         <Verb Id="open" Command="open" TargetFile="wsl.exe" Argument="--install --prompt-before-exit --from-file &quot;%1&quot;" />
                     </Extension>
                 </ProgId>
+                <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\WSLDistributionTar">
+                    <!-- FTA_AlwaysUnsafe -->
+                    <RegistryValue Name="EditFlags" Value="131072" Type="integer" />
+                </RegistryKey>
             </Component>
 
             <Component Id="wslservice" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134735" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
