@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageBuildTests
 {
@@ -41,18 +42,26 @@ class WSLCE2EImageBuildTests
     // safety net for images left behind by a crashed run.
     static constexpr auto c_builtImagePrefix = L"wslc-e2e-build-";
 
+    // Port for the local registry backing the --pull test; distinct from the other test classes.
+    static constexpr USHORT c_registryPort = 15005;
+
     // Returns an RAII guard that best-effort deletes the given image when it goes out of scope. It is
     // deliberately non-throwing (no VERIFY) because it may run while the stack unwinds after a test
     // failure; the class-level prune is the authoritative cleanup.
-    static auto DeleteImageOnExit(const TestImage& image)
+    static auto DeleteImageOnExit(std::wstring imageNameAndTag)
     {
-        return wil::scope_exit([image]() {
+        return wil::scope_exit([imageNameAndTag = std::move(imageNameAndTag)]() {
             try
             {
-                RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
+                RunWslc(std::format(L"image delete --force {}", imageNameAndTag));
             }
             CATCH_LOG()
         });
+    }
+
+    static auto DeleteImageOnExit(const TestImage& image)
+    {
+        return DeleteImageOnExit(image.NameAndTag());
     }
 
     // All secret tests build from this single shared (empty) context directory. Each distinct mounted
@@ -147,7 +156,14 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Pull_Success)
     {
-        SKIP_TEST_UNSTABLE(); // TODO: Enable when a private image source is available.
+        // A local registry acts as the private image source that --pull re-resolves the base image from.
+        auto session = OpenDefaultElevatedSession();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", c_registryPort);
+
+        auto registryImage = TagImageForRegistry(DebianTestImage().NameAndTag(), string::MultiByteToWide(registryAddress));
+        auto registryImageCleanup = DeleteImageOnExit(registryImage);
+
+        RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
 
         auto imageCleanup = DeleteImageOnExit(BuiltImagePull);
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-pull";
@@ -159,17 +175,15 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"pull-ok\"]\n");
+        auto dockerfile = std::format("FROM {}\nCMD [\"echo\", \"pull-ok\"]\n", string::WideToMultiByte(registryImage));
+        WriteTestFileContent(dockerfilePath, dockerfile);
 
-        // Build with --pull --verbose. When --pull causes docker to resolve the base image
-        // from the registry, the FROM step includes a @sha256: digest (e.g.
-        // "FROM docker.io/library/debian:latest@sha256:..."). Build progress goes to stderr.
+        // The base image is already local, so only --pull can make the FROM step resolve a registry digest.
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
         buildResult.Verify({.Stdout = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
-        VERIFY_IS_TRUE(buildResult.Stderr->find(L"@sha256:") != std::wstring::npos);
+        VERIFY_IS_TRUE(buildResult.StderrContainsSubstring(std::format(L"{}@sha256:", registryImage)));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Target_Success)
