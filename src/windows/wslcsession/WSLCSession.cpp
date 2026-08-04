@@ -1315,11 +1315,11 @@ try
     };
 
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure). Stdout's EOF signals build completion.
+    // failure).
     //
-    // For dest=- the exporter tarball is written to stdout instead, so it is relayed straight to the
-    // client handle as the build runs rather than being collected. RelayHandle is an overlapped handle,
-    // so a slow client only marks the relay pending and stderr keeps draining in the same IO loop.
+    // For dest=- the exporter tarball is written to stdout, so it is relayed to the client handle as the
+    // build runs. RelayHandle is an overlapped handle, so a slow client only marks the relay pending and
+    // stderr keeps draining in the same IO loop.
     if (streamOutput)
     {
         io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
