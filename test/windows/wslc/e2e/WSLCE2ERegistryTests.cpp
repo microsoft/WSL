@@ -203,9 +203,9 @@ class WSLCE2ERegistryTests
             // Login with interactive prompts (no flags).
             {
                 auto interactive = RunWslcInteractive(std::format(L"login {}", registryAddressW));
-                interactive.ExpectStderr("Username: ");
+                interactive.ExpectStdout("Username: ");
                 interactive.WriteLine(c_username);
-                interactive.ExpectStderr("Password: ");
+                interactive.ExpectStdout("Password: ");
                 interactive.WriteLine(c_password);
                 auto exitCode = interactive.Wait();
                 VERIFY_ARE_EQUAL(0, exitCode, L"Interactive login should succeed");
