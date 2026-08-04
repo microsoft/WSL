@@ -316,12 +316,13 @@ void ConsommeNetworking::RefreshGuestConnection()
     }
 
     const auto minMtu = GetMinimumConnectedInterfaceMtu();
-    const auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
+    auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
+    auto nameservers = ToIpAddresses(currentDns);
 
     // Acquire the lock and perform device updates.
     auto lock = m_lock.lock_exclusive();
 
-    // Add virtio net adapter to guest. Subsequent address/route/DNS changes are sent through GNS notifications below.
+    // Add the virtio net adapter to the guest, or update its runtime configuration.
     if (!m_adapterId.has_value())
     {
         WSL_LOG(
@@ -330,8 +331,14 @@ void ConsommeNetworking::RefreshGuestConnection()
             TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
             TraceLoggingValue(default_route.c_str(), "GatewayIp"),
             TraceLoggingValue(networkSettings->PreferredIpv6Address.AddressString.c_str(), "ClientIpv6"));
-        m_adapterId =
-            m_guestDeviceManager->AddVirtioNetDevice(c_eth0DeviceName, virtioNetConfig, ToIpAddresses(currentDns), m_userToken.get());
+        m_adapterId = m_guestDeviceManager->AddVirtioNetDevice(c_eth0DeviceName, virtioNetConfig, nameservers, m_userToken.get());
+    }
+    else
+    {
+        IpAddress emptyNameserver{};
+        auto* nameserversData = nameservers.empty() ? &emptyNameserver : nameservers.data();
+        const auto device = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
+        THROW_IF_FAILED(device->Update(&virtioNetConfig, gsl::narrow_cast<UINT32>(nameservers.size()), nameserversData));
     }
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
