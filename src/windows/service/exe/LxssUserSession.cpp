@@ -2569,6 +2569,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                 TraceLoggingValue(instanceId, "instanceId"));
 
             HRESULT result = E_UNEXPECTED;
+            wsl::windows::common::wslutil::StopWatch stopWatch;
             auto createEnd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
                 WSL_LOG_TELEMETRY(
                     "CreateInstanceEnd",
@@ -2577,11 +2578,12 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     TraceLoggingValue(version, "version"),
                     TraceLoggingValue(instanceId, "instanceId"),
                     TraceLoggingValue(SUCCEEDED(result), "success"),
-                    TraceLoggingValue(result, "error"));
+                    TraceLoggingValue(result, "error"),
+                    TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"));
             });
 
-            wsl::windows::common::wslutil::StopWatch stopWatch;
-            result = wil::ResultFromException([&]() {
+            try
+            {
                 auto clientKey = m_lifetimeManager.GetRegistrationId();
                 if (version == LXSS_WSL_VERSION_1)
                 {
@@ -2666,19 +2668,14 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     m_pluginManager.OnDistributionStarted(&m_session, instance->DistributionInformation());
                     cleanupOnFailure.release();
                 }
-            });
 
-            // This telemetry event is used to keep track of instance creation performance (via CreationTimeMs) and failure reasons (via Result).
-            WSL_LOG_TELEMETRY(
-                "CreateInstanceOutcome",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(configuration.Name.c_str(), "distroName"),
-                TraceLoggingValue(version, "version"),
-                TraceLoggingValue(instanceId, "instanceId"),
-                TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
-                TraceLoggingValue(result, "Result"));
-
-            THROW_IF_FAILED(result);
+                result = S_OK;
+            }
+            catch (...)
+            {
+                result = wil::ResultFromCaughtException();
+                throw;
+            }
         }
     }
 
