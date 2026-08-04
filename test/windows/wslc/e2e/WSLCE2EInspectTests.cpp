@@ -112,9 +112,9 @@ class WSLCE2EInspectTests
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         VERIFY_ARE_EQUAL(WslcContainerName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
 
-        // Config.Labels must be present in the emitted JSON even when empty; consumers do `.Config.Labels // {}`
-        // and would silently break if the key went missing.
-        VERIFY_IS_TRUE(result.Stdout.value().find(L"\"Labels\":") != std::wstring::npos);
+        // Config.Labels must be present in the emitted JSON even when empty.
+        auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
+        VERIFY_IS_TRUE(json.at(0).at("Config").contains("Labels"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_InheritsImageLabels)
