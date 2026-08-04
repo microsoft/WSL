@@ -350,7 +350,13 @@ class MountTests
         for (const auto* name : {L"\"\"", L".", L"..", L"foo/bar"})
         {
             const auto mountCommand = std::format(L"--mount {} --vhd --name {} --partition 1", VhdDevice, name);
-            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(mountCommand), (DWORD)0, name);
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(mountCommand, -1);
+            VERIFY_ARE_EQUAL(
+                output,
+                L"The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.\r\n"
+                L"Error code: Wsl/Service/MountDisk/WSL_E_VM_MODE_INVALID_MOUNT_NAME\r\n",
+                name);
+            VERIFY_ARE_EQUAL(error, L"", name);
         }
 
         const auto disk = GetBlockDeviceInWsl();
