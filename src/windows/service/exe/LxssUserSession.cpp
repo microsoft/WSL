@@ -1757,8 +1757,9 @@ CATCH_RETURN()
 HRESULT LxssUserSessionImpl::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe)
 try
 {
-    auto runAsUser = wil::CoImpersonateClient();
-    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    auto runAsUser = wil::impersonate_token(userToken.get());
+    const wil::unique_hkey lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
     std::lock_guard lock(m_instanceLock);
 
     const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
