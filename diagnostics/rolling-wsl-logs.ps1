@@ -1,9 +1,18 @@
 param (
-    $PeriodSeconds = 3600,
-    [string] $Profile = "wsl.wprp")
+    [int] $PeriodSeconds = 3600,
+    [ValidateNotNullOrEmpty()]
+    [string] $Profile = (Join-Path $PSScriptRoot "wsl.wprp")
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+trap
+{
+    try { & wpr.exe -cancel | Out-Null } catch {}
+    throw
+}
+
 [console]::TreatControlCAsInput = $true
 
 
