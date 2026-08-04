@@ -41,6 +41,9 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Number of virtual CPUs allocated to the session (e.g. 4 default: all available CPUs)\n"
     "  # cpuCount: default\n"
     "\n"
+    "  # Number of virtio network queue pairs (1-64, default: 2)\n"
+    "  # networkQueuePairs: default\n"
+    "\n"
     "  # Memory limit for the session (e.g. 2GB default: half of available memory)\n"
     "  # memorySize: default\n"
     "\n"
@@ -77,6 +80,11 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionCpuCount)
     {
         return value > 0 ? std::optional{value} : std::nullopt;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionNetworkQueuePairs)
+    {
+        return value > 0 && value <= 64 ? std::optional{value} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(SessionMemoryMb)

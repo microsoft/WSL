@@ -81,6 +81,7 @@ private:
     std::wstring m_vmIdString;
     ULONG m_bootTimeoutMs{};
     ULONG m_cpuCount{};
+    UINT16 m_consommeMaxQueuePairs{};
 
     wil::shared_handle m_userToken;
     WSLCFeatureFlags m_featureFlags{};

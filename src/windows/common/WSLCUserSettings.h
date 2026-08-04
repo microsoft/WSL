@@ -36,6 +36,7 @@ namespace wsl::windows::wslc::settings {
 enum class Setting : size_t
 {
     SessionCpuCount = 0,
+    SessionNetworkQueuePairs,
     SessionMemoryMb,
     SessionStorageSizeMb,
     SessionNetworkingMode,
@@ -92,6 +93,7 @@ namespace details {
     };
 
     DEFINE_SETTING_MAPPING(SessionCpuCount,          uint32_t,    uint32_t,            0,                             "session.cpuCount")
+    DEFINE_SETTING_MAPPING(SessionNetworkQueuePairs, uint32_t,    uint32_t,            2,                             "session.networkQueuePairs")
     DEFINE_SETTING_MAPPING(SessionMemoryMb,          std::string, uint32_t,            0,                             "session.memorySize")
     DEFINE_SETTING_MAPPING(SessionStorageSizeMb,     std::string, uint32_t,            1048576,                       "session.maxStorageSize")
     DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode,  WSLCNetworkingModeConsomme,    "session.networkingMode")

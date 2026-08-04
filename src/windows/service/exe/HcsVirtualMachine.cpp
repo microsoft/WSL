@@ -23,6 +23,8 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
+#include "WSLCUserSettings.h"
+#include "filesystem.hpp"
 #include "string.hpp"
 
 using namespace wsl::windows::common;
@@ -34,6 +36,14 @@ constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
 namespace {
+
+UINT16 GetConsommeMaxQueuePairs(HANDLE userToken)
+{
+    const auto localAppData = wsl::windows::common::filesystem::GetLocalAppDataPath(userToken);
+    const auto runAsUser = wil::impersonate_token(userToken);
+    const wsl::windows::wslc::settings::UserSettings userSettings(localAppData / L"wslc");
+    return gsl::narrow<UINT16>(userSettings.Get<wsl::windows::wslc::settings::Setting::SessionNetworkQueuePairs>());
+}
 
 SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
 {
@@ -81,6 +91,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Store the user token.
     m_userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
+    m_consommeMaxQueuePairs = GetConsommeMaxQueuePairs(m_userToken.get());
     m_crashDumpFolder = GetCrashDumpFolder();
 
     std::lock_guard lock(m_lock);
@@ -507,7 +518,7 @@ try
             nullptr,
             m_guestDeviceManager,
             m_userToken,
-            gsl::narrow<UINT16>(m_cpuCount));
+            m_consommeMaxQueuePairs);
     }
     else
     {
