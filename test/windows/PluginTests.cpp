@@ -721,6 +721,7 @@ class PluginTests
             WSLC Image created, session=*, id=sha256:*, name=wslc-registry:latest
             WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
             WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Container stopping, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
 
         ValidateLogFile(ExpectedOutput);

@@ -122,7 +122,7 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
-    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -158,17 +158,52 @@ public:
         IORelay& Relay);
 
 private:
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
+    enum class TransitionKind
+    {
+        Start,
+        Stop,
+        Delete
+    };
+
+    struct StateTransition
+    {
+        StateTransition(TransitionKind kind, ContainerEvent expectedEvent) : Kind(kind), ExpectedEvent(expectedEvent)
+        {
+        }
+
+        const TransitionKind Kind;
+        ContainerEvent ExpectedEvent;
+        wil::unique_event Completed{wil::EventOptions::ManualReset};
+        std::exception_ptr Exception;
+        // Access under WSLCContainerImpl::m_lock.
+        unique_com_disconnect Wrapper;
+    };
+
+    __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime) noexcept;
+
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
+
+    // Returns with both locks held when no transition is active or the active transition matches kind.
+    void WaitForConflictingTransitionToComplete(
+        wil::rwlock_release_exclusive_scope_exit& lock,
+        wil::rwlock_release_shared_scope_exit& lifecycleLock,
+        std::optional<TransitionKind> kind = std::nullopt);
+
+    void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
+    void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
+
+    __requires_exclusive_lock_held(m_lock) void CompleteTransition(
+        const std::shared_ptr<StateTransition>& transition, std::exception_ptr exception = {}) noexcept;
 
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect OnStopped(std::optional<std::uint64_t> stopTimestamp);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::optional<std::uint64_t> stopTimestamp);
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -182,6 +217,8 @@ private:
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
+    // Lifecycle requests hold this shared until their transitions are published; event delivery holds it exclusively.
+    wil::srwlock m_lifecycleLock;
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
@@ -193,17 +230,7 @@ private:
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
-    struct StopNotification
-    {
-        std::atomic<std::uint64_t> EventTime{0};
-        wil::unique_event Event{wil::EventOptions::None};
-    } m_stopNotification;
-
-    wil::unique_event m_destroyEvent{wil::EventOptions::ManualReset};
-
-    // Serializes Stop() callers and signals OnEvent that a Stop is in flight.
-    // Must be acquired before m_lock when both are needed.
-    std::mutex m_stopLock;
+    _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};

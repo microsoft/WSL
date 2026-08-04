@@ -26,6 +26,7 @@ enum class ContainerEvent
 {
     Create,
     Start,
+    Restart,
     Stop,
     Exit,
     Destroy,

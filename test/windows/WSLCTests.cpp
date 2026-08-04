@@ -173,6 +173,19 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
+    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(const std::string& name)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest",
+            name,
+            {"/bin/sh", "-c", "trap 'echo stopping; read value; exit 0' TERM; echo ready; while true; do sleep 1; done"},
+            {},
+            "host",
+            WSLCProcessFlagsStdin);
+
+        return launcher.Launch(*m_defaultSession);
+    }
+
     struct ListContainersResult
     {
         wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> Containers;
@@ -6726,11 +6739,7 @@ class WSLCTests
                 std::thread stopThread([&]() { VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalNone, -1)); });
 
                 auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                    // TODO: calling Kill() here hangs since Stop() holds the container lock.
-                    // Update this once fixed to:
-                    // LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGKILL));
-
-                    LOG_IF_FAILED(initProcess.Get().Signal(WSLCSignalSIGKILL));
+                    LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGKILL));
 
                     if (stopThread.joinable())
                     {
@@ -6964,6 +6973,237 @@ class WSLCTests
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsForce), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
         }
+    }
+
+    WSLC_TEST_METHOD(ConcurrentContainerStopAndKill)
+    {
+        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-container-stops");
+        auto initProcess = container.GetInitProcess();
+        auto input = initProcess.GetStdHandle(0);
+        auto outputHandle = initProcess.GetStdHandle(1);
+        PartialHandleRead output{outputHandle.get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult{};
+        HRESULT killResult{};
+        std::thread stopThread;
+        std::thread killThread;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            input.reset();
+
+            if (stopThread.joinable())
+            {
+                stopThread.join();
+            }
+
+            if (killThread.joinable())
+            {
+                killThread.join();
+            }
+        });
+
+        stopThread = std::thread([&]() { stopResult = container.Get().Stop(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE); });
+
+        output.ExpectConsume("stopping\n");
+
+        // A second lifecycle request must reach Docker while the indefinite Stop request is blocked.
+        wil::unique_event killStarted{wil::EventOptions::ManualReset};
+        killThread = std::thread([&]() {
+            killStarted.SetEvent();
+            killResult = container.Get().Kill(WSLCSignalSIGTERM);
+        });
+
+        VERIFY_IS_TRUE(killStarted.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(killThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        killThread.join();
+        VERIFY_SUCCEEDED(killResult);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 100), WAIT_TIMEOUT);
+
+        const char stopInput = '\n';
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
+        VERIFY_ARE_EQUAL(bytesWritten, static_cast<DWORD>(sizeof(stopInput)));
+        input.reset();
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+
+        stopThread.join();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(stopResult);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
+    WSLC_TEST_METHOD(ConcurrentContainerStopTimeoutOverride)
+    {
+        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-timeout");
+        auto initProcess = container.GetInitProcess();
+        auto input = initProcess.GetStdHandle(0);
+        auto outputHandle = initProcess.GetStdHandle(1);
+        PartialHandleRead output{outputHandle.get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT indefiniteStopResult{};
+        HRESULT immediateStopResult{};
+        std::thread indefiniteStopThread;
+        std::thread immediateStopThread;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            input.reset();
+
+            if (indefiniteStopThread.joinable())
+            {
+                indefiniteStopThread.join();
+            }
+
+            if (immediateStopThread.joinable())
+            {
+                immediateStopThread.join();
+            }
+        });
+
+        indefiniteStopThread =
+            std::thread([&]() { indefiniteStopResult = container.Get().Stop(WSLCSignalNone, WSLC_STOP_TIMEOUT_NONE); });
+
+        output.ExpectConsume("stopping\n");
+        VERIFY_ARE_EQUAL(WaitForSingleObject(indefiniteStopThread.native_handle(), 100), WAIT_TIMEOUT);
+
+        immediateStopThread = std::thread([&]() { immediateStopResult = container.Get().Stop(WSLCSignalNone, 0); });
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(immediateStopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(indefiniteStopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+
+        indefiniteStopThread.join();
+        immediateStopThread.join();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(indefiniteStopResult);
+        VERIFY_SUCCEEDED(immediateStopResult);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
+    WSLC_TEST_METHOD(ConcurrentContainerStopAndStart)
+    {
+        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-start");
+        auto initProcess = container.GetInitProcess();
+        auto input = initProcess.GetStdHandle(0);
+        auto outputHandle = initProcess.GetStdHandle(1);
+        PartialHandleRead output{outputHandle.get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult{};
+        HRESULT startResult{};
+        std::thread stopThread;
+        std::thread startThread;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            input.reset();
+
+            if (stopThread.joinable())
+            {
+                stopThread.join();
+            }
+
+            if (startThread.joinable())
+            {
+                startThread.join();
+            }
+        });
+
+        stopThread = std::thread([&]() { stopResult = container.Get().Stop(WSLCSignalNone, WSLC_STOP_TIMEOUT_NONE); });
+
+        output.ExpectConsume("stopping\n");
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 100), WAIT_TIMEOUT);
+
+        startThread = std::thread([&]() { startResult = container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr); });
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(startThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        startThread.join();
+        VERIFY_ARE_EQUAL(startResult, WSLC_E_CONTAINER_IS_RUNNING);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 100), WAIT_TIMEOUT);
+
+        const char stopInput = '\n';
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
+        VERIFY_ARE_EQUAL(bytesWritten, static_cast<DWORD>(sizeof(stopInput)));
+        input.reset();
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        stopThread.join();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(stopResult);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
+    WSLC_TEST_METHOD(ConcurrentContainerStopAndForceDelete)
+    {
+        auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-delete");
+        auto initProcess = container.GetInitProcess();
+        auto input = initProcess.GetStdHandle(0);
+        auto outputHandle = initProcess.GetStdHandle(1);
+        PartialHandleRead output{outputHandle.get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult{};
+        HRESULT deleteResult{};
+        std::thread stopThread;
+        std::thread deleteThread;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            input.reset();
+
+            if (stopThread.joinable())
+            {
+                stopThread.join();
+            }
+
+            if (deleteThread.joinable())
+            {
+                deleteThread.join();
+            }
+        });
+
+        stopThread = std::thread([&]() { stopResult = container.Get().Stop(WSLCSignalNone, WSLC_STOP_TIMEOUT_NONE); });
+
+        output.ExpectConsume("stopping\n");
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 100), WAIT_TIMEOUT);
+
+        deleteThread = std::thread([&]() { deleteResult = container.Get().Delete(WSLCDeleteFlagsForce); });
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(deleteThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+
+        deleteThread.join();
+        stopThread.join();
+        input.reset();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(stopResult);
+        VERIFY_SUCCEEDED(deleteResult);
+        container.SetDeleteOnClose(false);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+    }
+
+    WSLC_TEST_METHOD(ForceDeleteAutoRemoveContainer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "test-force-delete-auto-remove", {"sleep", "99999"});
+        launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+        auto container = launcher.Launch(*m_defaultSession);
+        auto id = container.Id();
+        auto name = container.Name();
+
+        VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+        container.SetDeleteOnClose(false);
+
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateDeleted);
+        VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsForce), RPC_E_DISCONNECTED);
+
+        wil::com_ptr<IWSLCContainer> openedContainer;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &openedContainer), WSLC_E_CONTAINER_NOT_FOUND);
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &openedContainer), WSLC_E_CONTAINER_NOT_FOUND);
     }
 
     WSLC_TEST_METHOD(ContainerListFilter)
