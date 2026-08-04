@@ -931,8 +931,9 @@ try
 
     // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
     // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. At most the build
-    // context (1) and one parent directory per file secret are mounted.
-    mountedPaths.reserve(static_cast<size_t>(1) + Options->Secrets.Count);
+    // context (1), the single-file exporter output destination (1), and one parent directory per file
+    // secret are mounted.
+    mountedPaths.reserve(static_cast<size_t>(2) + Options->Secrets.Count);
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
@@ -952,6 +953,50 @@ try
     {
         buildArgs.push_back("--target");
         buildArgs.push_back(Options->Target);
+    }
+    // Docker-style --output routing. Three cases, distinguished by what the client set:
+    //   * OutputHandle set (dest=- stdout): the client stripped dest= and expects the exporter output
+    //     streamed back. The exporter writes to the build process's stdout, which is relayed to the
+    //     client handle as the build runs, so the output never touches the VM's disk.
+    //   * OutputMountPath set (single-file exporter with a real destination): the client stripped dest=
+    //     and passed the destination file's parent directory, mounted read-write into the VM so buildx
+    //     writes the file (at OutputMountFile within the mount) in place - nothing is streamed back.
+    //   * Neither set: the spec is forwarded verbatim and the build runs entirely in the VM.
+    // Directory exporters (type=local, or oci/docker with tar=false) are rejected by the client while
+    // parsing --output: a Linux tree cannot be written faithfully to a Windows destination.
+    const bool streamOutput = Options->OutputHandle.Type != WSLCHandleTypeUnknown;
+    const bool mountOutput = Options->OutputMountPath != nullptr && Options->OutputMountPath[0] != L'\0';
+    // Streaming or mounting the exporter output requires a non-empty Output spec to route from, and the
+    // two destinations are mutually exclusive. Reject the mismatched combinations at the boundary rather
+    // than later failing to assign a dest path.
+    RETURN_HR_IF(E_INVALIDARG, (streamOutput || mountOutput) && (Options->Output == nullptr || Options->Output[0] == '\0'));
+    RETURN_HR_IF(E_INVALIDARG, streamOutput && mountOutput);
+
+    if (Options->Output != nullptr && Options->Output[0] != '\0')
+    {
+        std::string outputSpec = Options->Output;
+        if (streamOutput)
+        {
+            // buildx writes the exporter tarball to stdout for dest=-, which is relayed to the client
+            // handle below. With no image to load, buildx prints no image ID, so stdout carries only
+            // the tarball.
+            outputSpec += ",dest=-";
+        }
+        else if (mountOutput)
+        {
+            // Mount the client's destination directory read-write and point the exporter at the temp file
+            // to write within it, so buildx writes the single-file output straight to the Windows target.
+            auto guestMountPath = mountInVm(Options->OutputMountPath, FALSE);
+            std::string dest = guestMountPath;
+            if (Options->OutputMountFile != nullptr && Options->OutputMountFile[0] != L'\0')
+            {
+                dest += '/';
+                dest += wsl::shared::string::WideToMultiByte(Options->OutputMountFile);
+            }
+            outputSpec += std::format(",dest={}", dest);
+        }
+        buildArgs.push_back("--output");
+        buildArgs.push_back(outputSpec);
     }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
@@ -1075,6 +1120,13 @@ try
 
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, buildEnv, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
+
+    // Opened before the IO context so it outlives the relay registered on it below.
+    std::optional<UserHandle> userHandle;
+    if (streamOutput)
+    {
+        userHandle.emplace(OpenUserHandle(Options->OutputHandle));
+    }
 
     auto io = CreateIOContext();
 
@@ -1263,9 +1315,21 @@ try
     };
 
     // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
-    io.AddHandle(std::make_unique<io::ReadHandle>(
-        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
+    // failure).
+    //
+    // For dest=- the exporter tarball is written to stdout, so it is relayed to the client handle as the
+    // build runs. RelayHandle is an overlapped handle, so a slow client only marks the relay pending and
+    // stderr keeps draining in the same IO loop.
+    if (streamOutput)
+    {
+        io.AddHandle(std::make_unique<io::RelayHandle<io::ReadHandle>>(
+            common::io::HandleWrapper{buildProcess.GetStdHandle(1)}, userHandle->Get()));
+    }
+    else
+    {
+        io.AddHandle(std::make_unique<io::ReadHandle>(
+            buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
+    }
 
     io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 

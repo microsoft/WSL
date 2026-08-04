@@ -65,6 +65,43 @@ inline bool EndsWith(const std::basic_string<T>& String, const std::basic_string
     return std::equal(Suffix.rbegin(), Suffix.rend(), String.rbegin());
 }
 
+// Lowercases ASCII 'A'-'Z' only, leaving every other code unit untouched. Unlike std::tolower this is
+// locale-independent (no Turkish-'I' surprises) and has no signed-char UB, which is what you want when
+// normalizing ASCII protocol tokens such as buildx CSV keys.
+template <class T>
+inline std::basic_string<T> AsciiToLower(const std::basic_string_view<T>& String)
+{
+    std::basic_string<T> Result(String);
+    for (auto& Ch : Result)
+    {
+        if (Ch >= static_cast<T>('A') && Ch <= static_cast<T>('Z'))
+        {
+            Ch = static_cast<T>(Ch - static_cast<T>('A') + static_cast<T>('a'));
+        }
+    }
+
+    return Result;
+}
+
+// Trims leading and trailing ASCII whitespace (space, tab, CR, LF, vertical tab, form feed), matching
+// the ASCII subset of Go's strings.TrimSpace. Returns a view into the input, so the input must outlive
+// the result. The stdlib has no trim, so this centralizes the find_first/last_not_of idiom.
+template <class T>
+inline std::basic_string_view<T> TrimAscii(const std::basic_string_view<T>& String)
+{
+    constexpr T Whitespace[] = {
+        static_cast<T>(' '), static_cast<T>('\t'), static_cast<T>('\r'), static_cast<T>('\n'), static_cast<T>('\v'), static_cast<T>('\f'), static_cast<T>('\0')};
+
+    const auto First = String.find_first_not_of(Whitespace);
+    if (First == std::basic_string_view<T>::npos)
+    {
+        return {};
+    }
+
+    const auto Last = String.find_last_not_of(Whitespace);
+    return String.substr(First, Last - First + 1);
+}
+
 template <class T, class TInput>
 inline std::basic_string<T> Join(const std::vector<TInput>& Input, T Separator)
 {
