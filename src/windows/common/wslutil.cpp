@@ -326,6 +326,36 @@ constexpr unsigned long EndianSwap(unsigned long value)
     return gsl::narrow_cast<unsigned long>(EndianSwap(gsl::narrow_cast<uint32_t>(value)));
 }
 
+constexpr bool IsCrashException(DWORD exceptionCode)
+{
+    constexpr DWORD c_statusFatalAppExit = 0x40000015;
+    constexpr DWORD c_statusHeapCorruption = 0xC0000374;
+    constexpr DWORD c_statusStackBufferOverrun = 0xC0000409;
+    constexpr DWORD c_statusFailFastException = 0xC0000602;
+
+    switch (exceptionCode)
+    {
+    case EXCEPTION_ACCESS_VIOLATION:
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+    case EXCEPTION_IN_PAGE_ERROR:
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+    case EXCEPTION_INT_OVERFLOW:
+    case EXCEPTION_INVALID_DISPOSITION:
+    case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+    case EXCEPTION_PRIV_INSTRUCTION:
+    case EXCEPTION_STACK_OVERFLOW:
+    case c_statusFatalAppExit:
+    case c_statusHeapCorruption:
+    case c_statusStackBufferOverrun:
+    case c_statusFailFastException:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 constexpr GUID EndianSwap(GUID value)
 {
     value.Data1 = EndianSwap(value.Data1);
@@ -336,6 +366,11 @@ constexpr GUID EndianSwap(GUID value)
 
 static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
 {
+    if (!IsCrashException(exception->ExceptionRecord->ExceptionCode))
+    {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
     try
     {
         static std::atomic<bool> handlingException = false;
@@ -343,6 +378,8 @@ static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
         {
             return EXCEPTION_CONTINUE_SEARCH; // Don't keep trying if we crash during exception handling.
         }
+
+        auto resetFlag = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { handlingException.store(false); });
 
         // Collect a crash dump if enabled.
         auto image = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>()).filename();
