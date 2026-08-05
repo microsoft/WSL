@@ -309,9 +309,8 @@ void WSLCVirtualMachine::Initialize()
     // Mount VHDs
     const auto rootDevice = GetVhdDevicePath(0);
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs);
-
     const auto modulesDevice = GetVhdDevicePath(1);
-    Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
+    MountModules(m_initChannel, modulesDevice.c_str(), FeatureEnabled(WslcFeatureFlagsNestedVirtualization));
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
     // to the service before virtiofs shares or Consomme networking devices are created.
@@ -881,6 +880,23 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
         TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
         TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
         TraceLoggingValue(Flags, "Flags"),
+        TraceLoggingValue(response.Result, "Result"));
+
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+}
+
+void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Source, bool LoadKvm)
+{
+    wsl::shared::MessageWriter<WSLC_MOUNT_MODULES> message;
+    message.WriteString(message->SourceIndex, Source);
+    message->LoadKvm = LoadKvm;
+
+    const auto& response = Channel.Transaction<WSLC_MOUNT_MODULES>(message.Span());
+
+    WSL_LOG(
+        "WSLCMountModules",
+        TraceLoggingValue(Source, "Source"),
+        TraceLoggingValue(LoadKvm, "LoadKvm"),
         TraceLoggingValue(response.Result, "Result"));
 
     THROW_HR_IF(E_FAIL, response.Result != 0);

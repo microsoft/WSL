@@ -23,6 +23,8 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
+#include "ExecutionContext.h"
+#include "Localization.h"
 #include "string.hpp"
 
 using namespace wsl::windows::common;
@@ -145,21 +147,22 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
         vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = SanitizeHostingProcessNameSuffix(Settings->DisplayName);
     }
 
-    const bool nestedVirt = FeatureEnabled(WslcFeatureFlagsNestedVirtualization);
-    if (nestedVirt)
+    if (FeatureEnabled(WslcFeatureFlagsNestedVirtualization))
     {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            wsl::shared::Localization::MessageNestedVirtualizationNotSupported(),
+            !hcs::IsNestedVirtualizationSupported());
+
         vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = true;
     }
 
 #ifdef _AMD64_
 
-    if (!(nestedVirt && !helpers::IsWindows11OrAbove()))
-    {
-        HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
-        __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
-        vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
-        vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
-    }
+    HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
+    __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
+    vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
+    vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
 
 #endif
 
