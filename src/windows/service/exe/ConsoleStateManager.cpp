@@ -72,6 +72,9 @@ void ConsoleStateManager::Commit(_In_ const GUID& LeaseId, _In_ const LXSS_CONSO
 
 bool ConsoleStateManager::Release(_In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState)
 {
+    BaselineState = {};
+    ConfiguredState = {};
+
     std::vector<ULONG64> callbackIds;
     bool restore = false;
     {
