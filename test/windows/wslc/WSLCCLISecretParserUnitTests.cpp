@@ -36,9 +36,11 @@ public:
         m_path = std::filesystem::temp_directory_path() /
                  (L"wslc_ut_secret_" + std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(++s_counter) + L".bin");
         std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+        THROW_HR_IF_MSG(E_FAIL, !file.is_open(), "Failed to create temp file: %ls", m_path.c_str());
         if (!bytes.empty())
         {
             file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            THROW_HR_IF_MSG(E_FAIL, !file.good(), "Failed to write temp file: %ls", m_path.c_str());
         }
     }
 

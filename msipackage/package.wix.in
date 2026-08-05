@@ -139,6 +139,10 @@
                         <Verb Id="open" Command="open" TargetFile="wsl.exe" Argument="--install --prompt-before-exit --from-file &quot;%1&quot;" />
                     </Extension>
                 </ProgId>
+                <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\WSLDistributionTar">
+                    <!-- FTA_AlwaysUnsafe -->
+                    <RegistryValue Name="EditFlags" Value="131072" Type="integer" />
+                </RegistryKey>
             </Component>
 
             <Component Id="wslservice" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134735" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
@@ -289,7 +293,7 @@
                      which would fail the install. -->
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
 
-                <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll" />
+                <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_DLL_PATH}" />
 
                 <!-- WSLC COM app - activated through WSLService -->
                 <RegistryKey Root="HKCR" Key="AppID\{E9B79997-57E3-4201-AECC-6A464E530DD2}">

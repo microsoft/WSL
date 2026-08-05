@@ -64,8 +64,13 @@ public:
     using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::uint64_t)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::uint64_t)>;
 
-    DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSession& session, IORelay& relay);
+    explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
+
+    // Binds the tracker to a VM's docker client and IO relay. Called on every VM start. Existing
+    // container/volume registrations are preserved across (re)connects so callers do not re-register
+    // when the VM is idle-terminated and later restarted.
+    void Connect(DockerHTTPClient& dockerClient, IORelay& relay);
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;

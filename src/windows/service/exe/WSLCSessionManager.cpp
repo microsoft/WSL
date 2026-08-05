@@ -121,6 +121,7 @@ private:
         Settings.MemoryMb = memoryMb > 0 ? memoryMb : SessionSettings::DefaultMemoryMb();
         Settings.MaximumStorageSizeMb = userSettings.Get<settings::Setting::SessionStorageSizeMb>();
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
+        Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
 
         // TODO: Add a config setting to opt-out of GPU support.
@@ -285,8 +286,7 @@ void WSLCSessionManagerImpl::CreateSession(
             g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
         // Create the VM factory in the SYSTEM service (privileged). The per-user session
-        // uses it to create the VM. Funneling VM creation through a factory lets the session
-        // own when VMs are created, rather than having one handed to it up front.
+        // uses it to create VMs on demand and recreate them after idle-termination.
         auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings);
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
@@ -473,6 +473,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
+    sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
     return sessionSettings;
 }
 
@@ -688,15 +689,17 @@ wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
 {
     wil::com_ptr<IWSLCSession> result;
 
-    ForEachSession<HRESULT>([&](SessionEntry& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
-        if (entry.SessionId != Id)
-        {
-            return std::nullopt;
-        }
+    ForEachSession<HRESULT>(
+        [&](SessionEntry& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
+            if (entry.SessionId != Id)
+            {
+                return std::nullopt;
+            }
 
-        result = session;
-        return S_OK;
-    });
+            result = session;
+            return S_OK;
+        },
+        PluginManager::IsInWslcNotification());
 
     THROW_HR_IF_MSG(WSLC_E_SESSION_NOT_FOUND, !result, "WSLC session %lu not found", Id);
     return result;
