@@ -2327,7 +2327,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
-    <value>Invalid --secret value '{}': {}</value>
+    <value>Ogiltigt --secret värde '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">

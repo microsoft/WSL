@@ -132,6 +132,10 @@ bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Con
 
 void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
 {
+    // Process output is UTF-8.
+    wsl::windows::common::ConsoleState console;
+    console.SetOutputCodePageUtf8();
+
     windows::common::io::MultiHandleWait io;
 
     wil::unique_event exitEvent;

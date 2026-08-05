@@ -19,6 +19,7 @@ Abstract:
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 #include <Windows.h>
 #include <WexTestClass.h>
@@ -128,6 +129,71 @@ private:
     wil::unique_file m_file;
     wil::unique_hfile m_readPipe;
     std::unique_ptr<PartialHandleRead> m_reader;
+};
+
+// RAII pipe preloaded with input for tests. A background thread feeds the content
+// (UTF-8) into the pipe while the test drains the read end, mirroring how real stdin
+// is filled by a separate producer. A synchronous write of the whole content on the
+// reading thread would deadlock once the content exceeds the pipe buffer
+// (OpenAnonymousPipe defaults to 4096 bytes), so the feeder runs concurrently and
+// closes the write end when done, letting file() read the content then hit EOF. The
+// read FILE* is configured like real stdin (_O_U8TEXT) and passed to
+// InputChannel/Reporter.
+struct InputPipe
+{
+    explicit InputPipe(const std::wstring& content)
+    {
+        auto [r, w] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);
+
+        wil::unique_handle readHandle{r.release()};
+        m_file = FileFromHandle(readHandle, "r");
+
+        const int fd = _fileno(m_file.get());
+        WI_VERIFY(_setmode(fd, _O_U8TEXT) != -1);
+
+        // Feed the content from a background thread so the reader can drain while the
+        // writer fills. Closing the write end signals EOF. No VERIFY/THROW macros run
+        // here since this executes on a separate thread; a broken pipe (the reader
+        // closed early) simply stops the feed.
+        m_writer = std::thread([writeEnd = std::move(w), utf8 = WStringToUTF8(content)]() mutable {
+            size_t offset = 0;
+            while (offset < utf8.size())
+            {
+                DWORD written = 0;
+                if (!WriteFile(writeEnd.get(), utf8.data() + offset, static_cast<DWORD>(utf8.size() - offset), &written, nullptr))
+                {
+                    break;
+                }
+
+                offset += written;
+            }
+
+            writeEnd.reset();
+        });
+    }
+
+    ~InputPipe()
+    {
+        // Close the read end first so a feeder still blocked on a full pipe unblocks
+        // with a broken pipe, then join it.
+        m_file.reset();
+        if (m_writer.joinable())
+        {
+            m_writer.join();
+        }
+    }
+
+    NON_COPYABLE(InputPipe);
+    NON_MOVABLE(InputPipe);
+
+    FILE* file() const
+    {
+        return m_file.get();
+    }
+
+private:
+    wil::unique_file m_file;
+    std::thread m_writer;
 };
 
 // Reporter wired to a single capture pipe for full output capture.

@@ -2163,7 +2163,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Имя сети не может быть пустым.</value>
   </data>
   <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
-    <value>Error information from the engine:</value>
+    <value>Сведения об ошибке от обработчика:</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Нераспознанная команда: "{}"</value>
