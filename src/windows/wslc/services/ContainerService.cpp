@@ -654,6 +654,8 @@ void ContainerService::Export(Session& session, const std::string& id, HANDLE ou
 
 void ContainerService::CopyToContainer(Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -662,6 +664,8 @@ void ContainerService::CopyToContainer(Session& session, const std::string& id, 
 
 void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
