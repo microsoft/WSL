@@ -703,7 +703,7 @@ void LoadKvmModule()
     THROW_ERRNO_IF(ENOTSUP, module == nullptr);
 
     const char* argv[] = {"/sbin/modprobe", module, nullptr};
-    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait("/sbin/modprobe", argv) < 0);
+    THROW_ERRNO_IF(EIO, UtilCreateProcessAndWait("/sbin/modprobe", argv) < 0);
 
 #else
 
