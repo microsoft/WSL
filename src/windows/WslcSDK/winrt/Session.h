@@ -24,6 +24,8 @@ struct Session : SessionT<Session>
     void Start();
     void Terminate();
     winrt::Microsoft::WSL::Containers::Container CreateContainer(winrt::Microsoft::WSL::Containers::ContainerSettings const& containerSettings);
+    winrt::Microsoft::WSL::Containers::Container OpenContainer(
+        hstring const& nameOrId, winrt::Microsoft::WSL::Containers::ProcessOutputMode const& initProcessOutputMode);
     void PullImage(winrt::Microsoft::WSL::Containers::PullImageOptions const& options);
     winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> PullImageAsync(
         winrt::Microsoft::WSL::Containers::PullImageOptions options);
@@ -38,7 +40,8 @@ struct Session : SessionT<Session>
     void TagImage(winrt::Microsoft::WSL::Containers::TagImageOptions const& options);
     void CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdOptions const& options);
     void DeleteVhdVolume(hstring const& name);
-    hstring Authenticate(winrt::Windows::Foundation::Uri const& serverAddress, hstring const& username, hstring const& password);
+    winrt::Microsoft::WSL::Containers::AuthenticateResult Authenticate(
+        winrt::Windows::Foundation::Uri const& serverAddress, hstring const& username, hstring const& password);
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> GetImages();
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;

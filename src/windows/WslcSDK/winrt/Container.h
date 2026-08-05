@@ -22,6 +22,8 @@ struct Container : ContainerT<Container>
 {
     Container() = default;
     Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings);
+    // Package-internal: wraps an already-opened container handle (from WslcOpenContainer).
+    explicit Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::ProcessOutputMode initProcessOutputMode);
 
     void Start();
     void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, winrt::Windows::Foundation::TimeSpan timeout);
@@ -41,6 +43,7 @@ private:
     void EnsureNotClosed() const;
 
     winrt::com_ptr<implementation::Process> m_initProcess;
+    bool m_opened = false;
 
     // Releasing the container handle will end the processes and disconnect the callbacks.
     // Keep this at the end so that it is released first, ensuring the init process' events aren't destroyed while they may still be signaled.

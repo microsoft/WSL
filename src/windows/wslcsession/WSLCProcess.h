@@ -45,9 +45,19 @@ public:
     HANDLE GetExitEvent();
     int GetPid() const;
 
+    // Attaches an opaque keep-alive token whose lifetime is bound to this process object. A
+    // root-namespace process is not tracked as a container, so it relies on this token to hold an
+    // activity reference on the owning session for as long as the client keeps the process alive,
+    // preventing the idle worker from tearing the VM down (and killing the process) underneath it.
+    void SetKeepAliveToken(Microsoft::WRL::ComPtr<IUnknown>&& Token) noexcept
+    {
+        m_keepAliveToken = std::move(Token);
+    }
+
 private:
     WSLCProcessFlags m_flags;
     std::shared_ptr<WSLCProcessControl> m_control;
     std::unique_ptr<WSLCProcessIO> m_io;
+    Microsoft::WRL::ComPtr<IUnknown> m_keepAliveToken;
 };
 } // namespace wsl::windows::service::wslc

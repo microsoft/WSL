@@ -34,6 +34,13 @@ Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& setti
     }
 }
 
+Process::Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode outputMode) : m_outputMode(outputMode)
+{
+    // No ProcessSettings; used for opened-container paths where output mode is set independently.
+    // For Event mode, callers are responsible for registering callbacks via
+    // WslcSetContainerInitProcessIOCallbacks using the OutputCallback/ExitCallback statics.
+}
+
 void Process::ApplyCallbacksToSettings()
 {
     // Callbacks are only used with OutputMode::Event.
@@ -45,11 +52,7 @@ void Process::ApplyCallbacksToSettings()
 
     auto settingsPtr = GetStructPointer(m_settings);
 
-    WslcProcessCallbacks callbacks{};
-    callbacks.onExit = ExitCallback;
-    callbacks.onStdOut = OutputCallback;
-    callbacks.onStdErr = OutputCallback;
-
+    WslcProcessCallbacks callbacks = GetEventCallbacks();
     winrt::check_hresult(WslcSetProcessSettingsCallbacks(settingsPtr, &callbacks, this));
 }
 
@@ -95,6 +98,15 @@ void Process::AttachHandle(WslcProcess handle)
 
     m_process.reset(handle);
     StartWaitingForExit();
+}
+
+WslcProcessCallbacks Process::GetEventCallbacks() const noexcept
+{
+    WslcProcessCallbacks callbacks{};
+    callbacks.onStdOut = OutputCallback;
+    callbacks.onStdErr = OutputCallback;
+    callbacks.onExit = ExitCallback;
+    return callbacks;
 }
 
 ProcessOutputMode Process::OutputMode()
