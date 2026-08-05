@@ -134,6 +134,12 @@ void BuildImage(CLIExecutionContext& context)
         output = validation::ParseOutputSpec(context.Args.Get<ArgType::Output>());
     }
 
+    std::optional<std::wstring> iidFilePath;
+    if (context.Args.Contains(ArgType::IidFile))
+    {
+        iidFilePath = context.Args.Get<ArgType::IidFile>();
+    }
+
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
     WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.GetFlag<ArgType::Verbose>());
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetFlag<ArgType::NoCache>());
@@ -142,7 +148,7 @@ void BuildImage(CLIExecutionContext& context)
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.GetFlag<ArgType::Verbose>());
     services::ImageService::Build(
-        session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, flags, &callback, cancelEvent);
+        session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, iidFilePath, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)
