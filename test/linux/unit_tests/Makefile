@@ -51,6 +51,7 @@ UNIT_TEST_OBJECTS=\
 	sched.o \
 	sem.o \
 	shm.o \
+	socket.o \
 	socket_nonblock.o \
 	splice.o \
 	sysfs.o \
