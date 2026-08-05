@@ -383,6 +383,13 @@ class WSLCCLIArgumentUnitTests
         // string -> InspectType (inspect object type)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Type>(L"container"), InspectType::Container);
 
+        // string -> BuildOutput (docker-style build exporter spec)
+        {
+            auto output = ValidateAndGetCached<ArgType::BuildOutput>(L"type=tar,dest=-");
+            VERIFY_ARE_EQUAL(output.Type, std::wstring(L"tar"));
+            VERIFY_ARE_EQUAL(output.Dest, std::wstring(L"-"));
+        }
+
         // string -> pair<key, value> (label and driver option share the key=value shape)
         {
             auto label = ValidateAndGetCached<ArgType::Label>(L"env=prod");

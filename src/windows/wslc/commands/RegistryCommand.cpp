@@ -17,55 +17,10 @@ Abstract:
 #include "RegistryTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
-#include <iostream>
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 using namespace wsl::shared;
-
-namespace {
-
-std::wstring Prompt(wsl::windows::wslc::Reporter& reporter, const std::wstring& label, bool maskInput)
-{
-    // Write without a trailing newline so the cursor stays inline (matching Docker's behavior).
-    reporter.Info(L"{}", label);
-
-    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD previousMode = 0;
-    const bool canMask = maskInput && (input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &previousMode);
-
-    // Armed before echo is disabled and built from a direct lambda (no allocation, can't throw) so a
-    // failure while masking still restores the console. Only acts once echo was actually disabled.
-    bool echoDisabled = false;
-    auto restoreConsole = wil::scope_exit([input, previousMode, &echoDisabled, &reporter]() {
-        if (!echoDisabled)
-        {
-            return;
-        }
-
-        SetConsoleMode(input, previousMode);
-        // Runs from a noexcept scope_exit destructor, possibly during unwinding, so swallow any
-        // output failure to avoid std::terminate.
-        try
-        {
-            reporter.Info(L"\n");
-        }
-        CATCH_LOG()
-    });
-
-    if (canMask)
-    {
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, previousMode & ~ENABLE_ECHO_INPUT));
-        echoDisabled = true;
-    }
-
-    std::wstring value;
-    std::getline(std::wcin, value);
-
-    return value;
-}
-
-} // namespace
 
 namespace wsl::windows::wslc {
 
@@ -134,10 +89,10 @@ void RegistryLoginCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 
 void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    // Prompt for username if not provided.
     if (!context.Args.Contains(ArgType::Username))
     {
-        context.Args.Add(ArgType::Username, Prompt(context.Reporter, Localization::WSLCCLI_LoginUsernamePrompt(), false));
+        auto username = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
+        context.Args.Add(ArgType::Username, std::move(username));
     }
 
     // Resolve password: --password, --password-stdin, or interactive prompt.
@@ -145,18 +100,12 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         if (context.Args.GetValue<ArgType::PasswordStdin>())
         {
-            std::wstring line;
-            std::getline(std::wcin, line);
-            if (!line.empty() && line.back() == L'\r')
-            {
-                line.pop_back();
-            }
-
-            context.Args.Add(ArgType::Password, std::move(line));
+            context.Args.Add(ArgType::Password, context.Reporter.ReadLine().value_or(std::wstring{}));
         }
         else
         {
-            context.Args.Add(ArgType::Password, Prompt(context.Reporter, Localization::WSLCCLI_LoginPasswordPrompt(), true));
+            auto password = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
+            context.Args.Add(ArgType::Password, std::move(password));
         }
     }
 

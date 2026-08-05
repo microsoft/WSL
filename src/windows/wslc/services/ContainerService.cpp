@@ -327,6 +327,7 @@ std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 
 int ContainerService::Attach(Reporter& reporter, Session& session, const std::string& id)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -487,6 +488,7 @@ CreateContainerResult ContainerService::Create(Reporter& reporter, Session& sess
 
 int ContainerService::Start(Reporter& reporter, Session& session, const std::string& id, bool attach)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
@@ -517,6 +519,7 @@ int ContainerService::Start(Reporter& reporter, Session& session, const std::str
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     THROW_IF_FAILED_EXCEPT(container->Stop(options.Signal, options.Timeout), WSLC_E_CONTAINER_NOT_RUNNING);
@@ -524,6 +527,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
 
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     THROW_IF_FAILED(container->Kill(signal));
@@ -531,6 +535,7 @@ void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal 
 
 void ContainerService::Delete(Session& session, const std::string& id, bool force)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     THROW_IF_FAILED(container->Delete(force ? WSLCDeleteFlagsForce : WSLCDeleteFlagsNone));
@@ -585,6 +590,7 @@ std::vector<ContainerInformation> ContainerService::List(
 
 int ContainerService::Exec(Reporter& reporter, Session& session, const std::string& id, ContainerOptions options)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -616,6 +622,7 @@ int ContainerService::Exec(Reporter& reporter, Session& session, const std::stri
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     wil::unique_cotaskmem_ansistring output;
@@ -634,6 +641,8 @@ void ContainerService::Export(Session& session, const std::string& id, const std
 
 void ContainerService::Export(Session& session, const std::string& id, HANDLE outputHandle)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -645,6 +654,8 @@ void ContainerService::Export(Session& session, const std::string& id, HANDLE ou
 
 void ContainerService::CopyToContainer(Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -653,6 +664,8 @@ void ContainerService::CopyToContainer(Session& session, const std::string& id, 
 
 void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -661,6 +674,7 @@ void ContainerService::CopyFromContainer(Session& session, const std::string& id
 
 void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
@@ -671,6 +685,10 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
 
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
+
+    // Container output is UTF-8.
+    wsl::windows::common::ConsoleState console;
+    console.SetOutputCodePageUtf8();
 
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
@@ -688,6 +706,7 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
 
 wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Session& session, const std::string& id)
 {
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     wil::unique_cotaskmem_ansistring output;

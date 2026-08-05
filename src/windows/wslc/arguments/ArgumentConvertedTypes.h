@@ -26,8 +26,9 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+struct BuildOutput;
 struct BuildSecret;
-}
+} // namespace wsl::windows::wslc::services
 
 namespace wsl::windows::wslc::argument::details {
 
@@ -39,6 +40,7 @@ using InspectType = wsl::windows::wslc::models::InspectType;
 using WSLCSignal = ::WSLCSignal;
 using UlimitValue = std::tuple<std::string, int64_t, int64_t>;
 using KeyValuePair = std::pair<std::string, std::string>;
+using BuildOutput = wsl::windows::wslc::services::BuildOutput;
 using BuildSecret = wsl::windows::wslc::services::BuildSecret;
 
 // Generate the ArgType -> converted type mapping from the X-macro. Every ArgType gets a

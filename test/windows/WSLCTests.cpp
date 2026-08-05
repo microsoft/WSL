@@ -2342,7 +2342,7 @@ class WSLCTests
         WSLCBuildImageOptions options{
             .ContextPath = contextDir.c_str(),
             .DockerfileHandle = ToCOMInputHandle(dummyDockerfile.get()),
-            .Flags = static_cast<WSLCBuildImageFlags>(0x8)};
+            .Flags = static_cast<WSLCBuildImageFlags>(0x10)};
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr));
     }
@@ -3539,9 +3539,9 @@ class WSLCTests
             constexpr auto c_mountPoint = "/testdata";
             auto mountSource = std::filesystem::absolute(g_testDataPath);
 
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true));
-            auto unmount =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint)); });
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(mountSource.c_str(), c_mountPoint, true, TRUE));
+            auto unmount = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(session->UnmountWindowsFolder(c_mountPoint, TRUE)); });
 
             const auto installCommand = std::format("tdnf install -y --disablerepo='*' --nogpgcheck {}/packages/*.rpm", c_mountPoint);
             auto installSocat = WSLCProcessLauncher("/bin/sh", {"/bin/sh", "-c", installCommand}).Launch(*session);
@@ -3718,35 +3718,35 @@ class WSLCTests
 
         // Validate writeable mount.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(false));
 
             // Validate that mount can't be stacked on each other
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, TRUE), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that folder is writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt && sync"}, 0);
             VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate read-only mount.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Validate that folder is not writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate that a read-only share cannot be made writeable via mount -o remount,rw.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Attempt an in-place remount to read-write from the guest.
@@ -3755,14 +3755,14 @@ class WSLCTests
             // Verify the folder is still not writeable.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate that the device host enforces read-only even if the guest tries to bypass mount options.
         if (enableVirtioFs)
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Remount a bind of the share as read-write to ensure the device host still enforces read-only access.
@@ -3780,25 +3780,25 @@ class WSLCTests
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path-rw/file.txt"}, 1);
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "umount /win-path-rw && rmdir /win-path-rw"}, 0);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate various error paths
         {
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "relative-mountpoint", true), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "", true), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true, TRUE), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true, TRUE), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "relative-mountpoint", true, TRUE), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "", true, TRUE), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/not-mounted", TRUE), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/proc", TRUE), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             // Validate that folders that are manually unmounted from the guest are handled properly
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             ExpectCommandResult(session.get(), {"/usr/bin/umount", "/win-path"}, 0);
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
         }
     }
 
@@ -3834,8 +3834,8 @@ class WSLCTests
 
         // Concurrent mounts of the same host path use distinct children on the same aggregate device.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-1", false));
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-2", false));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-1", false, TRUE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-2", false, TRUE));
 
             auto firstDevice = getMountField("/win-path-1", "MAJ:MIN");
             auto secondDevice = getMountField("/win-path-2", "MAJ:MIN");
@@ -3853,19 +3853,19 @@ class WSLCTests
             const auto firstChild = std::format("/run/wsl/virtiofs-mounts/{}{}", LX_INIT_DRVFS_VIRTIO_TAG, firstRoot);
             const auto secondChild = std::format("/run/wsl/virtiofs-mounts/{}{}", LX_INIT_DRVFS_VIRTIO_TAG, secondRoot);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-1"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-1", TRUE));
             ExpectCommandResult(session.get(), {"/bin/cat", "/win-path-2/marker.txt"}, 0);
             ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", firstChild}, 0);
             ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-2"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-2", TRUE));
             ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", secondChild}, 0);
         }
 
         // Verify that read-write and read-only shares use different children on the same aggregate device.
         {
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-rw", false));
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-ro", true));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-rw", false, TRUE));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path-ro", true, TRUE));
 
             auto rwDevice = getMountField("/win-path-rw", "MAJ:MIN");
             auto roDevice = getMountField("/win-path-ro", "MAJ:MIN");
@@ -3875,8 +3875,8 @@ class WSLCTests
             VERIFY_ARE_EQUAL(rwDevice, roDevice);
             VERIFY_ARE_NOT_EQUAL(rwRoot, roRoot);
 
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-rw"));
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-ro"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-rw", TRUE));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path-ro", TRUE));
         }
     }
 
@@ -3904,8 +3904,8 @@ class WSLCTests
             return root;
         };
 
-        VERIFY_SUCCEEDED(session->MountWindowsFolder(firstFolder.c_str(), "/remove-child-first", false));
-        VERIFY_SUCCEEDED(session->MountWindowsFolder(secondFolder.c_str(), "/remove-child-second", false));
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(firstFolder.c_str(), "/remove-child-first", false, TRUE));
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(secondFolder.c_str(), "/remove-child-second", false, TRUE));
 
         const auto firstRoot = getMountRoot("/remove-child-first");
         const auto secondRoot = getMountRoot("/remove-child-second");
@@ -3917,12 +3917,12 @@ class WSLCTests
         ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", firstChild}, 0);
         ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
 
-        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-first"));
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-first", TRUE));
         ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", firstChild}, 0);
         ExpectCommandResult(session.get(), {"/bin/cat", "/remove-child-second/marker.txt"}, 0);
         ExpectCommandResult(session.get(), {"/usr/bin/test", "-e", secondChild}, 0);
 
-        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-second"));
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/remove-child-second", TRUE));
         ExpectCommandResult(session.get(), {"/usr/bin/test", "!", "-e", secondChild}, 0);
     }
 
@@ -3948,7 +3948,7 @@ class WSLCTests
             std::ofstream(folder / "marker.txt") << index;
 
             const auto mountPoint = std::format("/vfs-many-{}", index);
-            VERIFY_SUCCEEDED(session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(folder.c_str(), mountPoint.c_str(), false, TRUE));
             mountPoints.emplace_back(mountPoint);
 
             const auto command = std::format("cat {}/marker.txt", mountPoint);
@@ -3958,7 +3958,7 @@ class WSLCTests
 
         for (const auto& mountPoint : mountPoints)
         {
-            VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint.c_str()));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint.c_str(), TRUE));
         }
     }
 
@@ -4134,7 +4134,7 @@ class WSLCTests
             options.Flags = static_cast<WSLCProcessFlags>(0x4);
             wil::com_ptr<IWSLCProcess> process;
             int err = 0;
-            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateRootNamespaceProcess("/bin/true", &options, 0, 0, &process, &err));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateRootNamespaceProcess("/bin/true", &options, 0, 0, FALSE, &process, &err));
         }
 
         // Simple case
@@ -5790,6 +5790,7 @@ class WSLCTests
         options.IpRange = "10.0.0.0/24";
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options, nullptr));
+        ValidateCOMErrorMessageContains(L"invalid ip-range");
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
@@ -12168,6 +12169,10 @@ class WSLCTests
         auto settings = GetDefaultSessionSettings(c_sessionName);
         auto session = CreateSession(settings);
 
+        // Session creation is lazy, so start the VM by launching a process before killing it.
+        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+        auto process = launcher.Launch(*session);
+
         KillVmByOwner(c_sessionName);
 
         WaitForSessionTermination(session.get());
@@ -12190,6 +12195,284 @@ class WSLCTests
         VERIFY_IS_TRUE(process.GetExitEvent().wait(10000));
 
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+    }
+
+    // TriggerIdleTermination runs the idle-teardown path synchronously and reports whether the VM
+    // was already idle. Validates the idle -> running -> forced-idle -> running lifecycle.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRestartsVm)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-trigger-test";
+
+        // Idle termination is only permitted for storage-backed sessions (tmpfs state is
+        // unrecoverable), so this lifecycle test uses a dedicated storage directory.
+        const auto storageDir = std::filesystem::current_path() / "test-storage-idle-restart";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        auto settings = GetDefaultSessionSettings(c_sessionName);
+        settings.StoragePath = storageDir.c_str();
+        auto session = CreateSession(settings);
+
+        // The VM starts lazily, so a freshly created session is already idle.
+        BOOL wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        // Starting a process brings the VM up.
+        {
+            WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+            auto process = launcher.Launch(*session);
+            VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+        }
+
+        // Releasing the process wrapper removes its activity hold, allowing idle termination.
+        wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        // A second trigger is now a no-op.
+        wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+
+        // The session survives and lazily restarts the VM on the next operation.
+        WSLCProcessLauncher launcher2("/bin/sleep", {"/bin/sleep", "60"});
+        auto process2 = launcher2.Launch(*session);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+    }
+
+    // A tmpfs-backed session has no persistent storage, so its VM state cannot be recovered after a
+    // teardown. TriggerIdleTermination must refuse to tear such a session down (matching the
+    // automatic idle timer), leaving the VM running rather than destroying unrecoverable state.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRefusedWithoutStorage)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-tmpfs-test";
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName));
+
+        // A never-started session is already idle even though idle termination is disabled.
+        BOOL wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_TRUE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+
+        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+        auto process = launcher.Launch(*session);
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+
+        wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+
+        // The VM must still be running: the tmpfs session was not torn down.
+        VERIFY_IS_TRUE(IsVmRunning(c_sessionName));
+    }
+
+    // A running container pins the VM via its activity hold, matching the production idle timer.
+    WSLC_TEST_METHOD(TriggerIdleTerminationDefersForRunningContainer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-idle-active", {"/bin/sleep", "600"});
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        // The test hook honors the same activity guard as automatic idle teardown.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+    }
+
+    // A created or stopped container has no activity hold. Its port mapping and bind mount must remain
+    // usable after each idle teardown and lazy VM restart.
+    WSLC_TEST_METHOD(TriggerIdleTerminationRecoversStoppedContainerResources)
+    {
+        const auto hostFolder = std::filesystem::current_path() / "test-idle-container-volume";
+        std::filesystem::create_directories(hostFolder);
+        VERIFY_IS_TRUE((std::ofstream(hostFolder / "marker.txt") << "idle-recovery").good());
+        auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+        });
+
+        WSLCContainerLauncher launcher(
+            "python:3.12-alpine",
+            "wslc-idle-resource-recovery",
+            {"python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", "--directory", "/data"},
+            {"PYTHONUNBUFFERED=1"},
+            "bridge");
+        launcher.AddPort(1270, 8000, AF_INET);
+        launcher.AddVolume(hostFolder.wstring(), "/data", true);
+        auto container = launcher.Create(*m_defaultSession);
+
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+
+        // Tear down before the first start, then validate both recovered resources.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        for (int iteration = 0; iteration < 2; ++iteration)
+        {
+            {
+                VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
+                VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+                VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+                auto initProcess = container.GetInitProcess();
+                WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
+
+                const auto ports = container.Inspect().Ports;
+                VERIFY_IS_TRUE(ports.contains("8000/tcp"));
+                VERIFY_ARE_EQUAL(ports.at("8000/tcp").size(), 1u);
+                VERIFY_ARE_EQUAL(ports.at("8000/tcp")[0].HostPort, std::string{"1270"});
+                ExpectHttpResponse(L"http://127.0.0.1:1270/marker.txt", 200);
+
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+                VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+            }
+
+            wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+            VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+        }
+    }
+
+    // A container that outlives an idle teardown still owns VM-scoped state (bind mounts, port
+    // relays) that is released from ~WSLCContainerImpl when the session is finally torn down. By
+    // then the VM object is gone, and a graceful idle teardown leaves VmExited() false, so the
+    // release path must key off "no VM" as well; a throw out of the destructor is unrecoverable
+    // because destructors are noexcept and would terminate the session host.
+    WSLC_TEST_METHOD(SessionTerminationAfterIdleTerminationWithContainer)
+    {
+        const auto hostFolder = std::filesystem::current_path() / "test-idle-terminate-volume";
+        std::filesystem::create_directories(hostFolder);
+        auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+        });
+
+        WSLCContainerLauncher launcher("debian:latest", "wslc-idle-terminate-session", {"/bin/sleep", "600"});
+        launcher.AddVolume(hostFolder.wstring(), "/data", true);
+
+        {
+            auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+            // Stop the container so it releases its activity hold on the VM.
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+
+            // Drop the client reference without deleting: the session keeps the only remaining
+            // reference in m_containers, so the impl is destroyed by the session teardown below
+            // rather than here (where the VM is still alive and the release path is trivially safe).
+            container.SetDeleteOnClose(false);
+        }
+
+        // Tear the VM down. The container metadata (including its mounted-volume state) deliberately
+        // survives, while the VM object is released without the exit event ever being signaled.
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Terminating clears m_containers, running ~WSLCContainerImpl with no VM to unmount from.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        WaitForSessionTermination(m_defaultSession.get());
+
+        {
+            auto restore = ResetTestSession();
+        }
+
+        // The session host must still be alive and usable: if the destructor threw, the per-user
+        // host process died and this fails.
+        WSLCProcessLauncher processLauncher("/bin/echo", {"/bin/echo", "OK"});
+        auto process = processLauncher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(process.Wait(), 0);
+        PruneResult pruneResult;
+        LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &pruneResult.result));
+    }
+
+    // Hammer the idle-teardown path concurrently with VM-level operations to surface deadlocks or
+    // stale-state races. Operations may fail while the VM is being torn down; that is tolerated, but
+    // the workers must never hang and the session must remain usable afterwards.
+    WSLC_TEST_METHOD(TriggerIdleTerminationConcurrentWithOperations)
+    {
+        constexpr auto c_sessionName = L"wslc-idle-hammer-test";
+
+        // Idle termination only tears down storage-backed sessions, so a dedicated storage directory
+        // is required for the teardown path to actually run under the concurrent hammering.
+        const auto storageDir = std::filesystem::current_path() / "test-storage-idle-hammer";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        auto settings = GetDefaultSessionSettings(c_sessionName);
+        settings.StoragePath = storageDir.c_str();
+        auto session = CreateSession(settings);
+
+        std::atomic<bool> stop = false;
+        std::atomic<unsigned int> opFailures = 0;
+
+        // Run the hammering worker via a future so the join is bounded: a real teardown/operation
+        // deadlock would otherwise hang the test host indefinitely instead of failing. If the worker
+        // does not drain within the timeout after we signal stop, treat it as a deadlock and fail.
+        auto worker = std::async(std::launch::async, [&]() {
+            while (!stop.load())
+            {
+                try
+                {
+                    WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+                    auto process = launcher.Launch(*session);
+                    process.GetExitEvent().wait(5000);
+                }
+                catch (...)
+                {
+                    opFailures.fetch_add(1);
+                }
+            }
+        });
+
+        for (int i = 0; i < 25; ++i)
+        {
+            BOOL wasAlreadyIdle = FALSE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+        }
+
+        stop.store(true);
+
+        // A real teardown/operation deadlock would leave the worker wedged forever. The std::future
+        // destructor blocks until the task completes, so letting a failed VERIFY unwind here would hang
+        // the test host -- exactly what this test guards against. Fail fast with a dump on timeout so we
+        // never unwind with an unfinished async task.
+        FAIL_FAST_IF_MSG(
+            worker.wait_for(std::chrono::seconds(60)) != std::future_status::ready,
+            "hammering worker did not drain after stop; likely teardown/operation deadlock");
+
+        worker.get();
+
+        LogInfo("TriggerIdleTerminationConcurrentWithOperations tolerated %u operation failures", opFailures.load());
+
+        // The session must still be usable after the hammering.
+        WSLCProcessLauncher launcher("/bin/true", {"/bin/true"});
+        auto process = launcher.Launch(*session);
+        VERIFY_IS_TRUE(process.GetExitEvent().wait(30000));
     }
 
     // Helper: COM callback that captures all warnings received.
@@ -12259,13 +12542,21 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager2->CreateSession(&settings2, WSLCSessionFlagsNone, warningCallback.Get(), &session2));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session2.get());
 
-            // Verify the warning matches the expected localized message for the corrupt container.
+            // The VM (and container recovery) starts lazily on the first operation. Trigger it via a
+            // callback-bearing operation (CreateNetwork) so recovery warnings reach the warning callback.
+            WSLCNetworkOptions triggerNetwork{};
+            triggerNetwork.Name = "wslc-recovery-trigger";
+            triggerNetwork.Driver = "bridge";
+            VERIFY_SUCCEEDED(session2->CreateNetwork(&triggerNetwork, warningCallback.Get()));
+
+            // Recovery runs during the lazy VM start under this operation's context, so the failure
+            // warning is delivered to its warning callback.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(
+            auto recoveryWarning = std::format(
                 L"wsl: {}\n",
                 wsl::shared::Localization::MessageWslcFailedToRecoverContainer(wsl::shared::string::MultiByteToWide(containerId)));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             VERIFY_SUCCEEDED(session2->Terminate());
         }
@@ -12327,12 +12618,20 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-            // Verify the warning matches the expected localized message for the missing volume.
+            // The VM (and volume recovery) starts lazily on the first operation. Trigger it via a
+            // callback-bearing operation (CreateNetwork) so recovery warnings reach the warning callback.
+            WSLCNetworkOptions triggerNetwork{};
+            triggerNetwork.Name = "wslc-recovery-trigger";
+            triggerNetwork.Driver = "bridge";
+            VERIFY_SUCCEEDED(session->CreateNetwork(&triggerNetwork, warningCallback.Get()));
+
+            // Recovery runs during the lazy VM start under this operation's context, so the failure
+            // warning is delivered to its warning callback.
             auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning =
+            auto recoveryWarning =
                 std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(L"wslc-test-warning-recovery"));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             // Clean up the orphaned volume from Docker's metadata.
             LOG_IF_FAILED(session->DeleteVolume("wslc-test-warning-recovery"));
@@ -12392,10 +12691,19 @@ class WSLCTests
             VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-            auto warnings = warningCallback->GetWarnings();
-            auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+            // The VM (and guest volume recovery) starts lazily on the first operation. Trigger it via a
+            // callback-bearing operation (CreateNetwork) so recovery warnings reach the warning callback.
+            WSLCNetworkOptions triggerNetwork{};
+            triggerNetwork.Name = "wslc-recovery-trigger";
+            triggerNetwork.Driver = "bridge";
+            VERIFY_SUCCEEDED(session->CreateNetwork(&triggerNetwork, warningCallback.Get()));
 
-            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == expectedWarning; }));
+            // Recovery runs during the lazy VM start under this operation's context, so the failure
+            // warning is delivered to its warning callback.
+            auto warnings = warningCallback->GetWarnings();
+            auto recoveryWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::MessageWslcFailedToRecoverVolume(c_volumeName));
+
+            VERIFY_IS_TRUE(std::ranges::any_of(warnings, [&](const auto& w) { return w == recoveryWarning; }));
 
             // Clean up the volume from Docker's metadata.
             ExpectCommandResult(session.get(), {"/usr/bin/docker", "volume", "rm", "-f", c_volumeName}, 0);

@@ -116,6 +116,12 @@ void BuildImage(CLIExecutionContext& context)
         target = context.Args.GetValue<ArgType::BuildTarget>();
     }
 
+    std::optional<services::BuildOutput> output;
+    if (context.Args.Contains(ArgType::BuildOutput))
+    {
+        output = context.Args.GetValue<ArgType::BuildOutput>();
+    }
+
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
     WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.GetValue<ArgType::Verbose>());
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetValue<ArgType::NoCache>());
@@ -123,7 +129,8 @@ void BuildImage(CLIExecutionContext& context)
 
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.GetValue<ArgType::Verbose>());
-    services::ImageService::Build(session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, flags, &callback, cancelEvent);
+    services::ImageService::Build(
+        session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

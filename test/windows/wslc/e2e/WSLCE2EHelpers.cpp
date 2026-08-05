@@ -703,27 +703,33 @@ namespace {
 
     void WaitForTtySize(const WSLCInteractiveSession& session, SHORT columns, SHORT rows)
     {
-        try
-        {
-            wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() {
-                    const std::string data = session.GetStdoutData();
-                    THROW_HR_IF(E_ABORT, data.find(std::format("{} {}\r\n", rows, columns)) == std::string::npos);
-                },
-                std::chrono::milliseconds(200),
-                std::chrono::seconds(60));
-        }
-        catch (...)
-        {
-            const std::string data = session.GetStdoutData();
-            VERIFY_FAIL(std::format(
-                            L"Timed out waiting for tty resize. Captured pseudoconsole output: \"{}\"",
-                            wsl::shared::string::MultiByteToWide(EscapeString(data)))
-                            .c_str());
-        }
+        WaitForPseudoConsoleOutput(session, std::format("{} {}\r\n", rows, columns));
     }
 
 } // namespace
+
+void WaitForPseudoConsoleOutput(const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout)
+{
+    try
+    {
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const std::string data = session.GetStdoutData();
+                THROW_HR_IF(E_ABORT, data.find(expected) == std::string::npos);
+            },
+            std::chrono::milliseconds(200),
+            timeout);
+    }
+    catch (...)
+    {
+        const std::string data = session.GetStdoutData();
+        VERIFY_FAIL(std::format(
+                        L"Timed out waiting for \"{}\". Captured pseudoconsole output: \"{}\"",
+                        wsl::shared::string::MultiByteToWide(EscapeString(expected)),
+                        wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                        .c_str());
+    }
+}
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows)
 {

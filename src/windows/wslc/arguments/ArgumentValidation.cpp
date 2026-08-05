@@ -61,6 +61,11 @@ void Argument::Validate(ArgMap& execArgs) const
 {
     switch (m_argType)
     {
+    case ArgType::BuildOutput:
+        CacheConverted<ArgType::BuildOutput>(
+            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseOutputSpec(value); });
+        break;
+
     case ArgType::Format:
         CacheConverted<ArgType::Format>(execArgs, m_name, validation::GetFormatTypeFromString);
         break;
