@@ -160,7 +160,7 @@ WSL2 でディスクを強制的に停止してデタッチするには、'wsl.e
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>指定されたマウント名に無効な '/' 文字が含まれています。無効な文字を含めずに再試行してください。</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -2336,6 +2336,14 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>無効な --secret value '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Cannot write build output to the console for --output value '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>必須のオプションがありません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2896,6 +2904,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>常に新しいバージョンのイメージのプルを試みます</value>
+  </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>ビルドするターゲット ビルド ステージを設定します</value>

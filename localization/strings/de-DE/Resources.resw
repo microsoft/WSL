@@ -160,7 +160,7 @@ Führen Sie "wsl.exe {}" aus, um das Beenden und Trennen des Datenträgers durch
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Der angegebene Bereitstellungsname enthält ein ungültiges "/"-Zeichen. Wiederholen Sie den Vorgang ohne das ungültige Zeichen.</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -379,7 +379,7 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux aus
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linuxaus
 
 Verbrauch:
     /l, /list [Option]
@@ -1592,7 +1592,7 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
     <value>Windows-Dateien und -Programme über WSL starten</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
-    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, auszuführen.
+    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, auszuführen.
 „powershell.exe /c start .“, um den Datei-Explorer in Ihrem aktuellen Ordner zu öffnen.</value>
     <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
   </data>
@@ -2336,6 +2336,14 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Ungültiger --secret value '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Cannot write build output to the console for --output value '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Erforderliche Option fehlt: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2896,6 +2904,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Immer versuchen, eine neuere Version des Images zu laden</value>
+  </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Setzen Sie die angestrebte Build-Stufe auf „Build“</value>

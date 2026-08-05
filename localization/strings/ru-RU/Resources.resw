@@ -160,7 +160,7 @@
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Указанное имя подключения содержит недопустимый символ "/". Повторите попытку без недопустимого символа.</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -2337,6 +2337,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Недопустимое значение --secret "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Невозможно записать выходные данные сборки в консоль для значения --output '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Отсутствует обязательный параметр: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2897,6 +2905,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Всегда пытайтесь загрузить более новую версию образа</value>
+  </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Настройка целевой стадии сборки для сборки</value>

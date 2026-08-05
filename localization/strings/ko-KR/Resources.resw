@@ -160,7 +160,7 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>지정한 탑재 이름에 잘못된 '/' 문자가 있습니다. 잘못된 문자 없이 다시 시도하세요.</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -583,7 +583,7 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
         옵션:
             --all
-                배포를 포함하여 모든 배포를 나열합니다.
+                배포를 포함하여 모든 배포를 나열합니다.
                 현재 설치 중이거나 제거되고 있습니다.
 
             --running
@@ -2336,6 +2336,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>잘못된 --secret 값 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>'{}' 값에 대한 빌드 출력--output 콘솔에 쓸 수 없습니다.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>필수 옵션 누락: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2896,6 +2904,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>항상 최신 버전의 이미지를 가져오려고 시도합니다.</value>
+  </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>빌드할 대상 빌드 단계 설정</value>

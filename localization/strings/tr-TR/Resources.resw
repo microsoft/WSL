@@ -160,7 +160,7 @@ WSL2'yi diski durdurmaya ve ayırmaya zorlamak için 'wsl.exe {}' çalıştırı
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Belirtilen bağlama adı geçersiz bir '/' karakteri içeriyor. Lütfen geçersiz karakter olmadan yeniden deneyin.</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -2330,6 +2330,14 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Geçersiz --secret değeri '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Geçersiz --output değeri '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>--output değeri '{}' için derleme çıktısı konsola yazılamıyor.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Gerekli seçenek eksik: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2890,6 +2898,10 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Her zaman görüntünün daha yeni sürümünü çekmeye çalışın</value>
+  </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Derleme çıkış hedefi (docker buildx --output spec; örn. type=local,dest=path veya type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Hedef derleme aşamasını derleme olarak ayarlayın</value>

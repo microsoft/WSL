@@ -160,7 +160,7 @@ Voer wsl.exe {} uit om WSL2 te dwingen de schijf te stoppen en los te koppelen.<
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>De opgegeven koppelingsnaam bevat een ongeldig /-teken. Probeer het opnieuw zonder het ongeldige teken.</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -2330,6 +2330,14 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Ongeldige --secret waarde '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Ongeldige --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Kan de build-uitvoer niet naar de console schrijven voor --output value '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Ontbrekende vereiste optie: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2890,6 +2898,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Probeer altijd een nieuwere versie van de installatiekopie op te halen</value>
+  </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build-uitvoerbestemming (docker buildx --output spec; bijvoorbeeld type=local,dest=path of type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>De doelbuildfase instellen op build</value>
