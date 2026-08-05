@@ -22,5 +22,6 @@ inline constexpr const wchar_t DefaultAdminSessionName[] = L"wslc-cli-admin";
 inline constexpr const wchar_t DefaultStorageSubPath[] = L"wslc\\sessions";
 inline constexpr const wchar_t DefaultStorageVhdName[] = L"storage.vhdx";
 inline constexpr uint32_t DefaultBootTimeoutMs = 30000;
+inline constexpr const char ContainerdStorageMountPoint[] = "/var/lib/docker";
 
 } // namespace wsl::windows::wslc
