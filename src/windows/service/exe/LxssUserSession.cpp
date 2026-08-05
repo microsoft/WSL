@@ -2569,8 +2569,9 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                 TraceLoggingValue(instanceId, "instanceId"));
 
             HRESULT result = E_UNEXPECTED;
-
+            wsl::windows::common::wslutil::StopWatch stopWatch;
             auto createEnd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                const auto& reportedError = context.ReportedError();
                 WSL_LOG_TELEMETRY(
                     "CreateInstanceEnd",
                     PDT_ProductAndServicePerformance,
@@ -2578,7 +2579,9 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     TraceLoggingValue(version, "version"),
                     TraceLoggingValue(instanceId, "instanceId"),
                     TraceLoggingValue(SUCCEEDED(result), "success"),
-                    TraceLoggingValue(result, "error"));
+                    TraceLoggingValue(result, "error"),
+                    TraceLoggingValue(reportedError ? reportedError->Context : 0ULL, "errorContext"),
+                    TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"));
             });
 
             try
