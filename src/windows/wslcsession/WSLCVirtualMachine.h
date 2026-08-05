@@ -23,6 +23,7 @@ Abstract:
 #include <thread>
 #include <filesystem>
 #include <optional>
+#include <set>
 
 namespace wsl::windows::service::wslc {
 
