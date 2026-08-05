@@ -61,6 +61,13 @@ void Argument::Validate(ArgMap& execArgs) const
 {
     switch (m_argType)
     {
+    case ArgType::BuildLabel:
+        for (const auto& value : execArgs.GetAll<ArgType::BuildLabel>())
+        {
+            validation::ParseLabel(value);
+        }
+        break;
+
     case ArgType::BuildOutput:
         CacheConverted<ArgType::BuildOutput>(
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseOutputSpec(value); });

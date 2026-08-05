@@ -99,9 +99,7 @@ void BuildImage(CLIExecutionContext& context)
 
     auto tags = context.Args.GetAllValues<ArgType::Tag>();
     auto buildArgs = context.Args.GetAllValues<ArgType::BuildArg>();
-    // Labels are validated during argument validation; the build API consumes the raw strings.
-    auto labels = context.Args.GetAll<ArgType::Label>();
-
+    auto labels = context.Args.GetAllValues<ArgType::BuildLabel>();
     auto secrets = context.Args.GetAllValues<ArgType::Secret>();
 
     std::wstring dockerfilePath;

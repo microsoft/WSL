@@ -39,6 +39,7 @@ _(All,              "all",                  L"a",             Kind::Flag,       
 _(Archive,          "archive",              L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ArchiveArgDescription()) \
 _(Attach,           "attach",               L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,         "build-arg",            NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildArgDescription()) \
+_(BuildLabel,       "label",                L"l",             Kind::Value,      NoConversion, Localization::WSLCCLI_LabelArgDescription()) \
 _(BuildOutput,      "output",               L"o",             Kind::Value,      BuildOutput,  Localization::WSLCCLI_OutputArgDescription()) \
 _(BuildPull,        "pull",                 NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_BuildPullArgDescription()) \
 _(BuildTarget,      "target",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildTargetArgDescription()) \

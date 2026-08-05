@@ -566,6 +566,18 @@ class WSLCCLIArgumentUnitTests
     // Network rejects "host" mode and unsupported values.
     TEST_METHOD(ArgumentValidate_OnDemandValidateOnlyArgIsChecked)
     {
+        ArgMap labels;
+        labels.Add(ArgType::BuildLabel, std::wstring(L"foo"));
+        labels.Add(ArgType::BuildLabel, std::wstring(L"foo="));
+        auto labelValues = labels.GetAllValues<ArgType::BuildLabel>();
+        VERIFY_ARE_EQUAL(labelValues.size(), static_cast<size_t>(2));
+        VERIFY_ARE_EQUAL(labelValues[0], std::wstring(L"foo"));
+        VERIFY_ARE_EQUAL(labelValues[1], std::wstring(L"foo="));
+
+        ArgMap invalidLabel;
+        invalidLabel.Add(ArgType::BuildLabel, std::wstring(L"=value"));
+        VERIFY_THROWS(invalidLabel.GetAllValues<ArgType::BuildLabel>(), wil::ResultException);
+
         // Valid value, no prior validation pass: the read validates on demand and returns the raw value.
         ArgMap valid;
         valid.Add(ArgType::Network, std::wstring(L"bridge"));
