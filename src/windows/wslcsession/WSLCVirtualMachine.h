@@ -129,14 +129,12 @@ public:
     // disappears on VM shutdown.
     static inline const char* c_buildKitPolicyPath = "/run/wsl/buildkit-policy.json";
 
-    // Snapshot of the WSLContainerRegistryAllowlist policy taken at VM boot. `BuildImage` uses
-    // this to decide whether to set EXPERIMENTAL_BUILDKIT_SOURCE_POLICY (Configured), skip
-    // enforcement (NotConfigured), or refuse the build (ReadFailed).
+    // Snapshot of the WSLContainerRegistryAllowlist policy taken at VM boot. A read failure
+    // throws from Initialize; NotConfigured/Configured are the only states BuildImage sees.
     enum class BuildKitPolicyState
     {
         NotConfigured,
-        Configured,
-        ReadFailed
+        Configured
     };
 
     struct ConnectedSocket

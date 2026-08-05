@@ -983,13 +983,7 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    // The container-registry allowlist is snapshotted at VM boot. Fail closed when the read failed
-    // so a misconfigured/inaccessible registry cannot let a build slip past enforcement.
-    const auto policyState = m_virtualMachine->GetBuildKitPolicyState();
-    if (policyState == WSLCVirtualMachine::BuildKitPolicyState::ReadFailed)
-    {
-        THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
-    }
+    const auto policyState = runtime.Vm().GetBuildKitPolicyState();
 
     // Track every Windows folder we mount into the VM during this build so a single scope_exit
     // unmounts them all on success or on any throw partway through the loop below.

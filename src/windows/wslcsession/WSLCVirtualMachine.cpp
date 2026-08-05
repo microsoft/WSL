@@ -501,12 +501,12 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
 void WSLCVirtualMachine::ConfigureBuildKitPolicy()
 {
     const auto snapshot = wsl::windows::policies::ReadRegistryAllowlistSnapshotFromPoliciesRoot();
-    if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::ReadFailed)
-    {
-        // Fail closed: `BuildImage` refuses new builds when it sees this state.
-        m_buildKitPolicyState = BuildKitPolicyState::ReadFailed;
-        return;
-    }
+
+    // Fail closed: an unreadable policy must not silently let builds through.
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_REGISTRY_BLOCKED_BY_POLICY,
+        wsl::shared::Localization::MessageImageBuildBlockedByPolicy(),
+        snapshot.State == wsl::windows::policies::RegistryAllowlistState::ReadFailed);
 
     if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::NotConfigured)
     {
@@ -522,10 +522,24 @@ void WSLCVirtualMachine::ConfigureBuildKitPolicy()
 
     const auto policyJson = BuildBuildKitSourcePolicyJson(hosts);
 
-    auto message = wsl::shared::MessageWriter<WSLC_SET_BUILDKIT_POLICY>{};
-    message.WriteString(policyJson);
-    const auto& response = m_initChannel.Transaction<WSLC_SET_BUILDKIT_POLICY>(message.Span(), nullptr, m_initChannelTimeout);
-    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Guest failed to write BuildKit policy: %d", response.Result);
+    // Linux <fcntl.h> flags for open().
+    constexpr int c_lxOWriteOnly = 0x1;
+    constexpr int c_lxOCreate = 0x40;
+    constexpr int c_lxOTruncate = 0x200;
+    constexpr int c_lxOCloseOnExec = 0x80000;
+    constexpr int c_lxONoFollow = 0x20000;
+
+    auto message = wsl::shared::MessageWriter<WSLC_WRITE_FILE>{};
+    message.WriteString(message->PathIndex, c_buildKitPolicyPath);
+    message->ContentLength = static_cast<unsigned int>(policyJson.size());
+    gsl::copy(
+        gsl::as_bytes(gsl::make_span(policyJson.data(), policyJson.size())),
+        message.InsertBuffer(message->ContentIndex, policyJson.size()));
+    message->OpenFlags = c_lxOWriteOnly | c_lxOCreate | c_lxOTruncate | c_lxOCloseOnExec | c_lxONoFollow;
+    message->Permissions = 0644;
+
+    const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Guest failed to write %hs: %d", c_buildKitPolicyPath, response.Result);
 
     m_buildKitPolicyState = BuildKitPolicyState::Configured;
 }
