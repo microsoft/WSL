@@ -48,7 +48,7 @@ echo "Building test_distro version: $version for $Platform"
 Run { wsl.exe --install $Base --name test_distro --version 2 --no-launch }
 
 RunInDistro("apt update")
-RunInDistro("apt install daemonize libmount-dev genisoimage dosfstools make gcc socat systemd libpam-systemd bind9-dnsutils xz-utils bzip2 -f -y --no-install-recommends")
+RunInDistro("apt install daemonize libmount-dev genisoimage dosfstools make gcc socat systemd libpam-systemd bind9-dnsutils xz-utils bzip2 perl -f -y --no-install-recommends")
 RunInDistro("apt purge cpio isc-dhcp-client isc-dhcp-common nftables rsyslog vim vim-tiny vim-common whiptail xxd init genisoimage tasksel kmod mawk udev cron -y -f --allow-remove-essential")
 RunInDistro("apt-get autopurge -y")
 RunInDistro("apt clean")
