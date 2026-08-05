@@ -1367,7 +1367,7 @@ private:
             forceTcp ? "True" : "False");
 
         auto result = RunWslc(std::format(
-            L"container run {} --rm --name {} {} {}", forceTcp ? "--dns-option=use-vc" : "" , WslcContainerName, PythonImage.NameAndTag(), command));
+            L"container run {} --rm --name {} {} {}", forceTcp ? "--dns-option=use-vc" : "", WslcContainerName, PythonImage.NameAndTag(), command));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
