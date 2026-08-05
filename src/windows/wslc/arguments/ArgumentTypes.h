@@ -100,6 +100,7 @@ namespace details {
     struct ArgDataMapping<ArgType::EnumName> \
     { \
         using value_t = typename KindToType<ArgumentKind>::type; \
+        static constexpr Kind c_kind = ArgumentKind; \
     };
 
     WSLC_ARGUMENTS(WSLC_ARG_MAPPING)

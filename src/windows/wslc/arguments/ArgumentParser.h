@@ -133,7 +133,7 @@ private:
     // Sets a boolean flag by storing its explicit parsed value (true or false). Clearing first
     // collapses CLI duplicates to a single entry, so a repeated flag is docker-style last-wins
     // (e.g. "--flag --flag=false" ends up false) and a duplicate "--flag --flag" folds to one
-    // entry. Consumers read the flag with ArgMap::GetFlag (Contains ? stored value : default),
+    // entry. Consumers read the flag with ArgMap::GetValue(defaultValue),
     // which lets a flag default to on and be disabled with "--flag=false".
     void SetFlag(ArgType type, bool value);
 

@@ -142,10 +142,9 @@ protected:
     // mutually-exclusive arguments or required argument combinations.
     //
     // Contract: this hook enforces relationships between already-validated arguments. It receives a
-    // const ArgMap, so it cannot add or remove raw arguments; read them with the unified accessors
-    // GetValue/GetAllValues/GetFlag, which return the converted value for converted args and the raw
-    // value otherwise (validating on demand if needed).
-    virtual void ValidateArgumentsInternal(const ArgMap& source) const;
+    // GetValue/GetAllValues make the selected argument immutable after returning it. Converted
+    // arguments are validated on demand if needed.
+    virtual void ValidateArgumentsInternal(ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 
 private:

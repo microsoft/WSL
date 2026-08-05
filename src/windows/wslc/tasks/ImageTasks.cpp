@@ -117,12 +117,12 @@ void BuildImage(CLIExecutionContext& context)
     }
 
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.GetFlag<ArgType::Verbose>());
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetFlag<ArgType::NoCache>());
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.GetFlag<ArgType::BuildPull>());
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.GetValue<ArgType::Verbose>());
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetValue<ArgType::NoCache>());
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.GetValue<ArgType::BuildPull>());
 
     auto cancelEvent = context.CreateCancelEvent();
-    BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.GetFlag<ArgType::Verbose>());
+    BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.GetValue<ArgType::Verbose>());
     services::ImageService::Build(session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, flags, &callback, cancelEvent);
 }
 
@@ -143,9 +143,9 @@ void ListImages(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Images));
     auto& images = context.Data.Get<Data::Images>();
 
-    if (context.Args.GetFlag<ArgType::Quiet>())
+    if (context.Args.GetValue<ArgType::Quiet>())
     {
-        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         for (const auto& image : images)
         {
             context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
@@ -170,7 +170,7 @@ void ListImages(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
@@ -212,7 +212,7 @@ void PullImage(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
     const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
-    const bool quiet = context.Args.GetFlag<ArgType::Quiet>();
+    const bool quiet = context.Args.GetValue<ArgType::Quiet>();
 
     // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
     // the client reports this on stdout before contacting the registry.
@@ -253,8 +253,8 @@ void DeleteImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto imageIds = context.Args.GetAllValues<ArgType::ImageId>();
-    bool force = context.Args.GetFlag<ArgType::ImageForce>();
-    bool noPrune = context.Args.GetFlag<ArgType::NoPrune>();
+    bool force = context.Args.GetValue<ArgType::ImageForce>();
+    bool noPrune = context.Args.GetValue<ArgType::NoPrune>();
     for (const auto& id : imageIds)
     {
         services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
@@ -294,7 +294,7 @@ void ImportImage(CLIExecutionContext& context)
     auto imageId = services::ImageService::Import(context.Reporter, session, input, imageName);
     if (!imageId.empty())
     {
-        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         context.Reporter.Output(L"{}\n", MultiByteToWide(TruncateId(imageId, trunc)));
     }
 }
@@ -369,7 +369,7 @@ void PruneImages(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    bool all = context.Args.GetFlag<ArgType::All>();
+    bool all = context.Args.GetValue<ArgType::All>();
 
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();

@@ -197,7 +197,7 @@ void GetContainers(CLIExecutionContext& context)
     {
         limit = context.Args.GetValue<ArgType::Last>();
     }
-    else if (context.Args.GetFlag<ArgType::Latest>())
+    else if (context.Args.GetValue<ArgType::Latest>())
     {
         limit = 1;
     }
@@ -205,7 +205,7 @@ void GetContainers(CLIExecutionContext& context)
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetFlag<ArgType::All>(), limit, filters));
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters));
 }
 
 void InspectContainers(CLIExecutionContext& context)
@@ -543,7 +543,7 @@ void ListContainers(CLIExecutionContext& context)
     // Note: --all and --filter status= are honored by the Docker daemon when
     // GetContainers ran; no post-filtering needed here.
 
-    if (context.Args.GetFlag<ArgType::Quiet>())
+    if (context.Args.GetValue<ArgType::Quiet>())
     {
         // Print only the container ids
         for (const auto& container : containers)
@@ -570,7 +570,7 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table with or without column limits based on --no-trunc flag
@@ -618,7 +618,7 @@ void RemoveContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
-    bool force = context.Args.GetFlag<ArgType::Force>();
+    bool force = context.Args.GetValue<ArgType::Force>();
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force);
@@ -652,17 +652,17 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Name = WideToMultiByte(context.Args.GetValue<ArgType::Name>());
     }
 
-    if (context.Args.GetFlag<ArgType::TTY>())
+    if (context.Args.GetValue<ArgType::TTY>())
     {
         options.TTY = true;
     }
 
-    if (context.Args.GetFlag<ArgType::Detach>())
+    if (context.Args.GetValue<ArgType::Detach>())
     {
         options.Detach = true;
     }
 
-    if (context.Args.GetFlag<ArgType::Interactive>())
+    if (context.Args.GetValue<ArgType::Interactive>())
     {
         options.Interactive = true;
     }
@@ -677,7 +677,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.GetFlag<ArgType::PublishAll>())
+    if (context.Args.GetValue<ArgType::PublishAll>())
     {
         options.PublishAll = true;
     }
@@ -697,7 +697,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.GetFlag<ArgType::Remove>())
+    if (context.Args.GetValue<ArgType::Remove>())
     {
         options.Remove = true;
     }
@@ -742,7 +742,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.HealthRetries = context.Args.GetValue<ArgType::HealthRetries>();
     }
 
-    if (context.Args.GetFlag<ArgType::NoHealthcheck>())
+    if (context.Args.GetValue<ArgType::NoHealthcheck>())
     {
         options.NoHealthcheck = true;
     }
@@ -909,7 +909,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         for (const auto& container : allContainers)
         {
             // Skip non-running containers unless --all is specified.
-            if (!context.Args.GetFlag<ArgType::All>() && container.State != WSLCContainerState::WslcContainerStateRunning)
+            if (!context.Args.GetValue<ArgType::All>() && container.State != WSLCContainerState::WslcContainerStateRunning)
             {
                 continue;
             }
@@ -969,7 +969,7 @@ void ShowContainerStats(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
@@ -1022,7 +1022,7 @@ void StartContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     const auto& containerId = context.Args.GetValue<ArgType::ContainerId>();
-    const bool attach = context.Args.GetFlag<ArgType::Attach>();
+    const bool attach = context.Args.GetValue<ArgType::Attach>();
     context.ExitCode = ContainerService::Start(context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
 
     if (!attach)
@@ -1059,8 +1059,8 @@ void ViewContainerLogs(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerId = context.Args.GetValue<ArgType::ContainerId>();
-    bool follow = context.Args.GetFlag<ArgType::Follow>();
-    bool timestamps = context.Args.GetFlag<ArgType::Timestamps>();
+    bool follow = context.Args.GetValue<ArgType::Follow>();
+    bool timestamps = context.Args.GetValue<ArgType::Timestamps>();
 
     ULONGLONG tail = 0;
     if (context.Args.Contains(ArgType::Tail))

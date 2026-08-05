@@ -119,14 +119,14 @@ std::wstring RegistryLoginCommand::LongDescription() const
     return Localization::WSLCCLI_LoginLongDesc();
 }
 
-void RegistryLoginCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+void RegistryLoginCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
-    if (execArgs.Contains(ArgType::Password) && execArgs.GetFlag<ArgType::PasswordStdin>())
+    if (execArgs.Contains(ArgType::Password) && execArgs.GetValue<ArgType::PasswordStdin>())
     {
         throw CommandException(Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive());
     }
 
-    if (execArgs.GetFlag<ArgType::PasswordStdin>() && !execArgs.Contains(ArgType::Username))
+    if (execArgs.GetValue<ArgType::PasswordStdin>() && !execArgs.Contains(ArgType::Username))
     {
         throw CommandException(Localization::WSLCCLI_LoginPasswordStdinRequiresUsername());
     }
@@ -143,7 +143,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     // Resolve password: --password, --password-stdin, or interactive prompt.
     if (!context.Args.Contains(ArgType::Password))
     {
-        if (context.Args.GetFlag<ArgType::PasswordStdin>())
+        if (context.Args.GetValue<ArgType::PasswordStdin>())
         {
             std::wstring line;
             std::getline(std::wcin, line);

@@ -59,7 +59,8 @@ enum class EnumBasedVariantMapAction
     Remove,
 };
 
-// A callback function that can be used for logging map actions.
+// A callback function that can take any action in response to map operations, such as logging
+// accesses or maintaining state derived from the map contents.
 template <typename Enum>
 using EnumBasedVariantMapActionCallback = void (*)(const void* map, Enum value, EnumBasedVariantMapAction action);
 

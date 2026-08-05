@@ -262,12 +262,11 @@ class WSLCCLIArgumentUnitTests
         auto empty = args.GetAllValues<ArgType::Signal>();
         VERIFY_IS_TRUE(empty.empty());
 
-        // Reading an argument that was never validated throws E_NOT_SET.
+        // An absent argument resolves to its value type's default-constructed value.
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Memory));
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Memory), static_cast<size_t>(0));
-        VERIFY_THROWS_SPECIFIC(args.GetValue<ArgType::Memory>(), wil::ResultException, [](const wil::ResultException& e) {
-            return e.GetErrorCode() == E_NOT_SET;
-        });
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::Memory>(), int64_t{});
+        VERIFY_IS_FALSE(args.Contains(ArgType::Memory));
     }
 
     // Helper: run validation for a single-value argument and return the converted result (type fixed
@@ -532,24 +531,20 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
     }
 
-    // Test: Adding a raw value after the up-front validation pass invalidates that argument's cache
-    // (via the map-action callback) so the next converted read re-validates on demand and reflects
-    // the new value. This is the execution-time scenario -- e.g. credentials gathered while a command
-    // runs -- where a stale cache would otherwise return pre-mutation data.
-    TEST_METHOD(ArgumentValidate_PostValidationAddSelfHeals)
+    // Test: Raw values can change after the up-front validation pass until the argument is read.
+    // The mutation invalidates the cache, and the first read validates the final values.
+    TEST_METHOD(ArgumentValidate_PostValidationAddBeforeReadRevalidates)
     {
         ArgMap args;
         args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
         Argument::Create(ArgType::Signal).Validate(args);
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(1));
-        VERIFY_ARE_EQUAL(args.GetValue<ArgType::Signal>(), WSLCSignalSIGTERM);
 
-        // Add a second raw value after validation. The map-action callback drops the cached values
-        // for Signal so the memoized cache cannot outlive the raw data it was computed from.
+        // Add a second raw value before the first read. The map-action callback drops the cache.
         args.Add(ArgType::Signal, std::wstring(L"SIGKILL"));
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(0));
 
-        // The next read re-validates both raw values on demand, in insertion order.
+        // The first read re-validates both raw values on demand, in insertion order.
         auto signals = args.GetAllValues<ArgType::Signal>();
         VERIFY_ARE_EQUAL(signals.size(), static_cast<size_t>(2));
         VERIFY_ARE_EQUAL(signals[0], WSLCSignalSIGTERM);
@@ -577,14 +572,63 @@ class WSLCCLIArgumentUnitTests
         invalid.Add(ArgType::Network, std::wstring(L"host"));
         VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ArgumentException);
 
-        // Valid up-front, then an unsupported value added after the pass: the map-action callback
-        // clears the validated record, so the next read re-validates on demand and throws.
+        // Valid up-front, then an unsupported value added before the first read: the map-action
+        // callback clears the validated record, so the read re-validates on demand and throws.
         ArgMap added;
         added.Add(ArgType::Network, std::wstring(L"bridge"));
         Argument::Create(ArgType::Network).Validate(added);
-        VERIFY_ARE_EQUAL(added.GetAllValues<ArgType::Network>().size(), static_cast<size_t>(1));
         added.Add(ArgType::Network, std::wstring(L"host"));
         VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ArgumentException);
+    }
+
+    TEST_METHOD(ArgumentValidate_ReadMakesArgumentImmutable)
+    {
+        ArgMap args;
+        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::Signal>(), WSLCSignalSIGTERM);
+
+        const auto verifyImmutableFailure = [](const auto& operation) {
+            VERIFY_THROWS_SPECIFIC(operation(), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+        };
+
+        verifyImmutableFailure([&] { args.Add(ArgType::Signal, std::wstring(L"SIGKILL")); });
+        verifyImmutableFailure([&] { args.Remove(ArgType::Signal); });
+        verifyImmutableFailure([&] { args.InvalidateValidated(ArgType::Signal); });
+        verifyImmutableFailure([&] { args.AddValidated<ArgType::Signal>(WSLCSignalSIGKILL); });
+        verifyImmutableFailure([&] { args.MarkValidated(ArgType::Signal); });
+
+        // Immutability is per argument; other arguments remain writable until they are read.
+        args.Add(ArgType::StopTimeout, std::wstring(L"30"));
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::StopTimeout>(), 30);
+    }
+
+    TEST_METHOD(ArgumentValidate_FlagReadValidatesAndMakesArgumentImmutable)
+    {
+        const auto verifyImmutableFailure = [](const auto& operation) {
+            VERIFY_THROWS_SPECIFIC(operation(), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+        };
+
+        ArgMap absent;
+        VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>(true));
+        VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(absent.Contains(ArgType::Quiet));
+        verifyImmutableFailure([&] { absent.Add(ArgType::Quiet, true); });
+
+        ArgMap present;
+        present.Add(ArgType::NoHealthcheck, true);
+        present.Add(ArgType::HealthCmd, std::wstring(L"CMD echo healthy"));
+        VERIFY_THROWS(present.GetValue<ArgType::NoHealthcheck>(), ArgumentException);
+
+        // A failed read does not freeze the argument, so correcting the conflicting input permits
+        // a subsequent successful read.
+        present.Remove(ArgType::HealthCmd);
+        VERIFY_IS_TRUE(present.GetValue<ArgType::NoHealthcheck>());
+        verifyImmutableFailure([&] { present.Remove(ArgType::NoHealthcheck); });
     }
 
     // Timestamp parsing unit tests (exercises TryParseRfc3339 and integer path via GetTimestampFromString)

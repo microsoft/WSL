@@ -106,7 +106,7 @@ void DeleteVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto volumeNames = context.Args.GetAllValues<ArgType::VolumeName>();
-    const bool force = context.Args.GetFlag<ArgType::Force>();
+    const bool force = context.Args.GetValue<ArgType::Force>();
     for (const auto& name : volumeNames)
     {
         if (TryDeleteVolume(context.Reporter, session, WideToMultiByte(name), force))
@@ -155,7 +155,7 @@ void ListVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Volumes));
     auto& volumes = context.Data.Get<Data::Volumes>();
 
-    if (context.Args.GetFlag<ArgType::Quiet>())
+    if (context.Args.GetValue<ArgType::Quiet>())
     {
         for (const auto& volume : volumes)
         {
@@ -203,7 +203,7 @@ void PruneVolumes(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    const bool all = context.Args.GetFlag<ArgType::All>();
+    const bool all = context.Args.GetValue<ArgType::All>();
 
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();

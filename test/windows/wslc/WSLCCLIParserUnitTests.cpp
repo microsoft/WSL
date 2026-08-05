@@ -561,7 +561,7 @@ class WSLCCLIParserUnitTests
     }
 
     // Boolean flags store their explicit parsed value: present with true or false when the
-    // flag is specified, absent when it is not. Consumers read them via ArgMap::GetFlag,
+    // flag is specified, absent when it is not. Consumers read them via ArgMap::GetValue(defaultValue),
     // which returns the stored value if present or a caller-supplied default if absent. The
     // helper parses a single command line against the supplied defs and returns the resulting
     // ArgMap so each case can assert the stored flag value.
@@ -597,12 +597,12 @@ class WSLCCLIParserUnitTests
             VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
             VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
             VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
-            VERIFY_IS_TRUE(args.GetFlag<ArgType::Verbose>());
+            VERIFY_IS_TRUE(args.GetValue<ArgType::Verbose>());
         }
     }
 
     // Every recognized false form stores the flag present with value false (a docker-style
-    // "--flag=false"), so Contains() is true but GetFlag() reports false. The single-letter
+    // "--flag=false"), so Contains() is true but GetValue() reports false. The single-letter
     // "f"/"F" forms are Docker-parity extensions enabled for the CLI flag path.
     TEST_METHOD(Flag_FalseForms_StoreSingleFalseEntry)
     {
@@ -615,7 +615,7 @@ class WSLCCLIParserUnitTests
             VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
             VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
             VERIFY_IS_FALSE(args.Get<ArgType::Verbose>());
-            VERIFY_IS_FALSE(args.GetFlag<ArgType::Verbose>());
+            VERIFY_IS_FALSE(args.GetValue<ArgType::Verbose>());
         }
     }
 
@@ -662,18 +662,18 @@ class WSLCCLIParserUnitTests
     // Alias forms honor adjoined booleans just like the long name.
     TEST_METHOD(Flag_AliasAdjoinedBoolean)
     {
-        VERIFY_IS_TRUE(ParseFlags(L"wslc -q", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
-        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=true", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
-        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=false", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=true", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=false", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
     }
 
     // Docker-parity single-letter forms ("t"/"T"/"f"/"F") are honored on the alias form too.
     TEST_METHOD(Flag_AliasShortBooleanForms)
     {
-        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=t", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
-        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=T", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
-        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=f", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
-        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=F", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=t", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=T", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=f", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=F", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
     }
 
     // An adjoined boolean value may be wrapped in double quotes (e.g. --flag="true"), just like
@@ -681,12 +681,12 @@ class WSLCCLIParserUnitTests
     // the named and alias forms.
     TEST_METHOD(Flag_QuotedAdjoinedBoolean)
     {
-        VERIFY_IS_TRUE(ParseFlags(L"wslc --verbose=\"true\"", {Argument::Create(ArgType::Verbose)}).GetFlag<ArgType::Verbose>());
-        VERIFY_IS_FALSE(ParseFlags(L"wslc --verbose=\"false\"", {Argument::Create(ArgType::Verbose)}).GetFlag<ArgType::Verbose>());
-        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=\"true\"", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
-        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=\"false\"", {Argument::Create(ArgType::Quiet)}).GetFlag<ArgType::Quiet>());
-        VERIFY_IS_TRUE(ParseFlags(L"wslc --verbose=\"t\"", {Argument::Create(ArgType::Verbose)}).GetFlag<ArgType::Verbose>());
-        VERIFY_IS_FALSE(ParseFlags(L"wslc --verbose=\"f\"", {Argument::Create(ArgType::Verbose)}).GetFlag<ArgType::Verbose>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc --verbose=\"true\"", {Argument::Create(ArgType::Verbose)}).GetValue<ArgType::Verbose>());
+        VERIFY_IS_FALSE(ParseFlags(L"wslc --verbose=\"false\"", {Argument::Create(ArgType::Verbose)}).GetValue<ArgType::Verbose>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q=\"true\"", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(ParseFlags(L"wslc -q=\"false\"", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc --verbose=\"t\"", {Argument::Create(ArgType::Verbose)}).GetValue<ArgType::Verbose>());
+        VERIFY_IS_FALSE(ParseFlags(L"wslc --verbose=\"f\"", {Argument::Create(ArgType::Verbose)}).GetValue<ArgType::Verbose>());
     }
 
     // In an alias chain, leading flags are true and a trailing "=false" turns only the
@@ -696,25 +696,25 @@ class WSLCCLIParserUnitTests
         std::vector<Argument> defs = {Argument::Create(ArgType::Quiet), Argument::Create(ArgType::Interactive)};
 
         ArgMap all = ParseFlags(L"wslc -qi", defs);
-        VERIFY_IS_TRUE(all.GetFlag<ArgType::Quiet>());
-        VERIFY_IS_TRUE(all.GetFlag<ArgType::Interactive>());
+        VERIFY_IS_TRUE(all.GetValue<ArgType::Quiet>());
+        VERIFY_IS_TRUE(all.GetValue<ArgType::Interactive>());
 
         ArgMap trailingFalse = ParseFlags(L"wslc -qi=false", defs);
-        VERIFY_IS_TRUE(trailingFalse.GetFlag<ArgType::Quiet>());
-        VERIFY_IS_FALSE(trailingFalse.GetFlag<ArgType::Interactive>());
+        VERIFY_IS_TRUE(trailingFalse.GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(trailingFalse.GetValue<ArgType::Interactive>());
     }
 
     // Repeated flags are last-wins (matching docker) and never accumulate multiple entries:
     // "--flag --flag=false" ends up false, the reverse ends up true. The flag is stored either
-    // way (a single entry), so GetFlag reports the winning value.
+    // way (a single entry), so GetValue() reports the winning value.
     TEST_METHOD(Flag_Repeated_LastWins)
     {
         ArgMap trueThenFalse = ParseFlags(L"wslc --verbose --verbose=false", {Argument::Create(ArgType::Verbose)});
-        VERIFY_IS_FALSE(trueThenFalse.GetFlag<ArgType::Verbose>());
+        VERIFY_IS_FALSE(trueThenFalse.GetValue<ArgType::Verbose>());
         VERIFY_ARE_EQUAL(1u, trueThenFalse.Count(ArgType::Verbose));
 
         ArgMap falseThenTrue = ParseFlags(L"wslc --verbose=false --verbose", {Argument::Create(ArgType::Verbose)});
-        VERIFY_IS_TRUE(falseThenTrue.GetFlag<ArgType::Verbose>());
+        VERIFY_IS_TRUE(falseThenTrue.GetValue<ArgType::Verbose>());
         VERIFY_ARE_EQUAL(1u, falseThenTrue.Count(ArgType::Verbose));
 
         ArgMap duplicateTrue = ParseFlags(L"wslc --verbose --verbose=true", {Argument::Create(ArgType::Verbose)});
@@ -722,7 +722,7 @@ class WSLCCLIParserUnitTests
     }
 
     // "--flag=false" overrides a preloaded (env-style) default of true, replacing it with a
-    // single stored false rather than leaving a lingering true. GetFlag then reports false.
+    // single stored false rather than leaving a lingering true. GetValue() then reports false.
     TEST_METHOD(Flag_FalseOverridesPreloadedDefault)
     {
         auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose=false");
@@ -741,27 +741,27 @@ class WSLCCLIParserUnitTests
 
         VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
         VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
-        VERIFY_IS_FALSE(args.GetFlag<ArgType::Verbose>());
+        VERIFY_IS_FALSE(args.GetValue<ArgType::Verbose>());
     }
 
-    // A flag whose behavior is on by default is read with GetFlag(true): absent yields the
+    // A flag whose behavior is on by default is read with GetValue(true): absent yields the
     // default (true), "--flag=false" yields false, and "--flag" yields true. A bare Contains()
     // cannot express this: it reports true for both "--flag" and "--flag=false" and false when
     // the flag is absent, so it distinguishes neither the two stored values nor absent-as-default.
-    TEST_METHOD(Flag_GetFlagDefaultTrue_DefaultOnFlag)
+    TEST_METHOD(Flag_GetValueDefaultTrue_DefaultOnFlag)
     {
         std::vector<Argument> defs = {Argument::Create(ArgType::Remove)};
 
         ArgMap absent = ParseFlags(L"wslc", defs);
         VERIFY_IS_FALSE(absent.Contains(ArgType::Remove));
-        VERIFY_IS_TRUE(absent.GetFlag<ArgType::Remove>(true));
+        VERIFY_IS_TRUE(absent.GetValue<ArgType::Remove>(true));
 
         ArgMap disabled = ParseFlags(L"wslc --rm=false", defs);
         VERIFY_IS_TRUE(disabled.Contains(ArgType::Remove));
-        VERIFY_IS_FALSE(disabled.GetFlag<ArgType::Remove>(true));
+        VERIFY_IS_FALSE(disabled.GetValue<ArgType::Remove>(true));
 
         ArgMap enabled = ParseFlags(L"wslc --rm", defs);
-        VERIFY_IS_TRUE(enabled.GetFlag<ArgType::Remove>(true));
+        VERIFY_IS_TRUE(enabled.GetValue<ArgType::Remove>(true));
     }
 };
 

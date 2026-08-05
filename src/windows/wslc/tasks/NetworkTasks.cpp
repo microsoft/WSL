@@ -95,7 +95,7 @@ void CreateNetwork(CLIExecutionContext& context)
         options.Driver = WideToMultiByte(context.Args.GetValue<ArgType::Driver>());
     }
 
-    options.Internal = context.Args.GetFlag<ArgType::Internal>();
+    options.Internal = context.Args.GetValue<ArgType::Internal>();
 
     if (context.Args.Contains(ArgType::Subnet))
     {
@@ -121,7 +121,7 @@ void DeleteNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto networkNames = context.Args.GetAllValues<ArgType::NetworkName>();
-    const bool force = context.Args.GetFlag<ArgType::Force>();
+    const bool force = context.Args.GetValue<ArgType::Force>();
     for (const auto& name : networkNames)
     {
         if (TryDeleteNetwork(context.Reporter, session, WideToMultiByte(name), force))
@@ -170,7 +170,7 @@ void ListNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
 
-    if (context.Args.GetFlag<ArgType::Quiet>())
+    if (context.Args.GetValue<ArgType::Quiet>())
     {
         for (const auto& network : networks)
         {
