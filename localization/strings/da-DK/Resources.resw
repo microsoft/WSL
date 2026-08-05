@@ -2331,7 +2331,7 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
-    <value>Invalid --output value '{}': {}</value>
+    <value>Ugyldig --output value "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
