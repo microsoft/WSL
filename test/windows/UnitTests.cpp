@@ -571,7 +571,7 @@ class UnitTests
         DistroFileChange defaultLocale(L"/etc/default/locale", LxsstuLaunchWsl(L"test -f /etc/default/locale") == 0);
         DistroFileChange localeConf(L"/etc/locale.conf", LxsstuLaunchWsl(L"test -f /etc/locale.conf") == 0);
 
-        const auto readLang = []() { return LxsstuLaunchWslAndCaptureOutput(L"echo $LANG").first; };
+        const auto readLang = []() { return LxsstuLaunchWslAndCaptureOutput(L"printenv LANG").first; };
 
         // Only /etc/default/locale is present (Debian/Ubuntu).
         {
@@ -586,7 +586,7 @@ class UnitTests
         {
             defaultLocale.Delete();
             localeConf.Delete();
-            localeConf.SetContent(L"LANG=fr_FR.UTF-8\n");
+            localeConf.SetContent(L"LANG=\"fr_FR.UTF-8\"\n");
             TerminateDistribution();
             VERIFY_ARE_EQUAL(readLang(), L"fr_FR.UTF-8\n");
         }
