@@ -10677,8 +10677,9 @@ class WSLCTests
             }
 
             auto container = launcher.Launch(*m_defaultSession);
-            verifyUserLabelsPresent(container.Labels());
-            VERIFY_IS_TRUE(container.Labels().find("com.microsoft.wsl.container.metadata") == container.Labels().end());
+            const auto containerLabels = container.Labels();
+            verifyUserLabelsPresent(containerLabels);
+            VERIFY_IS_TRUE(containerLabels.find("com.microsoft.wsl.container.metadata") == containerLabels.end());
 
             // Keep the container alive after the handle is dropped so we can validate labels are persisted across sessions.
             container.SetDeleteOnClose(false);
@@ -10690,10 +10691,11 @@ class WSLCTests
 
             // Validate that labels are correctly loaded.
             auto container = OpenContainer(m_defaultSession.get(), "test-labels");
-            verifyUserLabelsPresent(container.Labels());
+            const auto containerLabels = container.Labels();
+            verifyUserLabelsPresent(containerLabels);
 
             const std::string c_metadataLabel = "com.microsoft.wsl.container.metadata";
-            VERIFY_IS_TRUE(container.Labels().find(c_metadataLabel) == container.Labels().end());
+            VERIFY_IS_TRUE(containerLabels.find(c_metadataLabel) == containerLabels.end());
             const auto inspect = container.Inspect();
             verifyUserLabelsPresent(inspect.Config.Labels);
             verifyUserLabelsPresent(inspect.Labels);
