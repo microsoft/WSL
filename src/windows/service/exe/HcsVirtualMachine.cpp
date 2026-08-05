@@ -24,6 +24,7 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
+#include "string.hpp"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
