@@ -190,6 +190,40 @@ wsl::windows::common::SvcComm::~SvcComm()
 {
 }
 
+void wsl::windows::common::SvcComm::AcquireConsoleStateLease(
+    _In_ HANDLE ConsoleHandle, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState) const
+{
+    WI_ASSERT(IS_VALID_HANDLE(ConsoleHandle));
+
+    // Use the process console connection handle for cross-process identification.
+    // CONIN$ handles can be used for mode operations but cannot be duplicated into the service.
+    const HANDLE console = NtCurrentTeb()->ProcessEnvironmentBlock->ProcessParameters->Reserved2[0];
+    THROW_HR_IF(E_UNEXPECTED, !IS_VALID_HANDLE(console));
+
+    BOOLEAN initialize{};
+    THROW_IF_FAILED(m_userSession->AcquireConsoleStateLease(HandleToUlong(console), &LeaseId, &initialize, &ConfiguredState));
+    Initialize = initialize;
+}
+
+void wsl::windows::common::SvcComm::CommitConsoleStateLease(
+    _In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState) const
+{
+    THROW_IF_FAILED(m_userSession->CommitConsoleStateLease(&LeaseId, &BaselineState, &ConfiguredState));
+}
+
+bool wsl::windows::common::SvcComm::ReleaseConsoleStateLease(
+    _In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState) const
+{
+    BOOLEAN restore{};
+    THROW_IF_FAILED(m_userSession->ReleaseConsoleStateLease(&LeaseId, &restore, &BaselineState, &ConfiguredState));
+    return restore;
+}
+
+void wsl::windows::common::SvcComm::CompleteConsoleStateLease(_In_ const GUID& LeaseId) const
+{
+    THROW_IF_FAILED(m_userSession->CompleteConsoleStateLease(&LeaseId));
+}
+
 void wsl::windows::common::SvcComm::ConfigureDistribution(_In_opt_ LPCGUID DistroGuid, _In_ ULONG DefaultUid, _In_ ULONG Flags) const
 {
     ClientExecutionContext context;
@@ -294,7 +328,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
     // Create the process.
     //
 
-    ConsoleState Io{RestorePolicySetting};
+    ConsoleState Io{RestorePolicySetting, this};
     Io.SetInteractiveMode();
     COORD WindowSize = Io.GetWindowSize();
     ULONG Flags = LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;

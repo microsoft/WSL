@@ -20,6 +20,8 @@ Abstract:
 
 namespace wsl::windows::common {
 
+class SvcComm;
+
 // Controls when ConsoleState attempts to restore the original console state.
 enum class RestorePolicy
 {
@@ -34,7 +36,7 @@ enum class RestorePolicy
 class ConsoleState
 {
 public:
-    explicit ConsoleState(RestorePolicy Policy = RestorePolicy::Always);
+    explicit ConsoleState(RestorePolicy Policy = RestorePolicy::Always, const SvcComm* Service = nullptr);
     ~ConsoleState();
     ConsoleState(const ConsoleState&) = delete;
     ConsoleState& operator=(const ConsoleState&) = delete;
@@ -45,11 +47,18 @@ public:
     void SetInteractiveMode();
 
 private:
+    void ApplyConsoleState(_In_ const LXSS_CONSOLE_STATE& State);
+    LXSS_CONSOLE_STATE CaptureConsoleState() const;
+    void ConfigureInteractiveMode();
     void RestoreConsoleState();
+    void RestoreLeasedConsoleState();
 
     wil::unique_hfile m_InputHandle;
     wil::unique_hfile m_OutputHandle;
     RestorePolicy m_restorePolicy;
+    const SvcComm* m_service{};
+    GUID m_leaseId{};
+    bool m_leaseAcquired{false};
     bool m_interactiveModeConfigured{false};
     std::optional<DWORD> m_SavedInputMode{};
     std::optional<DWORD> m_ConfiguredInputMode{};

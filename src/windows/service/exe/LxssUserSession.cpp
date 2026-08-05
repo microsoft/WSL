@@ -53,6 +53,60 @@ LxssUserSession::LxssUserSession(_In_ const std::weak_ptr<LxssUserSessionImpl>& 
     return;
 }
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::AcquireConsoleStateLease(
+    _In_ ULONG ConsoleHandle, _Out_ GUID* LeaseId, _Out_ BOOLEAN* Initialize, _Out_ LXSS_CONSOLE_STATE* ConfiguredState)
+try
+{
+    RETURN_HR_IF(E_INVALIDARG, !ConsoleHandle || !LeaseId || !Initialize || !ConfiguredState);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    wil::unique_handle consoleHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ConsoleHandle))};
+    bool initialize{};
+    session->AcquireConsoleStateLease(consoleHandle.get(), *LeaseId, initialize, *ConfiguredState);
+    *Initialize = initialize;
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::CommitConsoleStateLease(
+    _In_ LPCGUID LeaseId, _In_ const LXSS_CONSOLE_STATE* BaselineState, _In_ const LXSS_CONSOLE_STATE* ConfiguredState)
+try
+{
+    RETURN_HR_IF(E_INVALIDARG, !LeaseId || !BaselineState || !ConfiguredState);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    session->CommitConsoleStateLease(*LeaseId, *BaselineState, *ConfiguredState);
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::ReleaseConsoleStateLease(
+    _In_ LPCGUID LeaseId, _Out_ BOOLEAN* Restore, _Out_ LXSS_CONSOLE_STATE* BaselineState, _Out_ LXSS_CONSOLE_STATE* ConfiguredState)
+try
+{
+    RETURN_HR_IF(E_INVALIDARG, !LeaseId || !Restore || !BaselineState || !ConfiguredState);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    *Restore = session->ReleaseConsoleStateLease(*LeaseId, *BaselineState, *ConfiguredState);
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::CompleteConsoleStateLease(_In_ LPCGUID LeaseId)
+try
+{
+    RETURN_HR_IF(E_INVALIDARG, !LeaseId);
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    session->CompleteConsoleStateLease(*LeaseId);
+    return S_OK;
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::ConfigureDistribution(_In_opt_ LPCGUID DistroGuid, _In_ ULONG DefaultUid, _In_ ULONG Flags, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -676,6 +730,29 @@ LxssUserSessionImpl::~LxssUserSessionImpl()
 
     // Ensure that if there are no running instances.
     WI_ASSERT(m_runningInstances.empty());
+}
+
+void LxssUserSessionImpl::AcquireConsoleStateLease(
+    _In_ HANDLE ConsoleHandle, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState)
+{
+    m_consoleStateManager.Acquire(ConsoleHandle, LeaseId, Initialize, ConfiguredState);
+}
+
+void LxssUserSessionImpl::CommitConsoleStateLease(
+    _In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState)
+{
+    m_consoleStateManager.Commit(LeaseId, BaselineState, ConfiguredState);
+}
+
+bool LxssUserSessionImpl::ReleaseConsoleStateLease(
+    _In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState)
+{
+    return m_consoleStateManager.Release(LeaseId, BaselineState, ConfiguredState);
+}
+
+void LxssUserSessionImpl::CompleteConsoleStateLease(_In_ const GUID& LeaseId)
+{
+    m_consoleStateManager.Complete(LeaseId);
 }
 
 HRESULT LxssUserSessionImpl::AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags)

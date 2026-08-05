@@ -7565,6 +7565,40 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    struct ConsoleSnapshot
+    {
+        DWORD InputMode;
+        UINT InputCodePage;
+        DWORD OutputMode;
+        UINT OutputCodePage;
+    };
+
+    static ConsoleSnapshot GetConsoleSnapshot(HANDLE conin, HANDLE conout)
+    {
+        ConsoleSnapshot state{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin, &state.InputMode));
+        state.InputCodePage = GetConsoleCP();
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conout, &state.OutputMode));
+        state.OutputCodePage = GetConsoleOutputCP();
+        return state;
+    }
+
+    static void SetConsoleSnapshot(HANDLE conin, HANDLE conout, const ConsoleSnapshot& state)
+    {
+        LOG_LAST_ERROR_IF(!SetConsoleCP(state.InputCodePage));
+        LOG_LAST_ERROR_IF(!SetConsoleMode(conin, state.InputMode));
+        LOG_LAST_ERROR_IF(!SetConsoleOutputCP(state.OutputCodePage));
+        LOG_LAST_ERROR_IF(!SetConsoleMode(conout, state.OutputMode));
+    }
+
+    static void VerifyConsoleSnapshot(const ConsoleSnapshot& expected, const ConsoleSnapshot& actual)
+    {
+        VERIFY_ARE_EQUAL(expected.InputMode, actual.InputMode);
+        VERIFY_ARE_EQUAL(expected.InputCodePage, actual.InputCodePage);
+        VERIFY_ARE_EQUAL(expected.OutputMode, actual.OutputMode);
+        VERIFY_ARE_EQUAL(expected.OutputCodePage, actual.OutputCodePage);
+    }
+
     static std::optional<DWORD> TrySetDifferentValidInputMode(HANDLE conin, DWORD currentMode)
     {
         const std::array<DWORD, 4> candidates = {
@@ -7675,42 +7709,31 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     {
         wil::unique_hfile conin{CreateFileW(
             L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-        if (!conin)
+        wil::unique_hfile conout{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin || !conout)
         {
-            LogSkipped("Skipping ConsoleState concurrent-client test: CONIN$ is not available (no attached console)");
+            LogSkipped("Skipping ConsoleState concurrent-client test: console handles are not available");
             return;
         }
 
-        DWORD baseline{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
-        const DWORD scopeExitRestore = baseline;
-        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), scopeExitRestore); });
+        const auto baseline = GetConsoleSnapshot(conin.get(), conout.get());
+        auto restoreBaseline = wil::scope_exit([&] { SetConsoleSnapshot(conin.get(), conout.get(), baseline); });
+        wsl::windows::common::SvcComm service;
 
-        auto first = std::make_unique<wsl::windows::common::ConsoleState>(wsl::windows::common::RestorePolicy::OnlyIfUnchanged);
+        auto first = std::make_unique<wsl::windows::common::ConsoleState>(wsl::windows::common::RestorePolicy::OnlyIfUnchanged, &service);
         first->SetInteractiveMode();
+        const auto configured = GetConsoleSnapshot(conin.get(), conout.get());
 
-        DWORD configured{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &configured));
-
-        auto second = std::make_unique<wsl::windows::common::ConsoleState>(wsl::windows::common::RestorePolicy::OnlyIfUnchanged);
+        auto second = std::make_unique<wsl::windows::common::ConsoleState>(wsl::windows::common::RestorePolicy::OnlyIfUnchanged, &service);
         second->SetInteractiveMode();
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
 
         first.reset();
-
-        DWORD afterFirstExit{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &afterFirstExit));
-        VERIFY_IS_TRUE(
-            (afterFirstExit == baseline) || (afterFirstExit == configured),
-            L"Out-of-order teardown may restore baseline early; only the final mode after all clients exit is guaranteed");
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
 
         second.reset();
-
-        DWORD finalMode{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
-        VERIFY_ARE_EQUAL(
-            baseline,
-            finalMode,
-            L"RestorePolicy::OnlyIfUnchanged must leave the final mode at the original baseline after out-of-order teardown");
+        VerifyConsoleSnapshot(baseline, GetConsoleSnapshot(conin.get(), conout.get()));
     }
 
     TEST_METHOD(DownloadToHiddenSystemTempFolder)

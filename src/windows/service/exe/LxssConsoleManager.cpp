@@ -129,22 +129,6 @@ void ConsoleManager::_UnregisterProcess(_In_ const wil::unique_handle& ConsoleHa
     }
 }
 
-ULONG ConsoleManager::s_GetConhostServerId(_In_ HANDLE ConsoleHandle)
-{
-    IO_STATUS_BLOCK IoStatus;
-    HANDLE ServerPid;
-
-    //
-    // N.B.: The ioctl for getting server pid requires a handle as its buffer,
-    //       but it isn't really a handle but a process id.
-    //
-
-    THROW_IF_NTSTATUS_FAILED(NtDeviceIoControlFile(
-        ConsoleHandle, NULL, NULL, NULL, &IoStatus, IOCTL_CONDRV_GET_SERVER_PID, NULL, 0, &ServerPid, sizeof(ServerPid)));
-
-    return HandleToUlong(ServerPid);
-}
-
 void ConsoleManager::_OnProcessDisconnect(_In_ ULONG ConsoleId, _In_ bool Elevated)
 {
     wil::unique_handle firstClient;
@@ -171,48 +155,14 @@ void ConsoleManager::_OnProcessDisconnect(_In_ ULONG ConsoleId, _In_ bool Elevat
 
 void ConsoleManager::_GetConsoleInfo(_In_ const wil::unique_handle& ConsoleHandle, _Out_ ULONG& ConsoleId, _Out_ wil::unique_handle& ConhostHandle)
 {
-    FILE_FS_DEVICE_INFORMATION FsDeviceInformation;
-    IO_STATUS_BLOCK IoStatus;
-
-    //
-    // If no console handle was provided, use zero as the identifier.
-    //
-
+    // A missing console uses a shared identifier for the legacy session-leader path.
     if (!ConsoleHandle)
     {
         ConsoleId = 0;
         return;
     }
 
-    THROW_IF_NTSTATUS_FAILED(NtQueryVolumeInformationFile(
-        ConsoleHandle.get(), &IoStatus, &FsDeviceInformation, sizeof(FsDeviceInformation), FileFsDeviceInformation));
-
-    if (FsDeviceInformation.DeviceType != FILE_DEVICE_CONSOLE)
-    {
-        THROW_HR(E_UNEXPECTED);
-    }
-
-    ConsoleId = s_GetConhostServerId(ConsoleHandle.get());
-
-    //
-    // Open the conhost console process so it doesn't get closed and recycled while the process is
-    // running.
-    //
-
-    ConhostHandle.reset(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, ConsoleId));
-    THROW_LAST_ERROR_IF(!ConhostHandle);
-
-    //
-    // The conhost id needs to be queried again since it could get recycled between
-    // the query and the open.
-    //
-
-    if (ConsoleId != s_GetConhostServerId(ConsoleHandle.get()))
-    {
-        THROW_HR(E_UNEXPECTED);
-    }
-
-    WI_ASSERT(ConsoleId != 0);
+    ConsoleStateManager::GetConsoleInfo(ConsoleHandle.get(), ConsoleId, ConhostHandle);
 }
 
 bool ConsoleManager::s_OnProcessTerminated(_In_ ConsoleManager* Self, _In_ ULONG ConsoleId, _In_ bool Elevated)

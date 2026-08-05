@@ -23,6 +23,7 @@ Abstract:
 #include "PluginManager.h"
 #include "Lifetime.h"
 #include "DistributionRegistration.h"
+#include "ConsoleStateManager.h"
 
 #define WSL_NEW_DISTRO_LXFS L"NewDistributionLxFs"
 #define WSL_DISTRO_CONFIG_DEFAULT_UID L"DefaultUid"
@@ -72,6 +73,12 @@ public:
     LxssUserSession(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session);
     LxssUserSession(const LxssUserSession&) = delete;
     LxssUserSession& operator=(const LxssUserSession&) = delete;
+
+    IFACEMETHOD(AcquireConsoleStateLease)(_In_ ULONG ConsoleHandle, _Out_ GUID* LeaseId, _Out_ BOOLEAN* Initialize, _Out_ LXSS_CONSOLE_STATE* ConfiguredState) override;
+    IFACEMETHOD(CommitConsoleStateLease)(_In_ LPCGUID LeaseId, _In_ const LXSS_CONSOLE_STATE* BaselineState, _In_ const LXSS_CONSOLE_STATE* ConfiguredState) override;
+    IFACEMETHOD(ReleaseConsoleStateLease)(
+        _In_ LPCGUID LeaseId, _Out_ BOOLEAN* Restore, _Out_ LXSS_CONSOLE_STATE* BaselineState, _Out_ LXSS_CONSOLE_STATE* ConfiguredState) override;
+    IFACEMETHOD(CompleteConsoleStateLease)(_In_ LPCGUID LeaseId) override;
 
     /// <summary>
     /// Configures a distribution.
@@ -315,6 +322,11 @@ public:
     virtual ~LxssUserSessionImpl();
     LxssUserSessionImpl(const LxssUserSessionImpl&) = delete;
     LxssUserSessionImpl& operator=(const LxssUserSessionImpl&) = delete;
+
+    void AcquireConsoleStateLease(_In_ HANDLE ConsoleHandle, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
+    void CommitConsoleStateLease(_In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState);
+    bool ReleaseConsoleStateLease(_In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
+    void CompleteConsoleStateLease(_In_ const GUID& LeaseId);
 
     /// <summary>
     /// Configures a distribution.
@@ -787,6 +799,8 @@ private:
     static VOID CALLBACK s_VmIdleTerminate(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_opt_ PVOID Context, _Inout_ PTP_TIMER Timer);
 
     static LRESULT CALLBACK s_TimezoneWindowProc(HWND windowHandle, UINT messageCode, WPARAM wParameter, LPARAM lParameter);
+
+    ConsoleStateManager m_consoleStateManager;
 
     /// <summary>
     /// Lock for protecting various lists.

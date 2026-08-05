@@ -79,7 +79,7 @@ std::optional<DWORD> TryGetConsoleMode(_In_ HANDLE Handle)
 
 namespace wsl::windows::common {
 
-ConsoleState::ConsoleState(RestorePolicy Policy) : m_restorePolicy(Policy)
+ConsoleState::ConsoleState(RestorePolicy Policy, const SvcComm* Service) : m_restorePolicy(Policy), m_service(Service)
 {
     m_InputHandle.reset(
         CreateFileW(L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
@@ -102,6 +102,59 @@ void ConsoleState::SetInteractiveMode()
 {
     if (m_interactiveModeConfigured)
     {
+        return;
+    }
+
+    // Cross-process coordination is used only by opted-in wsl.exe launches with a console.
+    if ((m_restorePolicy == RestorePolicy::OnlyIfUnchanged) && m_service && m_InputHandle)
+    {
+        bool initialize{};
+        LXSS_CONSOLE_STATE configuredState{};
+        m_service->AcquireConsoleStateLease(m_InputHandle.get(), m_leaseId, initialize, configuredState);
+        m_leaseAcquired = true;
+
+        // Release removes an unfinished Initializing entry if setup fails.
+        auto releaseLease = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { RestoreLeasedConsoleState(); });
+        if (!initialize)
+        {
+            const auto currentState = CaptureConsoleState();
+            auto restoreCurrentState = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { ApplyConsoleState(currentState); });
+            ApplyConsoleState(configuredState);
+            m_interactiveModeConfigured = true;
+            restoreCurrentState.release();
+            releaseLease.release();
+            return;
+        }
+
+        const auto baselineState = CaptureConsoleState();
+
+        // The first lease configures the console and publishes the exact resulting state.
+        if (WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_INPUT_CODE_PAGE))
+        {
+            m_SavedInputCodePage = baselineState.InputCodePage;
+        }
+        if (WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_INPUT_MODE))
+        {
+            m_SavedInputMode = baselineState.InputMode;
+        }
+        if (WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_OUTPUT_CODE_PAGE))
+        {
+            m_SavedOutputCodePage = baselineState.OutputCodePage;
+        }
+        if (WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_OUTPUT_MODE))
+        {
+            m_SavedOutputMode = baselineState.OutputMode;
+        }
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { RestoreConsoleState(); });
+        ConfigureInteractiveMode();
+
+        const auto actualConfiguredState = CaptureConsoleState();
+        m_service->CommitConsoleStateLease(m_leaseId, baselineState, actualConfiguredState);
+
+        m_interactiveModeConfigured = true;
+        cleanup.release();
+        releaseLease.release();
         return;
     }
 
@@ -159,10 +212,145 @@ void ConsoleState::SetInteractiveMode()
     cleanup.release();
 }
 
+void ConsoleState::ConfigureInteractiveMode()
+{
+    if (m_InputHandle)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
+        DWORD mode{};
+        THROW_LAST_ERROR_IF(!GetConsoleMode(m_InputHandle.get(), &mode));
+        WI_SetAllFlags(mode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
+        WI_ClearAllFlags(mode, ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
+        ChangeConsoleMode(m_InputHandle.get(), mode);
+    }
+
+    if (m_OutputHandle)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
+        DWORD mode{};
+        THROW_LAST_ERROR_IF(!GetConsoleMode(m_OutputHandle.get(), &mode));
+        WI_SetAllFlags(mode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+        ChangeConsoleMode(m_OutputHandle.get(), mode);
+    }
+}
+
+LXSS_CONSOLE_STATE ConsoleState::CaptureConsoleState() const
+{
+    LXSS_CONSOLE_STATE state{};
+    if (m_InputHandle)
+    {
+        state.InputCodePage = GetConsoleCP();
+        WI_SetFlag(state.Flags, LXSS_CONSOLE_STATE_INPUT_CODE_PAGE);
+        if (const auto mode = TryGetConsoleMode(m_InputHandle.get()))
+        {
+            state.InputMode = mode.value();
+            WI_SetFlag(state.Flags, LXSS_CONSOLE_STATE_INPUT_MODE);
+        }
+    }
+
+    if (m_OutputHandle)
+    {
+        state.OutputCodePage = GetConsoleOutputCP();
+        WI_SetFlag(state.Flags, LXSS_CONSOLE_STATE_OUTPUT_CODE_PAGE);
+        if (const auto mode = TryGetConsoleMode(m_OutputHandle.get()))
+        {
+            state.OutputMode = mode.value();
+            WI_SetFlag(state.Flags, LXSS_CONSOLE_STATE_OUTPUT_MODE);
+        }
+    }
+
+    return state;
+}
+
+void ConsoleState::ApplyConsoleState(_In_ const LXSS_CONSOLE_STATE& State)
+{
+    if (m_InputHandle)
+    {
+        if (WI_IsFlagSet(State.Flags, LXSS_CONSOLE_STATE_INPUT_CODE_PAGE))
+        {
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(State.InputCodePage));
+        }
+        if (WI_IsFlagSet(State.Flags, LXSS_CONSOLE_STATE_INPUT_MODE))
+        {
+            ChangeConsoleMode(m_InputHandle.get(), State.InputMode);
+        }
+    }
+
+    if (m_OutputHandle)
+    {
+        if (WI_IsFlagSet(State.Flags, LXSS_CONSOLE_STATE_OUTPUT_CODE_PAGE))
+        {
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(State.OutputCodePage));
+        }
+        if (WI_IsFlagSet(State.Flags, LXSS_CONSOLE_STATE_OUTPUT_MODE))
+        {
+            ChangeConsoleMode(m_OutputHandle.get(), State.OutputMode);
+        }
+    }
+}
+
 ConsoleState::~ConsoleState()
 {
-    RestoreConsoleState();
+    if (m_leaseAcquired)
+    {
+        RestoreLeasedConsoleState();
+    }
+    else
+    {
+        RestoreConsoleState();
+    }
 }
+
+void ConsoleState::RestoreLeasedConsoleState()
+try
+{
+    if (!m_leaseAcquired)
+    {
+        return;
+    }
+
+    LXSS_CONSOLE_STATE baselineState{};
+    LXSS_CONSOLE_STATE configuredState{};
+    const auto restore = m_service->ReleaseConsoleStateLease(m_leaseId, baselineState, configuredState);
+    m_leaseAcquired = false;
+    if (!restore)
+    {
+        return;
+    }
+
+    // Always unblock waiters, even if the console disconnects while it is being restored.
+    auto complete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_service->CompleteConsoleStateLease(m_leaseId); });
+    if (m_InputHandle)
+    {
+        if (WI_IsFlagSet(configuredState.Flags, LXSS_CONSOLE_STATE_INPUT_CODE_PAGE) &&
+            WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_INPUT_CODE_PAGE) && (GetConsoleCP() == configuredState.InputCodePage))
+        {
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(baselineState.InputCodePage));
+        }
+        if (WI_IsFlagSet(configuredState.Flags, LXSS_CONSOLE_STATE_INPUT_MODE) &&
+            WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_INPUT_MODE) &&
+            (TryGetConsoleMode(m_InputHandle.get()) == configuredState.InputMode))
+        {
+            TrySetConsoleMode(m_InputHandle.get(), baselineState.InputMode);
+        }
+    }
+
+    if (m_OutputHandle)
+    {
+        if (WI_IsFlagSet(configuredState.Flags, LXSS_CONSOLE_STATE_OUTPUT_CODE_PAGE) &&
+            WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_OUTPUT_CODE_PAGE) && (GetConsoleOutputCP() == configuredState.OutputCodePage))
+        {
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(baselineState.OutputCodePage));
+        }
+        if (WI_IsFlagSet(configuredState.Flags, LXSS_CONSOLE_STATE_OUTPUT_MODE) &&
+            WI_IsFlagSet(baselineState.Flags, LXSS_CONSOLE_STATE_OUTPUT_MODE) &&
+            (TryGetConsoleMode(m_OutputHandle.get()) == configuredState.OutputMode))
+        {
+            TrySetConsoleMode(m_OutputHandle.get(), baselineState.OutputMode);
+        }
+    }
+}
+CATCH_LOG()
 
 void ConsoleState::RestoreConsoleState()
 {
