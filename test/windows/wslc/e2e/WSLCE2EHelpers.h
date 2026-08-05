@@ -209,6 +209,10 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
 
+// Waits for a substring to appear in the session's pseudo console output.
+void WaitForPseudoConsoleOutput(
+    const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout = std::chrono::seconds(60));
+
 // Starts a local registry container using the COM API and returns the running container (holds it
 // alive) plus the registry address. Host network for plain http, bridge network for tls enabled.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(

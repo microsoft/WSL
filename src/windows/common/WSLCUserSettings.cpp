@@ -59,7 +59,10 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "\n"
     "  # DNS name that resolves to the host loopback address (default: host.wslc.internal).\n"
     "  # Set to \"none\" to disable the entry.\n"
-    "  # hostLoopback: default\n"
+    "  # hostLoopback: default"
+    "\n"
+    "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
+    "  # idleTimeout: default\n"
     "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
@@ -175,6 +178,11 @@ namespace details {
         }
 
         return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionIdleTimeout)
+    {
+        return value > 0 ? std::optional{value} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)

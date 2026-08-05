@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Unit tests for OutputChannel and Reporter.
+    Unit tests for OutputChannel, InputChannel, and Reporter.
 
 --*/
 
@@ -16,6 +16,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
+#include "InputChannel.h"
 #include "OutputChannel.h"
 #include "Reporter.h"
 
@@ -36,6 +37,21 @@ struct SplitCaptureReporter
     Reporter reporter;
 
     explicit SplitCaptureReporter(bool vtEnabled = false) : reporter(outPipe.file(), vtEnabled, errPipe.file(), vtEnabled)
+    {
+    }
+};
+
+// Reporter wired with a preloaded input pipe plus split output capture, so prompt
+// input and the label/newline it writes can be asserted together.
+struct InputCaptureReporter
+{
+    CapturePipe outPipe;
+    CapturePipe errPipe;
+    InputPipe inPipe;
+    Reporter reporter;
+
+    explicit InputCaptureReporter(const std::wstring& input, bool interactive = false) :
+        inPipe(input), reporter(outPipe.file(), false, errPipe.file(), false, inPipe.file(), interactive)
     {
     }
 };
@@ -308,6 +324,243 @@ class WSLCCLIReporterUnitTests
             const auto expected = std::format(fmt, empty, 42, 255u, empty, empty, empty, empty);
             VERIFY_ARE_EQUAL(expected, cap.captured());
         }
+    }
+
+    TEST_METHOD(InputChannel_ReadLineReturnsNulloptAtEof)
+    {
+        InputPipe pipe{L""};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
+    }
+
+    TEST_METHOD(InputChannel_ReadLineSplitsOnNewline)
+    {
+        InputPipe pipe{L"user\npass\n"};
+        const InputChannel channel{pipe.file(), false};
+
+        auto first = channel.ReadLine(false);
+        VERIFY_IS_TRUE(first.has_value());
+        VERIFY_ARE_EQUAL(std::wstring{L"user"}, first.value());
+
+        auto second = channel.ReadLine(false);
+        VERIFY_IS_TRUE(second.has_value());
+        VERIFY_ARE_EQUAL(std::wstring{L"pass"}, second.value());
+
+        VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
+    }
+
+    TEST_METHOD(InputChannel_ReadLineStripsCarriageReturn)
+    {
+        InputPipe pipe{L"user\r\npass\r\n"};
+        const InputChannel channel{pipe.file(), false};
+
+        VERIFY_ARE_EQUAL(std::wstring{L"user"}, channel.ReadLine(false).value_or(L"<eof>"));
+        VERIFY_ARE_EQUAL(std::wstring{L"pass"}, channel.ReadLine(false).value_or(L"<eof>"));
+    }
+
+    TEST_METHOD(InputChannel_ReadLineReturnsEmptyStringForBlankLine)
+    {
+        // A bare empty line is distinct from EOF: value present but empty.
+        InputPipe pipe{L"\nsecond\n"};
+        const InputChannel channel{pipe.file(), false};
+
+        auto blank = channel.ReadLine(false);
+        VERIFY_IS_TRUE(blank.has_value());
+        VERIFY_ARE_EQUAL(std::wstring{L""}, blank.value());
+
+        VERIFY_ARE_EQUAL(std::wstring{L"second"}, channel.ReadLine(false).value_or(L"<eof>"));
+    }
+
+    TEST_METHOD(InputChannel_ReadLineReturnsFinalLineWithoutTrailingNewline)
+    {
+        InputPipe pipe{L"only"};
+        const InputChannel channel{pipe.file(), false};
+
+        VERIFY_ARE_EQUAL(std::wstring{L"only"}, channel.ReadLine(false).value_or(L"<eof>"));
+        VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
+    }
+
+    TEST_METHOD(InputChannel_IsInteractiveReflectsOverrideForNonConsole)
+    {
+        InputPipe pipe{L"x\n"};
+        const InputChannel notInteractive{pipe.file(), false};
+        VERIFY_IS_FALSE(notInteractive.IsInteractive());
+
+        InputPipe pipe2{L"x\n"};
+        const InputChannel interactive{pipe2.file(), true};
+        VERIFY_IS_TRUE(interactive.IsInteractive());
+    }
+
+    TEST_METHOD(InputChannel_ReadLineWithMaskReadsWhenNoConsole)
+    {
+        // Masking is a no-op without a real console; the read still succeeds.
+        InputPipe pipe{L"secret\n"};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_ARE_EQUAL(std::wstring{L"secret"}, channel.ReadLine(true).value_or(L"<eof>"));
+    }
+
+    TEST_METHOD(InputChannel_ReadLineOnNullFileReturnsNullopt)
+    {
+        const InputChannel channel{static_cast<FILE*>(nullptr), false};
+        VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
+    }
+
+    TEST_METHOD(InputChannel_ReadLinePreservesInteriorAndSurroundingWhitespace)
+    {
+        // Only the trailing CR/LF is stripped. Leading, interior, and trailing spaces
+        // and tabs are preserved verbatim (WSLC does not trim, unlike Docker's prompt).
+        InputPipe pipe{L"  spaced \t value  \n"};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_ARE_EQUAL(std::wstring{L"  spaced \t value  "}, channel.ReadLine(false).value_or(L"<eof>"));
+    }
+
+    TEST_METHOD(InputChannel_ReadLineStripsLoneTrailingCarriageReturnAtEof)
+    {
+        // A lone trailing CR (no following LF) is not collapsed by the stream's CRLF
+        // translation, so it reaches ReadLine and exercises the trailing-CR strip.
+        InputPipe pipe{L"value\r"};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_ARE_EQUAL(std::wstring{L"value"}, channel.ReadLine(false).value_or(L"<eof>"));
+        VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
+    }
+
+    TEST_METHOD(InputChannel_ReadLinePreservesEmbeddedCarriageReturn)
+    {
+        // Only a trailing CR is stripped; a CR in the middle of a line is preserved.
+        InputPipe pipe{L"a\rb\n"};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_ARE_EQUAL(std::wstring{L"a\rb"}, channel.ReadLine(false).value_or(L"<eof>"));
+    }
+
+    TEST_METHOD(InputChannel_ReadLineDecodesUnicode)
+    {
+        // UTF-8 bytes on the wire decode back to the original wide characters.
+        const std::wstring expected = L"\u00e9\u4e2d\u6587\u2013user";
+        InputPipe pipe{expected + L"\n"};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_ARE_EQUAL(expected, channel.ReadLine(false).value_or(L"<eof>"));
+    }
+
+    TEST_METHOD(InputChannel_ReadLineHandlesLongLine)
+    {
+        // Lines longer than any internal buffer are read in full (fgetwc loop).
+        const std::wstring expected(8192, L'z');
+        InputPipe pipe{expected + L"\n"};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_ARE_EQUAL(expected, channel.ReadLine(false).value_or(L"<eof>"));
+    }
+
+    TEST_METHOD(InputChannel_ReadLineReturnsNulloptAfterAllLinesConsumed)
+    {
+        InputPipe pipe{L"one\ntwo\n"};
+        const InputChannel channel{pipe.file(), false};
+        VERIFY_ARE_EQUAL(std::wstring{L"one"}, channel.ReadLine(false).value_or(L"<eof>"));
+        VERIFY_ARE_EQUAL(std::wstring{L"two"}, channel.ReadLine(false).value_or(L"<eof>"));
+        VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
+        // Further reads keep returning nullopt (idempotent at EOF).
+        VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
+    }
+
+    TEST_METHOD(Reporter_ReadLineReturnsInput)
+    {
+        InputCaptureReporter cap{L"line1\nline2\n"};
+        VERIFY_ARE_EQUAL(std::wstring{L"line1"}, cap.reporter.ReadLine().value_or(L"<eof>"));
+        VERIFY_ARE_EQUAL(std::wstring{L"line2"}, cap.reporter.ReadLine().value_or(L"<eof>"));
+        VERIFY_IS_FALSE(cap.reporter.ReadLine().has_value());
+    }
+
+    TEST_METHOD(Reporter_IsInputInteractiveReflectsChannel)
+    {
+        InputCaptureReporter pipeInput{L"x\n", /*interactive*/ false};
+        VERIFY_IS_FALSE(pipeInput.reporter.IsInputInteractive());
+
+        InputCaptureReporter consoleInput{L"x\n", /*interactive*/ true};
+        VERIFY_IS_TRUE(consoleInput.reporter.IsInputInteractive());
+    }
+
+    TEST_METHOD(Reporter_PromptForLineWritesLabelToStdoutAndReturnsInput)
+    {
+        InputCaptureReporter cap{L"myuser\n"};
+
+        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Username: ", false);
+        VERIFY_ARE_EQUAL(std::wstring{L"myuser"}, result);
+
+        // Label lands on stdout (Docker convention); nothing on stderr; no trailing
+        // newline because the input was not masked.
+        VERIFY_ARE_EQUAL(std::wstring{L"Username: "}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(Reporter_PromptForLineMaskedInteractiveEmitsTrailingNewline)
+    {
+        // Interactive override makes willMask true, so the un-echoed Enter is advanced
+        // with a trailing newline after the label.
+        InputCaptureReporter cap{L"secret\n", /*interactive*/ true};
+
+        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Password: ", true);
+        VERIFY_ARE_EQUAL(std::wstring{L"secret"}, result);
+        VERIFY_ARE_EQUAL(std::wstring{L"Password: \n"}, cap.outPipe.captured());
+    }
+
+    TEST_METHOD(Reporter_PromptForLineMaskedNonInteractiveEmitsNoTrailingNewline)
+    {
+        // Redirected input is not interactive, so no masking and no trailing newline.
+        InputCaptureReporter cap{L"secret\n", /*interactive*/ false};
+
+        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Password: ", true);
+        VERIFY_ARE_EQUAL(std::wstring{L"secret"}, result);
+        VERIFY_ARE_EQUAL(std::wstring{L"Password: "}, cap.outPipe.captured());
+    }
+
+    TEST_METHOD(Reporter_PromptForLineReturnsEmptyStringAtEof)
+    {
+        InputCaptureReporter cap{L""};
+        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Username: ", false);
+        VERIFY_ARE_EQUAL(std::wstring{L""}, result);
+        VERIFY_ARE_EQUAL(std::wstring{L"Username: "}, cap.outPipe.captured());
+    }
+
+    TEST_METHOD(Reporter_PromptForLineEmitsLabelVerbatimWithFormatCharacters)
+    {
+        // The label is passed as a formatting argument, not a format string, so brace
+        // and percent characters in it must never be interpreted (no format injection).
+        InputCaptureReporter cap{L"answer\n"};
+        const std::wstring label = L"Value {} {0} {name} 100% ${var}: ";
+
+        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, label, false);
+        VERIFY_ARE_EQUAL(std::wstring{L"answer"}, result);
+        VERIFY_ARE_EQUAL(label, cap.outPipe.captured());
+    }
+
+    TEST_METHOD(Reporter_PromptForLineDoesNotTrimPasswordWhitespace)
+    {
+        // Secrets are opaque: interior and surrounding whitespace is preserved so a
+        // password like "  a b  " is returned exactly as typed.
+        InputCaptureReporter cap{L"  a b  \n", /*interactive*/ true};
+
+        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Password: ", true);
+        VERIFY_ARE_EQUAL(std::wstring{L"  a b  "}, result);
+        VERIFY_ARE_EQUAL(std::wstring{L"Password: \n"}, cap.outPipe.captured());
+    }
+
+    TEST_METHOD(Reporter_PromptForLineReturnsUnicodeInput)
+    {
+        const std::wstring expected = L"\u00fcser\u00f1ame";
+        InputCaptureReporter cap{expected + L"\n"};
+
+        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Username: ", false);
+        VERIFY_ARE_EQUAL(expected, result);
+    }
+
+    TEST_METHOD(Reporter_ReadLineMaskDefaultsToUnmasked)
+    {
+        // ReadLine(bool mask = false): the default reads without masking and returns
+        // the line, used by the --password-stdin path.
+        InputCaptureReporter cap{L"piped-secret\n"};
+        VERIFY_ARE_EQUAL(std::wstring{L"piped-secret"}, cap.reporter.ReadLine().value_or(L"<eof>"));
+        // Nothing is written for a bare ReadLine (no prompt label).
+        VERIFY_ARE_EQUAL(std::wstring{L""}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
     }
 };
 
