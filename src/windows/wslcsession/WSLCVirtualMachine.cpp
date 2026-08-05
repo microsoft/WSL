@@ -15,13 +15,13 @@ Abstract:
 
 --*/
 
+#include "precomp.h"
 #include "WSLCVirtualMachine.h"
 #include <format>
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include "ServiceProcessLauncher.h"
 #include "wslutil.h"
-#include "wslpolicies.h"
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
