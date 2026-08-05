@@ -3147,6 +3147,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Do not error if the volume does not exist</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Remove anonymous volumes associated with the container</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Working directory inside the container</value>
   </data>

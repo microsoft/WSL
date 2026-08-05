@@ -29,6 +29,7 @@ std::vector<Argument> ContainerRemoveCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
         Argument::Create(ArgType::Force),
+        Argument::Create(ArgType::Volumes),
     };
 }
 
