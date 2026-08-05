@@ -26,6 +26,12 @@ extern "C" {
 #define WSLPLUGINAPI_ENTRYPOINTV1 WSLPluginAPIV1_EntryPoint
 #define WSL_E_PLUGIN_REQUIRES_UPDATE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x032A)
 
+// Returned by the WSLC plugin API calls below when the session has no running VM.
+// N.B. This value is also defined in wslc.idl; the two definitions must stay in sync.
+#ifndef WSLC_E_VM_NOT_RUNNING
+#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0610)
+#endif
+
 #define WSL_PLUGIN_REQUIRE_VERSION(_Major, _Minor, _Revision, Api) \
     if (Api->Version.Major < (_Major) || (Api->Version.Major == (_Major) && Api->Version.Minor < (_Minor)) || \
         (Api->Version.Major == (_Major) && Api->Version.Minor == (_Minor) && Api->Version.Revision < (_Revision))) \

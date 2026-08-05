@@ -27,8 +27,7 @@ public:
 protected:
     bool CollectUserWarning(const std::wstring& warning) override
     {
-        IWarningCallback* callback = m_warningCallback;
-        if (callback != nullptr)
+        if (m_warningCallback != nullptr)
         {
             std::unique_ptr<UserCOMCallback> comCallback;
             if (m_session != nullptr)
@@ -36,7 +35,7 @@ protected:
                 comCallback = std::make_unique<UserCOMCallback>(m_session->RegisterUserCOMCallback());
             }
 
-            auto hr = callback->OnWarning(warning.c_str());
+            auto hr = m_warningCallback->OnWarning(warning.c_str());
             if (SUCCEEDED(hr) || hr == RPC_E_CALL_CANCELED || hr == HRESULT_FROM_WIN32(ERROR_CANCELLED))
             {
                 return true;

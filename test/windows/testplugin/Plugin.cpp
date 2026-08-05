@@ -687,10 +687,9 @@ try
 
         g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
 
-        // Deliberately leave a live process behind when this callback returns. Its handle holds an
-        // activity reference, which under the old design abandoned the announced teardown. The stop is
-        // now committed before it is announced, so the VM goes away regardless and this process dies
-        // with it -- which is exactly what the callback was just told would happen.
+        // Deliberately leave a live process behind when this callback returns. The stop is committed
+        // before it is announced, so the VM goes away regardless and this process dies with it --
+        // which is exactly what the callback was just told would happen.
         //
         // Created before the thread below is started so its exit event is published first: that thread
         // claims the event and must not race ahead of it.
@@ -713,8 +712,7 @@ try
 
         // A call from a thread this plugin owns is served on the same terms as the callback itself:
         // by the VM that is stopping, not by a future one and not by a new one. It must not block on
-        // the teardown, which is exactly the deadlock the old "wait for the next VM" behaviour risked.
-        // Results are logged when this thread is joined, so the output stays deterministic.
+        // the teardown. Results are logged when this thread is joined, so the output stays deterministic.
         const auto sessionId = Session->SessionId;
         g_stopWindowCaller = std::thread([sessionId]() {
             std::vector<const char*> processArgs = {"/bin/true", nullptr};
@@ -751,8 +749,8 @@ try
 
     g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
 
-    // Proves OnVmStopping doesn't deadlock a plugin that calls back in: on idle teardown the session
-    // is alive so these restart the VM and succeed; on permanent teardown they fail cleanly.
+    // Proves OnVmStopping doesn't deadlock a plugin that calls back in: on idle teardown these are
+    // served by the VM that is still stopping and succeed; on permanent teardown they fail cleanly.
     std::vector<const char*> args = {"/bin/true", nullptr};
     WSLCProcessHandle process = nullptr;
     const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
