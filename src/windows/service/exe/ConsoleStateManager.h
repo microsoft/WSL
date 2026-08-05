@@ -15,12 +15,12 @@ Abstract:
 #pragma once
 
 #include <condition_variable>
-#include <set>
+#include "Lifetime.h"
 
 class ConsoleStateManager
 {
 public:
-    void Acquire(_In_ HANDLE ConsoleHandle, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
+    void Acquire(_In_ HANDLE ConsoleHandle, _In_ HANDLE ClientProcess, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
     void Commit(_In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState);
     bool Release(_In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
     void Complete(_In_ const GUID& LeaseId);
@@ -35,11 +35,17 @@ private:
         Restoring
     };
 
+    struct Lease
+    {
+        wil::unique_handle ClientProcess;
+        ULONG64 CallbackId{};
+    };
+
     struct Entry
     {
         wil::unique_handle ConhostHandle;
         State CurrentState{State::Initializing};
-        std::set<GUID, wsl::windows::common::helpers::GuidLess> Leases;
+        std::map<GUID, Lease, wsl::windows::common::helpers::GuidLess> Leases;
         GUID Restorer{};
         LXSS_CONSOLE_STATE BaselineState{};
         LXSS_CONSOLE_STATE ConfiguredState{};
@@ -50,9 +56,17 @@ private:
     _Requires_lock_held_(m_lock)
     EntryIterator FindLease(_In_ const GUID& LeaseId);
 
+    _Requires_lock_held_(m_lock)
+    void AddLease(_Inout_ Entry& Entry, _In_ const GUID& LeaseId, _In_ HANDLE ClientProcess);
+
+    void OnClientTerminated(_In_ const GUID& LeaseId);
+
     static ULONG GetConhostServerId(_In_ HANDLE ConsoleHandle);
 
     std::mutex m_lock;
     std::condition_variable m_stateChanged;
     _Guarded_by_(m_lock) std::map<ULONG, Entry> m_entries;
+
+    // N.B. Keep this last so callbacks cannot outlive the state they access.
+    LifetimeManager m_lifetimeManager;
 };

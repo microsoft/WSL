@@ -323,7 +323,7 @@ public:
     LxssUserSessionImpl(const LxssUserSessionImpl&) = delete;
     LxssUserSessionImpl& operator=(const LxssUserSessionImpl&) = delete;
 
-    void AcquireConsoleStateLease(_In_ HANDLE ConsoleHandle, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
+    void AcquireConsoleStateLease(_In_ HANDLE ConsoleHandle, _In_ HANDLE ClientProcess, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
     void CommitConsoleStateLease(_In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState);
     bool ReleaseConsoleStateLease(_In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState);
     void CompleteConsoleStateLease(_In_ const GUID& LeaseId);

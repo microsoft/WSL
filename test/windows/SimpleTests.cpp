@@ -189,6 +189,15 @@ class SimpleTests
             return m_process.get();
         }
 
+        void terminate()
+        {
+            if (m_process && (WaitForSingleObject(m_process.get(), 0) == WAIT_TIMEOUT))
+            {
+                VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(m_process.get(), 0));
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(m_process.get(), 5000));
+            }
+        }
+
         void reset()
         {
             if (m_process)
@@ -288,18 +297,62 @@ class SimpleTests
         outputB.Expect("ready");
         VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
 
-        SignalControllableProcessExit(aInWrite);
-        VERIFY_ARE_EQUAL(0u, WaitForProcessExit(processA.get(), 15000));
+        processA.terminate();
+        aInWrite.reset();
 
         VERIFY_ARE_EQUAL(
             static_cast<DWORD>(WAIT_TIMEOUT),
             WaitForSingleObject(processB.get(), 0),
-            L"Process B must still be alive when process A exits for out-of-order restore coverage");
+            L"Process B must still be alive when process A is terminated");
         VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
 
         SignalControllableProcessExit(bInWrite);
         VERIFY_ARE_EQUAL(0u, WaitForProcessExit(processB.get(), 15000));
         VerifyConsoleSnapshot(baseline, GetConsoleSnapshot(conin.get(), conout.get()));
+    }
+
+    TEST_METHOD(ConsoleState_WslProcess_SoleOwnerTermination_DoesNotBlockNextClient)
+    {
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        wil::unique_hfile conout{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin || !conout)
+        {
+            LogSkipped("Skipping ConsoleState WSL process test: console handles are not available");
+            return;
+        }
+
+        const auto baseline = GetConsoleSnapshot(conin.get(), conout.get());
+        auto restoreBaseline = wil::scope_exit([&] { SetConsoleSnapshot(conin.get(), conout.get(), baseline); });
+
+        auto [aOutRead, aOutWrite] = CreateSubprocessPipe(false, true);
+        auto [aInRead, aInWrite] = CreateSubprocessPipe(true, false);
+        unique_kill_process processA(StartControllableWslProcess(aInRead.get(), aOutWrite.get()));
+        VERIFY_IS_TRUE(processA.get() != nullptr);
+        aOutWrite.reset();
+        aInRead.reset();
+
+        PartialHandleRead outputA(aOutRead.get());
+        outputA.Expect("ready");
+        processA.terminate();
+        aInWrite.reset();
+
+        auto [bOutRead, bOutWrite] = CreateSubprocessPipe(false, true);
+        auto [bInRead, bInWrite] = CreateSubprocessPipe(true, false);
+        unique_kill_process processB(StartControllableWslProcess(bInRead.get(), bOutWrite.get()));
+        VERIFY_IS_TRUE(processB.get() != nullptr);
+        bOutWrite.reset();
+        bInRead.reset();
+
+        PartialHandleRead outputB(bOutRead.get());
+        outputB.Expect("ready");
+        SignalControllableProcessExit(bInWrite);
+        VERIFY_ARE_EQUAL(0u, WaitForProcessExit(processB.get(), 15000));
+
+        // The first client was the sole owner when it was terminated, so no process remained that
+        // could restore its baseline. This test only verifies that the abandoned lease does not
+        // prevent a subsequent client from acquiring and releasing a new lease.
     }
 
     TEST_METHOD(ConsoleState_WslProcesses_SeparateConsoles_Isolation)

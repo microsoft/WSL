@@ -62,8 +62,9 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     wil::unique_handle consoleHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ConsoleHandle))};
+    const auto clientProcess = wsl::windows::common::wslutil::OpenCallingProcess(SYNCHRONIZE);
     bool initialize{};
-    session->AcquireConsoleStateLease(consoleHandle.get(), *LeaseId, initialize, *ConfiguredState);
+    session->AcquireConsoleStateLease(consoleHandle.get(), clientProcess.get(), *LeaseId, initialize, *ConfiguredState);
     *Initialize = initialize;
     return S_OK;
 }
@@ -732,19 +733,17 @@ LxssUserSessionImpl::~LxssUserSessionImpl()
 }
 
 void LxssUserSessionImpl::AcquireConsoleStateLease(
-    _In_ HANDLE ConsoleHandle, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState)
+    _In_ HANDLE ConsoleHandle, _In_ HANDLE ClientProcess, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState)
 {
-    m_consoleStateManager.Acquire(ConsoleHandle, LeaseId, Initialize, ConfiguredState);
+    m_consoleStateManager.Acquire(ConsoleHandle, ClientProcess, LeaseId, Initialize, ConfiguredState);
 }
 
-void LxssUserSessionImpl::CommitConsoleStateLease(
-    _In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState)
+void LxssUserSessionImpl::CommitConsoleStateLease(_In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState)
 {
     m_consoleStateManager.Commit(LeaseId, BaselineState, ConfiguredState);
 }
 
-bool LxssUserSessionImpl::ReleaseConsoleStateLease(
-    _In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState)
+bool LxssUserSessionImpl::ReleaseConsoleStateLease(_In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState)
 {
     return m_consoleStateManager.Release(LeaseId, BaselineState, ConfiguredState);
 }
