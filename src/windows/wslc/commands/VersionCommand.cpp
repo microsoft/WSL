@@ -47,11 +47,7 @@ void VersionCommand::PrintVersion(Reporter& reporter)
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    FormatType format = FormatType::Table;
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = context.Args.GetValue<ArgType::Format>();
-    }
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {

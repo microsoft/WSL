@@ -161,11 +161,7 @@ void ListImages(CLIExecutionContext& context)
         return;
     }
 
-    FormatType format = FormatType::Table; // Default is table
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = context.Args.GetValue<ArgType::Format>();
-    }
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {

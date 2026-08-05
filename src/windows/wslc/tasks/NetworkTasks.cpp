@@ -180,11 +180,7 @@ void ListNetworks(CLIExecutionContext& context)
         return;
     }
 
-    FormatType format = FormatType::Table;
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = context.Args.GetValue<ArgType::Format>();
-    }
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {

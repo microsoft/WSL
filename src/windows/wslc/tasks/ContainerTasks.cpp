@@ -554,11 +554,7 @@ void ListContainers(CLIExecutionContext& context)
         return;
     }
 
-    FormatType format = FormatType::Table; // Default is table
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = context.Args.GetValue<ArgType::Format>();
-    }
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {
@@ -652,20 +648,9 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Name = WideToMultiByte(context.Args.GetValue<ArgType::Name>());
     }
 
-    if (context.Args.GetValue<ArgType::TTY>())
-    {
-        options.TTY = true;
-    }
-
-    if (context.Args.GetValue<ArgType::Detach>())
-    {
-        options.Detach = true;
-    }
-
-    if (context.Args.GetValue<ArgType::Interactive>())
-    {
-        options.Interactive = true;
-    }
+    options.TTY = context.Args.GetValue<ArgType::TTY>();
+    options.Detach = context.Args.GetValue<ArgType::Detach>();
+    options.Interactive = context.Args.GetValue<ArgType::Interactive>();
 
     if (context.Args.Contains(ArgType::Publish))
     {
@@ -677,10 +662,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.GetValue<ArgType::PublishAll>())
-    {
-        options.PublishAll = true;
-    }
+    options.PublishAll = context.Args.GetValue<ArgType::PublishAll>();
 
     if (context.Args.Contains(ArgType::Gpus))
     {
@@ -697,10 +679,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.GetValue<ArgType::Remove>())
-    {
-        options.Remove = true;
-    }
+    options.Remove = context.Args.GetValue<ArgType::Remove>();
 
     if (context.Args.Contains(ArgType::StopSignal))
     {
@@ -742,10 +721,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.HealthRetries = context.Args.GetValue<ArgType::HealthRetries>();
     }
 
-    if (context.Args.GetValue<ArgType::NoHealthcheck>())
-    {
-        options.NoHealthcheck = true;
-    }
+    options.NoHealthcheck = context.Args.GetValue<ArgType::NoHealthcheck>();
 
     if (context.Args.Contains(ArgType::Memory))
     {
@@ -954,11 +930,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         10 // Batch Size - chosen to be around typical expected container use while protecting against extreme cases.
     );
 
-    FormatType format = FormatType::Table; // Default is table
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = context.Args.GetValue<ArgType::Format>();
-    }
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {
