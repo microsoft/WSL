@@ -81,6 +81,9 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 // Parses an output format ("json"/"table") into a FormatType.
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
 
+// Parses the inspect family's sole supported format ("json") into its compact json::dump() indent.
+int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring& argName = {});
+
 // Parses an inspect target ("image"/"container"/"network"/"volume") into an InspectType.
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 

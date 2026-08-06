@@ -113,6 +113,7 @@ void Inspect(CLIExecutionContext& context)
     }
 
     // Always print the array, even if it's empty or an error was encountered
-    context.Reporter.Output(L"{}\n", MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)));
+    context.Reporter.Output(
+        L"{}\n", MultiByteToWide(array.dump(context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent))));
 }
 } // namespace wsl::windows::wslc::task

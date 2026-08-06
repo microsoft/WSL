@@ -37,6 +37,7 @@ namespace wsl::windows::wslc::argument::details {
 // commas would otherwise break X-macro argument parsing if written inline in the table.
 using FormatType = wsl::windows::wslc::models::FormatType;
 using InspectType = wsl::windows::wslc::models::InspectType;
+using JsonIndent = int;
 using WSLCSignal = ::WSLCSignal;
 using UlimitValue = std::tuple<std::string, int64_t, int64_t>;
 using KeyValuePair = std::pair<std::string, std::string>;

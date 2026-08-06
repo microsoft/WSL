@@ -19,6 +19,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "Exceptions.h"
 #include "ImageService.h"
+#include "JsonUtils.h"
 #include "Localization.h"
 #include <algorithm>
 #include <charconv>
@@ -637,7 +638,18 @@ models::FormatType GetFormatTypeFromString(const std::wstring& input, const std:
         supportedValues += formatType.first;
     }
 
-    throw ArgumentException(Localization::WSLCCLI_InvalidFormatTypeError(argName, input, supportedValues));
+    throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
+}
+
+int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (!IsEqual(input, L"json"))
+    {
+        constexpr std::wstring_view supportedValues = L"json";
+        throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
+    }
+
+    return wsl::shared::c_jsonCompactIndent;
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)

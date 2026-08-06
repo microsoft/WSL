@@ -429,8 +429,10 @@ struct ContainerConfig
     std::optional<std::string> StopSignal;
     std::optional<int> StopTimeout;
     std::optional<HealthConfig> Healthcheck;
+    // Optional because dockerd may emit `"Labels": null` for containers with no merged labels.
+    std::optional<std::map<std::string, std::string>> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout, Healthcheck);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout, Healthcheck, Labels);
 };
 
 struct InspectMount

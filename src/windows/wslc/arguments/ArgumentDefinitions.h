@@ -81,6 +81,7 @@ _(ImageForce,       "force",                L"f",             Kind::Flag,       
 _(ImageId,          "image",                NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ImageIdArgDescription()) \
 _(ImportFile,       "file",                 NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ImportFileArgDescription()) \
 _(Input,            "input",                L"i",             Kind::Value,      NoConversion, Localization::WSLCCLI_InputArgDescription()) \
+_(InspectFormat,    "format",               NO_ALIAS,         Kind::Value,      JsonIndent,   Localization::WSLCCLI_InspectFormatArgDescription()) \
 _(Interactive,      "interactive",          L"i",             Kind::Flag,       NoConversion, Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,         "internal",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkInternalArgDescription()) \
 _(IpAddress,        "ip",                   NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IpAddressArgDescription()) \

@@ -20,6 +20,7 @@ Abstract:
 #include "ArgMap.h"
 #include "ArgumentValidation.h"
 #include "ImageService.h"
+#include "JsonUtils.h"
 #include "Exceptions.h"
 #include <wslc.h>
 
@@ -334,6 +335,9 @@ class WSLCCLIArgumentUnitTests
     {
         // string -> FormatType
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Format>(L"json"), FormatType::Json);
+
+        // string -> json::dump() indentation
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::InspectFormat>(L"json"), wsl::shared::c_jsonCompactIndent);
 
         // string -> WSLCSignal (Signal and StopSignal share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Signal>(L"SIGTERM"), WSLCSignalSIGTERM);

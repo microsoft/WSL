@@ -55,7 +55,7 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         nlohmann::json root;
         root["Client"]["Version"] = std::string{WSL_PACKAGE_VERSION};
-        context.Reporter.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonPrettyPrintIndent)));
+        context.Reporter.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonCompactIndent)));
         break;
     }
     case FormatType::Table:

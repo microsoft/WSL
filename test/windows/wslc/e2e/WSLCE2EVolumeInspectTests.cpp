@@ -69,6 +69,20 @@ class WSLCE2EVolumeInspectTests
         VERIFY_ARE_EQUAL("guest", inspect.Driver);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_FormatJson_IsSingleLine)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"volume inspect --format json {}", TestVolumeName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), document[0]["Name"].get<std::string>());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Volume_InspectMultiple_Success)
     {
         // Create two volumes to inspect at the same time

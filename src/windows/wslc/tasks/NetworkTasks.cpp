@@ -161,7 +161,7 @@ void InspectNetworks(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, c_jsonPrettyPrintIndent);
+    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
     context.Reporter.Output(L"{}\n", MultiByteToWide(json));
 }
 
@@ -186,7 +186,7 @@ void ListNetworks(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(networks, c_jsonPrettyPrintIndent);
+        auto json = ToJson(networks, c_jsonCompactIndent);
         context.Reporter.Output(L"{}\n", MultiByteToWide(json));
         break;
     }

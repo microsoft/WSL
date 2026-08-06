@@ -146,7 +146,7 @@ void InspectVolumes(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, c_jsonPrettyPrintIndent);
+    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
     context.Reporter.Output(L"{}\n", MultiByteToWide(json));
 }
 
@@ -171,7 +171,7 @@ void ListVolumes(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(volumes, c_jsonPrettyPrintIndent);
+        auto json = ToJson(volumes, c_jsonCompactIndent);
         context.Reporter.Output(L"{}\n", MultiByteToWide(json));
         break;
     }

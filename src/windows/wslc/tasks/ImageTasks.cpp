@@ -165,7 +165,7 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(images, c_jsonPrettyPrintIndent);
+        auto json = ToJson(images, c_jsonCompactIndent);
         context.Reporter.Output(L"{}\n", MultiByteToWide(json));
         break;
     }
@@ -321,7 +321,7 @@ void InspectImages(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, c_jsonPrettyPrintIndent);
+    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
     context.Reporter.Output(L"{}\n", MultiByteToWide(json));
 }
 

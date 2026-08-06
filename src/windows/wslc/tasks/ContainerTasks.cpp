@@ -227,7 +227,7 @@ void InspectContainers(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, c_jsonPrettyPrintIndent);
+    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
     context.Reporter.Output(L"{}\n", MultiByteToWide(json));
 }
 
@@ -560,7 +560,7 @@ void ListContainers(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(containers, c_jsonPrettyPrintIndent);
+        auto json = ToJson(containers, c_jsonCompactIndent);
         context.Reporter.Output(L"{}\n", MultiByteToWide(json));
         break;
     }
@@ -936,7 +936,7 @@ void ShowContainerStats(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        context.Reporter.Output(L"{}\n", MultiByteToWide(statsJson.dump(c_jsonPrettyPrintIndent)));
+        context.Reporter.Output(L"{}\n", MultiByteToWide(statsJson.dump(c_jsonCompactIndent)));
         break;
     }
     case FormatType::Table:

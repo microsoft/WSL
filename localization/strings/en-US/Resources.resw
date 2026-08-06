@@ -2955,6 +2955,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Output formatting (json or table) (Default: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Arguments to pass to container's init process</value>
   </data>
@@ -3222,7 +3226,7 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Show detailed information about the listed sessions.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatTypeError" xml:space="preserve">
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>Invalid {} value: {} is not a recognized format type. Supported format types are: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
