@@ -2901,7 +2901,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Försök alltid att hämta en nyare version av bilden</value>
   </data>
   <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
-    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <value>Skapa utdatamål (docker buildx --output spec; t.ex. type=local,dest=path eller type=tar,dest=out.tar)</value>
     <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
