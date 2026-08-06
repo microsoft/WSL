@@ -2331,11 +2331,11 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
-    <value>Invalid --output value '{}': {}</value>
+    <value>Ugyldig --output verdi {}: {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
-    <value>Cannot write build output to the console for --output value '{}'.</value>
+    <value>Kan ikke skrive build-output til konsollen for --output verdi {}.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2900,7 +2900,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Forsøk alltid å hente en nyere versjon av avbildningen</value>
   </data>
   <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
-    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <value>Mål for build-output (docker buildx --output spesifikasjon; f.eks. type=local,dest=bane eller type=tar,dest=out.tar)</value>
     <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">

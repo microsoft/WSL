@@ -2338,7 +2338,7 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
-    <value>Invalid --output value '{}': {}</value>
+    <value>Valor inválido de --output '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
@@ -2907,7 +2907,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Sempre tente efetuar pull de uma versão mais recente da imagem</value>
   </data>
   <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
-    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <value>Destino da saída da compilação (docker buildx --output spec; por exemplo, type=local,dest=path ou type=tar,dest=out.tar)</value>
     <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
