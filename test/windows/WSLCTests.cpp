@@ -54,8 +54,6 @@ class WSLCTests
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
-        TerminateStraySessions();
-
         // The WSLC SDK tests use this same storage to reduce pull overhead.
         m_storagePath = std::filesystem::current_path() / "test-storage";
         m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLCNetworkingModeConsomme);
@@ -182,25 +180,6 @@ class WSLCTests
         }
 
         return names;
-    }
-
-    // Persistent sessions outlive the process that created them, so a run that failed partway
-    // through leaves them behind for the next run to trip over.
-    static void TerminateStraySessions()
-    {
-        const auto sessionManager = OpenSessionManager();
-
-        for (const auto& name : ListTestSessionNames(sessionManager.get()))
-        {
-            wil::com_ptr<IWSLCSession> session;
-            if (FAILED_LOG(sessionManager->OpenSessionByName(name.c_str(), &session)))
-            {
-                continue;
-            }
-
-            LogInfo("Terminating stray session '%ls'", name.c_str());
-            LOG_IF_FAILED(session->Terminate());
-        }
     }
 
     wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags Flags = WSLCSessionFlagsNone)
@@ -10406,7 +10385,27 @@ class WSLCTests
             }
         };
 
-        auto create = [this](LPCWSTR Name, WSLCSessionFlags Flags) {
+        // Persistent sessions outlive the COM reference that created them, so a test that fails
+        // partway through would leave them behind for the next run to trip over. Terminate the ones
+        // this test created, however it exits.
+        std::set<std::wstring> persistentSessions;
+        auto terminatePersistentSessions = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            for (const auto& name : persistentSessions)
+            {
+                wil::com_ptr<IWSLCSession> session;
+                if (SUCCEEDED(manager->OpenSessionByName(name.c_str(), &session)))
+                {
+                    LOG_IF_FAILED(session->Terminate());
+                }
+            }
+        });
+
+        auto create = [&](LPCWSTR Name, WSLCSessionFlags Flags) {
+            if (WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent))
+            {
+                persistentSessions.emplace(Name);
+            }
+
             return CreateSession(GetDefaultSessionSettings(Name), Flags);
         };
 
