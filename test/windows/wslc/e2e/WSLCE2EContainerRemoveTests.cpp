@@ -244,8 +244,8 @@ private:
         WriteTestFileContent(
             dockerfilePath, std::format("FROM {}\nVOLUME /data\n", wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag())));
 
-        auto result = RunWslc(
-            std::format(L"build \"{}\" -f \"{}\" -t {}", testRoot.wstring(), dockerfilePath.wstring(), AnonymousVolumeImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {}", testRoot.wstring(), dockerfilePath.wstring(), AnonymousVolumeImage.NameAndTag()));
         result.Verify({.ExitCode = 0});
     }
 
