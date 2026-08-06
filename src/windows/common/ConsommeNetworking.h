@@ -70,6 +70,8 @@ private:
     LPCWSTR m_dnsOptions = nullptr;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
+    std::optional<WslVirtioNetConfig> m_virtioNetConfig;
+    std::vector<IpAddress> m_virtioNetNameservers;
 
     ULONG m_networkMtu = 0;
     networking::EndpointIpAddress m_trackedIpv4Address{};
