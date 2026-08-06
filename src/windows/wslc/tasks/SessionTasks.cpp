@@ -30,7 +30,7 @@ namespace wsl::windows::wslc::task {
 void AttachToSession(CLIExecutionContext& context)
 {
     auto& session = context.Data.Get<Data::Session>();
-    context.ExitCode = SessionService::Attach(context.Reporter, session);
+    context.ExitCode = SessionService::Attach(context.Terminal, session);
 }
 
 void OpenSessionIfSpecified(CLIExecutionContext& context)
@@ -46,7 +46,7 @@ void OpenOrCreateDefaultSession(CLIExecutionContext& context)
 {
     if (!context.Data.Contains(Data::Session))
     {
-        context.Data.Add<Data::Session>(SessionService::OpenOrCreateDefaultSession(context.Reporter));
+        context.Data.Add<Data::Session>(SessionService::OpenOrCreateDefaultSession(context.Terminal));
     }
 }
 
@@ -70,11 +70,11 @@ void ListSessions(CLIExecutionContext& context)
     if (context.Args.GetFlag<ArgType::Verbose>())
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        context.Reporter.Output(L"[wslc] Found {} session{}\n", sessions.size(), plural);
+        context.Terminal.Output(L"[wslc] Found {} session{}\n", sessions.size(), plural);
     }
 
     TableOutput<3> table(
-        context.Reporter,
+        context.Terminal,
         {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
 
     for (const auto& session : sessions)
@@ -92,7 +92,7 @@ void ListSessions(CLIExecutionContext& context)
 void TerminateSession(CLIExecutionContext& context)
 {
     auto& session = context.Data.Get<Data::Session>();
-    context.ExitCode = SessionService::TerminateSession(context.Reporter, session);
+    context.ExitCode = SessionService::TerminateSession(context.Terminal, session);
 }
 
 void RunInSession(CLIExecutionContext& context)
@@ -109,7 +109,7 @@ void RunInSession(CLIExecutionContext& context)
         }
     }
 
-    context.ExitCode = SessionService::Run(context.Reporter, session, arguments);
+    context.ExitCode = SessionService::Run(context.Terminal, session, arguments);
 }
 
 void EnterSession(CLIExecutionContext& context)
@@ -128,7 +128,7 @@ void EnterSession(CLIExecutionContext& context)
         sessionName = wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::None);
     }
 
-    context.ExitCode = SessionService::Enter(context.Reporter, storagePath.wstring(), sessionName);
+    context.ExitCode = SessionService::Enter(context.Terminal, storagePath.wstring(), sessionName);
 }
 
 } // namespace wsl::windows::wslc::task

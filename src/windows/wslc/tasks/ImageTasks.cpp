@@ -41,7 +41,7 @@ namespace {
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IImageLoadCallback, IFastRundown>
     {
     public:
-        explicit WSLCImageLoadCallback(Reporter& reporter) : m_reporter(reporter)
+        explicit WSLCImageLoadCallback(Terminal& terminal) : m_terminal(terminal)
         {
         }
 
@@ -50,11 +50,11 @@ namespace {
         {
             if (Format == EnumReferenceFormatDigest)
             {
-                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoadedId(Reference));
+                m_terminal.Output(L"{}\n", Localization::WSLCCLI_ImageLoadedId(Reference));
             }
             else if (Format == EnumReferenceFormatTag)
             {
-                m_reporter.Output(L"{}\n", Localization::WSLCCLI_ImageLoaded(Reference));
+                m_terminal.Output(L"{}\n", Localization::WSLCCLI_ImageLoaded(Reference));
             }
             else
             {
@@ -66,12 +66,12 @@ namespace {
         CATCH_RETURN();
 
     private:
-        Reporter& m_reporter;
+        Terminal& m_terminal;
     };
 
 } // namespace
 
-static bool TryInspectImage(Reporter& reporter, Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
+static bool TryInspectImage(Terminal& terminal, Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
 {
     try
     {
@@ -82,7 +82,7 @@ static bool TryInspectImage(Reporter& reporter, Session& session, const std::str
     {
         if (ex.GetErrorCode() == WSLC_E_IMAGE_NOT_FOUND)
         {
-            reporter.Error(L"{}\n", Localization::MessageWslcImageNotFound(imageId.c_str()));
+            terminal.Error(L"{}\n", Localization::MessageWslcImageNotFound(imageId.c_str()));
             return false;
         }
 
@@ -140,7 +140,7 @@ void BuildImage(CLIExecutionContext& context)
     WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.GetFlag<ArgType::BuildPull>());
 
     auto cancelEvent = context.CreateCancelEvent();
-    BuildImageCallback callback(context.Reporter, cancelEvent, context.Args.GetFlag<ArgType::Verbose>());
+    BuildImageCallback callback(context.Terminal, cancelEvent, context.Args.GetFlag<ArgType::Verbose>());
     services::ImageService::Build(
         session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, flags, &callback, cancelEvent);
 }
@@ -178,7 +178,7 @@ void ListImages(CLIExecutionContext& context)
         bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
         for (const auto& image : images)
         {
-            context.Reporter.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
+            context.Terminal.Output(L"{}\n", trunc ? TruncateId(image.Id, true) : image.Id);
         }
 
         return;
@@ -195,7 +195,7 @@ void ListImages(CLIExecutionContext& context)
     case FormatType::Json:
     {
         auto json = ToJson(images, c_jsonPrettyPrintIndent);
-        context.Reporter.Output(L"{}\n", MultiByteToWide(json));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
@@ -208,14 +208,14 @@ void ListImages(CLIExecutionContext& context)
         auto table =
             trunc
                 ? wsl::windows::wslc::TableOutput<5>(
-                      context.Reporter,
+                      context.Terminal,
                       {{{L"REPOSITORY", {.Overflow = Shrink}},
                         {L"TAG", {.Overflow = Shrink}},
                         {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
                         {L"CREATED", {.Overflow = Shrink}},
                         {L"SIZE", {.Overflow = Shrink}}}},
                       images.size())
-                : wsl::windows::wslc::TableOutput<5>(context.Reporter, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+                : wsl::windows::wslc::TableOutput<5>(context.Terminal, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         for (const auto& image : images)
         {
@@ -249,22 +249,22 @@ void PullImage(CLIExecutionContext& context)
     const auto reference = ImageReference::Parse(image);
     if (!quiet && reference.Format == EnumReferenceFormatNone)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
     }
 
     // Match `docker pull`: in quiet mode, suppress progress output by passing no progress callback. Warnings are
-    // unaffected because the warning callback is built internally by ImageService::Pull from the Reporter.
+    // unaffected because the warning callback is built internally by ImageService::Pull from the Terminal.
     std::optional<ImageProgressCallback> callback;
     if (!quiet)
     {
-        callback.emplace(context.Reporter, Reporter::Level::Output);
+        callback.emplace(context.Terminal, Terminal::Level::Output);
     }
 
     IProgressCallback* progress = callback ? &*callback : nullptr;
-    services::ImageService::Pull(context.Reporter, session, image, progress);
+    services::ImageService::Pull(context.Terminal, session, image, progress);
 
     // Match `docker pull`: always print the resolved canonical image reference as the final line.
-    context.Reporter.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
 }
 
 void PushImage(CLIExecutionContext& context)
@@ -274,8 +274,8 @@ void PushImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
-    ImageProgressCallback callback(context.Reporter, Reporter::Level::Output);
-    services::ImageService::Push(context.Reporter, session, WideToMultiByte(imageId), &callback);
+    ImageProgressCallback callback(context.Terminal, Terminal::Level::Output);
+    services::ImageService::Push(context.Terminal, session, WideToMultiByte(imageId), &callback);
 }
 
 void DeleteImage(CLIExecutionContext& context)
@@ -299,8 +299,8 @@ void LoadImage(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Input))
     {
         auto& input = context.Args.Get<ArgType::Input>();
-        auto callback = wil::MakeOrThrow<WSLCImageLoadCallback>(context.Reporter);
-        services::ImageService::Load(context.Reporter, session, input, callback.Get());
+        auto callback = wil::MakeOrThrow<WSLCImageLoadCallback>(context.Terminal);
+        services::ImageService::Load(context.Terminal, session, input, callback.Get());
         return;
     }
 
@@ -321,11 +321,11 @@ void ImportImage(CLIExecutionContext& context)
     }
 
     auto& input = context.Args.Get<ArgType::ImportFile>();
-    auto imageId = services::ImageService::Import(context.Reporter, session, input, imageName);
+    auto imageId = services::ImageService::Import(context.Terminal, session, input, imageName);
     if (!imageId.empty())
     {
         bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
-        context.Reporter.Output(L"{}\n", MultiByteToWide(TruncateId(imageId, trunc)));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(TruncateId(imageId, trunc)));
     }
 }
 
@@ -340,7 +340,7 @@ void InspectImages(CLIExecutionContext& context)
     for (const auto& id : imageIds)
     {
         std::optional<wslc_schema::InspectImage> inspectData;
-        if (TryInspectImage(context.Reporter, session, WideToMultiByte(id), inspectData))
+        if (TryInspectImage(context.Terminal, session, WideToMultiByte(id), inspectData))
         {
             result.push_back(*inspectData);
         }
@@ -351,7 +351,7 @@ void InspectImages(CLIExecutionContext& context)
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);
-    context.Reporter.Output(L"{}\n", MultiByteToWide(json));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
 void SaveImage(CLIExecutionContext& context)
@@ -419,16 +419,16 @@ void PruneImages(CLIExecutionContext& context)
 
     for (const auto& image : result.UntaggedImages)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(image));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(image));
     }
 
     for (const auto& image : result.DeletedImages)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(image));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(image));
     }
 
-    context.Reporter.Output(L"\n");
-    context.Reporter.Output(
+    context.Terminal.Output(L"\n");
+    context.Terminal.Output(
         L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task
