@@ -28,6 +28,8 @@ namespace wsl::windows::wslc::argument {
 struct ArgMap;
 
 namespace details {
+    struct RawArgMapAccess;
+
     template <ArgType E, bool IsFlag = std::is_same_v<typename ArgDataMapping<E>::value_t, bool>>
     struct ArgValueTraits;
 
@@ -51,13 +53,38 @@ namespace details {
 // so this header stays decoupled from the converter/domain headers.
 void EnsureArgumentValidated(ArgMap& map, ArgType type);
 
-// Map-action callback (defined after ArgMap, as it calls a member): raw Add/Remove operations update
-// that ArgType's validation state.
+// Map-action callback (defined after ArgMap, as it calls a member): operations that can mutate raw
+// values update that ArgType's validation state.
 inline void ArgMapInvalidateValidatedCache(const void* map, ArgType type, EnumBasedVariantMapAction action);
 
 // This is the main ArgType map used for storing parsed arguments.
-struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>
+struct ArgMap : private wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>
 {
+private:
+    using Base = wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
+
+    friend struct details::RawArgMapAccess;
+
+    // Raw reads are implementation details used by validation and the typed accessors below.
+    // Callers consume arguments through GetValue/GetAllValues so reads validate and freeze them.
+    using Base::Get;
+    using Base::GetAll;
+
+public:
+    ArgMap() = default;
+    ArgMap(const ArgMap&) = default;
+    ArgMap(ArgMap&&) = default;
+    ArgMap& operator=(const ArgMap&) = delete;
+    ArgMap& operator=(ArgMap&&) = delete;
+
+    using Base::Add;
+    using Base::Contains;
+    using Base::Count;
+    using Base::GetCount;
+    using Base::GetKeys;
+    using Base::IsMatchingType;
+    using Base::Remove;
+
     template <ArgType E>
     using value_t = typename details::ArgValueTraits<E>::value_t;
 
@@ -107,9 +134,28 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
 
     void HandleMapMutation(ArgType type, EnumBasedVariantMapAction action)
     {
-        WI_ASSERT(action == EnumBasedVariantMapAction::Add || action == EnumBasedVariantMapAction::Remove);
+        WI_ASSERT(action == EnumBasedVariantMapAction::Add || action == EnumBasedVariantMapAction::GetMutable || action == EnumBasedVariantMapAction::Remove);
 
-        const char* operation = action == EnumBasedVariantMapAction::Add ? "add a raw argument value" : "remove the raw argument values";
+        const char* operation = nullptr;
+        switch (action)
+        {
+        case EnumBasedVariantMapAction::Add:
+            operation = "add a raw argument value";
+            break;
+
+        case EnumBasedVariantMapAction::GetMutable:
+            operation = "get mutable access to a raw argument value";
+            break;
+
+        case EnumBasedVariantMapAction::Remove:
+            operation = "remove the raw argument values";
+            break;
+
+        default:
+            WI_ASSERT(false);
+            return;
+        }
+
         ThrowIfImmutable(type, operation);
         ClearValidated(type);
     }
@@ -292,12 +338,12 @@ private:
     std::set<ArgType> m_immutableTypes;
 };
 
-// Only raw mutations affect validation state; reads are ignored. Add/Remove are non-const operations,
-// so recovering the non-const ArgMap from the callback's type-erased pointer is valid. The base
-// subobject is at offset 0 of ArgMap.
+// Only operations that can mutate raw values affect validation state; const reads are ignored.
+// Recovering the non-const ArgMap from the callback's type-erased pointer is valid because these
+// actions originate from non-const base operations. The base subobject is at offset 0 of ArgMap.
 inline void ArgMapInvalidateValidatedCache(const void* map, ArgType type, EnumBasedVariantMapAction action)
 {
-    if (action == EnumBasedVariantMapAction::Add || action == EnumBasedVariantMapAction::Remove)
+    if (action == EnumBasedVariantMapAction::Add || action == EnumBasedVariantMapAction::GetMutable || action == EnumBasedVariantMapAction::Remove)
     {
         const_cast<ArgMap*>(static_cast<const ArgMap*>(map))->HandleMapMutation(type, action);
     }

@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "Argument.h"
+#include "ArgumentConvertedTypes.h"
 #include "ArgMap.h"
 #include "ArgumentParser.h"
 #include "Invocation.h"
@@ -102,14 +103,14 @@ class WSLCCLIParserUnitTests
                 if (testCase.commandLine.find(L"image1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ImageId));
-                    auto imageId = args.Get<ArgType::ImageId>();
+                    auto imageId = args.GetValue<ArgType::ImageId>();
                     VERIFY_ARE_EQUAL(L"image1", imageId);
                 }
 
                 if (testCase.commandLine.find(L"cont1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::List)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ContainerId));
-                    auto containerId = args.Get<ArgType::ContainerId>();
+                    auto containerId = args.GetValue<ArgType::ContainerId>();
                     VERIFY_ARE_EQUAL(L"cont1", containerId);
                 }
 
@@ -121,14 +122,14 @@ class WSLCCLIParserUnitTests
                 if (testCase.commandLine.find(L"command") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::Command));
-                    auto command = args.Get<ArgType::Command>();
+                    auto command = args.GetValue<ArgType::Command>();
                     VERIFY_IS_TRUE(command.find(L"command") != std::wstring::npos);
                 }
 
                 if (testCase.commandLine.find(L"forward") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ForwardArgs));
-                    auto forwardArgs = args.Get<ArgType::ForwardArgs>();
+                    auto forwardArgs = args.GetValue<ArgType::ForwardArgs>();
                     std::wstring forwardArgsConcat = wsl::shared::string::Join(forwardArgs, L' ');
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"hello world") != std::wstring::npos); // Forward args should contain hello world
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"image1") == std::wstring::npos); // Forward args should not contain the imageId
@@ -139,7 +140,7 @@ class WSLCCLIParserUnitTests
                 if (testCase.commandLine.find(L"443") != std::wstring::npos)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::Publish));
-                    auto publishArgs = args.GetAll<ArgType::Publish>();
+                    auto publishArgs = args.GetAllValues<ArgType::Publish>();
                     VERIFY_ARE_EQUAL(2, publishArgs.size());              // Should have both publish args
                     VERIFY_ARE_NOT_EQUAL(publishArgs[0], publishArgs[1]); // Both publish args should be different
                 }
@@ -159,7 +160,7 @@ class WSLCCLIParserUnitTests
                     if (testCase.commandLine.find(L"--session") != std::wstring::npos)
                     {
                         VERIFY_IS_TRUE(args.Contains(ArgType::Session));
-                        VERIFY_ARE_EQUAL(std::wstring(L"foo"), args.Get<ArgType::Session>());
+                        VERIFY_ARE_EQUAL(std::wstring(L"foo"), args.GetValue<ArgType::Session>());
                     }
                 }
             }
@@ -266,7 +267,7 @@ class WSLCCLIParserUnitTests
         }
 
         VERIFY_IS_TRUE(args.Contains(ArgType::Signal));
-        VERIFY_ARE_EQUAL(std::wstring(L"9"), args.Get<ArgType::Signal>());
+        VERIFY_ARE_EQUAL(WSLCSignalSIGKILL, args.GetValue<ArgType::Signal>());
         VERIFY_ARE_EQUAL(std::wstring(L"image1"), *sm.Position());
     }
 
@@ -284,7 +285,7 @@ class WSLCCLIParserUnitTests
         }
 
         VERIFY_IS_TRUE(args.Contains(ArgType::Signal));
-        VERIFY_ARE_EQUAL(std::wstring(L"9"), args.Get<ArgType::Signal>());
+        VERIFY_ARE_EQUAL(WSLCSignalSIGKILL, args.GetValue<ArgType::Signal>());
         VERIFY_ARE_EQUAL(std::wstring(L"image1"), *sm.Position());
     }
 
@@ -369,9 +370,9 @@ class WSLCCLIParserUnitTests
         }
 
         VERIFY_IS_TRUE(subArgs.Contains(ArgType::ImageId));
-        VERIFY_ARE_EQUAL(std::wstring(L"image1"), subArgs.Get<ArgType::ImageId>());
+        VERIFY_ARE_EQUAL(std::wstring(L"image1"), subArgs.GetValue<ArgType::ImageId>());
         VERIFY_IS_TRUE(subArgs.Contains(ArgType::Signal));
-        VERIFY_ARE_EQUAL(std::wstring(L"9"), subArgs.Get<ArgType::Signal>());
+        VERIFY_ARE_EQUAL(WSLCSignalSIGKILL, subArgs.GetValue<ArgType::Signal>());
     }
 
     // stopOnUnknown: unknown -alias / --name / lone '-' / bare '--' tokens
@@ -466,7 +467,7 @@ class WSLCCLIParserUnitTests
         sm.ThrowIfError();
 
         VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
-        VERIFY_ARE_EQUAL(std::wstring(L"9"), args.Get<ArgType::Signal>());
+        VERIFY_ARE_EQUAL(WSLCSignalSIGKILL, args.GetValue<ArgType::Signal>());
     }
 
     // A preloaded (env-style) default followed by multiple CLI values collapses to the
@@ -488,7 +489,7 @@ class WSLCCLIParserUnitTests
         sm.ThrowIfError();
 
         VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
-        VERIFY_ARE_EQUAL(std::wstring(L"1"), args.Get<ArgType::Signal>());
+        VERIFY_ARE_EQUAL(WSLCSignalSIGHUP, args.GetValue<ArgType::Signal>());
     }
 
     // Preloaded flag default plus CLI mention of the same flag stays a single
@@ -510,7 +511,7 @@ class WSLCCLIParserUnitTests
         sm.ThrowIfError();
 
         VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
-        VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
+        VERIFY_IS_TRUE(args.GetValue<ArgType::Verbose>());
     }
 
     // Duplicate flag on the CLI (no env preload) folds to one entry: docker-style.
@@ -529,7 +530,7 @@ class WSLCCLIParserUnitTests
         sm.ThrowIfError();
 
         VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
-        VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
+        VERIFY_IS_TRUE(args.GetValue<ArgType::Verbose>());
     }
 
     // Duplicate single-value arg on the CLI (no preload) is last-wins (docker-style):
@@ -549,7 +550,7 @@ class WSLCCLIParserUnitTests
         sm.ThrowIfError();
 
         VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
-        VERIFY_ARE_EQUAL(std::wstring(L"1"), args.Get<ArgType::Signal>());
+        VERIFY_ARE_EQUAL(WSLCSignalSIGHUP, args.GetValue<ArgType::Signal>());
     }
 
     // Unlimited value args are exempt from last-wins: every CLI occurrence accumulates.
@@ -596,7 +597,6 @@ class WSLCCLIParserUnitTests
 
             VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
             VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
-            VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
             VERIFY_IS_TRUE(args.GetValue<ArgType::Verbose>());
         }
     }
@@ -614,7 +614,6 @@ class WSLCCLIParserUnitTests
 
             VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
             VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
-            VERIFY_IS_FALSE(args.Get<ArgType::Verbose>());
             VERIFY_IS_FALSE(args.GetValue<ArgType::Verbose>());
         }
     }
@@ -654,9 +653,9 @@ class WSLCCLIParserUnitTests
             L"wslc --verbose true", {Argument::Create(ArgType::Verbose), Argument::Create(ArgType::ContainerId, false, Limit::Unlimited)});
 
         VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
-        VERIFY_IS_TRUE(args.Get<ArgType::Verbose>());
+        VERIFY_IS_TRUE(args.GetValue<ArgType::Verbose>());
         VERIFY_ARE_EQUAL(1u, args.Count(ArgType::ContainerId));
-        VERIFY_ARE_EQUAL(std::wstring(L"true"), args.Get<ArgType::ContainerId>());
+        VERIFY_ARE_EQUAL(std::wstring(L"true"), args.GetValue<ArgType::ContainerId>());
     }
 
     // Alias forms honor adjoined booleans just like the long name.

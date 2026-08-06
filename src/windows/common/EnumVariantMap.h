@@ -54,6 +54,7 @@ enum class EnumBasedVariantMapAction
     Add,
     Contains,
     Get,
+    GetMutable,
     GetAll,
     Count,
     Remove,
@@ -173,7 +174,7 @@ struct EnumBasedVariantMap
     {
         if constexpr (Callback)
         {
-            Callback(this, E, EnumBasedVariantMapAction::Get);
+            Callback(this, E, EnumBasedVariantMapAction::GetMutable);
         }
         auto itr = m_data.find(E);
         THROW_HR_IF_MSG(E_NOT_SET, itr == m_data.end(), "Get(%d): key not found", static_cast<int>(E));

@@ -32,6 +32,12 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLIArgumentUnitTests {
+using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
+
+static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
+static_assert(!std::is_copy_assignable_v<ArgMap>);
+static_assert(!std::is_move_assignable_v<ArgMap>);
+
 class WSLCCLIArgumentUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLIArgumentUnitTests)
@@ -169,11 +175,11 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ForwardArgs));
 
         // Verify basic retrieval
-        auto retrievedBool = argsContainer.Get<ArgType::Help>();
+        auto retrievedBool = argsContainer.GetValue<ArgType::Help>();
         VERIFY_ARE_EQUAL(retrievedBool, true);
-        auto retrievedString = argsContainer.Get<ArgType::ContainerId>();
+        auto retrievedString = argsContainer.GetValue<ArgType::ContainerId>();
         VERIFY_ARE_EQUAL(retrievedString, std::wstring(L"test"));
-        auto retrievedStringSet = argsContainer.Get<ArgType::ForwardArgs>();
+        auto retrievedStringSet = argsContainer.GetValue<ArgType::ForwardArgs>();
         VERIFY_ARE_EQUAL(retrievedStringSet[0], std::wstring(L"test1"));
         VERIFY_ARE_EQUAL(retrievedStringSet[1], std::wstring(L"test2"));
 
@@ -182,22 +188,25 @@ class WSLCCLIArgumentUnitTests
         argsContainer.Add(ArgType::Publish, std::wstring(L"test2"));
         argsContainer.Add(ArgType::Publish, std::wstring(L"test3"));
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
-        auto publishArgs = argsContainer.GetAll<ArgType::Publish>();
+        auto publishArgs = argsContainer.GetAllValues<ArgType::Publish>();
         VERIFY_ARE_EQUAL(publishArgs.size(), 3);
         VERIFY_ARE_EQUAL(publishArgs[0], std::wstring(L"test1"));
         VERIFY_ARE_EQUAL(publishArgs[1], std::wstring(L"test2"));
         VERIFY_ARE_EQUAL(publishArgs[2], std::wstring(L"test3"));
 
         // Verify Remove
-        argsContainer.Remove(ArgType::Publish);
-        VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 0);
+        ArgMap removeArgs;
+        removeArgs.Add<ArgType::Publish>(L"test");
+        removeArgs.Remove(ArgType::Publish);
+        VERIFY_ARE_EQUAL(removeArgs.Count(ArgType::Publish), 0);
 
         // Verify compile time add works like runtime add for multimap types.
-        argsContainer.Add<ArgType::Publish>(L"test1");
-        argsContainer.Add<ArgType::Publish>(L"test2");
-        argsContainer.Add<ArgType::Publish>(L"test3");
-        VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
-        publishArgs = argsContainer.GetAll<ArgType::Publish>();
+        ArgMap compileTimeArgs;
+        compileTimeArgs.Add<ArgType::Publish>(L"test1");
+        compileTimeArgs.Add<ArgType::Publish>(L"test2");
+        compileTimeArgs.Add<ArgType::Publish>(L"test3");
+        VERIFY_ARE_EQUAL(compileTimeArgs.Count(ArgType::Publish), 3);
+        publishArgs = compileTimeArgs.GetAllValues<ArgType::Publish>();
         VERIFY_ARE_EQUAL(publishArgs.size(), 3);
         VERIFY_ARE_EQUAL(publishArgs[0], std::wstring(L"test1"));
         VERIFY_ARE_EQUAL(publishArgs[1], std::wstring(L"test2"));
@@ -217,11 +226,6 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::ForwardArgs), 1);
         VERIFY_ARE_EQUAL(argsContainer.GetCount(), 6); // 1 Help + 1 ContainerId + 3 Publish + 1 ForwardArgs
-        argsContainer.Remove(ArgType::Help);
-        argsContainer.Remove(ArgType::ContainerId);
-        argsContainer.Remove(ArgType::Publish);
-        argsContainer.Remove(ArgType::ForwardArgs);
-        VERIFY_ARE_EQUAL(argsContainer.GetCount(), 0);
     }
 
     // Test: Verify the validated-value cache stores and returns converted results so that a

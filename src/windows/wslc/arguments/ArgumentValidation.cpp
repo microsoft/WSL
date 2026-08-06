@@ -31,7 +31,20 @@ using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 
+namespace argument::details {
+    struct RawArgMapAccess
+    {
+        template <ArgType E>
+        static auto GetAll(const ArgMap& map)
+        {
+            return map.GetAll<E>();
+        }
+    };
+} // namespace argument::details
+
 namespace {
+    using argument::details::RawArgMapAccess;
+
     // Converts each raw value for argument A using the provided converter and caches the result on
     // the ArgMap. This is the single point where an argument's string input is converted; execution
     // later reads the cached value via GetValue/GetAllValues.
@@ -44,7 +57,7 @@ namespace {
             std::is_same_v<converted_t, value_t>,
             "converter return type must exactly match the argument's declared ConvertedType in ArgumentDefinitions.h");
 
-        for (const auto& value : execArgs.GetAll<A>())
+        for (const auto& value : RawArgMapAccess::GetAll<A>(execArgs))
         {
             execArgs.AddValidated<A>(convert(value, argName));
         }
@@ -62,7 +75,7 @@ void Argument::Validate(ArgMap& execArgs) const
     switch (m_argType)
     {
     case ArgType::BuildLabel:
-        for (const auto& value : execArgs.GetAll<ArgType::BuildLabel>())
+        for (const auto& value : RawArgMapAccess::GetAll<ArgType::BuildLabel>(execArgs))
         {
             validation::ParseLabel(value);
         }
@@ -184,16 +197,16 @@ void Argument::Validate(ArgMap& execArgs) const
         break;
 
     case ArgType::Gpus:
-        validation::ValidateGpus(execArgs.GetAll<ArgType::Gpus>(), m_name);
+        validation::ValidateGpus(RawArgMapAccess::GetAll<ArgType::Gpus>(execArgs), m_name);
         break;
 
     case ArgType::Volume:
-        validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
+        validation::ValidateVolumeMount(RawArgMapAccess::GetAll<ArgType::Volume>(execArgs));
         break;
 
     case ArgType::WorkDir:
     {
-        for (const auto& value : execArgs.GetAll<ArgType::WorkDir>())
+        for (const auto& value : RawArgMapAccess::GetAll<ArgType::WorkDir>(execArgs))
         {
             if (value.empty() ||
                 std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
@@ -206,7 +219,7 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::Network:
     {
-        for (const auto& value : execArgs.GetAll<ArgType::Network>())
+        for (const auto& value : RawArgMapAccess::GetAll<ArgType::Network>(execArgs))
         {
             if (value.empty() ||
                 std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
@@ -224,7 +237,7 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::NetworkAlias:
     {
-        for (const auto& value : execArgs.GetAll<ArgType::NetworkAlias>())
+        for (const auto& value : RawArgMapAccess::GetAll<ArgType::NetworkAlias>(execArgs))
         {
             if (value.empty() ||
                 std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
