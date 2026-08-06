@@ -1136,16 +1136,7 @@ Return Value:
                 std::string targetPath{target};
                 unsetenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
 
-                //
-                // MS_MOVE requires the destination to already exist, so create the target directory
-                // tree before moving the mount into place.
-                //
-
-                if (UtilMkdirPath(targetPath.c_str(), 0755) < 0)
-                {
-                    LOG_ERROR("UtilMkdirPath({}) failed {}", targetPath, errno);
-                }
-                else if (tempMount.MoveMount(targetPath.c_str()))
+                if (tempMount.MoveMount(targetPath.c_str()))
                 {
                     constexpr std::string_view c_includeSuffix = "/include";
                     if (targetPath.ends_with(c_includeSuffix))
@@ -1165,10 +1156,6 @@ Return Value:
                                 LOG_ERROR("symlink({}, {}) failed {}", headersRoot, linkPath, errno);
                             }
                         }
-                        else
-                        {
-                            LOG_ERROR("UtilMkdirPath({}) failed {}", modulesDir, errno);
-                        }
                     }
                 }
             }
@@ -1187,35 +1174,17 @@ Return Value:
                 std::string targetPath{target};
                 unsetenv(LX_WSL2_KERNEL_PERF_PATH_ENV);
 
-                //
-                // MS_MOVE requires the destination to already exist, so create the target directory
-                // tree before moving the perf tooling into place.
-                //
-
-                if (UtilMkdirPath(targetPath.c_str(), 0755) < 0)
-                {
-                    LOG_ERROR("UtilMkdirPath({}) failed {}", targetPath, errno);
-                }
-                else if (tempMount.MoveMount(targetPath.c_str()))
+                if (tempMount.MoveMount(targetPath.c_str()))
                 {
                     //
-                    // Expose perf on the default PATH via /usr/bin/perf, mirroring the Debian/Ubuntu
-                    // linux-tools layout.
+                    // Expose the kernel-matched perf on the default PATH. A bind mount hides any
+                    // distro-provided binary without overwriting a regular file.
                     //
 
                     const std::string perfBinary = targetPath + "/bin/perf";
-                    struct stat statBuffer{};
-                    if (stat(perfBinary.c_str(), &statBuffer) < 0)
+                    if (UtilMountFile(perfBinary.c_str(), "/usr/bin/perf") < 0)
                     {
-                        LOG_WARNING("kernel modules VHD perf tooling has no perf binary at '{}'; /usr/bin/perf not created", perfBinary);
-                    }
-                    else if (UtilMkdirPath("/usr/bin", 0755) < 0)
-                    {
-                        LOG_ERROR("UtilMkdirPath(/usr/bin) failed {}", errno);
-                    }
-                    else if ((symlink(perfBinary.c_str(), "/usr/bin/perf") < 0) && (errno != EEXIST))
-                    {
-                        LOG_ERROR("symlink({}, /usr/bin/perf) failed {}", perfBinary, errno);
+                        LOG_ERROR("UtilMountFile({}, /usr/bin/perf) failed {}", perfBinary, errno);
                     }
                 }
             }
