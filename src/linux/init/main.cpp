@@ -89,7 +89,6 @@ Abstract:
 #define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
 #define KERNEL_PERF_TEMP_PATH "/kernel_perf"
 #define KERNEL_PERF_PATH_PREFIX "/usr/lib/linux-tools/"
-#define KERNEL_PERF_BIN_SYMLINK "/usr/bin/perf"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -1644,7 +1643,7 @@ try
     //
     // If the perf tooling was mounted, move it to a temporary location and pass the desired target
     // path to the distro init via an environment variable. Distro init will move the mount to
-    // /usr/lib/linux-tools/<uname -r> and create the /usr/bin/perf symlink.
+    // /usr/lib/linux-tools/<uname -r> and bind mount the binary at /usr/bin/perf.
     //
 
     if (!Config.KernelPerfTarget.empty())
@@ -3197,11 +3196,6 @@ try
         //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
         //      layout when the nested modules directory is not present.
         //
-        // TODO: Determine whether the legacy flat-layout fallback is still needed once the kernel package
-        //       always ships the nested artifacts VHD. If no supported configuration produces a flat
-        //       module-only VHD, this fallback can be removed.
-        //
-
         if (EarlyConfig->KernelModulesDeviceId != UINT_MAX)
         {
             THROW_LAST_ERROR_IF(
@@ -3218,20 +3212,18 @@ try
             struct stat StatBuffer{};
             const bool NestedLayout = (stat(NestedModules.c_str(), &StatBuffer) == 0) && S_ISDIR(StatBuffer.st_mode);
             const std::string ModulesLower = NestedLayout ? NestedModules : std::string{KERNEL_MODULES_VHD_PATH};
+            const bool LegacyLayout =
+                !NestedLayout && (stat((ModulesLower + "/modules.dep").c_str(), &StatBuffer) == 0) && S_ISREG(StatBuffer.st_mode);
 
             //
-            // Warn if the selected modules tree does not contain a modules.dep for the running kernel.
             // A valid artifacts VHD nests the tree under <release>/modules; a legacy module-only VHD
-            // places it at the root. A missing modules.dep usually means the VHD is mismatched with the
-            // kernel, incomplete, or is not a kernel modules VHD at all.
+            // places it at the root.
             //
-            if (stat((ModulesLower + "/modules.dep").c_str(), &StatBuffer) != 0)
+            if (LegacyLayout)
             {
                 LOG_WARNING(
-                    "kernel modules VHD has no modules for kernel '{}' (no modules.dep in '{}'); modules, headers, and "
-                    "perf may be unavailable",
-                    Release,
-                    ModulesLower);
+                    "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
+                    "removed in a future version; kernel headers and perf tooling are unavailable");
             }
 
             std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, Release);
@@ -3260,45 +3252,15 @@ try
             if (NestedLayout)
             {
                 const std::string HeadersSource = ArtifactsBase + "/linux-headers/include";
-                if ((stat(HeadersSource.c_str(), &StatBuffer) == 0) && S_ISDIR(StatBuffer.st_mode))
+                if (UtilMount(HeadersSource.c_str(), KERNEL_HEADERS_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
                 {
-                    if ((UtilMkdir(KERNEL_HEADERS_TEMP_PATH, 0755) < 0) && (errno != EEXIST))
-                    {
-                        LOG_ERROR("UtilMkdir({}) failed {}", KERNEL_HEADERS_TEMP_PATH, errno);
-                    }
-                    else if (UtilMount(HeadersSource.c_str(), KERNEL_HEADERS_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) < 0)
-                    {
-                        LOG_ERROR("bind mount {} failed {}", HeadersSource, errno);
-                    }
-                    else
-                    {
-                        Config.KernelHeadersTarget = std::format("{}{}/include", KERNEL_HEADERS_PATH_PREFIX, Release);
-                    }
-                }
-                else
-                {
-                    LOG_WARNING("kernel modules VHD is missing kernel headers at '{}'", HeadersSource);
+                    Config.KernelHeadersTarget = std::format("{}{}/include", KERNEL_HEADERS_PATH_PREFIX, Release);
                 }
 
                 const std::string PerfSource = ArtifactsBase + "/perf";
-                if ((stat(PerfSource.c_str(), &StatBuffer) == 0) && S_ISDIR(StatBuffer.st_mode))
+                if (UtilMount(PerfSource.c_str(), KERNEL_PERF_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
                 {
-                    if ((UtilMkdir(KERNEL_PERF_TEMP_PATH, 0755) < 0) && (errno != EEXIST))
-                    {
-                        LOG_ERROR("UtilMkdir({}) failed {}", KERNEL_PERF_TEMP_PATH, errno);
-                    }
-                    else if (UtilMount(PerfSource.c_str(), KERNEL_PERF_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) < 0)
-                    {
-                        LOG_ERROR("bind mount {} failed {}", PerfSource, errno);
-                    }
-                    else
-                    {
-                        Config.KernelPerfTarget = std::format("{}{}", KERNEL_PERF_PATH_PREFIX, Release);
-                    }
-                }
-                else
-                {
-                    LOG_WARNING("kernel modules VHD is missing perf tooling at '{}'", PerfSource);
+                    Config.KernelPerfTarget = std::format("{}{}", KERNEL_PERF_PATH_PREFIX, Release);
                 }
             }
         }
