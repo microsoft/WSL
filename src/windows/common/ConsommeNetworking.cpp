@@ -404,6 +404,9 @@ void ConsommeNetworking::SetupHostLoopback()
     IpAddress virtualAddress;
     THROW_IF_FAILED(loopbackDevice->CreateVirtualAddress(&loopbackIp, &virtualAddress));
 
+    uint32_t addressBytes{};
+    std::memcpy(&addressBytes, &virtualAddress.bytes[0], sizeof(addressBytes));
+
     std::string virtualAddressString(INET_ADDRSTRLEN, '\0');
     RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(&virtualAddress.bytes[0]), virtualAddressString.data());
     virtualAddressString.resize(std::strlen(virtualAddressString.data()));

@@ -59,7 +59,7 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "\n"
     "  # DNS name that resolves to the host loopback address (default: host.wslc.internal).\n"
     "  # Set to \"none\" to disable the entry.\n"
-    "  # hostLoopback: default"
+    "  # hostLoopback: default\n"
     "\n"
     "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
     "  # idleTimeout: default\n"
