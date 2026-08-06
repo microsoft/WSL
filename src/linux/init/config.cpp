@@ -1151,7 +1151,28 @@ Return Value:
                         if (UtilMkdirPath(modulesDir.c_str(), 0755) == 0)
                         {
                             const std::string linkPath = modulesDir + "/build";
-                            if ((symlink(headersRoot.c_str(), linkPath.c_str()) < 0) && (errno != EEXIST))
+                            bool createLink = true;
+                            struct stat linkInfo{};
+                            if (lstat(linkPath.c_str(), &linkInfo) == 0)
+                            {
+                                if (S_ISDIR(linkInfo.st_mode))
+                                {
+                                    LOG_WARNING("cannot expose kernel headers because '{}' is a directory", linkPath);
+                                    createLink = false;
+                                }
+                                else if (unlink(linkPath.c_str()) < 0)
+                                {
+                                    LOG_ERROR("unlink({}) failed {}", linkPath, errno);
+                                    createLink = false;
+                                }
+                            }
+                            else if (errno != ENOENT)
+                            {
+                                LOG_ERROR("lstat({}) failed {}", linkPath, errno);
+                                createLink = false;
+                            }
+
+                            if (createLink && (symlink(headersRoot.c_str(), linkPath.c_str()) < 0))
                             {
                                 LOG_ERROR("symlink({}, {}) failed {}", headersRoot, linkPath, errno);
                             }

@@ -3033,9 +3033,20 @@ EOF
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
 
-        // A distro-provided regular file is hidden by the bind mount after the VM restarts.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"umount /usr/bin/perf && printf old-perf > /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        // Stale distro-provided artifacts are replaced or hidden after the VM restarts.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && "
+                L"umount /usr/bin/perf && printf old-perf > /usr/bin/perf",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
