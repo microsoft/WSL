@@ -899,14 +899,14 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transac
 void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_WRITE_FILE& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
-
-    if (Message.ContentIndex > Buffer.size() || Message.ContentLength > Buffer.size() - Message.ContentIndex)
+    if (Message.PathIndex >= Buffer.size() || Message.ContentIndex > Buffer.size() ||
+        Message.ContentLength > Buffer.size() - Message.ContentIndex)
     {
         Transaction.SendResultMessage<int32_t>(EINVAL);
         return;
     }
 
+    const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
     const auto content = Buffer.subspan(Message.ContentIndex, Message.ContentLength);
 
     int result = 0;
