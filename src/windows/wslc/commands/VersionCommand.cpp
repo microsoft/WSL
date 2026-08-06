@@ -47,11 +47,7 @@ void VersionCommand::PrintVersion(Terminal& terminal)
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    FormatType format = FormatType::Table;
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
-    }
+    FormatType format = validation::GetOutputFormat(context.Args);
 
     switch (format)
     {
@@ -59,7 +55,7 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         nlohmann::json root;
         root["Client"]["Version"] = std::string{WSL_PACKAGE_VERSION};
-        context.Terminal.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonPrettyPrintIndent)));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonCompactIndent)));
         break;
     }
     case FormatType::Table:
