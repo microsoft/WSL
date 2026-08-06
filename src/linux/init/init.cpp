@@ -1478,7 +1478,7 @@ Return Value:
 
     for (auto& Socket : Sockets)
     {
-        Socket.reset(UtilAcceptVsock(ListenSocket, SocketAddress));
+        Socket.reset(UtilAcceptVsock(ListenSocket, SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS));
         if (Socket.get() < 0)
         {
             Result = -1;

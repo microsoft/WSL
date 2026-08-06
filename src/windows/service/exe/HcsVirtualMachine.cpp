@@ -392,6 +392,7 @@ HcsVirtualMachine::~HcsVirtualMachine()
     {
         try
         {
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
             WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
             std::filesystem::remove(m_vmSavedStateFile);
         }
