@@ -37,6 +37,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateFormatTypeFromString(execArgs.GetAll<ArgType::Format>(), m_name);
         break;
 
+    case ArgType::InspectFormat:
+        validation::ValidateInspectFormatTypeFromString(execArgs.GetAll<ArgType::InspectFormat>(), m_name);
+        break;
+
     case ArgType::Signal:
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
@@ -221,6 +225,19 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetFormatTypeFromString(value, argName);
+    }
+}
+
+void ValidateInspectFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    constexpr std::wstring_view supportedValues = L"json";
+
+    for (const auto& value : values)
+    {
+        if (!IsEqual(value, L"json"))
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, value, supportedValues));
+        }
     }
 }
 

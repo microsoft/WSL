@@ -148,7 +148,7 @@ void InspectVolumes(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, c_jsonPrettyPrintIndent);
+    auto json = ToJson(result, validation::GetInspectJsonIndent(context.Args));
     context.Reporter.Output(L"{}\n", MultiByteToWide(json));
 }
 
@@ -167,17 +167,13 @@ void ListVolumes(CLIExecutionContext& context)
         return;
     }
 
-    FormatType format = FormatType::Table;
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
-    }
+    FormatType format = validation::GetOutputFormat(context.Args);
 
     switch (format)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(volumes, c_jsonPrettyPrintIndent);
+        auto json = ToJson(volumes, c_jsonCompactIndent);
         context.Reporter.Output(L"{}\n", MultiByteToWide(json));
         break;
     }

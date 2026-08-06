@@ -74,6 +74,9 @@ void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring&
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 
+// The inspect family only renders JSON, so `json` (single line) is the sole accepted value.
+void ValidateInspectFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
+
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values);

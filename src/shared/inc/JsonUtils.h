@@ -34,6 +34,9 @@ namespace wsl::shared {
 
 constexpr int c_jsonPrettyPrintIndent = 2;
 
+// A negative indent makes nlohmann::json::dump() emit the document on a single line.
+constexpr int c_jsonCompactIndent = -1;
+
 struct EmptyObject
 {
 };
