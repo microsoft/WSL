@@ -136,11 +136,16 @@ void ConsommeNetworking::Initialize()
 {
     // Initialize adapter state.
     RefreshGuestConnection();
-    SetupHostLoopback();
 
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
     {
         SetupLoopbackDevice();
+    }
+
+    if (!m_hostLoopback.empty())
+    {
+        THROW_HR_IF(E_UNEXPECTED, !WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay));
+        SetupHostLoopback();
     }
 
     THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&ConsommeNetworking::OnNetworkConnectivityChange, this, TRUE, &m_networkNotifyHandle));
@@ -357,12 +362,7 @@ void ConsommeNetworking::RefreshGuestConnection()
 
 void ConsommeNetworking::SetupHostLoopback()
 {
-    if (m_hostLoopback.empty())
-    {
-        return;
-    }
-
-    const auto device = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
+    const auto loopbackDevice = m_guestDeviceManager->GetVirtioNetDevice(c_loopbackDeviceName);
 
     SOCKADDR_INET loopback{};
     loopback.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -370,13 +370,14 @@ void ConsommeNetworking::SetupHostLoopback()
     auto loopbackIp = ToIpAddress(loopback);
 
     IpAddress virtualAddress;
-    THROW_IF_FAILED(device->CreateVirtualAddress(&loopbackIp, &virtualAddress));
+    THROW_IF_FAILED(loopbackDevice->CreateVirtualAddress(&loopbackIp, &virtualAddress));
 
     std::string virtualAddressString(INET_ADDRSTRLEN, '\0');
     RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(&virtualAddress.bytes[0]), virtualAddressString.data());
     virtualAddressString.resize(std::strlen(virtualAddressString.data()));
 
-    THROW_IF_FAILED(device->CreateDNSRecord(DnsRecordType_A, m_hostLoopback.c_str(), virtualAddressString.c_str()));
+    const auto eth0 = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
+    THROW_IF_FAILED(eth0->CreateDNSRecord(DnsRecordType_A, m_hostLoopback.c_str(), virtualAddressString.c_str()));
 
     WSL_LOG(
         "SetupHostLoopback",
