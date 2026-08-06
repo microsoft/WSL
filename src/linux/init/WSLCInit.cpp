@@ -69,6 +69,8 @@ struct WSLCState
 
 static WSLCState g_state;
 
+constexpr auto c_kernelModulesVhdMountPoint = "/kernel_modules_vhd";
+
 void WriteWslcCdiSpec()
 try
 {
@@ -697,8 +699,10 @@ void HandleMountMessage(
 
         const char* source = readField(Message.SourceIndex);
 
+        const bool kernelModules = WI_IsFlagSet(Message.Flags, WSLC_MOUNT::KernelModules);
+        std::string kernelRelease;
         const char* target{};
-        if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::KernelModules))
+        if (kernelModules)
         {
             assert(!g_state.ModulesMountPoint.has_value());
 
@@ -707,7 +711,8 @@ void HandleMountMessage(
             utsname UnameBuffer{};
             THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
 
-            g_state.ModulesMountPoint = std::format("/lib/modules/{}", UnameBuffer.release);
+            kernelRelease = UnameBuffer.release;
+            g_state.ModulesMountPoint = std::format("/lib/modules/{}", kernelRelease);
             target = g_state.ModulesMountPoint->c_str();
         }
         else
@@ -727,7 +732,27 @@ void HandleMountMessage(
         }
         else
         {
-            THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+            if (kernelModules)
+            {
+                THROW_LAST_ERROR_IF(
+                    UtilMount(source, c_kernelModulesVhdMountPoint, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) <
+                    0);
+
+                auto unmountVhd = wil::scope_exit([&]() {
+                    if (umount(c_kernelModulesVhdMountPoint) < 0)
+                    {
+                        LOG_ERROR("umount({}) failed {}", c_kernelModulesVhdMountPoint, errno);
+                    }
+                });
+
+                const std::string modulesSource = std::format("{}/{}/modules", c_kernelModulesVhdMountPoint, kernelRelease);
+                THROW_LAST_ERROR_IF(UtilMount(modulesSource.c_str(), target, nullptr, (MS_BIND | MS_REC), nullptr, c_defaultRetryTimeout) < 0);
+            }
+            else
+            {
+                THROW_LAST_ERROR_IF(
+                    UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+            }
         }
 
         // Workaround for a Linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs share before the permissions have been fetched.
