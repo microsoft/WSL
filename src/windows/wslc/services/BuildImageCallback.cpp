@@ -20,9 +20,6 @@ namespace wsl::windows::wslc::services {
 using wsl::windows::common::string::MultiByteToWide;
 using namespace wsl::windows::common::vt;
 
-// Fallback width used when the console width can't be queried.
-constexpr int c_fallbackConsoleWidth = 79;
-
 BuildImageCallback::~BuildImageCallback()
 try
 {
