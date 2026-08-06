@@ -25,7 +25,7 @@ set_target_properties(wslclib PROPERTIES FOLDER windows)
 # Create wslc.exe
 # N.B. Linking wslclib (OBJECT library) brings both object files and
 # transitive dependencies. Do not also use $<TARGET_OBJECTS:wslclib>.
-add_executable(wslc)
+add_executable(wslc main.rc resource.h)
 
 target_link_libraries(wslc wslclib)
 

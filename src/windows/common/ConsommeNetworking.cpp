@@ -67,6 +67,28 @@ IpAddress ToIpAddress(const SOCKADDR_INET& address)
     return result;
 }
 
+bool AreEqual(const IpAddress& left, const IpAddress& right)
+{
+    return left.family == right.family && std::equal(std::begin(left.bytes), std::end(left.bytes), std::begin(right.bytes));
+}
+
+bool AreEqual(const std::vector<IpAddress>& left, const std::vector<IpAddress>& right)
+{
+    return std::ranges::equal(
+        left, right, [](const auto& leftAddress, const auto& rightAddress) { return AreEqual(leftAddress, rightAddress); });
+}
+
+bool AreEqual(const WslVirtioNetConfig& left, const WslVirtioNetConfig& right)
+{
+    return left.clientIp.value == right.clientIp.value && left.hasClientIpv6 == right.hasClientIpv6 &&
+           std::equal(std::begin(left.clientIpv6.bytes), std::end(left.clientIpv6.bytes), std::begin(right.clientIpv6.bytes)) &&
+           std::equal(std::begin(left.clientMac.bytes), std::end(left.clientMac.bytes), std::begin(right.clientMac.bytes)) &&
+           left.gatewayIp.value == right.gatewayIp.value &&
+           std::equal(std::begin(left.gatewayMac.bytes), std::end(left.gatewayMac.bytes), std::begin(right.gatewayMac.bytes)) &&
+           std::equal(std::begin(left.gatewayMacIpv6.bytes), std::end(left.gatewayMacIpv6.bytes), std::begin(right.gatewayMacIpv6.bytes)) &&
+           left.netmask.value == right.netmask.value;
+}
+
 std::vector<IpAddress> ToIpAddresses(const DnsInfo& dns)
 {
     std::vector<IpAddress> result;
@@ -316,12 +338,13 @@ void ConsommeNetworking::RefreshGuestConnection()
     }
 
     const auto minMtu = GetMinimumConnectedInterfaceMtu();
-    const auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
+    auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
+    auto nameservers = ToIpAddresses(currentDns);
 
     // Acquire the lock and perform device updates.
     auto lock = m_lock.lock_exclusive();
 
-    // Add virtio net adapter to guest. Subsequent address/route/DNS changes are sent through GNS notifications below.
+    // Add the virtio net adapter to the guest, or update its runtime configuration.
     if (!m_adapterId.has_value())
     {
         WSL_LOG(
@@ -330,9 +353,18 @@ void ConsommeNetworking::RefreshGuestConnection()
             TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
             TraceLoggingValue(default_route.c_str(), "GatewayIp"),
             TraceLoggingValue(networkSettings->PreferredIpv6Address.AddressString.c_str(), "ClientIpv6"));
-        m_adapterId =
-            m_guestDeviceManager->AddVirtioNetDevice(c_eth0DeviceName, virtioNetConfig, ToIpAddresses(currentDns), m_userToken.get());
+        m_adapterId = m_guestDeviceManager->AddVirtioNetDevice(c_eth0DeviceName, virtioNetConfig, nameservers, m_userToken.get());
     }
+    else if (!m_virtioNetConfig.has_value() || !AreEqual(m_virtioNetConfig.value(), virtioNetConfig) || !AreEqual(m_virtioNetNameservers, nameservers))
+    {
+        IpAddress emptyNameserver{};
+        auto* nameserversData = nameservers.empty() ? &emptyNameserver : nameservers.data();
+        const auto device = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
+        THROW_IF_FAILED(device->Update(&virtioNetConfig, gsl::narrow_cast<UINT32>(nameservers.size()), nameserversData));
+    }
+
+    m_virtioNetConfig = virtioNetConfig;
+    m_virtioNetNameservers = std::move(nameservers);
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
