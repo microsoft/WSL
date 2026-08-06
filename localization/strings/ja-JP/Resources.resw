@@ -160,7 +160,7 @@ WSL2 でディスクを強制的に停止してデタッチするには、'wsl.e
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>指定されたマウント名に無効な '/' 文字が含まれています。無効な文字を含めずに再試行してください。</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -2161,6 +2161,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>ネットワーク名を空にすることはできません。</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>エンジンからのエラー情報:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>認識されないコマンド: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2329,6 +2332,18 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>イメージ '{}' が見つかりません。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>無効な --secret value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Cannot write build output to the console for --output value '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>必須のオプションがありません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2370,7 +2385,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
-    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <value>'--ip-range' オプションには '--subnet' の指定も必要です。</value>
     <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2890,8 +2905,16 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>常に新しいバージョンのイメージのプルを試みます</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>ビルドするターゲット ビルド ステージを設定します</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>ビルドにシークレットを公開します (id=NAME[,type=env|file][,env=VAR|,src=PATH]; 既定値は env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>実行するコマンド</value>

@@ -43,6 +43,7 @@ EXTERN_C_START
 #define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
 #define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)       /* 0x8004060E */
 #define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15)          /* 0x8004060F */
+#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16)             /* 0x80040610 */
 
 // Session values
 #define WSLC_SESSION_OPTIONS_SIZE 72
@@ -229,6 +230,12 @@ STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettin
 
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
+// Opens an existing container by name, full ID, or partial ID prefix.
+// The returned WslcContainer handle is owned by the caller; release it with WslcReleaseContainer.
+// Returns WSLC_E_CONTAINER_NOT_FOUND if no matching container exists, or
+// WSLC_E_CONTAINER_PREFIX_AMBIGUOUS if the given prefix matches more than one container.
+STDAPI WslcOpenContainer(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // OPTIONAL CONTAINER SETTINGS
@@ -399,6 +406,11 @@ typedef struct WslcProcessCallbacks
 } WslcProcessCallbacks;
 
 STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
+
+// Sets IO callbacks for the init process of a container.
+// Must be called before WslcStartContainer (with WSLC_CONTAINER_START_FLAG_ATTACH).
+// Has no effect on a container that is already running.
+STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
 
 // PROCESS MANAGEMENT
 

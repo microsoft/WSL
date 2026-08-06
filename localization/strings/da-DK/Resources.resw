@@ -160,7 +160,7 @@ Hvis du vil tvinge WSL2 til at stoppe og fjerne disken, skal du køre 'wsl.exe {
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Det angivne tilslutningsnavn indeholder et ugyldigt '/'-tegn. Prøv igen uden det ugyldige tegn.</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -2155,6 +2155,9 @@ Brug:
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Netværksnavnet må ikke være tomt.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Fejloplysninger fra motoren:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Ukendt kommando: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2322,6 +2325,18 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
   <data name="MessageWslcImageNotFound" xml:space="preserve">
     <value>Billedet '{}' blev ikke fundet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Ugyldig --secret værdi '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Build-output kan ikke skrives til konsollen for --output værdi '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Manglende obligatorisk indstilling: '{}'</value>
@@ -2884,8 +2899,16 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Forsøg altid at hente en nyere version af billedet</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Indstil målbuildfasen til build</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Eksponer secret til build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; bruger som standard miljøvariablen NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Kommandoen der skal køres</value>

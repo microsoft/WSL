@@ -160,7 +160,7 @@ Jos haluat pakottaa WSL2:n pysäyttämään levyn ja irrottamaan sen, suorita ws
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Määritetty käyttöönottonimi sisältää virheellisen /-merkin. Yritä uudelleen ilman virheellistä merkkiä.</value>
+    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -2155,6 +2155,9 @@ Käyttö:
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Verkon nimi ei voi olla tyhjä.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Moottorin virhetiedot:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Tunnistamaton komento: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2323,6 +2326,18 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Kuvaa {} ei löydy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Virheellinen --secret -arvo "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Invalid --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Cannot write build output to the console for --output value '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Pakollinen asetus puuttuu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2364,7 +2379,7 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
-    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <value>Vaihtoehto '--ip-range' edellyttää, että myös '--subnet' on määritetty.</value>
     <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2884,8 +2899,16 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Yritä aina hakea kuvan uudempi versio</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Koontiversion tuloskohde (docker buildx --output spec; esimerkiksi type=local,dest=path tai type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Aseta kohdekoontivaihe koontiversioksi</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Tuo salaisuus buildiin (id=NAME[,type=env|file][,env=VAR|,src=PATH]; oletuksena ympäristömuuttuja NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Suoritettava komento</value>
@@ -3290,7 +3313,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
-    <value>Allocate container IP addresses from a sub-range in CIDR format</value>
+    <value>Varaa säilöille IP-osoitteet CIDR-muotoisesta alialueesta</value>
     <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">

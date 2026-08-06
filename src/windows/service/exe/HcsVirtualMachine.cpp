@@ -348,7 +348,9 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 HcsVirtualMachine::~HcsVirtualMachine()
 {
-    std::lock_guard lock(m_lock);
+    // Do not hold m_lock: waiting on m_vmExitEvent and closing the compute system below both block
+    // on in-flight HCS exit/crash callbacks, which may themselves need m_lock. OnExit() is lock-free,
+    // and closing the compute system drains all callbacks, so the rest of teardown needs no lock.
 
     // Wait up to 5 seconds for the VM to terminate gracefully.
     bool forceTerminate = false;
@@ -389,6 +391,7 @@ HcsVirtualMachine::~HcsVirtualMachine()
     {
         try
         {
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
             WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
             std::filesystem::remove(m_vmSavedStateFile);
         }

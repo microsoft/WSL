@@ -768,9 +768,9 @@ private:
     static LXSS_DISTRO_CONFIGURATION s_GetDistributionConfiguration(const wsl::windows::service::DistributionRegistration& Distro, bool skipName = false);
 
     /// <summary>
-    /// Impersonate the user and open the lxss registry key
+    /// Impersonate the specified user and open the lxss registry key.
     /// </summary>
-    static wil::unique_hkey s_OpenLxssUserKey();
+    static wil::unique_hkey s_OpenLxssUserKey(_In_ HANDLE UserToken);
 
     /// <summary>
     /// Ensures the distribution name is valid.
