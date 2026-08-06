@@ -200,14 +200,12 @@ inline bool HasRegistryAllowlist(HKEY policiesKey)
     return subKey && !EnumerateRegistryAllowlist(subKey.get()).empty();
 }
 
-// Snapshot of the WSLContainerRegistryAllowlist policy captured in a single read. The State
-// field lets callers distinguish an unconfigured policy (fail open) from a registry read
-// failure (fail closed).
+// Snapshot of the WSLContainerRegistryAllowlist policy captured in a single read. Callers use
+// State to distinguish an unconfigured policy (fail open) from a policy that is present.
 enum class RegistryAllowlistState
 {
     NotConfigured,
-    Configured,
-    ReadFailed
+    Configured
 };
 
 struct RegistryAllowlistSnapshot
@@ -217,9 +215,9 @@ struct RegistryAllowlistSnapshot
 };
 
 // Reads the allowlist in one shot. Empty entries are skipped (matches EnumerateRegistryAllowlist).
-// Returns ReadFailed on registry errors so enforcement callers can fail closed.
+// Throws with an "invalid policy" user error when the sub-key exists but can't be read (bad ACL,
+// corrupted values, etc.) so the caller fails closed.
 inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY policiesKey)
-try
 {
     if (policiesKey == nullptr)
     {
@@ -233,11 +231,8 @@ try
         return {};
     }
 
-    if (openResult != ERROR_SUCCESS)
-    {
-        LOG_HR(HRESULT_FROM_WIN32(openResult));
-        return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
-    }
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(openResult), wsl::shared::Localization::MessageRegistryAllowlistPolicyInvalid(), openResult != ERROR_SUCCESS);
 
     RegistryAllowlistSnapshot snapshot;
     for (auto& [name, value] : wsl::windows::common::registry::EnumStringValues(subKey.get()))
@@ -257,16 +252,10 @@ try
 
     return snapshot;
 }
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
-    return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
-}
 
-// Convenience for SYSTEM-side callers with no open policies key. Returns ReadFailed (not
-// NotConfigured) when the key exists but can't be opened, so callers can fail closed.
+// Convenience for callers with no open policies key. Throws MessageRegistryAllowlistPolicyInvalid
+// when the policies key can't be opened.
 inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshotFromPoliciesRoot()
-try
 {
     wil::unique_hkey policiesKey;
     const auto openResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE, c_registryKey, 0, KEY_READ, &policiesKey);
@@ -275,18 +264,10 @@ try
         return {};
     }
 
-    if (openResult != ERROR_SUCCESS)
-    {
-        LOG_HR(HRESULT_FROM_WIN32(openResult));
-        return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
-    }
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(openResult), wsl::shared::Localization::MessageRegistryAllowlistPolicyInvalid(), openResult != ERROR_SUCCESS);
 
     return ReadRegistryAllowlistSnapshot(policiesKey.get());
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
-    return RegistryAllowlistSnapshot{RegistryAllowlistState::ReadFailed, {}};
 }
 
 } // namespace wsl::windows::policies

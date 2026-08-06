@@ -502,12 +502,6 @@ void WSLCVirtualMachine::ConfigureBuildKitPolicy()
 {
     const auto snapshot = wsl::windows::policies::ReadRegistryAllowlistSnapshotFromPoliciesRoot();
 
-    // Fail closed: an unreadable policy must not silently let builds through.
-    THROW_HR_WITH_USER_ERROR_IF(
-        WSLC_E_REGISTRY_BLOCKED_BY_POLICY,
-        wsl::shared::Localization::MessageImageBuildBlockedByPolicy(),
-        snapshot.State == wsl::windows::policies::RegistryAllowlistState::ReadFailed);
-
     if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::NotConfigured)
     {
         m_buildKitPolicyState = BuildKitPolicyState::NotConfigured;
