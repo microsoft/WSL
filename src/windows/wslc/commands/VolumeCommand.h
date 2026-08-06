@@ -89,7 +89,6 @@ struct VolumeListCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
-    void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 

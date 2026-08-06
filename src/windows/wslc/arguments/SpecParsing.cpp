@@ -19,6 +19,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "Exceptions.h"
 #include "ImageService.h"
+#include "JsonUtils.h"
 #include "Localization.h"
 #include <algorithm>
 #include <charconv>
@@ -621,9 +622,25 @@ models::FormatType GetFormatTypeFromString(const std::wstring& input, const std:
     }
     else
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        constexpr std::wstring_view supportedValues = L"json, table";
+        throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
     }
+}
+
+models::FormatType GetOutputFormat(const argument::ArgMap& args)
+{
+    if (!args.Contains(argument::ArgType::Format))
+    {
+        return models::FormatType::Table;
+    }
+
+    return GetFormatTypeFromString(args.Get<argument::ArgType::Format>());
+}
+
+int GetInspectJsonIndent(const argument::ArgMap& args)
+{
+    // Validation guarantees the only accepted value is "json", so its presence alone selects compact.
+    return args.Contains(argument::ArgType::InspectFormat) ? wsl::shared::c_jsonCompactIndent : wsl::shared::c_jsonPrettyPrintIndent;
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)

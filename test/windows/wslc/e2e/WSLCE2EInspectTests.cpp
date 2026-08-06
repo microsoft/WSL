@@ -99,6 +99,50 @@ class WSLCE2EInspectTests
         result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", DebianImage.NameAndTag()), .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_FormatJson_IsSingleLine)
+    {
+        // Parity with `docker inspect --format json`: the whole array is emitted on one compact line.
+        auto result = RunWslc(std::format(L"inspect --format json {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), document[0]["RepoTags"][0].get<std::string>());
+
+        // The compact rendering must not contain the pretty-printer's indentation.
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"\n  "));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_DefaultFormat_IsIndented)
+    {
+        // Parity with `docker inspect`: without --format the array stays indented over several lines.
+        auto result = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_GREATER_THAN(result.GetStdoutLines().size(), 1u);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_InvalidFormatOption)
+    {
+        auto result = RunWslc(std::format(L"inspect --format invalid {}", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json."));
+
+        // json is the only rendering the inspect family has; `table` belongs to the list commands.
+        auto tableResult = RunWslc(std::format(L"inspect --format table {}", DebianImage.NameAndTag()));
+        tableResult.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(tableResult.StderrContainsSubstring(
+            L"Invalid format value: table is not a recognized format type. Supported format types are: json."));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_FormatJson_ObjectNotFound)
+    {
+        // An empty array is already compact, so both formats agree on "[]".
+        auto result = RunWslc(std::format(L"inspect --format json {}", InvalidImage.NameAndTag()));
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_Success)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
