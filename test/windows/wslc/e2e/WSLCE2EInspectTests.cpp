@@ -101,7 +101,7 @@ class WSLCE2EInspectTests
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_FormatJson_IsSingleLine)
     {
-        // Parity with `docker inspect --format json`: the whole array is emitted on one compact line.
+        // The whole array is emitted on one compact line.
         auto result = RunWslc(std::format(L"inspect --format json {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -116,7 +116,7 @@ class WSLCE2EInspectTests
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_DefaultFormat_IsIndented)
     {
-        // Parity with `docker inspect`: without --format the array stays indented over several lines.
+        // Without --format the array stays indented over several lines.
         auto result = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_GREATER_THAN(result.GetStdoutLines().size(), 1u);

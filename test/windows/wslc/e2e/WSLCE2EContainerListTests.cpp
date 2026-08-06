@@ -176,7 +176,7 @@ class WSLCE2EContainerListTests
         // List containers with json format
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        // The payload is emitted on a single compact line, matching `docker ps --format json`.
+        // The payload is emitted on a single compact line.
         VERIFY_ARE_EQUAL(1u, result.GetStdoutLines().size());
         // Parse json and verify we got the expected container information back
         auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
@@ -305,11 +305,8 @@ class WSLCE2EContainerListTests
         VerifyContainerIsNotListed(WslcContainerName2);
 
         // First container has both labels; second has only one of them.
-        auto result = RunWslc(
-            std::format(
-                L"container create --name {} --label filter.test=yes --label filter.role=primary {}",
-                WslcContainerName,
-                DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container create --name {} --label filter.test=yes --label filter.role=primary {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container create --name {} --label filter.test=yes {}", WslcContainerName2, DebianImage.NameAndTag()));

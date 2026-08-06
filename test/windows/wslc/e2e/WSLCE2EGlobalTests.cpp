@@ -118,7 +118,7 @@ class WSLCE2EGlobalTests
         auto result = RunWslc(L"version --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
-        // `docker version --format json` prints one compact object; wslc matches that.
+        // The version payload is emitted as one compact object.
         const auto root = VerifyCompactJsonOutput(result);
         VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, root["Client"]["Version"].get<std::string>());
     }
@@ -449,8 +449,8 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Add a container to the new session.
-        result = RunWslc(
-            std::format(L"--session \"{}\" container create --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
+        result = RunWslc(std::format(
+            L"--session \"{}\" container create --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
         result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
         result.Verify({.ExitCode = 0});
 
