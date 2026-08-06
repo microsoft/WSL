@@ -419,6 +419,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCListDirResult,
     LxMessageWSLCMountVirtioFs,
     LxMessageWSLCWriteFile,
+    LxMessageWSLCMountModules,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -535,6 +536,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCListDirResult)
         X(LxMessageWSLCMountVirtioFs)
         X(LxMessageWSLCWriteFile)
+        X(LxMessageWSLCMountModules)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1656,8 +1658,7 @@ struct WSLC_MOUNT
         None,
         ReadOnly = 1,
         Chroot = 2,
-        OverlayFs = 4,
-        KernelModules = 8
+        OverlayFs = 4
     };
 
     char Buffer[];
@@ -1682,6 +1683,20 @@ struct WSLC_MOUNT_VIRTIOFS
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex), STRING_FIELD(ChildNameIndex));
+};
+
+struct WSLC_MOUNT_MODULES
+{
+    static inline auto Type = LxMessageWSLCMountModules;
+    using TResponse = WSLC_MOUNT_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_MOUNT_MODULES);
+
+    MESSAGE_HEADER Header{};
+    unsigned int SourceIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex));
 };
 
 struct WSLC_EXEC
