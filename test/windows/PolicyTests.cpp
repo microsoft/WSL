@@ -474,15 +474,11 @@ class PolicyTest
         auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        const std::wstring combined = stdoutText + stderrText;
-        if (combined.find(L"docker.io") == std::wstring::npos || combined.find(L"blocked by the computer policy") == std::wstring::npos)
-        {
-            LogError(
-                "Expected blocked-by-policy for docker.io when allowlist is mcr.microsoft.com, got stdout: '%ls' stderr: '%ls'",
-                stdoutText.c_str(),
-                stderrText.c_str());
-            VERIFY_FAIL();
-        }
+        VERIFY_ARE_EQUAL(L"", stdoutText);
+
+        const auto expected = wsl::shared::Localization::MessageRegistryBlockedByPolicy(L"docker.io") +
+                              L"\r\nError code: WSLC_E_REGISTRY_BLOCKED_BY_POLICY\r\n";
+        VERIFY_ARE_EQUAL(expected, stderrText);
     }
 
     // Verifies WSLContainerRegistryAllowlist blocks `wslc image build` when the FROM base image
@@ -494,7 +490,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(L"FROM docker.io/library/alpine:latest\n", L"wsl-policy-build-blocked");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"docker.io") == std::wstring::npos)
+        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"policy") == std::wstring::npos)
         {
             LogError("Expected BuildKit source-policy denial mentioning docker.io, got: '%ls'", output.c_str());
             VERIFY_FAIL();
@@ -541,7 +537,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(dockerfile, L"wsl-policy-build-copyfrom");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"docker.io") == std::wstring::npos)
+        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"policy") == std::wstring::npos)
         {
             LogError("Expected COPY --from=docker.io/... to be blocked, got: '%ls'", output.c_str());
             VERIFY_FAIL();
@@ -555,7 +551,8 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(L"FROM alpine:latest\n", L"wsl-policy-build-implicit");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"docker.io") == std::wstring::npos && output.find(L"alpine") == std::wstring::npos)
+        if (output.find(L"policy") == std::wstring::npos ||
+            (output.find(L"docker.io") == std::wstring::npos && output.find(L"alpine") == std::wstring::npos))
         {
             LogError("Expected bare `FROM alpine:latest` to be blocked, got: '%ls'", output.c_str());
             VERIFY_FAIL();
