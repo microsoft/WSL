@@ -1740,6 +1740,7 @@ try
 {
     struct stat sourceInfo{};
     THROW_LAST_ERROR_IF(stat(Source, &sourceInfo) < 0);
+    THROW_ERRNO_IF(EINVAL, !S_ISREG(sourceInfo.st_mode));
 
     // Is the file is a symlink, delete it since that would break the mount.
     if (std::filesystem::is_symlink(Destination))
