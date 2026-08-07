@@ -19,6 +19,7 @@ Abstract:
 #include "LxssSecurity.h"
 #include "WslCoreInstance.h"
 #include "resource.h"
+#include <atomic>
 #include <winrt\Windows.ApplicationModel.Background.h>
 #include <nlohmann\json.hpp>
 
@@ -47,6 +48,114 @@ using namespace wsl::windows::service;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::ServiceExecutionContext;
+
+namespace {
+constexpr DWORD c_controlCExitCode = 0xC000013A;
+
+class CreateInstanceEndReporter
+{
+public:
+    CreateInstanceEndReporter(const std::wstring& DistroName, ULONG Version, const GUID& InstanceId, wil::unique_handle ClientProcess) :
+        m_distroName(DistroName), m_version(Version), m_instanceId(InstanceId), m_clientProcess(std::move(ClientProcess))
+    {
+    }
+
+    ~CreateInstanceEndReporter()
+    {
+        if (m_clientTerminationWait)
+        {
+            SetThreadpoolWait(m_clientTerminationWait.get(), nullptr, nullptr);
+            WaitForThreadpoolWaitCallbacks(m_clientTerminationWait.get(), TRUE);
+        }
+    }
+
+    NON_COPYABLE(CreateInstanceEndReporter);
+    NON_MOVABLE(CreateInstanceEndReporter);
+
+    void Start() noexcept
+    {
+        LOG_IF_FAILED(wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
+            if (!m_clientProcess)
+            {
+                return;
+            }
+
+            m_clientTerminationWait.reset(CreateThreadpoolWait(&CreateInstanceEndReporter::s_OnClientTerminated, this, nullptr));
+            THROW_LAST_ERROR_IF_NULL(m_clientTerminationWait);
+            SetThreadpoolWait(m_clientTerminationWait.get(), m_clientProcess.get(), nullptr);
+        }));
+    }
+
+    void Complete(HRESULT Result, uint64_t ErrorContext) noexcept
+    {
+        if (m_clientTerminationWait)
+        {
+            SetThreadpoolWait(m_clientTerminationWait.get(), nullptr, nullptr);
+            WaitForThreadpoolWaitCallbacks(m_clientTerminationWait.get(), FALSE);
+        }
+
+        if (m_reported.load())
+        {
+            return;
+        }
+
+        if (m_clientProcess && WaitForSingleObject(m_clientProcess.get(), 0) == WAIT_OBJECT_0)
+        {
+            ReportClientTermination();
+            return;
+        }
+
+        Report(Result, ErrorContext);
+    }
+
+private:
+    static void CALLBACK s_OnClientTerminated(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_WAIT, TP_WAIT_RESULT WaitResult) noexcept
+    {
+        WI_ASSERT(WaitResult == WAIT_OBJECT_0);
+
+        const auto reporter = static_cast<CreateInstanceEndReporter*>(Context);
+        reporter->ReportClientTermination();
+    }
+
+    void ReportClientTermination() noexcept
+    {
+        DWORD exitCode = 0;
+        if (!GetExitCodeProcess(m_clientProcess.get(), &exitCode))
+        {
+            LOG_LAST_ERROR();
+        }
+
+        Report(exitCode == c_controlCExitCode ? HRESULT_FROM_NT(static_cast<NTSTATUS>(exitCode)) : HRESULT_FROM_WIN32(ERROR_PROCESS_ABORTED), 0);
+    }
+
+    void Report(HRESULT Result, uint64_t ErrorContext) noexcept
+    {
+        if (m_reported.exchange(true))
+        {
+            return;
+        }
+
+        WSL_LOG_TELEMETRY(
+            "CreateInstanceEnd",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(m_distroName.c_str(), "distroName"),
+            TraceLoggingValue(m_version, "version"),
+            TraceLoggingValue(m_instanceId, "instanceId"),
+            TraceLoggingValue(SUCCEEDED(Result), "success"),
+            TraceLoggingValue(Result, "error"),
+            TraceLoggingValue(ErrorContext, "errorContext"),
+            TraceLoggingValue(m_stopWatch.ElapsedMilliseconds(), "CreationTimeMs"));
+    }
+
+    const std::wstring& m_distroName;
+    const ULONG m_version;
+    const GUID m_instanceId;
+    wsl::windows::common::wslutil::StopWatch m_stopWatch;
+    std::atomic<bool> m_reported{false};
+    wil::unique_handle m_clientProcess;
+    wil::unique_threadpool_wait m_clientTerminationWait;
+};
+} // namespace
 
 LxssUserSession::LxssUserSession(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session) : m_session(Session)
 {
@@ -2530,6 +2639,14 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
     // Validate flags.
     THROW_HR_IF(E_INVALIDARG, (WI_IsAnyFlagSet(Flags, ~LXSS_CREATE_INSTANCE_FLAGS_ALL)));
 
+    wil::unique_handle telemetryClientProcess;
+    if (WI_IsFlagClear(Flags, LXSS_CREATE_INSTANCE_FLAGS_IGNORE_CLIENT))
+    {
+        LOG_IF_FAILED(wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
+            telemetryClientProcess = wsl::windows::common::wslutil::OpenCallingProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION);
+        }));
+    }
+
     // Clear the list of terminated instances before acquiring the instance
     // list lock.
     {
@@ -2579,21 +2696,8 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                 TraceLoggingValue(version, "version"),
                 TraceLoggingValue(instanceId, "instanceId"));
 
-            HRESULT result = E_UNEXPECTED;
-            wsl::windows::common::wslutil::StopWatch stopWatch;
-            auto createEnd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-                const auto& reportedError = context.ReportedError();
-                WSL_LOG_TELEMETRY(
-                    "CreateInstanceEnd",
-                    PDT_ProductAndServicePerformance,
-                    TraceLoggingValue(configuration.Name.c_str(), "distroName"),
-                    TraceLoggingValue(version, "version"),
-                    TraceLoggingValue(instanceId, "instanceId"),
-                    TraceLoggingValue(SUCCEEDED(result), "success"),
-                    TraceLoggingValue(result, "error"),
-                    TraceLoggingValue(reportedError ? reportedError->Context : 0ULL, "errorContext"),
-                    TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"));
-            });
+            CreateInstanceEndReporter createEndReporter(configuration.Name, version, instanceId, std::move(telemetryClientProcess));
+            createEndReporter.Start();
 
             try
             {
@@ -2682,11 +2786,13 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     cleanupOnFailure.release();
                 }
 
-                result = S_OK;
+                createEndReporter.Complete(S_OK, 0);
             }
             catch (...)
             {
-                result = wil::ResultFromCaughtException();
+                const auto result = wil::ResultFromCaughtException();
+                const auto& reportedError = context.ReportedError();
+                createEndReporter.Complete(result, reportedError ? reportedError->Context : 0ULL);
                 throw;
             }
         }
