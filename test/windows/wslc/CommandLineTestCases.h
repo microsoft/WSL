@@ -195,6 +195,11 @@ COMMAND_LINE_TEST_CASE(L"remove cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container remove cont1 cont2", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"rm cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container rm cont1 cont2", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm --volumes cont1", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm -v cont1 cont2", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm --force --volumes cont1", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm -fv cont1", L"remove", true) // Combined short flags
+COMMAND_LINE_TEST_CASE(L"container rm -v", L"remove", false)       // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container attach cont", L"attach", true)
 COMMAND_LINE_TEST_CASE(L"container attach", L"attach", false)
 // Stats command tests

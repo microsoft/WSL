@@ -31,7 +31,7 @@ struct ContainerService
     static int Start(Reporter& reporter, models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
-    static void Delete(models::Session& session, const std::string& id, bool force);
+    static void Delete(models::Session& session, const std::string& id, bool force, bool deleteVolumes = false);
     static std::vector<models::ContainerInformation> List(
         models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {});
 
