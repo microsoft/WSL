@@ -18,6 +18,7 @@ Abstract:
 #include "InspectModel.h"
 #include "SpecParsing.h"
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 #include <charconv>
@@ -81,5 +82,6 @@ void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& a
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
+void ValidateNetwork(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 } // namespace wsl::windows::wslc::validation

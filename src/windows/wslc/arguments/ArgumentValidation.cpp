@@ -149,19 +149,7 @@ void Argument::Validate(const ArgMap& execArgs) const
 
     case ArgType::Network:
     {
-        for (const auto& value : execArgs.GetAll<ArgType::Network>())
-        {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
-            }
-
-            if (IsEqual(value, L"host", true))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
-            }
-        }
+        validation::ValidateNetwork(execArgs.GetAll<ArgType::Network>(), m_name);
         break;
     }
 
@@ -209,6 +197,18 @@ void ValidateFilter(const std::vector<std::wstring>& values)
     for (const auto& value : values)
     {
         std::ignore = ParseFilter(value);
+    }
+}
+
+void ValidateNetwork(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        const auto parsed = ParseNetworkArgument(value, argName);
+        if (IsEqual(parsed.Name, "host", true))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
+        }
     }
 }
 

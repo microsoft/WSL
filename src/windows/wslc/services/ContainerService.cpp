@@ -41,6 +41,12 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
+static bool SupportsNetworkAliases(std::string_view network)
+{
+    // Aliases are only supported for user-defined networks, not built-in or container-sourced network modes.
+    return network != "bridge" && network != "host" && network != "none" && !network.starts_with("container:");
+}
+
 static wsl::windows::common::RunningWSLCContainer CreateInternal(Reporter& reporter, Session& session, const std::string& image, const ContainerOptions& options)
 {
     WarningCallback warningCallback(reporter);
@@ -54,14 +60,20 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Reporter& repor
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
-    std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front();
+    std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front().Name;
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, options.EnvironmentVariables, std::move(networkMode), processFlags);
 
     for (size_t i = 1; i < options.Networks.size(); ++i)
     {
-        containerLauncher.AddAdditionalNetwork(options.Networks[i]);
+        const auto& network = options.Networks[i];
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+            !network.Aliases.empty() && !SupportsNetworkAliases(network.Name));
+
+        containerLauncher.AddAdditionalNetwork(network.Name, network.Aliases);
     }
 
     if (!options.NetworkAliases.empty())
@@ -70,13 +82,24 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Reporter& repor
 
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
 
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        for (const auto& alias : options.NetworkAliases)
+        {
+            containerLauncher.AddPrimaryNetworkAlias(alias);
+        }
+    }
+
+    if (!options.Networks.empty())
+    {
         const auto& primary = options.Networks.front();
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
             Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
-            primary == "bridge" || primary == "host" || primary == "none" || primary.starts_with("container:"));
+            !primary.Aliases.empty() && !SupportsNetworkAliases(primary.Name));
 
-        for (const auto& alias : options.NetworkAliases)
+        for (const auto& alias : primary.Aliases)
         {
             containerLauncher.AddPrimaryNetworkAlias(alias);
         }
