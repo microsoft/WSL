@@ -160,7 +160,7 @@ Para forçar o WSL2 a parar e desanexar o disco, execute "wsl.exe {}".</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>O nome do ponto de montagem não pode estar vazio, ser ".", ".." ou conter "/". Tente novamente com um nome de ponto de montagem válido.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -1985,6 +1985,18 @@ Também pode aceder a mais Opções remotas do VS Code através da paleta de com
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>O número de milissegundos em que uma VM está inativa antes de ser encerrada.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Keep WSL running</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL running.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Repor tempo limite</value>
   </data>
@@ -1993,6 +2005,21 @@ Também pode aceder a mais Opções remotas do VS Code através da paleta de com
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>O número de milissegundos em que uma VM está inativa antes de ser encerrada.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reset timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Aplicar alterações</value>
@@ -2955,6 +2982,10 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Formato de saída (json ou table) (Predefinição: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumentos para passar para o processo init do contentor</value>
   </data>
@@ -3147,6 +3178,9 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Não apresentar erro se o volume não existir</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Remove anonymous volumes associated with the container</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Diretório de trabalho dentro do contentor</value>
   </data>
@@ -3219,9 +3253,9 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Mostrar informações detalhadas sobre as sessões listadas.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Tipo de formato inválido especificado. Os tipos de formato suportados são: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Valor de {} inválido: {} não é um tipo de formato reconhecido. Os tipos de formato suportados são: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Valor de {} inválido: {} não é um tipo de inspeção reconhecido. Os tipos de inspeção suportados são: {}.</value>

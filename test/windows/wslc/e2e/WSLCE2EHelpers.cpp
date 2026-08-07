@@ -26,7 +26,10 @@ extern std::wstring g_testDataPath;
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
-using namespace wsl::windows::common;
+
+namespace wslc_schema = wsl::windows::common::wslc_schema;
+using wsl::windows::common::RunningWSLCContainer;
+using wsl::windows::common::WSLCContainerLauncher;
 
 namespace {
     // Lazily compute the session storage base path.

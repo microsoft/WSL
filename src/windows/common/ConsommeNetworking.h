@@ -23,7 +23,13 @@ DEFINE_ENUM_FLAG_OPERATORS(ConsommeNetworkingFlags);
 class ConsommeNetworking : public INetworkingEngine
 {
 public:
-    ConsommeNetworking(GnsChannel&& gnsChannel, ConsommeNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
+    ConsommeNetworking(
+        GnsChannel&& gnsChannel,
+        ConsommeNetworkingFlags flags,
+        LPCWSTR dnsOptions,
+        LPCSTR hostLoopback,
+        std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+        wil::shared_handle userToken);
 
     ~ConsommeNetworking() override;
 
@@ -50,6 +56,7 @@ private:
     uint16_t ModifyOpenPorts(
         _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();
+    void SetupHostLoopback();
     void SetupLoopbackDevice();
     void SendDefaultRoute(const std::wstring& gateway, wsl::shared::hns::ModifyRequestType requestType);
     void SendIpv6Address(const networking::EndpointIpAddress& ipAddress, wsl::shared::hns::ModifyRequestType requestType);
@@ -68,6 +75,7 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     ConsommeNetworkingFlags m_flags = ConsommeNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
+    std::string m_hostLoopback;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
     std::optional<WslVirtioNetConfig> m_virtioNetConfig;

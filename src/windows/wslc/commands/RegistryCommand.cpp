@@ -50,7 +50,7 @@ std::wstring RegistryCommand::LongDescription() const
 
 void RegistryCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp(context.Reporter);
+    OutputHelp(context.Terminal);
 }
 
 // Registry Login Command
@@ -91,7 +91,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (!context.Args.Contains(ArgType::Username))
     {
-        auto username = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
+        auto username = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
         context.Args.Add(ArgType::Username, std::move(username));
     }
 
@@ -100,11 +100,11 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         if (context.Args.GetFlag<ArgType::PasswordStdin>())
         {
-            context.Args.Add(ArgType::Password, context.Reporter.ReadLine().value_or(std::wstring{}));
+            context.Args.Add(ArgType::Password, context.Terminal.ReadLine().value_or(std::wstring{}));
         }
         else
         {
-            auto password = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
+            auto password = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
             context.Args.Add(ArgType::Password, std::move(password));
         }
     }

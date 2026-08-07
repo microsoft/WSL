@@ -18,7 +18,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
-#include "Reporter.h"
+#include "Terminal.h"
 
 #include <memory>
 #include <optional>
@@ -101,7 +101,7 @@ struct Command
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
-    void OutputHelp(Reporter& reporter, const CommandException* exception = nullptr) const;
+    void OutputHelp(Terminal& terminal, const CommandException* exception = nullptr) const;
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
 

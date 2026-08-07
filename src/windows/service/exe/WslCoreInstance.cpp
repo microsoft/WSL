@@ -309,6 +309,8 @@ void WslCoreInstance::ReadOOBEResult(wil::unique_socket&& Socket, wsl::windows::
             registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(oobeResult->DefaultUid));
             m_defaultUid = static_cast<int>(oobeResult->DefaultUid);
         }
+
+        m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
     }
 }
 

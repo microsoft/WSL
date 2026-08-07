@@ -4,31 +4,31 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    Reporter.cpp
+    Terminal.cpp
 
 Abstract:
 
-    Implementation of Reporter.
+    Implementation of Terminal.
 
 --*/
 #include "precomp.h"
-#include "Reporter.h"
+#include "Terminal.h"
 
 namespace wsl::windows::wslc {
 
 using namespace wsl::windows::common::vt;
 
-Reporter::Reporter() :
+Terminal::Terminal() :
     m_out(GetStdHandle(STD_OUTPUT_HANDLE), stdout), m_err(GetStdHandle(STD_ERROR_HANDLE), stderr), m_in(GetStdHandle(STD_INPUT_HANDLE), stdin)
 {
 }
 
-Reporter::Reporter(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled, FILE* inFile, bool inInteractive) :
+Terminal::Terminal(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled, FILE* inFile, bool inInteractive) :
     m_out(outFile, outVtEnabled), m_err(errFile, errVtEnabled), m_in(inFile, inInteractive)
 {
 }
 
-std::wstring_view Reporter::LevelPrefix(Level level) const noexcept
+std::wstring_view Terminal::LevelPrefix(Level level) const noexcept
 {
     if (!IsColorEnabled(level))
     {
@@ -46,22 +46,22 @@ std::wstring_view Reporter::LevelPrefix(Level level) const noexcept
     }
 }
 
-bool Reporter::IsVTEnabled(Level level) const noexcept
+bool Terminal::IsVTEnabled(Level level) const noexcept
 {
     return ChannelFor(level).IsVTEnabled();
 }
 
-bool Reporter::IsColorEnabled(Level level) const noexcept
+bool Terminal::IsColorEnabled(Level level) const noexcept
 {
     return ChannelFor(level).IsVTEnabled() && !m_noColor;
 }
 
-std::optional<int> Reporter::GetConsoleWidth(Level level) const
+std::optional<int> Terminal::GetConsoleWidth(Level level) const
 {
     return ChannelFor(level).GetConsoleWidth();
 }
 
-std::wstring Reporter::PromptForLine(Level level, std::wstring_view label, bool mask)
+std::wstring Terminal::PromptForLine(Level level, std::wstring_view label, bool mask)
 {
     // Write the label without a trailing newline so the cursor stays inline (matching
     // Docker's prompt behavior), then flush so it reaches the user before the blocking read.

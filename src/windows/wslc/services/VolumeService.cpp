@@ -84,9 +84,9 @@ wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::
 }
 
 models::PruneVolumesResult VolumeService::Prune(
-    Reporter& reporter, models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
+    Terminal& terminal, models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     const bool hasExplicitAll = std::any_of(filters.begin(), filters.end(), [](const auto& f) { return f.first == "all"; });
 
     std::vector<WSLCFilter> filterEntries;

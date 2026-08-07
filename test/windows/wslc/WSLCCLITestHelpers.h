@@ -28,7 +28,7 @@ Abstract:
 #include "windows/Common.h"
 #include "Invocation.h"
 #include "OutputChannel.h"
-#include "Reporter.h"
+#include "Terminal.h"
 #include "TableOutput.h"
 
 namespace WSLCTestHelpers {
@@ -74,7 +74,7 @@ inline void LogComment(const std::wstring& message)
 }
 
 // RAII pipe pair for capturing FILE* output in tests.
-// file() is passed to OutputChannel/Reporter; captured() drains the read end after flush.
+// file() is passed to OutputChannel/Terminal; captured() drains the read end after flush.
 struct CapturePipe
 {
     CapturePipe()
@@ -138,7 +138,7 @@ private:
 // (OpenAnonymousPipe defaults to 4096 bytes), so the feeder runs concurrently and
 // closes the write end when done, letting file() read the content then hit EOF. The
 // read FILE* is configured like real stdin (_O_U8TEXT) and passed to
-// InputChannel/Reporter.
+// InputChannel/Terminal.
 struct InputPipe
 {
     explicit InputPipe(const std::wstring& content)
@@ -196,14 +196,14 @@ private:
     std::thread m_writer;
 };
 
-// Reporter wired to a single capture pipe for full output capture.
+// Terminal wired to a single capture pipe for full output capture.
 // VT is disabled (not a console handle), so error output stays in the same pipe.
-struct CaptureReporter
+struct CaptureTerminal
 {
     CapturePipe pipe;
-    wsl::windows::wslc::Reporter reporter;
+    wsl::windows::wslc::Terminal terminal;
 
-    explicit CaptureReporter(bool vtEnabled = false) : reporter(pipe.file(), vtEnabled, pipe.file(), vtEnabled)
+    explicit CaptureTerminal(bool vtEnabled = false) : terminal(pipe.file(), vtEnabled, pipe.file(), vtEnabled)
     {
     }
 
@@ -217,7 +217,7 @@ struct CaptureReporter
 template <size_t N>
 struct TableOutputCapture
 {
-    CaptureReporter capture;
+    CaptureTerminal capture;
     wsl::windows::wslc::TableOutput<N> table;
 
     // Header + optional config + optional VT flag.
@@ -226,7 +226,7 @@ struct TableOutputCapture
         size_t sizingBuffer = 50,
         size_t columnPadding = wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding,
         bool vtEnabled = false) :
-        capture(vtEnabled), table(capture.reporter, std::move(header), sizingBuffer, columnPadding)
+        capture(vtEnabled), table(capture.terminal, std::move(header), sizingBuffer, columnPadding)
     {
         table.SetConsoleWidthOverride(120);
     }
@@ -237,14 +237,14 @@ struct TableOutputCapture
         typename wsl::windows::wslc::TableOutput<N>::column_config_t&& configs,
         bool vtEnabled = false) :
         capture(vtEnabled),
-        table(capture.reporter, std::move(header), std::move(configs), 50, wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding)
+        table(capture.terminal, std::move(header), std::move(configs), 50, wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding)
     {
         table.SetConsoleWidthOverride(120);
     }
 
     // Column definitions.
     explicit TableOutputCapture(typename wsl::windows::wslc::TableOutput<N>::column_def_t&& defs, bool vtEnabled = false) :
-        capture(vtEnabled), table(capture.reporter, std::move(defs))
+        capture(vtEnabled), table(capture.terminal, std::move(defs))
     {
         table.SetConsoleWidthOverride(120);
     }
