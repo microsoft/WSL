@@ -40,9 +40,9 @@ std::wstring VersionCommand::LongDescription() const
     return Localization::WSLCCLI_VersionLongDesc();
 }
 
-void VersionCommand::PrintVersion(Reporter& reporter)
+void VersionCommand::PrintVersion(Terminal& terminal)
 {
-    reporter.Output(L"{} {}\n", s_ExecutableName, WSL_PACKAGE_VERSION);
+    terminal.Output(L"{} {}\n", s_ExecutableName, WSL_PACKAGE_VERSION);
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
@@ -55,11 +55,11 @@ void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         nlohmann::json root;
         root["Client"]["Version"] = std::string{WSL_PACKAGE_VERSION};
-        context.Reporter.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonCompactIndent)));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(root.dump(c_jsonCompactIndent)));
         break;
     }
     case FormatType::Table:
-        PrintVersion(context.Reporter);
+        PrintVersion(context.Terminal);
         break;
     default:
         THROW_HR(E_UNEXPECTED);

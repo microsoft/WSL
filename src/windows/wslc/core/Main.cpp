@@ -138,7 +138,7 @@ try
     catch (const CommandException& ce)
     {
         // Input failure: show help alongside the error so the user can correct it.
-        command->OutputHelp(context.Reporter, &ce);
+        command->OutputHelp(context.Terminal, &ce);
         return 1;
     }
     catch (...)
@@ -151,7 +151,7 @@ try
             // Cancel events are often considered warnings rather than errors, as the user
             // intentionally triggered it.
             const auto strings = wslutil::ErrorToString({.Code = HRESULT_FROM_WIN32(ERROR_CANCELLED)});
-            context.Reporter.Warn(L"\n{}\n", strings.Message);
+            context.Terminal.Warn(L"\n{}\n", strings.Message);
 
             // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
             // for cancellation is exit code 130, which is used by Docker compose and most shells.
@@ -170,12 +170,12 @@ try
             {
                 auto strings = wslutil::ErrorToString(*reported);
                 auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Reporter.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
+                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
             }
             else
             {
                 // Fallback for errors without context
-                context.Reporter.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
+                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
             }
         }
     }

@@ -30,7 +30,7 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
-static bool TryInspectNetwork(Reporter& reporter, Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& inspectData)
+static bool TryInspectNetwork(Terminal& terminal, Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& inspectData)
 {
     try
     {
@@ -41,7 +41,7 @@ static bool TryInspectNetwork(Reporter& reporter, Session& session, const std::s
     {
         if (ex.GetErrorCode() == WSLC_E_NETWORK_NOT_FOUND)
         {
-            reporter.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(networkName.c_str()));
+            terminal.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(networkName.c_str()));
             return false;
         }
 
@@ -49,7 +49,7 @@ static bool TryInspectNetwork(Reporter& reporter, Session& session, const std::s
     }
 }
 
-static bool TryDeleteNetwork(Reporter& reporter, Session& session, const std::string& networkName, bool force)
+static bool TryDeleteNetwork(Terminal& terminal, Session& session, const std::string& networkName, bool force)
 {
     try
     {
@@ -62,7 +62,7 @@ static bool TryDeleteNetwork(Reporter& reporter, Session& session, const std::st
         {
             if (!force)
             {
-                reporter.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(networkName.c_str()));
+                terminal.Error(L"{}\n", Localization::MessageWslcNetworkNotFound(networkName.c_str()));
             }
 
             return false;
@@ -112,8 +112,8 @@ void CreateNetwork(CLIExecutionContext& context)
         options.IpRange = WideToMultiByte(context.Args.Get<ArgType::IpRange>());
     }
 
-    NetworkService::Create(context.Reporter, context.Data.Get<Data::Session>(), options);
-    context.Reporter.Output(L"{}\n", MultiByteToWide(options.Name));
+    NetworkService::Create(context.Terminal, context.Data.Get<Data::Session>(), options);
+    context.Terminal.Output(L"{}\n", MultiByteToWide(options.Name));
 }
 
 void DeleteNetworks(CLIExecutionContext& context)
@@ -124,9 +124,9 @@ void DeleteNetworks(CLIExecutionContext& context)
     const bool force = context.Args.GetFlag<ArgType::Force>();
     for (const auto& name : networkNames)
     {
-        if (TryDeleteNetwork(context.Reporter, session, WideToMultiByte(name), force))
+        if (TryDeleteNetwork(context.Terminal, session, WideToMultiByte(name), force))
         {
-            context.Reporter.Output(L"{}\n", name);
+            context.Terminal.Output(L"{}\n", name);
         }
         else if (!force)
         {
@@ -151,7 +151,7 @@ void InspectNetworks(CLIExecutionContext& context)
     for (const auto& name : networkNames)
     {
         std::optional<wslc_schema::Network> inspectData;
-        if (TryInspectNetwork(context.Reporter, session, WideToMultiByte(name), inspectData))
+        if (TryInspectNetwork(context.Terminal, session, WideToMultiByte(name), inspectData))
         {
             result.push_back(*inspectData);
         }
@@ -162,7 +162,7 @@ void InspectNetworks(CLIExecutionContext& context)
     }
 
     auto json = ToJson(result, validation::GetInspectJsonIndent(context.Args));
-    context.Reporter.Output(L"{}\n", MultiByteToWide(json));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
 void ListNetworks(CLIExecutionContext& context)
@@ -174,7 +174,7 @@ void ListNetworks(CLIExecutionContext& context)
     {
         for (const auto& network : networks)
         {
-            context.Reporter.Output(L"{}\n", MultiByteToWide(network.Name));
+            context.Terminal.Output(L"{}\n", MultiByteToWide(network.Name));
         }
 
         return;
@@ -187,12 +187,12 @@ void ListNetworks(CLIExecutionContext& context)
     case FormatType::Json:
     {
         auto json = ToJson(networks, c_jsonCompactIndent);
-        context.Reporter.Output(L"{}\n", MultiByteToWide(json));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<3>(context.Reporter, {L"NETWORK ID", L"NAME", L"DRIVER"});
+        auto table = wsl::windows::wslc::TableOutput<3>(context.Terminal, {L"NETWORK ID", L"NAME", L"DRIVER"});
         for (const auto& network : networks)
         {
             table.WriteRow({
@@ -225,7 +225,7 @@ void PruneNetworks(CLIExecutionContext& context)
 
     for (const auto& networkName : result.PrunedNetworks)
     {
-        context.Reporter.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
     }
 }
 
