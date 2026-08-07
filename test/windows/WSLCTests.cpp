@@ -533,7 +533,7 @@ class WSLCTests
         // Reject invalid feature flags.
         {
             auto settings = GetDefaultSessionSettings(L"invalid-feature-flags");
-            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x40);
+            settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x80);
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
         }

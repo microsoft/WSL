@@ -30,6 +30,12 @@ Abstract:
 #include <sys/signalfd.h>
 #include <arpa/inet.h>
 
+#ifdef __x86_64__
+#include <cpuid.h>
+#endif
+
+#include <array>
+#include <cstring>
 #include <pty.h>
 #include <mutex>
 #include "mountutilcpp.h"
@@ -669,6 +675,43 @@ void HandleMessageImpl(
     Transaction.Send(Response);
 }
 
+void LoadKvmModule()
+{
+#ifdef __x86_64__
+
+    unsigned int eax{};
+    unsigned int ebx{};
+    unsigned int ecx{};
+    unsigned int edx{};
+    THROW_ERRNO_IF(ENOTSUP, __get_cpuid(0, &eax, &ebx, &ecx, &edx) == 0);
+
+    std::array<char, 13> vendor{};
+    memcpy(vendor.data(), &ebx, sizeof(ebx));
+    memcpy(vendor.data() + sizeof(ebx), &edx, sizeof(edx));
+    memcpy(vendor.data() + sizeof(ebx) + sizeof(edx), &ecx, sizeof(ecx));
+
+    const char* module = nullptr;
+    if (strcmp(vendor.data(), "GenuineIntel") == 0)
+    {
+        module = "kvm_intel";
+    }
+    else if (strcmp(vendor.data(), "AuthenticAMD") == 0)
+    {
+        module = "kvm_amd";
+    }
+
+    THROW_ERRNO_IF(ENOTSUP, module == nullptr);
+
+    const char* argv[] = {"/sbin/modprobe", module, nullptr};
+    THROW_ERRNO_IF(EIO, UtilCreateProcessAndWait("/sbin/modprobe", argv) < 0);
+
+#else
+
+    THROW_ERRNO(ENOTSUP);
+
+#endif
+}
+
 template <typename TMessage>
 void HandleMountMessage(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const TMessage& Message, const gsl::span<gsl::byte>& Buffer)
@@ -697,23 +740,7 @@ void HandleMountMessage(
 
         const char* source = readField(Message.SourceIndex);
 
-        const char* target{};
-        if (WI_IsFlagSet(Message.Flags, WSLC_MOUNT::KernelModules))
-        {
-            assert(!g_state.ModulesMountPoint.has_value());
-
-            // Modules need to be mounted to a specific path that depends on the kernel version.
-
-            utsname UnameBuffer{};
-            THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
-
-            g_state.ModulesMountPoint = std::format("/lib/modules/{}", UnameBuffer.release);
-            target = g_state.ModulesMountPoint->c_str();
-        }
-        else
-        {
-            target = readField(Message.DestinationIndex);
-        }
+        const char* target = readField(Message.DestinationIndex);
 
         // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
@@ -840,6 +867,40 @@ void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT_VIRTIOFS& Message, const gsl::span<gsl::byte>& Buffer)
 {
     HandleMountMessage(Channel, Transaction, Message, Buffer);
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT_MODULES& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    WSLC_MOUNT_RESULT response{};
+    response.Header.MessageType = WSLC_MOUNT_RESULT::Type;
+    response.Header.MessageSize = sizeof(response);
+
+    try
+    {
+        assert(!g_state.ModulesMountPoint.has_value());
+
+        utsname unameBuffer{};
+        THROW_LAST_ERROR_IF(uname(&unameBuffer) < 0);
+
+        g_state.ModulesMountPoint = std::format("/lib/modules/{}", unameBuffer.release);
+        const char* source = wsl::shared::string::FromSpan(Buffer, Message.SourceIndex);
+        THROW_LAST_ERROR_IF(UtilMount(source, g_state.ModulesMountPoint->c_str(), "ext4", MS_RDONLY, "", c_defaultRetryTimeout) < 0);
+
+        if (Message.LoadKvm)
+        {
+            LoadKvmModule();
+        }
+
+        response.Result = 0;
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        response.Result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.Send<WSLC_MOUNT_RESULT>(response);
 }
 
 void HandleMessageImpl(
@@ -1045,7 +1106,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)
