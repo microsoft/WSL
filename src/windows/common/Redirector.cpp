@@ -226,14 +226,14 @@ void ConnectionTargetManager::AddConnectionTarget(
     if (!Contains(security.LogonId))
     {
         redirector::AddConnectionTarget(m_name, security.LogonId, aname, uid, unixSocketPath, instanceId, port);
-        m_logonIds.push_back(security.LogonId);
+        m_targets.emplace_back(security.LogonId, std::string(aname), uid, std::wstring(unixSocketPath), instanceId, port);
     }
 
     // Checking the list also catches the case where the logon ID and linked logon ID are equal.
     if (!Contains(security.LinkedLogonId))
     {
         redirector::AddConnectionTarget(m_name, security.LinkedLogonId, aname, uid, unixSocketPath, instanceId, port);
-        m_logonIds.push_back(security.LinkedLogonId);
+        m_targets.emplace_back(security.LinkedLogonId, std::string(aname), uid, std::wstring(unixSocketPath), instanceId, port);
     }
 }
 
@@ -241,20 +241,41 @@ void ConnectionTargetManager::AddConnectionTarget(
 void ConnectionTargetManager::RemoveAll()
 {
     auto lock = m_lock.lock_exclusive();
-    for (const auto logonId : m_logonIds)
+    for (const auto& target : m_targets)
     {
-        RemoveConnectionTarget(m_name, logonId);
+        RemoveConnectionTarget(m_name, target.logonId);
     }
 
-    m_logonIds.clear();
+    m_targets.clear();
 }
 
-// Checks whether the list of logon IDs contains the specified ID.
+// Checks whether the list of targets contains the specified ID.
 bool ConnectionTargetManager::Contains(LUID luid) const
 {
-    const auto it = std::find_if(m_logonIds.begin(), m_logonIds.end(), [&luid](auto& item) { return RtlEqualLuid(&luid, &item); });
+    const auto it =
+        std::find_if(m_targets.begin(), m_targets.end(), [&luid](auto& item) { return RtlEqualLuid(&luid, &item.logonId); });
 
-    return it != m_logonIds.end();
+    return it != m_targets.end();
+}
+
+// Re-add all connection targets with the new UID.
+void ConnectionTargetManager::UpdateUid(LX_UID_T uid)
+{
+    auto lock = m_lock.lock_exclusive();
+
+    for (auto& target : m_targets)
+    {
+        if (target.uid == uid)
+        {
+            continue;
+        }
+
+        redirector::RemoveConnectionTarget(m_name, target.logonId);
+        redirector::AddConnectionTarget(
+            m_name, target.logonId, target.aname, uid, target.unixSocketPath, target.instanceId, target.port);
+
+        target.uid = uid;
+    }
 }
 
 } // namespace wsl::windows::common::redirector

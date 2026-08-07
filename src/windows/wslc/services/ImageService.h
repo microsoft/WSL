@@ -57,6 +57,7 @@ public:
         const std::wstring& dockerfilePath,
         const std::wstring& target,
         const std::optional<BuildOutput>& output,
+        const std::optional<std::wstring>& iidFilePath,
         WSLCBuildImageFlags flags,
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);

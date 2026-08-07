@@ -1985,6 +1985,18 @@ You can also access more VS Code Remote options through the command palette with
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>The number of milliseconds that a VM is idle, before it is shut down.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Keep WSL running</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL running.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Reset timeout</value>
   </data>
@@ -1993,6 +2005,21 @@ You can also access more VS Code Remote options through the command palette with
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>The number of milliseconds that a VM is idle, before it is shut down.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reset timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Apply changes</value>
@@ -3151,6 +3178,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Do not error if the volume does not exist</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Remove anonymous volumes associated with the container</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Working directory inside the container</value>
   </data>
@@ -3160,6 +3190,9 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Write the container ID to the provided path</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Write the image ID to the provided path</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP address of the DNS nameserver in resolv.conf</value>

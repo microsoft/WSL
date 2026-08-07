@@ -54,7 +54,7 @@ extern bool g_fastTestRun;
 #define DELETE_CONTAINER_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerOption::Force))
 #define DELETE_IMAGE_ON_SCOPE_EXIT(imageName) SCOPE_CLEANUP(m_defaultSession.DeleteImage(imageName))
 
-struct ProcessOutput
+struct CapturedProcessOutput
 {
     uint32_t ExitCode;
     std::wstring StandardOutput;
@@ -105,9 +105,9 @@ class WslcSdkWinRtTests
         VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
     }
 
-    ProcessOutput GetProcessOutput(WSLCSDK::Process const& process)
+    CapturedProcessOutput GetProcessOutput(WSLCSDK::Process const& process)
     {
-        ProcessOutput output;
+        CapturedProcessOutput output;
         output.ExitCode = process.ExitCode();
         output.StandardOutput = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput));
         output.StandardError = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError));
@@ -161,7 +161,7 @@ class WslcSdkWinRtTests
 
     // Creates and starts a one-shot container, waits for the init process to
     // exit, and returns the exit code.
-    ProcessOutput RunContainerAndWaitForExit(winrt::hstring imageName, RunContainerOptions options = {})
+    CapturedProcessOutput RunContainerAndWaitForExit(winrt::hstring imageName, RunContainerOptions options = {})
     {
         auto procSettings = WSLCSDK::ProcessSettings();
         if (!options.commandLine.empty())

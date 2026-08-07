@@ -32,6 +32,7 @@ std::vector<Argument> ImageBuildCommand::GetArguments() const
         Argument::Create(ArgType::BuildPull),
         Argument::Create(ArgType::BuildTarget),
         Argument::Create(ArgType::File),
+        Argument::Create(ArgType::IidFile),
         Argument::Create(ArgType::Label, false, Limit::Unlimited),
         Argument::Create(ArgType::NoCache),
         Argument::Create(ArgType::Output, false, std::nullopt, Localization::WSLCCLI_BuildOutputArgDescription()),

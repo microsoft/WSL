@@ -160,7 +160,7 @@ Chcete-li přinutit WSL2 zastavit a odpojit disk, spusťte 'wsl.exe {}'.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>Název připojení nemůže být prázdný, ., .. ani obsahovat /. Zkuste to prosím znovu s platným názvem připojení.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -1985,6 +1985,18 @@ K dalším možnostem VS Code Remote můžete přistupovat také prostřednictv�
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Počet milisekund, po které je virtuální počítač nečinný, než se vypne.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Keep WSL running</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL running.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Resetovat časový limit</value>
   </data>
@@ -1993,6 +2005,21 @@ K dalším možnostem VS Code Remote můžete přistupovat také prostřednictv�
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Počet milisekund, po které je virtuální počítač nečinný, než se vypne.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reset timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Použít změny</value>
@@ -2955,6 +2982,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Formát výstupu (json nebo table) (výchozí: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumenty, které se mají předat procesu init kontejneru</value>
   </data>
@@ -3147,6 +3178,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Nechybová zpráva, pokud svazek neexistuje</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Odebrání anonymních svazků přidružených ke kontejneru</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Pracovní adresář v kontejneru</value>
   </data>
@@ -3219,9 +3253,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Zobrazit podrobné informace o vypsaných relacích.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Byl zadán neplatný typ formátu. Podporované typy formátu jsou: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Neplatná hodnota {}: {} není rozpoznaný typ formátu. Podporované typy formátů jsou: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Neplatná hodnota {}: {} není rozpoznaný typ kontroly. Podporované typy kontrol jsou: {}.</value>

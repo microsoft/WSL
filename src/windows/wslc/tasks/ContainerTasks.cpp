@@ -626,9 +626,10 @@ void RemoveContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
     bool force = context.Args.GetFlag<ArgType::Force>();
+    bool deleteVolumes = context.Args.GetFlag<ArgType::Volumes>();
     for (const auto& id : containerIds)
     {
-        ContainerService::Delete(session, WideToMultiByte(id), force);
+        ContainerService::Delete(session, WideToMultiByte(id), force, deleteVolumes);
         context.Terminal.Output(L"{}\n", id);
     }
 }

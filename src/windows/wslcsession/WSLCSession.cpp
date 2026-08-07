@@ -1014,9 +1014,9 @@ try
 
     // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
     // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. At most the build
-    // context (1), the single-file exporter output destination (1), and one parent directory per file
-    // secret are mounted.
-    mountedPaths.reserve(static_cast<size_t>(2) + Options->Secrets.Count);
+    // context (1), the single-file exporter output destination (1), the --iidfile destination (1), and
+    // one parent directory per file secret are mounted.
+    mountedPaths.reserve(static_cast<size_t>(3) + Options->Secrets.Count);
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
@@ -1080,6 +1080,23 @@ try
         }
         buildArgs.push_back("--output");
         buildArgs.push_back(outputSpec);
+    }
+
+    // Docker-style --iidfile. The destination's parent directory is mounted read-write into the VM so
+    // buildx writes the image ID straight to the client's --iidfile path.
+    if (Options->IidFilePath != nullptr && Options->IidFilePath[0] != L'\0')
+    {
+        std::filesystem::path iidPath(Options->IidFilePath);
+        // The client and server have different current directories, so a relative path is ambiguous.
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Options->IidFilePath), !iidPath.is_absolute());
+
+        auto iidParent = iidPath.parent_path();
+        auto iidFileNameUtf8 = wsl::shared::string::WideToMultiByte(iidPath.filename().wstring());
+        RETURN_HR_IF(E_INVALIDARG, iidParent.empty() || iidFileNameUtf8.empty());
+
+        auto iidMountPath = mountInVm(iidParent.c_str(), FALSE);
+        buildArgs.push_back("--iidfile");
+        buildArgs.push_back(std::format("{}/{}", iidMountPath, iidFileNameUtf8));
     }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {

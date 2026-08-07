@@ -160,7 +160,7 @@
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>裝載名稱不可為空白、'.'、'..'，或包含 '/'。請使用有效裝載名稱重試。</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -1991,6 +1991,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>VM 在關機前閒置的毫秒數。</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Keep WSL running</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL running.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>重設逾時</value>
   </data>
@@ -1999,6 +2011,21 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM 在關機前閒置的毫秒數。</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reset timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>套用變更</value>
@@ -2961,6 +2988,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>輸出格式 (json 或 table) (預設: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>輸出格式 (單行輸出為 json)(預設: 縮排 JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>要傳遞至容器 init 處理序的引數</value>
   </data>
@@ -3153,6 +3184,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>如果此磁碟區不存在，請勿顯示錯誤</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>移除與容器相關聯的匿名磁碟區</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器內的工作目錄</value>
   </data>
@@ -3225,9 +3259,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>顯示所列工作階段的詳細資訊。</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>指定的格式類型無效。支援的格式類型為: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>無效的 {} 值： {} 不是可辨識的格式類型。支援的格式類型為： {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>無效的 {} 值： {} 不是可辨識的檢查類型。支援的檢查類型為： {}。</value>
