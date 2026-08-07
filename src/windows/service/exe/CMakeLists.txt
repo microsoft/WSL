@@ -1,4 +1,5 @@
 set(SOURCES
+    ConsoleStateManager.cpp
     DistributionRegistration.cpp
     LxssUserCallback.cpp
     LxssUserSession.cpp
@@ -30,6 +31,7 @@ set(SOURCES
 
 set(HEADERS
     ../../inc/comservicehelper.h
+    ConsoleStateManager.h
     DistributionRegistration.h
     LxssUserCallback.h
     LxssUserSession.h

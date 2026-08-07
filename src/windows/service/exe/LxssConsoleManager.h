@@ -16,6 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "LxssCreateProcess.h"
 #include "Lifetime.h"
+#include "ConsoleStateManager.h"
 
 class ConsoleManager : public std::enable_shared_from_this<ConsoleManager>
 {
@@ -64,8 +65,6 @@ private:
     void _OnProcessDisconnect(_In_ ULONG ConsoleId, _In_ bool Elevated);
 
     static void _GetConsoleInfo(_In_ const wil::unique_handle& ConsoleHandle, _Out_ ULONG& ConsoleId, _Out_ wil::unique_handle& ConhostHandle);
-
-    static ULONG s_GetConhostServerId(_In_ HANDLE ConsoleHandle);
 
     std::mutex m_mappingListLock;
 

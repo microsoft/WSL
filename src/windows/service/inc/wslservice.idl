@@ -91,6 +91,20 @@ struct _LXSS_ERROR_INFO {
     ULONG WarningsPipe;
 } LXSS_ERROR_INFO, *PLXSS_ERROR_INFO;
 
+cpp_quote("#define LXSS_CONSOLE_STATE_INPUT_MODE 0x1")
+cpp_quote("#define LXSS_CONSOLE_STATE_INPUT_CODE_PAGE 0x2")
+cpp_quote("#define LXSS_CONSOLE_STATE_OUTPUT_MODE 0x4")
+cpp_quote("#define LXSS_CONSOLE_STATE_OUTPUT_CODE_PAGE 0x8")
+
+typedef
+struct _LXSS_CONSOLE_STATE {
+    ULONG Flags;
+    ULONG InputMode;
+    ULONG InputCodePage;
+    ULONG OutputMode;
+    ULONG OutputCodePage;
+} LXSS_CONSOLE_STATE, *PLXSS_CONSOLE_STATE;
+
 cpp_quote("#define LXSS_DISTRO_VERSION_LEGACY 0")
 cpp_quote("#define LXSS_DISTRO_VERSION_1 1")
 cpp_quote("#define LXSS_DISTRO_VERSION_2 2")
@@ -344,8 +358,28 @@ interface ILxssUserSession : IUnknown
 
     HRESULT MoveDistribution(
         [in] LPCGUID DistroGuid,
-        [in] LPCWSTR DistributionName, 
+        [in] LPCWSTR DistributionName,
         [ in, out ] LXSS_ERROR_INFO * Error);
+
+    HRESULT AcquireConsoleStateLease(
+        [in] ULONG ConsoleHandle,
+        [out] GUID* LeaseId,
+        [out] BOOLEAN* Initialize,
+        [out] LXSS_CONSOLE_STATE* ConfiguredState);
+
+    HRESULT CommitConsoleStateLease(
+        [in] LPCGUID LeaseId,
+        [in] const LXSS_CONSOLE_STATE* BaselineState,
+        [in] const LXSS_CONSOLE_STATE* ConfiguredState);
+
+    HRESULT ReleaseConsoleStateLease(
+        [in] LPCGUID LeaseId,
+        [out] BOOLEAN* Restore,
+        [out] LXSS_CONSOLE_STATE* BaselineState,
+        [out] LXSS_CONSOLE_STATE* ConfiguredState);
+
+    HRESULT CompleteConsoleStateLease(
+        [in] LPCGUID LeaseId);
 };
 
 

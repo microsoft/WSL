@@ -17,6 +17,7 @@ Abstract:
 #include <vector>
 #include <memory>
 #include "helpers.hpp"
+#include "ConsoleState.h"
 #include "SocketChannel.h"
 
 namespace wsl::windows::common {
@@ -33,6 +34,11 @@ public:
 
     SvcComm();
     ~SvcComm();
+
+    void AcquireConsoleStateLease(_In_ HANDLE ConsoleHandle, _Out_ GUID& LeaseId, _Out_ bool& Initialize, _Out_ LXSS_CONSOLE_STATE& ConfiguredState) const;
+    void CommitConsoleStateLease(_In_ const GUID& LeaseId, _In_ const LXSS_CONSOLE_STATE& BaselineState, _In_ const LXSS_CONSOLE_STATE& ConfiguredState) const;
+    bool ReleaseConsoleStateLease(_In_ const GUID& LeaseId, _Out_ LXSS_CONSOLE_STATE& BaselineState, _Out_ LXSS_CONSOLE_STATE& ConfiguredState) const;
+    void CompleteConsoleStateLease(_In_ const GUID& LeaseId) const;
 
     void ConfigureDistribution(_In_opt_ LPCGUID DistroGuid, _In_ ULONG DefaultUid, _In_ ULONG Flags) const;
 
@@ -64,7 +70,8 @@ public:
         _In_ ULONG LaunchFlags = 0,
         _In_opt_ PCWSTR Username = nullptr,
         _In_opt_ PCWSTR CurrentWorkingDirectory = nullptr,
-        _In_ DWORD Timeout = INFINITE) const;
+        _In_ DWORD Timeout = INFINITE,
+        _In_ RestorePolicy RestorePolicySetting = RestorePolicy::Always) const;
 
     GUID GetDefaultDistribution() const;
 

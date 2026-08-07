@@ -50,6 +50,7 @@ struct LaunchProcessOptions
     std::optional<GUID> DistroGuid;
     std::wstring Username;
     ULONG LaunchFlags = LXSS_LAUNCH_FLAG_ENABLE_INTEROP | LXSS_LAUNCH_FLAG_TRANSLATE_ENVIRONMENT;
+    RestorePolicy RestorePolicySetting = RestorePolicy::Always;
 };
 
 struct ListOptions
@@ -535,6 +536,7 @@ int Install(_In_ std::wstring_view commandLine)
 
             LaunchProcessOptions options{};
             options.DistroGuid = id;
+            options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
             return LaunchProcess(nullptr, 0, nullptr, options);
         }
 
@@ -607,6 +609,7 @@ int Install(_In_ std::wstring_view commandLine)
             {
                 LaunchProcessOptions options{};
                 options.DistroGuid = installResult.Id.value();
+                options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 
                 return LaunchProcess(nullptr, 0, nullptr, options);
             }
@@ -681,7 +684,9 @@ int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPC
         argv,
         options.LaunchFlags,
         options.Username.empty() ? nullptr : options.Username.c_str(),
-        options.CurrentWorkingDirectory.empty() ? nullptr : options.CurrentWorkingDirectory.c_str());
+        options.CurrentWorkingDirectory.empty() ? nullptr : options.CurrentWorkingDirectory.c_str(),
+        INFINITE,
+        options.RestorePolicySetting);
 
     THROW_HR_IF(WSL_E_USER_NOT_FOUND, (exitCode == LX_INIT_USER_NOT_FOUND));
     THROW_HR_IF(WSL_E_TTY_LIMIT, (exitCode == LX_INIT_TTY_LIMIT));
@@ -1369,6 +1374,7 @@ int WslgMain(_In_ std::wstring_view commandLine)
     WI_ASSERT(!wsl::windows::common::wslutil::IsRunningInMsix());
 
     auto options = ParseLegacyArguments(commandLine);
+    options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 
     // Parse additional arguments.
     std::wstring_view argument;
@@ -1542,6 +1548,7 @@ int WslMain(_In_ std::wstring_view commandLine)
 
     // Parse the command line to determine if the legacy distro GUID or the '~' argument were specified.
     auto options = ParseLegacyArguments(commandLine);
+    options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 
     // Parse additional arguments.
     std::wstring_view argument;

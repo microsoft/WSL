@@ -7616,6 +7616,177 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    struct ConsoleSnapshot
+    {
+        DWORD InputMode;
+        UINT InputCodePage;
+        DWORD OutputMode;
+        UINT OutputCodePage;
+    };
+
+    static ConsoleSnapshot GetConsoleSnapshot(HANDLE conin, HANDLE conout)
+    {
+        ConsoleSnapshot state{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin, &state.InputMode));
+        state.InputCodePage = GetConsoleCP();
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conout, &state.OutputMode));
+        state.OutputCodePage = GetConsoleOutputCP();
+        return state;
+    }
+
+    static void SetConsoleSnapshot(HANDLE conin, HANDLE conout, const ConsoleSnapshot& state)
+    {
+        LOG_LAST_ERROR_IF(!SetConsoleCP(state.InputCodePage));
+        LOG_LAST_ERROR_IF(!SetConsoleMode(conin, state.InputMode));
+        LOG_LAST_ERROR_IF(!SetConsoleOutputCP(state.OutputCodePage));
+        LOG_LAST_ERROR_IF(!SetConsoleMode(conout, state.OutputMode));
+    }
+
+    static void VerifyConsoleSnapshot(const ConsoleSnapshot& expected, const ConsoleSnapshot& actual)
+    {
+        VERIFY_ARE_EQUAL(expected.InputMode, actual.InputMode);
+        VERIFY_ARE_EQUAL(expected.InputCodePage, actual.InputCodePage);
+        VERIFY_ARE_EQUAL(expected.OutputMode, actual.OutputMode);
+        VERIFY_ARE_EQUAL(expected.OutputCodePage, actual.OutputCodePage);
+    }
+
+    static std::optional<DWORD> TrySetDifferentValidInputMode(HANDLE conin, DWORD currentMode)
+    {
+        const std::array<DWORD, 4> candidates = {
+            currentMode | ENABLE_PROCESSED_INPUT,
+            currentMode | ENABLE_LINE_INPUT,
+            currentMode ^ ENABLE_INSERT_MODE,
+            currentMode ^ ENABLE_WINDOW_INPUT,
+        };
+
+        for (const DWORD candidate : candidates)
+        {
+            if ((candidate != currentMode) && SetConsoleMode(conin, candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    TEST_METHOD(ConsoleState_DefaultAlways_RestoresExternalInputModeDrift)
+    {
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin)
+        {
+            LogSkipped("Skipping ConsoleState default-restore test: CONIN$ is not available (no attached console)");
+            return;
+        }
+
+        DWORD baseline{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
+        const DWORD scopeExitRestore = baseline;
+        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), scopeExitRestore); });
+
+        std::optional<DWORD> externalMode;
+        {
+            wsl::windows::common::ConsoleState io;
+            io.SetInteractiveMode();
+
+            DWORD configured{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &configured));
+
+            externalMode = TrySetDifferentValidInputMode(conin.get(), configured);
+            if (!externalMode.has_value())
+            {
+                LogSkipped("Skipping ConsoleState default-restore test: could not apply an alternate valid input mode");
+                return;
+            }
+
+            DWORD observed{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &observed));
+            VERIFY_ARE_EQUAL(externalMode.value(), observed);
+        }
+
+        DWORD finalMode{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
+        VERIFY_ARE_EQUAL(
+            baseline,
+            finalMode,
+            L"RestorePolicy::Always must restore the original mode even when the mode drifted after SetInteractiveMode");
+    }
+
+    TEST_METHOD(ConsoleState_OnlyIfUnchanged_PreservesExternalInputModeChange)
+    {
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin)
+        {
+            LogSkipped("Skipping ConsoleState unchanged-restore test: CONIN$ is not available (no attached console)");
+            return;
+        }
+
+        DWORD baseline{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
+        const DWORD scopeExitRestore = baseline;
+        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), scopeExitRestore); });
+
+        std::optional<DWORD> externalMode;
+        {
+            wsl::windows::common::ConsoleState io{wsl::windows::common::RestorePolicy::OnlyIfUnchanged};
+            io.SetInteractiveMode();
+
+            DWORD configured{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &configured));
+
+            externalMode = TrySetDifferentValidInputMode(conin.get(), configured);
+            if (!externalMode.has_value())
+            {
+                LogSkipped("Skipping ConsoleState unchanged-restore test: could not apply an alternate valid input mode");
+                return;
+            }
+
+            DWORD observed{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &observed));
+            VERIFY_ARE_EQUAL(externalMode.value(), observed);
+        }
+
+        DWORD finalMode{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
+        VERIFY_ARE_EQUAL(
+            externalMode.value(),
+            finalMode,
+            L"RestorePolicy::OnlyIfUnchanged must preserve external mode changes made after SetInteractiveMode");
+    }
+
+    TEST_METHOD(ConsoleState_OnlyIfUnchanged_ConcurrentClients_OutOfOrderFinalRestore)
+    {
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        wil::unique_hfile conout{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin || !conout)
+        {
+            LogSkipped("Skipping ConsoleState concurrent-client test: console handles are not available");
+            return;
+        }
+
+        const auto baseline = GetConsoleSnapshot(conin.get(), conout.get());
+        auto restoreBaseline = wil::scope_exit([&] { SetConsoleSnapshot(conin.get(), conout.get(), baseline); });
+        wsl::windows::common::SvcComm service;
+
+        auto first = std::make_unique<wsl::windows::common::ConsoleState>(wsl::windows::common::RestorePolicy::OnlyIfUnchanged, &service);
+        first->SetInteractiveMode();
+        const auto configured = GetConsoleSnapshot(conin.get(), conout.get());
+
+        auto second = std::make_unique<wsl::windows::common::ConsoleState>(wsl::windows::common::RestorePolicy::OnlyIfUnchanged, &service);
+        second->SetInteractiveMode();
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
+
+        first.reset();
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
+
+        second.reset();
+        VerifyConsoleSnapshot(baseline, GetConsoleSnapshot(conin.get(), conout.get()));
+    }
+
     TEST_METHOD(DownloadToHiddenSystemTempFolder)
     {
         // Avoid contaminating the real temp folder.
