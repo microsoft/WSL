@@ -55,6 +55,8 @@ Abstract:
 #define LOCALE_FILE_PATH ETC_DEFAULT_FOLDER "locale"
 #define LOCALE_CONF_FILE_PATH ETC_FOLDER "locale.conf"
 #define PATH_ENV "PATH"
+#define PERF_BINARY_PATH "/usr/bin/perf"
+#define PERF_EXEC_PATH_ENV "PERF_EXEC_PATH"
 #define RESOLV_CONF_DIRECTORY_MODE 0755
 #define RESOLV_CONF_FILE_MODE 0644
 #define RESOLV_CONF_FILE_NAME "resolv.conf"
@@ -1164,16 +1166,29 @@ Return Value:
         }
     });
 
-    MoveTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, LX_WSL2_KERNEL_PERF_PATH_ENV, [](const std::string& target) {
+    MoveTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, LX_WSL2_KERNEL_PERF_PATH_ENV, [&](const std::string& target) {
         //
-        // Expose the kernel-matched perf on the default PATH. A bind mount hides any
-        // distro-provided binary without overwriting a regular file.
+        // Expose the kernel-matched perf via the environment block (see ConfigCreateEnvironmentBlock).
         //
 
-        const std::string perfBinary = target + "/bin/perf";
-        if (UtilMountFile(perfBinary.c_str(), "/usr/bin/perf") < 0)
+        Config.KernelPerfPath = target;
+
+        //
+        // If the distro ships its own perf, shadow it with a bind mount so that the binary matching the
+        // running kernel is used.
+        //
+        // N.B. The distro's file system is only modified if perf is already present as a regular file.
+        //      Distros without perf pick it up via $PATH instead.
+        //
+
+        struct stat existing{};
+        if ((lstat(PERF_BINARY_PATH, &existing) == 0) && S_ISREG(existing.st_mode))
         {
-            LOG_ERROR("UtilMountFile({}, /usr/bin/perf) failed {}", perfBinary, errno);
+            const std::string perfBinary = target + "/bin/perf";
+            if (UtilMountFile(perfBinary.c_str(), PERF_BINARY_PATH) < 0)
+            {
+                LOG_ERROR("UtilMountFile({}, {}) failed {}", perfBinary, PERF_BINARY_PATH, errno);
+            }
         }
     });
 
@@ -1715,6 +1730,17 @@ Return Value:
         if (Config.AppendGpuLibPath && Config.GpuEnabled)
         {
             ConfigAppendToPath(Environment, LXSS_LIB_PATH);
+        }
+
+        //
+        // Add the kernel-matched perf tools to the $PATH variable and point perf at its helper
+        // scripts since it is built with a prefix that does not match where it is mounted.
+        //
+
+        if (Config.KernelPerfPath.has_value())
+        {
+            ConfigAppendToPath(Environment, std::format("{}/bin", *Config.KernelPerfPath));
+            Environment.AddVariable(PERF_EXEC_PATH_ENV, std::format("{}/libexec/perf-core", *Config.KernelPerfPath));
         }
     }
 

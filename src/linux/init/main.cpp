@@ -1643,7 +1643,7 @@ try
     //
     // If the perf tooling was mounted, move it to a temporary location and pass the desired target
     // path to the distro init via an environment variable. Distro init will move the mount to
-    // /usr/lib/linux-tools/<uname -r> and bind mount the binary at /usr/bin/perf.
+    // /usr/lib/linux-tools/<uname -r> and add it to the default $PATH.
     //
 
     if (!Config.KernelPerfTarget.empty())

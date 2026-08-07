@@ -3047,29 +3047,35 @@ EOF
                 nullptr),
             0u);
 
-        // perf: the versioned binary is bind mounted at /usr/bin/perf and runs.
+        // perf: leave no trace in the distro's file system and make the versioned binary reachable
+        // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(command -v perf)\" = \"/usr/lib/linux-tools/$(uname -r)/bin/perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(perf --exec-path)\" = \"/usr/lib/linux-tools/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+
+        // Stale distro-provided artifacts are replaced or hidden after the VM restarts. A distro
+        // provided perf is shadowed by the binary matching the running kernel.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf > /usr/bin/perf", nullptr, nullptr, nullptr, nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(
                 L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
 
-        // Stale distro-provided artifacts are replaced or hidden after the VM restarts.
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && "
-                L"umount /usr/bin/perf && printf old-perf > /usr/bin/perf",
-                nullptr,
-                nullptr,
-                nullptr,
-                nullptr),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
-            0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"umount /usr/bin/perf && rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
     WSL2_TEST_METHOD(CrashCollection)
