@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Byte source used by Reporter for user input. Reads a line at a time from the
+    Byte source used by Terminal for user input. Reads a line at a time from the
     console (or a redirected file/pipe). For console sources the channel can mask
     echo while reading (password entry) and reports whether input is interactive.
 

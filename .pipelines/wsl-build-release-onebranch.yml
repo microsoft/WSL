@@ -33,6 +33,10 @@ resources:
       type: git
       name: OneBranch.Pipelines/GovernedTemplates
       ref: refs/heads/main
+    - repository: releaseScripts
+      type: git
+      name: Microsoft.WSL/wsl-release-scripts
+      ref: refs/tags/v1
 
 extends:
   template: v2/Microsoft.Official.yml@templates
@@ -74,6 +78,8 @@ extends:
         traceLoggingConfig: $(ReleaseTraceLoggingConfig)
         vsoOrg: microsoft
         vsoProject: Microsoft.WSL
+
+    - template: dcat-stage.yml@self
 
     - template: test-stage.yml@self
       parameters:

@@ -53,6 +53,6 @@ std::wstring ImageCommand::LongDescription() const
 
 void ImageCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp(context.Reporter);
+    OutputHelp(context.Terminal);
 }
 } // namespace wsl::windows::wslc

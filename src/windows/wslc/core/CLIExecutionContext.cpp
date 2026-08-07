@@ -21,7 +21,7 @@ void CLIExecutionContext::ApplyGlobalOptions()
 {
     if (GlobalArgs.GetValue<ArgType::NoColor>())
     {
-        Reporter.SetNoColor(true);
+        Terminal.SetNoColor(true);
     }
 }
 

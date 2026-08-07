@@ -331,16 +331,16 @@ std::vector<ImageInformation> ImageService::List(
     return result;
 }
 
-void ImageService::Load(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
+void ImageService::Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto source = OpenImageInput(input);
     THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, &warningCallback, callback));
 }
 
-std::string ImageService::Import(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
+std::string ImageService::Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto source = OpenImageInput(input);
     wil::unique_cotaskmem_ansistring imageId;
     THROW_IF_FAILED(session.Get()->ImportImage(
@@ -367,9 +367,9 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 }
 
-void ImageService::Pull(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, &warningCallback));
@@ -398,9 +398,9 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
     THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, &warningCallback));
