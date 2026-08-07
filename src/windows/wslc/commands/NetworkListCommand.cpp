@@ -21,7 +21,6 @@ Abstract:
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 using namespace wsl::shared;
-using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 // Network List Command
@@ -41,18 +40,6 @@ std::wstring NetworkListCommand::ShortDescription() const
 std::wstring NetworkListCommand::LongDescription() const
 {
     return Localization::WSLCCLI_NetworkListLongDesc();
-}
-
-void NetworkListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
-{
-    if (execArgs.Contains(ArgType::Format))
-    {
-        auto format = execArgs.Get<ArgType::Format>();
-        if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
-        {
-            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
-        }
-    }
 }
 
 void NetworkListCommand::ExecuteInternal(CLIExecutionContext& context) const

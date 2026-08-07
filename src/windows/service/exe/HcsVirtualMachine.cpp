@@ -81,7 +81,6 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Store the user token.
     m_userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
-    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
     m_crashDumpFolder = GetCrashDumpFolder();
 
     std::lock_guard lock(m_lock);
@@ -90,6 +89,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_featureFlags = Settings->FeatureFlags;
     m_networkingMode = Settings->NetworkingMode;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
     m_bootTimeoutMs = Settings->BootTimeoutMs;
 
     // Build HCS settings
@@ -155,8 +155,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 #endif
 
-    // Compute a swiotlb device-options token sized to fit this VM's RAM, used by the kernel
-    // command line, virtiofs shares, and the Consomme virtio-net adapter.
+    // Compute a swiotlb size that fits this VM's RAM for the kernel command line.
     // Only needed when a virtio device that requires bounce buffers will be attached.
     ULONG64 swiotlbSizeBytes = 0;
     if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
@@ -350,7 +349,9 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 HcsVirtualMachine::~HcsVirtualMachine()
 {
-    std::lock_guard lock(m_lock);
+    // Do not hold m_lock: waiting on m_vmExitEvent and closing the compute system below both block
+    // on in-flight HCS exit/crash callbacks, which may themselves need m_lock. OnExit() is lock-free,
+    // and closing the compute system drains all callbacks, so the rest of teardown needs no lock.
 
     // Wait up to 5 seconds for the VM to terminate gracefully.
     bool forceTerminate = false;
@@ -391,6 +392,7 @@ HcsVirtualMachine::~HcsVirtualMachine()
     {
         try
         {
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
             WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
             std::filesystem::remove(m_vmSavedStateFile);
         }
@@ -503,7 +505,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, m_swiotlbOption);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_hostLoopback.c_str(), m_guestDeviceManager, m_userToken);
     }
     else
     {
@@ -623,31 +625,15 @@ try
         // N.B. The 'metadata' option is required so the virtiofs device host persists per-file
         //      uid/gid in NTFS extended attributes. Without it, all files appear as root-owned.
         std::wstring options = ReadOnly ? L"ro;metadata" : L"metadata";
-        auto appendOption = [&options](const std::wstring& option) {
-            if (option.empty())
-            {
-                return;
-            }
+        if (!m_virtioFsDevice.has_value())
+        {
+            VirtioFsShareOptions aggregateOptions{.Kind = VirtiofsShareKind_Aggregate};
+            m_virtioFsDevice =
+                m_guestDeviceManager->AddVirtiofsDevice(TEXT(LX_INIT_DRVFS_VIRTIO_TAG), L"", L"", m_userToken.get(), aggregateOptions);
+        }
 
-            if (!options.empty())
-            {
-                options += L";";
-            }
-
-            options += option;
-        };
-
-        appendOption(m_swiotlbOption);
-        appendOption(c_vcpusOption);
-
-        it->second = m_guestDeviceManager->AddGuestDevice(
-            VIRTIO_FS_DEVICE_ID,
-            m_virtioFsClassId,
-            shareName.c_str(),
-            options.c_str(),
-            WindowsPath,
-            VIRTIO_FS_FLAGS_TYPE_FILES,
-            m_userToken.get());
+        m_guestDeviceManager->AddVirtiofsChild(m_virtioFsDevice.value(), shareName.c_str(), options.c_str(), WindowsPath);
+        it->second = m_virtioFsDevice;
     }
 
     cleanup.release();
@@ -672,7 +658,8 @@ try
     }
     else
     {
-        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, it->second.value());
+        auto shareName = wsl::shared::string::GuidToString<wchar_t>(it->first, wsl::shared::string::None);
+        m_guestDeviceManager->RemoveVirtiofsChild(it->second.value(), shareName.c_str());
     }
 
     m_shares.erase(it);
@@ -688,11 +675,16 @@ try
 
     std::lock_guard lock(m_lock);
 
-    THROW_HR_IF(E_INVALIDARG, !m_swiotlbOption.empty());
+    THROW_HR_IF(E_INVALIDARG, m_swiotlbConfigured);
 
     if (Capabilities->HvPciSwiotlbBase != 0 && Capabilities->HvPciSwiotlbSize != 0)
     {
-        m_swiotlbOption = std::format(L"swiotlb=0x{:x},{}", Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize);
+        if (m_guestDeviceManager)
+        {
+            m_guestDeviceManager->SetSwiotlb(Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize);
+        }
+
+        m_swiotlbConfigured = true;
     }
 
     WSL_LOG(
@@ -964,6 +956,7 @@ WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSetti
     m_bootTimeoutMs = Settings->BootTimeoutMs;
     m_networkingMode = Settings->NetworkingMode;
     m_featureFlags = Settings->FeatureFlags;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
     m_storageFlags = Settings->StorageFlags;
 }
 
@@ -978,6 +971,7 @@ WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
     settings.BootTimeoutMs = m_bootTimeoutMs;
     settings.NetworkingMode = m_networkingMode;
     settings.FeatureFlags = m_featureFlags;
+    settings.HostLoopback = m_hostLoopback.empty() ? nullptr : m_hostLoopback.c_str();
     settings.StorageFlags = m_storageFlags;
     settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;
     settings.RootVhdTypeOverride = m_rootVhdTypeOverride ? m_rootVhdTypeOverride->c_str() : nullptr;

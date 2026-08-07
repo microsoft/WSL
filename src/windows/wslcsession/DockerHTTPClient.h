@@ -26,7 +26,11 @@ Abstract:
     if ((_Ex).HasErrorMessage()) \
     { \
         THROW_HR_WITH_USER_ERROR_MSG( \
-            (_Ex).HResultFromStatusCode(), (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
+            (_Ex).HResultFromStatusCode(), \
+            wsl::windows::service::wslc::FormatDockerEngineError( \
+                (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message), \
+            _Msg, \
+            ##__VA_ARGS__); \
     } \
     else \
     { \
@@ -40,6 +44,8 @@ Abstract:
     }
 
 namespace wsl::windows::service::wslc {
+
+std::string FormatDockerEngineError(const std::string& EngineMessage);
 
 class DockerHTTPException : public std::runtime_error
 {
@@ -137,6 +143,8 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
+    std::unique_ptr<HTTPRequestContext> PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength);
+    std::tuple<uint32_t, wil::unique_socket, bool> GetArchive(const std::string& ContainerID, const std::string& Path);
     common::docker_schema::PruneContainerResult PruneContainers(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Volume management.

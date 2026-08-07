@@ -39,6 +39,25 @@ struct InspectMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, ReadWrite);
 };
 
+struct HealthcheckResult
+{
+    std::string Start;
+    std::string End;
+    int ExitCode{};
+    std::string Output;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthcheckResult, Start, End, ExitCode, Output);
+};
+
+struct Health
+{
+    std::string Status;
+    int FailingStreak{};
+    std::vector<HealthcheckResult> Log;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Health, Status, FailingStreak, Log);
+};
+
 struct ContainerInspectState
 {
     std::string Status;
@@ -46,8 +65,9 @@ struct ContainerInspectState
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
+    std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct Ulimit
@@ -69,6 +89,17 @@ struct InspectHostConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
 };
 
+struct HealthConfig
+{
+    std::optional<std::vector<std::string>> Test;
+    std::optional<std::int64_t> Interval;
+    std::optional<std::int64_t> Timeout;
+    std::optional<std::int64_t> StartPeriod;
+    std::optional<int> Retries;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthConfig, Test, Interval, Timeout, StartPeriod, Retries);
+};
+
 struct ContainerConfig
 {
     std::optional<std::vector<std::string>> Env;
@@ -77,8 +108,18 @@ struct ContainerConfig
     std::string User;
     std::string WorkingDir;
     std::optional<int> StopTimeout;
+    std::optional<HealthConfig> Healthcheck;
+    std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck, Labels);
+};
+
+struct InspectEndpointIPAMConfig
+{
+    std::string IPv4Address;
+    std::vector<std::string> LinkLocalIPs;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
 };
 
 struct InspectEndpointSettings
@@ -88,8 +129,11 @@ struct InspectEndpointSettings
     std::string MacAddress;
     int IPPrefixLen{};
     std::vector<std::string> Aliases;
+    std::vector<std::string> Links;
+    std::map<std::string, std::string> DriverOpts;
+    std::optional<InspectEndpointIPAMConfig> IPAMConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases, Links, DriverOpts, IPAMConfig);
 };
 
 struct InspectNetworkSettings
@@ -175,8 +219,9 @@ struct IPAMConfig
 {
     std::string Subnet;
     std::string Gateway;
+    std::string IPRange;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway, IPRange);
 };
 
 struct IPAM

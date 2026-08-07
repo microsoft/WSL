@@ -118,8 +118,9 @@ struct IPAMConfig
 {
     std::string Subnet;
     std::string Gateway;
+    std::string IPRange;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway, IPRange);
 };
 
 struct IPAM
@@ -166,13 +167,77 @@ struct Network
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Options, Labels);
 };
 
+struct EndpointIPAMConfig
+{
+    std::string IPv4Address;
+    std::optional<std::vector<std::string>> LinkLocalIPs;
+};
+
+inline void to_json(nlohmann::json& j, const EndpointIPAMConfig& v)
+{
+    j = nlohmann::json::object();
+    if (!v.IPv4Address.empty())
+    {
+        j["IPv4Address"] = v.IPv4Address;
+    }
+    if (v.LinkLocalIPs.has_value() && !v.LinkLocalIPs->empty())
+    {
+        j["LinkLocalIPs"] = *v.LinkLocalIPs;
+    }
+}
+
+struct EndpointConfig
+{
+    std::optional<std::vector<std::string>> Aliases;
+    std::optional<EndpointIPAMConfig> IPAMConfig;
+    std::optional<std::vector<std::string>> Links;
+    std::optional<std::map<std::string, std::string>> DriverOpts;
+};
+
+inline void to_json(nlohmann::json& j, const EndpointConfig& v)
+{
+    j = nlohmann::json::object();
+    if (v.Aliases.has_value() && !v.Aliases->empty())
+    {
+        j["Aliases"] = *v.Aliases;
+    }
+    if (v.IPAMConfig.has_value())
+    {
+        auto ipam = nlohmann::json(*v.IPAMConfig);
+        if (!ipam.empty())
+        {
+            j["IPAMConfig"] = std::move(ipam);
+        }
+    }
+    if (v.Links.has_value() && !v.Links->empty())
+    {
+        j["Links"] = *v.Links;
+    }
+    if (v.DriverOpts.has_value() && !v.DriverOpts->empty())
+    {
+        j["DriverOpts"] = *v.DriverOpts;
+    }
+}
+
 struct ContainerNetworkRequest
 {
     using TResponse = void;
     std::string Container;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerNetworkRequest, Container);
+    std::optional<EndpointConfig> EndpointConfig;
 };
+
+inline void to_json(nlohmann::json& j, const ContainerNetworkRequest& v)
+{
+    j = nlohmann::json{{"Container", v.Container}};
+    if (v.EndpointConfig.has_value())
+    {
+        auto endpoint = nlohmann::json(*v.EndpointConfig);
+        if (!endpoint.empty())
+        {
+            j["EndpointConfig"] = std::move(endpoint);
+        }
+    }
+}
 
 struct Mount
 {
@@ -245,6 +310,14 @@ struct HostConfig
         HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
+struct InspectEndpointIPAMConfig
+{
+    std::string IPv4Address;
+    std::optional<std::vector<std::string>> LinkLocalIPs;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
+};
+
 struct EndpointSettings
 {
     std::string IPAddress;
@@ -252,23 +325,12 @@ struct EndpointSettings
     std::string MacAddress;
     int IPPrefixLen{};
     std::optional<std::vector<std::string>> Aliases;
+    std::optional<std::vector<std::string>> Links;
+    std::optional<std::map<std::string, std::string>> DriverOpts;
+    std::optional<InspectEndpointIPAMConfig> IPAMConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases, Links, DriverOpts, IPAMConfig);
 };
-
-struct EndpointConfig
-{
-    std::optional<std::vector<std::string>> Aliases;
-};
-
-inline void to_json(nlohmann::json& j, const EndpointConfig& v)
-{
-    j = nlohmann::json::object();
-    if (v.Aliases.has_value() && !v.Aliases->empty())
-    {
-        j["Aliases"] = *v.Aliases;
-    }
-}
 
 struct NetworkingConfig
 {
@@ -282,6 +344,17 @@ struct NetworkSettings
     std::map<std::string, EndpointSettings> Networks;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkSettings, Networks);
+};
+
+struct HealthConfig
+{
+    std::optional<std::vector<std::string>> Test;
+    std::optional<std::int64_t> Interval;
+    std::optional<std::int64_t> Timeout;
+    std::optional<std::int64_t> StartPeriod;
+    std::optional<int> Retries;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthConfig, Test, Interval, Timeout, StartPeriod, Retries);
 };
 
 struct CreateContainer
@@ -306,11 +379,31 @@ struct CreateContainer
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
     std::map<std::string, std::string> Labels;
+    std::optional<HealthConfig> Healthcheck;
     HostConfig HostConfig;
     NetworkingConfig NetworkingConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, NetworkingConfig);
+        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, StopTimeout, WorkingDir, User, Hostname, Domainname, Labels, Healthcheck, NetworkingConfig);
+};
+
+struct HealthcheckResult
+{
+    std::string Start;
+    std::string End;
+    int ExitCode{};
+    std::string Output;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthcheckResult, Start, End, ExitCode, Output);
+};
+
+struct Health
+{
+    std::string Status;
+    int FailingStreak{};
+    std::vector<HealthcheckResult> Log;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Health, Status, FailingStreak, Log);
 };
 
 struct ContainerInspectState
@@ -320,8 +413,9 @@ struct ContainerInspectState
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
+    std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct ContainerConfig
@@ -334,8 +428,11 @@ struct ContainerConfig
     std::optional<std::vector<std::string>> Entrypoint;
     std::optional<std::string> StopSignal;
     std::optional<int> StopTimeout;
+    std::optional<HealthConfig> Healthcheck;
+    // Optional because dockerd may emit `"Labels": null` for containers with no merged labels.
+    std::optional<std::map<std::string, std::string>> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout, Healthcheck, Labels);
 };
 
 struct InspectMount

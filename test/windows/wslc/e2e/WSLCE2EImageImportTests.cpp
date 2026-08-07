@@ -57,9 +57,8 @@ class WSLCE2EImageImportTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_MissingFile)
     {
         const auto result = RunWslc(L"image import");
-        result.Verify({.ExitCode = 1});
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_TRUE(result.Stderr->find(L"Required argument not provided: 'file'") != std::wstring::npos);
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'file'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_Success)
@@ -141,8 +140,16 @@ class WSLCE2EImageImportTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_FromStdin_Success)
     {
-        // TODO: http://task.ms/62246732
-        SKIP_TEST_NOT_IMPL();
+        // Save image as a tarball
+        auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
+        saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // '-' reads the archive from stdin; a file handle is required because import needs the size.
+        auto importResult = RunWslcWithStdinFile(std::format(L"image import - {}", ImportedImage.NameAndTag()), SavedArchivePath);
+        importResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyIdOutput(importResult.GetStdoutOneLine(), true);
+        VerifyImageIsListed(ImportedImage);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_InvalidPath)

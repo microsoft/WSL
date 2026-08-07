@@ -34,6 +34,7 @@ Abstract:
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(All,            "all",                 L"a",              Kind::Flag,        Localization::WSLCCLI_AllArgDescription()) \
+_(Archive,        "archive",             L"a",              Kind::Flag,        Localization::WSLCCLI_ArchiveArgDescription()) \
 _(Attach,         "attach",              L"a",              Kind::Flag,        Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,       "build-arg",           NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_BuildArgDescription()) \
 _(BuildPull,      "pull",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_BuildPullArgDescription()) \
@@ -50,6 +51,7 @@ _(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       L
 _(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSSearchArgDescription()) \
 _(Domainname,     "domainname",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DomainnameArgDescription()) \
 _(Driver,         "driver",              L"d",              Kind::Value,       Localization::WSLCCLI_DriverOptionDescription()) \
+_(DriverOpt,      "driver-opt",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DriverOptArgDescription()) \
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EntrypointArgDescription()) \
 _(Env,            "env",                 L"e",              Kind::Value,       Localization::WSLCCLI_EnvArgDescription()) \
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EnvFileArgDescription()) \
@@ -64,17 +66,28 @@ _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L
 _(Gateway,        "gateway",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkGatewayArgDescription()) \
 _(Gpus,           "gpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GpusArgDescription()) \
 /*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GroupIdArgDescription())*/ \
+_(HealthCmd,      "health-cmd",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthCmdArgDescription()) \
+_(HealthInterval, "health-interval",     NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthIntervalArgDescription()) \
+_(HealthRetries,  "health-retries",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthRetriesArgDescription()) \
+_(HealthStartPeriod, "health-start-period", NO_ALIAS,       Kind::Value,       Localization::WSLCCLI_HealthStartPeriodArgDescription()) \
+_(HealthTimeout,  "health-timeout",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_HealthTimeoutArgDescription()) \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(Hostname,       "hostname",            L"h",              Kind::Value,       Localization::WSLCCLI_HostnameArgDescription()) \
 _(ImageForce,     "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ImageForceArgDescription()) \
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ImageIdArgDescription()) \
 _(ImportFile,     "file",                NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ImportFileArgDescription()) \
+_(IidFile,        "iidfile",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_IidFileArgDescription()) \
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
+_(InspectFormat,  "format",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_InspectFormatArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,       "internal",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NetworkInternalArgDescription()) \
+_(IpAddress,      "ip",                  NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_IpAddressArgDescription()) \
+_(IpRange,        "ip-range",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkIpRangeArgDescription()) \
 _(Label,          "label",               L"l",              Kind::Value,       Localization::WSLCCLI_LabelArgDescription()) \
 _(Last,           "last",                L"n",              Kind::Value,       Localization::WSLCCLI_LastArgDescription()) \
 _(Latest,         "latest",              L"l",              Kind::Flag,        Localization::WSLCCLI_LatestArgDescription()) \
+_(Link,           "link",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_LinkArgDescription()) \
+_(LinkLocalIp,    "link-local-ip",       NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_LinkLocalIpArgDescription()) \
 _(Memory,         "memory",              L"m",              Kind::Value,       Localization::WSLCCLI_MemoryArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 _(Network,        "network",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkArgDescription()) \
@@ -83,6 +96,7 @@ _(NetworkName,    "network-name",        NO_ALIAS,          Kind::Positional,  L
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoColor,        "no-color",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoColorArgDescription()) \
+_(NoHealthcheck,  "no-healthcheck",      NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoHealthcheckArgDescription()) \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
 _(ObjectId,       "object-id",           NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ObjectIdArgDescription()) \
@@ -98,6 +112,7 @@ _(PublishAll,     "publish-all",         L"P",              Kind::Flag,        L
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SchemeArgDescription())*/ \
+_(Secret,         "secret",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SecretArgDescription()) \
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(ShmSize,        "shm-size",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ShmSizeArgDescription()) \
@@ -122,5 +137,6 @@ _(Version,        "version",             L"v",              Kind::Flag,        L
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       Localization::WSLCCLI_VolumeArgDescription()) \
 _(VolumeName,     "volume-name",         NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_VolumeNameArgDescription()) \
+_(Volumes,        "volumes",             L"v",              Kind::Flag,        Localization::WSLCCLI_RemoveVolumesArgDescription()) \
 _(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkingDirArgDescription()) \
 // clang-format on

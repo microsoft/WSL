@@ -26,7 +26,10 @@ extern std::wstring g_testDataPath;
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
-using namespace wsl::windows::common;
+
+namespace wslc_schema = wsl::windows::common::wslc_schema;
+using wsl::windows::common::RunningWSLCContainer;
+using wsl::windows::common::WSLCContainerLauncher;
 
 namespace {
     // Lazily compute the session storage base path.
@@ -288,6 +291,34 @@ wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName
     return inspectData[0];
 }
 
+wslc_schema::Health WaitForContainerHealth(const std::wstring& containerName, const std::string_view& expectedStatus, std::chrono::milliseconds timeout)
+{
+    try
+    {
+        return wsl::shared::retry::RetryWithTimeout<wslc_schema::Health>(
+            [&]() {
+                const auto inspect = InspectContainer(containerName);
+                THROW_HR_IF(E_FAIL, !inspect.State.Health.has_value());
+                THROW_HR_IF(E_FAIL, inspect.State.Health->Status != expectedStatus);
+                return inspect.State.Health.value();
+            },
+            std::chrono::seconds(1),
+            timeout);
+    }
+    catch (...)
+    {
+        const auto inspect = InspectContainer(containerName);
+        const std::string actual = inspect.State.Health.has_value() ? inspect.State.Health->Status : "<none>";
+        VERIFY_FAIL(std::format(
+                        L"Container '{}' did not reach health status '{}' (last status: '{}')",
+                        containerName,
+                        wsl::shared::string::MultiByteToWide(std::string(expectedStatus)),
+                        wsl::shared::string::MultiByteToWide(actual))
+                        .c_str());
+        throw;
+    }
+}
+
 wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
@@ -360,6 +391,26 @@ void EnsureImageIsDeleted(const TestImage& image)
             auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
+        }
+    }
+}
+
+void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+
+    const auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    const auto prefix = wsl::shared::string::WideToMultiByte(repositoryPrefix);
+    for (const auto& image : images)
+    {
+        if (image.Repository && image.Tag && image.Repository->starts_with(prefix))
+        {
+            // No container cleanup here: the images this prunes are only ever built and inspected, never used to
+            // create containers, so image delete --force is sufficient. If a future test containerizes a built
+            // image, remove its container in that test's cleanup rather than broadening this prefix-based safety net.
+            const auto nameAndTag = wsl::shared::string::MultiByteToWide(std::format("{}:{}", *image.Repository, *image.Tag));
+            RunWslc(std::format(L"image delete --force {}", nameAndTag)).Verify({.Stderr = L"", .ExitCode = 0});
         }
     }
 }
@@ -655,27 +706,33 @@ namespace {
 
     void WaitForTtySize(const WSLCInteractiveSession& session, SHORT columns, SHORT rows)
     {
-        try
-        {
-            wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() {
-                    const std::string data = session.GetStdoutData();
-                    THROW_HR_IF(E_ABORT, data.find(std::format("{} {}\r\n", rows, columns)) == std::string::npos);
-                },
-                std::chrono::milliseconds(200),
-                std::chrono::seconds(60));
-        }
-        catch (...)
-        {
-            const std::string data = session.GetStdoutData();
-            VERIFY_FAIL(std::format(
-                            L"Timed out waiting for tty resize. Captured pseudoconsole output: \"{}\"",
-                            wsl::shared::string::MultiByteToWide(EscapeString(data)))
-                            .c_str());
-        }
+        WaitForPseudoConsoleOutput(session, std::format("{} {}\r\n", rows, columns));
     }
 
 } // namespace
+
+void WaitForPseudoConsoleOutput(const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout)
+{
+    try
+    {
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const std::string data = session.GetStdoutData();
+                THROW_HR_IF(E_ABORT, data.find(expected) == std::string::npos);
+            },
+            std::chrono::milliseconds(200),
+            timeout);
+    }
+    catch (...)
+    {
+        const std::string data = session.GetStdoutData();
+        VERIFY_FAIL(std::format(
+                        L"Timed out waiting for \"{}\". Captured pseudoconsole output: \"{}\"",
+                        wsl::shared::string::MultiByteToWide(EscapeString(expected)),
+                        wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                        .c_str());
+    }
+}
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows)
 {

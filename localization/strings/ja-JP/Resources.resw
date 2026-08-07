@@ -160,7 +160,7 @@ WSL2 でディスクを強制的に停止してデタッチするには、'wsl.e
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>指定されたマウント名に無効な '/' 文字が含まれています。無効な文字を含めずに再試行してください。</value>
+    <value>マウント名を空の名前、'.'、'..' にすることや、名前に '/' を含めることはできません。有効なマウント名でもう一度お試しください。</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -1204,6 +1204,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>翻訳に失敗しました '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>問題が発生しました。後でやり直してください。</value>
   </data>
@@ -1987,6 +1991,18 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>VM がシャットダウンされるまでのアイドル時間 (ミリ秒) です。</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>WSL の実行を維持する</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>ディストリビューションの実行を継続し、それらをホストしている WSL 仮想マシンがアイドル状態になった後に自動的にシャットダウンされないようにします。</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>WSL の実行を維持します。</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>ディストリビューションの実行を継続し、それらをホストしている WSL 仮想マシンがアイドル状態になった後に自動的にシャットダウンされないようにします。</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>タイムアウトのリセット</value>
   </data>
@@ -1995,6 +2011,21 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM がシャットダウンされるまでのアイドル時間 (ミリ秒) です。</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>ディストリビューションのアイドル タイムアウト</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>ディストリビューションが終了するまでにアイドル状態になっている時間 (ミリ秒)。</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>タイムアウトのリセット</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>ディストリビューションのアイドル タイムアウト</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>ディストリビューションが終了するまでにアイドル状態になっている時間 (ミリ秒)。</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>変更の適用</value>
@@ -2140,10 +2171,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>コンテナー '{}' は実行中です。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress はまだサポートされていません。</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>ポート マッピングは、コンテナー ネットワーク モードではサポートされていません。ポートはターゲット コンテナーによって所有されます。</value>
   </data>
@@ -2161,16 +2188,15 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>ネットワーク名を空にすることはできません。</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>エンジンからのエラー情報:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>認識されないコマンド: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>必須の引数が指定されていません: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>引数に指定された回数が許容回数を超えています: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
@@ -2214,6 +2240,21 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>特定のコマンドの詳細については、そのコマンドにヘルプ引数を渡します。</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>コマンド:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>オプション :</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>グローバル オプション:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>エイリアス:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>引数:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>現在のコマンドの引数名が認識されませんでした: '{}'</value>
@@ -2265,6 +2306,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
      <value>フラグ引数に隣接する値を含めることはできません: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>フラグ引数のブール値が無効です: '{}'。true、false、1、または 0 が必要です。</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
      <value>必要なものが見つからないときに位置指定引数が見つかりました: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2314,6 +2359,18 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>イメージ '{}' が見つかりません。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>無効な --secret value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>--output の値 '{}' が無効です: {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>--output 値 '{}' のビルド出力をコンソールに書き込むことはできません。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>必須のオプションがありません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2354,6 +2411,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>'--gateway' オプションには '--subnet' の指定も必要です。</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>'--ip-range' オプションには '--subnet' の指定も必要です。</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>ネットワーク '{}' にはアクティブなエンドポイントがあります。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2370,17 +2431,32 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>無効な停止タイムアウト値: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>プライマリ ネットワーク モードが 'host' または 'none' の場合、追加のネットワークは許可されません。</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>プライマリ ネットワーク モード '{}' では、追加のネットワークの接続または切断はサポートされていません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>重複するネットワーク: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>エンドポイント設定はまだサポートされていません (ネットワーク '{}')。</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>重複するドライバー オプション '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>無効なドライバー オプション '{}'; 'key=value' が必要です。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>ネットワーク '{}' のエンドポイント設定 '{}' が不明です。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>ネットワーク '{}' に指定できる IP アドレスは 1 つだけです。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>ネットワーク リンクを空にすることはできません。</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>ネットワーク エイリアスを空にすることはできません。</value>
@@ -2388,6 +2464,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>ネットワーク エイリアスには、ユーザー定義のネットワークが必要です。--network を使用して 1 つ指定します。</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>エンドポイント設定は、ネットワーク モード '{}' ではサポートされていません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>複数のネットワークが要求されている場合は、ネットワーク エイリアスを指定できません。単一の --network 引数を使用します。</value>
@@ -2488,6 +2568,58 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_ContainerExportOutputArgDescription" xml:space="preserve">
     <value>STDOUT の代わりにファイルに書き込みます</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>コンテナーとローカル ファイル システムの間でファイルをコピーします。</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>コンテナーとローカル ファイルシステムの間でファイルをコピーします。
+使用法: wslc container cp [OPTIONS] SOURCE DEST
+  ローカルからコンテナーへ: wslc container cp LOCAL_PATH CONTAINER:PATH
+  コンテナーからローカルへ: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Stdin からコンテナーへ: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>ソース: ローカル パス、CONTAINER:PATH、または '-' で stdin</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>宛先: ローカル パスまたは CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>宛先の形式が無効です。CONTAINER:PATH 形式を使用してください</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>ソースの形式が無効です。CONTAINER:PATH 形式を使用してください</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>ソース パスが見つかりません: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe 見つかりません。ローカル ファイルのコピーには Windows tar が必要です。</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>コピーの方向が無効です。ソースまたは宛先のいずれかに CONTAINER:PATH を使用してください。</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>ターミナルから tar データを読み取れません。tar アーカイブを stdin にパイプしてください。
+例: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>コンテナー アーカイブから抽出されたファイルはありません</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>ディレクトリをファイル パスにコピーできません。代わりにディレクトリ ターゲット (末尾に区切り記号を含む) を使用してください。</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>コンテナーを検査します。</value>
@@ -2789,6 +2921,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>状態に関係なくすべてを表示します。</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>アーカイブ モード (Docker CLI との互換性確保のため受け付け可能になっています)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>ビルド時の変数を設定します (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2796,8 +2932,16 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>常に新しいバージョンのイメージのプルを試みます</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>ビルド出力先 (docker buildx --output spec; 例: type=local,dest=path または type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>ビルドするターゲット ビルド ステージを設定します</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>ビルドにシークレットを公開します (id=NAME[,type=env|file][,env=VAR|,src=PATH]; 既定値は env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>実行するコマンド</value>
@@ -2844,6 +2988,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>出力の書式設定 (json または table) (既定値: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>コンテナーの初期化プロセスに渡す引数</value>
   </data>
@@ -2854,6 +3002,24 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
     <value>無効な {} 値: '{}'。'all' のみがサポートされています。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>コンテナーの正常性をチェックするために実行するコマンド</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>正常性チェックの実行間隔 (例: 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>コンテナーを異常として報告するために必要な連続失敗回数</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>正常性チェックのカウントダウンを開始する前にコンテナーを初期化するための開始期間 (例: 30s、1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>1 回の正常性チェックを実行するために許可される最大時間 (例: 30s、1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>使用中であってもイメージを削除します</value>
@@ -2905,12 +3071,31 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>コンテナーにネットワーク スコープのエイリアスを追加する</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>エンドポイント ドライバー オプションを設定する (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>コンテナーにネットワーク上の IPv4 アドレスを割り当てます</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>別のコンテナーへのリンクを追加する (--link name:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>コンテナーのリンクローカル IPv4 アドレスを追加します</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>無効な {} 値: ネットワーク エイリアスを空または空白にすることはできません</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>イメージのビルド時にキャッシュを使用しない</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>コンテナーで指定された正常性チェックを無効にする</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>タグのない親は削除しないでください</value>
@@ -2929,6 +3114,13 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>公開されているすべてのポートをランダム ホスト ポートに発行する</value>
+  </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>詳細出力を抑制する</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>既定値 ({}) を使用しています</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>コンテナー ID のみを出力します</value>
@@ -2991,6 +3183,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>ボリュームが存在しない場合はエラーにしない</value>
+  </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Remove anonymous volumes associated with the container</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>コンテナー内の作業ディレクトリ</value>
@@ -3064,9 +3259,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>一覧表示されたセッションに関する詳細情報を表示します。</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>無効な形式の種類が指定されました。サポートされている形式の種類: json、table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Invalid {} value: {} is not a recognized format type. Supported format types are: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>無効な {} 値: {} は認識された検査の種類ではありません。サポートされている検査の種類: {}。</value>
@@ -3091,6 +3286,14 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>無効な {} 引数の値: '{}'。メモリ サイズが予期されます (例: 256M、1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>無効な {} 引数の値: '{}'。期間が必要です (例: 30s、1m30s)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>--no-healthcheck オプションは、他の正常性チェック オプションと組み合わせることはできません。</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>CID ファイル '{}' は既に存在します</value>
@@ -3149,6 +3352,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>サブネットの IPv4 または IPv6 ゲートウェイ</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>CIDR 形式のサブ範囲からコンテナー IP アドレスを割り当てる</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>ネットワークを 1 つ以上削除します。</value>
   </data>
@@ -3182,6 +3389,18 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
     <value>削除済み: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>コンテナーをネットワークに接続する</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>コンテナーを既存のネットワークに接続します。</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>コンテナーをネットワークから切断します。</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>既存のネットワークからコンテナーを切断します。</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>ボリュームを管理します。</value>
@@ -3381,6 +3600,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>割り込みを初期化できませんでした</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>現在のネットワーク モードでは UDP ポート転送がサポートされていないため、イメージによって公開された UDP ポートは公開されませんでした</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>コンテナー '{}' のタイムスタンプを復元できませんでした</value>
