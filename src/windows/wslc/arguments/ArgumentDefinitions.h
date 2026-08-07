@@ -80,6 +80,7 @@ _(Hostname,         "hostname",             L"h",             Kind::Value,      
 _(ImageForce,       "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ImageForceArgDescription()) \
 _(ImageId,          "image",                NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ImageIdArgDescription()) \
 _(ImportFile,       "file",                 NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ImportFileArgDescription()) \
+_(IidFile,          "iidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IidFileArgDescription()) \
 _(Input,            "input",                L"i",             Kind::Value,      NoConversion, Localization::WSLCCLI_InputArgDescription()) \
 _(InspectFormat,    "format",               NO_ALIAS,         Kind::Value,      JsonIndent,   Localization::WSLCCLI_InspectFormatArgDescription()) \
 _(Interactive,      "interactive",          L"i",             Kind::Flag,       NoConversion, Localization::WSLCCLI_InteractiveArgDescription()) \
@@ -140,5 +141,6 @@ _(Version,          "version",              L"v",             Kind::Flag,       
 /*_(Virtual,          "virtualization",       NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,           "volume",               L"v",             Kind::Value,      NoConversion, Localization::WSLCCLI_VolumeArgDescription()) \
 _(VolumeName,       "volume-name",          NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_VolumeNameArgDescription()) \
+_(Volumes,          "volumes",              L"v",             Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveVolumesArgDescription()) \
 _(WorkDir,          "workdir",              L"w",             Kind::Value,      NoConversion, Localization::WSLCCLI_WorkingDirArgDescription()) \
 // clang-format on

@@ -24,7 +24,8 @@ Abstract:
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
-using namespace wsl::windows::common;
+
+namespace wslutil = wsl::windows::common::wslutil;
 
 namespace {
     // The bridge IP assigned to the first container started in a fresh session. The registry is always

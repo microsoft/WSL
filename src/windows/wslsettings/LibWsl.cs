@@ -43,7 +43,8 @@ namespace LibWsl
         HardwarePerformanceCountersEnabled = 23,
         KernelPath = 24,
         SystemDistroPath = 25,
-        KernelModulesPath = 26
+        KernelModulesPath = 26,
+        InstanceIdleTimeout = 27
     }
 
     public enum NetworkingConfiguration

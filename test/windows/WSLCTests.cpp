@@ -23,6 +23,7 @@ Abstract:
 #include "ContainerNameGenerator.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
 #include "HttpHeaderEndDetector.h"
+#include "WSLCSessionDefaults.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -147,6 +148,38 @@ class WSLCTests
         wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
         return sessionManager;
+    }
+
+    // Returns true for the names the wslc CLI reserves for its default sessions.
+    static bool IsCliSessionName(std::wstring_view Name)
+    {
+        constexpr std::wstring_view prefix{wsl::windows::wslc::DefaultSessionName};
+
+        return Name.size() >= prefix.size() && wsl::shared::string::IsEqual(Name.substr(0, prefix.size()), prefix, true) &&
+               (Name.size() == prefix.size() || Name[prefix.size()] == L'-');
+    }
+
+    // ListSessions() reports every session on the machine, including the persistent sessions the
+    // wslc CLI creates for itself. Those are outside this class's control, so they are filtered
+    // out to keep assertions independent of what else has run on the machine.
+    static std::set<std::wstring> ListTestSessionNames(IWSLCSessionManager* SessionManager)
+    {
+        wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+        VERIFY_SUCCEEDED(SessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+
+        std::set<std::wstring> names;
+        for (const auto& e : sessions)
+        {
+            if (IsCliSessionName(e.DisplayName))
+            {
+                continue;
+            }
+
+            auto [it, inserted] = names.emplace(e.DisplayName);
+            VERIFY_IS_TRUE(inserted);
+        }
+
+        return names;
     }
 
     wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags Flags = WSLCSessionFlagsNone)
@@ -364,36 +397,24 @@ class WSLCTests
 
         // Act: list sessions
         {
-            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-            VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            const auto names = ListTestSessionNames(sessionManager.get());
 
             // Assert
-            VERIFY_ARE_EQUAL(sessions.size(), 1u);
-            const auto& info = sessions[0];
+            VERIFY_ARE_EQUAL(names.size(), 1u);
 
             // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
-            VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), c_testSessionName);
+            VERIFY_IS_TRUE(names.contains(c_testSessionName));
         }
 
         // List multiple sessions.
         {
             auto session2 = CreateSession(GetDefaultSessionSettings(L"wslc-test-list-2"));
 
-            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-            VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            const auto names = ListTestSessionNames(sessionManager.get());
 
-            VERIFY_ARE_EQUAL(sessions.size(), 2);
-
-            std::vector<std::wstring> displayNames;
-            for (const auto& e : sessions)
-            {
-                displayNames.push_back(e.DisplayName);
-            }
-
-            std::ranges::sort(displayNames);
-
-            VERIFY_ARE_EQUAL(displayNames[0], c_testSessionName);
-            VERIFY_ARE_EQUAL(displayNames[1], L"wslc-test-list-2");
+            VERIFY_ARE_EQUAL(names.size(), 2u);
+            VERIFY_IS_TRUE(names.contains(c_testSessionName));
+            VERIFY_IS_TRUE(names.contains(L"wslc-test-list-2"));
         }
     }
 
@@ -10343,16 +10364,7 @@ class WSLCTests
         auto manager = OpenSessionManager();
 
         auto expectSessions = [&](const std::vector<std::wstring>& expectedSessions) {
-            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-            VERIFY_SUCCEEDED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
-
-            std::set<std::wstring> displayNames;
-            for (const auto& e : sessions)
-            {
-                auto [_, inserted] = displayNames.insert(e.DisplayName);
-
-                VERIFY_IS_TRUE(inserted);
-            }
+            auto displayNames = ListTestSessionNames(manager.get());
 
             for (const auto& e : expectedSessions)
             {
@@ -10373,7 +10385,27 @@ class WSLCTests
             }
         };
 
-        auto create = [this](LPCWSTR Name, WSLCSessionFlags Flags) {
+        // Persistent sessions outlive the COM reference that created them, so a test that fails
+        // partway through would leave them behind for the next run to trip over. Terminate the ones
+        // this test created, however it exits.
+        std::set<std::wstring> persistentSessions;
+        auto terminatePersistentSessions = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            for (const auto& name : persistentSessions)
+            {
+                wil::com_ptr<IWSLCSession> session;
+                if (SUCCEEDED(manager->OpenSessionByName(name.c_str(), &session)))
+                {
+                    LOG_IF_FAILED(session->Terminate());
+                }
+            }
+        });
+
+        auto create = [&](LPCWSTR Name, WSLCSessionFlags Flags) {
+            if (WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent))
+            {
+                persistentSessions.emplace(Name);
+            }
+
             return CreateSession(GetDefaultSessionSettings(Name), Flags);
         };
 

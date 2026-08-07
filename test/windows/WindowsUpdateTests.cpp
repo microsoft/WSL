@@ -18,7 +18,8 @@ Abstract:
 #include "Common.h"
 #include "WindowsUpdateIntegration.h"
 
-using namespace wsl::windows::common;
+using wsl::windows::common::WindowsUpdateClassFactory;
+using wsl::windows::common::WindowsUpdateContext;
 namespace WRL = Microsoft::WRL;
 
 namespace {

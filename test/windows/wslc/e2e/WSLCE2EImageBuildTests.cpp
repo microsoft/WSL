@@ -1267,6 +1267,124 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
     }
 
+    // --iidfile writes the built image's ID to the given host path on success, matching docker build
+    // --iidfile. The file must contain the same sha256 digest the image is stored under.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_IidFile_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageIidFile);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-iidfile";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedOutputBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-iidfile-marker > /marker.txt\n");
+
+        // Point --iidfile at a path that does not yet exist.
+        const auto iidFilePath = testRoot / L"image.id";
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --iidfile \"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageIidFile.NameAndTag(),
+            iidFilePath.wstring()));
+        buildResult.Verify({.ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(iidFilePath));
+        const auto iid = ReadFileContent(iidFilePath.wstring());
+        VERIFY_IS_TRUE(iid.starts_with(L"sha256:"), L"iidfile must contain a sha256 digest");
+        VERIFY_ARE_EQUAL(static_cast<size_t>(71), iid.size(), L"iidfile must contain sha256: plus a 64-char hex digest");
+
+        // The digest written to the iidfile must match the ID the image is stored under.
+        const auto inspectedId = InspectImage(BuiltImageIidFile.NameAndTag()).Id;
+        VERIFY_ARE_EQUAL(inspectedId, wsl::windows::common::string::WideToMultiByte(iid));
+    }
+
+    // A failing build must not write the iidfile (matching docker: the file only appears on success).
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_IidFile_BuildFailure_NoFileWritten)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-iidfile-fail";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedOutputBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN exit 7\n");
+
+        const auto iidFilePath = testRoot / L"image.id";
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --iidfile \"{}\"", contextDir.wstring(), dockerfilePath.wstring(), iidFilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_FALSE(std::filesystem::exists(iidFilePath), L"a failed build must not leave an iidfile behind");
+    }
+
+    // Unlike --output, --iidfile does not create a missing parent directory (matching docker). The server
+    // mounts the parent into the VM, so a missing directory must surface as a clean error, not a crash.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_IidFile_ParentDirectoryMissing_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-iidfile-noparent";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedOutputBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        const auto iidFilePath = testRoot / L"does-not-exist" / L"image.id";
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" --iidfile \"{}\"", contextDir.wstring(), dockerfilePath.wstring(), iidFilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_FALSE(buildResult.Stderr->empty());
+        VERIFY_IS_FALSE(std::filesystem::exists(iidFilePath));
+        VERIFY_IS_FALSE(std::filesystem::exists(iidFilePath.parent_path()), L"--iidfile must not create its parent directory");
+    }
+
+    // The iidfile's parent is mounted read-write, but the destination file itself may still be
+    // unwritable. buildx must fail rather than silently reporting success.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_IidFile_NotWritable_Fails)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageIidFileNotWritable);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-iidfile-readonly";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedOutputBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        // Pre-create the destination and deny write access so buildx cannot write the image ID to it.
+        const auto iidFilePath = testRoot / L"image.id";
+        WriteTestFileContent(iidFilePath, "original-content");
+        SetPathAccess(iidFilePath, GENERIC_WRITE, DENY_ACCESS);
+
+        // The deny ACE also blocks this test from reading the file back, so it must be revoked before
+        // any assertion on the contents, and before cleanup can delete the file.
+        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [iidFilePath]() {
+            SetPathAccess(iidFilePath, 0, REVOKE_ACCESS);
+            DeleteFileW(iidFilePath.c_str());
+        });
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --iidfile \"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageIidFileNotWritable.NameAndTag(),
+            iidFilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_FALSE(buildResult.Stderr->empty());
+
+        // buildx truncates the destination when it opens it, so the previous contents are not preserved.
+        // What matters is that a failed write never leaves an image ID behind.
+        SetPathAccess(iidFilePath, 0, REVOKE_ACCESS);
+        const auto contents = ReadFileContent(iidFilePath.wstring());
+        VERIFY_IS_FALSE(contents.starts_with(L"sha256:"), L"a failed iidfile write must not leave an image ID behind");
+    }
+
 private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
@@ -1301,6 +1419,8 @@ private:
     const TestImage BuiltImageOutputImage{L"wslc-e2e-build-output-image", L"latest", L""};
     const TestImage BuiltImageOutputImageFail{L"wslc-e2e-build-output-image-fail", L"latest", L""};
     const TestImage BuiltImageOutputCacheOnly{L"wslc-e2e-build-output-cacheonly", L"latest", L""};
+    const TestImage BuiltImageIidFile{L"wslc-e2e-build-iidfile", L"latest", L""};
+    const TestImage BuiltImageIidFileNotWritable{L"wslc-e2e-build-iidfile-readonly", L"latest", L""};
 
     // Runs `tar.exe -tf <path>` and returns the member listing so tests can assert an exporter produced a
     // valid, non-empty archive that contains an expected entry.

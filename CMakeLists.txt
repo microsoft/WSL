@@ -188,6 +188,15 @@ if (NOT DEFINED WSL_INCLUDE_SDK_CSHARP)
     set(WSL_INCLUDE_SDK_CSHARP false)
 endif ()
 
+# Number of test sources combined into each unity translation unit.
+# Set to 0 to compile every file separately.
+if (NOT DEFINED WSL_TEST_UNITY_BATCH_SIZE)
+    set(WSL_TEST_UNITY_BATCH_SIZE 2)
+endif ()
+
+if (NOT WSL_TEST_UNITY_BATCH_SIZE MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "WSL_TEST_UNITY_BATCH_SIZE must be a non-negative integer: got '${WSL_TEST_UNITY_BATCH_SIZE}'")
+endif ()
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
