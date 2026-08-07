@@ -186,8 +186,11 @@ void ListNetworks(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(networks, c_jsonCompactIndent);
-        context.Reporter.Output(L"{}\n", MultiByteToWide(json));
+        for (const auto& network : networks)
+        {
+            context.Reporter.Output(L"{}\n", ToJsonW(network, c_jsonCompactIndent));
+        }
+
         break;
     }
     case FormatType::Table:

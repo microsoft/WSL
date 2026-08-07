@@ -103,7 +103,7 @@ class WSLCE2EImageImportTests
         auto countUntaggedImages = [&]() {
             auto result = RunWslc(L"image list --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
-            auto images = FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+            auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
             size_t count = 0;
             for (const auto& img : images)
             {
