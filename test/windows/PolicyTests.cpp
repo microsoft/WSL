@@ -490,7 +490,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(L"FROM docker.io/library/alpine:latest\n", L"wsl-policy-build-blocked");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"policy") == std::wstring::npos)
+        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"denied by policy") == std::wstring::npos)
         {
             LogError("Expected BuildKit source-policy denial mentioning docker.io, got: '%ls'", output.c_str());
             VERIFY_FAIL();
@@ -537,7 +537,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(dockerfile, L"wsl-policy-build-copyfrom");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"policy") == std::wstring::npos)
+        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"denied by policy") == std::wstring::npos)
         {
             LogError("Expected COPY --from=docker.io/... to be blocked, got: '%ls'", output.c_str());
             VERIFY_FAIL();
@@ -551,7 +551,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(L"FROM alpine:latest\n", L"wsl-policy-build-implicit");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"policy") == std::wstring::npos ||
+        if (output.find(L"denied by policy") == std::wstring::npos ||
             (output.find(L"docker.io") == std::wstring::npos && output.find(L"alpine") == std::wstring::npos))
         {
             LogError("Expected bare `FROM alpine:latest` to be blocked, got: '%ls'", output.c_str());
@@ -565,7 +565,7 @@ class PolicyTest
     {
         // Terminate any existing session so ConfigureBuildKitPolicy re-snapshots the registry.
         {
-            std::wstring terminateCmd = L"\"" + GetWslcExePath() + L"\" session terminate";
+            std::wstring terminateCmd = L"\"" + GetWslcExePath() + L"\" system session terminate";
             LxsstuLaunchCommandAndCaptureOutputWithResult(terminateCmd.data(), nullptr, nullptr);
         }
 
