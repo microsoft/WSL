@@ -2901,8 +2901,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Ensure the kernel modules folder is mounted correctly.
         std::wstring command = std::format(
             L"mount | grep -iF 'none on /usr/lib/modules/{} type overlay "
-            L"(rw,nosuid,nodev,noatime,lowerdir=/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
+            L"(rw,nosuid,nodev,noatime,lowerdir=/modules/{}/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
             L"work,uuid=on)'",
+            kernelVersion,
             kernelVersion,
             kernelVersion,
             kernelVersion);
@@ -2931,7 +2932,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 #ifdef WSL_DEV_INSTALL_PATH
 
         std::wstring kernelPath = WSL_DEV_INSTALL_PATH L"/kernel";
-        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/modules.vhd";
+        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/artifacts.vhd";
 
 #else
 
@@ -2941,7 +2942,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         std::filesystem::path wslInstallPath(installPath.value());
 
         std::wstring kernelPath = wslInstallPath / "tools" / "kernel";
-        std::wstring kernelModulesPath = wslInstallPath / "tools" / "modules.vhd";
+        std::wstring kernelModulesPath = wslInstallPath / "tools" / "artifacts.vhd";
 
 #endif
 
@@ -2978,6 +2979,87 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Validate that failing to load a module shows a warning in dmesg.
         configChange.Update(LxssGenerateTestConfig({.loadKernelModules = L"not-found"}));
         ValidateOutput(L"dmesg | grep -iF \"failed to load module 'not-found'\" | wc -l", L"1\n", L"", 0);
+    }
+
+    WSL2_TEST_METHOD(KernelArtifacts)
+    {
+        // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
+        // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
+        // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
+        // /usr/lib/linux-tools/$(uname -r) with its binary bind mounted at /usr/bin/perf.
+
+        // Headers: the build symlink and a representative uapi header are present.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test -s /lib/modules/$(uname -r)/build/include/linux/version.h", nullptr, nullptr, nullptr, nullptr), 0u);
+
+        // Headers are usable: compile and run a tiny program that includes recent uapi headers. The
+        // identifiers below fail to compile if the headers are missing or too old (BPF_PROG_TYPE_NETFILTER
+        // added in 6.4, IORING_OP_FUTEX_WAKE added in 6.7). Their numeric values are not a stable API
+        // contract, so the program only checks that <linux/version.h> matches the running kernel.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                LR"BASH(bash -ec '
+                    d=$(mktemp -d)
+                    trap "rm -rf $d" EXIT
+                    cat > "$d/t.c" <<EOF
+#include <stdio.h>
+#include <linux/version.h>
+#include <linux/bpf.h>
+#include <linux/io_uring.h>
+int main(void){
+    (void)BPF_PROG_TYPE_NETFILTER;
+    (void)IORING_OP_FUTEX_WAKE;
+    printf("%u.%u.%u\n",
+        LINUX_VERSION_MAJOR, LINUX_VERSION_PATCHLEVEL, LINUX_VERSION_SUBLEVEL);
+    return 0;
+}
+EOF
+                    cc -isystem /lib/modules/$(uname -r)/build/include -o "$d/t" "$d/t.c"
+                    v=$("$d/t")
+                    case "$(uname -r)" in "$v"*) exit 0 ;; *) exit 8 ;; esac
+                ')BASH",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
+            0u);
+
+        // perf: leave no trace in the distro's file system and make the versioned binary reachable
+        // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
+        //
+        // N.B. The cleanup is registered before the distro's file system is modified so that a
+        //      failure can't leave a perf binary behind, which would be shadowed by the bind mount
+        //      on the next boot and break subsequent runs.
+        auto perfCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr);
+        });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(command -v perf)\" = \"/usr/lib/linux-tools/$(uname -r)/bin/perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(perf --exec-path)\" = \"/usr/lib/linux-tools/$(uname -r)/libexec/perf-core\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+
+        // Stale distro-provided artifacts are replaced or hidden after the VM restarts. A distro
+        // provided perf is shadowed by the binary matching the running kernel.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf > /usr/bin/perf", nullptr, nullptr, nullptr, nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
+            0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
     WSL2_TEST_METHOD(CrashCollection)
@@ -6712,13 +6794,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
@@ -6765,13 +6847,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 

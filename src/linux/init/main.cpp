@@ -85,6 +85,10 @@ Abstract:
 #define KERNEL_MODULES_PATH "/lib/modules"
 #define KERNEL_MODULES_VHD_PATH "/modules"
 #define KERNEL_MODULES_OVERLAY "/modules_overlay"
+#define KERNEL_HEADERS_TEMP_PATH "/kernel_headers"
+#define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
+#define KERNEL_PERF_TEMP_PATH "/kernel_perf"
+#define KERNEL_PERF_PATH_PREFIX "/usr/lib/linux-tools/"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -115,6 +119,8 @@ struct VmConfiguration
     bool EnableSystemDistro = false;
     bool EnableCrashDumpCollection = false;
     std::string KernelModulesPath;
+    std::string KernelHeadersTarget;
+    std::string KernelPerfTarget;
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
 
@@ -1619,6 +1625,31 @@ try
     {
         AddTemporaryMount(LX_WSL2_KERNEL_MODULES_MOUNT_ENV, Config.KernelModulesPath.c_str(), (MS_MOVE | MS_REC));
         AddEnvironmentVariable(LX_WSL2_KERNEL_MODULES_PATH_ENV, Config.KernelModulesPath.c_str());
+    }
+
+    //
+    // If kernel headers were mounted, move them to a temporary location and pass the desired
+    // target path to the distro init via an environment variable. Distro init will move the
+    // mount to /usr/src/linux-headers-<uname -r>/include and create the
+    // /lib/modules/<release>/build symlink.
+    //
+
+    if (!Config.KernelHeadersTarget.empty())
+    {
+        AddTemporaryMount(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV, KERNEL_HEADERS_TEMP_PATH, (MS_MOVE | MS_REC));
+        AddEnvironmentVariable(LX_WSL2_KERNEL_HEADERS_PATH_ENV, Config.KernelHeadersTarget.c_str());
+    }
+
+    //
+    // If the perf tooling was mounted, move it to a temporary location and pass the desired target
+    // path to the distro init via an environment variable. Distro init will move the mount to
+    // /usr/lib/linux-tools/<uname -r> and add it to the default $PATH.
+    //
+
+    if (!Config.KernelPerfTarget.empty())
+    {
+        AddTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, KERNEL_PERF_TEMP_PATH, (MS_MOVE | MS_REC));
+        AddEnvironmentVariable(LX_WSL2_KERNEL_PERF_PATH_ENV, Config.KernelPerfTarget.c_str());
     }
 
     //
@@ -3161,7 +3192,10 @@ try
         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
         //      directory must be writable for tools like depmod to work.
         //
-
+        // N.B. The artifacts VHD nests its payloads under <release>/{modules,linux-headers,perf}.
+        //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
+        //      layout when the nested modules directory is not present.
+        //
         if (EarlyConfig->KernelModulesDeviceId != UINT_MAX)
         {
             THROW_LAST_ERROR_IF(
@@ -3170,9 +3204,30 @@ try
 
             utsname UnameBuffer{};
             THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+            const std::string Release{UnameBuffer.release};
 
-            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, UnameBuffer.release);
-            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), KERNEL_MODULES_VHD_PATH, (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
+            const std::string ArtifactsBase = std::format("{}/{}", KERNEL_MODULES_VHD_PATH, Release);
+            const std::string NestedModules = ArtifactsBase + "/modules";
+
+            struct stat StatBuffer{};
+            const bool NestedLayout = (stat(NestedModules.c_str(), &StatBuffer) == 0) && S_ISDIR(StatBuffer.st_mode);
+            const std::string ModulesLower = NestedLayout ? NestedModules : std::string{KERNEL_MODULES_VHD_PATH};
+            const bool LegacyLayout =
+                !NestedLayout && (stat((ModulesLower + "/modules.dep").c_str(), &StatBuffer) == 0) && S_ISREG(StatBuffer.st_mode);
+
+            //
+            // A valid artifacts VHD nests the tree under <release>/modules; a legacy module-only VHD
+            // places it at the root.
+            //
+            if (LegacyLayout)
+            {
+                LOG_WARNING(
+                    "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
+                    "removed in a future version; kernel headers and perf tooling are unavailable");
+            }
+
+            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, Release);
+            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), ModulesLower.c_str(), (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
 
             const std::string KernelModulesList = wsl::shared::string::FromSpan(Buffer, EarlyConfig->KernelModulesListOffset);
             for (const auto& Module : wsl::shared::string::Split(KernelModulesList, ','))
@@ -3187,6 +3242,27 @@ try
             }
 
             Config.KernelModulesPath = std::move(Target);
+
+            //
+            // When the nested artifacts layout is present, bind mount the kernel headers and perf
+            // tooling to temporary locations. Each distro init moves them into the distro namespace
+            // at /usr/src/linux-headers-<release> and /usr/lib/linux-tools/<release> (see config.cpp).
+            //
+
+            if (NestedLayout)
+            {
+                const std::string HeadersSource = ArtifactsBase + "/linux-headers";
+                if (UtilMount(HeadersSource.c_str(), KERNEL_HEADERS_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
+                {
+                    Config.KernelHeadersTarget = std::format("{}{}", KERNEL_HEADERS_PATH_PREFIX, Release);
+                }
+
+                const std::string PerfSource = ArtifactsBase + "/perf";
+                if (UtilMount(PerfSource.c_str(), KERNEL_PERF_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
+                {
+                    Config.KernelPerfTarget = std::format("{}{}", KERNEL_PERF_PATH_PREFIX, Release);
+                }
+            }
         }
 
         //
