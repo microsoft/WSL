@@ -3251,10 +3251,10 @@ try
 
             if (NestedLayout)
             {
-                const std::string HeadersSource = ArtifactsBase + "/linux-headers/include";
+                const std::string HeadersSource = ArtifactsBase + "/linux-headers";
                 if (UtilMount(HeadersSource.c_str(), KERNEL_HEADERS_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
                 {
-                    Config.KernelHeadersTarget = std::format("{}{}/include", KERNEL_HEADERS_PATH_PREFIX, Release);
+                    Config.KernelHeadersTarget = std::format("{}{}", KERNEL_HEADERS_PATH_PREFIX, Release);
                 }
 
                 const std::string PerfSource = ArtifactsBase + "/perf";
