@@ -308,7 +308,7 @@ private:
 /// <summary>
 /// Each user gets its own LxssUserSessionImpl object, This object manages the lifetime of running instances.
 /// </summary>
-class LxssUserSessionImpl
+class LxssUserSessionImpl : public std::enable_shared_from_this<LxssUserSessionImpl>
 {
 public:
     LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager);
@@ -760,6 +760,8 @@ private:
     /// Impersonate the specified user and open the lxss registry key.
     /// </summary>
     static wil::unique_hkey s_OpenLxssUserKey(_In_ HANDLE UserToken);
+
+    static LX_INIT_DRVFS_MOUNT s_InitializeDrvFs(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session, _In_ const GUID& VmId, _In_ HANDLE UserToken) noexcept;
 
     /// <summary>
     /// Ensures the distribution name is valid.

@@ -2912,8 +2912,13 @@ void LxssUserSessionImpl::_CreateVm()
 
         m_vmId.store(vmId);
 
+        const auto weakSession = weak_from_this();
+        auto initializeDrvFs = [weakSession, vmId](HANDLE userToken) noexcept {
+            return s_InitializeDrvFs(weakSession, vmId, userToken);
+        };
+
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
+        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
         if (m_httpProxyStateTracker)
         {
@@ -4171,6 +4176,31 @@ wil::unique_hkey LxssUserSessionImpl::s_OpenLxssUserKey(_In_ HANDLE UserToken)
 {
     auto runAsUser = wil::impersonate_token(UserToken);
     return wsl::windows::common::registry::OpenLxssUserKey();
+}
+
+LX_INIT_DRVFS_MOUNT LxssUserSessionImpl::s_InitializeDrvFs(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session, _In_ const GUID& VmId, _In_ HANDLE UserToken) noexcept
+{
+    try
+    {
+        const auto session = Session.lock();
+        if (!session)
+        {
+            return LxInitDrvfsMountNone;
+        }
+
+        std::lock_guard lock(session->m_instanceLock);
+        if (!session->m_utilityVm || !IsEqualGUID(session->m_utilityVm->GetRuntimeId(), VmId))
+        {
+            return LxInitDrvfsMountNone;
+        }
+
+        return session->m_utilityVm->InitializeDrvFs(UserToken) ? LxInitDrvfsMountElevated : LxInitDrvfsMountNonElevated;
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        return LxInitDrvfsMountNone;
+    }
 }
 
 bool LxssUserSessionImpl::s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ bool CheckForClients)
