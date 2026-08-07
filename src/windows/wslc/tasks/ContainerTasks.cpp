@@ -238,7 +238,7 @@ void InspectContainers(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, c_jsonPrettyPrintIndent);
+    auto json = ToJson(result, validation::GetInspectJsonIndent(context.Args));
     context.Reporter.Output(L"{}\n", MultiByteToWide(json));
 }
 
@@ -565,17 +565,13 @@ void ListContainers(CLIExecutionContext& context)
         return;
     }
 
-    FormatType format = FormatType::Table; // Default is table
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
-    }
+    FormatType format = validation::GetOutputFormat(context.Args);
 
     switch (format)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(containers, c_jsonPrettyPrintIndent);
+        auto json = ToJson(containers, c_jsonCompactIndent);
         context.Reporter.Output(L"{}\n", MultiByteToWide(json));
         break;
     }
@@ -630,9 +626,10 @@ void RemoveContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
     bool force = context.Args.GetFlag<ArgType::Force>();
+    bool deleteVolumes = context.Args.GetFlag<ArgType::Volumes>();
     for (const auto& id : containerIds)
     {
-        ContainerService::Delete(session, WideToMultiByte(id), force);
+        ContainerService::Delete(session, WideToMultiByte(id), force, deleteVolumes);
         context.Reporter.Output(L"{}\n", id);
     }
 }
@@ -975,17 +972,13 @@ void ShowContainerStats(CLIExecutionContext& context)
         10 // Batch Size - chosen to be around typical expected container use while protecting against extreme cases.
     );
 
-    FormatType format = FormatType::Table; // Default is table
-    if (context.Args.Contains(ArgType::Format))
-    {
-        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
-    }
+    FormatType format = validation::GetOutputFormat(context.Args);
 
     switch (format)
     {
     case FormatType::Json:
     {
-        context.Reporter.Output(L"{}\n", MultiByteToWide(statsJson.dump(c_jsonPrettyPrintIndent)));
+        context.Reporter.Output(L"{}\n", MultiByteToWide(statsJson.dump(c_jsonCompactIndent)));
         break;
     }
     case FormatType::Table:

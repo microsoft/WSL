@@ -23,6 +23,7 @@ Abstract:
 #include "ContainerNameGenerator.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
 #include "HttpHeaderEndDetector.h"
+#include "WSLCSessionDefaults.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -147,6 +148,38 @@ class WSLCTests
         wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
         return sessionManager;
+    }
+
+    // Returns true for the names the wslc CLI reserves for its default sessions.
+    static bool IsCliSessionName(std::wstring_view Name)
+    {
+        constexpr std::wstring_view prefix{wsl::windows::wslc::DefaultSessionName};
+
+        return Name.size() >= prefix.size() && wsl::shared::string::IsEqual(Name.substr(0, prefix.size()), prefix, true) &&
+               (Name.size() == prefix.size() || Name[prefix.size()] == L'-');
+    }
+
+    // ListSessions() reports every session on the machine, including the persistent sessions the
+    // wslc CLI creates for itself. Those are outside this class's control, so they are filtered
+    // out to keep assertions independent of what else has run on the machine.
+    static std::set<std::wstring> ListTestSessionNames(IWSLCSessionManager* SessionManager)
+    {
+        wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
+        VERIFY_SUCCEEDED(SessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+
+        std::set<std::wstring> names;
+        for (const auto& e : sessions)
+        {
+            if (IsCliSessionName(e.DisplayName))
+            {
+                continue;
+            }
+
+            auto [it, inserted] = names.emplace(e.DisplayName);
+            VERIFY_IS_TRUE(inserted);
+        }
+
+        return names;
     }
 
     wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags Flags = WSLCSessionFlagsNone)
@@ -364,36 +397,24 @@ class WSLCTests
 
         // Act: list sessions
         {
-            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-            VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            const auto names = ListTestSessionNames(sessionManager.get());
 
             // Assert
-            VERIFY_ARE_EQUAL(sessions.size(), 1u);
-            const auto& info = sessions[0];
+            VERIFY_ARE_EQUAL(names.size(), 1u);
 
             // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
-            VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), c_testSessionName);
+            VERIFY_IS_TRUE(names.contains(c_testSessionName));
         }
 
         // List multiple sessions.
         {
             auto session2 = CreateSession(GetDefaultSessionSettings(L"wslc-test-list-2"));
 
-            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-            VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            const auto names = ListTestSessionNames(sessionManager.get());
 
-            VERIFY_ARE_EQUAL(sessions.size(), 2);
-
-            std::vector<std::wstring> displayNames;
-            for (const auto& e : sessions)
-            {
-                displayNames.push_back(e.DisplayName);
-            }
-
-            std::ranges::sort(displayNames);
-
-            VERIFY_ARE_EQUAL(displayNames[0], c_testSessionName);
-            VERIFY_ARE_EQUAL(displayNames[1], L"wslc-test-list-2");
+            VERIFY_ARE_EQUAL(names.size(), 2u);
+            VERIFY_IS_TRUE(names.contains(c_testSessionName));
+            VERIFY_IS_TRUE(names.contains(L"wslc-test-list-2"));
         }
     }
 
@@ -10343,16 +10364,7 @@ class WSLCTests
         auto manager = OpenSessionManager();
 
         auto expectSessions = [&](const std::vector<std::wstring>& expectedSessions) {
-            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
-            VERIFY_SUCCEEDED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
-
-            std::set<std::wstring> displayNames;
-            for (const auto& e : sessions)
-            {
-                auto [_, inserted] = displayNames.insert(e.DisplayName);
-
-                VERIFY_IS_TRUE(inserted);
-            }
+            auto displayNames = ListTestSessionNames(manager.get());
 
             for (const auto& e : expectedSessions)
             {
@@ -10373,7 +10385,27 @@ class WSLCTests
             }
         };
 
-        auto create = [this](LPCWSTR Name, WSLCSessionFlags Flags) {
+        // Persistent sessions outlive the COM reference that created them, so a test that fails
+        // partway through would leave them behind for the next run to trip over. Terminate the ones
+        // this test created, however it exits.
+        std::set<std::wstring> persistentSessions;
+        auto terminatePersistentSessions = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            for (const auto& name : persistentSessions)
+            {
+                wil::com_ptr<IWSLCSession> session;
+                if (SUCCEEDED(manager->OpenSessionByName(name.c_str(), &session)))
+                {
+                    LOG_IF_FAILED(session->Terminate());
+                }
+            }
+        });
+
+        auto create = [&](LPCWSTR Name, WSLCSessionFlags Flags) {
+            if (WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent))
+            {
+                persistentSessions.emplace(Name);
+            }
+
             return CreateSession(GetDefaultSessionSettings(Name), Flags);
         };
 
@@ -10654,6 +10686,19 @@ class WSLCTests
         // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
         std::map<std::string, std::string> labels = {{"key1", "value1"}, {"key2", std::string(10000, 'a')}};
 
+        // Contains-style rather than exact-equality so the test stays green if the base image ever ships with its own labels.
+        auto verifyUserLabelsPresent = [&](const std::map<std::string, std::string>& observed) {
+            for (const auto& [key, value] : labels)
+            {
+                auto it = observed.find(key);
+                VERIFY_IS_TRUE(it != observed.end());
+                if (it != observed.end())
+                {
+                    VERIFY_ARE_EQUAL(value, it->second);
+                }
+            }
+        };
+
         // Test valid labels
         {
             WSLCContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
@@ -10664,7 +10709,9 @@ class WSLCTests
             }
 
             auto container = launcher.Launch(*m_defaultSession);
-            VERIFY_ARE_EQUAL(labels, container.Labels());
+            const auto containerLabels = container.Labels();
+            verifyUserLabelsPresent(containerLabels);
+            VERIFY_IS_TRUE(containerLabels.find("com.microsoft.wsl.container.metadata") == containerLabels.end());
 
             // Keep the container alive after the handle is dropped so we can validate labels are persisted across sessions.
             container.SetDeleteOnClose(false);
@@ -10676,7 +10723,16 @@ class WSLCTests
 
             // Validate that labels are correctly loaded.
             auto container = OpenContainer(m_defaultSession.get(), "test-labels");
-            VERIFY_ARE_EQUAL(labels, container.Labels());
+            const auto containerLabels = container.Labels();
+            verifyUserLabelsPresent(containerLabels);
+
+            const std::string c_metadataLabel = "com.microsoft.wsl.container.metadata";
+            VERIFY_IS_TRUE(containerLabels.find(c_metadataLabel) == containerLabels.end());
+            const auto inspect = container.Inspect();
+            verifyUserLabelsPresent(inspect.Config.Labels);
+            verifyUserLabelsPresent(inspect.Labels);
+            VERIFY_ARE_EQUAL(inspect.Config.Labels, inspect.Labels);
+            VERIFY_IS_TRUE(inspect.Config.Labels.find(c_metadataLabel) == inspect.Config.Labels.end());
         }
 
         // Test nullptr key
@@ -10733,6 +10789,99 @@ class WSLCTests
 
             auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+    }
+
+    // Regression: containers must inherit their base image's LABEL entries (Docker parity), with user --label
+    // winning on key conflict. The dockerd daemon does the merge; wslc reads it back from InspectContainer.
+    WSLC_TEST_METHOD(ContainerLabelsInheritedFromImage)
+    {
+        const std::string c_imageTag = "wslc-test-labels-inherited:latest";
+        const std::string c_imageLabelKey = "com.microsoft.wsl.test.image-label";
+        const std::string c_imageLabelValue = "from-image";
+        const std::string c_sharedLabelKey = "com.microsoft.wsl.test.shared";
+        const std::string c_sharedImageValue = "image-wins-if-no-override";
+        const std::string c_sharedUserValue = "user-wins";
+        const std::string c_userOnlyLabelKey = "com.microsoft.wsl.test.user-only";
+        const std::string c_userOnlyLabelValue = "from-user";
+        const std::string c_metadataLabel = "com.microsoft.wsl.container.metadata";
+        const std::string c_userOverrideContainerName = "test-labels-inherited-user-override";
+
+        auto contextDir = std::filesystem::current_path() / "build-context-labels-inherited";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow(c_imageTag.c_str(), WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "LABEL " << c_imageLabelKey << "=" << c_imageLabelValue << "\n";
+            dockerfile << "LABEL " << c_sharedLabelKey << "=" << c_sharedImageValue << "\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, c_imageTag.c_str()));
+        ExpectImagePresent(*m_defaultSession, c_imageTag.c_str());
+
+        // Image-only label survives on the container (bug repro).
+        {
+            WSLCContainerLauncher launcher(c_imageTag.c_str(), "test-labels-inherited-image-only", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            const auto containerLabels = container.Labels();
+            const auto inspect = container.Inspect();
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, containerLabels.at(c_imageLabelKey));
+            VERIFY_IS_TRUE(inspect.Config.Labels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, inspect.Config.Labels.at(c_imageLabelKey));
+
+            VERIFY_IS_TRUE(containerLabels.find(c_metadataLabel) == containerLabels.end());
+        }
+
+        // Persist across a session reset so the second block exercises the Open() codepath, which reads labels
+        // from the /containers/json list-API — a different deserialization than InspectContainer.Config.Labels.
+        {
+            WSLCContainerLauncher launcher(c_imageTag.c_str(), c_userOverrideContainerName.c_str(), {"echo", "OK"});
+            launcher.AddLabel(c_sharedLabelKey, c_sharedUserValue);
+            launcher.AddLabel(c_userOnlyLabelKey, c_userOnlyLabelValue);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            const auto containerLabels = container.Labels();
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, containerLabels.at(c_imageLabelKey));
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_sharedLabelKey));
+            VERIFY_ARE_EQUAL(c_sharedUserValue, containerLabels.at(c_sharedLabelKey));
+
+            VERIFY_IS_TRUE(containerLabels.contains(c_userOnlyLabelKey));
+            VERIFY_ARE_EQUAL(c_userOnlyLabelValue, containerLabels.at(c_userOnlyLabelKey));
+
+            container.SetDeleteOnClose(false);
+        }
+
+        {
+            ResetTestSession();
+
+            auto reopened = OpenContainer(m_defaultSession.get(), c_userOverrideContainerName.c_str());
+            const auto reopenedLabels = reopened.Labels();
+
+            VERIFY_IS_TRUE(reopenedLabels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, reopenedLabels.at(c_imageLabelKey));
+            VERIFY_IS_TRUE(reopenedLabels.contains(c_sharedLabelKey));
+            VERIFY_ARE_EQUAL(c_sharedUserValue, reopenedLabels.at(c_sharedLabelKey));
+            VERIFY_IS_TRUE(reopenedLabels.contains(c_userOnlyLabelKey));
+            VERIFY_ARE_EQUAL(c_userOnlyLabelValue, reopenedLabels.at(c_userOnlyLabelKey));
+
+            VERIFY_IS_TRUE(reopenedLabels.find(c_metadataLabel) == reopenedLabels.end());
+
+            const auto reopenedInspect = reopened.Inspect();
+            VERIFY_IS_TRUE(reopenedInspect.Config.Labels.contains(c_imageLabelKey));
+            VERIFY_ARE_EQUAL(c_imageLabelValue, reopenedInspect.Config.Labels.at(c_imageLabelKey));
         }
     }
 

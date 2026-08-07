@@ -14,6 +14,7 @@ Abstract:
 --*/
 #pragma once
 
+#include "ArgumentTypes.h"
 #include "ContainerModel.h"
 #include "InspectModel.h"
 #include <string>
@@ -80,6 +81,12 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 
 // Parses an output format ("json"/"table") into a FormatType.
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
+
+// Resolves the --format argument, falling back to table when it was not supplied.
+models::FormatType GetOutputFormat(const argument::ArgMap& args);
+
+// Returns the json::dump() indent for the inspect family: compact for `--format json`, indented otherwise.
+int GetInspectJsonIndent(const argument::ArgMap& args);
 
 // Parses an inspect target ("image"/"container"/"network"/"volume") into an InspectType.
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);

@@ -2338,7 +2338,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
-    <value>Invalid --output value '{}': {}</value>
+    <value>Недопустимое значение для --output '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">

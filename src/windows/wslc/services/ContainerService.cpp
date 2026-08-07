@@ -533,12 +533,16 @@ void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal 
     THROW_IF_FAILED(container->Kill(signal));
 }
 
-void ContainerService::Delete(Session& session, const std::string& id, bool force)
+void ContainerService::Delete(Session& session, const std::string& id, bool force, bool deleteVolumes)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Delete(force ? WSLCDeleteFlagsForce : WSLCDeleteFlagsNone));
+
+    auto flags = WSLCDeleteFlagsNone;
+    WI_SetFlagIf(flags, WSLCDeleteFlagsForce, force);
+    WI_SetFlagIf(flags, WSLCDeleteFlagsDeleteVolumes, deleteVolumes);
+    THROW_IF_FAILED(container->Delete(flags));
 }
 
 std::vector<ContainerInformation> ContainerService::List(

@@ -77,6 +77,7 @@ _(ImageForce,     "force",               L"f",              Kind::Flag,        L
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ImageIdArgDescription()) \
 _(ImportFile,     "file",                NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ImportFileArgDescription()) \
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
+_(InspectFormat,  "format",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_InspectFormatArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,       "internal",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NetworkInternalArgDescription()) \
 _(IpAddress,      "ip",                  NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_IpAddressArgDescription()) \
@@ -135,5 +136,6 @@ _(Version,        "version",             L"v",              Kind::Flag,        L
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       Localization::WSLCCLI_VolumeArgDescription()) \
 _(VolumeName,     "volume-name",         NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_VolumeNameArgDescription()) \
+_(Volumes,        "volumes",             L"v",              Kind::Flag,        Localization::WSLCCLI_RemoveVolumesArgDescription()) \
 _(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkingDirArgDescription()) \
 // clang-format on

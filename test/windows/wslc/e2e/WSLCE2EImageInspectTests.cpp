@@ -57,6 +57,17 @@ class WSLCE2EImageInspectTests
         result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Image '{}' not found.\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_FormatJson_IsSingleLine)
+    {
+        auto result = RunWslc(std::format(L"image inspect --format json {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), document[0]["RepoTags"][0].get<std::string>());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_Success)
     {
         auto result = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));

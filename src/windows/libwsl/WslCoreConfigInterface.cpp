@@ -195,6 +195,10 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
         static_assert(std::is_same<decltype(wslConfigSetting.StringValue), decltype(wslConfig->Config.KernelModulesPath.c_str())>::value);
         wslConfigSetting.StringValue = wslConfig->Config.KernelModulesPath.c_str();
         break;
+    case InstanceIdleTimeout:
+        static_assert(std::is_same<decltype(wslConfigSetting.Int32Value), decltype(wslConfig->Config.InstanceIdleTimeout)>::value);
+        wslConfigSetting.Int32Value = wslConfig->Config.InstanceIdleTimeout;
+        break;
     default:
         FAIL_FAST();
     }
@@ -560,6 +564,13 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
             wslConfigSetting.StringValue,
             wslConfig->Config.KernelModulesPath);
     }
+    case InstanceIdleTimeout:
+        return SetWslConfigSetting(
+            wslConfig,
+            ConfigSetting::InstanceIdleTimeout,
+            defaultConfig.InstanceIdleTimeout,
+            wslConfigSetting.Int32Value,
+            wslConfig->Config.InstanceIdleTimeout);
     default:
         FAIL_FAST();
     }

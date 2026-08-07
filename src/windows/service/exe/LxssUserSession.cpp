@@ -3119,7 +3119,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
                         [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
                         std::chrono::milliseconds(100),
                         std::chrono::seconds(10),
-                        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+                        {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
                 }
                 CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
             }
@@ -3145,7 +3145,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
                     [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
                     std::chrono::milliseconds(100),
                     std::chrono::seconds(10),
-                    []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+                    {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
             }
             CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
         }

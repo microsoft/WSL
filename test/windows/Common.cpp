@@ -66,7 +66,7 @@ static std::wstring g_originalDefaultDistro;
 std::wstring g_dumpFolder;
 std::optional<std::wstring> g_dumpToolPath;
 static bool g_enableWerReport = false;
-static std::wstring g_pipelineBuildId;
+std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f

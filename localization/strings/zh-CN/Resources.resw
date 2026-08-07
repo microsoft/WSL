@@ -2331,11 +2331,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
-    <value>Invalid --output value '{}': {}</value>
+    <value>无效的 --output 值 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
-    <value>Cannot write build output to the console for --output value '{}'.</value>
+    <value>对于 --output 值 '{}'，无法将构建输出写入控制台。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2899,7 +2899,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>始终尝试拉取较新版本的映像</value>
   </data>
   <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
-    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <value>构建输出目标(docker buildx --output spec; 例如 type=local,dest=path 或 type=tar,dest=out.tar)</value>
     <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">

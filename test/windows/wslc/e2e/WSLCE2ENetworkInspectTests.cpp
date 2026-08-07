@@ -68,6 +68,20 @@ class WSLCE2ENetworkInspectTests
         VERIFY_ARE_EQUAL("bridge", inspect.Driver);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Network_Inspect_FormatJson_IsSingleLine)
+    {
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"network inspect --format json {}", TestNetworkName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL(WideToMultiByte(TestNetworkName1), document[0]["Name"].get<std::string>());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Network_InspectMultiple_Success)
     {
         auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName1));

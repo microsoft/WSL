@@ -176,6 +176,8 @@ class WSLCE2EContainerListTests
         // List containers with json format
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
+        // The payload is emitted on a single compact line.
+        VERIFY_ARE_EQUAL(1u, result.GetStdoutLines().size());
         // Parse json and verify we got the expected container information back
         auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
         VERIFY_IS_GREATER_THAN_OR_EQUAL(containers.size(), 1U);
