@@ -15,12 +15,16 @@ Abstract:
 #pragma once
 
 #include <winsock2.h>
+#include <chrono>
 #include "ConsoleState.h"
 #include "HandleIO.h"
 
 namespace wsl::windows::common::relay {
 
 using namespace wsl::windows::common::io;
+
+// Default cap for bounded relay drains.
+constexpr auto c_relayDrainTimeout = std::chrono::seconds{60};
 
 std::thread CreateThread(_In_ HANDLE InputHandle, _In_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle = nullptr, _In_ size_t BufferSize = LX_RELAY_BUFFER_SIZE);
 
@@ -98,6 +102,8 @@ public:
         m_onDestroy(std::move(OnDestroy))
     {
         m_thread = std::thread{[this, Input = std::move(Input), Output = std::move(Output), BufferSize = BufferSize]() {
+            // Signal completion for bounded Sync().
+            auto signalCompleted = wil::scope_exit([this]() { m_completed.SetEvent(); });
             try
             {
                 Run(GetUnderlyingHandle(Input), GetUnderlyingHandle(Output), BufferSize);
@@ -108,7 +114,7 @@ public:
 
     ~ScopedRelay();
 
-    ScopedRelay(ScopedRelay&& other) = default;
+    ScopedRelay(ScopedRelay&&) = delete;
     ScopedRelay(const ScopedRelay&) = delete;
 
     ScopedRelay& operator=(const ScopedRelay&) = delete;
@@ -118,6 +124,9 @@ public:
     // This is useful for situations where the relay should make sure that all
     // the content has been flushed before exiting.
     void Sync();
+
+    // Blocks until EOF, or cancels after Timeout.
+    void Sync(std::chrono::milliseconds Timeout);
 
 private:
     template <typename THandle>
@@ -150,6 +159,7 @@ private:
 
     std::thread m_thread;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_completed{wil::EventOptions::ManualReset};
     std::function<void()> m_onDestroy;
 };
 

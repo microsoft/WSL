@@ -249,7 +249,8 @@ wsl::windows::common::SvcComm::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _
     }
 
     stdErrWrite.reset();
-    stdErrRelay.Sync();
+    // Client relay is EOF-bounded; timeout is a defensive cap.
+    stdErrRelay.Sync(relay::c_relayDrainTimeout);
 
     RETURN_HR(result);
 }
@@ -421,19 +422,23 @@ wsl::windows::common::SvcComm::LaunchProcess(
         // Create stdin, stdout and stderr worker threads.
         //
 
-        std::thread StdOutWorker;
-        std::thread StdErrWorker;
+        // StdOut/StdErr drain to EOF, bounded in case a guest socket wedges.
+        std::optional<relay::ScopedRelay> StdOutWorker;
+        std::optional<relay::ScopedRelay> StdErrWorker;
         auto ExitEvent = wil::unique_event(wil::EventOptions::ManualReset);
         auto outWorkerExit = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&StdOutWorker, &StdErrWorker, &ExitEvent] {
+            // Signal the detached stdin relay (it uses ExitEvent as its ExitHandle).
             ExitEvent.SetEvent();
-            if (StdOutWorker.joinable())
+
+            // Drain stdout/stderr, bounded in case a guest socket wedges.
+            if (StdOutWorker.has_value())
             {
-                StdOutWorker.join();
+                StdOutWorker->Sync(relay::c_relayDrainTimeout);
             }
 
-            if (StdErrWorker.joinable())
+            if (StdErrWorker.has_value())
             {
-                StdErrWorker.join();
+                StdErrWorker->Sync(relay::c_relayDrainTimeout);
             }
         });
 
@@ -476,9 +481,10 @@ wsl::windows::common::SvcComm::LaunchProcess(
         }
 
         auto StdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        StdOutWorker = relay::CreateThread(std::move(StdOutSocket), IS_VALID_HANDLE(StdOut) ? StdOut : nullptr);
+        // Relay guest stdout with bounded teardown drain.
+        StdOutWorker.emplace(std::move(StdOutSocket), IS_VALID_HANDLE(StdOut) ? StdOut : nullptr);
         auto StdErr = GetStdHandle(STD_ERROR_HANDLE);
-        StdErrWorker = relay::CreateThread(std::move(StdErrSocket), IS_VALID_HANDLE(StdErr) ? StdErr : nullptr);
+        StdErrWorker.emplace(std::move(StdErrSocket), IS_VALID_HANDLE(StdErr) ? StdErr : nullptr);
 
         //
         // Spawn wslhost to handle interop requests from processes that have
@@ -612,7 +618,8 @@ std::pair<GUID, wil::unique_cotaskmem_string> wsl::windows::common::SvcComm::Reg
     }
 
     stdErrWrite.reset();
-    stdErrRelay.Sync();
+    // Client relay is EOF-bounded; timeout is a defensive cap.
+    stdErrRelay.Sync(relay::c_relayDrainTimeout);
 
     THROW_IF_FAILED(Result);
 
@@ -648,7 +655,8 @@ wsl::windows::common::SvcComm::ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ 
     const auto result = m_userSession->ResizeDistribution(DistroGuid, outputWrite.get(), NewSize, context.OutError());
 
     outputWrite.reset();
-    outputRelay.Sync();
+    // Client relay is EOF-bounded; timeout is a defensive cap.
+    outputRelay.Sync(relay::c_relayDrainTimeout);
 
     RETURN_HR(result);
 }

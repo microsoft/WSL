@@ -1164,8 +1164,8 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
                 ULONG exitCode = 1;
                 vmContext.instance->GetInitPort()->Receive(&exitCode, sizeof(exitCode), clientProcess.get());
 
-                // Flush any pending IO on the error relay before exiting.
-                stdErrRelay.Sync();
+                // Drain error output, bounded in case the guest socket wedges.
+                stdErrRelay.Sync(wsl::windows::common::relay::c_relayDrainTimeout);
 
                 THROW_HR_IF(WSL_E_EXPORT_FAILED, (exitCode != 0));
             }
@@ -1614,10 +1614,10 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 gsl::span<gsl::byte> span;
                 const auto& message = channel->GetChannel().ReceiveMessage<LX_MINI_INIT_IMPORT_RESULT>(&span);
 
-                // Flush any pending IO on the error relay before exiting.
+                // Drain error output, bounded in case the guest socket wedges.
                 if (errorRelay.has_value())
                 {
-                    errorRelay->Sync();
+                    errorRelay->Sync(wsl::windows::common::relay::c_relayDrainTimeout);
                 }
 
                 // Process the import result message.

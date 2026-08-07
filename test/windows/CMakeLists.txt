@@ -12,7 +12,8 @@ set(SOURCES
     WSLCTests.cpp
     WslcSdkTests.cpp
     WslcSdkWinRtTests.cpp
-    WindowsUpdateTests.cpp)
+    WindowsUpdateTests.cpp
+    ScopedRelayUnitTests.cpp)
 
 set(HEADERS
     Common.h

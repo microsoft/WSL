@@ -445,6 +445,26 @@ void ScopedRelay::Sync()
     }
 }
 
+void ScopedRelay::Sync(std::chrono::milliseconds Timeout)
+{
+    // Drain to natural EOF within the timeout; otherwise cancel before joining.
+    if (!m_thread.joinable())
+    {
+        return;
+    }
+
+    // Keep the wait bounded and below INFINITE.
+    const DWORD timeoutMs =
+        Timeout.count() <= 0 ? 0 : static_cast<DWORD>(std::min<long long>(Timeout.count(), static_cast<long long>(INFINITE) - 1));
+
+    if (!m_completed.wait(timeoutMs))
+    {
+        m_exitEvent.SetEvent();
+    }
+
+    m_thread.join();
+}
+
 ScopedRelay::~ScopedRelay()
 {
     try
