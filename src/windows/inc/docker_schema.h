@@ -51,23 +51,23 @@ struct EmptyRequest
     using TResponse = void;
 };
 
-struct AuthRequest
-{
-    using TResponse = struct AuthResponse;
-
-    std::string username;
-    std::string password;
-    std::string serveraddress;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(AuthRequest, username, password, serveraddress);
-};
-
 struct AuthResponse
 {
     std::string Status;
     std::optional<std::string> IdentityToken;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AuthResponse, Status, IdentityToken);
+};
+
+struct AuthRequest
+{
+    using TResponse = AuthResponse;
+
+    std::string username;
+    std::string password;
+    std::string serveraddress;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(AuthRequest, username, password, serveraddress);
 };
 
 struct VolumeUsageData
@@ -295,11 +295,13 @@ struct HostConfig
     std::optional<std::vector<std::string>> DnsOptions;
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
-    // Docker wire type is int64. 0 means "use daemon default" — same as omitting
-    // the field — so we don't bother with std::optional here.
+    // Docker wire type is int64. 0 means "use daemon default"  - same as omitting
+    // the field  - so we don't bother with std::optional here.
     std::int64_t ShmSize{};
     std::optional<std::vector<DeviceMapping>> Devices;
     std::optional<std::vector<DeviceRequest>> DeviceRequests;
+    bool Privileged{};
+    std::vector<std::string> SecurityOpt;
 
     // Per-container resource limits. 0 means "no limit" (Docker default).
     std::int64_t Memory{};
@@ -307,7 +309,7 @@ struct HostConfig
     std::optional<std::vector<Ulimit>> Ulimits;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Privileged, SecurityOpt, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct InspectEndpointIPAMConfig

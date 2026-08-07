@@ -91,6 +91,7 @@ public:
     void SetDnsOptions(std::vector<std::string>&& DnsOptions);
     void SetMemoryLimit(std::int64_t Bytes);
     void SetNanoCpus(std::int64_t NanoCpus);
+    void SetPrivileged(bool privileged);
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
@@ -134,6 +135,7 @@ private:
     std::int64_t m_memoryBytes = 0;
     std::int64_t m_nanoCpus = 0;
     std::vector<WSLCUlimit> m_ulimits;
+    bool m_privileged = false;
     std::deque<std::string> m_ulimitNames;
 };
 } // namespace wsl::windows::common

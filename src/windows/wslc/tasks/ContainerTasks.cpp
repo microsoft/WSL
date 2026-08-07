@@ -908,6 +908,12 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.WorkingDirectory = WideToMultiByte(context.Args.Get<ArgType::WorkDir>());
     }
 
+
+    if (context.Args.Contains(ArgType::Privileged))
+    {
+        options.Privileged = true;
+    }
+
     context.Data.Add<Data::ContainerOptions>(std::move(options));
 }
 

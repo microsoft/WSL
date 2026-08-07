@@ -107,6 +107,7 @@ _(Path,           "path",                NO_ALIAS,          Kind::Positional,  L
 /*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ProgressArgDescription())*/ \
 _(Publish,        "publish",             L"p",              Kind::Value,       Localization::WSLCCLI_PublishArgDescription()) \
 _(PublishAll,     "publish-all",         L"P",              Kind::Flag,        Localization::WSLCCLI_PublishAllArgDescription()) \
+_(Privileged,     "privileged",          NO_ALIAS,          Kind::Flag,        L"Run container in privileged mode") \
 /*_(Pull,           "pull",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_PullArgDescription())*/ \
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_RemoveArgDescription()) \

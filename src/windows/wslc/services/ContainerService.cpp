@@ -239,6 +239,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Reporter& repor
         containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
     }
 
+
+    if (options.Privileged)
+    {
+        containerLauncher.SetPrivileged(true);
+    }
+
     for (const auto& [key, value] : options.Labels)
     {
         containerLauncher.AddLabel(key, value);
