@@ -427,7 +427,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Accept the connection from the Linux guest for notifications.
-    m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
+    // Instrumented so slow/hung boots are attributed to this phase vs WaitForMiniInitConnect.
+    {
+        SlowOperationWatcher slowOperation{"WaitForNotifyChannelConnect"};
+        m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
+    }
 
     // Receive and parse the guest kernel version
     {
