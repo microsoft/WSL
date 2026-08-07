@@ -123,6 +123,7 @@ void ImageService::Build(
     const std::wstring& dockerfilePath,
     const std::wstring& target,
     const std::optional<BuildOutput>& output,
+    const std::optional<std::wstring>& iidFilePath,
     WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
@@ -259,6 +260,15 @@ void ImageService::Build(
     }
 
     auto contextPathStr = absolutePath.wstring();
+
+    // Resolve the --iidfile destination against the client's working directory; the server mounts its
+    // parent directory read-write into the VM so buildx writes the image ID straight to it.
+    std::wstring iidPathStr;
+    if (iidFilePath.has_value())
+    {
+        iidPathStr = std::filesystem::weakly_canonical(std::filesystem::absolute(*iidFilePath)).wstring();
+    }
+
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
         .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
@@ -272,6 +282,7 @@ void ImageService::Build(
         .OutputHandle = outputHandle != nullptr ? ToCOMInputHandle(outputHandle) : WSLCHandle{.Type = WSLCHandleTypeUnknown},
         .OutputMountPath = outputMountPath.empty() ? nullptr : outputMountPath.c_str(),
         .OutputMountFile = outputMountFile.empty() ? nullptr : outputMountFile.c_str(),
+        .IidFilePath = iidPathStr.empty() ? nullptr : iidPathStr.c_str(),
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
