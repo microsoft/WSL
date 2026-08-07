@@ -3027,7 +3027,15 @@ EOF
 
         // perf: leave no trace in the distro's file system and make the versioned binary reachable
         // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
+        //
+        // N.B. The cleanup is registered before the distro's file system is modified so that a
+        //      failure can't leave a perf binary behind, which would be shadowed by the bind mount
+        //      on the next boot and break subsequent runs.
+        auto perfCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr);
+        });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3052,8 +3060,6 @@ EOF
                 L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/usr/bin/perf --version", nullptr, nullptr, nullptr, nullptr), 0u);
-
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"umount /usr/bin/perf && rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
     WSL2_TEST_METHOD(CrashCollection)
