@@ -2213,7 +2213,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 
             // Terminate the utility VM.
             _VmTerminate();
-            m_suppressVmTerminationCallback.store(false);
+            resetVmTerminationCallback.reset();
 
             // Reset the proxy state.
             // We don't clear it in _VMTerminate because we want to cache results if possible.
