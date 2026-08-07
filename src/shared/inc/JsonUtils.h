@@ -53,10 +53,7 @@ inline void from_json(const nlohmann::json&, EmptyObject&)
 template <typename T>
 std::string ToJson(const T& Value, int indent = -1)
 {
-    nlohmann::json json;
-    to_json(json, Value);
-
-    return json.dump(indent);
+    return nlohmann::json(Value).dump(indent);
 }
 
 template <typename T>
