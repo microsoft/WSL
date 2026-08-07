@@ -84,6 +84,7 @@ private:
     wil::shared_handle m_userToken;
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
+    std::string m_hostLoopback;
 
     bool m_swiotlbConfigured = false;
 
@@ -150,6 +151,7 @@ private:
     ULONG m_bootTimeoutMs{};
     WSLCNetworkingMode m_networkingMode{};
     WSLCFeatureFlags m_featureFlags{};
+    std::string m_hostLoopback;
     WSLCSessionStorageFlags m_storageFlags{};
 };
 

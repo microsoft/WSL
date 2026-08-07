@@ -49,6 +49,7 @@ using wsl::windows::service::wslc::VMPortMapping;
 using wsl::windows::service::wslc::WSLCContainer;
 using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
+using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCPortMapping;
@@ -507,6 +508,17 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
     wrapper.V1 = metadata;
 
     return wsl::shared::ToJson(wrapper);
+}
+
+std::map<std::string, std::string> StripInternalLabels(std::map<std::string, std::string> labels)
+{
+    labels.erase(WSLCContainerMetadataLabel);
+    return labels;
+}
+
+std::map<std::string, std::string> StripInternalLabels(std::optional<std::map<std::string, std::string>>&& labels)
+{
+    return StripInternalLabels(std::move(labels).value_or(std::map<std::string, std::string>{}));
 }
 
 void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::windows::common::docker_schema::CreateContainer& request)
@@ -1624,7 +1636,8 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcInspect.Mounts.push_back(std::move(mountInfo));
     }
 
-    // Map labels. m_labels should already exclude internal metadata labels.
+    // Config.Labels is the Docker-shape location; top-level Labels is a legacy alias.
+    wslcInspect.Config.Labels = m_labels;
     wslcInspect.Labels = m_labels;
 
     // Map per-endpoint network settings from Docker inspect data.
@@ -2029,7 +2042,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             .HostIp = e.VmMapping.IsIPv6() ? "::" : "0.0.0.0", .HostPort = std::to_string(hostPort)});
     }
 
-    auto labels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
+    auto requestedLabels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
 
     // Build WSLC metadata to store in a label for recovery on Open().
     WSLCContainerMetadataV1 metadata;
@@ -2043,7 +2056,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.Labels[WSLCContainerMetadataLabel] = SerializeContainerMetadata(metadata);
-    request.Labels.insert(labels.begin(), labels.end());
+    request.Labels.insert(requestedLabels.begin(), requestedLabels.end());
 
     // Send the request to docker.
     auto result = DockerClient.CreateContainer(request, containerName);
@@ -2106,6 +2119,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         namedVolumes.emplace_back(containerOptions.NamedVolumes[i].Name);
     }
 
+    auto mergedLabels = StripInternalLabels(std::move(inspectData.Config.Labels));
+
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
         runtime,
@@ -2117,7 +2132,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(volumes),
         std::move(namedVolumes),
         std::move(mappedPorts),
-        std::move(labels),
+        std::move(mergedLabels),
         std::move(OnDeleted),
         WslcContainerStateCreated,
         ParseDockerTimestamp(inspectData.Created),
@@ -2153,19 +2168,18 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         }
     }
 
-    auto labels(dockerContainer.Labels);
-    auto metadataIt = labels.find(WSLCContainerMetadataLabel);
+    auto metadataIt = dockerContainer.Labels.find(WSLCContainerMetadataLabel);
 
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        metadataIt == labels.end(),
+        metadataIt == dockerContainer.Labels.end(),
         "Cannot open WSLC container %hs: missing WSLC metadata label",
         dockerContainer.Id.c_str());
 
     WI_ASSERT(dockerContainer.State != ContainerState::Running);
 
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
-    labels.erase(metadataIt);
+    auto labels = StripInternalLabels(dockerContainer.Labels);
 
     // Docker treats empty NetworkMode as the default (bridge).
     std::string networkMode = dockerContainer.HostConfig.NetworkMode.empty() ? std::string{"bridge"} : dockerContainer.HostConfig.NetworkMode;

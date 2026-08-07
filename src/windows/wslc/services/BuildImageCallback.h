@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "Reporter.h"
+#include "Terminal.h"
 #include "SessionService.h"
 #include "VTSupport.h"
 #include <deque>
@@ -24,8 +24,8 @@ class DECLSPEC_UUID("3EDD5DBF-CA6C-4CF7-923A-AD94B6A732E5") BuildImageCallback
 {
 public:
     // The cancel event handle must remain valid for the lifetime of this callback.
-    BuildImageCallback(Reporter& reporter, HANDLE cancelEvent, bool verbose) :
-        m_reporter(reporter), m_verbose(verbose), m_cancelEvent(cancelEvent)
+    BuildImageCallback(Terminal& terminal, HANDLE cancelEvent, bool verbose) :
+        m_terminal(terminal), m_verbose(verbose), m_cancelEvent(cancelEvent)
     {
     }
     ~BuildImageCallback();
@@ -41,10 +41,10 @@ private:
     void RedrawIfNeeded();
     bool IsCancelled() const;
 
-    Reporter& m_reporter;
+    Terminal& m_terminal;
     const bool m_verbose;
     const HANDLE m_cancelEvent;
-    bool m_isConsole = m_reporter.IsVTEnabled(Reporter::Level::Info);
+    bool m_isConsole = m_terminal.IsVTEnabled(Terminal::Level::Info);
     std::deque<std::string> m_lines;
     // Each entry already contains the trailing newline so the bytes match what's replayed.
     // TODO: Track logs per step so the destructor can replay only the failing step's

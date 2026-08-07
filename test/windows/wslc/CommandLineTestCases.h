@@ -183,10 +183,23 @@ COMMAND_LINE_TEST_CASE(L"kill cont1 --signal sigkill", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"container kill cont1 -s KILL", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"inspect cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"container inspect cont1", L"inspect", true)
+// --format on the inspect family: json is the only accepted value, so `table` is rejected here.
+COMMAND_LINE_TEST_CASE(L"inspect --format json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"inspect --format table cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"inspect --type container --format json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"inspect --format badformat cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"container inspect --format json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"container inspect --format table cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"container inspect --format badformat cont1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"remove cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container remove cont1 cont2", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"rm cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container rm cont1 cont2", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm --volumes cont1", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm -v cont1 cont2", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm --force --volumes cont1", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm -fv cont1", L"remove", true) // Combined short flags
+COMMAND_LINE_TEST_CASE(L"container rm -v", L"remove", false)       // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container attach cont", L"attach", true)
 COMMAND_LINE_TEST_CASE(L"container attach", L"attach", false)
 // Stats command tests
@@ -299,6 +312,17 @@ COMMAND_LINE_TEST_CASE(L"pull ubuntu --quiet", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu -q", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 --force --no-prune", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 cont2 cont3 --force --no-prune", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"image inspect --format json img1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"image inspect --format table img1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"image inspect --format badformat img1", L"inspect", false)
+
+// Network and volume inspect --format tests
+COMMAND_LINE_TEST_CASE(L"network inspect --format json net1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"network inspect --format table net1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"network inspect --format badformat net1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"volume inspect --format json vol1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"volume inspect --format table vol1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"volume inspect --format badformat vol1", L"inspect", false)
 
 // Version command tests
 COMMAND_LINE_TEST_CASE(L"version", L"version", true)

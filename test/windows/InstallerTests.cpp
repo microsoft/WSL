@@ -25,7 +25,7 @@ using namespace wsl::windows::common::registry;
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 extern std::wstring g_dumpFolder;
-static std::wstring g_pipelineBuildId;
+extern std::wstring g_pipelineBuildId;
 
 class InstallerTests
 {

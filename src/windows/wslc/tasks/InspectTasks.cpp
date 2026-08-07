@@ -107,12 +107,12 @@ void Inspect(CLIExecutionContext& context)
         }
         else
         {
-            context.Reporter.Error(L"{}\n", Localization::WSLCCLI_ObjectNotFoundError(objectId));
+            context.Terminal.Error(L"{}\n", Localization::WSLCCLI_ObjectNotFoundError(objectId));
             context.ExitCode = 1;
         }
     }
 
     // Always print the array, even if it's empty or an error was encountered
-    context.Reporter.Output(L"{}\n", MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(array.dump(validation::GetInspectJsonIndent(context.Args))));
 }
 } // namespace wsl::windows::wslc::task
