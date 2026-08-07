@@ -328,11 +328,6 @@ constexpr unsigned long EndianSwap(unsigned long value)
 
 constexpr bool IsCrashException(DWORD exceptionCode)
 {
-    constexpr DWORD c_statusFatalAppExit = 0x40000015;
-    constexpr DWORD c_statusHeapCorruption = 0xC0000374;
-    constexpr DWORD c_statusStackBufferOverrun = 0xC0000409;
-    constexpr DWORD c_statusFailFastException = 0xC0000602;
-
     switch (exceptionCode)
     {
     case EXCEPTION_ACCESS_VIOLATION:
@@ -345,10 +340,10 @@ constexpr bool IsCrashException(DWORD exceptionCode)
     case EXCEPTION_NONCONTINUABLE_EXCEPTION:
     case EXCEPTION_PRIV_INSTRUCTION:
     case EXCEPTION_STACK_OVERFLOW:
-    case c_statusFatalAppExit:
-    case c_statusHeapCorruption:
-    case c_statusStackBufferOverrun:
-    case c_statusFailFastException:
+    case 0x40000015: // EXCEPTION_FATAL_APP_EXIT
+    case 0xC0000374: // EXCEPTION_HEAP_CORRUPT
+    case 0xC0000409: // EXCEPTION_STACK_BUFFER_OVERRUN
+    case 0xC0000602: // EXCEPTION_FAIL_FAST
         return true;
 
     default:
