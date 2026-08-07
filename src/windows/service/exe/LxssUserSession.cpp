@@ -81,7 +81,7 @@ public:
             }
 
             m_clientTerminationWait.reset(CreateThreadpoolWait(&CreateInstanceEndReporter::s_OnClientTerminated, this, nullptr));
-            THROW_LAST_ERROR_IF_NULL(m_clientTerminationWait);
+            THROW_LAST_ERROR_IF(!m_clientTerminationWait);
             SetThreadpoolWait(m_clientTerminationWait.get(), m_clientProcess.get(), nullptr);
         }));
     }
