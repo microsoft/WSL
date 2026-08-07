@@ -167,6 +167,8 @@ try
     WslTraceLoggingInitialize(LxssTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslTraceLoggingUninitialize(); });
 
+    wsl::windows::common::wslutil::ConfigureCrashHandler();
+
     // Initialize COM.
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wsl::windows::common::wslutil::CoInitializeSecurity();

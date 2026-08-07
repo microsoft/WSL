@@ -58,6 +58,8 @@ try
     WslTraceLoggingInitialize(LxssTelemetryProvider, disableTelemetry);
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslTraceLoggingUninitialize(); });
 
+    wsl::windows::common::wslutil::ConfigureCrashHandler();
+
     // Ensure that the other end of the pipe has connected if required.
     if (connectPipe)
     {
