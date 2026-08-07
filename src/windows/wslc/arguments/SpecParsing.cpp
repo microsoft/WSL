@@ -170,7 +170,7 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         // reject an unmountable or unreadable file instead. weakly_canonical resolves a relative path
         // against the current directory, collapses '..', and resolves symlinks for the portion of the
         // path that exists; it succeeds for a missing file but still reports genuine errors.
-        auto absPath = std::filesystem::weakly_canonical(srcPath, ec);
+        auto absPath = std::filesystem::weakly_canonical(std::filesystem::absolute(srcPath), ec);
         if (ec.value() != 0)
         {
             throw ArgumentException(
