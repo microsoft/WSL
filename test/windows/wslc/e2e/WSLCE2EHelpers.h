@@ -250,7 +250,11 @@ inline std::vector<nlohmann::json> ParseNdjsonOutput(const WSLCExecutionResult& 
         }
 
         auto entry = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(line));
-        VERIFY_IS_TRUE(entry.is_object(), WEX::Common::String().Format(L"Line is not a JSON object: '%ls'", line.c_str()));
+        if (!entry.is_object())
+        {
+            VERIFY_FAIL(std::format(L"Line is not a JSON object: '{}'", line).c_str());
+        }
+
         entries.push_back(std::move(entry));
     }
 
