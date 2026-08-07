@@ -88,6 +88,8 @@ public:
 
     void Complete(HRESULT Result, uint64_t ErrorContext) noexcept
     {
+        const bool clientTerminated = m_clientProcess && WaitForSingleObject(m_clientProcess.get(), 0) == WAIT_OBJECT_0;
+
         if (m_clientTerminationWait)
         {
             SetThreadpoolWait(m_clientTerminationWait.get(), nullptr, nullptr);
@@ -99,7 +101,7 @@ public:
             return;
         }
 
-        if (m_clientProcess && WaitForSingleObject(m_clientProcess.get(), 0) == WAIT_OBJECT_0)
+        if (clientTerminated)
         {
             ReportClientTermination();
             return;
