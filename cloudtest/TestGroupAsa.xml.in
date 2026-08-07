@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestJobGroup EnableProcessJobObjectBreakaway="true">
+  <ResourceSpec>
+    <Resource SKU="Standard_D4_v3" Image="${image}"/>
+  </ResourceSpec>
+  <Setup TimeoutMins="30">
+    <BuildFiles>
+      <Copy Src="[drop]\bundle\wsl.${PACKAGE_VERSION}.${TARGET_PLATFORM}.msi" Dest="[WorkingDirectory]" IsRecursive="false" Writable="true"/>
+      <Copy Src="[drop]\testbin\devops\*" Dest="[WorkingDirectory]\devops" IsRecursive="true" Writable="true"/>
+    </BuildFiles>
+  </Setup>
+
+  <TestJob Name="CloudTest.Asa" TimeoutMins="120">
+    <Execution Type="Exe" Path="C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" Args="-NoProfile -ExecutionPolicy Bypass -File &quot;[WorkingDirectory]\devops\Run-AsaInstallDiff.ps1&quot; -MsiPath &quot;[WorkingDirectory]\wsl.${PACKAGE_VERSION}.${TARGET_PLATFORM}.msi&quot; -ExpectedFindingsPath &quot;[WorkingDirectory]\devops\asa-expected-findings.json&quot; -WorkDir &quot;[LoggingDirectory]\asa&quot; -TrxPath &quot;[WorkingDirectory]\TestResults\asa.trx&quot; -AllowUnsignedWslBinaries ${ASA_ALLOW_UNSIGNED} -FailOnNewFindings ${ASA_FAIL_ON_NEW}" Parser="TRX" />
+  </TestJob>
+</TestJobGroup>

@@ -1,0 +1,68 @@
+{
+    "$comment": "Attack Surface Analyzer (ASA) install-diff allowlist for WSL. Each entry documents a category of ASA finding that has been reviewed and determined to be benign, so the nightly ASA gate only fires on net-new, genuine attack-surface changes. Reviewed 2026-06-22 against a clean-VM install-diff of wsl.msi. See tools/devops/Run-AsaInstallDiff.ps1.",
+    "ignoreRules": [
+        "Default Level",
+        "Registry Keys Frequently Modified by Windows"
+    ],
+    "expected": [
+        {
+            "ruleId": "Missing ASLR",
+            "pathGlobs": [
+                "*/lib/libd3d12.so",
+                "*/lib/libd3d12core.so",
+                "*/lib/libdxcore.so",
+                "*/tools/bsdtar",
+                "*/tools/init",
+                "*/tools/kernel"
+            ],
+            "rationale": "Linux guest ELF artifacts. ASA evaluates the Windows PE DllCharacteristics ASLR bit, which does not apply to ELF binaries that execute inside the Linux VM; those rely on Linux kernel ASLR."
+        },
+        {
+            "ruleId": "Missing DEP",
+            "pathGlobs": [
+                "*/lib/libd3d12.so",
+                "*/lib/libd3d12core.so",
+                "*/lib/libdxcore.so",
+                "*/tools/bsdtar",
+                "*/tools/init",
+                "*/tools/kernel"
+            ],
+            "rationale": "Linux guest ELF artifacts. ASA evaluates the Windows PE NX/DEP bit, which does not apply to ELF binaries that execute inside the Linux VM; those rely on Linux kernel NX."
+        },
+        {
+            "ruleId": "Unsigned binaries",
+            "pathGlobs": [
+                "*/tools/kernel"
+            ],
+            "rationale": "The Linux guest kernel is an ELF image and is not Authenticode-signable. WSL-built PE binaries are signed via the ESRP pipeline on release/nightly builds; for unsigned dev builds pass -AllowUnsignedWslBinaries to the runbook."
+        },
+        {
+            "ruleId": "Binaries with expired signatures",
+            "pathGlobs": [
+                "*/msrdc.exe",
+                "*/rdclientax.dll",
+                "*/rdpnanoTransport.dll",
+                "*/RdpWinStlHelper.dll",
+                "*/msal.wsl.proxy.exe",
+                "*/*.mui"
+            ],
+            "rationale": "Third-party bundled redistributables (the Microsoft Remote Desktop client used by WSLg, and the approved MSAL proxy) plus their localization resources. Their Authenticode signatures remain valid via RFC3161 timestamp countersignature despite the signing certificate having passed its validity date (verified Get-AuthenticodeSignature Status=Valid)."
+        },
+        {
+            "ruleId": "Modified Services",
+            "pathGlobs": [
+                "wmiApSrv",
+                "NetSetupSvc",
+                "AppReadiness"
+            ],
+            "rationale": "Incidental Windows host services touched by the OS during MSI installation. Not WSL components."
+        },
+        {
+            "ruleId": "Open Ports",
+            "pathGlobs": [
+                "*5353*"
+            ],
+            "rationale": "UDP 5353 (mDNS) is opened by svchost.exe, an incidental host service, not a WSL listener."
+        }
+    ]
+}
