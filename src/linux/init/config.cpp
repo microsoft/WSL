@@ -170,6 +170,32 @@ private:
     const char* m_mountPath = nullptr;
 };
 
+//
+// Moves a temporary mount created by mini_init into the distro namespace. The temporary mount point is
+// passed via MountEnvironmentName and its final target via PathEnvironmentName. The callback is invoked
+// with the target path once the mount has been moved.
+//
+template <typename TCallback>
+static void MoveTemporaryMount(const char* MountEnvironmentName, const char* PathEnvironmentName, const TCallback& Callback)
+try
+{
+    auto tempMount = RemoveMountAndEnvironmentOnScopeExit(MountEnvironmentName);
+    const char* target = tempMount ? getenv(PathEnvironmentName) : nullptr;
+    if (target == nullptr)
+    {
+        return;
+    }
+
+    const std::string targetPath{target};
+    unsetenv(PathEnvironmentName);
+
+    if (tempMount.MoveMount(targetPath.c_str()))
+    {
+        Callback(targetPath);
+    }
+}
+CATCH_LOG()
+
 constexpr auto HostsFileFormatString = LX_INIT_AUTO_GENERATED_FILE_HEADER
     "# [network]\n"
     "# generateHosts = false\n"
@@ -1110,108 +1136,46 @@ Return Value:
     }
     CATCH_LOG()
 
-    try
-    {
-        auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_MODULES_MOUNT_ENV);
-        if (tempMount)
+    std::string kernelModulesPath;
+    MoveTemporaryMount(LX_WSL2_KERNEL_MODULES_MOUNT_ENV, LX_WSL2_KERNEL_MODULES_PATH_ENV, [&](const std::string& target) {
+        kernelModulesPath = target;
+    });
+
+    MoveTemporaryMount(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV, LX_WSL2_KERNEL_HEADERS_PATH_ENV, [&](const std::string& target) {
+        if (kernelModulesPath.empty())
         {
-            auto target = getenv(LX_WSL2_KERNEL_MODULES_PATH_ENV);
-            if (target)
-            {
-                unsetenv(LX_WSL2_KERNEL_MODULES_PATH_ENV);
-                tempMount.MoveMount(target);
-            }
+            return;
         }
-    }
-    CATCH_LOG()
 
-    try
-    {
-        auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV);
-        if (tempMount)
+        //
+        // Point /lib/modules/<release>/build at the kernel headers, replacing any entry that the
+        // distro may have created so that it can't shadow the headers matching the running kernel.
+        //
+
+        const std::string linkPath = kernelModulesPath + "/build";
+        if ((unlink(linkPath.c_str()) < 0) && (errno != ENOENT))
         {
-            const char* target = getenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
-            if (target)
-            {
-                std::string targetPath{target};
-                unsetenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
-
-                if (tempMount.MoveMount(targetPath.c_str()))
-                {
-                    constexpr std::string_view c_includeSuffix = "/include";
-                    if (targetPath.ends_with(c_includeSuffix))
-                    {
-                        const std::string headersRoot = targetPath.substr(0, targetPath.size() - c_includeSuffix.size());
-
-                        utsname unameBuffer{};
-                        THROW_LAST_ERROR_IF(uname(&unameBuffer) < 0);
-
-                        const std::string release{unameBuffer.release};
-                        const std::string modulesDir = std::format("/lib/modules/{}", release);
-                        if (UtilMkdirPath(modulesDir.c_str(), 0755) == 0)
-                        {
-                            const std::string linkPath = modulesDir + "/build";
-                            bool createLink = true;
-                            struct stat linkInfo{};
-                            if (lstat(linkPath.c_str(), &linkInfo) == 0)
-                            {
-                                if (S_ISDIR(linkInfo.st_mode))
-                                {
-                                    LOG_WARNING("cannot expose kernel headers because '{}' is a directory", linkPath);
-                                    createLink = false;
-                                }
-                                else if (unlink(linkPath.c_str()) < 0)
-                                {
-                                    LOG_ERROR("unlink({}) failed {}", linkPath, errno);
-                                    createLink = false;
-                                }
-                            }
-                            else if (errno != ENOENT)
-                            {
-                                LOG_ERROR("lstat({}) failed {}", linkPath, errno);
-                                createLink = false;
-                            }
-
-                            if (createLink && (symlink(headersRoot.c_str(), linkPath.c_str()) < 0))
-                            {
-                                LOG_ERROR("symlink({}, {}) failed {}", headersRoot, linkPath, errno);
-                            }
-                        }
-                    }
-                }
-            }
+            LOG_ERROR("unlink({}) failed {}", linkPath, errno);
         }
-    }
-    CATCH_LOG()
 
-    try
-    {
-        auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_PERF_MOUNT_ENV);
-        if (tempMount)
+        if (symlink(target.c_str(), linkPath.c_str()) < 0)
         {
-            const char* target = getenv(LX_WSL2_KERNEL_PERF_PATH_ENV);
-            if (target)
-            {
-                std::string targetPath{target};
-                unsetenv(LX_WSL2_KERNEL_PERF_PATH_ENV);
-
-                if (tempMount.MoveMount(targetPath.c_str()))
-                {
-                    //
-                    // Expose the kernel-matched perf on the default PATH. A bind mount hides any
-                    // distro-provided binary without overwriting a regular file.
-                    //
-
-                    const std::string perfBinary = targetPath + "/bin/perf";
-                    if (UtilMountFile(perfBinary.c_str(), "/usr/bin/perf") < 0)
-                    {
-                        LOG_ERROR("UtilMountFile({}, /usr/bin/perf) failed {}", perfBinary, errno);
-                    }
-                }
-            }
+            LOG_ERROR("symlink({}, {}) failed {}", target, linkPath, errno);
         }
-    }
-    CATCH_LOG()
+    });
+
+    MoveTemporaryMount(LX_WSL2_KERNEL_PERF_MOUNT_ENV, LX_WSL2_KERNEL_PERF_PATH_ENV, [](const std::string& target) {
+        //
+        // Expose the kernel-matched perf on the default PATH. A bind mount hides any
+        // distro-provided binary without overwriting a regular file.
+        //
+
+        const std::string perfBinary = target + "/bin/perf";
+        if (UtilMountFile(perfBinary.c_str(), "/usr/bin/perf") < 0)
+        {
+            LOG_ERROR("UtilMountFile({}, /usr/bin/perf) failed {}", perfBinary, errno);
+        }
+    });
 
     //
     // Change the permission of some devtmpfs devices to be more permissive.
