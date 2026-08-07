@@ -1740,7 +1740,15 @@ Return Value:
         if (Config.KernelPerfPath.has_value())
         {
             ConfigAppendToPath(Environment, std::format("{}/bin", *Config.KernelPerfPath));
-            Environment.AddVariable(PERF_EXEC_PATH_ENV, std::format("{}/libexec/perf-core", *Config.KernelPerfPath));
+
+            //
+            // N.B. This is only set if the user has not provided a value via WSLENV.
+            //
+
+            if (Environment.GetVariable(PERF_EXEC_PATH_ENV).empty())
+            {
+                Environment.AddVariable(PERF_EXEC_PATH_ENV, std::format("{}/libexec/perf-core", *Config.KernelPerfPath));
+            }
         }
     }
 
