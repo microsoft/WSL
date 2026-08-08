@@ -1892,7 +1892,8 @@ try
 
     {
         std::lock_guard lock(m_instanceLock);
-        const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
         const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
         configuration = s_GetDistributionConfiguration(registration);
         RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
@@ -1917,7 +1918,6 @@ try
         try
         {
             _CreateVm();
-            const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
             const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
             auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
             m_utilityVm->TrimDistribution(lun);
