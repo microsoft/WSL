@@ -13,11 +13,11 @@ Abstract:
 --*/
 #pragma once
 #include "ArgumentDefinitions.h"
-#include "EnumVariantMap.h"
 #include <string>
 #include <vector>
 #include <array>
 #include <type_traits>
+#include <utility>
 
 namespace wsl::windows::wslc::argument {
 // General format:  commandname [Flag | Value]* [Positional]* [Forward]
@@ -52,7 +52,7 @@ enum class Limit
 // Generate ArgType enum from X-macro
 enum class ArgType : size_t
 {
-#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, Desc) EnumName,
+#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, ConvertedType, Desc) EnumName,
     WSLC_ARGUMENTS(WSLC_ARG_ENUM)
 #undef WSLC_ARG_ENUM
 
@@ -95,38 +95,30 @@ namespace details {
     };
 
     // Generate data mappings from X-macro - Kind determines the type
-#define WSLC_ARG_MAPPING(EnumName, Name, Alias, ArgumentKind, Desc) \
+#define WSLC_ARG_MAPPING(EnumName, Name, Alias, ArgumentKind, ConvertedType, Desc) \
     template <> \
     struct ArgDataMapping<ArgType::EnumName> \
     { \
         using value_t = typename KindToType<ArgumentKind>::type; \
+        static constexpr Kind c_kind = ArgumentKind; \
     };
 
     WSLC_ARGUMENTS(WSLC_ARG_MAPPING)
 #undef WSLC_ARG_MAPPING
 
-} // namespace details
-
-// This is the main ArgType map used for storing parsed arguments.
-struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping>
-{
-    // Reads a boolean (Kind::Flag) argument's effective value in one call. A flag stores its
-    // explicit parsed value when specified (docker-style "--flag"/"--flag=true" => true,
-    // "--flag=false" => false) and is absent when not specified. Prefer this over a bare
-    // Contains() for flags: Contains() only tells you the flag was seen, while GetFlag() folds
-    // the presence check and the stored value into a single "is this flag effectively on?" test.
-    //
-    //   if (args.GetFlag<ArgType::Quiet>()) { ... }              // default-off flag
-    //   bool removeOnExit = args.GetFlag<ArgType::Remove>(true); // default-on flag; --rm=false disables
-    //
-    // defaultValue is returned when the flag was not specified; pass true for flags whose
-    // behavior is on by default and must be turned off with "--flag=false".
-    template <ArgType E>
-    bool GetFlag(bool defaultValue = false) const
+    // Sentinel type for arguments that are not converted to a typed value during validation
+    // (their raw string is used directly at execution). Arguments mapped to NoConversion cannot
+    // be read from or written to the validated cache; doing so is a compile error.
+    struct NoConversion
     {
-        static_assert(std::is_same_v<mapping_t<E>, bool>, "GetFlag is only valid for Kind::Flag arguments");
-        return Contains(E) ? Get<E>() : defaultValue;
-    }
-};
+    };
+
+    // Maps an ArgType to the type its string value is converted to during validation. Declared here
+    // so ArgMap's cache accessors can name the converted type without depending on the domain headers
+    // that define it; the specializations live in ArgumentConvertedTypes.h.
+    template <ArgType D>
+    struct ArgConvertedTypeMapping;
+
+} // namespace details
 
 } // namespace wsl::windows::wslc::argument

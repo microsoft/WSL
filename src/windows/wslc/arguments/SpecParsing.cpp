@@ -612,35 +612,44 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (IsEqual(input, L"json"))
+    // Single source of truth for the accepted format values. It drives both parsing and the error
+    // message's supported-values list, so adding a type here updates both automatically.
+    static constexpr std::pair<std::wstring_view, models::FormatType> c_formatTypes[] = {
+        {L"json", models::FormatType::Json},
+        {L"table", models::FormatType::Table},
+    };
+
+    for (const auto& [name, type] : c_formatTypes)
     {
-        return models::FormatType::Json;
+        if (IsEqual(input, name))
+        {
+            return type;
+        }
     }
-    else if (IsEqual(input, L"table"))
+
+    std::wstring supportedValues;
+    for (const auto& formatType : c_formatTypes)
     {
-        return models::FormatType::Table;
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += formatType.first;
     }
-    else
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
+}
+
+int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (!IsEqual(input, L"json"))
     {
-        constexpr std::wstring_view supportedValues = L"json, table";
+        constexpr std::wstring_view supportedValues = L"json";
         throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
     }
-}
 
-models::FormatType GetOutputFormat(const argument::ArgMap& args)
-{
-    if (!args.Contains(argument::ArgType::Format))
-    {
-        return models::FormatType::Table;
-    }
-
-    return GetFormatTypeFromString(args.Get<argument::ArgType::Format>());
-}
-
-int GetInspectJsonIndent(const argument::ArgMap& args)
-{
-    // Validation guarantees the only accepted value is "json", so its presence alone selects compact.
-    return args.Contains(argument::ArgType::InspectFormat) ? wsl::shared::c_jsonCompactIndent : wsl::shared::c_jsonPrettyPrintIndent;
+    return wsl::shared::c_jsonCompactIndent;
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)

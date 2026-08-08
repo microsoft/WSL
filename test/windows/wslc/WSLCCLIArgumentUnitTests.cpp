@@ -17,8 +17,10 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "Argument.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ArgumentValidation.h"
+#include "ImageService.h"
+#include "JsonUtils.h"
 #include "Exceptions.h"
 #include <wslc.h>
 
@@ -31,6 +33,12 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLIArgumentUnitTests {
+using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
+
+static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
+static_assert(!std::is_copy_assignable_v<ArgMap>);
+static_assert(!std::is_move_assignable_v<ArgMap>);
+
 class WSLCCLIArgumentUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLIArgumentUnitTests)
@@ -168,11 +176,11 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ForwardArgs));
 
         // Verify basic retrieval
-        auto retrievedBool = argsContainer.Get<ArgType::Help>();
+        auto retrievedBool = argsContainer.GetValue<ArgType::Help>();
         VERIFY_ARE_EQUAL(retrievedBool, true);
-        auto retrievedString = argsContainer.Get<ArgType::ContainerId>();
+        auto retrievedString = argsContainer.GetValue<ArgType::ContainerId>();
         VERIFY_ARE_EQUAL(retrievedString, std::wstring(L"test"));
-        auto retrievedStringSet = argsContainer.Get<ArgType::ForwardArgs>();
+        auto retrievedStringSet = argsContainer.GetValue<ArgType::ForwardArgs>();
         VERIFY_ARE_EQUAL(retrievedStringSet[0], std::wstring(L"test1"));
         VERIFY_ARE_EQUAL(retrievedStringSet[1], std::wstring(L"test2"));
 
@@ -181,22 +189,25 @@ class WSLCCLIArgumentUnitTests
         argsContainer.Add(ArgType::Publish, std::wstring(L"test2"));
         argsContainer.Add(ArgType::Publish, std::wstring(L"test3"));
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
-        auto publishArgs = argsContainer.GetAll<ArgType::Publish>();
+        auto publishArgs = argsContainer.GetAllValues<ArgType::Publish>();
         VERIFY_ARE_EQUAL(publishArgs.size(), 3);
         VERIFY_ARE_EQUAL(publishArgs[0], std::wstring(L"test1"));
         VERIFY_ARE_EQUAL(publishArgs[1], std::wstring(L"test2"));
         VERIFY_ARE_EQUAL(publishArgs[2], std::wstring(L"test3"));
 
         // Verify Remove
-        argsContainer.Remove(ArgType::Publish);
-        VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 0);
+        ArgMap removeArgs;
+        removeArgs.Add<ArgType::Publish>(L"test");
+        removeArgs.Remove(ArgType::Publish);
+        VERIFY_ARE_EQUAL(removeArgs.Count(ArgType::Publish), 0);
 
         // Verify compile time add works like runtime add for multimap types.
-        argsContainer.Add<ArgType::Publish>(L"test1");
-        argsContainer.Add<ArgType::Publish>(L"test2");
-        argsContainer.Add<ArgType::Publish>(L"test3");
-        VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
-        publishArgs = argsContainer.GetAll<ArgType::Publish>();
+        ArgMap compileTimeArgs;
+        compileTimeArgs.Add<ArgType::Publish>(L"test1");
+        compileTimeArgs.Add<ArgType::Publish>(L"test2");
+        compileTimeArgs.Add<ArgType::Publish>(L"test3");
+        VERIFY_ARE_EQUAL(compileTimeArgs.Count(ArgType::Publish), 3);
+        publishArgs = compileTimeArgs.GetAllValues<ArgType::Publish>();
         VERIFY_ARE_EQUAL(publishArgs.size(), 3);
         VERIFY_ARE_EQUAL(publishArgs[0], std::wstring(L"test1"));
         VERIFY_ARE_EQUAL(publishArgs[1], std::wstring(L"test2"));
@@ -216,12 +227,437 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::ForwardArgs), 1);
         VERIFY_ARE_EQUAL(argsContainer.GetCount(), 6); // 1 Help + 1 ContainerId + 3 Publish + 1 ForwardArgs
-        argsContainer.Remove(ArgType::Help);
-        argsContainer.Remove(ArgType::ContainerId);
-        argsContainer.Remove(ArgType::Publish);
-        argsContainer.Remove(ArgType::ForwardArgs);
-        VERIFY_ARE_EQUAL(argsContainer.GetCount(), 0);
     }
+
+    // Test: Verify the validated-value cache stores and returns converted results so that a
+    // conversion performed during validation is reused during execution. Access is by a compile-time
+    // ArgType, so the value type is fixed by the argument's ConvertedType and cannot be mismatched.
+    TEST_METHOD(ValidatedCache_StoresAndRetrievesConvertedValues)
+    {
+        ArgMap args;
+
+        // Populate raw arguments so the validated-cache invariant (raw count == validated count,
+        // enforced by a debug assert in the cache readers) holds when values are read below.
+        args.Add(ArgType::StopTimeout, std::wstring(L"30"));
+        args.Add(ArgType::Filter, std::wstring(L"status=running"));
+        args.Add(ArgType::Filter, std::wstring(L"label=env=prod"));
+
+        // Nothing cached yet.
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::StopTimeout));
+
+        // A conversion that produces a non-string type (string -> int). The value type is fixed by
+        // ArgType::StopTimeout's ConvertedType (int), so no type is supplied by the caller.
+        args.AddValidated<ArgType::StopTimeout>(30);
+        VERIFY_IS_TRUE(args.ContainsValidated(ArgType::StopTimeout));
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::StopTimeout), static_cast<size_t>(1));
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::StopTimeout>(), 30);
+
+        // Multiple cached values for one argument preserve insertion order.
+        args.AddValidated<ArgType::Filter>(std::pair<std::string, std::string>{"status", "running"});
+        args.AddValidated<ArgType::Filter>(std::pair<std::string, std::string>{"label", "env=prod"});
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Filter), static_cast<size_t>(2));
+        auto filters = args.GetAllValues<ArgType::Filter>();
+        VERIFY_ARE_EQUAL(filters.size(), static_cast<size_t>(2));
+        VERIFY_ARE_EQUAL(filters[0].first, std::string("status"));
+        VERIFY_ARE_EQUAL(filters[0].second, std::string("running"));
+        VERIFY_ARE_EQUAL(filters[1].first, std::string("label"));
+        VERIFY_ARE_EQUAL(filters[1].second, std::string("env=prod"));
+
+        // GetAllValidated returns empty when nothing is cached for the argument.
+        auto empty = args.GetAllValues<ArgType::Signal>();
+        VERIFY_IS_TRUE(empty.empty());
+
+        // An absent argument resolves to its value type's default-constructed value.
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Memory));
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Memory), static_cast<size_t>(0));
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::Memory>(), int64_t{});
+        VERIFY_IS_FALSE(args.Contains(ArgType::Memory));
+    }
+
+    // Helper: run validation for a single-value argument and return the converted result (type fixed
+    // by the argument's ConvertedType). Drives both paths for every converted ArgType its callers
+    // exercise: the eager path (an explicit validation pass) and the on-demand path (a converted read
+    // with no prior validation pass, which must self-validate). The returned value is the on-demand
+    // result, so callers' expected-value assertions verify the on-demand output equals what the
+    // validation pass produces. Both paths run the same Argument::Validate, so their results match by
+    // construction; this asserts the on-demand trigger fires and caches an equal number of values.
+    template <ArgType E>
+    static auto ValidateAndGetCached(const std::wstring& raw)
+    {
+        ArgMap eager;
+        eager.Add(E, std::wstring(raw));
+        Argument::Create(E).Validate(eager);
+        VERIFY_IS_TRUE(eager.ContainsValidated(E));
+
+        ArgMap onDemand;
+        onDemand.Add(E, std::wstring(raw));
+        VERIFY_IS_FALSE(onDemand.ContainsValidated(E)); // no validation pass ran
+        auto value = onDemand.GetValue<E>();            // triggers on-demand validation
+        VERIFY_IS_TRUE(onDemand.ContainsValidated(E));
+        VERIFY_ARE_EQUAL(onDemand.CountValidated(E), eager.CountValidated(E));
+        return value;
+    }
+
+    // Helper: as ValidateAndGetCached, for an argument that appears multiple times (ArgMap is a
+    // multimap). Runs the eager and on-demand paths and returns every on-demand converted value in
+    // insertion order.
+    template <ArgType E>
+    static auto ValidateAndGetAllCached(const std::vector<std::wstring>& raws)
+    {
+        ArgMap eager;
+        for (const auto& raw : raws)
+        {
+            eager.Add(E, std::wstring(raw));
+        }
+
+        Argument::Create(E).Validate(eager);
+
+        // The cache must hold exactly one converted value per raw value in the map.
+        VERIFY_ARE_EQUAL(eager.CountValidated(E), eager.Count(E));
+        VERIFY_ARE_EQUAL(eager.CountValidated(E), raws.size());
+
+        ArgMap onDemand;
+        for (const auto& raw : raws)
+        {
+            onDemand.Add(E, std::wstring(raw));
+        }
+
+        VERIFY_IS_FALSE(onDemand.ContainsValidated(E)); // no validation pass ran
+        auto values = onDemand.GetAllValues<E>();       // triggers on-demand validation
+        VERIFY_ARE_EQUAL(onDemand.CountValidated(E), eager.CountValidated(E));
+        return values;
+    }
+
+    // Test: Every ArgType whose validation converts its raw string into a typed value must cache
+    // that value on the ArgMap during Argument::Validate, so execution reads it back without
+    // re-converting. This drives the real validation + caching path for each converted ArgType.
+    TEST_METHOD(ArgumentValidate_ConvertsAndCachesEveryConvertedArgType)
+    {
+        // string -> FormatType
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Format>(L"json"), FormatType::Json);
+
+        // string -> json::dump() indentation
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::InspectFormat>(L"json"), wsl::shared::c_jsonCompactIndent);
+
+        // string -> WSLCSignal (Signal and StopSignal share the converter)
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Signal>(L"SIGTERM"), WSLCSignalSIGTERM);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::StopSignal>(L"SIGKILL"), WSLCSignalSIGKILL);
+
+        // string -> int
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::StopTimeout>(L"30"), 30);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthRetries>(L"3"), 3);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Last>(L"5"), 5);
+
+        // string -> LONG
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Time>(L"5"), 5L);
+
+        // string -> ULONGLONG (Tail is a raw integer; Since/Until go through the timestamp parser)
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Tail>(L"10"), 10ULL);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Since>(L"100"), validation::GetTimestampFromString(L"100"));
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Until>(L"200"), validation::GetTimestampFromString(L"200"));
+
+        // string -> int64_t (memory sizes). The cached value matches the converter's result.
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Memory>(L"512M"), validation::GetMemorySizeFromString(L"512M"));
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::ShmSize>(L"64M"), validation::GetMemorySizeFromString(L"64M"));
+
+        // string -> int64_t (durations, in nanoseconds)
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthInterval>(L"30s"), validation::GetDurationNanosFromString(L"30s"));
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthTimeout>(L"30s"), validation::GetDurationNanosFromString(L"30s"));
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthStartPeriod>(L"30s"), validation::GetDurationNanosFromString(L"30s"));
+
+        // string -> int64_t (nano CPUs)
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Cpus>(L"1.5"), validation::GetNanoCpusFromString(L"1.5"));
+
+        // string -> tuple<name, soft, hard> (ulimit)
+        auto ulimit = ValidateAndGetCached<ArgType::Ulimit>(L"nofile=1024:2048");
+        VERIFY_ARE_EQUAL(std::get<0>(ulimit), std::string("nofile"));
+        VERIFY_ARE_EQUAL(std::get<1>(ulimit), 1024LL);
+        VERIFY_ARE_EQUAL(std::get<2>(ulimit), 2048LL);
+
+        // string -> pair<key, value> (filter). A single Validate call caches every raw value in order.
+        {
+            ArgMap args;
+            args.Add(ArgType::Filter, std::wstring(L"status=running"));
+            args.Add(ArgType::Filter, std::wstring(L"label=env=prod")); // split on first '='
+            Argument::Create(ArgType::Filter).Validate(args);
+            auto filters = args.GetAllValues<ArgType::Filter>();
+            VERIFY_ARE_EQUAL(filters.size(), static_cast<size_t>(2));
+            VERIFY_ARE_EQUAL(filters[0].first, std::string("status"));
+            VERIFY_ARE_EQUAL(filters[0].second, std::string("running"));
+            VERIFY_ARE_EQUAL(filters[1].first, std::string("label"));
+            VERIFY_ARE_EQUAL(filters[1].second, std::string("env=prod"));
+        }
+
+        // string -> InspectType (inspect object type)
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Type>(L"container"), InspectType::Container);
+
+        // string -> BuildOutput (docker-style build exporter spec)
+        {
+            auto output = ValidateAndGetCached<ArgType::BuildOutput>(L"type=tar,dest=-");
+            VERIFY_ARE_EQUAL(output.Type, std::wstring(L"tar"));
+            VERIFY_ARE_EQUAL(output.Dest, std::wstring(L"-"));
+        }
+
+        // string -> pair<key, value> (label and driver option share the key=value shape)
+        {
+            auto label = ValidateAndGetCached<ArgType::Label>(L"env=prod");
+            VERIFY_ARE_EQUAL(label.first, std::string("env"));
+            VERIFY_ARE_EQUAL(label.second, std::string("prod"));
+
+            auto option = ValidateAndGetCached<ArgType::Options>(L"com.docker.network.bridge.name=br0");
+            VERIFY_ARE_EQUAL(option.first, std::string("com.docker.network.bridge.name"));
+            VERIFY_ARE_EQUAL(option.second, std::string("br0"));
+        }
+
+        // string -> BuildSecret (docker-style --secret spec resolved to an id and value bytes)
+        {
+            ScopedEnvVariable env(L"WSLC_UT_CONV_SECRET", L"conv-value");
+            auto secret = ValidateAndGetCached<ArgType::Secret>(L"id=convtest,env=WSLC_UT_CONV_SECRET");
+            VERIFY_ARE_EQUAL(secret.Id, std::wstring(L"convtest"));
+            const std::string expected = "conv-value";
+            VERIFY_IS_TRUE(std::vector<BYTE>(expected.begin(), expected.end()) == secret.Value);
+        }
+    }
+
+    // Test: Because ArgMap is a multimap and any command may allow an argument to repeat, a single
+    // Argument::Validate call must convert and cache every occurrence, in order. Covers the
+    // different converter result shapes (integer, enum, tuple, pair). The helper also asserts the
+    // cached count matches the number of raw values in the map.
+    TEST_METHOD(ArgumentValidate_CachesEveryValueForRepeatedArg)
+    {
+        // Integer converter, multiple values -> all cached in order.
+        auto retries = ValidateAndGetAllCached<ArgType::HealthRetries>({L"1", L"2", L"3"});
+        VERIFY_ARE_EQUAL(retries.size(), static_cast<size_t>(3));
+        VERIFY_ARE_EQUAL(retries[0], 1);
+        VERIFY_ARE_EQUAL(retries[1], 2);
+        VERIFY_ARE_EQUAL(retries[2], 3);
+
+        // int64_t converter (memory sizes), multiple values -> all cached in order.
+        auto memories = ValidateAndGetAllCached<ArgType::Memory>({L"128M", L"256M"});
+        VERIFY_ARE_EQUAL(memories.size(), static_cast<size_t>(2));
+        VERIFY_ARE_EQUAL(memories[0], validation::GetMemorySizeFromString(L"128M"));
+        VERIFY_ARE_EQUAL(memories[1], validation::GetMemorySizeFromString(L"256M"));
+
+        // Enum converter, multiple values -> all cached in order.
+        auto signals = ValidateAndGetAllCached<ArgType::Signal>({L"SIGTERM", L"SIGKILL", L"SIGHUP"});
+        VERIFY_ARE_EQUAL(signals.size(), static_cast<size_t>(3));
+        VERIFY_ARE_EQUAL(signals[0], WSLCSignalSIGTERM);
+        VERIFY_ARE_EQUAL(signals[1], WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(signals[2], WSLCSignalSIGHUP);
+
+        // Tuple converter (ulimit), multiple values -> all cached in order.
+        auto ulimits = ValidateAndGetAllCached<ArgType::Ulimit>({L"nofile=1024:2048", L"nproc=512:1024"});
+        VERIFY_ARE_EQUAL(ulimits.size(), static_cast<size_t>(2));
+        VERIFY_ARE_EQUAL(std::get<0>(ulimits[0]), std::string("nofile"));
+        VERIFY_ARE_EQUAL(std::get<1>(ulimits[0]), 1024LL);
+        VERIFY_ARE_EQUAL(std::get<2>(ulimits[0]), 2048LL);
+        VERIFY_ARE_EQUAL(std::get<0>(ulimits[1]), std::string("nproc"));
+        VERIFY_ARE_EQUAL(std::get<1>(ulimits[1]), 512LL);
+        VERIFY_ARE_EQUAL(std::get<2>(ulimits[1]), 1024LL);
+
+        // Pair converter (filter), multiple values -> all cached in order.
+        auto filters = ValidateAndGetAllCached<ArgType::Filter>({L"status=running", L"name=web", L"label=env=prod"});
+        VERIFY_ARE_EQUAL(filters.size(), static_cast<size_t>(3));
+        VERIFY_ARE_EQUAL(filters[0].first, std::string("status"));
+        VERIFY_ARE_EQUAL(filters[0].second, std::string("running"));
+        VERIFY_ARE_EQUAL(filters[1].first, std::string("name"));
+        VERIFY_ARE_EQUAL(filters[1].second, std::string("web"));
+        VERIFY_ARE_EQUAL(filters[2].first, std::string("label"));
+        VERIFY_ARE_EQUAL(filters[2].second, std::string("env=prod"));
+
+        // BuildSecret converter (secret specs), multiple values -> all cached in order.
+        {
+            ScopedEnvVariable envA(L"WSLC_UT_CONV_SECRET_A", L"value-a");
+            ScopedEnvVariable envB(L"WSLC_UT_CONV_SECRET_B", L"value-b");
+            auto secrets = ValidateAndGetAllCached<ArgType::Secret>(
+                {L"id=seca,env=WSLC_UT_CONV_SECRET_A", L"id=secb,env=WSLC_UT_CONV_SECRET_B"});
+            VERIFY_ARE_EQUAL(secrets.size(), static_cast<size_t>(2));
+            VERIFY_ARE_EQUAL(secrets[0].Id, std::wstring(L"seca"));
+            VERIFY_ARE_EQUAL(secrets[1].Id, std::wstring(L"secb"));
+            const std::string expectedA = "value-a";
+            const std::string expectedB = "value-b";
+            VERIFY_IS_TRUE(std::vector<BYTE>(expectedA.begin(), expectedA.end()) == secrets[0].Value);
+            VERIFY_IS_TRUE(std::vector<BYTE>(expectedB.begin(), expectedB.end()) == secrets[1].Value);
+        }
+    }
+
+    // Test: Every validate-only ArgType (checked during validation but not converted into a
+    // distinct typed value that execution consumes) must NOT populate the cache. Execution reads
+    // the raw value for these instead.
+    TEST_METHOD(ArgumentValidate_ValidateOnlyArgsAreNotCached)
+    {
+        struct Case
+        {
+            ArgType Type;
+            std::wstring Value;
+        };
+
+        const std::vector<Case> cases = {
+            {ArgType::Gpus, L"all"},
+            {ArgType::Volume, LR"(C:\hostPath:/containerPath)"},
+            {ArgType::WorkDir, L"/app"},
+            {ArgType::Network, L"bridge"},
+            {ArgType::NetworkAlias, L"myalias"},
+        };
+
+        for (const auto& c : cases)
+        {
+            ArgMap args;
+            args.Add(c.Type, std::wstring(c.Value));
+            Argument::Create(c.Type).Validate(args);
+            VERIFY_IS_FALSE(args.ContainsValidated(c.Type));
+        }
+
+        // NoHealthcheck is a flag whose validation only rejects conflicting health options. With
+        // no conflicts present it passes and caches nothing.
+        ArgMap noHealthcheck;
+        noHealthcheck.Add(ArgType::NoHealthcheck, true);
+        Argument::Create(ArgType::NoHealthcheck).Validate(noHealthcheck);
+        VERIFY_IS_FALSE(noHealthcheck.ContainsValidated(ArgType::NoHealthcheck));
+    }
+
+    // Test: When conversion fails during validation, Validate throws and nothing is cached.
+    TEST_METHOD(ArgumentValidate_InvalidValueThrowsAndCachesNothing)
+    {
+        ArgMap args;
+        args.Add(ArgType::Format, std::wstring(L"xml"));
+        VERIFY_THROWS(Argument::Create(ArgType::Format).Validate(args), ArgumentException);
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
+    }
+
+    // Note: on-demand validation for every converted ArgType (reading with no prior validation pass
+    // and getting the same result the pass produces) is covered by the tests above:
+    // ValidateAndGetCached / ValidateAndGetAllCached drive both the eager and on-demand paths and
+    // return the on-demand value, so those tests' expected-value assertions verify on-demand output
+    // for all converted shapes. The tests below cover the behaviors unique to the on-demand trigger:
+    // a bad value fails the same way as on the command line, a value added after the validation pass
+    // is re-validated, and validate-only arguments (no converted value) are checked on demand too.
+
+    // Test: An invalid value read on demand (no prior validation pass) throws ArgumentException --
+    // the same failure the up-front validation pass raises for that value. This proves an argument
+    // populated during execution routes to the same user error path as a bad command-line value,
+    // and that a failed on-demand validation leaves nothing cached.
+    TEST_METHOD(ArgumentValidate_OnDemandInvalidValueThrows)
+    {
+        ArgMap args;
+        args.Add(ArgType::Format, std::wstring(L"xml")); // not a valid FormatType
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
+        VERIFY_THROWS(args.GetValue<ArgType::Format>(), ArgumentException);
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
+    }
+
+    // Test: Raw values can change after the up-front validation pass until the argument is read.
+    // The mutation invalidates the cache, and the first read validates the final values.
+    TEST_METHOD(ArgumentValidate_PostValidationAddBeforeReadRevalidates)
+    {
+        ArgMap args;
+        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
+        Argument::Create(ArgType::Signal).Validate(args);
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(1));
+
+        // Add a second raw value before the first read. The map-action callback drops the cache.
+        args.Add(ArgType::Signal, std::wstring(L"SIGKILL"));
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(0));
+
+        // The first read re-validates both raw values on demand, in insertion order.
+        auto signals = args.GetAllValues<ArgType::Signal>();
+        VERIFY_ARE_EQUAL(signals.size(), static_cast<size_t>(2));
+        VERIFY_ARE_EQUAL(signals[0], WSLCSignalSIGTERM);
+        VERIFY_ARE_EQUAL(signals[1], WSLCSignalSIGKILL);
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(2));
+    }
+
+    // Test: A validate-only argument (checked during validation but not converted into a cached
+    // value) is validated on demand when read, so a value added after the up-front pass is checked
+    // exactly as a command-line value. These arguments have no converted cache, so the earlier
+    // converted-path tests do not cover them; the read path still runs their range/format checks.
+    // Network rejects "host" mode and unsupported values.
+    TEST_METHOD(ArgumentValidate_OnDemandValidateOnlyArgIsChecked)
+    {
+        ArgMap labels;
+        labels.Add(ArgType::BuildLabel, std::wstring(L"foo"));
+        labels.Add(ArgType::BuildLabel, std::wstring(L"foo="));
+        auto labelValues = labels.GetAllValues<ArgType::BuildLabel>();
+        VERIFY_ARE_EQUAL(labelValues.size(), static_cast<size_t>(2));
+        VERIFY_ARE_EQUAL(labelValues[0], std::wstring(L"foo"));
+        VERIFY_ARE_EQUAL(labelValues[1], std::wstring(L"foo="));
+
+        ArgMap invalidLabel;
+        invalidLabel.Add(ArgType::BuildLabel, std::wstring(L"=value"));
+        VERIFY_THROWS(invalidLabel.GetAllValues<ArgType::BuildLabel>(), wil::ResultException);
+
+        // Valid value, no prior validation pass: the read validates on demand and returns the raw value.
+        ArgMap valid;
+        valid.Add(ArgType::Network, std::wstring(L"bridge"));
+        auto networks = valid.GetAllValues<ArgType::Network>();
+        VERIFY_ARE_EQUAL(networks.size(), static_cast<size_t>(1));
+        VERIFY_ARE_EQUAL(networks[0], std::wstring(L"bridge"));
+
+        // Invalid value, no prior validation pass: the read validates on demand and throws, matching
+        // the failure the up-front pass raises for the same value.
+        ArgMap invalid;
+        invalid.Add(ArgType::Network, std::wstring(L"host"));
+        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ArgumentException);
+
+        // Valid up-front, then an unsupported value added before the first read: the map-action
+        // callback clears the validated record, so the read re-validates on demand and throws.
+        ArgMap added;
+        added.Add(ArgType::Network, std::wstring(L"bridge"));
+        Argument::Create(ArgType::Network).Validate(added);
+        added.Add(ArgType::Network, std::wstring(L"host"));
+        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ArgumentException);
+    }
+
+    TEST_METHOD(ArgumentValidate_ReadMakesArgumentImmutable)
+    {
+        ArgMap args;
+        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::Signal>(), WSLCSignalSIGTERM);
+
+        const auto verifyImmutableFailure = [](const auto& operation) {
+            VERIFY_THROWS_SPECIFIC(operation(), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+        };
+
+        verifyImmutableFailure([&] { args.Add(ArgType::Signal, std::wstring(L"SIGKILL")); });
+        verifyImmutableFailure([&] { args.Remove(ArgType::Signal); });
+        verifyImmutableFailure([&] { args.InvalidateValidated(ArgType::Signal); });
+        verifyImmutableFailure([&] { args.AddValidated<ArgType::Signal>(WSLCSignalSIGKILL); });
+        verifyImmutableFailure([&] { args.MarkValidated(ArgType::Signal); });
+
+        // Immutability is per argument; other arguments remain writable until they are read.
+        args.Add(ArgType::StopTimeout, std::wstring(L"30"));
+        VERIFY_ARE_EQUAL(args.GetValue<ArgType::StopTimeout>(), 30);
+    }
+
+    TEST_METHOD(ArgumentValidate_FlagReadValidatesAndMakesArgumentImmutable)
+    {
+        const auto verifyImmutableFailure = [](const auto& operation) {
+            VERIFY_THROWS_SPECIFIC(operation(), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+        };
+
+        ArgMap absent;
+        VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>(true));
+        VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>());
+        VERIFY_IS_FALSE(absent.Contains(ArgType::Quiet));
+        verifyImmutableFailure([&] { absent.Add(ArgType::Quiet, true); });
+
+        ArgMap present;
+        present.Add(ArgType::NoHealthcheck, true);
+        present.Add(ArgType::HealthCmd, std::wstring(L"CMD echo healthy"));
+        VERIFY_THROWS(present.GetValue<ArgType::NoHealthcheck>(), ArgumentException);
+
+        // A failed read does not freeze the argument, so correcting the conflicting input permits
+        // a subsequent successful read.
+        present.Remove(ArgType::HealthCmd);
+        VERIFY_IS_TRUE(present.GetValue<ArgType::NoHealthcheck>());
+        verifyImmutableFailure([&] { present.Remove(ArgType::NoHealthcheck); });
+    }
+
     // Timestamp parsing unit tests (exercises TryParseRfc3339 and integer path via GetTimestampFromString)
 
     TEST_METHOD(ValidateTimestamp_ValidUnixEpochSeconds)

@@ -136,7 +136,7 @@ void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
     // Boolean flags store their explicit parsed value (true or false) so a flag whose behavior
     // is on by default can be turned off with "--flag=false". Clearing first collapses CLI
     // duplicates to a single entry and gives docker's last-wins behavior for repeated flags
-    // (e.g. "--flag --flag=false" ends up false). Read flags back via ArgMap::GetFlag, which
+    // (e.g. "--flag --flag=false" ends up false). Read flags back via ArgMap::GetValue(defaultValue), which
     // folds the presence check and the stored value into one test, rather than a bare Contains().
     ClearArgument(type);
     m_executionArgs.Add(type, value);

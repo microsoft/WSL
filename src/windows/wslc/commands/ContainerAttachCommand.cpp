@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 
+#include "ArgumentConvertedTypes.h"
 #include "ContainerCommand.h"
 #include "CLIExecutionContext.h"
 #include "ContainerTasks.h"
@@ -45,6 +46,6 @@ void ContainerAttachCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context               //
         << ResolveSession //
-        << AttachContainer(context.Args.Get<ArgType::ContainerId>());
+        << AttachContainer(context.Args.GetValue<ArgType::ContainerId>());
 }
 } // namespace wsl::windows::wslc

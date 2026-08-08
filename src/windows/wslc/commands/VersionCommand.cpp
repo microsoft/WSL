@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 #include "VersionCommand.h"
-#include "ArgumentValidation.h"
+#include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
 #include "JsonUtils.h"
 
@@ -47,7 +47,7 @@ void VersionCommand::PrintVersion(Terminal& terminal)
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    FormatType format = validation::GetOutputFormat(context.Args);
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {

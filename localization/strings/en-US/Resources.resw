@@ -3135,6 +3135,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Session storage path</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Path to the session storage directory</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signal to send</value>
   </data>
