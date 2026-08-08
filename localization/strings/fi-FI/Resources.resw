@@ -998,8 +998,8 @@ Palataan nat-verkkopalveluun.</value>
     <value>Säilökuvien rekisteri {} on estetty tietokonekäytännön vuoksi.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Säilökuvien luonti on estetty, koska tietokonekäytäntö on määrittänyt säilörekisteri sallittujen luettelon. Kuvien luonti voi noutaa peruskuvia mistä tahansa rekisteristä, eikä sitä voida luotettavasti rajoittaa sallittujen luetteloon.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Säilörekisterin sallittujen kohteiden luettelon käytäntö on virheellinen. Tarkista, että kohteen Software\Policies\WSL WSLContainerRegistryAllowlist-arvot on määritetty oikein.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Päivitä WSL2-versioksi suorittamalla wsl.exe --set-version {} 2.</value>
@@ -1986,16 +1986,16 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
     <value>Virtuaalikoneen käyttämättömyysaika millisekunteina, ennen kuin se sammutetaan.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>Pidä WSL käynnissä</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Estä jakeluja ja niitä isännöivää WSL-virtuaalikonetta sammumasta automaattisesti niiden oltua käyttämättöminä.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>Pidä WSL käynnissä.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Estä jakeluja ja niitä isännöivää WSL-virtuaalikonetta sammumasta automaattisesti niiden oltua käyttämättöminä.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Palauta aikakatkaisu</value>
@@ -2007,19 +2007,19 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
     <value>Virtuaalikoneen käyttämättömyysaika millisekunteina, ennen kuin se sammutetaan.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Jakelun käyttämättömyysaikakatkaisu</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>Niiden millisekuntien määrä, jotka jakelu on käyttämättömänä, ennen kuin se lopetetaan.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Palauta aikakatkaisu</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Jakelun käyttämättömyysaikakatkaisu</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>Niiden millisekuntien määrä, jotka jakelu on käyttämättömänä, ennen kuin se lopetetaan.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Ota muutokset käyttöön</value>
@@ -2983,7 +2983,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
-    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <value>Tulostusmuotoilu (json yksiriviselle tulosteelle) (Default: sisennetty JSON)</value>
     <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
@@ -3135,6 +3135,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Istunnon tallennuspolku</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Path to the session storage directory</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Lähetettävä signaali</value>
   </data>
@@ -3179,7 +3182,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Älä ilmoita virhettä, jos taltiota ei ole olemassa</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>Poista säilöön liittyvät anonyymit asemat</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Työhakemisto säilön sisällä</value>
@@ -3190,6 +3193,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Kirjoita säilön tunnus annettuun polkuun</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Write the image ID to the provided path</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-osoite resolv.conf-tiedoston DNS-nimipalvelimelle</value>
@@ -3254,7 +3260,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Näytä tarkat tiedot luetelluista istunnoista.</value>
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized format type. Supported format types are: {}.</value>
+    <value>Virheellinen {} -arvo: {} ei ole tunnistettu formaattityyppi. Tuetut muototyypit ovat: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">

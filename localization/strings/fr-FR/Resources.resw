@@ -1005,8 +1005,8 @@ Retour à la mise en réseau NAT.</value>
     <value>Le registre d’images conteneur « {} » est bloqué par la stratégie de l’ordinateur.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>La génération d’images conteneur est bloquée, car une liste verte de registre de conteneurs est configurée par la stratégie de l’ordinateur. Les générations d’images peuvent extraire des images de base de registres arbitraires et ne peuvent pas être limitées de manière fiable à la liste d’autorisation.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>La stratégie de liste verte du registre de conteneurs n’est pas valide. Vérifiez que les valeurs WSLContainerRegistryAllowlist sous Software\Policies\WSL sont configurées correctement.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Exécutez « wsl.exe --set-version {} 2 » pour effectuer la mise à niveau vers WSL2.</value>
@@ -1993,13 +1993,13 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
     <value>Nombre de millisecondes pendant lesquelles une machine virtuelle est inactive, avant d’être éteinte.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>Gardez WSL en cours d’exécution</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
     <value>Empêcher les distributions en cours d’exécution et la machine virtuelle WSL qui les héberge d’être automatiquement arrêtées après leur inactivité.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>Gardez WSL en cours d’exécution.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Empêcher les distributions en cours d’exécution et la machine virtuelle WSL qui les héberge d’être automatiquement arrêtées après leur inactivité.</value>
@@ -2014,19 +2014,19 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
     <value>Nombre de millisecondes pendant lesquelles une machine virtuelle est inactive, avant d’être éteinte.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Délai d’inactivité de la distribution</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>Nombre de millisecondes pendant lesquelles une distribution est inactive, avant d’être terminée.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Réinitialiser le délai d’expiration</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Délai d’inactivité de la distribution</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>Nombre de millisecondes pendant lesquelles une distribution est inactive, avant d’être terminée.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Appliquer les modifications</value>
@@ -3142,6 +3142,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Chemin d’accès de stockage de session</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Path to the session storage directory</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signal à envoyer</value>
   </data>
@@ -3186,7 +3189,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Ne générez pas d’erreur si le volume n’existe pas</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>Supprimer les volumes anonymes associés au conteneur</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Répertoire de travail à l’intérieur du conteneur</value>
@@ -3197,6 +3200,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Écrire l’ID de conteneur dans le chemin d’accès fourni</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Écrire l’ID d’image dans le chemin d’accès fourni</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Adresse IP du serveur de noms DNS dans resolv.conf</value>
