@@ -61,6 +61,7 @@ struct SessionSettings
 {
     std::wstring DisplayName;
     std::wstring StoragePath;
+    std::string HostLoopback;
     WSLCSessionSettings Settings{};
 
     NON_COPYABLE(SessionSettings);
@@ -111,10 +112,11 @@ struct SessionSettings
 
 private:
     SessionSettings(std::wstring name, std::wstring path, WSLCSessionStorageFlags storageFlags, const settings::UserSettings& userSettings) :
-        DisplayName(std::move(name)), StoragePath(std::move(path))
+        DisplayName(std::move(name)), StoragePath(std::move(path)), HostLoopback(userSettings.Get<settings::Setting::SessionHostLoopback>())
     {
         Settings.DisplayName = DisplayName.c_str();
         Settings.StoragePath = StoragePath.c_str();
+        Settings.HostLoopback = HostLoopback.empty() ? nullptr : HostLoopback.c_str();
         auto cpuCount = userSettings.Get<settings::Setting::SessionCpuCount>();
         Settings.CpuCount = cpuCount > 0 ? cpuCount : wsl::windows::common::wslutil::GetLogicalProcessorCount();
         auto memoryMb = userSettings.Get<settings::Setting::SessionMemoryMb>();

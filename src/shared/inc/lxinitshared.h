@@ -414,6 +414,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCListDir,
     LxMessageWSLCListDirResult,
     LxMessageWSLCMountVirtioFs,
+    LxMessageWSLCWriteFile,
     LxMiniInitMessageTrimDistribution,
     LxMiniInitMessageTrimDistributionResponse,
 } LX_MESSAGE_TYPE,
@@ -531,6 +532,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCListDir)
         X(LxMessageWSLCListDirResult)
         X(LxMessageWSLCMountVirtioFs)
+        X(LxMessageWSLCWriteFile)
         X(LxMiniInitMessageTrimDistribution)
         X(LxMiniInitMessageTrimDistributionResponse)
 
@@ -1948,6 +1950,24 @@ struct WSLC_GET_GUEST_CAPABILITIES
     MESSAGE_HEADER Header{};
 
     PRETTY_PRINT(FIELD(Header));
+};
+
+struct WSLC_WRITE_FILE
+{
+    static inline auto Type = LxMessageWSLCWriteFile;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(WSLC_WRITE_FILE);
+    MESSAGE_HEADER Header;
+    unsigned int PathIndex;
+    unsigned int ContentIndex;
+    unsigned int ContentLength;
+    int OpenFlags;
+    int Permissions;
+    char Buffer[];
+
+    // Buffer content excluded from PRETTY_PRINT so callers can pass sensitive payloads.
+    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

@@ -971,15 +971,6 @@ try
         "Invalid flags: 0x%x",
         Options->Flags);
 
-    // Image builds shell out to `docker build` inside the VM, which fetches FROM
-    // base images directly through the in-VM docker daemon and bypasses the
-    // per-pull registry policy gate. When an allowlist is configured, refuse the
-    // build outright since we cannot reliably attribute its registry traffic.
-    if (wsl::windows::policies::HasRegistryAllowlist(wsl::windows::policies::OpenPoliciesKey().get()))
-    {
-        THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
-    }
-
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
     std::optional<UserCOMCallback> comCall;
@@ -991,6 +982,8 @@ try
     auto runtime = m_runtime.Acquire();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
+
+    const auto policyState = runtime.Vm().GetBuildKitPolicyState();
 
     // Track every Windows folder we mount into the VM during this build so a single scope_exit
     // unmounts them all on success or on any throw partway through the loop below.
@@ -1014,16 +1007,22 @@ try
 
     // Reserve up front so mountInVm's push_back can never reallocate-and-throw after a successful
     // MountWindowsFolder, which would leak a mount the scope_exit hasn't recorded yet. At most the build
-    // context (1), the single-file exporter output destination (1), and one parent directory per file
-    // secret are mounted.
-    mountedPaths.reserve(static_cast<size_t>(2) + Options->Secrets.Count);
+    // context (1), the single-file exporter output destination (1), the --iidfile destination (1), and
+    // one parent directory per file secret are mounted.
+    mountedPaths.reserve(static_cast<size_t>(3) + Options->Secrets.Count);
+
+    // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
+    // values never touch disk; kept off telemetry (only buildArgs is logged).
+    std::vector<std::string> buildEnv;
+
+    if (policyState == WSLCVirtualMachine::BuildKitPolicyState::Configured)
+    {
+        buildEnv.emplace_back(std::string{"EXPERIMENTAL_BUILDKIT_SOURCE_POLICY="} + WSLCVirtualMachine::c_buildKitPolicyPath);
+    }
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
-    // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
-    // values never touch disk; kept off telemetry (only buildArgs is logged).
-    std::vector<std::string> buildEnv;
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
@@ -1080,6 +1079,23 @@ try
         }
         buildArgs.push_back("--output");
         buildArgs.push_back(outputSpec);
+    }
+
+    // Docker-style --iidfile. The destination's parent directory is mounted read-write into the VM so
+    // buildx writes the image ID straight to the client's --iidfile path.
+    if (Options->IidFilePath != nullptr && Options->IidFilePath[0] != L'\0')
+    {
+        std::filesystem::path iidPath(Options->IidFilePath);
+        // The client and server have different current directories, so a relative path is ambiguous.
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Options->IidFilePath), !iidPath.is_absolute());
+
+        auto iidParent = iidPath.parent_path();
+        auto iidFileNameUtf8 = wsl::shared::string::WideToMultiByte(iidPath.filename().wstring());
+        RETURN_HR_IF(E_INVALIDARG, iidParent.empty() || iidFileNameUtf8.empty());
+
+        auto iidMountPath = mountInVm(iidParent.c_str(), FALSE);
+        buildArgs.push_back("--iidfile");
+        buildArgs.push_back(std::format("{}/{}", iidMountPath, iidFileNameUtf8));
     }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {

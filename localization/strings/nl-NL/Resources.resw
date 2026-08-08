@@ -160,7 +160,7 @@ Voer wsl.exe {} uit om WSL2 te dwingen de schijf te stoppen en los te koppelen.<
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>De mountnaam mag niet leeg zijn, '.', '..' of '/' bevatten. Probeer het opnieuw met een geldige mountnaam.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -1985,6 +1985,18 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Het aantal milliseconden dat een VM inactief is voordat deze wordt afgesloten.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Keep WSL running</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Keep WSL running.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Time-out voor opnieuw instellen</value>
   </data>
@@ -1993,6 +2005,21 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Het aantal milliseconden dat een VM inactief is voordat deze wordt afgesloten.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Het aantal milliseconden dat een distributie inactief is voordat deze wordt beëindigd.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reset timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Distribution idle timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Het aantal milliseconden dat een distributie inactief is voordat deze wordt beëindigd.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Wijzigingen toepassen</value>
@@ -2955,6 +2982,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Uitvoeropmaak (json of table) (Standaard: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumenten om door te geven aan het init-proces van de container</value>
   </data>
@@ -3147,6 +3178,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Meld geen fout als het volume niet bestaat</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Remove anonymous volumes associated with the container</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Werkmap binnen de container</value>
   </data>
@@ -3219,9 +3253,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Toon gedetailleerde informatie over de weergegeven sessies.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Ongeldig indelingstype opgegeven. Ondersteunde indelingstypen zijn: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: {} is geen herkend indelingstype. Ondersteunde indelingstypen zijn: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} is geen herkend inspectietype. Ondersteunde inspectietypen zijn: {}.</value>

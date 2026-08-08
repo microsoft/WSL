@@ -122,6 +122,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -294,6 +295,7 @@ class WSLCCLISettingsUnitTests
             "  networkingMode: default\n"
             "  hostFileShareMode: default\n"
             "  dnsTunneling: default\n"
+            "  hostLoopback: default\n"
             "experimental:\n"
             "  portRelay: default\n"
             "credentialStore: default\n");
@@ -308,6 +310,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeConsomme), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
         VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
+        VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
         VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::VirtioNet), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
@@ -546,6 +549,32 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::WslRelay), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
+    }
+
+    // -----------------------------------------------------------------------
+    // session.hostLoopback
+    // -----------------------------------------------------------------------
+
+    TEST_METHOD(Validation_HostLoopback_CustomName)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  hostLoopback: host.containers.internal\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("host.containers.internal"), s.Get<Setting::SessionHostLoopback>());
+    }
+
+    TEST_METHOD(Validation_HostLoopback_NoneDisablesEntry)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  hostLoopback: none\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
     }
 
     // -----------------------------------------------------------------------

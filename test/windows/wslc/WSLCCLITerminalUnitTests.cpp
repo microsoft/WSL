@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCCLIReporterUnitTests.cpp
+    WSLCCLITerminalUnitTests.cpp
 
 Abstract:
 
-    Unit tests for OutputChannel, InputChannel, and Reporter.
+    Unit tests for OutputChannel, InputChannel, and Terminal.
 
 --*/
 
@@ -18,7 +18,7 @@ Abstract:
 
 #include "InputChannel.h"
 #include "OutputChannel.h"
-#include "Reporter.h"
+#include "Terminal.h"
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::common::vt;
@@ -27,38 +27,38 @@ using namespace WEX::Logging;
 using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
-namespace WSLCCLIReporterUnitTests {
+namespace WSLCCLITerminalUnitTests {
 
-// Dual-pipe Reporter so stdout and stderr can be asserted independently.
-struct SplitCaptureReporter
+// Dual-pipe Terminal so stdout and stderr can be asserted independently.
+struct SplitCaptureTerminal
 {
     CapturePipe outPipe;
     CapturePipe errPipe;
-    Reporter reporter;
+    Terminal terminal;
 
-    explicit SplitCaptureReporter(bool vtEnabled = false) : reporter(outPipe.file(), vtEnabled, errPipe.file(), vtEnabled)
+    explicit SplitCaptureTerminal(bool vtEnabled = false) : terminal(outPipe.file(), vtEnabled, errPipe.file(), vtEnabled)
     {
     }
 };
 
-// Reporter wired with a preloaded input pipe plus split output capture, so prompt
+// Terminal wired with a preloaded input pipe plus split output capture, so prompt
 // input and the label/newline it writes can be asserted together.
-struct InputCaptureReporter
+struct InputCaptureTerminal
 {
     CapturePipe outPipe;
     CapturePipe errPipe;
     InputPipe inPipe;
-    Reporter reporter;
+    Terminal terminal;
 
-    explicit InputCaptureReporter(const std::wstring& input, bool interactive = false) :
-        inPipe(input), reporter(outPipe.file(), false, errPipe.file(), false, inPipe.file(), interactive)
+    explicit InputCaptureTerminal(const std::wstring& input, bool interactive = false) :
+        inPipe(input), terminal(outPipe.file(), false, errPipe.file(), false, inPipe.file(), interactive)
     {
     }
 };
 
-class WSLCCLIReporterUnitTests
+class WSLCCLITerminalUnitTests
 {
-    WSLC_TEST_CLASS(WSLCCLIReporterUnitTests)
+    WSLC_TEST_CLASS(WSLCCLITerminalUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -102,58 +102,58 @@ class WSLCCLIReporterUnitTests
         VERIFY_IS_FALSE(channel.GetConsoleWidth().has_value());
     }
 
-    TEST_METHOD(Reporter_WriteEmitsExactText)
+    TEST_METHOD(Terminal_WriteEmitsExactText)
     {
-        CaptureReporter cap;
-        cap.reporter.Output(L"hello\n");
+        CaptureTerminal cap;
+        cap.terminal.Output(L"hello\n");
         VERIFY_ARE_EQUAL(std::wstring{L"hello\n"}, cap.captured());
     }
 
-    TEST_METHOD(Reporter_WriteWithoutNewline)
+    TEST_METHOD(Terminal_WriteWithoutNewline)
     {
-        CaptureReporter cap;
-        cap.reporter.Write(Reporter::Level::Output, L"hello");
+        CaptureTerminal cap;
+        cap.terminal.Write(Terminal::Level::Output, L"hello");
         VERIFY_ARE_EQUAL(std::wstring{L"hello"}, cap.captured());
     }
 
-    TEST_METHOD(Reporter_FormatStringSubstitutesArgs)
+    TEST_METHOD(Terminal_FormatStringSubstitutesArgs)
     {
-        CaptureReporter cap;
-        cap.reporter.Output(L"value={}, name={}\n", 42, L"alice");
+        CaptureTerminal cap;
+        cap.terminal.Output(L"value={}, name={}\n", 42, L"alice");
         VERIFY_ARE_EQUAL(std::wstring{L"value=42, name=alice\n"}, cap.captured());
     }
 
-    TEST_METHOD(Reporter_PlainStringNeedsNoArgs)
+    TEST_METHOD(Terminal_PlainStringNeedsNoArgs)
     {
-        CaptureReporter cap;
-        cap.reporter.Output(L"plain literal\n");
+        CaptureTerminal cap;
+        cap.terminal.Output(L"plain literal\n");
         VERIFY_ARE_EQUAL(std::wstring{L"plain literal\n"}, cap.captured());
     }
 
-    TEST_METHOD(Reporter_SequenceEmittedWhenVTEnabled)
+    TEST_METHOD(Terminal_SequenceEmittedWhenVTEnabled)
     {
-        CaptureReporter cap{/*vtEnabled*/ true};
-        cap.reporter.Output(L"{}highlighted{}\n", Format::Fg::BrightYellow, Format::Default);
+        CaptureTerminal cap{/*vtEnabled*/ true};
+        cap.terminal.Output(L"{}highlighted{}\n", Format::Fg::BrightYellow, Format::Default);
 
         const auto result = cap.captured();
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L"highlighted"));
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(Format::Fg::BrightYellow.Get()));
     }
 
-    TEST_METHOD(Reporter_SequenceStrippedWhenVTDisabled)
+    TEST_METHOD(Terminal_SequenceStrippedWhenVTDisabled)
     {
-        CaptureReporter cap{/*vtEnabled*/ false};
-        cap.reporter.Output(L"{}plain{}\n", Format::Fg::BrightYellow, Format::Default);
+        CaptureTerminal cap{/*vtEnabled*/ false};
+        cap.terminal.Output(L"{}plain{}\n", Format::Fg::BrightYellow, Format::Default);
         VERIFY_ARE_EQUAL(std::wstring{L"plain\n"}, cap.captured());
     }
 
-    TEST_METHOD(Reporter_ColorSequenceStrippedWhenNoColor)
+    TEST_METHOD(Terminal_ColorSequenceStrippedWhenNoColor)
     {
-        CaptureReporter cap{/*vtEnabled*/ true};
-        cap.reporter.SetNoColor(true);
+        CaptureTerminal cap{/*vtEnabled*/ true};
+        cap.terminal.SetNoColor(true);
 
         // Color sequence (SGR) stripped; cursor moves (non-color) still pass.
-        cap.reporter.Output(L"{}{}plain{}\n", Cursor::Up(1), Format::Fg::BrightRed, Format::Default);
+        cap.terminal.Output(L"{}{}plain{}\n", Cursor::Up(1), Format::Fg::BrightRed, Format::Default);
 
         const auto result = cap.captured();
         VERIFY_ARE_EQUAL(std::wstring::npos, result.find(Format::Fg::BrightRed.Get()));
@@ -161,25 +161,25 @@ class WSLCCLIReporterUnitTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L"plain"));
     }
 
-    TEST_METHOD(Reporter_ConstructedSequenceHandledLikeSequence)
+    TEST_METHOD(Terminal_ConstructedSequenceHandledLikeSequence)
     {
-        CaptureReporter cap{/*vtEnabled*/ true};
+        CaptureTerminal cap{/*vtEnabled*/ true};
         const auto cursor = Cursor::Up(3);
-        cap.reporter.Output(L"{}done\n", cursor);
+        cap.terminal.Output(L"{}done\n", cursor);
 
         const auto result = cap.captured();
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(cursor.Get()));
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.find(L"done"));
     }
 
-    TEST_METHOD(Reporter_LevelColorWrapsOutputWhenVTEnabled)
+    TEST_METHOD(Terminal_LevelColorWrapsOutputWhenVTEnabled)
     {
-        CaptureReporter cap{/*vtEnabled*/ true};
+        CaptureTerminal cap{/*vtEnabled*/ true};
 
-        cap.reporter.Output(L"starting\n");
-        cap.reporter.Info(L"pulling\n");
-        cap.reporter.Warn(L"careful\n");
-        cap.reporter.Error(L"failed\n");
+        cap.terminal.Output(L"starting\n");
+        cap.terminal.Info(L"pulling\n");
+        cap.terminal.Warn(L"careful\n");
+        cap.terminal.Error(L"failed\n");
 
         const std::wstring def{Format::Default.Get()};
         const std::wstring yellow{Format::Fg::BrightYellow.Get()};
@@ -190,90 +190,90 @@ class WSLCCLIReporterUnitTests
         VERIFY_ARE_EQUAL(expected, cap.captured());
     }
 
-    TEST_METHOD(Reporter_LevelColorSuppressedWhenVTDisabled)
+    TEST_METHOD(Terminal_LevelColorSuppressedWhenVTDisabled)
     {
-        CaptureReporter cap{/*vtEnabled*/ false};
-        cap.reporter.Error(L"failed\n");
+        CaptureTerminal cap{/*vtEnabled*/ false};
+        cap.terminal.Error(L"failed\n");
         VERIFY_ARE_EQUAL(std::wstring{L"failed\n"}, cap.captured());
     }
 
-    TEST_METHOD(Reporter_LevelColorSuppressedWhenNoColor)
+    TEST_METHOD(Terminal_LevelColorSuppressedWhenNoColor)
     {
-        CaptureReporter cap{/*vtEnabled*/ true};
-        cap.reporter.SetNoColor(true);
-        cap.reporter.Warn(L"careful\n");
+        CaptureTerminal cap{/*vtEnabled*/ true};
+        cap.terminal.SetNoColor(true);
+        cap.terminal.Warn(L"careful\n");
         VERIFY_ARE_EQUAL(std::wstring{L"careful\n"}, cap.captured());
     }
 
-    TEST_METHOD(Reporter_RoutingByLevel)
+    TEST_METHOD(Terminal_RoutingByLevel)
     {
-        SplitCaptureReporter cap;
+        SplitCaptureTerminal cap;
 
-        cap.reporter.Output(L"output text\n");
-        cap.reporter.Info(L"info text\n");
-        cap.reporter.Warn(L"warn text\n");
-        cap.reporter.Error(L"error text\n");
+        cap.terminal.Output(L"output text\n");
+        cap.terminal.Info(L"info text\n");
+        cap.terminal.Warn(L"warn text\n");
+        cap.terminal.Error(L"error text\n");
 
         VERIFY_ARE_EQUAL(std::wstring{L"output text\n"}, cap.outPipe.captured());
         VERIFY_ARE_EQUAL(std::wstring{L"info text\nwarn text\nerror text\n"}, cap.errPipe.captured());
     }
 
-    TEST_METHOD(Reporter_SetNoColorTogglesIsNoColor)
+    TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)
     {
-        CaptureReporter cap;
-        VERIFY_IS_FALSE(cap.reporter.IsNoColor());
-        cap.reporter.SetNoColor(true);
-        VERIFY_IS_TRUE(cap.reporter.IsNoColor());
-        cap.reporter.SetNoColor(false);
-        VERIFY_IS_FALSE(cap.reporter.IsNoColor());
+        CaptureTerminal cap;
+        VERIFY_IS_FALSE(cap.terminal.IsNoColor());
+        cap.terminal.SetNoColor(true);
+        VERIFY_IS_TRUE(cap.terminal.IsNoColor());
+        cap.terminal.SetNoColor(false);
+        VERIFY_IS_FALSE(cap.terminal.IsNoColor());
     }
 
-    TEST_METHOD(Reporter_IsVTEnabledReflectsPerChannelState)
+    TEST_METHOD(Terminal_IsVTEnabledReflectsPerChannelState)
     {
         {
-            SplitCaptureReporter cap{/*vt*/ false};
-            VERIFY_IS_FALSE(cap.reporter.IsVTEnabled(Reporter::Level::Output));
-            VERIFY_IS_FALSE(cap.reporter.IsVTEnabled(Reporter::Level::Error));
+            SplitCaptureTerminal cap{/*vt*/ false};
+            VERIFY_IS_FALSE(cap.terminal.IsVTEnabled(Terminal::Level::Output));
+            VERIFY_IS_FALSE(cap.terminal.IsVTEnabled(Terminal::Level::Error));
         }
         {
-            SplitCaptureReporter cap{/*vt*/ true};
-            VERIFY_IS_TRUE(cap.reporter.IsVTEnabled(Reporter::Level::Output));
-            VERIFY_IS_TRUE(cap.reporter.IsVTEnabled(Reporter::Level::Error));
+            SplitCaptureTerminal cap{/*vt*/ true};
+            VERIFY_IS_TRUE(cap.terminal.IsVTEnabled(Terminal::Level::Output));
+            VERIFY_IS_TRUE(cap.terminal.IsVTEnabled(Terminal::Level::Error));
         }
         {
             CapturePipe outPipe;
             CapturePipe errPipe;
-            Reporter reporter{outPipe.file(), /*outVt*/ true, errPipe.file(), /*errVt*/ false};
-            VERIFY_IS_TRUE(reporter.IsVTEnabled(Reporter::Level::Output));
-            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Info));
-            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Warning));
-            VERIFY_IS_FALSE(reporter.IsVTEnabled(Reporter::Level::Error));
+            Terminal terminal{outPipe.file(), /*outVt*/ true, errPipe.file(), /*errVt*/ false};
+            VERIFY_IS_TRUE(terminal.IsVTEnabled(Terminal::Level::Output));
+            VERIFY_IS_FALSE(terminal.IsVTEnabled(Terminal::Level::Info));
+            VERIFY_IS_FALSE(terminal.IsVTEnabled(Terminal::Level::Warning));
+            VERIFY_IS_FALSE(terminal.IsVTEnabled(Terminal::Level::Error));
         }
     }
 
-    TEST_METHOD(Reporter_IsColorEnabledPerLevelHonorsBothVTAndNoColor)
+    TEST_METHOD(Terminal_IsColorEnabledPerLevelHonorsBothVTAndNoColor)
     {
-        SplitCaptureReporter cap{/*vt*/ true};
-        VERIFY_IS_TRUE(cap.reporter.IsColorEnabled(Reporter::Level::Output));
-        VERIFY_IS_TRUE(cap.reporter.IsColorEnabled(Reporter::Level::Error));
+        SplitCaptureTerminal cap{/*vt*/ true};
+        VERIFY_IS_TRUE(cap.terminal.IsColorEnabled(Terminal::Level::Output));
+        VERIFY_IS_TRUE(cap.terminal.IsColorEnabled(Terminal::Level::Error));
 
-        cap.reporter.SetNoColor(true);
-        VERIFY_IS_FALSE(cap.reporter.IsColorEnabled(Reporter::Level::Output));
-        VERIFY_IS_FALSE(cap.reporter.IsColorEnabled(Reporter::Level::Error));
+        cap.terminal.SetNoColor(true);
+        VERIFY_IS_FALSE(cap.terminal.IsColorEnabled(Terminal::Level::Output));
+        VERIFY_IS_FALSE(cap.terminal.IsColorEnabled(Terminal::Level::Error));
     }
 
-    TEST_METHOD(Reporter_GetConsoleWidthReturnsNulloptForFileChannels)
+    TEST_METHOD(Terminal_GetConsoleWidthReturnsNulloptForFileChannels)
     {
-        SplitCaptureReporter cap;
-        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Output).has_value());
-        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Info).has_value());
-        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Warning).has_value());
-        VERIFY_IS_FALSE(cap.reporter.GetConsoleWidth(Reporter::Level::Error).has_value());
+        SplitCaptureTerminal cap;
+        VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Output).has_value());
+        VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Info).has_value());
+        VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Warning).has_value());
+        VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Error).has_value());
     }
 
-    TEST_METHOD(Reporter_Write_MixesSequencesWithStandardFormatArgs)
+    TEST_METHOD(Terminal_Write_MixesSequencesWithStandardFormatArgs)
     {
-        // Reporter.Write is std::format under the hood — any formattable type works
+        // Terminal.Write is std::format under the hood — any formattable type works
         // alongside Sequences. Sequences are stripped when color is off; everything
         // else formats normally through std::format machinery.
         //
@@ -295,8 +295,8 @@ class WSLCCLIReporterUnitTests
 
         // VT + color enabled: equivalent to std::format with all sequence bytes.
         {
-            CaptureReporter cap{/*vtEnabled*/ true};
-            cap.reporter.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
+            CaptureTerminal cap{/*vtEnabled*/ true};
+            cap.terminal.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
 
             const auto expected = std::format(
                 fmt, Format::Fg::BrightRed.Get(), 42, 255u, eraseLine.Get(), linkOpen.Get(), linkClose.Get(), Format::Default.Get());
@@ -306,9 +306,9 @@ class WSLCCLIReporterUnitTests
         // NoColor (VT enabled, color disabled): non-color sequences pass through,
         // color sequences (SGR, hyperlink) replaced with empty string.
         {
-            CaptureReporter cap{/*vtEnabled*/ true};
-            cap.reporter.SetNoColor(true);
-            cap.reporter.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
+            CaptureTerminal cap{/*vtEnabled*/ true};
+            cap.terminal.SetNoColor(true);
+            cap.terminal.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
 
             const std::wstring_view empty;
             const auto expected = std::format(fmt, empty, 42, 255u, eraseLine.Get(), empty, empty, empty);
@@ -317,8 +317,8 @@ class WSLCCLIReporterUnitTests
 
         // VT disabled: all sequences replaced with empty string.
         {
-            CaptureReporter cap{/*vtEnabled*/ false};
-            cap.reporter.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
+            CaptureTerminal cap{/*vtEnabled*/ false};
+            cap.terminal.Output(fmt, Format::Fg::BrightRed, 42, 255u, eraseLine, linkOpen, linkClose, Format::Default);
 
             const std::wstring_view empty;
             const auto expected = std::format(fmt, empty, 42, 255u, empty, empty, empty, empty);
@@ -461,28 +461,28 @@ class WSLCCLIReporterUnitTests
         VERIFY_IS_FALSE(channel.ReadLine(false).has_value());
     }
 
-    TEST_METHOD(Reporter_ReadLineReturnsInput)
+    TEST_METHOD(Terminal_ReadLineReturnsInput)
     {
-        InputCaptureReporter cap{L"line1\nline2\n"};
-        VERIFY_ARE_EQUAL(std::wstring{L"line1"}, cap.reporter.ReadLine().value_or(L"<eof>"));
-        VERIFY_ARE_EQUAL(std::wstring{L"line2"}, cap.reporter.ReadLine().value_or(L"<eof>"));
-        VERIFY_IS_FALSE(cap.reporter.ReadLine().has_value());
+        InputCaptureTerminal cap{L"line1\nline2\n"};
+        VERIFY_ARE_EQUAL(std::wstring{L"line1"}, cap.terminal.ReadLine().value_or(L"<eof>"));
+        VERIFY_ARE_EQUAL(std::wstring{L"line2"}, cap.terminal.ReadLine().value_or(L"<eof>"));
+        VERIFY_IS_FALSE(cap.terminal.ReadLine().has_value());
     }
 
-    TEST_METHOD(Reporter_IsInputInteractiveReflectsChannel)
+    TEST_METHOD(Terminal_IsInputInteractiveReflectsChannel)
     {
-        InputCaptureReporter pipeInput{L"x\n", /*interactive*/ false};
-        VERIFY_IS_FALSE(pipeInput.reporter.IsInputInteractive());
+        InputCaptureTerminal pipeInput{L"x\n", /*interactive*/ false};
+        VERIFY_IS_FALSE(pipeInput.terminal.IsInputInteractive());
 
-        InputCaptureReporter consoleInput{L"x\n", /*interactive*/ true};
-        VERIFY_IS_TRUE(consoleInput.reporter.IsInputInteractive());
+        InputCaptureTerminal consoleInput{L"x\n", /*interactive*/ true};
+        VERIFY_IS_TRUE(consoleInput.terminal.IsInputInteractive());
     }
 
-    TEST_METHOD(Reporter_PromptForLineWritesLabelToStdoutAndReturnsInput)
+    TEST_METHOD(Terminal_PromptForLineWritesLabelToStdoutAndReturnsInput)
     {
-        InputCaptureReporter cap{L"myuser\n"};
+        InputCaptureTerminal cap{L"myuser\n"};
 
-        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Username: ", false);
+        const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, L"Username: ", false);
         VERIFY_ARE_EQUAL(std::wstring{L"myuser"}, result);
 
         // Label lands on stdout (Docker convention); nothing on stderr; no trailing
@@ -491,77 +491,77 @@ class WSLCCLIReporterUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
     }
 
-    TEST_METHOD(Reporter_PromptForLineMaskedInteractiveEmitsTrailingNewline)
+    TEST_METHOD(Terminal_PromptForLineMaskedInteractiveEmitsTrailingNewline)
     {
         // Interactive override makes willMask true, so the un-echoed Enter is advanced
         // with a trailing newline after the label.
-        InputCaptureReporter cap{L"secret\n", /*interactive*/ true};
+        InputCaptureTerminal cap{L"secret\n", /*interactive*/ true};
 
-        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Password: ", true);
+        const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, L"Password: ", true);
         VERIFY_ARE_EQUAL(std::wstring{L"secret"}, result);
         VERIFY_ARE_EQUAL(std::wstring{L"Password: \n"}, cap.outPipe.captured());
     }
 
-    TEST_METHOD(Reporter_PromptForLineMaskedNonInteractiveEmitsNoTrailingNewline)
+    TEST_METHOD(Terminal_PromptForLineMaskedNonInteractiveEmitsNoTrailingNewline)
     {
         // Redirected input is not interactive, so no masking and no trailing newline.
-        InputCaptureReporter cap{L"secret\n", /*interactive*/ false};
+        InputCaptureTerminal cap{L"secret\n", /*interactive*/ false};
 
-        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Password: ", true);
+        const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, L"Password: ", true);
         VERIFY_ARE_EQUAL(std::wstring{L"secret"}, result);
         VERIFY_ARE_EQUAL(std::wstring{L"Password: "}, cap.outPipe.captured());
     }
 
-    TEST_METHOD(Reporter_PromptForLineReturnsEmptyStringAtEof)
+    TEST_METHOD(Terminal_PromptForLineReturnsEmptyStringAtEof)
     {
-        InputCaptureReporter cap{L""};
-        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Username: ", false);
+        InputCaptureTerminal cap{L""};
+        const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, L"Username: ", false);
         VERIFY_ARE_EQUAL(std::wstring{L""}, result);
         VERIFY_ARE_EQUAL(std::wstring{L"Username: "}, cap.outPipe.captured());
     }
 
-    TEST_METHOD(Reporter_PromptForLineEmitsLabelVerbatimWithFormatCharacters)
+    TEST_METHOD(Terminal_PromptForLineEmitsLabelVerbatimWithFormatCharacters)
     {
         // The label is passed as a formatting argument, not a format string, so brace
         // and percent characters in it must never be interpreted (no format injection).
-        InputCaptureReporter cap{L"answer\n"};
+        InputCaptureTerminal cap{L"answer\n"};
         const std::wstring label = L"Value {} {0} {name} 100% ${var}: ";
 
-        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, label, false);
+        const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, label, false);
         VERIFY_ARE_EQUAL(std::wstring{L"answer"}, result);
         VERIFY_ARE_EQUAL(label, cap.outPipe.captured());
     }
 
-    TEST_METHOD(Reporter_PromptForLineDoesNotTrimPasswordWhitespace)
+    TEST_METHOD(Terminal_PromptForLineDoesNotTrimPasswordWhitespace)
     {
         // Secrets are opaque: interior and surrounding whitespace is preserved so a
         // password like "  a b  " is returned exactly as typed.
-        InputCaptureReporter cap{L"  a b  \n", /*interactive*/ true};
+        InputCaptureTerminal cap{L"  a b  \n", /*interactive*/ true};
 
-        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Password: ", true);
+        const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, L"Password: ", true);
         VERIFY_ARE_EQUAL(std::wstring{L"  a b  "}, result);
         VERIFY_ARE_EQUAL(std::wstring{L"Password: \n"}, cap.outPipe.captured());
     }
 
-    TEST_METHOD(Reporter_PromptForLineReturnsUnicodeInput)
+    TEST_METHOD(Terminal_PromptForLineReturnsUnicodeInput)
     {
         const std::wstring expected = L"\u00fcser\u00f1ame";
-        InputCaptureReporter cap{expected + L"\n"};
+        InputCaptureTerminal cap{expected + L"\n"};
 
-        const auto result = cap.reporter.PromptForLine(Reporter::Level::Output, L"Username: ", false);
+        const auto result = cap.terminal.PromptForLine(Terminal::Level::Output, L"Username: ", false);
         VERIFY_ARE_EQUAL(expected, result);
     }
 
-    TEST_METHOD(Reporter_ReadLineMaskDefaultsToUnmasked)
+    TEST_METHOD(Terminal_ReadLineMaskDefaultsToUnmasked)
     {
         // ReadLine(bool mask = false): the default reads without masking and returns
         // the line, used by the --password-stdin path.
-        InputCaptureReporter cap{L"piped-secret\n"};
-        VERIFY_ARE_EQUAL(std::wstring{L"piped-secret"}, cap.reporter.ReadLine().value_or(L"<eof>"));
+        InputCaptureTerminal cap{L"piped-secret\n"};
+        VERIFY_ARE_EQUAL(std::wstring{L"piped-secret"}, cap.terminal.ReadLine().value_or(L"<eof>"));
         // Nothing is written for a bare ReadLine (no prompt label).
         VERIFY_ARE_EQUAL(std::wstring{L""}, cap.outPipe.captured());
         VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
     }
 };
 
-} // namespace WSLCCLIReporterUnitTests
+} // namespace WSLCCLITerminalUnitTests

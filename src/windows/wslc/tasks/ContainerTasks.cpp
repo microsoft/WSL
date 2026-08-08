@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #include "Argument.h"
-#include "ArgumentValidation.h"
+#include "ArgumentConvertedTypes.h"
 #include "AsyncExecution.h"
 #include "CLIExecutionContext.h"
 #include "ContainerModel.h"
@@ -136,7 +136,7 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 namespace wsl::windows::wslc::task {
 
-static bool TryInspectContainer(Reporter& reporter, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
+static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
 {
     try
     {
@@ -147,7 +147,7 @@ static bool TryInspectContainer(Reporter& reporter, Session& session, const std:
     {
         if (ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
         {
-            reporter.Error(L"{}\n", Localization::MessageWslcContainerNotFound(containerId.c_str()));
+            terminal.Error(L"{}\n", Localization::MessageWslcContainerNotFound(containerId.c_str()));
             return false;
         }
 
@@ -158,7 +158,7 @@ static bool TryInspectContainer(Reporter& reporter, Session& session, const std:
 void AttachContainer::operator()(CLIExecutionContext& context) const
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    context.ExitCode = ContainerService::Attach(context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(m_containerId));
+    context.ExitCode = ContainerService::Attach(context.Terminal, context.Data.Get<Data::Session>(), WideToMultiByte(m_containerId));
 }
 
 void CreateContainer(CLIExecutionContext& context)
@@ -167,11 +167,11 @@ void CreateContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     auto result = ContainerService::Create(
-        context.Reporter,
+        context.Terminal,
         context.Data.Get<Data::Session>(),
-        WideToMultiByte(context.Args.Get<ArgType::ImageId>()),
+        WideToMultiByte(context.Args.GetValue<ArgType::ImageId>()),
         context.Data.Get<Data::ContainerOptions>());
-    context.Reporter.Output(L"{}\n", MultiByteToWide(result.Id));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(result.Id));
 }
 
 void ExecContainer(CLIExecutionContext& context)
@@ -180,9 +180,9 @@ void ExecContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     context.ExitCode = ContainerService::Exec(
-        context.Reporter,
+        context.Terminal,
         context.Data.Get<Data::Session>(),
-        WideToMultiByte(context.Args.Get<ArgType::ContainerId>()),
+        WideToMultiByte(context.Args.GetValue<ArgType::ContainerId>()),
         context.Data.Get<Data::ContainerOptions>());
 }
 
@@ -195,40 +195,29 @@ void GetContainers(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Last))
     {
-        limit = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::Last>(), L"--last");
+        limit = context.Args.GetValue<ArgType::Last>();
     }
-    else if (context.Args.GetFlag<ArgType::Latest>())
+    else if (context.Args.GetValue<ArgType::Latest>())
     {
         limit = 1;
     }
 
-    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
-    std::vector<std::pair<std::string, std::string>> filters;
-    if (context.Args.Contains(ArgType::Filter))
-    {
-        for (const auto& wideValue : context.Args.GetAll<ArgType::Filter>())
-        {
-            std::string raw = WideToMultiByte(wideValue);
-            const auto eq = raw.find('=');
-            WI_ASSERT(eq != std::string::npos);
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-            filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
-        }
-    }
-
-    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetFlag<ArgType::All>(), limit, filters));
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters));
 }
 
 void InspectContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
+    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     std::vector<wsl::windows::common::wslc_schema::InspectContainer> result;
     for (const auto& id : containerIds)
     {
         std::optional<wslc_schema::InspectContainer> inspectData;
-        if (TryInspectContainer(context.Reporter, session, WideToMultiByte(id), inspectData))
+        if (TryInspectContainer(context.Terminal, session, WideToMultiByte(id), inspectData))
         {
             result.push_back(*inspectData);
         }
@@ -238,25 +227,25 @@ void InspectContainers(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, validation::GetInspectJsonIndent(context.Args));
-    context.Reporter.Output(L"{}\n", MultiByteToWide(json));
+    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
 void KillContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
+    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     WSLCSignal signal = WSLCSignalSIGKILL;
     if (context.Args.Contains(ArgType::Signal))
     {
-        signal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::Signal>());
+        signal = context.Args.GetValue<ArgType::Signal>();
     }
 
     for (const auto& id : containerIds)
     {
         ContainerService::Kill(session, WideToMultiByte(id), signal);
-        context.Reporter.Output(L"{}\n", id);
+        context.Terminal.Output(L"{}\n", id);
     }
 }
 
@@ -265,11 +254,11 @@ void ExportContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerId = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
+    auto containerId = WideToMultiByte(context.Args.GetValue<ArgType::ContainerId>());
 
     if (context.Args.Contains(ArgType::Output))
     {
-        auto& output = context.Args.Get<ArgType::Output>();
+        auto& output = context.Args.GetValue<ArgType::Output>();
         ContainerService::Export(session, containerId, output);
     }
     else
@@ -291,8 +280,8 @@ void ContainerCp(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::Target));
 
     auto& session = context.Data.Get<Data::Session>();
-    const auto& source = context.Args.Get<ArgType::Source>();
-    const auto& target = context.Args.Get<ArgType::Target>();
+    const auto& source = context.Args.GetValue<ArgType::Source>();
+    const auto& target = context.Args.GetValue<ArgType::Target>();
 
     // Determine copy direction by looking for CONTAINER:PATH patterns.
     // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
@@ -554,35 +543,35 @@ void ListContainers(CLIExecutionContext& context)
     // Note: --all and --filter status= are honored by the Docker daemon when
     // GetContainers ran; no post-filtering needed here.
 
-    if (context.Args.GetFlag<ArgType::Quiet>())
+    if (context.Args.GetValue<ArgType::Quiet>())
     {
         // Print only the container ids
         for (const auto& container : containers)
         {
-            context.Reporter.Output(L"{}\n", MultiByteToWide(container.Id));
+            context.Terminal.Output(L"{}\n", MultiByteToWide(container.Id));
         }
 
         return;
     }
 
-    FormatType format = validation::GetOutputFormat(context.Args);
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {
     case FormatType::Json:
     {
         auto json = ToJson(containers, c_jsonCompactIndent);
-        context.Reporter.Output(L"{}\n", MultiByteToWide(json));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table with or without column limits based on --no-trunc flag
         auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
-                                 context.Reporter,
+                                 context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
@@ -591,7 +580,7 @@ void ListContainers(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}}}},
                                  containers.size())
                            : wsl::windows::wslc::TableOutput<6>(
-                                 context.Reporter,
+                                 context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderName(),
                                   Localization::WSLCCLI_TableHeaderImage(),
@@ -624,13 +613,13 @@ void RemoveContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    bool force = context.Args.GetFlag<ArgType::Force>();
-    bool deleteVolumes = context.Args.GetFlag<ArgType::Volumes>();
+    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
+    bool force = context.Args.GetValue<ArgType::Force>();
+    bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
     for (const auto& id : containerIds)
     {
         ContainerService::Delete(session, WideToMultiByte(id), force, deleteVolumes);
-        context.Reporter.Output(L"{}\n", id);
+        context.Terminal.Output(L"{}\n", id);
     }
 }
 
@@ -640,9 +629,9 @@ void RunContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     context.ExitCode = ContainerService::Run(
-        context.Reporter,
+        context.Terminal,
         context.Data.Get<Data::Session>(),
-        WideToMultiByte(context.Args.Get<ArgType::ImageId>()),
+        WideToMultiByte(context.Args.GetValue<ArgType::ImageId>()),
         context.Data.Get<Data::ContainerOptions>());
 }
 
@@ -652,32 +641,21 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::CIDFile))
     {
-        options.CidFile = context.Args.Get<ArgType::CIDFile>();
+        options.CidFile = context.Args.GetValue<ArgType::CIDFile>();
     }
 
     if (context.Args.Contains(ArgType::Name))
     {
-        options.Name = WideToMultiByte(context.Args.Get<ArgType::Name>());
+        options.Name = WideToMultiByte(context.Args.GetValue<ArgType::Name>());
     }
 
-    if (context.Args.GetFlag<ArgType::TTY>())
-    {
-        options.TTY = true;
-    }
-
-    if (context.Args.GetFlag<ArgType::Detach>())
-    {
-        options.Detach = true;
-    }
-
-    if (context.Args.GetFlag<ArgType::Interactive>())
-    {
-        options.Interactive = true;
-    }
+    options.TTY = context.Args.GetValue<ArgType::TTY>();
+    options.Detach = context.Args.GetValue<ArgType::Detach>();
+    options.Interactive = context.Args.GetValue<ArgType::Interactive>();
 
     if (context.Args.Contains(ArgType::Publish))
     {
-        auto ports = context.Args.GetAll<ArgType::Publish>();
+        auto ports = context.Args.GetAllValues<ArgType::Publish>();
         options.Ports.reserve(options.Ports.size() + ports.size());
         for (const auto& port : ports)
         {
@@ -685,10 +663,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.GetFlag<ArgType::PublishAll>())
-    {
-        options.PublishAll = true;
-    }
+    options.PublishAll = context.Args.GetValue<ArgType::PublishAll>();
 
     if (context.Args.Contains(ArgType::Gpus))
     {
@@ -697,7 +672,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Volume))
     {
-        auto volumes = context.Args.GetAll<ArgType::Volume>();
+        auto volumes = context.Args.GetAllValues<ArgType::Volume>();
         options.Volumes.reserve(options.Volumes.size() + volumes.size());
         for (const auto& volume : volumes)
         {
@@ -705,82 +680,70 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.GetFlag<ArgType::Remove>())
-    {
-        options.Remove = true;
-    }
+    options.Remove = context.Args.GetValue<ArgType::Remove>();
 
     if (context.Args.Contains(ArgType::StopSignal))
     {
-        options.StopSignal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::StopSignal>());
+        options.StopSignal = context.Args.GetValue<ArgType::StopSignal>();
     }
 
     if (context.Args.Contains(ArgType::StopTimeout))
     {
-        options.StopTimeout = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::StopTimeout>());
+        options.StopTimeout = context.Args.GetValue<ArgType::StopTimeout>();
     }
 
     if (context.Args.Contains(ArgType::ShmSize))
     {
-        options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
+        options.ShmSize = context.Args.GetValue<ArgType::ShmSize>();
     }
 
     if (context.Args.Contains(ArgType::HealthCmd))
     {
-        options.HealthCmd = WideToMultiByte(context.Args.Get<ArgType::HealthCmd>());
+        options.HealthCmd = WideToMultiByte(context.Args.GetValue<ArgType::HealthCmd>());
     }
 
     if (context.Args.Contains(ArgType::HealthInterval))
     {
-        options.HealthInterval = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthInterval>());
+        options.HealthInterval = context.Args.GetValue<ArgType::HealthInterval>();
     }
 
     if (context.Args.Contains(ArgType::HealthTimeout))
     {
-        options.HealthTimeout = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthTimeout>());
+        options.HealthTimeout = context.Args.GetValue<ArgType::HealthTimeout>();
     }
 
     if (context.Args.Contains(ArgType::HealthStartPeriod))
     {
-        options.HealthStartPeriod = validation::GetDurationNanosFromString(context.Args.Get<ArgType::HealthStartPeriod>());
+        options.HealthStartPeriod = context.Args.GetValue<ArgType::HealthStartPeriod>();
     }
 
     if (context.Args.Contains(ArgType::HealthRetries))
     {
-        options.HealthRetries = validation::GetIntegerFromString<int>(context.Args.Get<ArgType::HealthRetries>());
+        options.HealthRetries = context.Args.GetValue<ArgType::HealthRetries>();
     }
 
-    if (context.Args.GetFlag<ArgType::NoHealthcheck>())
-    {
-        options.NoHealthcheck = true;
-    }
+    options.NoHealthcheck = context.Args.GetValue<ArgType::NoHealthcheck>();
 
     if (context.Args.Contains(ArgType::Memory))
     {
-        options.MemoryBytes = validation::GetMemorySizeFromString(context.Args.Get<ArgType::Memory>());
+        options.MemoryBytes = context.Args.GetValue<ArgType::Memory>();
     }
 
     if (context.Args.Contains(ArgType::Cpus))
     {
-        options.NanoCpus = validation::GetNanoCpusFromString(context.Args.Get<ArgType::Cpus>());
+        options.NanoCpus = context.Args.GetValue<ArgType::Cpus>();
     }
 
-    if (context.Args.Contains(ArgType::Ulimit))
-    {
-        for (const auto& value : context.Args.GetAll<ArgType::Ulimit>())
-        {
-            options.Ulimits.emplace_back(validation::ParseUlimit(value));
-        }
-    }
+    options.Ulimits = context.Args.GetAllValues<ArgType::Ulimit>();
 
     if (context.Args.Contains(ArgType::Command))
     {
-        options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
+        options.Arguments.emplace_back(WideToMultiByte(context.Args.GetValue<ArgType::Command>()));
     }
 
     if (context.Args.Contains(ArgType::EnvFile))
     {
-        auto const& envFiles = context.Args.GetAll<ArgType::EnvFile>();
+        auto envFiles = context.Args.GetAllValues<ArgType::EnvFile>();
         for (const auto& envFile : envFiles)
         {
             auto parsedEnvVars = EnvironmentVariable::ParseFile(envFile);
@@ -793,7 +756,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Env))
     {
-        auto const& envArgs = context.Args.GetAll<ArgType::Env>();
+        auto envArgs = context.Args.GetAllValues<ArgType::Env>();
         for (const auto& arg : envArgs)
         {
             auto envVar = EnvironmentVariable::Parse(arg);
@@ -806,22 +769,22 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Entrypoint))
     {
-        options.Entrypoint.push_back(WideToMultiByte(context.Args.Get<ArgType::Entrypoint>()));
+        options.Entrypoint.push_back(WideToMultiByte(context.Args.GetValue<ArgType::Entrypoint>()));
     }
 
     if (context.Args.Contains(ArgType::Hostname))
     {
-        options.Hostname = WideToMultiByte(context.Args.Get<ArgType::Hostname>());
+        options.Hostname = WideToMultiByte(context.Args.GetValue<ArgType::Hostname>());
     }
 
     if (context.Args.Contains(ArgType::Domainname))
     {
-        options.Domainname = WideToMultiByte(context.Args.Get<ArgType::Domainname>());
+        options.Domainname = WideToMultiByte(context.Args.GetValue<ArgType::Domainname>());
     }
 
     if (context.Args.Contains(ArgType::DNS))
     {
-        auto dnsServers = context.Args.GetAll<ArgType::DNS>();
+        auto dnsServers = context.Args.GetAllValues<ArgType::DNS>();
         options.DnsServers.reserve(options.DnsServers.size() + dnsServers.size());
         for (const auto& value : dnsServers)
         {
@@ -831,7 +794,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::DNSSearch))
     {
-        auto dnsSearch = context.Args.GetAll<ArgType::DNSSearch>();
+        auto dnsSearch = context.Args.GetAllValues<ArgType::DNSSearch>();
         options.DnsSearchDomains.reserve(options.DnsSearchDomains.size() + dnsSearch.size());
         for (const auto& value : dnsSearch)
         {
@@ -841,7 +804,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::DNSOption))
     {
-        auto dnsOptions = context.Args.GetAll<ArgType::DNSOption>();
+        auto dnsOptions = context.Args.GetAllValues<ArgType::DNSOption>();
         options.DnsOptions.reserve(options.DnsOptions.size() + dnsOptions.size());
         for (const auto& value : dnsOptions)
         {
@@ -851,7 +814,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Network))
     {
-        auto networks = context.Args.GetAll<ArgType::Network>();
+        auto networks = context.Args.GetAllValues<ArgType::Network>();
         options.Networks.reserve(options.Networks.size() + networks.size());
         for (const auto& value : networks)
         {
@@ -861,7 +824,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::NetworkAlias))
     {
-        auto aliases = context.Args.GetAll<ArgType::NetworkAlias>();
+        auto aliases = context.Args.GetAllValues<ArgType::NetworkAlias>();
         options.NetworkAliases.reserve(aliases.size());
         for (const auto& value : aliases)
         {
@@ -871,12 +834,12 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::User))
     {
-        options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
+        options.User = WideToMultiByte(context.Args.GetValue<ArgType::User>());
     }
 
     if (context.Args.Contains(ArgType::TMPFS))
     {
-        auto tmpfs = context.Args.GetAll<ArgType::TMPFS>();
+        auto tmpfs = context.Args.GetAllValues<ArgType::TMPFS>();
         options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
         for (const auto& value : tmpfs)
         {
@@ -884,18 +847,14 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.Contains(ArgType::Label))
+    for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
     {
-        for (const auto& label : context.Args.GetAll<ArgType::Label>())
-        {
-            auto parsed = validation::ParseLabel(label);
-            options.Labels.emplace_back(parsed.first, parsed.second);
-        }
+        options.Labels.push_back(label);
     }
 
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
-        auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();
+        auto const& forwardArgs = context.Args.GetValue<ArgType::ForwardArgs>();
         options.Arguments.reserve(options.Arguments.size() + forwardArgs.size());
         for (const auto& arg : forwardArgs)
         {
@@ -905,7 +864,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::WorkDir))
     {
-        options.WorkingDirectory = WideToMultiByte(context.Args.Get<ArgType::WorkDir>());
+        options.WorkingDirectory = WideToMultiByte(context.Args.GetValue<ArgType::WorkDir>());
     }
 
     context.Data.Add<Data::ContainerOptions>(std::move(options));
@@ -916,7 +875,7 @@ void ShowContainerStats(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    auto containers = context.Args.GetAll<ArgType::ContainerId>();
+    auto containers = context.Args.GetAllValues<ArgType::ContainerId>();
 
     // If any are specified we use those, otherwise we show all containers.
     const bool userSpecifiedContainers = !containers.empty();
@@ -927,7 +886,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         for (const auto& container : allContainers)
         {
             // Skip non-running containers unless --all is specified.
-            if (!context.Args.GetFlag<ArgType::All>() && container.State != WSLCContainerState::WslcContainerStateRunning)
+            if (!context.Args.GetValue<ArgType::All>() && container.State != WSLCContainerState::WslcContainerStateRunning)
             {
                 continue;
             }
@@ -972,22 +931,22 @@ void ShowContainerStats(CLIExecutionContext& context)
         10 // Batch Size - chosen to be around typical expected container use while protecting against extreme cases.
     );
 
-    FormatType format = validation::GetOutputFormat(context.Args);
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {
     case FormatType::Json:
     {
-        context.Reporter.Output(L"{}\n", MultiByteToWide(statsJson.dump(c_jsonCompactIndent)));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(statsJson.dump(c_jsonCompactIndent)));
         break;
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetFlag<ArgType::NoTrunc>();
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
-                                 context.Reporter,
+                                 context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderCpuPercent(), {.Overflow = Shrink}},
@@ -998,7 +957,7 @@ void ShowContainerStats(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderPids(), {.Overflow = Shrink}}}},
                                  statsJson.size())
                            : wsl::windows::wslc::TableOutput<8>(
-                                 context.Reporter,
+                                 context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderName(),
                                   Localization::WSLCCLI_TableHeaderCpuPercent(),
@@ -1035,13 +994,13 @@ void StartContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
-    const auto& containerId = context.Args.Get<ArgType::ContainerId>();
-    const bool attach = context.Args.GetFlag<ArgType::Attach>();
-    context.ExitCode = ContainerService::Start(context.Reporter, context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
+    const auto& containerId = context.Args.GetValue<ArgType::ContainerId>();
+    const bool attach = context.Args.GetValue<ArgType::Attach>();
+    context.ExitCode = ContainerService::Start(context.Terminal, context.Data.Get<Data::Session>(), WideToMultiByte(containerId), attach);
 
     if (!attach)
     {
-        context.Reporter.Output(L"{}\n", containerId);
+        context.Terminal.Output(L"{}\n", containerId);
     }
 }
 
@@ -1049,22 +1008,22 @@ void StopContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containersToStop = context.Args.GetAll<ArgType::ContainerId>();
+    auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
-        options.Signal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::Signal>());
+        options.Signal = context.Args.GetValue<ArgType::Signal>();
     }
 
     if (context.Args.Contains(ArgType::Time))
     {
-        options.Timeout = validation::GetIntegerFromString<LONG>(context.Args.Get<ArgType::Time>());
+        options.Timeout = context.Args.GetValue<ArgType::Time>();
     }
 
     for (const auto& id : containersToStop)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
-        context.Reporter.Output(L"{}\n", id);
+        context.Terminal.Output(L"{}\n", id);
     }
 }
 
@@ -1072,14 +1031,14 @@ void ViewContainerLogs(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerId = context.Args.Get<ArgType::ContainerId>();
-    bool follow = context.Args.GetFlag<ArgType::Follow>();
-    bool timestamps = context.Args.GetFlag<ArgType::Timestamps>();
+    auto containerId = context.Args.GetValue<ArgType::ContainerId>();
+    bool follow = context.Args.GetValue<ArgType::Follow>();
+    bool timestamps = context.Args.GetValue<ArgType::Timestamps>();
 
     ULONGLONG tail = 0;
     if (context.Args.Contains(ArgType::Tail))
     {
-        tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
+        tail = context.Args.GetValue<ArgType::Tail>();
     }
 
     // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
@@ -1088,13 +1047,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     ULONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
-        since = validation::GetTimestampFromString(context.Args.Get<ArgType::Since>());
+        since = context.Args.GetValue<ArgType::Since>();
     }
 
     ULONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
-        until = validation::GetTimestampFromString(context.Args.Get<ArgType::Until>());
+        until = context.Args.GetValue<ArgType::Until>();
     }
 
     ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);
@@ -1109,11 +1068,11 @@ void PruneContainers(CLIExecutionContext& context)
 
     for (const auto& containerId : result.PrunedContainers)
     {
-        context.Reporter.Output(L"{}\n", MultiByteToWide(containerId));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
     }
 
-    context.Reporter.Output(L"\n");
-    context.Reporter.Output(
+    context.Terminal.Output(L"\n");
+    context.Terminal.Output(
         L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

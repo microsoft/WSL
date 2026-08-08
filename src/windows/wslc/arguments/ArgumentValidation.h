@@ -16,6 +16,7 @@ Abstract:
 #include "Exceptions.h"
 #include "ContainerModel.h"
 #include "InspectModel.h"
+#include "ArgumentConvertedTypes.h"
 #include "SpecParsing.h"
 #include <string>
 #include <tuple>
@@ -73,9 +74,6 @@ void ValidateNanoCpus(const std::vector<std::wstring>& values, const std::wstrin
 void ValidateUlimit(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
-
-// The inspect family only renders JSON, so `json` (single line) is the sole accepted value.
-void ValidateInspectFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 
