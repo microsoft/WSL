@@ -998,8 +998,8 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <value>Containeravbildningsregistret {} blockeras av datorprincipen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Att skapa containeravbildningar blockeras eftersom en lista över tillåtna containerregister konfigureras av datorprincipen. Avbildningsversioner kan hämta basavbildningar från godtyckliga register och kan inte begränsas till listan över tillåtna på ett tillförlitligt sätt.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Principen för containerregistrets lista över tillåtna är ogiltig. Kontrollera att WSLContainerRegistryAllowlist-värdena under Software\Policies\WSL har konfigurerats korrekt.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Kör wsl.exe --set-version {} 2 för att uppgradera till WSL2.</value>
@@ -1986,13 +1986,13 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
     <value>Antalet millisekunder som en virtuell dator är inaktiv innan den stängs av.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>Fortsätt köra WSL</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
     <value>Fortsätt att köra distributioner och den virtuella WSL-dator som är värd för dem från att stängas av automatiskt när de har varit inaktiva.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>Fortsätt köra WSL.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Fortsätt att köra distributioner och den virtuella WSL-dator som är värd för dem från att stängas av automatiskt när de har varit inaktiva.</value>
@@ -2007,16 +2007,16 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
     <value>Antalet millisekunder som en virtuell dator är inaktiv innan den stängs av.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Tidsgräns för inaktivitet för distribution</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
     <value>Antalet millisekunder som en distribution är inaktiv innan den avslutas.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Återställ tidsgräns</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Tidsgräns för inaktivitet för distribution</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Antalet millisekunder som en distribution är inaktiv innan den avslutas.</value>
@@ -3136,6 +3136,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Sökväg för sessionslagring</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Path to the session storage directory</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signal att skicka</value>
   </data>
@@ -3180,7 +3183,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Rapportera det inte som ett fel om volymen inte finns</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>Ta bort anonyma volymer som är kopplade till containern</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbetskatalog i containern</value>
@@ -3191,6 +3194,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Skriv container-ID:t till den angivna sökvägen</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Skriv avbildnings-id:t till den angivna sökvägen</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adress för DNS-namnservern i resolv.conf</value>

@@ -1004,8 +1004,8 @@ Revirtiendo a las redes NAT.</value>
     <value>La directiva de equipo bloquea el registro de imágenes de contenedor "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>La creación de imágenes de contenedor está bloqueada porque la directiva de equipo ha configurado una lista de permitidos del registro de contenedor. Las compilaciones de imágenes pueden extraer imágenes base de registros arbitrarios y no se pueden restringir de forma confiable a la lista de permitidos.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>La directiva de lista de permitidos del registro de contenedor no es válida. Compruebe que los valores de WSLContainerRegistryAllowlist en Software\Policies\WSL estén configurados correctamente.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Ejecute "wsl.exe --set-version {} 2" para actualizar a WSL2.</value>
@@ -1992,13 +1992,13 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Número de milisegundos que una VM está inactiva antes de apagarse.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>Mantenga WSL en ejecución</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
     <value>Evitar que las distribuciones en ejecución y la máquina virtual WSL que las hospeda se apaguen automáticamente después de que hayan estado inactivas.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>Mantenga WSL en ejecución.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Evitar que las distribuciones en ejecución y la máquina virtual WSL que las hospeda se apaguen automáticamente después de que hayan estado inactivas.</value>
@@ -2013,16 +2013,16 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Número de milisegundos que una VM está inactiva antes de apagarse.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Tiempo de espera de inactividad de la distribución</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
     <value>Número de milisegundos que una distribución está inactiva antes de que finalice.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Restablecer tiempo de espera</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Tiempo de espera de inactividad de la distribución</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Número de milisegundos que una distribución está inactiva antes de que finalice.</value>
@@ -3141,6 +3141,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Ruta de almacenamiento de sesión</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Path to the session storage directory</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Señal para enviar</value>
   </data>
@@ -3185,7 +3188,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se produce un error si el volumen no existe</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>Quitar volúmenes anónimos asociados al contenedor</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Directorio de trabajo dentro del contenedor</value>
@@ -3196,6 +3199,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Escribir el id. de contenedor en la ruta de acceso proporcionada</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Escribir el id. de imagen en la ruta de acceso proporcionada</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Dirección IP del servidor de nombres DNS en resolv.conf</value>

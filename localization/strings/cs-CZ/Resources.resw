@@ -998,8 +998,8 @@ Návrat k sítím NAT.</value>
     <value>Zásady počítače zablokovaly registr imagí kontejneru {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Vytváření imagí kontejnerů je zablokované, protože zásady počítače nakonfigurovaly seznam povolených registrů kontejnerů. Sestavení imagí mohou načíst základní image z libovolných registrů a nelze je spolehlivě omezit na seznam povolených.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Zásady seznamu povolených registrů kontejnerů nejsou platné. Ověřte, že jsou hodnoty WSLContainerRegistryAllowlist v části Software\Policies\WSL správně nakonfigurované.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Spuštěním příkazu 'wsl.exe --set-version {} 2' upgradujte na WSL2.</value>
@@ -1986,16 +1986,16 @@ K dalším možnostem VS Code Remote můžete přistupovat také prostřednictv�
     <value>Počet milisekund, po které je virtuální počítač nečinný, než se vypne.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>Ponechat WSL spuštěné</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Zabraňte automatickému vypnutí spuštěných distribucí a virtuálního počítače WSL, který je hostuje, když jsou nečinné.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>Ponechat WSL spuštěné.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Zabraňte automatickému vypnutí spuštěných distribucí a virtuálního počítače WSL, který je hostuje, když jsou nečinné.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Resetovat časový limit</value>
@@ -2007,19 +2007,19 @@ K dalším možnostem VS Code Remote můžete přistupovat také prostřednictv�
     <value>Počet milisekund, po které je virtuální počítač nečinný, než se vypne.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Časový limit nečinnosti distribuce</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>Počet milisekund, po které je distribuce nečinná, než se ukončí.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Resetovat časový limit</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Časový limit nečinnosti distribuce</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>Počet milisekund, po které je distribuce nečinná, než se ukončí.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Použít změny</value>
@@ -2983,7 +2983,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
-    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <value>Formátování výstupu (json pro jednořádkový výstup) (výchozí: odsazený JSON)</value>
     <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
@@ -3135,6 +3135,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Cesta k úložišti relace</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Path to the session storage directory</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signál k odeslání</value>
   </data>
@@ -3190,6 +3193,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Zapsat ID kontejneru do zadané cesty</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Zapsat ID image do zadané cesty</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP adresa DNS nameserveru v resolv.conf</value>
