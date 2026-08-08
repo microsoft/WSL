@@ -492,6 +492,18 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::CompactDistribution(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CompactDistribution(DistroGuid);
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -1871,6 +1883,73 @@ try
 }
 CATCH_RETURN()
 
+HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
+try
+{
+    auto runAsUser = wil::CoImpersonateClient();
+    std::filesystem::path vhdPath;
+    LXSS_DISTRO_CONFIGURATION configuration;
+
+    {
+        std::lock_guard lock(m_instanceLock);
+        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
+        const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+        configuration = s_GetDistributionConfiguration(registration);
+        RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+        vhdPath = configuration.VhdFilePath;
+        if (wsl::shared::string::IsEqual(vhdPath.extension().c_str(), wsl::windows::common::wslutil::c_vhdFileExtension, true))
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageCompactVhdNotSupported());
+        }
+
+        _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+
+        // Trim the filesystem before compaction so the host can reclaim the freed blocks.
+        //
+        // WSL2 does not mount ext4 with 'discard' and does not run fsck at boot, so blocks freed
+        // inside the guest are still marked as allocated in the VHD and a bare compaction reclaims
+        // little space. Attaching the (now stopped) distribution's VHD to the utility VM and running
+        // an offline fsck with block discard releases those blocks, then ejecting flushes the change
+        // back to the VHD before it is compacted below.
+        //
+        // This is best-effort: any failure here must not prevent compaction.
+        try
+        {
+            _CreateVm();
+            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+            auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
+            m_utilityVm->TrimDistribution(lun);
+        }
+        CATCH_LOG();
+    }
+
+    HRESULT result = E_UNEXPECTED;
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        WSL_LOG_TELEMETRY(
+            "CompactDistributionEnd",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(result, "result"));
+
+        _ConversionComplete(configuration.DistroId);
+    });
+
+    WSL_LOG_TELEMETRY(
+        "CompactDistributionBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(configuration.Name.c_str(), "distroName"));
+
+    result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
+    if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
+    {
+        THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageVhdInUse());
+    }
+
+    THROW_IF_FAILED(result);
+    return S_OK;
+}
+CATCH_RETURN()
+
 HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StderrHandle)
 {
     RETURN_HR_IF(E_INVALIDARG, ((Version != LXSS_WSL_VERSION_1) && (Version != LXSS_WSL_VERSION_2)));
@@ -3165,13 +3244,13 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
 _Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_EnsureNotLocked(_In_ LPCGUID DistroGuid, const std::source_location& location)
 {
-    const auto found = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
+    const auto locked = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
         return IsEqualGUID(entry.first, *DistroGuid);
     });
 
     THROW_HR_IF_MSG(
         E_ILLEGAL_STATE_CHANGE,
-        (found != m_lockedDistributions.end()),
+        locked != m_lockedDistributions.end(),
         "%hs, %hs:%u",
         location.function_name(),
         location.file_name(),

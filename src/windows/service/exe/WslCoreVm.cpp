@@ -2489,6 +2489,24 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     }
 }
 
+void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
+{
+    auto lock = m_lock.lock_exclusive();
+
+    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message;
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = LxMiniInitMessageTrimDistribution;
+    message.ScsiLun = Lun;
+
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send(message);
+
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "TrimDistribution", {m_terminatingEvent.get()}};
+
+    const auto& resultMessage = channel.ReceiveMessage<LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE>();
+    THROW_HR_IF(E_FAIL, resultMessage.ResponseCode != 0);
+}
+
 void WslCoreVm::SaveAttachedDisksState()
 try
 {
