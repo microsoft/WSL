@@ -998,8 +998,8 @@ Falling back to NAT networking.</value>
     <value>The container image registry '{}' is blocked by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Building container images is blocked because a container registry allowlist is configured by the computer policy. Image builds may pull base images from arbitrary registries and cannot be reliably restricted to the allowlist.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>The container registry allowlist policy is invalid. Verify the WSLContainerRegistryAllowlist values under Software\Policies\WSL are configured correctly.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Please run 'wsl.exe --set-version {} 2' to upgrade to WSL2.</value>
@@ -3135,6 +3135,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Session storage path</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Path to the session storage directory</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signal to send</value>
   </data>
@@ -3190,6 +3193,9 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Write the container ID to the provided path</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Write the image ID to the provided path</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP address of the DNS nameserver in resolv.conf</value>
