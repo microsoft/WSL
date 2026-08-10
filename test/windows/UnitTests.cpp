@@ -3475,8 +3475,6 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
         VERIFY_ARE_EQUAL(out, L"ok\n");
         VERIFY_ARE_EQUAL(err, L"");
-        WslShutdown();
-
     }
 
     WSL2_TEST_METHOD(FileOffsets)
