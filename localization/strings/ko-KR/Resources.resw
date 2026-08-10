@@ -1004,8 +1004,8 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>컨테이너 이미지 레지스트리 '{}'이(가) 컴퓨터 정책에 의해 차단되었습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>컴퓨터 정책에 따라 컨테이너 레지스트리 허용 목록이 구성되어 컨테이너 이미지 빌드가 차단되었습니다. 이미지 빌드는 임의의 레지스트리에서 기본 이미지를 가져올 수 있으며 허용 목록으로 안정적으로 제한할 수 없습니다.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>컨테이너 레지스트리 허용 목록 정책이 잘못되었습니다. Software\Policies\WSL 아래의 WSLContainerRegistryAllowlist 값이 올바르게 구성되었는지 확인합니다.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>'wsl.exe --set-version {} 2'를 실행하여 WSL2로 업그레이드하세요.</value>
@@ -2989,7 +2989,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
-    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <value>출력 형식(단일 줄 출력을 위한 json)(기본값: 들여쓰기된 JSON)</value>
     <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
@@ -3141,6 +3141,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>세션 저장소 경로</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>세션 스토리지 디렉터리의 경로</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>보낼 신호</value>
   </data>
@@ -3185,7 +3188,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>볼륨이 없으면 오류 발생 안 함</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>컨테이너에 연결된 익명 볼륨 제거</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>컨테이너 내부의 작업 디렉터리</value>
@@ -3196,6 +3199,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>제공된 경로에 컨테이너 ID 쓰기</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>제공된 경로에 이미지 ID 쓰기</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>resolv.conf DNS 이름 서버의 IP 주소</value>
@@ -3260,7 +3266,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>나열된 세션에 대한 자세한 정보를 표시합니다.</value>
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized format type. Supported format types are: {}.</value>
+    <value>잘못된 {} 값: {}은(는) 인식할 수 있는 형식 형식이 아닙니다. 지원되는 형식 형식은 {}입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">

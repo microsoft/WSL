@@ -160,7 +160,7 @@
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>装载名称不能为空、“.”、“..”或包含“/”。请使用有效的装载名称重试。</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -998,8 +998,8 @@ Windows 版本: {}</value>
     <value>容器映像注册表 '{}' 被计算机策略阻止。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>生成容器映像被阻止，因为计算机策略配置了容器注册表允许列表。映像生成可以从任意注册表中拉取基础映像，并且无法可靠地限制为允许列表。</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>容器注册表允许列表策略无效。验证软件\策略\WSL 下的 WSLContainerRegistryAllowlist 值是否已正确配置。</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>请运行“wsl.exe --set-version {} 2”以升级到 WSL2。</value>
@@ -1986,16 +1986,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>让 WSL 保持运行</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
-    <value>保持正在运行的分发以及托管它们的 WSL 虚拟机在其空闲后自动关闭。</value>
+    <value>防止正在运行的分发及托管它们的 WSL 虚拟机在空闲后被自动关闭。</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>让 WSL 保持运行。</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>保持正在运行的分发以及托管它们的 WSL 虚拟机在其空闲后自动关闭。</value>
+    <value>防止正在运行的分发及托管它们的 WSL 虚拟机在空闲后被自动关闭。</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>重置超时</value>
@@ -2007,16 +2007,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>分发空闲超时</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
     <value>分发在终止之前处于空闲状态的毫秒数。</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>重置超时</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>分发空闲超时</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>分发在终止之前处于空闲状态的毫秒数。</value>
@@ -3134,6 +3134,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>会话存储路径</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>会话存储目录的路径</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>要发送的信号</value>
   </data>
@@ -3178,7 +3181,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>如果卷不存在，则不要报错</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>删除与容器关联的匿名卷</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>容器内的工作目录</value>
@@ -3189,6 +3192,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>将容器 ID 写入提供的路径</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>将映像 ID 写入提供的路径</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>resolv.conf 中 DNS 名称服务器的 IP 地址</value>

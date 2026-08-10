@@ -642,6 +642,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 {
     ContainerOptions options;
 
+    if (context.Args.Contains(ArgType::Pull))
+    {
+        options.Pull = context.Args.GetValue<ArgType::Pull>();
+    }
+
     if (context.Args.Contains(ArgType::CIDFile))
     {
         options.CidFile = context.Args.GetValue<ArgType::CIDFile>();

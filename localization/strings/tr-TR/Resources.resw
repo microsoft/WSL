@@ -998,8 +998,8 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>'{}' kapsayıcı görüntüsü kayıt defteri bilgisayar ilkesi tarafından engellendi.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Bilgisayar ilkesi tarafından bir kapsayıcı kayıt defteri izin listesi yapılandırıldığı için kapsayıcı görüntüleri oluşturulamaz. Görüntü derlemeleri, temel görüntüleri rastgele kayıt defterlerinden alabilir ve izin verilenler listesiyle güvenilir bir şekilde sınırlandırılamaz.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Kapsayıcı kayıt defteri izin verilenler listesi ilkesi geçersiz. Software\Policies\WSL altındaki WSLContainerRegistryAllowlist değerlerinin doğru yapılandırıldığını doğrulayın.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>WSL2'ye yükseltmek için lütfen 'wsl.exe --set-version {} 2' çalıştırın.</value>
@@ -1986,16 +1986,16 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
     <value>Bir VM'nin kapatılmadan önce boşta olduğu milisaniye sayısı.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>WSL'yi çalışır durumda tutun</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Dağıtımların ve bunları barındıran WSL sanal makinesinin, boşta kaldıktan sonra otomatik olarak kapatılmasını önleyin.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>WSL'yi çalışır durumda tutun.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Dağıtımların ve bunları barındıran WSL sanal makinesinin, boşta kaldıktan sonra otomatik olarak kapatılmasını önleyin.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Zaman aşımını sıfırla</value>
@@ -2007,16 +2007,16 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
     <value>Bir VM'nin kapatılmadan önce boşta olduğu milisaniye sayısı.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Dağıtımın boşta kalma zaman aşımı</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
     <value>Bir dağıtımın sonlandırılmadan önce boşta olduğu milisaniye sayısı.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Zaman aşımını sıfırla</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Dağıtımın boşta kalma zaman aşımı</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Bir dağıtımın sonlandırılmadan önce boşta olduğu milisaniye sayısı.</value>
@@ -3135,6 +3135,9 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Oturum depolama alanı yolu</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Oturum depolama dizininin yolu</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Gönderilecek sinyal</value>
   </data>
@@ -3179,7 +3182,7 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Birim mevcut değilse hata verme</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>Kapsayıcıyla ilişkilendirilmiş anonim birimleri kaldırın</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Kapsayıcı içindeki çalışma dizini</value>
@@ -3190,6 +3193,9 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Kapsayıcı kimliğini verilen yola yazın</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Resim kimliğini sağlanan yola yazın</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>resolv.conf'deki DNS ad sunucusunun IP adresi</value>
@@ -3254,7 +3260,7 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Listelenen oturumlarla ilgili ayrıntılı bilgileri göster.</value>
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized format type. Supported format types are: {}.</value>
+    <value>Geçersiz {} değeri: {} tanınan bir biçim türü değil. Desteklenen biçim türleri: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
