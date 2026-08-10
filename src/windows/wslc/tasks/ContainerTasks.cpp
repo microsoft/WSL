@@ -560,8 +560,11 @@ void ListContainers(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(containers, c_jsonCompactIndent);
-        context.Terminal.Output(L"{}\n", MultiByteToWide(json));
+        for (const auto& container : containers)
+        {
+            context.Terminal.Output(L"{}\n", ToJsonW(container, c_jsonCompactIndent));
+        }
+
         break;
     }
     case FormatType::Table:
@@ -937,7 +940,11 @@ void ShowContainerStats(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(statsJson.dump(c_jsonCompactIndent)));
+        for (const auto& entry : statsJson)
+        {
+            context.Terminal.Output(L"{}\n", ToJsonW(entry, c_jsonCompactIndent));
+        }
+
         break;
     }
     case FormatType::Table:

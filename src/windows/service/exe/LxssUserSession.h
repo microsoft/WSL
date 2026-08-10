@@ -828,6 +828,11 @@ private:
     std::atomic<GUID> m_vmId{GUID_NULL};
 
     /// <summary>
+    /// True when the VM termination callback should not perform session cleanup.
+    /// </summary>
+    std::atomic<bool> m_suppressVmTerminationCallback{false};
+
+    /// <summary>
     /// Contains the user sid for the session.
     /// </summary>
     SE_SID m_userSid;

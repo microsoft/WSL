@@ -171,8 +171,11 @@ void ListVolumes(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(volumes, c_jsonCompactIndent);
-        context.Terminal.Output(L"{}\n", MultiByteToWide(json));
+        for (const auto& volume : volumes)
+        {
+            context.Terminal.Output(L"{}\n", ToJsonW(volume, c_jsonCompactIndent));
+        }
+
         break;
     }
     case FormatType::Table:

@@ -2226,11 +2226,15 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 {
     try
     {
+        auto resetVmTerminationCallback = wil::scope_exit([&]() { m_suppressVmTerminationCallback.store(false); });
+
         auto forceTerminate = [this]() {
             auto vmId = m_vmId.load();
             if (!IsEqualGUID(vmId, GUID_NULL))
             {
                 auto vmIdStr = wsl::shared::string::GuidToString<wchar_t>(vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+
+                m_suppressVmTerminationCallback.store(true);
 
                 auto result = wil::ResultFromException([&]() {
                     auto computeSystem = wsl::windows::common::hcs::OpenComputeSystem(vmIdStr.c_str(), GENERIC_ALL);
@@ -2283,6 +2287,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 
             // Terminate the utility VM.
             _VmTerminate();
+            resetVmTerminationCallback.reset();
 
             // Reset the proxy state.
             // We don't clear it in _VMTerminate because we want to cache results if possible.
@@ -4309,6 +4314,11 @@ void LxssUserSessionImpl::s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSessio
 try
 {
     UNREFERENCED_PARAMETER(VmId);
+
+    if (UserSession->m_suppressVmTerminationCallback.load())
+    {
+        return;
+    }
 
     UserSession->TerminateByClientId(LXSS_CLIENT_ID_WILDCARD);
     return;
