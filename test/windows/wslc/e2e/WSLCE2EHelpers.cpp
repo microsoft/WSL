@@ -118,6 +118,12 @@ const TestImage& DebianTestImage()
     return image;
 }
 
+const TestImage& HelloWorldTestImage()
+{
+    static const TestImage image{L"hello-world", L"latest", std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar"};
+    return image;
+}
+
 const TestImage& PythonTestImage()
 {
     static const TestImage image{L"python", L"3.12-alpine", std::filesystem::path{g_testDataPath} / L"python-3_12-alpine.tar"};

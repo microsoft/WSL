@@ -32,6 +32,7 @@ class WSLCE2EContainerCreateTests
     {
         EnsureImageIsLoaded(AlpineImage);
         EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(HelloWorldImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), HostEnvVariableValue2.c_str()));
@@ -44,6 +45,7 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(AlpineImage);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(HelloWorldImage);
         EnsureNetworkDoesNotExist(TestNetworkName);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
@@ -105,8 +107,8 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_PullPolicy)
     {
         auto session = OpenDefaultElevatedSession();
-        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15005);
-        auto registryImage = TagImageForRegistry(DebianImage.NameAndTag(), string::MultiByteToWide(registryAddress));
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
+        auto registryImage = TagImageForRegistry(HelloWorldImage.NameAndTag(), string::MultiByteToWide(registryAddress));
         auto cleanup = wil::scope_exit([&]() {
             EnsureContainerDoesNotExist(WslcContainerName);
             RunWslc(std::format(L"image delete --force {}", registryImage));
@@ -118,9 +120,18 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
 
         result = RunWslc(std::format(L"container create --pull=always --name {} {}", WslcContainerName, registryImage));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"manifest unknown"));
+        const auto errorMessage = std::format(
+            L"manifest for {} not found: manifest unknown: manifest unknown\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", registryImage);
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
+
+        RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
+
+        result = RunWslc(std::format(L"container create --pull=missing --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.ExitCode = 0});
+        VerifyContainerIsListed(WslcContainerName, L"created");
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Valid)
@@ -1539,6 +1550,7 @@ private:
     // Test images
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& HelloWorldImage = HelloWorldTestImage();
     const TestImage& PythonImage = PythonTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
