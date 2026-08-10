@@ -12,7 +12,7 @@ Abstract:
 --*/
 
 #include "Argument.h"
-#include "ArgumentValidation.h"
+#include "ArgumentConvertedTypes.h"
 #include "InspectTasks.h"
 #include "InspectModel.h"
 #include "ImageService.h"
@@ -72,13 +72,13 @@ void Inspect(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto objectIds = context.Args.GetAll<ArgType::ObjectId>();
+    auto objectIds = context.Args.GetAllValues<ArgType::ObjectId>();
 
     nlohmann::json array = nlohmann::json::array();
     auto type = InspectType::All;
     if (context.Args.Contains(ArgType::Type))
     {
-        type = validation::GetInspectTypeFromString(context.Args.Get<ArgType::Type>(), L"type");
+        type = context.Args.GetValue<ArgType::Type>();
     }
 
     for (const auto& objectId : objectIds)
@@ -113,6 +113,6 @@ void Inspect(CLIExecutionContext& context)
     }
 
     // Always print the array, even if it's empty or an error was encountered
-    context.Terminal.Output(L"{}\n", MultiByteToWide(array.dump(validation::GetInspectJsonIndent(context.Args))));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(array.dump(context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent))));
 }
 } // namespace wsl::windows::wslc::task

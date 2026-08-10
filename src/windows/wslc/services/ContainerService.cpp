@@ -41,9 +41,21 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
+static void PullImage(Terminal& terminal, Session& session, const std::string& image)
+{
+    ImageProgressCallback callback(terminal, Terminal::Level::Info);
+    ImageService imageService;
+    imageService.Pull(terminal, session, image, &callback);
+}
+
 static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& terminal, Session& session, const std::string& image, const ContainerOptions& options)
 {
     WarningCallback warningCallback(terminal);
+
+    if (options.Pull == PullPolicy::Always)
+    {
+        PullImage(terminal, session, image);
+    }
 
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
@@ -245,16 +257,10 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
     }
 
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get(), &warningCallback);
-    if (result == WSLC_E_IMAGE_NOT_FOUND)
+    if (result == WSLC_E_IMAGE_NOT_FOUND && options.Pull == PullPolicy::Missing)
     {
-        {
-            // Implicit pull for run/create: progress goes to Info (stderr), keeping stdout for the
-            // container id/output.
-            ImageProgressCallback callback(terminal, Terminal::Level::Info);
-            terminal.Info(L"{}\n", Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)));
-            ImageService imageService;
-            imageService.Pull(terminal, session, image, &callback);
-        }
+        terminal.Info(L"{}\n", Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)));
+        PullImage(terminal, session, image);
         return containerLauncher.Create(*session.Get(), &warningCallback);
     }
 

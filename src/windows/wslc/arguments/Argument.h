@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 
 #include <string>
 
@@ -105,8 +105,9 @@ struct Argument
         return m_limit == argument::Limit::Unlimited;
     }
 
-    // Validates this argument's value in the provided args
-    void Validate(const ArgMap& execArgs) const;
+    // Validates this argument's current values, caching the converted result (converted arguments
+    // only) on `execArgs` so reads reuse it without re-parsing until the raw values change.
+    void Validate(ArgMap& execArgs) const;
 
 private:
     ArgType m_argType;

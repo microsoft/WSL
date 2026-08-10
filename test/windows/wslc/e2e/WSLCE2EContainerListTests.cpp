@@ -176,11 +176,10 @@ class WSLCE2EContainerListTests
         // List containers with json format
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        // The payload is emitted on a single compact line.
-        VERIFY_ARE_EQUAL(1u, result.GetStdoutLines().size());
         // Parse json and verify we got the expected container information back
-        auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_IS_GREATER_THAN_OR_EQUAL(containers.size(), 1U);
+        VERIFY_ARE_EQUAL(containers.size(), result.GetStdoutLines().size());
 
         auto findContainer = [](const std::vector<ContainerInformation>& list, const std::wstring& id) {
             return std::ranges::any_of(list, [&](const auto& c) { return wsl::shared::string::MultiByteToWide(c.Id) == id; });
@@ -198,7 +197,7 @@ class WSLCE2EContainerListTests
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         // Parse json and verify we got both containers back
-        containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_IS_GREATER_THAN_OR_EQUAL(containers.size(), 2U);
 
         VERIFY_IS_TRUE(findContainer(containers, containerId));
@@ -247,7 +246,7 @@ class WSLCE2EContainerListTests
         result = RunWslc(std::format(L"container list --all --format json --filter name={}", WslcContainerName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_ARE_EQUAL(1U, containers.size());
         VERIFY_ARE_EQUAL(WideToMultiByte(WslcContainerName2), std::string(containers[0].Name));
     }
@@ -268,7 +267,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -315,7 +314,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -362,7 +361,7 @@ class WSLCE2EContainerListTests
         result = RunWslc(std::format(L"container list --all --format json --filter id={}", containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_ARE_EQUAL(1U, containers.size());
         VERIFY_ARE_EQUAL(WideToMultiByte(containerId), std::string(containers[0].Id));
     }
@@ -383,7 +382,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -422,7 +421,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -464,7 +463,7 @@ class WSLCE2EContainerListTests
             result = RunWslc(L"container list --latest --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
             VERIFY_ARE_EQUAL(1U, containers.size());
             VERIFY_ARE_EQUAL(WideToMultiByte(WslcContainerName2), std::string(containers[0].Name));
         }
@@ -474,7 +473,7 @@ class WSLCE2EContainerListTests
             result = RunWslc(L"container list --last 2 --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
             VERIFY_IS_TRUE(containers.size() <= 2u);
         }
 
