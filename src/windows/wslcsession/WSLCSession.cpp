@@ -363,7 +363,6 @@ HRESULT WSLCSession::Initialize(
     _In_opt_ IWarningCallback* WarningCallback)
 try
 {
-    __fastfail(FAST_FAIL_FATAL_APP_EXIT);
     RETURN_HR_IF(E_POINTER, Settings == nullptr || VmFactory == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_vmFactoryGitCookie != 0);
 
