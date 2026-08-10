@@ -171,8 +171,11 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(images, c_jsonCompactIndent);
-        context.Terminal.Output(L"{}\n", MultiByteToWide(json));
+        for (const auto& image : images)
+        {
+            context.Terminal.Output(L"{}\n", ToJsonW(image, c_jsonCompactIndent));
+        }
+
         break;
     }
     case FormatType::Table:

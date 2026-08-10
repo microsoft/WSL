@@ -204,7 +204,7 @@ void VerifyImageIsListed(const TestImage& image)
 {
     auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
     for (const auto& img : images)
     {
         if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
@@ -221,7 +221,7 @@ void VerifyVolumeIsListed(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -237,7 +237,7 @@ void VerifyVolumeIsNotListed(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -251,7 +251,7 @@ void VerifyNetworkIsListed(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
@@ -267,7 +267,7 @@ void VerifyNetworkIsNotListed(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
@@ -359,7 +359,7 @@ std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers(
 {
     auto result = RunWslc(L"container list --all --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(result.Stdout.value().c_str());
+    return ParseNdjsonOutputAs<wsl::windows::wslc::models::ContainerInformation>(result);
 }
 
 void EnsureImageContainersAreDeleted(const TestImage& image)
@@ -381,7 +381,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
     for (const auto& img : images)
     {
         if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
@@ -400,7 +400,7 @@ void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
     auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    const auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
     const auto prefix = wsl::shared::string::WideToMultiByte(repositoryPrefix);
     for (const auto& image : images)
     {
@@ -420,7 +420,7 @@ void EnsureNoUntaggedImages()
     auto result = RunWslc(L"image list --format json --filter dangling=true");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    const auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
 
     for (const auto& image : images)
     {
@@ -448,7 +448,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     auto result = RunWslc(listCommand);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
     for (const auto& img : images)
     {
         if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
@@ -504,7 +504,7 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -520,7 +520,7 @@ void EnsureNetworkDoesNotExist(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))

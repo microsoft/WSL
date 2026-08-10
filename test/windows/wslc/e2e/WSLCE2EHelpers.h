@@ -236,6 +236,44 @@ inline nlohmann::json VerifyCompactJsonOutput(const WSLCExecutionResult& result)
     return nlohmann::json::parse(wsl::shared::string::WideToMultiByte(lines[0]));
 }
 
+// Parses list output emitted as one compact JSON object per line.
+inline std::vector<nlohmann::json> ParseNdjsonOutput(const WSLCExecutionResult& result)
+{
+    VERIFY_IS_TRUE(result.Stdout.has_value());
+
+    std::vector<nlohmann::json> entries;
+    for (const auto& line : result.GetStdoutLines())
+    {
+        if (line.empty())
+        {
+            continue;
+        }
+
+        auto entry = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(line));
+        if (!entry.is_object())
+        {
+            VERIFY_FAIL(std::format(L"Line is not a JSON object: '{}'", line).c_str());
+        }
+
+        entries.push_back(std::move(entry));
+    }
+
+    return entries;
+}
+
+// Typed form of ParseNdjsonOutput() that deserializes each line into T.
+template <typename T>
+std::vector<T> ParseNdjsonOutputAs(const WSLCExecutionResult& result)
+{
+    std::vector<T> entries;
+    for (const auto& entry : ParseNdjsonOutput(result))
+    {
+        entries.push_back(entry.get<T>());
+    }
+
+    return entries;
+}
+
 // Verifies that a string is a valid hex ID output.
 // truncated=true expects 12 hex chars, truncated=false expects 64 hex chars.
 inline void VerifyIdOutput(const std::wstring& id, bool truncated)
