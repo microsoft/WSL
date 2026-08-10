@@ -1541,9 +1541,7 @@ class UnitTests
 
             // wsl.exe --manage --compact requires WSL2.
             ValidateErrorMessage(
-                L"--manage test_distro --compact",
-                L"This operation is only supported by WSL2.",
-                L"Wsl/Service/WSL_E_WSL2_NEEDED");
+                L"--manage test_distro --compact", L"This operation is only supported by WSL2.", L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
 
         ValidateErrorMessage(
@@ -3335,7 +3333,6 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
-
     }
 
     // Verifies that VHD-mutating manage operations (--resize, --set-sparse, --move) are rejected while a
@@ -3414,7 +3411,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_IS_NOT_NULL(distroKey.get());
 
         const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
-        const auto vhdFileName = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
         const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
         VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
 
@@ -3448,8 +3446,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         // Delete the file but do NOT trim from inside the guest: reclaiming the freed blocks now
         // depends on the trim that '--compact' performs on the host before compacting the VHD.
-        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
-            L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync'", name));
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync'", name));
         VERIFY_ARE_EQUAL(err, L"");
         WslShutdown();
 
