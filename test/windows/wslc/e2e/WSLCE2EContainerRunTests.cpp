@@ -95,8 +95,7 @@ class WSLCE2EContainerRunTests
     {
         auto session = OpenDefaultElevatedSession();
         auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15006);
-        auto registryImage =
-            TagImageForRegistry(DebianImage.NameAndTag(), wsl::shared::string::MultiByteToWide(registryAddress));
+        auto registryImage = TagImageForRegistry(DebianImage.NameAndTag(), wsl::shared::string::MultiByteToWide(registryAddress));
         auto cleanup = wil::scope_exit([&]() {
             EnsureContainerDoesNotExist(WslcContainerName);
             RunWslc(std::format(L"image delete --force {}", registryImage));

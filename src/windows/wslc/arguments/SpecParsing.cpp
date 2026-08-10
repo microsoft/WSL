@@ -668,7 +668,17 @@ models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std:
         }
     }
 
-    constexpr std::wstring_view supportedValues = L"always, missing, never";
+    std::wstring supportedValues;
+    for (const auto& pullPolicy : c_pullPolicies)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += pullPolicy.first;
+    }
+
     throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
 }
 
