@@ -1738,6 +1738,11 @@ Return Value:
 int UtilMountFile(const char* Source, const char* Destination)
 try
 {
+    //
+    // N.B. The source is validated up front because the destination is created below if it does not
+    //      already exist; letting the mount fail instead would leave an empty file behind.
+    //
+
     struct stat sourceInfo{};
     THROW_LAST_ERROR_IF(stat(Source, &sourceInfo) < 0);
     THROW_ERRNO_IF(EINVAL, !S_ISREG(sourceInfo.st_mode));

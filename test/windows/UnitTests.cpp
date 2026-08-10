@@ -3008,7 +3008,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // The unified kernel artifacts VHD provides the kernel headers and the perf tooling
         // alongside the kernel modules. Headers are mounted at /usr/src/linux-headers-$(uname -r)
         // with /lib/modules/$(uname -r)/build symlinked to that directory; perf is mounted at
-        // /usr/lib/linux-tools/$(uname -r) with its binary bind mounted at /usr/bin/perf.
+        // /usr/lib/linux-tools/$(uname -r) and exposed via $PATH.
 
         // Headers: the build symlink and a representative uapi header are present.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -L /lib/modules/$(uname -r)/build", nullptr, nullptr, nullptr, nullptr), 0u);
@@ -3050,15 +3050,7 @@ EOF
         // perf: leave no trace in the distro's file system and make the versioned binary reachable
         // via $PATH, with PERF_EXEC_PATH pointing at its helper scripts.
         //
-        // N.B. The cleanup is registered before the distro's file system is modified so that a
-        //      failure can't leave a perf binary behind, which would be shadowed by the bind mount
-        //      on the next boot and break subsequent runs.
-        auto perfCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr);
-        });
-
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
+        // N.B. The test distro does not ship perf, so nothing should be created at /usr/bin/perf.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -x /usr/lib/linux-tools/$(uname -r)/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /usr/bin/perf", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(
@@ -3070,6 +3062,14 @@ EOF
 
         // Stale distro-provided artifacts are replaced or hidden after the VM restarts. A distro
         // provided perf is shadowed by the binary matching the running kernel.
+        //
+        // N.B. The cleanup is registered before the distro's file system is modified so that a
+        //      failure can't leave a perf binary behind, which would be shadowed by the bind mount
+        //      on the next boot and break subsequent runs.
+        auto perfCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr);
+        });
+
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf > /usr/bin/perf", nullptr, nullptr, nullptr, nullptr),
             0u);

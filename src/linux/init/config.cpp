@@ -1153,8 +1153,22 @@ Return Value:
         // Point /lib/modules/<release>/build at the kernel headers, replacing any entry that the
         // distro may have created so that it can't shadow the headers matching the running kernel.
         //
+        // N.B. A directory can't be replaced with a symlink (and removing it would mean a recursive
+        //      delete), so bind mount the headers over it instead.
+        //
 
         const std::string linkPath = kernelModulesPath + "/build";
+        struct stat existing{};
+        if ((lstat(linkPath.c_str(), &existing) == 0) && S_ISDIR(existing.st_mode))
+        {
+            if (UtilMount(target.c_str(), linkPath.c_str(), nullptr, (MS_BIND | MS_REC), nullptr) < 0)
+            {
+                LOG_ERROR("UtilMount({}, {}) failed {}", target, linkPath, errno);
+            }
+
+            return;
+        }
+
         if ((unlink(linkPath.c_str()) < 0) && (errno != ENOENT))
         {
             LOG_ERROR("unlink({}) failed {}", linkPath, errno);

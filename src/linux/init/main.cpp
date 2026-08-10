@@ -3271,11 +3271,10 @@ try
             const std::string ArtifactsBase = std::format("{}/{}", KERNEL_MODULES_VHD_PATH, Release);
             const std::string NestedModules = ArtifactsBase + "/modules";
 
-            struct stat StatBuffer{};
-            const bool NestedLayout = (stat(NestedModules.c_str(), &StatBuffer) == 0) && S_ISDIR(StatBuffer.st_mode);
+            std::error_code Error{};
+            const bool NestedLayout = std::filesystem::is_directory(NestedModules, Error);
             const std::string ModulesLower = NestedLayout ? NestedModules : std::string{KERNEL_MODULES_VHD_PATH};
-            const bool LegacyLayout =
-                !NestedLayout && (stat((ModulesLower + "/modules.dep").c_str(), &StatBuffer) == 0) && S_ISREG(StatBuffer.st_mode);
+            const bool LegacyLayout = !NestedLayout && std::filesystem::is_regular_file(ModulesLower + "/modules.dep", Error);
 
             //
             // A valid artifacts VHD nests the tree under <release>/modules; a legacy module-only VHD
