@@ -1888,7 +1888,7 @@ try
 {
     auto runAsUser = wil::CoImpersonateClient();
     std::filesystem::path vhdPath;
-    LXSS_DISTRO_CONFIGURATION configuration;
+    LXSS_DISTRO_CONFIGURATION configuration{};
 
     {
         std::lock_guard lock(m_instanceLock);
