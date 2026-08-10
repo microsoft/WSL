@@ -214,28 +214,11 @@ struct RegistryAllowlistSnapshot
     std::vector<std::wstring> Hosts{};
 };
 
-// Reads the allowlist in one shot. Empty entries are skipped (matches EnumerateRegistryAllowlist).
-// Throws with an "invalid policy" user error when the sub-key exists but can't be read (bad ACL,
-// corrupted values, etc.) so the caller fails closed.
-inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY policiesKey)
+// subKey must be the WSLContainerRegistryAllowlist sub-key, not the policies root.
+inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY subKey)
 {
-    if (policiesKey == nullptr)
-    {
-        return {};
-    }
-
-    wil::unique_hkey subKey;
-    const auto openResult = RegOpenKeyExW(policiesKey, c_wslContainerRegistryAllowlist, 0, KEY_READ, &subKey);
-    if (openResult == ERROR_PATH_NOT_FOUND || openResult == ERROR_FILE_NOT_FOUND)
-    {
-        return {};
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(openResult), wsl::shared::Localization::MessageRegistryAllowlistPolicyInvalid(), openResult != ERROR_SUCCESS);
-
     RegistryAllowlistSnapshot snapshot;
-    for (auto& [name, value] : wsl::windows::common::registry::EnumStringValues(subKey.get()))
+    for (auto& [name, value] : wsl::windows::common::registry::EnumStringValues(subKey))
     {
         if (value.empty())
         {
@@ -253,12 +236,12 @@ inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY policiesKey)
     return snapshot;
 }
 
-// Convenience for callers with no open policies key. Throws MessageRegistryAllowlistPolicyInvalid
-// when the policies key can't be opened.
+// Throws MessageRegistryAllowlistPolicyInvalid on an unreadable sub-key so callers fail closed.
 inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshotFromPoliciesRoot()
 {
-    wil::unique_hkey policiesKey;
-    const auto openResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE, c_registryKey, 0, KEY_READ, &policiesKey);
+    const auto subKeyPath = std::wstring{c_registryKey} + L"\\" + c_wslContainerRegistryAllowlist;
+    wil::unique_hkey subKey;
+    const auto openResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE, subKeyPath.c_str(), 0, KEY_READ, &subKey);
     if (openResult == ERROR_PATH_NOT_FOUND || openResult == ERROR_FILE_NOT_FOUND)
     {
         return {};
@@ -267,7 +250,7 @@ inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshotFromPoliciesRoot()
     THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(openResult), wsl::shared::Localization::MessageRegistryAllowlistPolicyInvalid(), openResult != ERROR_SUCCESS);
 
-    return ReadRegistryAllowlistSnapshot(policiesKey.get());
+    return ReadRegistryAllowlistSnapshot(subKey.get());
 }
 
 } // namespace wsl::windows::policies
