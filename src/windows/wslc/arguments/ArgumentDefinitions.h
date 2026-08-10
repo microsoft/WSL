@@ -112,7 +112,7 @@ _(Path,             "path",                 NO_ALIAS,         Kind::Positional, 
 /*_(Progress,         "progress",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ProgressArgDescription())*/ \
 _(Publish,          "publish",              L"p",             Kind::Value,      NoConversion, Localization::WSLCCLI_PublishArgDescription()) \
 _(PublishAll,       "publish-all",          L"P",             Kind::Flag,       NoConversion, Localization::WSLCCLI_PublishAllArgDescription()) \
-_(Pull,               "pull",                 NO_ALIAS,         Kind::Value,      PullPolicy,   Localization::WSLCCLI_PullArgDescription()) \
+_(Pull,             "pull",                 NO_ALIAS,         Kind::Value,      PullPolicy,   Localization::WSLCCLI_PullArgDescription()) \
 _(Quiet,            "quiet",                L"q",             Kind::Flag,       NoConversion, Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,           "rm",                   NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,           "scheme",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SchemeArgDescription())*/ \
