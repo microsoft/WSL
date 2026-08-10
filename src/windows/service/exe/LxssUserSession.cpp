@@ -1940,11 +1940,6 @@ try
         "CompactDistributionBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(configuration.Name.c_str(), "distroName"));
 
     result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
-    if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
-    {
-        THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageVhdInUse());
-    }
-
     THROW_IF_FAILED(result);
     return S_OK;
 }
