@@ -3064,10 +3064,16 @@ EOF
         // provided perf is shadowed by the binary matching the running kernel.
         //
         // N.B. The cleanup is registered before the distro's file system is modified so that a
-        //      failure can't leave a perf binary behind, which would be shadowed by the bind mount
-        //      on the next boot and break subsequent runs.
-        auto perfCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf", nullptr, nullptr, nullptr, nullptr);
+        //      failure can't leave a perf binary or a broken build symlink behind, which would
+        //      break subsequent runs.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(
+                L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf; ln -snf /usr/src/linux-headers-$(uname -r) "
+                L"/lib/modules/$(uname -r)/build",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr);
         });
 
         VERIFY_ARE_EQUAL(

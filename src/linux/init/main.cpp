@@ -3286,6 +3286,10 @@ try
                     "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
                     "removed in a future version; kernel headers and perf tooling are unavailable");
             }
+            else if (!NestedLayout)
+            {
+                LOG_WARNING("kernel modules VHD does not contain modules for {}", Release);
+            }
 
             std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, Release);
             THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), ModulesLower.c_str(), (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
