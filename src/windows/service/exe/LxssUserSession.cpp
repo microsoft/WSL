@@ -1925,22 +1925,13 @@ try
         CATCH_LOG();
     }
 
-    HRESULT result = E_UNEXPECTED;
-    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        WSL_LOG_TELEMETRY(
-            "CompactDistributionEnd",
-            PDT_ProductAndServicePerformance,
-            TraceLoggingValue(configuration.Name.c_str(), "distroName"),
-            TraceLoggingValue(result, "result"));
+    auto compactionComplete =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
 
-        _ConversionComplete(configuration.DistroId);
-    });
-
-    WSL_LOG_TELEMETRY(
-        "CompactDistributionBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(configuration.Name.c_str(), "distroName"));
-
-    result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
-    THROW_IF_FAILED(result);
+    THROW_IF_FAILED_MSG(
+        wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); }),
+        "Failed to compact VHD: %ls",
+        vhdPath.c_str());
     return S_OK;
 }
 CATCH_RETURN()
