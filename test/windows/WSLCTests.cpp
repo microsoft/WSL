@@ -9369,8 +9369,9 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ContainerVolumesAdvanced)
     {
-        auto hostFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume");
-        auto symlinkFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume-symlink");
+        auto hostFolder = wsl::windows::common::filesystem::GetCanonicalPath(std::filesystem::current_path() / "test-volume");
+        auto symlinkFolder =
+            wsl::windows::common::filesystem::GetCanonicalPath(std::filesystem::current_path() / "test-volume-symlink");
         std::filesystem::create_directories(hostFolder);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {

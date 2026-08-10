@@ -3847,7 +3847,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
     if (Path != nullptr)
     {
-        canonicalPath = std::filesystem::weakly_canonical(std::filesystem::absolute(Path, error), error);
+        canonicalPath = wsl::windows::common::filesystem::GetCanonicalPath(Path, error);
         if (error)
         {
             LOG_WIN32(error.value());
@@ -3891,7 +3891,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Path != nullptr)
         {
-            auto canonicalDistroPath = std::filesystem::weakly_canonical(std::filesystem::absolute(configuration.BasePath, error), error);
+            auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
             if (error)
             {
                 LOG_WIN32(error.value());

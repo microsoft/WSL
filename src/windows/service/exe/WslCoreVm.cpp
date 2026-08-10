@@ -2182,7 +2182,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         sharePath.push_back(L'\\');
     }
 
-    sharePath = std::filesystem::weakly_canonical(std::filesystem::absolute(sharePath)).wstring();
+    sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
 
     std::wstring effectiveOptions(Options);
 
