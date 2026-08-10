@@ -29,8 +29,8 @@ enum class FormatType
 
 enum class PullPolicy
 {
-    Always,
     Missing,
+    Always,
     Never,
 };
 

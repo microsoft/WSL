@@ -349,7 +349,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::InspectFormat>(L"json"), wsl::shared::c_jsonCompactIndent);
 
         // string -> PullPolicy
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"missing"), PullPolicy::Missing);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"always"), PullPolicy::Always);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"never"), PullPolicy::Never);
 
         // string -> WSLCSignal (Signal and StopSignal share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Signal>(L"SIGTERM"), WSLCSignalSIGTERM);
