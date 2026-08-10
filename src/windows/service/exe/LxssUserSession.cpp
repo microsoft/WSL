@@ -3235,13 +3235,13 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
 _Requires_lock_held_(m_instanceLock)
 void LxssUserSessionImpl::_EnsureNotLocked(_In_ LPCGUID DistroGuid, const std::source_location& location)
 {
-    const auto locked = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
+    const auto found = std::find_if(m_lockedDistributions.begin(), m_lockedDistributions.end(), [&DistroGuid](const auto& entry) {
         return IsEqualGUID(entry.first, *DistroGuid);
     });
 
     THROW_HR_IF_MSG(
         E_ILLEGAL_STATE_CHANGE,
-        locked != m_lockedDistributions.end(),
+        (found != m_lockedDistributions.end()),
         "%hs, %hs:%u",
         location.function_name(),
         location.file_name(),
