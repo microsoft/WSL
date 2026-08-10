@@ -214,8 +214,9 @@ struct RegistryAllowlistSnapshot
     std::vector<std::wstring> Hosts{};
 };
 
-// subKey must be the WSLContainerRegistryAllowlist sub-key, not the policies root.
+// subKey must be the WSLContainerRegistryAllowlist sub-key; enumeration failures throw MessageRegistryAllowlistPolicyInvalid.
 inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY subKey)
+try
 {
     RegistryAllowlistSnapshot snapshot;
     for (auto& [name, value] : wsl::windows::common::registry::EnumStringValues(subKey))
@@ -234,6 +235,11 @@ inline RegistryAllowlistSnapshot ReadRegistryAllowlistSnapshot(HKEY subKey)
     }
 
     return snapshot;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    THROW_HR_WITH_USER_ERROR(wil::ResultFromCaughtException(), wsl::shared::Localization::MessageRegistryAllowlistPolicyInvalid());
 }
 
 // Throws MessageRegistryAllowlistPolicyInvalid on an unreadable sub-key so callers fail closed.
