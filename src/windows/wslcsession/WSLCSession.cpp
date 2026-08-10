@@ -2846,6 +2846,7 @@ try
     request.Labels[WSLCNetworkManagedLabel] = "true";
 
     request.Internal = static_cast<bool>(Options->Internal);
+    request.EnableIPv6 = static_cast<bool>(Options->EnableIPv6);
 
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcGatewayRequiresSubnet(), Options->Gateway != nullptr && Options->Subnet == nullptr);
@@ -2915,6 +2916,7 @@ try
     entry.Driver = full.Driver;
     entry.Scope = full.Scope;
     entry.Internal = full.Internal;
+    entry.EnableIPv6 = full.EnableIPv6;
     entry.Labels = full.Labels;
     if (full.Options)
     {
@@ -3043,6 +3045,7 @@ try
     result.Driver = entry.Driver;
     result.Scope = entry.Scope;
     result.Internal = entry.Internal;
+    result.EnableIPv6 = entry.EnableIPv6;
     result.Labels = entry.Labels;
     if (!entry.Options.empty())
     {
@@ -3838,6 +3841,7 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Driver = network.Driver;
             entry.Scope = network.Scope;
             entry.Internal = network.Internal;
+            entry.EnableIPv6 = network.EnableIPv6;
             entry.Labels = network.Labels;
             if (network.Options)
             {

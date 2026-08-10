@@ -146,11 +146,12 @@ struct CreateNetwork
     std::string Name;
     std::string Driver;
     bool Internal{};
+    bool EnableIPv6{};
     std::optional<IPAM> IPAM;
     std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Options, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, EnableIPv6, IPAM, Options, Labels);
 };
 
 struct Network
@@ -160,11 +161,12 @@ struct Network
     std::string Driver;
     std::string Scope;
     bool Internal{};
+    bool EnableIPv6{};
     IPAM IPAM;
     std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Options, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, EnableIPv6, IPAM, Options, Labels);
 };
 
 struct EndpointIPAMConfig
