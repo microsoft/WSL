@@ -129,9 +129,11 @@ try
         return S_OK;
     }
 
-    if (m_verbose || !m_isConsole)
+    if (m_verbose || !m_renderInPlace)
     {
-        // Skip pull progress updates when output is redirected, show only major steps
+        // Only major steps are reported here. Unlike docker's plain output, which appends
+        // throttled download lines, pull progress is omitted entirely: without in-place
+        // updates those lines are mostly noise.
         if (!isPullProgress)
         {
             m_terminal.Info(L"{}", status);
@@ -209,8 +211,8 @@ try
     wide.resize(bodyLength);
 
     // Pass the color sequences as arguments (not baked into the string) so Terminal strips
-    // them when --no-color is set. Color() additionally strips them in plain mode. The trailing
-    // newlines are emitted after the reset.
+    // them when --no-color is set. Color() additionally strips them outside Tty mode. The
+    // trailing newlines are emitted after the reset.
     m_terminal.Info(L"{}{}{}{}", Color(Format::Fg::BrightGreen), wide, Color(Format::Default), newlines);
     return S_OK;
 }
@@ -231,10 +233,10 @@ void BuildImageCallback::Redraw()
     const int displayCount = completedCount + reservedLines;
 
     // Build the frame body in one buffer to minimize console writes. The cursor moves,
-    // erases, and text lines it holds are non-color VT that only runs when a VT console is
-    // attached. The cursor hide/show wrapper and the dim intensity attribute are passed as
-    // Sequence arguments to Terminal (below) so it strips the color ones (Dim/Normal) when
-    // --no-color is set, while leaving the non-color cursor moves intact.
+    // erases, and text lines it holds are non-color VT. This only runs in Tty mode, where a
+    // VT console is attached. The cursor hide/show wrapper and the dim intensity attribute are
+    // passed as Sequence arguments to Terminal (below) so it strips the color ones (Dim/Normal)
+    // when --no-color is set, while leaving the non-color cursor moves intact.
     //
     // m_frameBuffer is a member so its backing allocation is reused across frames -
     // it grows to the high-water mark and is never freed between redraws.
@@ -285,8 +287,7 @@ void BuildImageCallback::Redraw()
 
     // Emit the frame as a single atomic write. Cursor Hide/Show are non-color and always
     // rendered here (VT is on); Format::Dim/Normal are color sequences that Terminal strips
-    // under --no-color and Color() strips in plain mode. The buffered body carries the cursor
-    // moves, erases, and text lines.
+    // under --no-color. The buffered body carries the cursor moves, erases, and text lines.
     m_terminal.Info(L"{}{}{}{}{}", Cursor::Hide, Color(Format::Dim), std::wstring_view{m_frameBuffer}, Color(Format::Normal), Cursor::Show);
     m_displayedLines = displayCount;
 }

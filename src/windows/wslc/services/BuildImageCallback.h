@@ -45,7 +45,7 @@ private:
     // Appends a log chunk to the error-replay buffer, enforcing the retained-bytes cap.
     void CaptureForReplay(std::string_view text);
     // Returns the sequence when color is enabled for this callback, else an empty (no-op) sequence so
-    // the Terminal emits nothing for it. Used to strip color in plain mode while keeping cursor moves.
+    // the Terminal emits nothing for it. Used to strip color from the sequences emitted in Tty mode.
     const wsl::windows::common::vt::Sequence& Color(const wsl::windows::common::vt::Sequence& sequence) const;
 
     Terminal& m_terminal;
@@ -53,7 +53,10 @@ private:
     const HANDLE m_cancelEvent;
     const models::ProgressMode m_mode;
     const bool m_color;
-    bool m_isConsole = m_terminal.IsVTEnabled(Terminal::Level::Info);
+    // In-place rendering (cursor moves, erases and redraws) is only used for Tty mode on a VT
+    // console. Plain mode appends one line at a time so its output carries no cursor control and
+    // is identical whether it goes to a console or a redirected stream.
+    bool m_renderInPlace = m_mode == models::ProgressMode::Tty && m_terminal.IsVTEnabled(Terminal::Level::Info);
     std::deque<std::string> m_lines;
     // Each entry already contains the trailing newline so the bytes match what's replayed.
     // TODO: Track logs per step so the destructor can replay only the failing step's
