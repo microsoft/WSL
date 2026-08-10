@@ -652,6 +652,36 @@ int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring
     return wsl::shared::c_jsonCompactIndent;
 }
 
+models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName)
+{
+    static constexpr std::pair<std::wstring_view, models::PullPolicy> c_pullPolicies[] = {
+        {L"always", models::PullPolicy::Always},
+        {L"missing", models::PullPolicy::Missing},
+        {L"never", models::PullPolicy::Never},
+    };
+
+    for (const auto& [name, policy] : c_pullPolicies)
+    {
+        if (IsEqual(input, name))
+        {
+            return policy;
+        }
+    }
+
+    std::wstring supportedValues;
+    for (const auto& pullPolicy : c_pullPolicies)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += pullPolicy.first;
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
+}
+
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
     if (IsEqual(input, L"image"))

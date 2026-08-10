@@ -94,6 +94,10 @@ void Argument::Validate(ArgMap& execArgs) const
         CacheConverted<ArgType::InspectFormat>(execArgs, m_name, validation::GetInspectJsonIndentFromString);
         break;
 
+    case ArgType::Pull:
+        CacheConverted<ArgType::Pull>(execArgs, m_name, validation::GetPullPolicyFromString);
+        break;
+
     case ArgType::Signal:
         CacheConverted<ArgType::Signal>(execArgs, m_name, validation::GetWSLCSignalFromString);
         break;

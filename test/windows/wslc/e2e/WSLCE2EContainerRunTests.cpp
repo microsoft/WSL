@@ -25,6 +25,7 @@ class WSLCE2EContainerRunTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(HelloWorldImage);
         EnsureImageIsLoaded(PythonImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
@@ -42,6 +43,7 @@ class WSLCE2EContainerRunTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(HelloWorldImage);
         EnsureImageIsDeleted(PythonImage);
         EnsureVolumeDoesNotExist(WslcVolumeName);
         EnsureNetworkDoesNotExist(TestNetworkName);
@@ -89,6 +91,36 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"echo_from_container\n", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(WslcContainerName, L"exited");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PullPolicy)
+    {
+        auto session = OpenDefaultElevatedSession();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
+        auto registryImage = TagImageForRegistry(HelloWorldImage.NameAndTag(), wsl::shared::string::MultiByteToWide(registryAddress));
+        auto cleanup = wil::scope_exit([&]() {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            RunWslc(std::format(L"image delete --force {}", registryImage));
+        });
+
+        auto result = RunWslc(std::format(L"container run --pull=never --rm --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_FALSE(result.Stdout->empty());
+
+        result = RunWslc(std::format(L"container run --pull=always --rm --name {} {}", WslcContainerName, registryImage));
+        const auto errorMessage = std::format(
+            L"manifest for {} not found: manifest unknown: manifest unknown\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", registryImage);
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
+
+        result = RunWslc(std::format(L"container run --pull=missing --rm --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_FALSE(result.Stdout->empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_CIDFile_Valid)
@@ -1383,6 +1415,7 @@ private:
 
     // Test images
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& HelloWorldImage = HelloWorldTestImage();
     const TestImage& PythonImage = PythonTestImage();
 
     // Test environment variable files
