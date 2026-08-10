@@ -3430,10 +3430,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             return size.QuadPart;
         };
 
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --set-sparse false", name));
-        VERIFY_ARE_EQUAL(err, L"");
-
-        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
         VERIFY_ARE_EQUAL(err, L"");
 
         constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
