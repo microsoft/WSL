@@ -102,6 +102,27 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_PullPolicy)
+    {
+        auto session = OpenDefaultElevatedSession();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15005);
+        auto registryImage = TagImageForRegistry(DebianImage.NameAndTag(), string::MultiByteToWide(registryAddress));
+        auto cleanup = wil::scope_exit([&]() {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            RunWslc(std::format(L"image delete --force {}", registryImage));
+        });
+
+        auto result = RunWslc(std::format(L"container create --pull=never --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyContainerIsListed(WslcContainerName, L"created");
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        result = RunWslc(std::format(L"container create --pull=always --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"manifest unknown"));
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Valid)
     {
         VerifyContainerIsNotListed(WslcContainerName);

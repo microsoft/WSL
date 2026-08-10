@@ -153,6 +153,15 @@ class WSLCCLIArgumentUnitTests
         VERIFY_NO_THROW(validation::ValidateFormatTypeFromString({L"json", L"table"}, L"formatArg"));
         VERIFY_THROWS(validation::ValidateFormatTypeFromString({L"JSON", L"TABLE", L"csv"}, L"formatArg"), ArgumentException);
 
+        // Verify image pull policy
+        auto pullPolicy = validation::GetPullPolicyFromString(L"always");
+        VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Always);
+        pullPolicy = validation::GetPullPolicyFromString(L"missing");
+        VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Missing);
+        pullPolicy = validation::GetPullPolicyFromString(L"never");
+        VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Never);
+        VERIFY_THROWS(validation::GetPullPolicyFromString(L"invalid"), ArgumentException);
+
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
         VERIFY_THROWS(validation::ValidateGpus({L"none"}, L"gpusArg"), ArgumentException);
@@ -338,6 +347,9 @@ class WSLCCLIArgumentUnitTests
 
         // string -> json::dump() indentation
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::InspectFormat>(L"json"), wsl::shared::c_jsonCompactIndent);
+
+        // string -> PullPolicy
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"always"), PullPolicy::Always);
 
         // string -> WSLCSignal (Signal and StopSignal share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Signal>(L"SIGTERM"), WSLCSignalSIGTERM);

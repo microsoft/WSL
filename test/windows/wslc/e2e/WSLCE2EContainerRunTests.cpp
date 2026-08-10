@@ -91,6 +91,26 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsListed(WslcContainerName, L"exited");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PullPolicy)
+    {
+        auto session = OpenDefaultElevatedSession();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15006);
+        auto registryImage = TagImageForRegistry(DebianImage.NameAndTag(), string::MultiByteToWide(registryAddress));
+        auto cleanup = wil::scope_exit([&]() {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            RunWslc(std::format(L"image delete --force {}", registryImage));
+        });
+
+        auto result =
+            RunWslc(std::format(L"container run --pull=never --rm --name {} {} echo pull-policy", WslcContainerName, registryImage));
+        result.Verify({.Stdout = L"pull-policy\n", .Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container run --pull=always --rm --name {} {} echo pull-policy", WslcContainerName, registryImage));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"manifest unknown"));
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_CIDFile_Valid)
     {
         // Prepare a CID file path that does not exist
