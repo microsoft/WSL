@@ -154,10 +154,7 @@ class SimpleTests
         return LxssGenerateWslCommandLine(L"-- sh -c \"printf ready; IFS= read -r _\"");
     }
 
-    static wil::unique_handle StartControllableWslProcess(
-        HANDLE standardInput,
-        HANDLE standardOutput,
-        DWORD createFlags = CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT)
+    static wil::unique_handle StartControllableWslProcess(HANDLE standardInput, HANDLE standardOutput, DWORD createFlags = CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT)
     {
         auto commandLine = BuildControllableWslCommandLine();
         return LxsstuStartProcess(commandLine.data(), standardInput, standardOutput, standardOutput, nullptr, createFlags);

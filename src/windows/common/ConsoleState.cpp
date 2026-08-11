@@ -290,8 +290,8 @@ bool ConsoleState::AcquireCoordination()
     const auto name = std::format(L"Local\\WSL.ConsoleState.v2.{:X}", reinterpret_cast<ULONG_PTR>(window));
     m_coordinationMutex.reset(CreateMutexW(nullptr, FALSE, (name + L".Mutex").c_str()));
     THROW_LAST_ERROR_IF(!m_coordinationMutex);
-    m_coordinationMapping.reset(CreateFileMappingW(
-        INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(CoordinationState), (name + L".Mapping").c_str()));
+    m_coordinationMapping.reset(
+        CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(CoordinationState), (name + L".Mapping").c_str()));
     THROW_LAST_ERROR_IF(!m_coordinationMapping);
     auto view = MapViewOfFile(m_coordinationMapping.get(), FILE_MAP_ALL_ACCESS, 0, 0, sizeof(CoordinationState));
     THROW_LAST_ERROR_IF(!view);
@@ -318,21 +318,23 @@ bool ConsoleState::AcquireCoordination()
     });
     if (owner == std::end(state.Owners))
     {
-        owner = std::find_if(std::begin(state.Owners), std::end(state.Owners), [](const auto& value) { return value.ProcessId == 0; });
+        owner =
+            std::find_if(std::begin(state.Owners), std::end(state.Owners), [](const auto& value) { return value.ProcessId == 0; });
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TOO_MANY_SESS), owner == std::end(state.Owners));
         *owner = {pid, 0, creationTime};
     }
 
-    const bool initialize = (owner->References == 0) && std::none_of(
-        std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) { return value.ProcessId && (&value != &*owner); });
+    const bool initialize =
+        (owner->References == 0) && std::none_of(std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) {
+            return value.ProcessId && (&value != &*owner);
+        });
     ++owner->References;
     if (initialize)
     {
         auto rollback = wil::scope_exit([&] { *owner = {}; });
         state.Baseline = CaptureConsoleValues(m_InputHandle.get(), m_OutputHandle.get());
-        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            ApplyConsoleValues(m_InputHandle.get(), m_OutputHandle.get(), state.Baseline);
-        });
+        auto restore = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&] { ApplyConsoleValues(m_InputHandle.get(), m_OutputHandle.get(), state.Baseline); });
         ConfigureInteractiveMode();
         state.Configured = CaptureConsoleValues(m_InputHandle.get(), m_OutputHandle.get());
         restore.release();
