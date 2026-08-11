@@ -611,7 +611,7 @@ class WSLCCLIArgumentUnitTests
         // the failure the up-front pass raises for the same value.
         ArgMap invalid;
         invalid.Add(ArgType::Network, std::wstring(L"host"));
-        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ArgumentException);
+        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ExecutionException);
 
         // Valid up-front, then an unsupported value added before the first read: the map-action
         // callback clears the validated record, so the read re-validates on demand and throws.
@@ -619,7 +619,7 @@ class WSLCCLIArgumentUnitTests
         added.Add(ArgType::Network, std::wstring(L"bridge"));
         Argument::Create(ArgType::Network).Validate(added);
         added.Add(ArgType::Network, std::wstring(L"host"));
-        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ArgumentException);
+        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ExecutionException);
     }
 
     TEST_METHOD(ArgumentValidate_ReadMakesArgumentImmutable)

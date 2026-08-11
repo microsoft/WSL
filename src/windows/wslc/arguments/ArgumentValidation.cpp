@@ -143,7 +143,17 @@ void Argument::Validate(ArgMap& execArgs) const
         if (execArgs.Contains(ArgType::HealthCmd) || execArgs.Contains(ArgType::HealthInterval) || execArgs.Contains(ArgType::HealthTimeout) ||
             execArgs.Contains(ArgType::HealthStartPeriod) || execArgs.Contains(ArgType::HealthRetries))
         {
-            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError());
+            std::vector<Argument> conflictingArguments{*this};
+            for (const auto type :
+                 {ArgType::HealthCmd, ArgType::HealthInterval, ArgType::HealthTimeout, ArgType::HealthStartPeriod, ArgType::HealthRetries})
+            {
+                if (execArgs.Contains(type))
+                {
+                    conflictingArguments.emplace_back(Argument::Create(type));
+                }
+            }
+
+            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError(), std::move(conflictingArguments));
         }
         break;
 
@@ -242,7 +252,7 @@ void Argument::Validate(ArgMap& execArgs) const
 
             if (IsEqual(value, L"host", true))
             {
-                throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
+                throw ExecutionException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }
         }
         break;

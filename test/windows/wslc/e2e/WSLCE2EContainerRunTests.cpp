@@ -914,8 +914,7 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"host mode networking is not supported"));
+        result.Verify({.Stdout = L"", .Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
