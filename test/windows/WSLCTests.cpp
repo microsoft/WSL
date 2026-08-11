@@ -5374,7 +5374,7 @@ class WSLCTests
 
         // List should start empty.
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, networks.size());
 
         WSLCNetworkOptions options{};
@@ -5387,7 +5387,7 @@ class WSLCTests
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         // Verify it appears in the list with correct fields.
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
         VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
         VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
@@ -5400,7 +5400,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
         // List should be empty again.
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, networks.size());
 
         // Delete non-existent should fail.
@@ -5416,6 +5416,82 @@ class WSLCTests
         options.LabelsCount = static_cast<ULONG>(Labels.size());
 
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+    }
+
+    WSLC_TEST_METHOD(ListNetworksFilters)
+    {
+        const std::string netA = "wslc-flt-net-a";
+        const std::string netB = "wslc-flt-net-b";
+        const std::string netC = "wslc-flt-net-c";
+        const std::string testLabelKey = "wslc.test.list_filter";
+        const std::string testLabelValue = "1";
+        const std::string testLabelKV = testLabelKey + "=" + testLabelValue;
+        const std::string managedLabel = "com.microsoft.wsl.network.managed";
+
+        auto cleanup = wil::scope_exit([&]() {
+            for (const auto& name : {netA, netB, netC})
+            {
+                LOG_IF_FAILED(m_defaultSession->DeleteNetwork(name.c_str()));
+            }
+        });
+
+        CreateNamedNetwork(netA, {{testLabelKey.c_str(), testLabelValue.c_str()}, {"env", "prod"}, {"tier", "web"}});
+        CreateNamedNetwork(netB, {{testLabelKey.c_str(), testLabelValue.c_str()}, {"env", "test"}});
+        CreateNamedNetwork(netC, {{testLabelKey.c_str(), testLabelValue.c_str()}, {"env", "prod"}});
+
+        auto expectListFails = [&](HRESULT expected, const std::vector<WSLCFilter>& filters) {
+            const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
+            const ULONG filtersCount = static_cast<ULONG>(filters.size());
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+            VERIFY_ARE_EQUAL(
+                expected, m_defaultSession->ListNetworks(filtersPtr, filtersCount, networks.addressof(), networks.size_address<ULONG>()));
+        };
+
+        auto expectList = [&](const std::vector<std::string>& expected,
+                              const std::vector<WSLCFilter>& filters,
+                              const std::source_location& source = std::source_location::current()) {
+            const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
+            const ULONG filtersCount = static_cast<ULONG>(filters.size());
+
+            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(filtersPtr, filtersCount, networks.addressof(), networks.size_address<ULONG>()));
+
+            std::vector<std::string> names;
+            for (const auto& n : networks)
+            {
+                names.emplace_back(n.Name);
+                VERIFY_IS_TRUE(strlen(n.Id) > 0);
+                VERIFY_ARE_EQUAL(std::string("bridge"), std::string(n.Driver));
+            }
+
+            VerifyAreEqualUnordered(expected, names, source);
+        };
+
+        const std::vector<std::string> all{netA, netB, netC};
+
+        expectList(all, {{"label", testLabelKV.c_str()}});
+
+        // label=<key>=<value> selects a subset within this test's scope.
+        expectList({netA, netC}, {{"label", testLabelKV.c_str()}, {"label", "env=prod"}});
+        expectList({netB}, {{"label", testLabelKV.c_str()}, {"label", "env=test"}});
+
+        // Multiple label filters are AND'd.
+        expectList({netA}, {{"label", testLabelKV.c_str()}, {"label", "env=prod"}, {"label", "tier=web"}});
+
+        // label=<key> (key-only) matches any stored value.
+        expectList(all, {{"label", testLabelKV.c_str()}, {"label", "env"}});
+
+        // driver filter combined with the test-scope label.
+        expectList(all, {{"label", testLabelKV.c_str()}, {"driver", "bridge"}});
+        expectList({}, {{"label", testLabelKV.c_str()}, {"driver", "nonexistent"}});
+
+        // Explicit managed-label filter is idempotent with the auto-injected one.
+        expectList(all, {{"label", testLabelKV.c_str()}, {"label", managedLabel.c_str()}});
+
+        // Null filter key/value is rejected.
+        expectListFails(E_POINTER, {{nullptr, "anything"}});
+        expectListFails(E_POINTER, {{"label", nullptr}});
     }
 
     WSLC_TEST_METHOD(PruneNetworksTest)
@@ -5457,7 +5533,7 @@ class WSLCTests
             expectPrune({a, b});
 
             wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
             for (const auto& n : networks)
             {
                 VERIFY_ARE_NOT_EQUAL(a, std::string(n.Name));
@@ -5598,7 +5674,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
         VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
     }
@@ -5661,7 +5737,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
         VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
         VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
@@ -5899,7 +5975,7 @@ class WSLCTests
         ResetTestSession();
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
         VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
         VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
@@ -5952,11 +6028,11 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsC, nullptr));
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(3u, networks.size());
 
         VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, networks.size());
     }
 

@@ -27,6 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkListCommand::GetArguments() const
 {
     return {
+        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Quiet, false, std::nullopt, Localization::WSLCCLI_NetworkListQuietArgDesc()),
     };

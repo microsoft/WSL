@@ -2979,7 +2979,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkInformation** Networks, ULONG* Count)
 try
 {
     WSLCExecutionContext context(this);
@@ -2990,22 +2990,69 @@ try
     *Networks = nullptr;
     *Count = 0;
 
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
     auto lock = AcquireLease();
+
+    if (filters.empty())
+    {
+        std::lock_guard networksLock(m_networksLock);
+
+        if (m_networks.empty())
+        {
+            return S_OK;
+        }
+
+        auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
+
+        ULONG index = 0;
+        for (const auto& [name, entry] : m_networks)
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
+            index++;
+        }
+
+        *Networks = output.release();
+        *Count = index;
+
+        return S_OK;
+    }
+
+    // Scope the filtered query to WSLC-managed networks.
+    filters["label"].push_back(WSLCNetworkManagedLabel);
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+
+    std::vector<docker_schema::Network> dockerNetworks;
+    try
+    {
+        dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+
     std::lock_guard networksLock(m_networksLock);
 
-    if (m_networks.empty())
+    if (dockerNetworks.empty())
     {
         return S_OK;
     }
 
-    auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
+    auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(dockerNetworks.size());
 
     ULONG index = 0;
-    for (const auto& [name, entry] : m_networks)
+    for (const auto& dockerNetwork : dockerNetworks)
     {
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
+        auto it = m_networks.find(dockerNetwork.Name);
+        if (it == m_networks.end())
+        {
+            continue;
+        }
+
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, it->first.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, it->second.Id.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, it->second.Driver.c_str()) != 0);
         index++;
     }
 
