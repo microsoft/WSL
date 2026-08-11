@@ -55,6 +55,7 @@ private:
     wil::unique_handle m_coordinationMutex;
     wil::unique_handle m_coordinationMapping;
     void* m_coordinationView{};
+    ULONGLONG m_ownerCreationTime{};
     RestorePolicy m_restorePolicy;
     bool m_interactiveModeConfigured{false};
     std::optional<DWORD> m_SavedInputMode{};

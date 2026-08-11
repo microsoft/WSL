@@ -307,16 +307,21 @@ bool ConsoleState::AcquireCoordination()
     }
 
     const auto pid = GetCurrentProcessId();
-    const auto creationTime = TryGetProcessCreationTime(GetCurrentProcess()).value();
+    const auto creationTime = TryGetProcessCreationTime(GetCurrentProcess());
+    if (!creationTime)
+    {
+        return false;
+    }
+
     auto owner = std::find_if(std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) {
-        return (value.ProcessId == pid) && (value.CreationTime == creationTime);
+        return (value.ProcessId == pid) && (value.CreationTime == creationTime.value());
     });
     if (owner == std::end(state.Owners))
     {
         owner =
             std::find_if(std::begin(state.Owners), std::end(state.Owners), [](const auto& value) { return value.ProcessId == 0; });
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TOO_MANY_SESS), owner == std::end(state.Owners));
-        *owner = {pid, 0, creationTime};
+        *owner = {pid, 0, creationTime.value()};
     }
 
     const bool initialize =
@@ -337,6 +342,7 @@ bool ConsoleState::AcquireCoordination()
     }
 
     m_coordinationView = view;
+    m_ownerCreationTime = creationTime.value();
     unmap.release();
     return true;
 }
@@ -346,10 +352,9 @@ void ConsoleState::ReleaseCoordination()
     MutexLock lock(m_coordinationMutex.get());
     auto& state = *static_cast<CoordinationState*>(m_coordinationView);
     const auto pid = GetCurrentProcessId();
-    const auto creationTime = TryGetProcessCreationTime(GetCurrentProcess()).value();
     for (auto& owner : state.Owners)
     {
-        if ((owner.ProcessId == pid) && (owner.CreationTime == creationTime))
+        if ((owner.ProcessId == pid) && (owner.CreationTime == m_ownerCreationTime))
         {
             if (--owner.References == 0)
             {
