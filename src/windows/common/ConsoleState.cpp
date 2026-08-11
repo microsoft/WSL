@@ -88,6 +88,7 @@ struct CoordinationState
     {
         DWORD ProcessId;
         ULONG References;
+        ULONGLONG CreationTime;
     };
 
     ULONG Version;
@@ -132,15 +133,28 @@ void ApplyConsoleValues(HANDLE input, HANDLE output, const ConsoleValues& values
     TrySetConsoleMode(output, values.OutputMode);
 }
 
+std::optional<ULONGLONG> TryGetProcessCreationTime(HANDLE process)
+{
+    FILETIME creation{}, exit{}, kernel{}, user{};
+    if (!GetProcessTimes(process, &creation, &exit, &kernel, &user))
+    {
+        LOG_LAST_ERROR_MSG("GetProcessTimes failed");
+        return std::nullopt;
+    }
+
+    return (static_cast<ULONGLONG>(creation.dwHighDateTime) << 32) | creation.dwLowDateTime;
+}
+
 bool IsOwnerAlive(const CoordinationState::Owner& owner)
 {
-    wil::unique_handle process{OpenProcess(SYNCHRONIZE, FALSE, owner.ProcessId)};
+    wil::unique_handle process{OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, owner.ProcessId)};
     if (!process)
     {
         return GetLastError() != ERROR_INVALID_PARAMETER;
     }
 
-    return WaitForSingleObject(process.get(), 0) != WAIT_OBJECT_0;
+    const auto creationTime = TryGetProcessCreationTime(process.get());
+    return (WaitForSingleObject(process.get(), 0) != WAIT_OBJECT_0) && (!creationTime || (creationTime.value() == owner.CreationTime));
 }
 
 } // namespace
@@ -273,7 +287,7 @@ bool ConsoleState::AcquireCoordination()
         return false;
     }
 
-    const auto name = std::format(L"Local\\WSL.ConsoleState.{:X}", reinterpret_cast<ULONG_PTR>(window));
+    const auto name = std::format(L"Local\\WSL.ConsoleState.v2.{:X}", reinterpret_cast<ULONG_PTR>(window));
     m_coordinationMutex.reset(CreateMutexW(nullptr, FALSE, (name + L".Mutex").c_str()));
     THROW_LAST_ERROR_IF(!m_coordinationMutex);
     m_coordinationMapping.reset(CreateFileMappingW(
@@ -285,9 +299,9 @@ bool ConsoleState::AcquireCoordination()
 
     MutexLock lock(m_coordinationMutex.get());
     auto& state = *static_cast<CoordinationState*>(view);
-    if (state.Version != 1)
+    if (state.Version != 2)
     {
-        state = {.Version = 1};
+        state = {.Version = 2};
     }
     for (auto& owner : state.Owners)
     {
@@ -298,13 +312,15 @@ bool ConsoleState::AcquireCoordination()
     }
 
     const auto pid = GetCurrentProcessId();
-    auto owner = std::find_if(
-        std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) { return value.ProcessId == pid; });
+    const auto creationTime = TryGetProcessCreationTime(GetCurrentProcess()).value();
+    auto owner = std::find_if(std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) {
+        return (value.ProcessId == pid) && (value.CreationTime == creationTime);
+    });
     if (owner == std::end(state.Owners))
     {
         owner = std::find_if(std::begin(state.Owners), std::end(state.Owners), [](const auto& value) { return value.ProcessId == 0; });
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TOO_MANY_SESS), owner == std::end(state.Owners));
-        *owner = {pid, 0};
+        *owner = {pid, 0, creationTime};
     }
 
     const bool initialize = (owner->References == 0) && std::none_of(
@@ -333,9 +349,10 @@ void ConsoleState::ReleaseCoordination()
     MutexLock lock(m_coordinationMutex.get());
     auto& state = *static_cast<CoordinationState*>(m_coordinationView);
     const auto pid = GetCurrentProcessId();
+    const auto creationTime = TryGetProcessCreationTime(GetCurrentProcess()).value();
     for (auto& owner : state.Owners)
     {
-        if (owner.ProcessId == pid)
+        if ((owner.ProcessId == pid) && (owner.CreationTime == creationTime))
         {
             if (--owner.References == 0)
             {
@@ -366,7 +383,7 @@ void ConsoleState::ReleaseCoordination()
         {
             LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(state.Baseline.OutputCodePage));
         }
-        state = {.Version = 1};
+        state = {.Version = 2};
     }
 }
 
