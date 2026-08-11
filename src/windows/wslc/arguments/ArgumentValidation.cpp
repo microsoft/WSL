@@ -72,6 +72,11 @@ namespace {
 // validated on success.
 void Argument::Validate(ArgMap& execArgs) const
 {
+    if (execArgs.IsValidated(m_argType))
+    {
+        return;
+    }
+
     switch (m_argType)
     {
     case ArgType::BuildLabel:

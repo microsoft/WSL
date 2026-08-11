@@ -627,6 +627,11 @@ class WSLCCLIArgumentUnitTests
         ArgMap args;
         args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
         VERIFY_ARE_EQUAL(args.GetValue<ArgType::Signal>(), WSLCSignalSIGTERM);
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(1));
+
+        Argument::Create(ArgType::Signal).Validate(args);
+        args.MarkValidated(ArgType::Signal);
+        VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(1));
 
         const auto verifyImmutableFailure = [](const auto& operation) {
             VERIFY_THROWS_SPECIFIC(operation(), wil::ResultException, [](const wil::ResultException& e) {
@@ -638,7 +643,6 @@ class WSLCCLIArgumentUnitTests
         verifyImmutableFailure([&] { args.Remove(ArgType::Signal); });
         verifyImmutableFailure([&] { args.InvalidateValidated(ArgType::Signal); });
         verifyImmutableFailure([&] { args.AddValidated<ArgType::Signal>(WSLCSignalSIGKILL); });
-        verifyImmutableFailure([&] { args.MarkValidated(ArgType::Signal); });
 
         // Immutability is per argument; other arguments remain writable until they are read.
         args.Add(ArgType::StopTimeout, std::wstring(L"30"));

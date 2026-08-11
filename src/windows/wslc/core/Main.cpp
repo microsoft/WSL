@@ -92,7 +92,7 @@ try
     // throw can't reroute through the colored-help error path.
     auto envDefs = command->GetGlobalsAndEnvArguments();
     ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
-    context.ApplyGlobalOptions();
+    context.ApplyGlobalEnvironmentOptions();
 
     // Past this point, environment variable options are in effect.
 
@@ -119,9 +119,8 @@ try
             /*stopOnUnknown*/ true,
             /*overridableDefaults*/ envDefs);
         command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
-        context.ApplyGlobalOptions();
 
-        // Past this point, global options are in effect.
+        // Past this point, global option parsing and validation are complete.
 
         // Pass 2 - Subcommand and leaf command resolution.
         std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
