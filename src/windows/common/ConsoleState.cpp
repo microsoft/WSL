@@ -156,6 +156,25 @@ bool IsOwnerAlive(const CoordinationState::Owner& owner)
     return (WaitForSingleObject(process.get(), 0) != WAIT_OBJECT_0) && (!creationTime || (creationTime.value() == owner.CreationTime));
 }
 
+std::optional<ULONG> TryGetConsoleId()
+{
+    const auto console = NtCurrentTeb()->ProcessEnvironmentBlock->ProcessParameters->Reserved2[0];
+    if (!console || (console == INVALID_HANDLE_VALUE))
+    {
+        return std::nullopt;
+    }
+
+    HANDLE serverPid{};
+    DWORD bytesReturned{};
+    if (!DeviceIoControl(console, IOCTL_CONDRV_GET_SERVER_PID, nullptr, 0, &serverPid, sizeof(serverPid), &bytesReturned, nullptr))
+    {
+        LOG_LAST_ERROR_MSG("IOCTL_CONDRV_GET_SERVER_PID failed");
+        return std::nullopt;
+    }
+
+    return HandleToUlong(serverPid);
+}
+
 } // namespace
 
 namespace wsl::windows::common {
@@ -280,13 +299,13 @@ void ConsoleState::ConfigureInteractiveMode()
 
 bool ConsoleState::AcquireCoordination()
 {
-    const auto window = GetConsoleWindow();
-    if (!window || !m_InputHandle || !m_OutputHandle)
+    const auto consoleId = TryGetConsoleId();
+    if (!consoleId || !m_InputHandle || !m_OutputHandle)
     {
         return false;
     }
 
-    const auto name = std::format(L"Local\\WSL.ConsoleState.v1.{:X}", reinterpret_cast<ULONG_PTR>(window));
+    const auto name = std::format(L"Local\\WSL.ConsoleState.v1.{:X}", consoleId.value());
     m_coordinationMutex.reset(CreateMutexW(nullptr, FALSE, (name + L".Mutex").c_str()));
     THROW_LAST_ERROR_IF(!m_coordinationMutex);
     m_coordinationMapping.reset(
