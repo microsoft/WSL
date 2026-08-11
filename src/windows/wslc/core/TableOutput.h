@@ -11,7 +11,7 @@ Abstract:
     Structured table output for the WSLC CLI. Cells are either plain text or
     format-string + Sequence args. Sequences are zero display width; the table
     measures visible width by counting non-placeholder characters. At render
-    time, sequences are emitted or stripped based on Reporter color state.
+    time, sequences are emitted or stripped based on Terminal color state.
 
 --*/
 #pragma once
@@ -25,7 +25,7 @@ Abstract:
 #include <variant>
 #include <vector>
 #include <wil/result_macros.h>
-#include "Reporter.h"
+#include "Terminal.h"
 #include "VTSupport.h"
 
 namespace wsl::windows::wslc {
@@ -139,11 +139,11 @@ struct TableOutput
     // The wrap pass is skipped in that case so the receiver controls its own width.
     static constexpr size_t DefaultRedirectedConsoleWidth = 2000;
 
-    TableOutput(Reporter& reporter, header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding, Reporter::Level level = Reporter::Level::Output) :
-        m_reporter(reporter),
+    TableOutput(Terminal& terminal, header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding, Terminal::Level level = Terminal::Level::Output) :
+        m_terminal(terminal),
         m_outputLevel(level),
-        m_vtEnabled(reporter.IsVTEnabled(level)),
-        m_colorEnabled(reporter.IsColorEnabled(level)),
+        m_vtEnabled(terminal.IsVTEnabled(level)),
+        m_colorEnabled(terminal.IsColorEnabled(level)),
         m_sizingBuffer(sizingBuffer),
         m_columnPadding(columnPadding)
     {
@@ -151,16 +151,16 @@ struct TableOutput
     }
 
     TableOutput(
-        Reporter& reporter,
+        Terminal& terminal,
         header_t&& header,
         column_config_t&& config,
         size_t sizingBuffer = 50,
         size_t columnPadding = DefaultColumnPadding,
-        Reporter::Level level = Reporter::Level::Output) :
-        m_reporter(reporter),
+        Terminal::Level level = Terminal::Level::Output) :
+        m_terminal(terminal),
         m_outputLevel(level),
-        m_vtEnabled(reporter.IsVTEnabled(level)),
-        m_colorEnabled(reporter.IsColorEnabled(level)),
+        m_vtEnabled(terminal.IsVTEnabled(level)),
+        m_colorEnabled(terminal.IsColorEnabled(level)),
         m_sizingBuffer(sizingBuffer),
         m_columnPadding(columnPadding),
         m_columnConfigs(std::move(config))
@@ -169,15 +169,15 @@ struct TableOutput
     }
 
     TableOutput(
-        Reporter& reporter,
+        Terminal& terminal,
         column_def_t&& columns,
         size_t sizingBuffer = 50,
         size_t columnPadding = DefaultColumnPadding,
-        Reporter::Level level = Reporter::Level::Output) :
-        m_reporter(reporter),
+        Terminal::Level level = Terminal::Level::Output) :
+        m_terminal(terminal),
         m_outputLevel(level),
-        m_vtEnabled(reporter.IsVTEnabled(level)),
-        m_colorEnabled(reporter.IsColorEnabled(level)),
+        m_vtEnabled(terminal.IsVTEnabled(level)),
+        m_colorEnabled(terminal.IsColorEnabled(level)),
         m_sizingBuffer(sizingBuffer),
         m_columnPadding(columnPadding)
     {
@@ -214,7 +214,7 @@ struct TableOutput
         m_rowIndent = spaces;
     }
 
-    // Overrides console width for column shrinking; pass 0 to restore default (Reporter-derived).
+    // Overrides console width for column shrinking; pass 0 to restore default (Terminal-derived).
     // When set, the wrap pass also runs as if a real console were attached.
     void SetConsoleWidthOverride(size_t width)
     {
@@ -288,8 +288,8 @@ private:
         ColumnOverflow Overflow = ColumnOverflow::Truncate;
     };
 
-    Reporter& m_reporter;
-    Reporter::Level m_outputLevel;
+    Terminal& m_terminal;
+    Terminal::Level m_outputLevel;
     const bool m_vtEnabled;
     const bool m_colorEnabled;
     std::array<Column, FieldCount> m_columns;
@@ -359,7 +359,7 @@ private:
             return m_consoleWidthOverride;
         }
 
-        if (const auto width = m_reporter.GetConsoleWidth(m_outputLevel); width.has_value())
+        if (const auto width = m_terminal.GetConsoleWidth(m_outputLevel); width.has_value())
         {
             return static_cast<size_t>(*width);
         }
@@ -609,7 +609,7 @@ private:
 
     void OutputCellLineToStream(const FormattedCell& cell)
     {
-        m_reporter.Write(m_outputLevel, L"{}\n", cell.Render(m_vtEnabled, m_colorEnabled));
+        m_terminal.Write(m_outputLevel, L"{}\n", cell.Render(m_vtEnabled, m_colorEnabled));
     }
 
     // Renders a logical row, emitting multiple physical rows for word-wrapping columns.
@@ -666,7 +666,7 @@ private:
                 }
             }
 
-            m_reporter.Write(m_outputLevel, L"{}\n", rowStr);
+            m_terminal.Write(m_outputLevel, L"{}\n", rowStr);
         }
     }
 };

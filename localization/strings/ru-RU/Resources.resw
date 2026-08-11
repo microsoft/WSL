@@ -160,7 +160,7 @@
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Указанное имя подключения содержит недопустимый символ "/". Повторите попытку без недопустимого символа.</value>
+    <value>Имя подключения не может быть пустым, ".", ".." или содержать "/". Повторите попытку с допустимым именем подключения.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -1005,8 +1005,8 @@
     <value>Реестр образов контейнера "{}" заблокирован политикой компьютера.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Создание образов контейнеров заблокировано, так как политикой компьютера настроен список разрешенных реестров контейнеров. При сборке образов базовые образы могут извлекаться из любых реестров, и их нельзя надежно ограничить этим списком разрешенных.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Политика списка разрешений для реестра контейнеров недействительна. Проверьте, что значения WSLContainerRegistryAllowlist в разделе Software\Policies\WSL настроены правильно.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Выполните команду "wsl.exe --set-version {} 2", чтобы перейти на WSL2.</value>
@@ -1992,6 +1992,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Число миллисекунд бездействия виртуальной машины до ее завершения.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Поддерживать работу WSL</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Не допускайте автоматического завершения работы запущенных дистрибутивов и виртуальной машины WSL, на которой они размещены.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Продолжайте работу WSL.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Не допускайте автоматического завершения работы запущенных дистрибутивов и виртуальной машины WSL, на которой они размещены.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Сброс времени ожидания</value>
   </data>
@@ -2000,6 +2012,21 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Число миллисекунд бездействия виртуальной машины до ее завершения.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Тайм-аут простоя распределения</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Время простоя распределения (в миллисекундах) до его завершения.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Сброс времени ожидания</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Тайм-аут простоя распределения</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Время простоя распределения (в миллисекундах) до его завершения.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Применить изменения</value>
@@ -2161,6 +2188,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Имя сети не может быть пустым.</value>
+  </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Сведения об ошибке от обработчика:</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Нераспознанная команда: "{}"</value>
@@ -2330,6 +2360,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Изображение "{}" не найдено.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Недопустимое значение --secret "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Недопустимое значение для --output '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Невозможно записать выходные данные сборки в консоль для значения --output '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Отсутствует обязательный параметр: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2371,7 +2413,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
-    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <value>Для параметра '--ip-range' также требуется указать '--subnet'.</value>
     <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2891,8 +2933,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Всегда пытайтесь загрузить более новую версию образа</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Настройка целевой стадии сборки для сборки</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Предоставить секрет сборке (id=NAME[,type=env|file][,env=VAR|,src=PATH]; по умолчанию env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Команда для выполнения</value>
@@ -2938,6 +2988,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Формат вывода (json или table) (по умолчанию: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Форматирование вывода — json для однострочного вывода (по умолчанию: JSON с отступами)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Аргументы для передачи процессу инициализации контейнера.</value>
@@ -3088,6 +3142,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Путь к хранилищу сеанса</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Путь к каталогу хранилища сеансов</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Сигнал для отправки</value>
   </data>
@@ -3131,6 +3188,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Не выдавать ошибку, если том не существует</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Удалите анонимные тома, связанные с контейнером</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Рабочий каталог внутри контейнера</value>
   </data>
@@ -3140,6 +3200,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Записать идентификатор контейнера по указанному пути</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Запишите идентификатор образа по указанному пути</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-адрес сервера доменных имен DNS в resolv.conf</value>
@@ -3172,7 +3235,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Политика извлечения образов (always|missing|never) (по умолчанию: never).</value>
+    <value>Политика вытягивания образов (always|missing|never) (по умолчанию: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3203,9 +3266,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Показать подробные сведения о перечисленных сеансах.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Указан недопустимый тип формата. Поддерживаемые типы формата: json, table.</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Недопустимое значение {}: {} не является распознаваемым типом формата. Поддерживаемые типы форматов: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Недопустимое значение {}: {} не является признанной политикой вытягивания. Поддерживаемые политики извлечения: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Недопустимое значение {}: {} не является распознанным типом проверки. Поддерживаемые типы проверки: {}.</value>

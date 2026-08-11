@@ -110,8 +110,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 16.0",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260624.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.105-Build1.105.wsl",
-                    "Sha256": "0x08681b0070e9fc6d517e86821f0d280ac0c9ed268cb9fa3487715b7e9858d697"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260805.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.131-Build1.131.wsl",
+                    "Sha256": "0xc80dce10e2f7fd0bc0b4e7f3e489c36c60159f3a4a32adb74a36d0a4924b1460"
                 }
             }
         ],
@@ -205,8 +205,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2026.07.01.171406/archlinux-2026.07.01.171406.wsl",
-                    "Sha256": "f780765cdd7b2e289e5f3dad3af6e316021b7dc63085a5636485e5469533c9a0"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2026.08.01.174141/archlinux-2026.08.01.174141.wsl",
+                    "Sha256": "98d7689fdde3df0c041c61b438187fa3f1632510d4149c0a4f3aad605e925445"
                 }
             }
         ],

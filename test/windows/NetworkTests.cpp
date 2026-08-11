@@ -17,6 +17,7 @@ Abstract:
 #include "Common.h"
 #include "wslpolicies.h"
 #include "hns_schema.h"
+#include "WslCoreNetworkEndpointSettings.h"
 
 #include <mstcpip.h>
 #include <winhttp.h>
@@ -294,6 +295,27 @@ class NetworkTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -f -s /init /gns"), (DWORD)0);
 
         return true;
+    }
+
+    TEST_METHOD(DefaultRouteClassification)
+    {
+        const auto makeRoute = [](ADDRESS_FAMILY family, const wchar_t* destination, uint8_t prefixLength) {
+            MIB_IPFORWARD_ROW2 routeRow{};
+            routeRow.DestinationPrefix.Prefix = wsl::windows::common::string::StringToSockAddrInet(destination);
+            routeRow.DestinationPrefix.PrefixLength = prefixLength;
+            routeRow.NextHop.si_family = family;
+            return wsl::core::networking::EndpointRoute(routeRow);
+        };
+
+        VERIFY_IS_TRUE(makeRoute(AF_INET, L"0.0.0.0", 0).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET, L"0.0.0.0", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET, L"128.0.0.0", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET, L"0.0.0.0", 32).IsDefault());
+
+        VERIFY_IS_TRUE(makeRoute(AF_INET6, L"::", 0).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET6, L"::", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET6, L"8000::", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET6, L"::", 128).IsDefault());
     }
 
     WSL2_TEST_METHOD(RemoveAndAddDefaultRoute)
@@ -2294,6 +2316,65 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
+    static void VerifyPortZeroBindFromThreadIsTracked()
+    {
+        auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
+        // LXT uses one bit per variation; the threaded port-zero server is the sixth server variation.
+        constexpr unsigned long long c_portZeroThreadVariationMask = 1ull << 5;
+        const auto commandLine = std::format(L"/data/test/wsl_unit_tests socket -s -v {}", c_portZeroThreadVariationMask);
+        auto cmd = LxssGenerateWslCommandLine(commandLine.data());
+        unique_kill_process serverProcess(LxsstuStartProcess(cmd.data(), nullptr, stdOutWrite.get()));
+        stdOutWrite.reset();
+
+        constexpr std::string_view portMarker = "PORT_ZERO_THREAD_LISTENER_PORT=";
+        std::string output(512, '\0');
+        DWORD writeOffset = 0;
+        uint16_t assignedPort = 0;
+        while (assignedPort == 0)
+        {
+            if (writeOffset == output.size())
+            {
+                output.resize(output.size() * 2);
+            }
+
+            DWORD bytesRead = 0;
+            VERIFY_IS_TRUE(ReadFile(
+                stdOutRead.get(), output.data() + writeOffset, static_cast<DWORD>(output.size() - writeOffset), &bytesRead, nullptr));
+            VERIFY_ARE_NOT_EQUAL(bytesRead, 0u);
+            writeOffset += bytesRead;
+
+            const std::string_view outputView(output.data(), writeOffset);
+            const auto markerPosition = outputView.find(portMarker);
+            if (markerPosition == std::string_view::npos)
+            {
+                continue;
+            }
+
+            const auto portBegin = markerPosition + portMarker.size();
+            const auto portEnd = outputView.find_first_not_of("0123456789", portBegin);
+            if (portEnd == std::string_view::npos)
+            {
+                continue;
+            }
+
+            assignedPort = static_cast<uint16_t>(std::stoi(std::string(outputView.substr(portBegin, portEnd - portBegin))));
+        }
+
+        LogInfo("Threaded guest listener assigned port %u", assignedPort);
+        const auto connectToGuest = [&]() {
+            wil::unique_socket clientSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+            THROW_LAST_ERROR_IF(!clientSocket);
+
+            SOCKADDR_IN address{};
+            address.sin_family = AF_INET;
+            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            address.sin_port = htons(assignedPort);
+            THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR);
+        };
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+    }
+
     static void VerifyPortZeroRebindSucceeds()
     {
         // Verify that bind(0) -> close -> immediate rebind on the same port succeeds.
@@ -3880,6 +3961,9 @@ class MirroredTests
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
 
+        // Build the Linux unit tests used by the port tracking tests.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), (DWORD)0);
+
         if (LxsstuVmMode())
         {
             m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
@@ -4295,6 +4379,8 @@ class MirroredTests
         // this range, so even after the guest releases the port the host still cannot bind
         // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
+
+        NetworkTests::VerifyPortZeroBindFromThreadIsTracked();
     }
 
     WSL2_TEST_METHOD(ListenWithoutBindIsTracked)
@@ -4420,64 +4506,145 @@ class MirroredTests
         VERIFY_IS_TRUE(canBindUdp);
     }
 
-    void VerifyGuestBindToHostEphemeralRangeDenied(LPCWSTR ProtocolSettingClass, LPCWSTR SocatProtocolPrefix)
+    static std::pair<int, int> QueryHostEphemeralRange(LPCWSTR ProtocolSettingCmdlet)
+    {
+        const auto startQuery =
+            std::wstring(L"(") + ProtocolSettingCmdlet +
+            L" | Where-Object { $_.DynamicPortRangeStartPort -gt 0 } | Select-Object -First 1).DynamicPortRangeStartPort";
+        auto [startStr, _1] = LxsstuLaunchPowershellAndCaptureOutput(startQuery, 0);
+        const auto start = std::stoi(startStr);
+
+        const auto countQuery =
+            std::wstring(L"(") + ProtocolSettingCmdlet +
+            L" | Where-Object { $_.DynamicPortRangeNumberOfPorts -gt 0 } | Select-Object -First 1).DynamicPortRangeNumberOfPorts";
+        auto [countStr, _2] = LxsstuLaunchPowershellAndCaptureOutput(countQuery, 0);
+        const auto count = std::stoi(countStr);
+
+        return {start, count};
+    }
+
+    static void SetHostEphemeralRange(LPCWSTR Protocol, int Start, int NumberOfPorts)
+    {
+        // Note: setting the range for v4 also sets the same range for v6, so we only need to set one of them.
+        auto cmd = std::format(L"netsh int ipv4 set dynamicportrange {} startport={} numberofports={}", Protocol, Start, NumberOfPorts);
+        VERIFY_ARE_EQUAL(LxsstuRunCommand(cmd.data()), 0L);
+    }
+
+    // Attempt every host-ephemeral port from the guest and verify exactly the service-enforced cap
+    // (half of the host ephemeral range size) can be reserved.
+    static void VerifyHostEphemeralRangeCap(int Protocol, int HostEphemeralStart, int HostEphemeralEnd, int Cap)
+    {
+        WslKeepAlive keepAlive;
+
+        auto [guestStartStr, err1] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f1", 0);
+        guestStartStr.pop_back();
+        const auto guestStart = std::stoi(guestStartStr);
+
+        auto [guestEndStr, err2] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f2", 0);
+        guestEndStr.pop_back();
+        const auto guestEnd = std::stoi(guestEndStr);
+
+        const int overlapStart = std::max(HostEphemeralStart, guestStart);
+        const int overlapEnd = std::min(HostEphemeralEnd, guestEnd);
+        const int overlap = (overlapStart <= overlapEnd) ? (overlapEnd - overlapStart + 1) : 0;
+
+        const int expectedSuccesses = Cap - overlap;
+        VERIFY_IS_GREATER_THAN(expectedSuccesses, 0);
+
+        // Repeat the pattern a couple of times: verify the cap, release every socket, then verify the
+        // reservations drain and the full capacity becomes available again.
+        constexpr int c_cycles = 2;
+
+        for (int cycle = 0; cycle < c_cycles; cycle++)
+        {
+            // Bind every candidate from one guest process so the test does not launch wsl.exe once per port.
+            std::wstring perlCommand = L"perl -MSocket -MErrno=EADDRINUSE -e '";
+            perlCommand += L"$|=1;";
+            perlCommand += L"my @sockets;";
+            perlCommand += L"my $candidate=0;";
+            perlCommand +=
+                L"for my $port (" + std::to_wstring(HostEphemeralStart) + L".." + std::to_wstring(HostEphemeralEnd) + L"){";
+            perlCommand += L"next if $port>=" + std::to_wstring(guestStart) + L" && $port<=" + std::to_wstring(guestEnd) + L";";
+            perlCommand += L"my $family=(($candidate++ % 2)==0) ? AF_INET : AF_INET6;";
+            perlCommand += L"socket(my $socket,$family," + std::wstring(Protocol == IPPROTO_TCP ? L"SOCK_STREAM" : L"SOCK_DGRAM") +
+                           L",0) or die \"socket port=$port: $!\\n\";";
+            perlCommand +=
+                L"my $address=$family==AF_INET ? sockaddr_in($port,INADDR_ANY) : "
+                L"Socket::sockaddr_in6($port,Socket::inet_pton(AF_INET6,\"::\"));";
+            perlCommand += L"if(bind($socket,$address)){";
+            perlCommand += L"push @sockets,$socket;";
+            perlCommand += L"}elsif($!{EADDRINUSE}){}else{die \"bind port=$port: $!\\n\";}";
+            perlCommand += L"}";
+            perlCommand += L"print \"successes=\",scalar(@sockets),\"\\nready\\n\";";
+            perlCommand += L"while(1){sleep 1000}'";
+
+            auto cmd = LxssGenerateWslCommandLine(perlCommand.data());
+            auto [readPipe, writePipe] = CreateSubprocessPipe(false, true);
+            NetworkTests::unique_kill_process process(LxsstuStartProcess(cmd.data(), nullptr, writePipe.get(), writePipe.get()));
+            writePipe.reset();
+
+            std::string output;
+            VERIFY_IS_TRUE(NetworkTests::FindSubstring(readPipe, "ready", output));
+
+            constexpr std::string_view c_successPrefix = "successes=";
+            const auto successOffset = output.find(c_successPrefix);
+            THROW_HR_IF(E_FAIL, successOffset == std::string::npos);
+            const auto successEnd = output.find('\n', successOffset);
+            THROW_HR_IF(E_FAIL, successEnd == std::string::npos);
+            const auto successes =
+                std::stoi(output.substr(successOffset + c_successPrefix.size(), successEnd - successOffset - c_successPrefix.size()));
+            VERIFY_ARE_EQUAL(expectedSuccesses, successes, L"Expected exactly the service-enforced number of reservations");
+
+            // Release every reservation so usage drops back below the cap.
+            process.reset();
+
+            // The Linux port tracker only releases a reservation c_bind_timeout_seconds (60s) after the
+            // socket is closed (see GnsPortTracker.cpp), so wait for the reservations to drain before the
+            // next iteration reserves the same ports again.
+            if (cycle + 1 < c_cycles)
+            {
+                std::this_thread::sleep_for(std::chrono::seconds(90));
+            }
+        }
+    }
+
+    WSL2_TEST_METHOD(GuestBindToHostEphemeralRangeCapped)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
+        // The service caps the number of host-ephemeral ports the guest can reserve at half the host
+        // ephemeral range size, so it cannot exhaust the host's ephemeral ports. Shrink the host
+        // TCP/UDP ephemeral ranges to the smallest allowed size (255 ports) so the cap is a small,
+        // deterministic number (255 / 2 = 127), then verify the guest is denied once it reaches it.
+        constexpr int c_ephemeralRangeSize = 255;
+        constexpr int c_expectedCap = c_ephemeralRangeSize / 2;
+
+        // Save the current host ephemeral ranges so they can be restored at the end of the test.
+        int originalTcpStart = 0, originalTcpCount = 0, originalUdpStart = 0, originalUdpCount = 0;
+        std::tie(originalTcpStart, originalTcpCount) = QueryHostEphemeralRange(L"Get-NetTCPSetting");
+        std::tie(originalUdpStart, originalUdpCount) = QueryHostEphemeralRange(L"Get-NetUDPSetting");
+
+        auto restoreRanges = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            SetHostEphemeralRange(L"tcp", originalTcpStart, originalTcpCount);
+            SetHostEphemeralRange(L"udp", originalUdpStart, originalUdpCount);
+        });
+
+        // Use a low start port so the small host ephemeral window is less likely to overlap the
+        // guest's reserved ephemeral range, which HNS assigns from the high port space.
+        constexpr int c_hostEphemeralStart = 10000;
+        constexpr int c_hostEphemeralEnd = c_hostEphemeralStart + c_ephemeralRangeSize - 1;
+        SetHostEphemeralRange(L"tcp", c_hostEphemeralStart, c_ephemeralRangeSize);
+        SetHostEphemeralRange(L"udp", c_hostEphemeralStart, c_ephemeralRangeSize);
+
+        // Force a restart of WSL so that it queries the new host ephemeral ranges.
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        RestartWslService();
+
         WaitForMirroredStateInLinux();
 
-        // Query the host ephemeral port range via PowerShell.
-        auto startQuery =
-            std::wstring(L"(") + ProtocolSettingClass +
-            L" | Where-Object { $_.DynamicPortRangeStartPort -gt 0 } | Select-Object -First 1).DynamicPortRangeStartPort";
-        auto [startStr, _1] = LxsstuLaunchPowershellAndCaptureOutput(startQuery.c_str(), 0);
-        const auto hostEphemeralStart = std::stoi(startStr);
-
-        auto countQuery =
-            std::wstring(L"(") + ProtocolSettingClass +
-            L" | Where-Object { $_.DynamicPortRangeNumberOfPorts -gt 0 } | Select-Object -First 1).DynamicPortRangeNumberOfPorts";
-        auto [countStr, _2] = LxsstuLaunchPowershellAndCaptureOutput(countQuery.c_str(), 0);
-        const auto hostEphemeralEnd = hostEphemeralStart + std::stoi(countStr) - 1;
-
-        // Get the guest ephemeral port range.
-        auto [start, err1] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f1", 0);
-        start.pop_back();
-        const auto guestEphemeralRangeStart = std::stoi(start);
-
-        auto [end, err2] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range | cut -f2", 0);
-        end.pop_back();
-        const auto guestEphemeralRangeEnd = std::stoi(end);
-
-        // Pick a port in the host ephemeral range but not in the guest's assigned range.
-        // The ranges may overlap
-        int testPort = 0;
-        if (hostEphemeralStart < guestEphemeralRangeStart || hostEphemeralStart > guestEphemeralRangeEnd)
-        {
-            testPort = hostEphemeralStart;
-        }
-        else if (guestEphemeralRangeEnd < hostEphemeralEnd)
-        {
-            testPort = guestEphemeralRangeEnd + 1;
-        }
-        else
-        {
-            VERIFY_FAIL(L"Guest ephemeral range fully covers the host ephemeral range, cannot find a test port");
-        }
-
-        auto socatArg = std::wstring(SocatProtocolPrefix) + std::to_wstring(testPort);
-        auto [listener, success, read] = NetworkTests::BindGuestPortHelper(socatArg);
-        VERIFY_IS_FALSE(success);
-    }
-
-    WSL2_TEST_METHOD(GuestTcpBindToHostEphemeralRangeDenied)
-    {
-        VerifyGuestBindToHostEphemeralRangeDenied(L"Get-NetTCPSetting", L"TCP4-LISTEN:");
-    }
-
-    WSL2_TEST_METHOD(GuestUdpBindToHostEphemeralRangeDenied)
-    {
-        VerifyGuestBindToHostEphemeralRangeDenied(L"Get-NetUDPSetting", L"UDP4-LISTEN:");
+        // TCP and UDP are capped independently, but each cap is shared by IPv4 and IPv6.
+        VerifyHostEphemeralRangeCap(IPPROTO_TCP, c_hostEphemeralStart, c_hostEphemeralEnd, c_expectedCap);
+        VerifyHostEphemeralRangeCap(IPPROTO_UDP, c_hostEphemeralStart, c_hostEphemeralEnd, c_expectedCap);
     }
 
     WSL2_TEST_METHOD(NonRootNamespaceEphemeralBind)
@@ -5100,6 +5267,9 @@ class ConsommeTests
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
 
+        // Build the Linux unit tests used by the port tracking tests.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), (DWORD)0);
+
         if (LxsstuVmMode())
         {
             m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
@@ -5263,6 +5433,8 @@ class ConsommeTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
         NetworkTests::VerifyPortZeroBindIsTracked();
+
+        NetworkTests::VerifyPortZeroBindFromThreadIsTracked();
     }
 
     WSL2_TEST_METHOD(ListenWithoutBindIsTracked)

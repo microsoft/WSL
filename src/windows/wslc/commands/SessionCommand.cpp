@@ -48,6 +48,6 @@ std::wstring SessionCommand::LongDescription() const
 
 void SessionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp(context.Reporter);
+    OutputHelp(context.Terminal);
 }
 } // namespace wsl::windows::wslc

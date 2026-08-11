@@ -160,7 +160,7 @@ Aby wymusić zatrzymanie i odłączenie dysku w podsystemie WSL2, uruchom polece
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Określona nazwa instalacji zawiera nieprawidłowy znak "/". Spróbuj ponownie bez nieprawidłowego znaku.</value>
+    <value>Nazwa punktu montowania nie może być pusta, nie może mieć postaci „.” lub „..” ani zawierać znaku „/”. Spróbuj ponownie, używając prawidłowej nazwy punktu montowania.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -998,8 +998,8 @@ Powrót do sieci NAT.</value>
     <value>Rejestr obrazów kontenerów „{}” jest zablokowany przez zasady komputera.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Kompilowanie obrazów kontenerów jest zablokowane, ponieważ lista dozwolonych rejestru kontenerów jest skonfigurowana przez zasady komputera. Kompilacje obrazów mogą pobierać obrazy podstawowe z dowolnych rejestrów i nie można ich niezawodnie ograniczyć do listy dozwolonych.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Zasady listy dozwolonych rejestru kontenerów są nieprawidłowe. Sprawdź, czy wartości WSLContainerRegistryAllowlist w obszarze Software\Policies\WSL są poprawnie skonfigurowane.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Uruchom polecenie „wsl.exe --set-version {} 2”, aby uaktualnić do podsystemu WSL2.</value>
@@ -1985,6 +1985,18 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Liczba milisekund bezczynności maszyny wirtualnej przed jej zamknięciem.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Zapewnij ciągłość działania podsystemu WSL</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Zapobiegaj automatycznemu wyłączaniu uruchomionych dystrybucji oraz maszyny wirtualnej WSL, na której są one uruchomione, po okresie bezczynności.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Zapewnij ciągłość działania podsystemu WSL.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Zapobiegaj automatycznemu wyłączaniu uruchomionych dystrybucji oraz maszyny wirtualnej WSL, na której są one uruchomione, po okresie bezczynności.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Limit czasu resetowania</value>
   </data>
@@ -1993,6 +2005,21 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Liczba milisekund bezczynności maszyny wirtualnej przed jej zamknięciem.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Limit czasu bezczynności dystrybucji</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Liczba milisekund, przez które dystrybucja pozostaje w stanie bezczynności, zanim zostanie zakończona.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Limit czasu resetowania</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Limit czasu bezczynności dystrybucji</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Liczba milisekund, przez które dystrybucja pozostaje w stanie bezczynności, zanim zostanie zakończona.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Zastosuj zmiany</value>
@@ -2154,6 +2181,9 @@ Użycie:
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Nazwa sieci nie może być pusta.</value>
+  </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Informacje o błędzie z aparatu:</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Nierozpoznane polecenie: „{}”</value>
@@ -2323,6 +2353,18 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Nie znaleziono obrazu „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Nieprawidłowa wartość --secret value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Nieprawidłowa wartość --output „{}”: {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Nie można zapisać danych wyjściowych kompilacji w konsoli dla wartości --output „{}”.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Brakuje wymaganej opcji: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2364,7 +2406,7 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
-    <value>The '--ip-range' option requires '--subnet' to also be specified.</value>
+    <value>Opcja '--ip-range' wymaga również określenia opcji '--subnet'.</value>
     <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
@@ -2884,8 +2926,16 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Zawsze próbuj pobrać nowszą wersję obrazu</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Miejsce docelowe danych wyjściowych kompilacji (docker buildx --output spec; np. type=local,dest=path lub type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Ustaw etap docelowy kompilacji</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Udostępnij sekret kompilacji (id=NAME[,type=env|file][,env=VAR|,src=PATH]; domyślnie zmienna środowiskowa NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Polecenie do uruchomienia</value>
@@ -2931,6 +2981,10 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Formatowanie wyniku (json lub table) (domyślnie: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Formatowanie danych wyjściowych (json dla wyjścia w jednej linii) (Domyślnie: JSON z wcięciami)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumenty do przekazania do procesu init kontenera</value>
@@ -3081,6 +3135,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Ścieżka magazynu sesji</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Ścieżka do katalogu magazynu sesji</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Sygnał do wysłania</value>
   </data>
@@ -3124,6 +3181,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Nie zgłaszaj błędu, jeśli wolumin nie istnieje</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Usuń anonimowe woluminy powiązane z kontenerem</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Katalog roboczy wewnątrz kontenera</value>
   </data>
@@ -3133,6 +3193,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Zapisz identyfikator kontenera w podanej ścieżce</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Zapisz identyfikator obrazu w podanej ścieżce</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Adres IP serwera nazw DNS w pliku resolv.conf</value>
@@ -3165,7 +3228,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Zasada pobierania obrazu (always|missing|never) (domyślnie: never)</value>
+    <value>Image pull policy (always|missing|never) (default: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3196,9 +3259,13 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Pokaż szczegółowe informacje o wyświetlonych sesjach.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Określono nieprawidłowy typ formatu. Obsługiwane typy formatów to: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Nieprawidłowa wartość {}: {} nie jest rozpoznawanym typem formatu. Obsługiwane typy formatów to: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Nieprawidłowa wartość {}: {} nie jest rozpoznawaną zasadą ściągania. Obsługiwane zasady ściągania to: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Nieprawidłowa wartość {}: {} nie jest rozpoznawanym typem inspekcji. Obsługiwane typy inspekcji to: {}.</value>
@@ -3290,7 +3357,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
-    <value>Allocate container IP addresses from a sub-range in CIDR format</value>
+    <value>Przydziel adresy IP kontenerów z podzakresu w formacie CIDR</value>
     <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">

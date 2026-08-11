@@ -60,6 +60,15 @@ void OutputChannel::WriteString(std::wstring_view text) const
     }
 }
 
+void OutputChannel::Flush() const
+{
+    if (m_file != nullptr && fflush(m_file) != 0)
+    {
+        const int err = errno;
+        LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), "fflush of redirected output failed (errno=%d)", err);
+    }
+}
+
 std::optional<int> OutputChannel::GetConsoleWidth() const
 {
     if (m_consoleHandle == nullptr)

@@ -160,7 +160,7 @@ Voer wsl.exe {} uit om WSL2 te dwingen de schijf te stoppen en los te koppelen.<
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>De opgegeven koppelingsnaam bevat een ongeldig /-teken. Probeer het opnieuw zonder het ongeldige teken.</value>
+    <value>De mountnaam mag niet leeg zijn, '.', '..' of '/' bevatten. Probeer het opnieuw met een geldige mountnaam.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -998,8 +998,8 @@ Terugvallen op NAT-netwerken.</value>
     <value>Het containerinstallatiekopieregister {} wordt geblokkeerd door het computerbeleid.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Het bouwen van containerimages is geblokkeerd omdat er via het computerbeleid een acceptatielijst voor containerregisters is geconfigureerd. Bij het bouwen van images kunnen basisimages uit willekeurige registers worden opgehaald en die kunnen niet betrouwbaar worden beperkt tot de acceptatielijst.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Het beleid voor de acceptatielijst van het containerregister is ongeldig. Controleer of de WSLContainerRegistryAllowlist-waarden onder Software\Policies\WSL correct zijn geconfigureerd.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Voer wsl.exe --set-version {} 2 uit om een upgrade uit te voeren naar WSL2.</value>
@@ -1985,6 +1985,18 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Het aantal milliseconden dat een VM inactief is voordat deze wordt afgesloten.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>WSL actief houden</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>WSL actief houden.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Time-out voor opnieuw instellen</value>
   </data>
@@ -1993,6 +2005,21 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Het aantal milliseconden dat een VM inactief is voordat deze wordt afgesloten.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Time-out voor inactiviteit van de distributie</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Het aantal milliseconden dat een distributie inactief is voordat deze wordt beëindigd.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Time-out voor opnieuw instellen</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Time-out voor inactiviteit van de distributie</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Het aantal milliseconden dat een distributie inactief is voordat deze wordt beëindigd.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Wijzigingen toepassen</value>
@@ -2154,6 +2181,9 @@ Gebruik:
   </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Netwerknaam mag niet leeg zijn.</value>
+  </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Foutinformatie van de engine:</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Niet-herkende opdracht: '{}'</value>
@@ -2322,6 +2352,18 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="MessageWslcImageNotFound" xml:space="preserve">
     <value>Installatiekopie {} niet gevonden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Ongeldige --secret waarde '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Ongeldige --output value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Kan de build-uitvoer niet naar de console schrijven voor --output value '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Ontbrekende vereiste optie: '{}'</value>
@@ -2884,8 +2926,16 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Probeer altijd een nieuwere versie van de installatiekopie op te halen</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build-uitvoerbestemming (docker buildx --output spec; bijvoorbeeld type=local,dest=path of type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>De doelbuildfase instellen op build</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Geheim beschikbaar maken voor de build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; standaard env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>De opdracht om uit te voeren</value>
@@ -2931,6 +2981,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Uitvoeropmaak (json of table) (Standaard: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Uitvoeropmaak (json voor éénregelige uitvoer) (Standaard: ingesprongen JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumenten om door te geven aan het init-proces van de container</value>
@@ -3081,6 +3135,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Pad naar sessieopslag</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Pad naar de sessieopslagmap</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signaal om te verzenden</value>
   </data>
@@ -3124,6 +3181,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Meld geen fout als het volume niet bestaat</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Verwijder anonieme volumes die zijn gekoppeld aan de container</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Werkmap binnen de container</value>
   </data>
@@ -3133,6 +3193,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>De container-id naar het opgegeven pad schrijven</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Schrijf de afbeeldings-id naar het opgegeven pad</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adres van de DNS-nameserver in resolv.conf</value>
@@ -3165,7 +3228,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Beleid voor het ophalen van afbeeldingen (always|missing|never) (standaard:never)</value>
+    <value>Beleid voor het ophalen van afbeeldingen (always|missing|never) (standaard: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3196,9 +3259,13 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Toon gedetailleerde informatie over de weergegeven sessies.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Ongeldig indelingstype opgegeven. Ondersteunde indelingstypen zijn: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: {} is geen herkend indelingstype. Ondersteunde indelingstypen zijn: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: {} is geen herkend pull-beleid. Ondersteund pull-beleid is: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} is geen herkend inspectietype. Ondersteunde inspectietypen zijn: {}.</value>

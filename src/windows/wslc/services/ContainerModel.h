@@ -35,6 +35,13 @@ struct ContainerNetwork
     std::vector<std::string> Aliases;
 };
 
+enum class PullPolicy
+{
+    Missing,
+    Always,
+    Never,
+};
+
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
@@ -73,6 +80,7 @@ struct ContainerOptions
     std::optional<int64_t> MemoryBytes{};
     std::optional<int64_t> NanoCpus{};
     std::vector<std::tuple<std::string, int64_t, int64_t>> Ulimits;
+    PullPolicy Pull = PullPolicy::Missing;
 };
 
 struct CreateContainerResult

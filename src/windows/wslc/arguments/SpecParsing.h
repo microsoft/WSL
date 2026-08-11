@@ -25,7 +25,8 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 struct BuildSecret;
-}
+struct BuildOutput;
+} // namespace wsl::windows::wslc::services
 
 namespace wsl::windows::wslc::validation {
 
@@ -44,6 +45,22 @@ KeyValueSplit SplitKeyValue(const std::wstring& value, wchar_t separator = L'=')
 
 // Parses a docker-style --secret spec ("id=...,type=...,src=...") and resolves its value bytes.
 services::BuildSecret ParseSecretSpec(const std::wstring& spec);
+
+// Parses a docker-style --output spec ("type=...,dest=...,<attr>=...") into a BuildOutput.
+services::BuildOutput ParseOutputSpec(const std::wstring& spec);
+
+// Serializes a BuildOutput back into a canonical buildx --output spec ("type=...,dest=...,<attr>=...").
+std::wstring FormatOutputSpec(const services::BuildOutput& output);
+
+// True when the exporter produces a destination (file, directory, or stdout stream) that the client
+// must materialize, versus running entirely in the build VM. Mirrors `docker buildx build --output`:
+// local/tar/oci always stream a result back; docker streams only when a 'dest=' is given (an omitted
+// dest loads the image into the VM store); image/registry/cacheonly never stream.
+bool OutputStreamsToClient(const services::BuildOutput& output);
+
+// True when the exporter writes a directory tree rather than a single file/stream. The local exporter
+// is always a directory; oci/docker export an OCI layout directory when 'tar=false' is set.
+bool OutputIsDirectory(const services::BuildOutput& output);
 
 // Parses a --ulimit spec ("<name>=<soft>[:<hard>]") into (name, soft, hard). -1 means unlimited.
 std::tuple<std::string, int64_t, int64_t> ParseUlimit(const std::wstring& input, const std::wstring& argName = {});
@@ -74,6 +91,12 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 
 // Parses an output format ("json"/"table") into a FormatType.
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
+
+// Parses the inspect family's sole supported format ("json") into its compact json::dump() indent.
+int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring& argName = {});
+
+// Parses an image pull policy ("always"/"missing"/"never").
+models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName = {});
 
 // Parses an inspect target ("image"/"container"/"network"/"volume") into an InspectType.
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);

@@ -16,6 +16,7 @@ Abstract:
 #include "Exceptions.h"
 #include "ContainerModel.h"
 #include "InspectModel.h"
+#include "ArgumentConvertedTypes.h"
 #include "SpecParsing.h"
 #include <string>
 #include <string_view>
@@ -79,6 +80,5 @@ void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& a
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
-void ValidateNetwork(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 } // namespace wsl::windows::wslc::validation
