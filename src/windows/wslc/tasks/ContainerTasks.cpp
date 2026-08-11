@@ -23,6 +23,7 @@ Abstract:
 #include "SessionService.h"
 #include "TableOutput.h"
 #include <wil/result_macros.h>
+#include <filesystem.hpp>
 #include <wslc_schema.h>
 #include <filesystem>
 

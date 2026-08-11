@@ -16,6 +16,7 @@ Abstract:
 #include "SessionService.h"
 #include "SpecParsing.h"
 #include "WarningCallback.h"
+#include <filesystem.hpp>
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <relay.hpp>
