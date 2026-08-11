@@ -17,6 +17,7 @@ Abstract:
 #include "Common.h"
 #include "wslpolicies.h"
 #include "hns_schema.h"
+#include "WslCoreNetworkEndpointSettings.h"
 
 #include <mstcpip.h>
 #include <winhttp.h>
@@ -294,6 +295,27 @@ class NetworkTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -f -s /init /gns"), (DWORD)0);
 
         return true;
+    }
+
+    TEST_METHOD(DefaultRouteClassification)
+    {
+        const auto makeRoute = [](ADDRESS_FAMILY family, const wchar_t* destination, uint8_t prefixLength) {
+            MIB_IPFORWARD_ROW2 routeRow{};
+            routeRow.DestinationPrefix.Prefix = wsl::windows::common::string::StringToSockAddrInet(destination);
+            routeRow.DestinationPrefix.PrefixLength = prefixLength;
+            routeRow.NextHop.si_family = family;
+            return wsl::core::networking::EndpointRoute(routeRow);
+        };
+
+        VERIFY_IS_TRUE(makeRoute(AF_INET, L"0.0.0.0", 0).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET, L"0.0.0.0", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET, L"128.0.0.0", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET, L"0.0.0.0", 32).IsDefault());
+
+        VERIFY_IS_TRUE(makeRoute(AF_INET6, L"::", 0).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET6, L"::", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET6, L"8000::", 1).IsDefault());
+        VERIFY_IS_FALSE(makeRoute(AF_INET6, L"::", 128).IsDefault());
     }
 
     WSL2_TEST_METHOD(RemoveAndAddDefaultRoute)

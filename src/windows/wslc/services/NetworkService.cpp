@@ -22,9 +22,9 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
-void NetworkService::Create(Reporter& reporter, models::Session& session, const models::CreateNetworkOptions& createOptions)
+void NetworkService::Create(Terminal& terminal, models::Session& session, const models::CreateNetworkOptions& createOptions)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     WSLCNetworkOptions options{};
     options.Name = createOptions.Name.c_str();
     if (createOptions.Driver.has_value())

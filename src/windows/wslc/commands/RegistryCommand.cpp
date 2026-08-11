@@ -50,7 +50,7 @@ std::wstring RegistryCommand::LongDescription() const
 
 void RegistryCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp(context.Reporter);
+    OutputHelp(context.Terminal);
 }
 
 // Registry Login Command
@@ -74,14 +74,14 @@ std::wstring RegistryLoginCommand::LongDescription() const
     return Localization::WSLCCLI_LoginLongDesc();
 }
 
-void RegistryLoginCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+void RegistryLoginCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
-    if (execArgs.Contains(ArgType::Password) && execArgs.GetFlag<ArgType::PasswordStdin>())
+    if (execArgs.Contains(ArgType::Password) && execArgs.GetValue<ArgType::PasswordStdin>())
     {
         throw CommandException(Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive());
     }
 
-    if (execArgs.GetFlag<ArgType::PasswordStdin>() && !execArgs.Contains(ArgType::Username))
+    if (execArgs.GetValue<ArgType::PasswordStdin>() && !execArgs.Contains(ArgType::Username))
     {
         throw CommandException(Localization::WSLCCLI_LoginPasswordStdinRequiresUsername());
     }
@@ -91,20 +91,20 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (!context.Args.Contains(ArgType::Username))
     {
-        auto username = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
+        auto username = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
         context.Args.Add(ArgType::Username, std::move(username));
     }
 
     // Resolve password: --password, --password-stdin, or interactive prompt.
     if (!context.Args.Contains(ArgType::Password))
     {
-        if (context.Args.GetFlag<ArgType::PasswordStdin>())
+        if (context.Args.GetValue<ArgType::PasswordStdin>())
         {
-            context.Args.Add(ArgType::Password, context.Reporter.ReadLine().value_or(std::wstring{}));
+            context.Args.Add(ArgType::Password, context.Terminal.ReadLine().value_or(std::wstring{}));
         }
         else
         {
-            auto password = context.Reporter.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
+            auto password = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
             context.Args.Add(ArgType::Password, std::move(password));
         }
     }

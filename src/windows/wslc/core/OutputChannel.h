@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Byte sink used by Reporter. Each WriteString call is a single WriteConsoleW
+    Byte sink used by Terminal. Each WriteString call is a single WriteConsoleW
     or fwprintf. For console destinations the channel owns VT enablement (RAII).
 
 --*/

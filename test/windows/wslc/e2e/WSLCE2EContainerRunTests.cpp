@@ -25,6 +25,7 @@ class WSLCE2EContainerRunTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(HelloWorldImage);
         EnsureImageIsLoaded(PythonImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
@@ -42,6 +43,7 @@ class WSLCE2EContainerRunTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(HelloWorldImage);
         EnsureImageIsDeleted(PythonImage);
         EnsureVolumeDoesNotExist(WslcVolumeName);
         EnsureNetworkDoesNotExist(TestNetworkName);
@@ -89,6 +91,36 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"echo_from_container\n", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(WslcContainerName, L"exited");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PullPolicy)
+    {
+        auto session = OpenDefaultElevatedSession();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
+        auto registryImage = TagImageForRegistry(HelloWorldImage.NameAndTag(), wsl::shared::string::MultiByteToWide(registryAddress));
+        auto cleanup = wil::scope_exit([&]() {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            RunWslc(std::format(L"image delete --force {}", registryImage));
+        });
+
+        auto result = RunWslc(std::format(L"container run --pull=never --rm --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_FALSE(result.Stdout->empty());
+
+        result = RunWslc(std::format(L"container run --pull=always --rm --name {} {}", WslcContainerName, registryImage));
+        const auto errorMessage = std::format(
+            L"manifest for {} not found: manifest unknown: manifest unknown\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", registryImage);
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
+
+        result = RunWslc(std::format(L"container run --pull=missing --rm --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_FALSE(result.Stdout->empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_CIDFile_Valid)
@@ -570,6 +602,13 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL(1u, portBindings.size());
         VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
         VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HostLoopback)
+    {
+        VerifyHostLoopback("default", "host.wslc.internal", false);
+        VerifyHostLoopback("default", "host.wslc.internal", true);
+        VerifyHostLoopback("host.containers.internal", "host.containers.internal", false);
     }
 
     // Verifies that 'session.defaultBindingAddress: default' resolves to the built-in
@@ -1336,6 +1375,34 @@ class WSLCE2EContainerRunTests
     }
 
 private:
+    void VerifyHostLoopback(std::string_view setting, std::string_view dnsName, bool forceTcp)
+    {
+        EnsureSessionIsTerminated();
+        auto terminateSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { EnsureSessionIsTerminated(); });
+
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(settingsPath, std::format("session:\n  hostLoopback: \"{}\"\n", setting));
+
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", HostLoopbackTestPort);
+        UniqueWebServer server(endpoint.c_str(), L"host-loopback-ok");
+        ExpectHttpResponse(endpoint.c_str(), HTTP_STATUS_OK, true);
+
+        auto command = std::format(
+            L"python3 -c \"import http.client,socket;"
+            L"a=socket.getaddrinfo('{}',{},socket.AF_INET,socket.SOCK_STREAM)[0][4];"
+            L"c=http.client.HTTPConnection(*a,timeout=60);"
+            L"c.request('GET','/');"
+            L"assert c.getresponse().read()==b'host-loopback-ok';"
+            L"assert ('use-vc' in open('/etc/resolv.conf').read()) == {}\"", // Validate that the DNS setting was applied
+            std::string(dnsName),
+            HostLoopbackTestPort,
+            forceTcp ? "True" : "False");
+
+        auto result = RunWslc(std::format(
+            L"container run {} --rm --name {} {} {}", forceTcp ? "--dns-option=use-vc" : "", WslcContainerName, PythonImage.NameAndTag(), command));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
@@ -1348,6 +1415,7 @@ private:
 
     // Test images
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& HelloWorldImage = HelloWorldTestImage();
     const TestImage& PythonImage = PythonTestImage();
 
     // Test environment variable files
@@ -1358,6 +1426,7 @@ private:
     const uint16_t ContainerTestPort = 8080;
     const uint16_t HostTestPort1 = 1234;
     const uint16_t HostTestPort2 = 1235;
+    const uint16_t HostLoopbackTestPort = 1236;
 
     // Test named volume
     const std::wstring WslcVolumeName = L"wslc-test-volume";

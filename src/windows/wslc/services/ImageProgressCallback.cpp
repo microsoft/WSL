@@ -30,7 +30,7 @@ auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        m_reporter.Write(m_level, L"{}", Cursor::Up(line));
+        m_terminal.Write(m_level, L"{}", Cursor::Up(line));
     }
 
     // scope_exit is noexcept and may fire during unwinding; scope_exit_log swallows output
@@ -38,7 +38,7 @@ auto ImageProgressCallback::MoveToLine(int line)
     return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [line = line, this]() {
         if (line > 1)
         {
-            m_reporter.Write(m_level, L"{}", Cursor::Down(line - 1));
+            m_terminal.Write(m_level, L"{}", Cursor::Down(line - 1));
         }
     });
 }
@@ -57,7 +57,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
         {
             if (id == nullptr || *id == '\0')
             {
-                m_reporter.Write(m_level, L"{}\n", status);
+                m_terminal.Write(m_level, L"{}\n", status);
             }
             else
             {
@@ -65,7 +65,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
                 if (inserted || it->second != status)
                 {
                     it->second = status;
-                    m_reporter.Write(m_level, L"{}: {}\n", id, status);
+                    m_terminal.Write(m_level, L"{}: {}\n", id, status);
                 }
             }
 
@@ -74,30 +74,30 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
         // Hide the cursor while rendering so it doesn't bounce through the movements; scope_exit_log
         // restores it on every exit path and can't call std::terminate during unwinding.
-        m_reporter.Write(m_level, L"{}", Cursor::Hide);
-        auto showCursor = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { m_reporter.Write(m_level, L"{}", Cursor::Show); });
+        m_terminal.Write(m_level, L"{}", Cursor::Hide);
+        auto showCursor = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { m_terminal.Write(m_level, L"{}", Cursor::Show); });
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            m_reporter.Write(m_level, L"{}\n", status);
+            m_terminal.Write(m_level, L"{}\n", status);
             m_currentLine++;
             return S_OK;
         }
 
-        const int visibleWidth = m_reporter.GetConsoleWidth(m_level).value_or(c_fallbackConsoleWidth);
+        const int visibleWidth = m_terminal.GetConsoleWidth(m_level).value_or(c_fallbackConsoleWidth);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
+            m_terminal.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
+            m_terminal.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
         }
 
         return S_OK;

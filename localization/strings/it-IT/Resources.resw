@@ -160,7 +160,7 @@ Per forzare l'arresto e lo scollegamento del disco in WSL2, eseguire 'wsl.exe {}
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>Il nome del montaggio non può essere vuoto, '.', '..' o contenere '/'. Riprova con un nome di montaggio valido.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -1004,8 +1004,8 @@ Fallback alla rete NAT.</value>
     <value>Il registro immagini del contenitore '{}' è bloccato dai criteri del computer.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>La creazione di immagini del contenitore è bloccata perché un elenco di elementi consentiti del registro dei contenitori è configurato dal criterio del computer. Le creazioni delle immagini possono eseguire il pull immagini base da registri arbitrari e non possono essere limitate in modo affidabile all'elenco di elementi consentiti.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>I criteri dell'elenco di elementi consentiti del registro contenitori non sono validi. Verificare che i valori di WSLContainerRegistryAllowlist in Software\Policies\WSL siano configurati correttamente.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Eseguire 'wsl.exe --set-version {} 2' per eseguire l'aggiornamento a WSL2.</value>
@@ -1991,6 +1991,18 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Numero di millisecondi di inattività di una macchina virtuale prima dell'arresto.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Mantieni WSL in esecuzione</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Evita che le distribuzioni in esecuzione, e la macchina virtuale WSL che le ospita, vengano arrestate automaticamente dopo un periodo di inattività.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Mantieni WSL in esecuzione.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Evita che le distribuzioni in esecuzione, e la macchina virtuale WSL che le ospita, vengano arrestate automaticamente dopo un periodo di inattività.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Reimposta timeout</value>
   </data>
@@ -1999,6 +2011,21 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Numero di millisecondi di inattività di una macchina virtuale prima dell'arresto.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Timeout di inattività della distribuzione</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Numero di millisecondi di inattività di una distribuzione prima che venga terminata.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reimposta timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Timeout di inattività della distribuzione</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Numero di millisecondi di inattività di una distribuzione prima che venga terminata.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Applica modifiche</value>
@@ -2961,6 +2988,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Formattazione dell'output (json o table) (impostazione predefinita: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Formattazione dell'output (json per output su una riga singola) (Predefinito: JSON con rientro)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argomenti da passare al processo init del contenitore</value>
   </data>
@@ -3110,6 +3141,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Percorso di archiviazione sessione</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Percorso della directory di archiviazione della sessione</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Segnale da inviare</value>
   </data>
@@ -3153,6 +3187,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Non restituire un errore se il volume non esiste</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Rimuovere i volumi anonimi associati al contenitore</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Directory di lavoro all'interno del contenitore</value>
   </data>
@@ -3162,6 +3199,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Scrivi l'ID contenitore nel percorso specificato</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Scrivi l'ID immagine nel percorso specificato</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Indirizzo IP del server dei nomi DNS in resolv.conf</value>
@@ -3225,9 +3265,9 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Visualizza informazioni dettagliate sulle sessioni elencate.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Tipo di formato specificato non valido. I tipi di formato supportati sono: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Valore {} non valido: {} non è un tipo di formato riconosciuto. I tipi di formato supportati sono: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Valore {} non valido: {} non è un tipo di ispezione riconosciuto. I tipi di controllo supportati sono: {}.</value>

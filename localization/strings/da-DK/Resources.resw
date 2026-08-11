@@ -160,7 +160,7 @@ Hvis du vil tvinge WSL2 til at stoppe og fjerne disken, skal du køre 'wsl.exe {
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>Tilslutningsnavnet må ikke være tomt, '.', '..', eller indeholde '/'. Prøv igen med et gyldigt tilslutningsnavn.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -998,8 +998,8 @@ Går tilbage til NAT-netværk.</value>
     <value>Registreringsdatabasen for objektbeholderafbildningen '{}' er blokeret af computerpolitikken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Oprettelse af objektbeholderafbildninger er blokeret, fordi computerpolitikken har konfigureret en liste over tilladte registreringsdatabasen for objektbeholderen. Afbildningsbuilds kan hente basisbilleder fra vilkårlige registreringsdatabaser og kan ikke begrænses pålideligt til tilladelseslisten.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Politikken for liste over tilladte for objektbeholderregistreringsdatabasen er ugyldig. Kontrollér, at WSLContainerRegistryAllowlist-værdierne under Software\Policies\WSL er konfigureret korrekt.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Kør 'wsl.exe --set-version {} 2' for at opgradere til WSL2.</value>
@@ -1985,6 +1985,18 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Det antal millisekunder, en VM er inaktiv, før den lukkes.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Hold WSL kørende</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Bliv ved med at holde kørende distributioner og den virtuelle WSL-maskine, der er vært for dem, fra automatisk at blive lukket, når de har været inaktive.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hold WSL kørende.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Bliv ved med at holde kørende distributioner og den virtuelle WSL-maskine, der er vært for dem, fra automatisk at blive lukket, når de har været inaktive.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Nulstil timeout</value>
   </data>
@@ -1993,6 +2005,21 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Det antal millisekunder, en VM er inaktiv, før den lukkes.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Timeout for inaktivitet i distributionen</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Det antal millisekunder, en distribution er inaktiv, før den afsluttes.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Nulstil timeout</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Timeout for inaktivitet i distributionen</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Det antal millisekunder, en distribution er inaktiv, før den afsluttes.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Anvend ændringer</value>
@@ -2900,7 +2927,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Forsøg altid at hente en nyere version af billedet</value>
   </data>
   <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
-    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <value>Outputdestination for build (docker buildx --output destination; f.eks. type=local,dest=path eller type=tar,dest=out.tar)</value>
     <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
@@ -2954,6 +2981,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Outputformatering (json eller table) (Standard: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Outputformatering (json til output på én linje) (standard: indrykket JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumenter, der skal overføres til objektbeholderens initialiseringsproces</value>
@@ -3104,6 +3135,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Sti til sessionslager</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Sti til sessionslagringsmappen</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signal, der skal sendes</value>
   </data>
@@ -3147,6 +3181,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Udfør ikke fejl, hvis diskenheden ikke findes</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Fjern anonyme volumener, der er tilknyttet objektbeholderen</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbejdsmappe inde i objektbeholderen</value>
   </data>
@@ -3156,6 +3193,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Skriv container-id'et til den angivne sti</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Skriv billed-id'et til den angivne sti</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adressen på DNS-navneserveren i resolv.conf</value>
@@ -3219,9 +3259,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Vis detaljerede oplysninger om de angivne sessioner.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Der er angivet en ugyldig formattype. Understøttede formattyper er: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Ugyldig {}-værdi: {} er ikke en genkendt formattype. Understøttede formattyper er: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Ugyldig {}-værdi: {} er ikke en kendt inspektionstype. Understøttede inspektionstyper er: {}.</value>

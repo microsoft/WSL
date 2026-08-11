@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    Reporter.h
+    Terminal.h
 
 Abstract:
 
@@ -31,7 +31,7 @@ Abstract:
 
 namespace wsl::windows::wslc {
 
-namespace reporter_detail {
+namespace terminal_detail {
 
     // SFINAE: excludes Sequence-derived types so the overload below wins for them.
     template <typename T, typename = std::enable_if_t<!std::is_base_of_v<wsl::windows::common::vt::Sequence, std::remove_cvref_t<T>>>>
@@ -55,9 +55,9 @@ namespace reporter_detail {
         return sequence.Get();
     }
 
-} // namespace reporter_detail
+} // namespace terminal_detail
 
-struct Reporter
+struct Terminal
 {
     enum class Level
     {
@@ -67,13 +67,13 @@ struct Reporter
         Error,
     };
 
-    Reporter();
-    Reporter(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled, FILE* inFile = nullptr, bool inInteractive = false);
+    Terminal();
+    Terminal(FILE* outFile, bool outVtEnabled, FILE* errFile, bool errVtEnabled, FILE* inFile = nullptr, bool inInteractive = false);
 
-    NON_COPYABLE(Reporter);
-    NON_MOVABLE(Reporter);
+    NON_COPYABLE(Terminal);
+    NON_MOVABLE(Terminal);
 
-    ~Reporter() = default;
+    ~Terminal() = default;
 
     // std::format-style write API.
     template <typename... Args>
@@ -168,7 +168,7 @@ private:
         const bool colorEnabled = vtEnabled && !m_noColor;
 
         // Materialize stripped args into stable storage for vformat.
-        auto stripped = std::tuple{reporter_detail::StripIfDisabled(std::forward<Args>(args), vtEnabled, colorEnabled)...};
+        auto stripped = std::tuple{terminal_detail::StripIfDisabled(std::forward<Args>(args), vtEnabled, colorEnabled)...};
 
         std::wstring body = std::apply(
             [&fmt](auto&... values) { return std::vformat(std::wstring_view{fmt.get()}, std::make_wformat_args(values...)); }, stripped);

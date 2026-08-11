@@ -612,35 +612,74 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (IsEqual(input, L"json"))
+    // Single source of truth for the accepted format values. It drives both parsing and the error
+    // message's supported-values list, so adding a type here updates both automatically.
+    static constexpr std::pair<std::wstring_view, models::FormatType> c_formatTypes[] = {
+        {L"json", models::FormatType::Json},
+        {L"table", models::FormatType::Table},
+    };
+
+    for (const auto& [name, type] : c_formatTypes)
     {
-        return models::FormatType::Json;
+        if (IsEqual(input, name))
+        {
+            return type;
+        }
     }
-    else if (IsEqual(input, L"table"))
+
+    std::wstring supportedValues;
+    for (const auto& formatType : c_formatTypes)
     {
-        return models::FormatType::Table;
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += formatType.first;
     }
-    else
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
+}
+
+int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (!IsEqual(input, L"json"))
     {
-        constexpr std::wstring_view supportedValues = L"json, table";
+        constexpr std::wstring_view supportedValues = L"json";
         throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
     }
+
+    return wsl::shared::c_jsonCompactIndent;
 }
 
-models::FormatType GetOutputFormat(const argument::ArgMap& args)
+models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (!args.Contains(argument::ArgType::Format))
+    static constexpr std::pair<std::wstring_view, models::PullPolicy> c_pullPolicies[] = {
+        {L"always", models::PullPolicy::Always},
+        {L"missing", models::PullPolicy::Missing},
+        {L"never", models::PullPolicy::Never},
+    };
+
+    for (const auto& [name, policy] : c_pullPolicies)
     {
-        return models::FormatType::Table;
+        if (IsEqual(input, name))
+        {
+            return policy;
+        }
     }
 
-    return GetFormatTypeFromString(args.Get<argument::ArgType::Format>());
-}
+    std::wstring supportedValues;
+    for (const auto& pullPolicy : c_pullPolicies)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
 
-int GetInspectJsonIndent(const argument::ArgMap& args)
-{
-    // Validation guarantees the only accepted value is "json", so its presence alone selects compact.
-    return args.Contains(argument::ArgType::InspectFormat) ? wsl::shared::c_jsonCompactIndent : wsl::shared::c_jsonPrettyPrintIndent;
+        supportedValues += pullPolicy.first;
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
