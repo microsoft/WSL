@@ -50,7 +50,6 @@ struct LaunchProcessOptions
     std::optional<GUID> DistroGuid;
     std::wstring Username;
     ULONG LaunchFlags = LXSS_LAUNCH_FLAG_ENABLE_INTEROP | LXSS_LAUNCH_FLAG_TRANSLATE_ENVIRONMENT;
-    RestorePolicy RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 };
 
 struct ListOptions
@@ -684,7 +683,7 @@ int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPC
         options.Username.empty() ? nullptr : options.Username.c_str(),
         options.CurrentWorkingDirectory.empty() ? nullptr : options.CurrentWorkingDirectory.c_str(),
         INFINITE,
-        options.RestorePolicySetting);
+        RestorePolicy::OnlyIfUnchanged);
 
     THROW_HR_IF(WSL_E_USER_NOT_FOUND, (exitCode == LX_INIT_USER_NOT_FOUND));
     THROW_HR_IF(WSL_E_TTY_LIMIT, (exitCode == LX_INIT_TTY_LIMIT));

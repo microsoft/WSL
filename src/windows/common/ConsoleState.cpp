@@ -135,7 +135,12 @@ void ApplyConsoleValues(HANDLE input, HANDLE output, const ConsoleValues& values
 bool IsOwnerAlive(const CoordinationState::Owner& owner)
 {
     wil::unique_handle process{OpenProcess(SYNCHRONIZE, FALSE, owner.ProcessId)};
-    return process && (WaitForSingleObject(process.get(), 0) == WAIT_TIMEOUT);
+    if (!process)
+    {
+        return GetLastError() != ERROR_INVALID_PARAMETER;
+    }
+
+    return WaitForSingleObject(process.get(), 0) != WAIT_OBJECT_0;
 }
 
 } // namespace
@@ -240,10 +245,8 @@ ConsoleState::~ConsoleState()
 
         LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(m_coordinationView));
     }
-    else
-    {
-        RestoreConsoleState();
-    }
+
+    RestoreConsoleState();
 }
 
 void ConsoleState::ConfigureInteractiveMode()
@@ -274,15 +277,15 @@ bool ConsoleState::AcquireCoordination()
     m_coordinationMapping.reset(CreateFileMappingW(
         INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(CoordinationState), (name + L".Mapping").c_str()));
     THROW_LAST_ERROR_IF(!m_coordinationMapping);
-    m_coordinationView = MapViewOfFile(m_coordinationMapping.get(), FILE_MAP_ALL_ACCESS, 0, 0, sizeof(CoordinationState));
-    THROW_LAST_ERROR_IF(!m_coordinationView);
+    auto view = MapViewOfFile(m_coordinationMapping.get(), FILE_MAP_ALL_ACCESS, 0, 0, sizeof(CoordinationState));
+    THROW_LAST_ERROR_IF(!view);
+    auto unmap = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(view)); });
 
     MutexLock lock(m_coordinationMutex.get());
-    auto& state = *static_cast<CoordinationState*>(m_coordinationView);
+    auto& state = *static_cast<CoordinationState*>(view);
     if (state.Version != 1)
     {
-        state = {};
-        state.Version = 1;
+        state = {.Version = 1};
     }
     for (auto& owner : state.Owners)
     {
@@ -318,6 +321,8 @@ bool ConsoleState::AcquireCoordination()
         rollback.release();
     }
 
+    m_coordinationView = view;
+    unmap.release();
     return true;
 }
 
@@ -359,8 +364,7 @@ void ConsoleState::ReleaseCoordination()
         {
             LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(state.Baseline.OutputCodePage));
         }
-        state = {};
-        state.Version = 1;
+        state = {.Version = 1};
     }
 }
 

@@ -7585,33 +7585,30 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         return std::nullopt;
     }
 
-    TEST_METHOD(ConsoleState_DefaultAlways_RestoresExternalInputModeDrift)
+    static void VerifyExternalInputModeRestore(wsl::windows::common::RestorePolicy policy)
     {
         wil::unique_hfile conin{CreateFileW(
             L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
         if (!conin)
         {
-            LogSkipped("Skipping ConsoleState default-restore test: CONIN$ is not available (no attached console)");
+            LogSkipped("Skipping ConsoleState restore test: CONIN$ is not available (no attached console)");
             return;
         }
 
         DWORD baseline{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
-        const DWORD scopeExitRestore = baseline;
-        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), scopeExitRestore); });
+        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), baseline); });
 
         std::optional<DWORD> externalMode;
         {
-            wsl::windows::common::ConsoleState io;
+            wsl::windows::common::ConsoleState io{policy};
             io.SetInteractiveMode();
-
             DWORD configured{};
             VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &configured));
-
             externalMode = TrySetDifferentValidInputMode(conin.get(), configured);
-            if (!externalMode.has_value())
+            if (!externalMode)
             {
-                LogSkipped("Skipping ConsoleState default-restore test: could not apply an alternate valid input mode");
+                LogSkipped("Skipping ConsoleState restore test: could not apply an alternate valid input mode");
                 return;
             }
 
@@ -7622,53 +7619,17 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         DWORD finalMode{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
-        VERIFY_ARE_EQUAL(
-            baseline,
-            finalMode,
-            L"RestorePolicy::Always must restore the original mode even when the mode drifted after SetInteractiveMode");
+        VERIFY_ARE_EQUAL(policy == wsl::windows::common::RestorePolicy::Always ? baseline : externalMode.value(), finalMode);
+    }
+
+    TEST_METHOD(ConsoleState_DefaultAlways_RestoresExternalInputModeDrift)
+    {
+        VerifyExternalInputModeRestore(wsl::windows::common::RestorePolicy::Always);
     }
 
     TEST_METHOD(ConsoleState_OnlyIfUnchanged_PreservesExternalInputModeChange)
     {
-        wil::unique_hfile conin{CreateFileW(
-            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-        if (!conin)
-        {
-            LogSkipped("Skipping ConsoleState unchanged-restore test: CONIN$ is not available (no attached console)");
-            return;
-        }
-
-        DWORD baseline{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
-        const DWORD scopeExitRestore = baseline;
-        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), scopeExitRestore); });
-
-        std::optional<DWORD> externalMode;
-        {
-            wsl::windows::common::ConsoleState io{wsl::windows::common::RestorePolicy::OnlyIfUnchanged};
-            io.SetInteractiveMode();
-
-            DWORD configured{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &configured));
-
-            externalMode = TrySetDifferentValidInputMode(conin.get(), configured);
-            if (!externalMode.has_value())
-            {
-                LogSkipped("Skipping ConsoleState unchanged-restore test: could not apply an alternate valid input mode");
-                return;
-            }
-
-            DWORD observed{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &observed));
-            VERIFY_ARE_EQUAL(externalMode.value(), observed);
-        }
-
-        DWORD finalMode{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
-        VERIFY_ARE_EQUAL(
-            externalMode.value(),
-            finalMode,
-            L"RestorePolicy::OnlyIfUnchanged must preserve external mode changes made after SetInteractiveMode");
+        VerifyExternalInputModeRestore(wsl::windows::common::RestorePolicy::OnlyIfUnchanged);
     }
 
     TEST_METHOD(ConsoleState_OnlyIfUnchanged_ConcurrentClients_OutOfOrderFinalRestore)
@@ -7699,9 +7660,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         DWORD afterFirstExit{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &afterFirstExit));
-        VERIFY_IS_TRUE(
-            (afterFirstExit == baseline) || (afterFirstExit == configured),
-            L"Out-of-order teardown may restore baseline early; only the final mode after all clients exit is guaranteed");
+        VERIFY_ARE_EQUAL(configured, afterFirstExit, L"The console must remain configured while the second client is active");
 
         second.reset();
 

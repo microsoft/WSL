@@ -154,14 +154,12 @@ class SimpleTests
         return LxssGenerateWslCommandLine(L"-- sh -c \"printf ready; IFS= read -r _\"");
     }
 
-    static DWORD WaitForProcessExit(HANDLE process, DWORD timeoutMs)
+    static wil::unique_handle StartControllableWslProcess(
+        HANDLE standardInput,
+        HANDLE standardOutput,
+        DWORD createFlags = CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT)
     {
-        return wsl::windows::common::SubProcess::GetExitCode(process, timeoutMs);
-    }
-
-    static wil::unique_handle StartControllableWslProcess(HANDLE standardInput, HANDLE standardOutput, DWORD createFlags = CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT)
-    {
-        std::wstring commandLine = BuildControllableWslCommandLine();
+        auto commandLine = BuildControllableWslCommandLine();
         return LxsstuStartProcess(commandLine.data(), standardInput, standardOutput, standardOutput, nullptr, createFlags);
     }
 
@@ -257,7 +255,7 @@ class SimpleTests
         outputB.Expect("ready");
 
         SignalControllableProcessExit(aInWrite);
-        VERIFY_ARE_EQUAL(0u, WaitForProcessExit(processA.get(), 15000));
+        VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(processA.get(), 15000));
 
         VERIFY_ARE_EQUAL(
             static_cast<DWORD>(WAIT_TIMEOUT),
@@ -269,7 +267,7 @@ class SimpleTests
         VERIFY_ARE_EQUAL(configured, afterA, L"The console must remain configured while process B is active");
 
         SignalControllableProcessExit(bInWrite);
-        VERIFY_ARE_EQUAL(0u, WaitForProcessExit(processB.get(), 15000));
+        VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(processB.get(), 15000));
 
         DWORD finalMode{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
@@ -308,7 +306,7 @@ class SimpleTests
             L"A WSL process launched in CREATE_NEW_CONSOLE must not mutate this console's input mode");
 
         SignalControllableProcessExit(inWrite);
-        VERIFY_ARE_EQUAL(0u, WaitForProcessExit(process.get(), 15000));
+        VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(process.get(), 15000));
 
         DWORD finalMode{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
