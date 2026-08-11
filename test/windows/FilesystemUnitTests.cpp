@@ -38,6 +38,14 @@ std::filesystem::path CanonicalCurrentDirectory()
     return std::filesystem::canonical(std::filesystem::current_path());
 }
 
+// A path that std::filesystem::absolute is guaranteed to reject, because it exceeds the longest path
+// Win32 can express. An empty path is not used: whether absolute rejects one is implementation
+// defined, and some standard library versions accept it.
+std::filesystem::path UnresolvablePath()
+{
+    return {L"C:\\" + std::wstring(40000, L'a')};
+}
+
 // A file that is known to exist, used to cover paths that resolve to a real filesystem entry. The
 // test module itself is used so that no file has to be created.
 std::filesystem::path ExistingFile()
@@ -99,15 +107,15 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(expected.wstring(), GetCanonicalPath(expected).wstring());
     }
 
-    // An empty path is rejected by std::filesystem::absolute. This is the case the previous
-    // weakly_canonical(absolute(Path, error), error) idiom silently dropped, because weakly_canonical
-    // clears the error_code on success and therefore erased the failure absolute had just reported.
+    // A failure from std::filesystem::absolute must be reported. absolute returns an empty path when
+    // it fails, and weakly_canonical succeeds on an empty path and clears the error_code, so calling
+    // the two in sequence without checking in between silently turns the failure into success.
     TEST_METHOD(GetCanonicalPath_ErrorOverloadReportsFailure)
     {
         std::error_code error;
-        const auto result = GetCanonicalPath(std::filesystem::path{}, error);
+        const auto result = GetCanonicalPath(UnresolvablePath(), error);
 
-        VERIFY_IS_TRUE(!!error);
+        VERIFY_ARE_NOT_EQUAL(std::error_code{}, error);
         VERIFY_IS_TRUE(result.empty());
     }
 
@@ -119,7 +127,7 @@ class FilesystemUnitTests
         auto error = std::make_error_code(std::errc::permission_denied);
         const auto result = GetCanonicalPath(expected, error);
 
-        VERIFY_IS_FALSE(!!error);
+        VERIFY_ARE_EQUAL(std::error_code{}, error);
         VERIFY_ARE_EQUAL(expected.wstring(), result.wstring());
     }
 
@@ -127,11 +135,11 @@ class FilesystemUnitTests
     TEST_METHOD(GetCanonicalPath_ThrowingOverloadSurfacesFailure)
     {
         std::error_code error;
-        (void)GetCanonicalPath(std::filesystem::path{}, error);
-        VERIFY_IS_TRUE(!!error);
+        (void)GetCanonicalPath(UnresolvablePath(), error);
+        VERIFY_ARE_NOT_EQUAL(std::error_code{}, error);
 
         const auto expectedResult = HRESULT_FROM_WIN32(error.value());
-        VERIFY_THROWS_SPECIFIC(GetCanonicalPath(std::filesystem::path{}), wil::ResultException, [&](const wil::ResultException& e) {
+        VERIFY_THROWS_SPECIFIC(GetCanonicalPath(UnresolvablePath()), wil::ResultException, [&](const wil::ResultException& e) {
             return e.GetErrorCode() == expectedResult;
         });
     }
