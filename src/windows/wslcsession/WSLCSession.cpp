@@ -1022,6 +1022,8 @@ try
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
+    // Progress is requested as JSON so it can be parsed into the formatted progress messages sent to the
+    // client. The raw JSON is a docker implementation detail and is never forwarded.
     std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
@@ -1243,7 +1245,6 @@ try
         });
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
-    bool rawJson = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsRawJson);
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
@@ -1414,29 +1415,7 @@ try
         }
     };
 
-    // rawjson mode: forward each complete JSON object docker writes to stderr verbatim (as newline-delimited
-    // JSON) to the client, bypassing the parsing/formatting done by captureOutput.
-    auto rawJsonPassthrough = [&](const gsl::span<char>& content) {
-        pendingJson.append(content.begin(), content.end());
-
-        if (!nlohmann::json::accept(pendingJson))
-        {
-            // Not yet a complete object; keep accumulating. Drop leading non-JSON noise.
-            if (!pendingJson.empty() && pendingJson[0] != '{')
-            {
-                pendingJson.clear();
-            }
-
-            return;
-        }
-
-        pendingJson.push_back('\n');
-        reportProgress(pendingJson);
-        pendingJson.clear();
-    };
-
-    // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure).
+    // Docker writes progress to stderr and the final image ID to stdout on success (empty on failure).
     //
     // For dest=- the exporter tarball is written to stdout, so it is relayed to the client handle as the
     // build runs. RelayHandle is an overlapped handle, so a slow client only marks the relay pending and
@@ -1452,14 +1431,7 @@ try
             buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
     }
 
-    if (rawJson)
-    {
-        io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), rawJsonPassthrough, false));
-    }
-    else
-    {
-        io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
-    }
+    io.AddHandle(std::make_unique<io::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
     // Handle cancellation within the IO loop (NeedNotComplete) so pipes keep draining.
     bool cancelled = false;

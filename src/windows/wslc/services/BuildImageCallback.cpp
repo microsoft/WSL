@@ -108,13 +108,6 @@ try
         return S_OK;
     }
 
-    // rawjson: the server forwards docker's raw progress JSON verbatim; print it as-is with no rendering.
-    if (m_mode == models::ProgressMode::RawJson)
-    {
-        m_terminal.Info(L"{}", MultiByteToWide(status));
-        return S_OK;
-    }
-
     const std::string_view idView = (id != nullptr) ? id : std::string_view{};
     const bool isLog = (idView == "log");
     const bool isPullProgress = (!idView.empty() && total > 0 && !isLog);

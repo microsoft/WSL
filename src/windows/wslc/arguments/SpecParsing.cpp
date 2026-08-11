@@ -689,7 +689,6 @@ models::ProgressMode GetProgressModeFromString(const std::wstring& input, const 
         {L"tty", models::ProgressMode::Tty},
         {L"plain", models::ProgressMode::Plain},
         {L"quiet", models::ProgressMode::Quiet},
-        {L"rawjson", models::ProgressMode::RawJson},
     };
 
     for (const auto& [name, mode] : c_progressModes)

@@ -167,7 +167,6 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"tty"), ProgressMode::Tty);
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"plain"), ProgressMode::Plain);
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"quiet"), ProgressMode::Quiet);
-        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"rawjson"), ProgressMode::RawJson);
         VERIFY_THROWS(validation::GetProgressModeFromString(L"TTY"), ArgumentException); // Case-sensitive: only lowercase accepted
         VERIFY_THROWS(validation::GetProgressModeFromString(L"fancy"), ArgumentException);
 

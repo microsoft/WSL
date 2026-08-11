@@ -137,14 +137,6 @@ class WSLCCLIBuildImageCallbackUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L""}, output);
     }
 
-    // rawjson forwards the server's payload verbatim, so it must not be wrapped in cursor control.
-    TEST_METHOD(BuildImageCallback_RawJsonOnVtConsole_EmitsNoEscapeSequences)
-    {
-        const auto output = RunBuild(ProgressMode::RawJson, true);
-
-        VERIFY_IS_TRUE(output.find(L'\x1b') == std::wstring::npos, L"rawjson mode must forward payloads without VT sequences");
-    }
-
     // quiet prints nothing while the build runs, but a failure must still explain what went wrong.
     // The step that failed and the error itself are reported with an empty id rather than "log", so
     // they have to be captured too or the replay only shows unattributed log output.

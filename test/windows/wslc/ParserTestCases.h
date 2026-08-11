@@ -246,17 +246,15 @@ WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q -q system list)") \
 \
 /* `wslc build` --progress option (Build set mirrors ImageBuildCommand). The build \
  * context path is the required positional; --progress takes one of auto/tty/plain/ \
- * quiet/rawjson and is validated by Argument::Validate via GetProgressModeFromString. */ \
+ * quiet and is validated by Argument::Validate via GetProgressModeFromString.      */ \
 /* Valid modes, separated and adjoined value forms, and case-sensitivity.           */ \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress=auto)") \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress auto)") \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc --progress=tty .)") \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress=plain)") \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress quiet)") \
-WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress=rawjson)") \
 /* Values are case-sensitive (lowercase only), matching Docker and --format.        */ \
 WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress=TTY)") \
-WSLC_PARSER_TEST_CASE(Build, false, LR"(wslc . --progress=RawJson)") \
 /* A build with no --progress at all is valid (the option is optional).             */ \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc .)") \
 /* Invalid / unrecognized modes, empty value, and missing value at end of input.    */ \

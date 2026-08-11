@@ -87,7 +87,7 @@ int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring
 // Parses an image pull policy ("always"/"missing"/"never").
 models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName = {});
 
-// Parses a build progress type ("auto"/"tty"/"plain"/"quiet"/"rawjson") into a ProgressMode.
+// Parses a build progress type ("auto"/"tty"/"plain"/"quiet") into a ProgressMode.
 models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName = {});
 
 // Parses an inspect target ("image"/"container"/"network"/"volume") into an InspectType.

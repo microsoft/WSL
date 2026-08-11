@@ -1406,33 +1406,6 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_TRUE(buildResult.Stderr->find(L"is not a recognized progress type") != std::wstring::npos);
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressRawJson_Success)
-    {
-        auto imageCleanup = DeleteImageOnExit(BuiltImageProgressRawJson);
-        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-rawjson";
-        auto cleanup = SetupTestDirectory(testRoot);
-
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
-
-        auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"rawjson-ok\"]\n");
-
-        // rawjson forwards docker's raw BuildKit progress JSON to stderr verbatim. BuildKit status
-        // objects contain a "vertexes" array that the formatted (parsed) output never emits.
-        auto buildResult = RunWslc(std::format(
-            L"build \"{}\" -f \"{}\" -t {} --progress=rawjson",
-            contextDir.wstring(),
-            dockerfilePath.wstring(),
-            BuiltImageProgressRawJson.NameAndTag()));
-        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
-
-        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
-        VERIFY_IS_TRUE(buildResult.Stderr->find(L"\"vertexes\"") != std::wstring::npos);
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressPlain_NoEscapeSequences_Success)
     {
         auto imageCleanup = DeleteImageOnExit(BuiltImageProgressPlain);
@@ -1523,7 +1496,6 @@ private:
     const TestImage BuiltImageOutputCacheOnly{L"wslc-e2e-build-output-cacheonly", L"latest", L""};
     const TestImage BuiltImageIidFile{L"wslc-e2e-build-iidfile", L"latest", L""};
     const TestImage BuiltImageIidFileNotWritable{L"wslc-e2e-build-iidfile-readonly", L"latest", L""};
-    const TestImage BuiltImageProgressRawJson{L"wslc-e2e-build-progress-rawjson", L"latest", L""};
     const TestImage BuiltImageProgressPlain{L"wslc-e2e-build-progress-plain", L"latest", L""};
     const TestImage BuiltImageProgressQuiet{L"wslc-e2e-build-progress-quiet", L"latest", L""};
 

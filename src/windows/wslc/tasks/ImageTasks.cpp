@@ -139,10 +139,6 @@ void BuildImage(CLIExecutionContext& context)
         progressMode = context.Terminal.IsVTEnabled(Terminal::Level::Info) ? ProgressMode::Tty : ProgressMode::Plain;
     }
 
-    // rawjson is the only mode that changes what the server sends: it forwards docker's raw progress
-    // output verbatim instead of parsing it into formatted messages.
-    WI_SetFlagIf(flags, WSLCBuildImageFlagsRawJson, progressMode == ProgressMode::RawJson);
-
     auto cancelEvent = context.CreateCancelEvent();
     BuildImageCallback callback(context.Terminal, cancelEvent, context.Args.GetValue<ArgType::Verbose>(), progressMode);
     services::ImageService::Build(

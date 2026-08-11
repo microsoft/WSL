@@ -42,7 +42,6 @@ enum class ProgressMode
     Tty,
     Plain,
     Quiet,
-    RawJson,
 };
 
 struct ContainerOptions
