@@ -785,7 +785,7 @@ std::filesystem::path wsl::windows::common::filesystem::GetCanonicalPath(const s
 
 std::filesystem::path wsl::windows::common::filesystem::GetCanonicalPath(const std::filesystem::path& Path, std::error_code& Error)
 {
-    // N.B. absolute() is applied first because weakly_canonical() does not resolve a relative path
+    // absolute() is applied first because weakly_canonical() does not resolve a relative path
     // against the current directory on its own. Its result is checked before canonicalizing because
     // weakly_canonical() clears Error on success, which would otherwise mask an absolute() failure.
     const auto absolutePath = std::filesystem::absolute(Path, Error);
