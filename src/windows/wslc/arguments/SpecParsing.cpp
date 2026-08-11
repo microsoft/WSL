@@ -684,34 +684,34 @@ models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std:
 
 models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (IsEqual(input, L"auto"))
+    static constexpr std::pair<std::wstring_view, models::ProgressMode> c_progressModes[] = {
+        {L"auto", models::ProgressMode::Auto},
+        {L"tty", models::ProgressMode::Tty},
+        {L"plain", models::ProgressMode::Plain},
+        {L"quiet", models::ProgressMode::Quiet},
+        {L"rawjson", models::ProgressMode::RawJson},
+    };
+
+    for (const auto& [name, mode] : c_progressModes)
     {
-        return models::ProgressMode::Auto;
+        if (IsEqual(input, name))
+        {
+            return mode;
+        }
     }
-    else if (IsEqual(input, L"tty"))
+
+    std::wstring supportedValues;
+    for (const auto& progressMode : c_progressModes)
     {
-        return models::ProgressMode::Tty;
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += progressMode.first;
     }
-    else if (IsEqual(input, L"plain"))
-    {
-        return models::ProgressMode::Plain;
-    }
-    else if (IsEqual(input, L"quiet"))
-    {
-        return models::ProgressMode::Quiet;
-    }
-    else if (IsEqual(input, L"rawjson"))
-    {
-        return models::ProgressMode::RawJson;
-    }
-    else
-    {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized progress type. Supported progress types are: auto, tty, plain, "
-            L"quiet, rawjson.",
-            argName,
-            input));
-    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidProgressTypeError(argName, input, supportedValues));
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
