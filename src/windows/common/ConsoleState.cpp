@@ -252,13 +252,15 @@ ConsoleState::~ConsoleState()
 void ConsoleState::ConfigureInteractiveMode()
 {
     LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
-    auto inputMode = TryGetConsoleMode(m_InputHandle.get()).value();
+    DWORD inputMode{};
+    THROW_LAST_ERROR_IF(!GetConsoleMode(m_InputHandle.get(), &inputMode));
     WI_SetAllFlags(inputMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
     WI_ClearAllFlags(inputMode, ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
     ChangeConsoleMode(m_InputHandle.get(), inputMode);
 
     LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
-    auto outputMode = TryGetConsoleMode(m_OutputHandle.get()).value();
+    DWORD outputMode{};
+    THROW_LAST_ERROR_IF(!GetConsoleMode(m_OutputHandle.get(), &outputMode));
     WI_SetAllFlags(outputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
     ChangeConsoleMode(m_OutputHandle.get(), outputMode);
 }
