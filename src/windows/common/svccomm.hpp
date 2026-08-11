@@ -66,7 +66,7 @@ public:
         _In_opt_ PCWSTR Username = nullptr,
         _In_opt_ PCWSTR CurrentWorkingDirectory = nullptr,
         _In_ DWORD Timeout = INFINITE,
-        _In_ RestorePolicy RestorePolicySetting = RestorePolicy::Always) const;
+        _In_ RestorePolicy RestorePolicySetting = RestorePolicy::Exclusive) const;
 
     GUID GetDefaultDistribution() const;
 

@@ -683,7 +683,7 @@ int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPC
         options.Username.empty() ? nullptr : options.Username.c_str(),
         options.CurrentWorkingDirectory.empty() ? nullptr : options.CurrentWorkingDirectory.c_str(),
         INFINITE,
-        RestorePolicy::OnlyIfUnchanged);
+        RestorePolicy::Cooperative);
 
     THROW_HR_IF(WSL_E_USER_NOT_FOUND, (exitCode == LX_INIT_USER_NOT_FOUND));
     THROW_HR_IF(WSL_E_TTY_LIMIT, (exitCode == LX_INIT_TTY_LIMIT));
@@ -1502,7 +1502,7 @@ int RunDebugShell()
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(pipe.get(), "\n", 1, nullptr, nullptr));
 
     // Create a thread to relay stdin to the pipe.
-    wsl::windows::common::ConsoleState console{RestorePolicy::OnlyIfUnchanged};
+    wsl::windows::common::ConsoleState console{RestorePolicy::Cooperative};
     console.SetInteractiveMode();
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread([&]() {

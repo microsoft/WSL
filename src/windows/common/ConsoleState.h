@@ -23,18 +23,18 @@ namespace wsl::windows::common {
 // Controls when ConsoleState attempts to restore the original console state.
 enum class RestorePolicy
 {
-    // Always restore to the original state captured by this instance.
-    Always,
+    // Exclusive restore to the original state captured by this instance.
+    Exclusive,
 
     // Restore only when the state still matches what this instance configured.
-    OnlyIfUnchanged,
+    Cooperative,
 };
 
 // RAII wrapper for console state configuration and restoration
 class ConsoleState
 {
 public:
-    explicit ConsoleState(RestorePolicy Policy = RestorePolicy::Always);
+    explicit ConsoleState(RestorePolicy Policy = RestorePolicy::Exclusive);
     ~ConsoleState();
     ConsoleState(const ConsoleState&) = delete;
     ConsoleState& operator=(const ConsoleState&) = delete;

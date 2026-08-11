@@ -186,7 +186,7 @@ void ConsoleState::SetInteractiveMode()
         return;
     }
 
-    if ((m_restorePolicy == RestorePolicy::OnlyIfUnchanged) && AcquireCoordination())
+    if ((m_restorePolicy == RestorePolicy::Cooperative) && AcquireCoordination())
     {
         m_interactiveModeConfigured = true;
         return;
@@ -199,7 +199,7 @@ void ConsoleState::SetInteractiveMode()
     {
         m_SavedInputCodePage = GetConsoleCP();
         LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
-        if (m_restorePolicy == RestorePolicy::OnlyIfUnchanged)
+        if (m_restorePolicy == RestorePolicy::Cooperative)
         {
             m_ConfiguredInputCodePage = GetConsoleCP();
         }
@@ -213,7 +213,7 @@ void ConsoleState::SetInteractiveMode()
         WI_ClearAllFlags(newMode, ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
         ChangeConsoleMode(m_InputHandle.get(), newMode);
         m_SavedInputMode = mode;
-        if (m_restorePolicy == RestorePolicy::OnlyIfUnchanged)
+        if (m_restorePolicy == RestorePolicy::Cooperative)
         {
             m_ConfiguredInputMode = TryGetConsoleMode(m_InputHandle.get()).value_or(newMode);
         }
@@ -223,7 +223,7 @@ void ConsoleState::SetInteractiveMode()
     {
         m_SavedOutputCodePage = GetConsoleOutputCP();
         LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
-        if (m_restorePolicy == RestorePolicy::OnlyIfUnchanged)
+        if (m_restorePolicy == RestorePolicy::Cooperative)
         {
             m_ConfiguredOutputCodePage = GetConsoleOutputCP();
         }
@@ -236,7 +236,7 @@ void ConsoleState::SetInteractiveMode()
         WI_SetAllFlags(newMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
         ChangeConsoleMode(m_OutputHandle.get(), newMode);
         m_SavedOutputMode = mode;
-        if (m_restorePolicy == RestorePolicy::OnlyIfUnchanged)
+        if (m_restorePolicy == RestorePolicy::Cooperative)
         {
             m_ConfiguredOutputMode = TryGetConsoleMode(m_OutputHandle.get()).value_or(newMode);
         }
@@ -391,7 +391,7 @@ void ConsoleState::RestoreConsoleState()
         if (m_SavedInputCodePage.has_value())
         {
             const auto currentCodePage = GetConsoleCP();
-            if ((m_restorePolicy == RestorePolicy::Always) || !m_ConfiguredInputCodePage.has_value() ||
+            if ((m_restorePolicy == RestorePolicy::Exclusive) || !m_ConfiguredInputCodePage.has_value() ||
                 (currentCodePage == m_ConfiguredInputCodePage.value()))
             {
                 LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedInputCodePage.value()));
@@ -403,7 +403,7 @@ void ConsoleState::RestoreConsoleState()
 
         if (m_SavedInputMode.has_value())
         {
-            if (m_restorePolicy == RestorePolicy::Always)
+            if (m_restorePolicy == RestorePolicy::Exclusive)
             {
                 TrySetConsoleMode(m_InputHandle.get(), m_SavedInputMode.value());
             }
@@ -426,7 +426,7 @@ void ConsoleState::RestoreConsoleState()
         if (m_SavedOutputCodePage.has_value())
         {
             const auto currentCodePage = GetConsoleOutputCP();
-            if ((m_restorePolicy == RestorePolicy::Always) || !m_ConfiguredOutputCodePage.has_value() ||
+            if ((m_restorePolicy == RestorePolicy::Exclusive) || !m_ConfiguredOutputCodePage.has_value() ||
                 (currentCodePage == m_ConfiguredOutputCodePage.value()))
             {
                 LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(m_SavedOutputCodePage.value()));
@@ -438,7 +438,7 @@ void ConsoleState::RestoreConsoleState()
 
         if (m_SavedOutputMode.has_value())
         {
-            if (m_restorePolicy == RestorePolicy::Always)
+            if (m_restorePolicy == RestorePolicy::Exclusive)
             {
                 TrySetConsoleMode(m_OutputHandle.get(), m_SavedOutputMode.value());
             }
