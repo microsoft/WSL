@@ -266,10 +266,7 @@ class SimpleTests
 
         DWORD afterA{};
         VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &afterA));
-        VERIFY_IS_TRUE(
-            (afterA == baseline) || (afterA == configured),
-            L"Out-of-order process teardown may restore baseline early; "
-            L"only the final mode after all clients exit is guaranteed");
+        VERIFY_ARE_EQUAL(configured, afterA, L"The console must remain configured while process B is active");
 
         SignalControllableProcessExit(bInWrite);
         VERIFY_ARE_EQUAL(0u, WaitForProcessExit(processB.get(), 15000));

@@ -50,7 +50,7 @@ struct LaunchProcessOptions
     std::optional<GUID> DistroGuid;
     std::wstring Username;
     ULONG LaunchFlags = LXSS_LAUNCH_FLAG_ENABLE_INTEROP | LXSS_LAUNCH_FLAG_TRANSLATE_ENVIRONMENT;
-    RestorePolicy RestorePolicySetting = RestorePolicy::Always;
+    RestorePolicy RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 };
 
 struct ListOptions
@@ -536,7 +536,6 @@ int Install(_In_ std::wstring_view commandLine)
 
             LaunchProcessOptions options{};
             options.DistroGuid = id;
-            options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
             return LaunchProcess(nullptr, 0, nullptr, options);
         }
 
@@ -609,7 +608,6 @@ int Install(_In_ std::wstring_view commandLine)
             {
                 LaunchProcessOptions options{};
                 options.DistroGuid = installResult.Id.value();
-                options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 
                 return LaunchProcess(nullptr, 0, nullptr, options);
             }
@@ -1374,7 +1372,6 @@ int WslgMain(_In_ std::wstring_view commandLine)
     WI_ASSERT(!wsl::windows::common::wslutil::IsRunningInMsix());
 
     auto options = ParseLegacyArguments(commandLine);
-    options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 
     // Parse additional arguments.
     std::wstring_view argument;
@@ -1506,7 +1503,7 @@ int RunDebugShell()
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(pipe.get(), "\n", 1, nullptr, nullptr));
 
     // Create a thread to relay stdin to the pipe.
-    wsl::windows::common::ConsoleState console;
+    wsl::windows::common::ConsoleState console{RestorePolicy::OnlyIfUnchanged};
     console.SetInteractiveMode();
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread([&]() {
@@ -1548,7 +1545,6 @@ int WslMain(_In_ std::wstring_view commandLine)
 
     // Parse the command line to determine if the legacy distro GUID or the '~' argument were specified.
     auto options = ParseLegacyArguments(commandLine);
-    options.RestorePolicySetting = RestorePolicy::OnlyIfUnchanged;
 
     // Parse additional arguments.
     std::wstring_view argument;

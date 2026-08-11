@@ -13,7 +13,6 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "svccomm.hpp"
 #include "ConsoleState.h"
 #pragma hdrstop
 
@@ -75,6 +74,70 @@ std::optional<DWORD> TryGetConsoleMode(_In_ HANDLE Handle)
     return mode;
 }
 
+struct ConsoleValues
+{
+    DWORD InputMode;
+    UINT InputCodePage;
+    DWORD OutputMode;
+    UINT OutputCodePage;
+};
+
+struct CoordinationState
+{
+    struct Owner
+    {
+        DWORD ProcessId;
+        ULONG References;
+    };
+
+    ULONG Version;
+    ConsoleValues Baseline;
+    ConsoleValues Configured;
+    Owner Owners[128];
+};
+
+class MutexLock
+{
+public:
+    explicit MutexLock(HANDLE mutex) : m_mutex(mutex)
+    {
+        const auto result = WaitForSingleObject(mutex, INFINITE);
+        THROW_HR_IF(E_UNEXPECTED, (result != WAIT_OBJECT_0) && (result != WAIT_ABANDONED));
+    }
+
+    ~MutexLock()
+    {
+        LOG_IF_WIN32_BOOL_FALSE(ReleaseMutex(m_mutex));
+    }
+
+private:
+    HANDLE m_mutex;
+};
+
+ConsoleValues CaptureConsoleValues(HANDLE input, HANDLE output)
+{
+    ConsoleValues values{};
+    THROW_IF_WIN32_BOOL_FALSE(GetConsoleMode(input, &values.InputMode));
+    values.InputCodePage = GetConsoleCP();
+    THROW_IF_WIN32_BOOL_FALSE(GetConsoleMode(output, &values.OutputMode));
+    values.OutputCodePage = GetConsoleOutputCP();
+    return values;
+}
+
+void ApplyConsoleValues(HANDLE input, HANDLE output, const ConsoleValues& values)
+{
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(values.InputCodePage));
+    TrySetConsoleMode(input, values.InputMode);
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(values.OutputCodePage));
+    TrySetConsoleMode(output, values.OutputMode);
+}
+
+bool IsOwnerAlive(const CoordinationState::Owner& owner)
+{
+    wil::unique_handle process{OpenProcess(SYNCHRONIZE, FALSE, owner.ProcessId)};
+    return process && (WaitForSingleObject(process.get(), 0) == WAIT_TIMEOUT);
+}
+
 } // namespace
 
 namespace wsl::windows::common {
@@ -102,6 +165,12 @@ void ConsoleState::SetInteractiveMode()
 {
     if (m_interactiveModeConfigured)
     {
+        return;
+    }
+
+    if ((m_restorePolicy == RestorePolicy::OnlyIfUnchanged) && AcquireCoordination())
+    {
+        m_interactiveModeConfigured = true;
         return;
     }
 
@@ -161,7 +230,138 @@ void ConsoleState::SetInteractiveMode()
 
 ConsoleState::~ConsoleState()
 {
-    RestoreConsoleState();
+    if (m_coordinationView)
+    {
+        try
+        {
+            ReleaseCoordination();
+        }
+        CATCH_LOG()
+
+        LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(m_coordinationView));
+    }
+    else
+    {
+        RestoreConsoleState();
+    }
+}
+
+void ConsoleState::ConfigureInteractiveMode()
+{
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
+    auto inputMode = TryGetConsoleMode(m_InputHandle.get()).value();
+    WI_SetAllFlags(inputMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
+    WI_ClearAllFlags(inputMode, ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
+    ChangeConsoleMode(m_InputHandle.get(), inputMode);
+
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
+    auto outputMode = TryGetConsoleMode(m_OutputHandle.get()).value();
+    WI_SetAllFlags(outputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+    ChangeConsoleMode(m_OutputHandle.get(), outputMode);
+}
+
+bool ConsoleState::AcquireCoordination()
+{
+    const auto window = GetConsoleWindow();
+    if (!window || !m_InputHandle || !m_OutputHandle)
+    {
+        return false;
+    }
+
+    const auto name = std::format(L"Local\\WSL.ConsoleState.{:X}", reinterpret_cast<ULONG_PTR>(window));
+    m_coordinationMutex.reset(CreateMutexW(nullptr, FALSE, (name + L".Mutex").c_str()));
+    THROW_LAST_ERROR_IF(!m_coordinationMutex);
+    m_coordinationMapping.reset(CreateFileMappingW(
+        INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(CoordinationState), (name + L".Mapping").c_str()));
+    THROW_LAST_ERROR_IF(!m_coordinationMapping);
+    m_coordinationView = MapViewOfFile(m_coordinationMapping.get(), FILE_MAP_ALL_ACCESS, 0, 0, sizeof(CoordinationState));
+    THROW_LAST_ERROR_IF(!m_coordinationView);
+
+    MutexLock lock(m_coordinationMutex.get());
+    auto& state = *static_cast<CoordinationState*>(m_coordinationView);
+    if (state.Version != 1)
+    {
+        state = {};
+        state.Version = 1;
+    }
+    for (auto& owner : state.Owners)
+    {
+        if (owner.ProcessId && !IsOwnerAlive(owner))
+        {
+            owner = {};
+        }
+    }
+
+    const auto pid = GetCurrentProcessId();
+    auto owner = std::find_if(
+        std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) { return value.ProcessId == pid; });
+    if (owner == std::end(state.Owners))
+    {
+        owner = std::find_if(std::begin(state.Owners), std::end(state.Owners), [](const auto& value) { return value.ProcessId == 0; });
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TOO_MANY_SESS), owner == std::end(state.Owners));
+        *owner = {pid, 0};
+    }
+
+    const bool initialize = (owner->References == 0) && std::none_of(
+        std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) { return value.ProcessId && (&value != &*owner); });
+    ++owner->References;
+    if (initialize)
+    {
+        auto rollback = wil::scope_exit([&] { *owner = {}; });
+        state.Baseline = CaptureConsoleValues(m_InputHandle.get(), m_OutputHandle.get());
+        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            ApplyConsoleValues(m_InputHandle.get(), m_OutputHandle.get(), state.Baseline);
+        });
+        ConfigureInteractiveMode();
+        state.Configured = CaptureConsoleValues(m_InputHandle.get(), m_OutputHandle.get());
+        restore.release();
+        rollback.release();
+    }
+
+    return true;
+}
+
+void ConsoleState::ReleaseCoordination()
+{
+    MutexLock lock(m_coordinationMutex.get());
+    auto& state = *static_cast<CoordinationState*>(m_coordinationView);
+    const auto pid = GetCurrentProcessId();
+    for (auto& owner : state.Owners)
+    {
+        if (owner.ProcessId == pid)
+        {
+            if (--owner.References == 0)
+            {
+                owner = {};
+            }
+        }
+        else if (owner.ProcessId && !IsOwnerAlive(owner))
+        {
+            owner = {};
+        }
+    }
+
+    if (std::none_of(std::begin(state.Owners), std::end(state.Owners), [](const auto& owner) { return owner.ProcessId != 0; }))
+    {
+        if (TryGetConsoleMode(m_InputHandle.get()) == state.Configured.InputMode)
+        {
+            TrySetConsoleMode(m_InputHandle.get(), state.Baseline.InputMode);
+        }
+        if (GetConsoleCP() == state.Configured.InputCodePage)
+        {
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(state.Baseline.InputCodePage));
+        }
+        if (TryGetConsoleMode(m_OutputHandle.get()) == state.Configured.OutputMode)
+        {
+            TrySetConsoleMode(m_OutputHandle.get(), state.Baseline.OutputMode);
+        }
+        if (GetConsoleOutputCP() == state.Configured.OutputCodePage)
+        {
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(state.Baseline.OutputCodePage));
+        }
+        state = {};
+        state.Version = 1;
+    }
 }
 
 void ConsoleState::RestoreConsoleState()

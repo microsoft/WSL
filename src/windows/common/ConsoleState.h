@@ -45,10 +45,16 @@ public:
     void SetInteractiveMode();
 
 private:
+    bool AcquireCoordination();
+    void ConfigureInteractiveMode();
+    void ReleaseCoordination();
     void RestoreConsoleState();
 
     wil::unique_hfile m_InputHandle;
     wil::unique_hfile m_OutputHandle;
+    wil::unique_handle m_coordinationMutex;
+    wil::unique_handle m_coordinationMapping;
+    void* m_coordinationView{};
     RestorePolicy m_restorePolicy;
     bool m_interactiveModeConfigured{false};
     std::optional<DWORD> m_SavedInputMode{};
