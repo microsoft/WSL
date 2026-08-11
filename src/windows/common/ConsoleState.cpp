@@ -91,7 +91,6 @@ struct CoordinationState
         ULONGLONG CreationTime;
     };
 
-    ULONG Version;
     ConsoleValues Baseline;
     ConsoleValues Configured;
     Owner Owners[128];
@@ -287,7 +286,7 @@ bool ConsoleState::AcquireCoordination()
         return false;
     }
 
-    const auto name = std::format(L"Local\\WSL.ConsoleState.v2.{:X}", reinterpret_cast<ULONG_PTR>(window));
+    const auto name = std::format(L"Local\\WSL.ConsoleState.v1.{:X}", reinterpret_cast<ULONG_PTR>(window));
     m_coordinationMutex.reset(CreateMutexW(nullptr, FALSE, (name + L".Mutex").c_str()));
     THROW_LAST_ERROR_IF(!m_coordinationMutex);
     m_coordinationMapping.reset(
@@ -299,10 +298,6 @@ bool ConsoleState::AcquireCoordination()
 
     MutexLock lock(m_coordinationMutex.get());
     auto& state = *static_cast<CoordinationState*>(view);
-    if (state.Version != 2)
-    {
-        state = {.Version = 2};
-    }
     for (auto& owner : state.Owners)
     {
         if (owner.ProcessId && !IsOwnerAlive(owner))
@@ -385,7 +380,7 @@ void ConsoleState::ReleaseCoordination()
         {
             LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(state.Baseline.OutputCodePage));
         }
-        state = {.Version = 2};
+        state = {};
     }
 }
 
