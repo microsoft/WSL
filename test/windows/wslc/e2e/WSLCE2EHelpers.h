@@ -207,6 +207,9 @@ inline void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 
+std::string RunDockerInSession(IWSLCSession& session, std::vector<std::string>&& args);
+void RemoveDockerContainerNoThrow(const std::string& containerId);
+
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
 
 // Waits for a substring to appear in the session's pseudo console output.

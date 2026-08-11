@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include <JsonUtils.h>
+#include <WSLCProcessLauncher.h>
 #include <wslutil.h>
 
 extern std::wstring g_testDataPath;
@@ -556,6 +557,33 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 
     return std::move(session);
 }
+
+std::string RunDockerInSession(IWSLCSession& session, std::vector<std::string>&& args)
+{
+    wsl::windows::common::WSLCProcessLauncher launcher("/usr/bin/docker", args);
+    auto result = launcher.Launch(session).WaitAndCaptureOutput();
+    VERIFY_ARE_EQUAL(0, result.Code);
+
+    auto output = result.Output[1];
+    output.erase(output.find_last_not_of(" \n\r") + 1);
+    return output;
+}
+
+void RemoveDockerContainerNoThrow(const std::string& containerId)
+try
+{
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(sessionManager->OpenSessionByName(nullptr, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    wsl::windows::common::WSLCProcessLauncher launcher("/usr/bin/docker", {"/usr/bin/docker", "rm", "-f", containerId});
+    launcher.Launch(*session).WaitAndCaptureOutput();
+}
+CATCH_LOG()
 
 std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
     IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir)

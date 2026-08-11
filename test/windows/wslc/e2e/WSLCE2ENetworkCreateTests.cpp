@@ -23,15 +23,28 @@ class WSLCE2ENetworkCreateTests
 {
     WSLC_TEST_CLASS(WSLCE2ENetworkCreateTests)
 
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsaData));
+        EnsureImageIsLoaded(PythonImage);
+        return true;
+    }
+
     TEST_METHOD_SETUP(MethodSetup)
     {
+        EnsureContainerDoesNotExist(ClientContainerName);
+        RemoveDockerContainerNoThrow(wsl::shared::string::WideToMultiByte(ServerContainerName));
         EnsureNetworkDoesNotExist(TestNetworkName);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
+        EnsureContainerDoesNotExist(ClientContainerName);
+        RemoveDockerContainerNoThrow(wsl::shared::string::WideToMultiByte(ServerContainerName));
         EnsureNetworkDoesNotExist(TestNetworkName);
+        EnsureImageIsDeleted(PythonImage);
+        WSACleanup();
         return true;
     }
 
@@ -128,8 +141,7 @@ class WSLCE2ENetworkCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_Ipv6_Success)
     {
-        const std::wstring subnet = L"fd00:172:53::/64";
-        auto result = RunWslc(std::format(L"network create --ipv6 --subnet {} {}", subnet, TestNetworkName));
+        auto result = RunWslc(std::format(L"network create --ipv6 --subnet {} {}", Ipv6Subnet, TestNetworkName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
 
@@ -139,8 +151,65 @@ class WSLCE2ENetworkCreateTests
         VERIFY_IS_TRUE(inspect.EnableIPv6);
         VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
         VERIFY_IS_TRUE(std::ranges::any_of(*inspect.IPAM.Config, [&](const auto& config) {
-            return config.Subnet == wsl::shared::string::WideToMultiByte(subnet);
+            return config.Subnet == wsl::shared::string::WideToMultiByte(Ipv6Subnet);
         }));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_Ipv6_OutboundConnectivity)
+    {
+        auto result = RunWslc(std::format(L"network create --ipv6 --subnet {} {}", Ipv6Subnet, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto session = OpenDefaultElevatedSession();
+        const auto serverName = wsl::shared::string::WideToMultiByte(ServerContainerName);
+        const auto serverScript = std::format(
+            "import socket;"
+            "s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);"
+            "s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_V6ONLY,1);"
+            "s.bind(('::',{}));"
+            "s.listen(1);"
+            "print('SERVER READY',flush=True);"
+            "c,_=s.accept();"
+            "c.sendall(b'ipv6-ok');"
+            "c.close()",
+            Ipv6TestPort);
+
+        RunDockerInSession(
+            *session,
+            {"/usr/bin/docker",
+             "run",
+             "-d",
+             "--network",
+             "host",
+             "--name",
+             serverName,
+             wsl::shared::string::WideToMultiByte(PythonImage.NameAndTag()),
+             "python3",
+             "-u",
+             "-c",
+             serverScript});
+        auto cleanupServer = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { RemoveDockerContainerNoThrow(serverName); });
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const auto logs = RunDockerInSession(*session, {"/usr/bin/docker", "logs", serverName});
+                THROW_HR_IF(E_PENDING, logs.find("SERVER READY") == std::string::npos);
+            },
+            std::chrono::milliseconds(200),
+            std::chrono::seconds(10)));
+
+        const auto clientCommand = std::format(
+            L"python3 -c \"import socket;"
+            L"s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);"
+            L"s.settimeout(10);"
+            L"s.connect(('{}',{}));"
+            L"print(s.recv(16).decode())\"",
+            Ipv6Gateway,
+            Ipv6TestPort);
+
+        result = RunWslc(std::format(
+            L"container run --rm --network {} --name {} {} {}", TestNetworkName, ClientContainerName, PythonImage.NameAndTag(), clientCommand));
+        result.Verify({.Stdout = L"ipv6-ok\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_Subnet_Success)
@@ -230,6 +299,13 @@ class WSLCE2ENetworkCreateTests
     }
 
 private:
+    const std::wstring ClientContainerName = L"wslc-e2e-network-ipv6-client";
+    const std::wstring ServerContainerName = L"wslc-e2e-network-ipv6-server";
     const std::wstring TestNetworkName = L"wslc-e2e-network-create";
+    const std::wstring Ipv6Subnet = L"fd00:172:53::/64";
+    const std::wstring Ipv6Gateway = L"fd00:172:53::1";
+    const uint16_t Ipv6TestPort = 18080;
+    const TestImage& PythonImage = PythonTestImage();
+    WSADATA m_wsaData{};
 };
 } // namespace WSLCE2ETests
