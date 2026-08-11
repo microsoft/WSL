@@ -170,9 +170,6 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"rawjson"), ProgressMode::RawJson);
         VERIFY_THROWS(validation::GetProgressModeFromString(L"TTY"), ArgumentException); // Case-sensitive: only lowercase accepted
         VERIFY_THROWS(validation::GetProgressModeFromString(L"fancy"), ArgumentException);
-        VERIFY_NO_THROW(
-            validation::ValidateProgressModeFromString({L"auto", L"tty", L"plain", L"quiet", L"rawjson"}, L"progressArg"));
-        VERIFY_THROWS(validation::ValidateProgressModeFromString({L"tty", L"bogus"}, L"progressArg"), ArgumentException);
 
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));

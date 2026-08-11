@@ -13,7 +13,6 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
-#include "ArgumentValidation.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
 #include "ContainerService.h"
@@ -132,11 +131,7 @@ void BuildImage(CLIExecutionContext& context)
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetValue<ArgType::NoCache>());
     WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.GetValue<ArgType::BuildPull>());
 
-    ProgressMode progressMode = ProgressMode::Auto;
-    if (context.Args.Contains(ArgType::Progress))
-    {
-        progressMode = validation::GetProgressModeFromString(context.Args.GetValue<ArgType::Progress>());
-    }
+    auto progressMode = context.Args.GetValue<ArgType::Progress>(ProgressMode::Auto);
 
     // Resolve Auto based on whether progress output (stderr) is an interactive VT console.
     if (progressMode == ProgressMode::Auto)
