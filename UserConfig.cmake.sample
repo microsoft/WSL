@@ -2,6 +2,10 @@
 
 message(STATUS "Loading user configuration")
 
+# Uncomment to use locally built wsldevicehost binaries.
+# This folder should contain both wsldevicehost.dll and WslDeviceHost.idl
+# set(WSL_DEVICEHOST_BIN "C:/path/to/devicehost/bin")
+
 # Uncomment to enable development packages (smaller, faster to install)
 # # Note: .vhd files fail to mount via symlink / hardlink, so COPY is needed.
 # set(WSL_DEV_BINARY_PATH "C:/wsldev")
@@ -60,3 +64,7 @@ endif()
 # #   error - block the commit when formatting issues are found
 # #   fix   - automatically fix formatting and re-stage files
 # set(WSL_PRE_COMMIT_MODE "warn")
+
+# # Uncomment to change how many test sources share a unity translation unit (default: 2).
+# # Use 0 to disable unity builds and compile every test file separately.
+# set(WSL_TEST_UNITY_BATCH_SIZE 4)

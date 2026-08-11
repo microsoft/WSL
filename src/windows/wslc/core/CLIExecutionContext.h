@@ -12,9 +12,9 @@ Abstract:
 
 --*/
 #pragma once
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ExecutionContextData.h"
-#include "Reporter.h"
+#include "Terminal.h"
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
@@ -39,8 +39,8 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     // Map of data stored in the context.
     DataMap Data;
 
-    // Central output reporter for all user-facing status messages.
-    Reporter Reporter;
+    // Central output terminal for all user-facing status messages.
+    Terminal Terminal;
 
     // Process exit code set by tasks like Run/Exec.
     std::optional<int> ExitCode;
@@ -50,9 +50,8 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     HANDLE CreateCancelEvent();
 
-    // Single chokepoint that turns parsed GlobalArgs into process-wide effects
-    // (debug logging, VT color, ...). Idempotent.
-    void ApplyGlobalOptions();
+    // Applies and freezes environment-only global options before command-line parsing reports errors.
+    void ApplyGlobalEnvironmentOptions();
 };
 
 } // namespace wsl::windows::wslc::execution

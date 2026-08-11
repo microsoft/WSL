@@ -14,11 +14,11 @@ Abstract:
 #pragma once
 #include "Argument.h"
 #include "Exceptions.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
-#include "Reporter.h"
+#include "Terminal.h"
 
 #include <memory>
 #include <optional>
@@ -101,7 +101,7 @@ struct Command
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
-    void OutputHelp(Reporter& reporter, const CommandException* exception = nullptr) const;
+    void OutputHelp(Terminal& terminal, const CommandException* exception = nullptr) const;
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
 
@@ -127,9 +127,9 @@ struct Command
         ParseArguments(inv, target, GetAllArguments());
     }
 
-    void ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
+    void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
 
-    void ValidateArguments(const ArgMap& source) const
+    void ValidateArguments(ArgMap& source) const
     {
         ValidateArguments(source, GetAllArguments(), true);
     }
@@ -137,7 +137,14 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
-    virtual void ValidateArgumentsInternal(const ArgMap& source) const;
+    // Command-specific validation hook, run after the shared per-argument Argument::Validate pass.
+    // Override to enforce cross-argument rules that per-argument validation cannot express, such as
+    // mutually-exclusive arguments or required argument combinations.
+    //
+    // Contract: this hook enforces relationships between already-validated arguments. It receives a
+    // GetValue/GetAllValues make the selected argument immutable after returning it. Converted
+    // arguments are validated on demand if needed.
+    virtual void ValidateArgumentsInternal(ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 
 private:

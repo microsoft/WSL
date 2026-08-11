@@ -15,9 +15,11 @@ Abstract:
 
 --*/
 
+#include "precomp.h"
 #include "WSLCVirtualMachine.h"
 #include <format>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 #include "ServiceProcessLauncher.h"
 #include "wslutil.h"
 #include "lxinitshared.h"
@@ -34,8 +36,55 @@ constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
-VmPortAllocation::VmPortAllocation(uint16_t port, int family, int protocol, WSLCVirtualMachine& vm) :
-    m_port(port), m_family(family), m_protocol(protocol), m_vm(&vm)
+namespace {
+
+// Escapes regex metacharacters in `input` so a literal hostname can be embedded into a BuildKit
+// source-policy regex identifier (e.g. `myreg:5000` stays a literal match).
+std::string EscapeRegexMetacharacters(std::string_view input)
+{
+    static constexpr std::string_view c_metacharacters = R"(\.+*?()|[]{}^$)";
+    std::string escaped;
+    escaped.reserve(input.size());
+    for (const char ch : input)
+    {
+        if (c_metacharacters.find(ch) != std::string_view::npos)
+        {
+            escaped.push_back('\\');
+        }
+        escaped.push_back(ch);
+    }
+    return escaped;
+}
+
+// DENY-all first, then per-host ALLOW: BuildKit evaluates rules in order and last match wins.
+// Hosts are lowercased because BuildKit normalises identifiers before regex matching.
+// https://github.com/moby/buildkit/blob/master/docs/sourcepolicy.md
+std::string BuildBuildKitSourcePolicyJson(const std::vector<std::string>& allowedHosts)
+{
+    nlohmann::json rules = nlohmann::json::array();
+    rules.push_back({{"action", "DENY"}, {"selector", {{"identifier", "docker-image://.*"}, {"match_type", "REGEX"}}}});
+
+    for (const auto& host : allowedHosts)
+    {
+        std::string lowered;
+        lowered.reserve(host.size());
+        std::transform(host.begin(), host.end(), std::back_inserter(lowered), [](unsigned char ch) {
+            return static_cast<char>(std::tolower(ch));
+        });
+
+        const auto identifier = "docker-image://" + EscapeRegexMetacharacters(lowered) + "/.*";
+        rules.push_back({{"action", "ALLOW"}, {"selector", {{"identifier", identifier}, {"match_type", "REGEX"}}}});
+    }
+
+    nlohmann::json document;
+    document["rules"] = std::move(rules);
+    return document.dump();
+}
+
+} // namespace
+
+VmPortAllocation::VmPortAllocation(uint16_t port, int family, int protocol, std::weak_ptr<VmPortReservations> reservations) :
+    m_port(port), m_family(family), m_protocol(protocol), m_reservations(std::move(reservations))
 {
 }
 
@@ -52,7 +101,7 @@ VmPortAllocation& VmPortAllocation::operator=(VmPortAllocation&& Other)
         m_port = Other.m_port;
         m_family = Other.m_family;
         m_protocol = Other.m_protocol;
-        m_vm = Other.m_vm;
+        m_reservations = Other.m_reservations;
 
         Other.Release();
     }
@@ -66,16 +115,20 @@ VmPortAllocation::~VmPortAllocation()
 
 void VmPortAllocation::Reset()
 {
-    if (m_vm != nullptr)
+    // Release the reservation only if the owning VM (and its table) is still alive. If the VM was torn
+    // down the table is already gone and lock() returns null, so a surviving allocation is a safe no-op.
+    if (auto reservations = m_reservations.lock())
     {
-        m_vm->ReleasePort(*this);
-        Release();
+        std::lock_guard lock{reservations->Mutex};
+        LOG_HR_IF(E_UNEXPECTED, reservations->Ports.erase(m_port) != 1);
     }
+
+    Release();
 }
 
 void VmPortAllocation::Release()
 {
-    m_vm = nullptr;
+    m_reservations.reset();
     m_port = 0;
     m_family = 0;
     m_protocol = 0;
@@ -320,6 +373,11 @@ void WSLCVirtualMachine::Initialize()
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
 
+    // Snapshot the container-registry allowlist and, if configured, hand the BuildKit source-policy
+    // JSON to init. Done at boot rather than per build so a compromised user process cannot bypass
+    // enforcement by racing the write.
+    ConfigureBuildKitPolicy();
+
     // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
     ConfigureNetworking();
 }
@@ -438,6 +496,46 @@ void WSLCVirtualMachine::ReadGuestCapabilities()
     capabilities.HvPciSwiotlbBase = m_hvPciSwiotlbBase;
     capabilities.HvPciSwiotlbSize = m_hvPciSwiotlbSize;
     THROW_IF_FAILED(m_vm->ApplyGuestCapabilities(&capabilities));
+}
+
+void WSLCVirtualMachine::ConfigureBuildKitPolicy()
+{
+    const auto snapshot = wsl::windows::policies::ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+
+    if (snapshot.State == wsl::windows::policies::RegistryAllowlistState::NotConfigured)
+    {
+        m_buildKitPolicyState = BuildKitPolicyState::NotConfigured;
+        return;
+    }
+
+    std::vector<std::string> hosts;
+    hosts.reserve(snapshot.Hosts.size());
+    std::ranges::transform(snapshot.Hosts, std::back_inserter(hosts), [](const std::wstring& host) {
+        return wsl::shared::string::WideToMultiByte(host);
+    });
+
+    const auto policyJson = BuildBuildKitSourcePolicyJson(hosts);
+
+    // Linux <fcntl.h> flags for open().
+    constexpr int c_lxOWriteOnly = 0x1;
+    constexpr int c_lxOCreate = 0x40;
+    constexpr int c_lxOTruncate = 0x200;
+    constexpr int c_lxOCloseOnExec = 0x80000;
+    constexpr int c_lxONoFollow = 0x20000;
+
+    auto message = wsl::shared::MessageWriter<WSLC_WRITE_FILE>{};
+    message.WriteString(message->PathIndex, c_buildKitPolicyPath);
+    message->ContentLength = static_cast<unsigned int>(policyJson.size());
+    gsl::copy(
+        gsl::as_bytes(gsl::make_span(policyJson.data(), policyJson.size())),
+        message.InsertBuffer(message->ContentIndex, policyJson.size()));
+    message->OpenFlags = c_lxOWriteOnly | c_lxOCreate | c_lxOTruncate | c_lxOCloseOnExec | c_lxONoFollow;
+    message->Permissions = 0644;
+
+    const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Guest failed to write %hs: %d", c_buildKitPolicyPath, response.Result);
+
+    m_buildKitPolicyState = BuildKitPolicyState::Configured;
 }
 
 bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
@@ -886,6 +984,30 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
     THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
+void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
+{
+    wsl::shared::MessageWriter<WSLC_MOUNT_VIRTIOFS> message;
+    message.WriteString(message->SourceIndex, Source);
+    message.WriteString(message->ChildNameIndex, ChildName);
+    message.WriteString(message->DestinationIndex, Target);
+    message.WriteString(message->TypeIndex, "virtiofs");
+    message.WriteString(message->OptionsIndex, Options);
+    message->Flags = Flags;
+
+    const auto& response = Channel.Transaction<WSLC_MOUNT_VIRTIOFS>(message.Span());
+
+    WSL_LOG(
+        "WSLCMountVirtioFsChild",
+        TraceLoggingValue(Source, "Source"),
+        TraceLoggingValue(ChildName, "ChildName"),
+        TraceLoggingValue(Target, "Target"),
+        TraceLoggingValue(Options, "Options"),
+        TraceLoggingValue(Flags, "Flags"),
+        TraceLoggingValue(response.Result, "Result"));
+
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+}
+
 int32_t WSLCVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
 {
     auto [response, span] = Channel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
@@ -1077,9 +1199,7 @@ try
     THROW_HR_IF_MSG(E_INVALIDARG, LinuxPath[0] != '/', "Mountpoint is not absolute: '%hs'", LinuxPath);
 
     const bool readOnly = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly);
-    auto normalizedPath = std::filesystem::weakly_canonical(path).wstring();
     GUID shareGuid{};
-    bool reusingShare = false;
 
     {
         std::lock_guard lock(m_lock);
@@ -1088,34 +1208,8 @@ try
         auto it = m_mountedWindowsFolders.find(LinuxPath);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
 
-        // In VirtioFs mode, try to reuse an existing share for the same Windows path and access mode.
-        if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
-        {
-            auto shareIt = m_virtioFsShares.find({normalizedPath, readOnly});
-            if (shareIt != m_virtioFsShares.end())
-            {
-                shareGuid = shareIt->second;
-                reusingShare = true;
-            }
-            else
-            {
-                THROW_HR_WITH_USER_ERROR_IF(
-                    E_OUTOFMEMORY,
-                    shared::Localization::MessageWslcTooManyVirtioFsShares(shared::c_maxVirtioFsShares),
-                    m_virtioFsShares.size() >= shared::c_maxVirtioFsShares);
-            }
-        }
-
-        if (!reusingShare)
-        {
-            // Delegate to IWSLCVirtualMachine for the privileged share creation
-            THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
-
-            if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
-            {
-                m_virtioFsShares[{normalizedPath, readOnly}] = shareGuid;
-            }
-        }
+        // Delegate to IWSLCVirtualMachine for the privileged share creation.
+        THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
 
         m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
     }
@@ -1126,11 +1220,7 @@ try
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
             m_mountedWindowsFolders.erase(mountIt);
-            if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
-            {
-                m_virtioFsShares.erase({normalizedPath, readOnly});
-                LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
-            }
+            LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
         }
     });
 
@@ -1154,7 +1244,7 @@ try
     else
     {
         std::string options = readOnly ? "ro" : "rw";
-        Mount(m_initChannel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
+        MountVirtioFsChild(m_initChannel, LX_INIT_DRVFS_VIRTIO_TAG, shareName.c_str(), LinuxPath, options.c_str(), Flags);
     }
 
     deleteOnFailure.release();
@@ -1178,13 +1268,8 @@ try
 
     auto shareId = it->second;
 
-    // Keep the share mounted in virtiofs mode to avoid accumulating devices, which can cause a hang when reached.
-    // TODO: Actually remove the device once this is supported by the device host.
-    if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
-    {
-        // Delegate to IWSLCVirtualMachine for the privileged share removal
-        THROW_IF_FAILED(m_vm->RemoveShare(shareId));
-    }
+    // Delegate to IWSLCVirtualMachine for the privileged share removal.
+    THROW_IF_FAILED(m_vm->RemoveShare(shareId));
 
     m_mountedWindowsFolders.erase(it);
 
@@ -1268,47 +1353,45 @@ void WSLCVirtualMachine::OnSessionTerminated()
 
 std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard lock{m_reservations->Mutex};
 
     WSL_LOG("AllocatePort", TraceLoggingValue(Port, "Port"));
 
-    auto [_, inserted] = m_allocatedPorts.insert(Port);
-
-    if (inserted)
-    {
-        return std::make_shared<VmPortAllocation>(Port, Family, Protocol, *this);
-    }
-    else
+    if (!m_reservations->Ports.insert(Port).second)
     {
         return {};
     }
+
+    // Roll the reservation back if the allocation object can't be created: nothing owns the port
+    // until the shared_ptr exists, so it would otherwise stay marked in use for the VM's lifetime.
+    auto reservationCleanup = wil::scope_exit([&]() { m_reservations->Ports.erase(Port); });
+    auto allocation = std::make_shared<VmPortAllocation>(Port, Family, Protocol, m_reservations);
+    reservationCleanup.release();
+
+    return allocation;
 }
 
 std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::AllocatePort(int Family, int Protocol)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard lock{m_reservations->Mutex};
 
     for (uint32_t i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
         uint16_t port = static_cast<uint16_t>(i);
-        if (!m_allocatedPorts.contains(port))
+        if (!m_reservations->Ports.contains(port))
         {
-            WI_VERIFY(m_allocatedPorts.insert(port).second);
-            return std::make_shared<VmPortAllocation>(port, Family, Protocol, *this);
+            WI_VERIFY(m_reservations->Ports.insert(port).second);
+
+            auto reservationCleanup = wil::scope_exit([&]() { m_reservations->Ports.erase(port); });
+            auto allocation = std::make_shared<VmPortAllocation>(port, Family, Protocol, m_reservations);
+            reservationCleanup.release();
+
+            return allocation;
         }
     }
 
     // Fail if we couldn't find a port.
     THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES), "Failed to allocate port");
-}
-
-void WSLCVirtualMachine::ReleasePort(VmPortAllocation& Port)
-{
-    std::lock_guard lock{m_lock};
-
-    WSL_LOG("ReleasePort", TraceLoggingValue(Port.Port(), "Port"));
-
-    LOG_HR_IF(E_UNEXPECTED, m_allocatedPorts.erase(Port.Port()) != 1);
 }
 
 wil::unique_socket WSLCVirtualMachine::ConnectUnixSocket(const char* Path)

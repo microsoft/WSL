@@ -146,13 +146,17 @@ GUID DeviceHostProxy::AddVirtiofsDevice(
         const auto label = wil::make_bstr(Label.c_str());
         const auto rootPath = wil::make_bstr(RootPath.c_str());
         const auto mountOptions = wil::make_bstr(MountOptions.c_str());
+
+        // Only a few aggregate devices exist per VM, so they can afford multiple queues. Per-share
+        // devices stay at one queue to avoid exhausting the memory aperture.
+        const UINT32 queueCount = (Kind == VirtiofsShareKind_Aggregate) ? 4 : 1;
+
         WslVirtiofsConfig config{
             .label = label.get(),
             .rootPath = rootPath.get(),
             .kind = Kind,
             .shmemSizeMb = ShmemSizeMb,
-            // To workaround memory aperture limitations, limit virtiofs devices to one queue.
-            .queueCount = 1,
+            .queueCount = queueCount,
             .mountOptions = mountOptions.get()};
         THROW_IF_FAILED(GetWslVm(UserToken)->CreateVirtiofsDevice(&instanceIdForCall, GetCallback().get(), &config, virtiofsDevice.put()));
     }
@@ -168,6 +172,24 @@ GUID DeviceHostProxy::AddVirtiofsDevice(
     AddFlexibleIoDevice(c_virtioFsDeviceId, instanceId);
     removeOnFailure.release();
     return instanceId;
+}
+
+void DeviceHostProxy::AddVirtiofsChild(const GUID& InstanceId, const std::wstring& Name, const std::wstring& RootPath, const std::wstring& MountOptions)
+{
+    std::lock_guard lifecycleLock(m_deviceLifecycleLock);
+
+    const auto name = wil::make_bstr(Name.c_str());
+    const auto rootPath = wil::make_bstr(RootPath.c_str());
+    const auto mountOptions = wil::make_bstr(MountOptions.c_str());
+    THROW_IF_FAILED(GetVirtiofsDevice(InstanceId)->AddChild(name.get(), rootPath.get(), mountOptions.get()));
+}
+
+void DeviceHostProxy::RemoveVirtiofsChild(const GUID& InstanceId, const std::wstring& Name)
+{
+    std::lock_guard lifecycleLock(m_deviceLifecycleLock);
+
+    const auto name = wil::make_bstr(Name.c_str());
+    THROW_IF_FAILED(GetVirtiofsDevice(InstanceId)->RemoveChild(name.get()));
 }
 
 GUID DeviceHostProxy::AddVirtioPmemDevice(_In_ HANDLE UserToken, const std::wstring& Path, bool Writable)
@@ -302,6 +324,16 @@ wil::com_ptr<IWslVirtioNetDevice> DeviceHostProxy::GetVirtioNetDevice(const GUID
     const auto device = m_devices.find(InstanceId);
     THROW_HR_IF(E_NOT_SET, device == m_devices.end() || device->second.ShuttingDown || !device->second.Device);
     return device->second.Device.query<IWslVirtioNetDevice>();
+}
+
+wil::com_ptr<IWslVirtiofsDevice> DeviceHostProxy::GetVirtiofsDevice(const GUID& InstanceId)
+{
+    auto lock = m_devicesLock.lock_shared();
+    THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
+
+    const auto device = m_devices.find(InstanceId);
+    THROW_HR_IF(E_NOT_SET, device == m_devices.end() || device->second.ShuttingDown || !device->second.Device);
+    return device->second.Device.query<IWslVirtiofsDevice>();
 }
 
 void DeviceHostProxy::SetSwiotlb(UINT64 GpaBase, UINT64 SizeBytes)

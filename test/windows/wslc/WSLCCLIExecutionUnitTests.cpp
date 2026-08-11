@@ -53,6 +53,32 @@ class WSLCCLIExecutionUnitTests
         return true;
     }
 
+    TEST_METHOD(GlobalEnvironmentOptions_NoColorIsAppliedAndFrozen)
+    {
+        {
+            CLIExecutionContext context;
+
+            context.ApplyGlobalEnvironmentOptions();
+            VERIFY_IS_FALSE(context.Terminal.IsNoColor());
+
+            VERIFY_THROWS_SPECIFIC(context.GlobalArgs.Add<ArgType::NoColor>(true), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+        }
+
+        {
+            CLIExecutionContext present;
+            present.GlobalArgs.Add<ArgType::NoColor>(true);
+            present.ApplyGlobalEnvironmentOptions();
+            VERIFY_IS_TRUE(present.Terminal.IsNoColor());
+
+            VERIFY_NO_THROW(Argument::Create(ArgType::NoColor).Validate(present.GlobalArgs));
+            VERIFY_THROWS_SPECIFIC(present.GlobalArgs.Remove(ArgType::NoColor), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+        }
+    }
+
     // Test: Verify EnumVariantMap on DataMap for Context Data
     TEST_METHOD(EnumVariantMap_DataMapValidation)
     {
@@ -108,6 +134,12 @@ class WSLCCLIExecutionUnitTests
             {
                 std::vector<WSLCNetworkInformation> networks;
                 dataMap.Add<Data::Networks>(std::move(networks));
+                handled = true;
+            }
+            else if (dataType == Data::NetworkEndpointOptions)
+            {
+                wsl::windows::wslc::models::NetworkEndpointOptions endpointOptions;
+                dataMap.Add<Data::NetworkEndpointOptions>(std::move(endpointOptions));
                 handled = true;
             }
 

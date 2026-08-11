@@ -160,7 +160,7 @@ Jos haluat pakottaa WSL2:n pysäyttämään levyn ja irrottamaan sen, suorita ws
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Määritetty käyttöönottonimi sisältää virheellisen /-merkin. Yritä uudelleen ilman virheellistä merkkiä.</value>
+    <value>Kansion nimeä ei saa jättää tyhjäksi, eikä se saa sisältää merkkejä '.', '..' tai '/'. Yritä uudelleen käyttäen kelvollista käyttöönottonimeä.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -998,8 +998,8 @@ Palataan nat-verkkopalveluun.</value>
     <value>Säilökuvien rekisteri {} on estetty tietokonekäytännön vuoksi.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Säilökuvien luonti on estetty, koska tietokonekäytäntö on määrittänyt säilörekisteri sallittujen luettelon. Kuvien luonti voi noutaa peruskuvia mistä tahansa rekisteristä, eikä sitä voida luotettavasti rajoittaa sallittujen luetteloon.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Säilörekisterin sallittujen kohteiden luettelon käytäntö on virheellinen. Tarkista, että kohteen Software\Policies\WSL WSLContainerRegistryAllowlist-arvot on määritetty oikein.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Päivitä WSL2-versioksi suorittamalla wsl.exe --set-version {} 2.</value>
@@ -1197,6 +1197,10 @@ Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Kääntäminen epäonnistui {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 ei ole yhteensopiva jakelukohtaisen cgroup-eristyksen kanssa. Jos haluat käyttää cgroup v1:tä, määritä isolateDistroCgroup=false tiedoston .wslconfig [wsl2]-osaan ja suorita sitten wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Tapahtui jokin virhe. Yritä myöhemmin uudelleen.</value>
@@ -1981,6 +1985,18 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Virtuaalikoneen käyttämättömyysaika millisekunteina, ennen kuin se sammutetaan.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Pidä WSL käynnissä</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Estä jakeluja ja niitä isännöivää WSL-virtuaalikonetta sammumasta automaattisesti niiden oltua käyttämättöminä.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Pidä WSL käynnissä.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Estä jakeluja ja niitä isännöivää WSL-virtuaalikonetta sammumasta automaattisesti niiden oltua käyttämättöminä.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Palauta aikakatkaisu</value>
   </data>
@@ -1989,6 +2005,21 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Virtuaalikoneen käyttämättömyysaika millisekunteina, ennen kuin se sammutetaan.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Jakelun käyttämättömyysaikakatkaisu</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Niiden millisekuntien määrä, jotka jakelu on käyttämättömänä, ennen kuin se lopetetaan.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Palauta aikakatkaisu</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Jakelun käyttämättömyysaikakatkaisu</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Niiden millisekuntien määrä, jotka jakelu on käyttämättömänä, ennen kuin se lopetetaan.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Ota muutokset käyttöön</value>
@@ -2134,10 +2165,6 @@ Käyttö:
     <value>Säilö '{}' on käynnissä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress ei vielä tueta.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Porttimäärityksiä ei tueta säilön verkkotilassa; portit kuuluvat kohdesäilölle.</value>
   </data>
@@ -2155,16 +2182,15 @@ Käyttö:
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Verkon nimi ei voi olla tyhjä.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Moottorin virhetiedot:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Tunnistamaton komento: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>Pakollista argumenttia ei ole annettu: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argumentti annettu sallittua useammin: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
@@ -2208,6 +2234,21 @@ Käyttö:
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Jos haluat lisätietoja tietystä komennosta, siirrä se ohjeargumenttiin.</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Komennot:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Asetukset:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Yleiset asetukset:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliakset:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argumentit:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Argumentin nimeä ei tunnistettu nykyiselle komennolle: {}</value>
@@ -2312,6 +2353,18 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Kuvaa {} ei löydy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Virheellinen --secret -arvo "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Virheellinen --output -arvo {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Ei voi kirjoittaa koontitulosta konsoliin --output -arvolle {}.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Pakollinen asetus puuttuu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2352,6 +2405,10 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Vaihtoehto '--gateway' edellyttää, että myös '--subnet' on määritetty.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>Vaihtoehto '--ip-range' edellyttää, että myös '--subnet' on määritetty.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Verkolla {} on aktiivisia päätepisteitä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2368,17 +2425,32 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Virheellinen pysäytyksen aikakatkaisuarvo: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Lisäverkkoja ei sallita, kun ensisijainen verkkotila on host tai none.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Ensisijaisen verkon tila {} ei tue lisäverkkojen yhdistämistä tai yhteyden katkaisemista.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Monistunut verkko: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>Päätepisteasetuksia ei vielä tueta (verkko {}).</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Ohjainasetus {} on määritetty kahdesti.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Virheellinen ohjainasetus {}; odotettiin muotoa key=value.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Tuntematon päätepisteasetus {} verkolle {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>Verkolle {} voidaan määrittää vain yksi IP-osoite.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Verkkolinkki ei voi olla tyhjä.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Verkkotunnus ei voi olla tyhjä.</value>
@@ -2386,6 +2458,10 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Network aliases require a user-defined network. Use --network to specify one.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>Päätepisteen asetuksia ei tueta verkkotilalle {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
@@ -2850,8 +2926,16 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Yritä aina hakea kuvan uudempi versio</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Koontiversion tuloskohde (docker buildx --output spec; esimerkiksi type=local,dest=path tai type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Aseta kohdekoontivaihe koontiversioksi</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Tuo salaisuus buildiin (id=NAME[,type=env|file][,env=VAR|,src=PATH]; oletuksena ympäristömuuttuja NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Suoritettava komento</value>
@@ -2897,6 +2981,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Tulostusmuotoilu (json tai table) (Oletus: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Tulostusmuotoilu (json yksiriviselle tulosteelle) (Default: sisennetty JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumentit, jotka annetaan säilön init-prosessille</value>
@@ -2977,6 +3065,22 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Lisää säilölle verkkokohtainen alias</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Määritä päätepisteen ohjaimen asetukset (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Määritä kontille IPv4-osoite verkossa</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Lisää linkki toiseen säilöön (--link name:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Lisää säilölle link-local IPv4 -osoite</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Virheellinen {}-arvo: verkkotunnus ei voi olla tyhjä tai välilyönti</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3005,6 +3109,13 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Julkaise kaikki paljastetut portit satunnaisiin isäntäportteihin</value>
   </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Piilota yksityiskohtainen tulos</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Käytetään oletustunnistetta: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Tulostaa vain säilöjen tunnukset</value>
   </data>
@@ -3023,6 +3134,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Istunnon tallennuspolku</value>
+  </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Istunnon tallennushakemiston polku</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Lähetettävä signaali</value>
@@ -3067,6 +3181,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Älä ilmoita virhettä, jos taltiota ei ole olemassa</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Poista säilöön liittyvät anonyymit asemat</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Työhakemisto säilön sisällä</value>
   </data>
@@ -3076,6 +3193,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Kirjoita säilön tunnus annettuun polkuun</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Kirjoita kuvan tunnus annettuun polkuun</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-osoite resolv.conf-tiedoston DNS-nimipalvelimelle</value>
@@ -3139,9 +3259,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Näytä tarkat tiedot luetelluista istunnoista.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Virheellinen muototyyppi määritetty. Tuetut muototyypit ovat: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Virheellinen {} -arvo: {} ei ole tunnistettu formaattityyppi. Tuetut muototyypit ovat: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Virheellinen {} -arvo: {} ei ole tunnistettu inspect-tyyppi. Tuetut inspect-tyypit ovat: {}.</value>
@@ -3231,6 +3351,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
     <value>Aliverkon IPv4- tai IPv6-yhdyskäytävä</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Varaa säilöille IP-osoitteet CIDR-muotoisesta alialueesta</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Poista vähintään yksi verkko.</value>
@@ -3476,6 +3600,9 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Vaihdon alustaminen epäonnistui</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>Kuvan paljastamia UDP-portteja ei julkaistu, koska UDP-porttien edelleenohjausta ei tueta nykyisessä verkkotilassa</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Säilön {} aikaleiman palauttaminen epäonnistui</value>

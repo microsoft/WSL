@@ -160,7 +160,7 @@ Führen Sie "wsl.exe {}" aus, um das Beenden und Trennen des Datenträgers durch
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>Der angegebene Bereitstellungsname enthält ein ungültiges "/"-Zeichen. Wiederholen Sie den Vorgang ohne das ungültige Zeichen.</value>
+    <value>Der Mount-Name darf nicht leer sein, „.“, „..“ oder „/“ enthalten. Wiederholen Sie den Vorgang mit einem gültigen Mount-Namen.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -379,7 +379,7 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux:
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux aus
 
 Verbrauch:
     /l, /list [Option]
@@ -1004,8 +1004,8 @@ Fallback auf NAT-Netzwerk.</value>
     <value>Die Container-Image-Registry „{}“ wird durch die Computerrichtlinie blockiert.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Das Erstellen von Containerimages ist blockiert, da in der Computerrichtlinie eine Container-Registry-Positivliste konfiguriert ist. Image-Builds können Basis-Images aus beliebigen Registern beziehen und lassen sich nicht zuverlässig auf die Zulassungsliste beschränken.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Die Richtlinie für die Positivliste der Containerregistrierung ist ungültig. Überprüfen Sie, ob die WSLContainerRegistryAllowlist-Werte unter "Software\Policies\WSL" ordnungsgemäß konfiguriert sind.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Führen Sie "wsl.exe --set-version {} 2" aus, um ein Upgrade auf WSL2 durchzuführen.</value>
@@ -1203,6 +1203,10 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
   <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Fehler beim Übersetzen von „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Da hat etwas nicht geklappt, versuchen Sie es später noch einmal.</value>
@@ -1987,6 +1991,18 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Die Anzahl von Millisekunden, die eine VM im Leerlauf ist, bevor sie heruntergefahren wird.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>WSL weiterhin ausführen</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Verhindern Sie, dass ausgeführte Distributionen und die WSL-VM, auf der sie ausgeführt werden, nach einer Leerlaufzeit automatisch heruntergefahren werden.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>WSL weiterhin ausführen.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Verhindern Sie, dass ausgeführte Distributionen und die WSL-VM, auf der sie ausgeführt werden, nach einer Leerlaufzeit automatisch heruntergefahren werden.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Timeout zurücksetzen</value>
   </data>
@@ -1995,6 +2011,21 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Die Anzahl von Millisekunden, die eine VM im Leerlauf ist, bevor sie heruntergefahren wird.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Leerlauftimeout der Distribution</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Die Anzahl von Millisekunden, die sich eine Verteilung im Leerlauf befindet, bevor sie beendet wird.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Timeout zurücksetzen</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Leerlauftimeout der Distribution</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Die Anzahl von Millisekunden, die sich eine Verteilung im Leerlauf befindet, bevor sie beendet wird.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Änderungen anwenden</value>
@@ -2140,10 +2171,6 @@ Verwendung:
     <value>Container „{}“ wird ausgeführt.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress wird noch nicht unterstützt.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Portzuordnungen werden im Containernetzwerkmodus nicht unterstützt. Ports befinden sich im Besitz des Zielcontainers.</value>
   </data>
@@ -2161,16 +2188,15 @@ Verwendung:
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Der Netzwerkname darf nicht leer sein.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>Fehlerinformationen von der Engine:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Nicht erkannter Befehl: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>Erforderliches Argument nicht angegeben: „{}“</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argument wurde öfter angegeben als zulässig: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
@@ -2214,6 +2240,21 @@ Verwendung:
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>Wenn Sie weitere Details zu einem bestimmten Befehl erfahren möchten, übergeben Sie ihm das Hilfe-Argument.</value>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>Befehle:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>Optionen:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>Globale Optionen:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>Aliase:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>Argumente:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Argumentname wurde für den aktuellen Befehl nicht erkannt: „{}“</value>
@@ -2318,6 +2359,18 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Image„{}“ wurde nicht gefunden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>Ungültiger --secret value '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Ungültiger Wert für --output „{}“: {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Cannot write build output to the console for --output value '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Erforderliche Option fehlt: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2358,6 +2411,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Die Option '--gateway' erfordert, dass auch '--subnet' angegeben wird.</value>
     <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>Die Option '--ip-range' erfordert, dass auch '--subnet' angegeben wird.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>Das Netzwerk „{}“ hat aktive Endpunkte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2374,17 +2431,32 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Ungültiger Wert für das Stopp-Timeout: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>Zusätzliche Netzwerke sind nicht zulässig, wenn der primäre Netzwerkmodus „host“ oder „none“ ist.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>Der primäre Netzwerkmodus '{}' unterstützt das Herstellen oder Trennen von Verbindungen zu zusätzlichen Netzwerken nicht.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>Doppelt vorhandenes Netzwerk: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>Endpunkteinstellungen werden noch nicht unterstützt (Netzwerk "{}").</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>Treiberoption "{}" duplizieren.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>Ungültige Treiberoption "{}"; "key=value" wurde erwartet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>Unbekannte Endpunkteinstellung "{}" für Netzwerk "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>Es darf nur eine IP-Adresse für das Netzwerk '{}' angegeben werden.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>Die Netzwerkverbindung darf nicht leer sein.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>Der Netzwerkalias darf nicht leer sein.</value>
@@ -2392,6 +2464,10 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
   <data name="MessageWslcAliasRequiresUserDefinedNetwork" xml:space="preserve">
     <value>Netzwerkaliase erfordern ein benutzerdefiniertes Netzwerk. Verwenden Sie --network , um eine anzugeben.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>Endpunkteinstellungen werden für den Netzwerkmodus "{}" nicht unterstützt.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
     <value>Netzwerkaliase können nicht angegeben werden, wenn mehrere Netzwerke angefordert werden. Verwenden Sie ein einzelnes --network Argument.</value>
@@ -2856,8 +2932,16 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Immer versuchen, eine neuere Version des Images zu laden</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Build output destination (docker buildx --output spec; e.g. type=local,dest=path or type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Setzen Sie die angestrebte Build-Stufe auf „Build“</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>Geheimnis für den Build verfügbar machen (id=NAME[,type=env|file][,env=VAR|,src=PATH]; Standardwert: env var NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Der auszuführende Befehl</value>
@@ -2903,6 +2987,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Ausgabeformat (json oder table) (Standard: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Ausgabeformatierung (json für einzeilige Ausgabe) (Standard: eingerücktes JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumente, die an den Init-Prozess des Containers übergeben werden</value>
@@ -2983,6 +3071,22 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>Fügen Sie einen netzwerkbezogenen Alias für den Container hinzu.</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>Festlegen von Endpunkttreiberoptionen (--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>Zuweisen einer IPv4-Adresse für den Container im Netzwerk</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>Link zu einem anderen Container hinzufügen (--link name:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>Hinzufügen einer lokalen Link-IPv4-Adresse für den Container</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>Ungültiger {}-Wert: Der Netzwerkalias darf nicht leer sein oder nur aus Leerzeichen bestehen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3011,6 +3115,13 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Alle exponierten Ports auf zufällige Host-Ports veröffentlichen</value>
   </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>Ausführliche Ausgabe unterdrücken</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>Standardtag wird verwendet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Gibt nur die Container-IDs aus.</value>
   </data>
@@ -3029,6 +3140,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Pfad für den Sitzungsspeicher</value>
+  </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Pfad zum Verzeichnis für den Sitzungsspeicher</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Zu sendendes Signal</value>
@@ -3073,6 +3187,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Keinen Fehler ausgeben, wenn das Volume nicht vorhanden ist</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Anonyme Volumes entfernen, die dem Container zugeordnet sind</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbeitsverzeichnis im Container</value>
   </data>
@@ -3082,6 +3199,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Schreibt die Container-ID in den angegebenen Pfad</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Schreiben Sie die Bild-ID in den angegebenen Pfad</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-Adresse des DNS-Nameservers in resolv.conf</value>
@@ -3145,9 +3265,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Detaillierte Informationen zu den aufgelisteten Sitzungen anzeigen.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Ungültiger Formattyp angegeben. Unterstützte Formattypen sind: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Ungültiger {}-Wert: {} ist kein bekannter Formattyp. Unterstützte Formattypen: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Ungültiger {}-Wert: {} ist kein bekannter Überprüfungstyp. Unterstützte Überprüfungstypen sind: {}.</value>
@@ -3237,6 +3357,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
     <value>IPv4- oder IPv6-Gateway für das Subnetz</value>
     <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>Container-IP-Adressen aus einem Unterbereich in CIDR Format zuweisen</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>Ein oder mehrere Netzwerke entfernen.</value>
@@ -3482,6 +3606,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>Fehler beim Initialisieren der Swap-Datei</value>
+  </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>Die vom Image verfügbar gemachten UDP-Ports wurden nicht veröffentlicht, weil die UDP-Portweiterleitung im aktuellen Netzwerkmodus nicht unterstützt wird.</value>
   </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>Fehler beim Wiederherstellen des Zeitstempels für den Container „{}“</value>

@@ -27,6 +27,20 @@ GUID GuestDeviceManager::AddVirtiofsDevice(_In_ PCWSTR Label, _In_opt_ PCWSTR Mo
 }
 
 _Requires_lock_not_held_(m_lock)
+void GuestDeviceManager::AddVirtiofsChild(_In_ const GUID& InstanceId, _In_ PCWSTR Name, _In_opt_ PCWSTR MountOptions, _In_ PCWSTR RootPath)
+{
+    auto guestDeviceLock = m_lock.lock_exclusive();
+    m_deviceHostSupport->AddVirtiofsChild(InstanceId, Name, RootPath, MountOptions ? MountOptions : L"");
+}
+
+_Requires_lock_not_held_(m_lock)
+void GuestDeviceManager::RemoveVirtiofsChild(_In_ const GUID& InstanceId, _In_ PCWSTR Name)
+{
+    auto guestDeviceLock = m_lock.lock_exclusive();
+    m_deviceHostSupport->RemoveVirtiofsChild(InstanceId, Name);
+}
+
+_Requires_lock_not_held_(m_lock)
 GUID GuestDeviceManager::AddVirtioPmemDevice(_In_ PCWSTR Path, bool ReadOnly, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();

@@ -47,6 +47,7 @@ enum WslConfigEntry
     KernelPath,
     SystemDistroPath,
     KernelModulesPath,
+    InstanceIdleTimeout,
 };
 
 enum NetworkingConfiguration

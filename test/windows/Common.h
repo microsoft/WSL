@@ -37,6 +37,7 @@ using namespace std::chrono_literals;
 #define LXSS_DISTRO_NAME_TEST_L WIDEN(LXSS_DISTRO_NAME_TEST)
 
 #define LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE L"-u root -e rm /etc/wsl.conf"
+#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
 
 //
 // Test method declaration macros that tag tests with TAEF metadata for version-based selection.
@@ -356,7 +357,7 @@ private:
 class UniqueWebServer
 {
 public:
-    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent);
+    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent, UINT StatusCode = 200);
     UniqueWebServer(LPCWSTR Endpoint, const std::filesystem::path& path);
     ~UniqueWebServer();
     UniqueWebServer(const UniqueWebServer&) = delete;
@@ -555,6 +556,7 @@ struct TestConfigDefaults
     std::optional<bool> earlyBootLogging;
     std::optional<std::wstring> debugConsoleLogFile;
     std::optional<DrvFsMode> drvFsMode;
+    std::optional<bool> virtioFsAggregateShares;
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;
     const std::optional<std::wstring> macAddress;
