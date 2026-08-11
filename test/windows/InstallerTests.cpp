@@ -751,7 +751,7 @@ class InstallerTests
     TEST_METHOD(MsiUpgradeFailureRestoresFiles)
     {
 #ifdef WSL_OFFICIAL_BUILD
-        Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
+        WEX::Logging::Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
         return;
 #else
         // End-to-end rollback test: install an older version, then attempt a major
