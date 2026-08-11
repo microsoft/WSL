@@ -257,6 +257,7 @@ FsUserContext::~FsUserContext()
         }
     }
     CATCH_LOG()
+
 }
 
 } // namespace p9fs::util
