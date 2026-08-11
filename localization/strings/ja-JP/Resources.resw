@@ -3234,7 +3234,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>イメージのプル ポリシー (always|missing|never) (既定値: never)</value>
+    <value>イメージのプル ポリシー (always|missing|never) (既定値: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3267,6 +3267,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>無効な {} 値: {} は認識された形式の種類ではありません。サポートされている形式の種類: {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>無効な {} 値: {} は認識されたプル ポリシーではありません。サポートされているプル ポリシーは {} です。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
