@@ -521,8 +521,9 @@ void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& def
     {
         if (arg.Required() && !source.Contains(arg.Type()))
         {
+            const auto name = arg.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + arg.Name() : arg.Name();
             throw ArgumentException(
-                arg.IsOption() ? Localization::WSLCCLI_RequiredArgumentOptionError(arg.Name())
+                arg.IsOption() ? Localization::WSLCCLI_RequiredArgumentOptionError(name)
                                : Localization::WSLCCLI_RequiredArgumentError(arg.Name()),
                 arg);
         }

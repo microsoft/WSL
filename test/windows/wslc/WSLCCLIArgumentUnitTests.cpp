@@ -55,6 +55,17 @@ class WSLCCLIArgumentUnitTests
         return true;
     }
 
+    TEST_METHOD(ArgumentException_NullArgumentOmitsHelp)
+    {
+        const ArgumentException withoutArgument{L"error", static_cast<const Argument*>(nullptr)};
+        VERIFY_IS_TRUE(withoutArgument.Arguments().empty());
+
+        const auto argument = Argument::Create(ArgType::Verbose);
+        const ArgumentException withArgument{L"error", &argument};
+        VERIFY_ARE_EQUAL(1u, withArgument.Arguments().size());
+        VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
+    }
+
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
     TEST_METHOD(ArgumentCreate_AllArguments)
     {

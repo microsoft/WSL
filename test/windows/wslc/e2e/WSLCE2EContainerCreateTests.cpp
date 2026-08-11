@@ -1050,7 +1050,7 @@ class WSLCE2EContainerCreateTests
     {
         auto result =
             RunWslc(std::format(L"container create --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = wsl::shared::Localization::WSLCCLI_NetworkHostModeNotSupportedError() + L"\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -1058,7 +1058,7 @@ class WSLCE2EContainerCreateTests
     {
         auto result = RunWslc(std::format(
             L"container create --name {} --network bridge --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = wsl::shared::Localization::WSLCCLI_NetworkHostModeNotSupportedError() + L"\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
 

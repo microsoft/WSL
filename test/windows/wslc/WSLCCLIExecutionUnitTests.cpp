@@ -53,6 +53,23 @@ class WSLCCLIExecutionUnitTests
         return true;
     }
 
+    TEST_METHOD(ValidateArguments_RequiredOptionUsesLongName)
+    {
+        RootCommand command;
+        ArgMap args;
+        const std::vector<Argument> definitions{Argument::Create(ArgType::Password, true)};
+
+        try
+        {
+            command.ValidateArguments(args, definitions, false);
+            VERIFY_FAIL(L"Expected ArgumentException");
+        }
+        catch (const ArgumentException& exception)
+        {
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_RequiredArgumentOptionError(L"--password"), exception.Message());
+        }
+    }
+
     TEST_METHOD(GlobalEnvironmentOptions_NoColorIsAppliedAndFrozen)
     {
         {
