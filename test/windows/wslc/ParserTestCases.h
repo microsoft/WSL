@@ -247,7 +247,7 @@ WSLC_PARSER_TEST_CASE(Globals, true,  LR"(wslc -q -q system list)") \
 /* `wslc build` --progress option (Build set mirrors ImageBuildCommand). The build \
  * context path is the required positional; --progress takes one of auto/tty/plain/ \
  * quiet/rawjson and is validated by Argument::Validate via GetProgressModeFromString. */ \
-/* Valid modes, separated and adjoined value forms, and case-insensitivity.         */ \
+/* Valid modes, separated and adjoined value forms, and case-sensitivity.           */ \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress=auto)") \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc . --progress auto)") \
 WSLC_PARSER_TEST_CASE(Build, true,  LR"(wslc --progress=tty .)") \

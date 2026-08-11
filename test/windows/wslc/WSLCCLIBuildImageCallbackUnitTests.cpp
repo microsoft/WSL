@@ -54,6 +54,33 @@ namespace {
         return capture.captured();
     }
 
+    // Drives the same build as RunBuild, but destroys the callback while an exception is in flight,
+    // which is the only condition under which the destructor replays captured output.
+    std::wstring RunFailingBuild(ProgressMode mode, bool vtEnabled)
+    {
+        CaptureTerminal capture(vtEnabled);
+        wil::unique_event cancelEvent;
+        cancelEvent.create(wil::EventOptions::ManualReset);
+
+        try
+        {
+            BuildImageCallback callback(capture.terminal, cancelEvent.get(), false, mode);
+
+            VERIFY_SUCCEEDED(callback.OnProgress("#1 [1/2] FROM debian:latest\n", "", 0, 0));
+            VERIFY_SUCCEEDED(callback.OnProgress("sha256:abc downloading", "sha256:abc", 50, 100));
+            VERIFY_SUCCEEDED(callback.OnProgress("#2 [2/2] RUN exit 7\n", "", 0, 0));
+            VERIFY_SUCCEEDED(callback.OnProgress("  | about-to-fail\n", "log", 0, 0));
+            VERIFY_SUCCEEDED(callback.OnProgress("process \"/bin/sh -c exit 7\" did not complete successfully: exit code: 7\n", "", 0, 0));
+
+            THROW_HR(E_FAIL);
+        }
+        catch (...)
+        {
+        }
+
+        return capture.captured();
+    }
+
 } // namespace
 
 class WSLCCLIBuildImageCallbackUnitTests
@@ -102,6 +129,7 @@ class WSLCCLIBuildImageCallbackUnitTests
     }
 
     // quiet suppresses progress entirely on success, and must not emit cursor control either.
+    // This also covers the success side of replay: nothing captured may reach the terminal.
     TEST_METHOD(BuildImageCallback_QuietOnVtConsole_EmitsNothing)
     {
         const auto output = RunBuild(ProgressMode::Quiet, true);
@@ -115,6 +143,29 @@ class WSLCCLIBuildImageCallbackUnitTests
         const auto output = RunBuild(ProgressMode::RawJson, true);
 
         VERIFY_IS_TRUE(output.find(L'\x1b') == std::wstring::npos, L"rawjson mode must forward payloads without VT sequences");
+    }
+
+    // quiet prints nothing while the build runs, but a failure must still explain what went wrong.
+    // The step that failed and the error itself are reported with an empty id rather than "log", so
+    // they have to be captured too or the replay only shows unattributed log output.
+    TEST_METHOD(BuildImageCallback_QuietReplaysFailingStepAndError)
+    {
+        const auto output = RunFailingBuild(ProgressMode::Quiet, true);
+
+        VERIFY_IS_TRUE(output.find(L"#2 [2/2] RUN exit 7") != std::wstring::npos, L"quiet must replay the step that failed");
+        VERIFY_IS_TRUE(
+            output.find(L"did not complete successfully: exit code: 7") != std::wstring::npos,
+            L"quiet must replay the build error");
+        VERIFY_IS_TRUE(output.find(L"about-to-fail") != std::wstring::npos, L"quiet must replay log output");
+    }
+
+    // Pull progress is rewritten in place and is the one message sent without a trailing newline,
+    // so replaying it would emit a partial line into an otherwise line-oriented transcript.
+    TEST_METHOD(BuildImageCallback_QuietReplayOmitsPullProgress)
+    {
+        const auto output = RunFailingBuild(ProgressMode::Quiet, true);
+
+        VERIFY_IS_TRUE(output.find(L"sha256:abc downloading") == std::wstring::npos, L"quiet must not replay pull progress");
     }
 };
 

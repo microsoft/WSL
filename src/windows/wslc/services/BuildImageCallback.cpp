@@ -119,10 +119,12 @@ try
     const bool isLog = (idView == "log");
     const bool isPullProgress = (!idView.empty() && total > 0 && !isLog);
 
-    // quiet: suppress live progress but retain log output so the destructor can replay it on build failure.
+    // quiet: suppress live progress but retain everything plain would have printed, so the destructor
+    // can replay the failing step and its logs on build failure. Pull progress is excluded because it
+    // is rewritten in place rather than appended, and so is the only message with no trailing newline.
     if (m_mode == models::ProgressMode::Quiet)
     {
-        if (isLog)
+        if (!isPullProgress)
         {
             CaptureForReplay(status);
         }
