@@ -16,6 +16,7 @@ Abstract:
 #include "Exceptions.h"
 #include "ContainerModel.h"
 #include "InspectModel.h"
+#include "ArgumentConvertedTypes.h"
 #include "SpecParsing.h"
 #include <string>
 #include <tuple>

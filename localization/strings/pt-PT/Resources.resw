@@ -160,7 +160,7 @@ Para forçar o WSL2 a parar e desanexar o disco, execute "wsl.exe {}".</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>O nome de montagem especificado contém um caráter '/' inválido. Tente novamente sem o caráter inválido.</value>
+    <value>O nome do ponto de montagem não pode estar vazio, ser ".", ".." ou conter "/". Tente novamente com um nome de ponto de montagem válido.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -998,8 +998,8 @@ A reverter para a rede NAT.</value>
     <value>O registo da imagem do contentor "{}" está bloqueado pela política do computador.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>A criação de imagens de contentor está bloqueada porque a política do computador configurou uma lista de permissões do registo de contentores. As compilações de imagens podem extrair imagens base de registos arbitrários e não podem ser restringidas de forma fiável à lista de permissões.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>A política da lista de permissões do registo de contentor é inválida. Verifique se os valores WSLContainerRegistryAllowlist em Software\Policies\WSL estão configurados corretamente.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Execute "wsl.exe --set-version {} 2" para atualizar para o WSL2.</value>
@@ -1985,6 +1985,18 @@ Também pode aceder a mais Opções remotas do VS Code através da paleta de com
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>O número de milissegundos em que uma VM está inativa antes de ser encerrada.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Mantenha o WSL em execução</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Impedir que as distribuições em execução e a máquina virtual WSL que as hospeda sejam encerradas automaticamente depois de permanecerem inativas.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Mantenha o WSL em execução.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Impedir que as distribuições em execução e a máquina virtual WSL que as hospeda sejam encerradas automaticamente depois de permanecerem inativas.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Repor tempo limite</value>
   </data>
@@ -1993,6 +2005,21 @@ Também pode aceder a mais Opções remotas do VS Code através da paleta de com
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>O número de milissegundos em que uma VM está inativa antes de ser encerrada.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Tempo limite de inatividade da distribuição</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>O número de milissegundos em que uma distribuição está inativa antes de ser terminada.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Repor tempo limite</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Tempo limite de inatividade da distribuição</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>O número de milissegundos em que uma distribuição está inativa antes de ser terminada.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Aplicar alterações</value>
@@ -2327,8 +2354,16 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
-    <value>Invalid --secret value '{}': {}</value>
+    <value>Valor --secret inválido '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>Valor inválido para --output '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>Não é possível escrever a saída da compilação na consola para --output valor '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>Opção obrigatória em falta: '{}'</value>
@@ -2891,11 +2926,15 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>Tentar sempre solicitar uma versão mais recente da imagem</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>Destino de saída da compilação (docker buildx --output spec; por exemplo, type=local,dest=path ou type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>Definir a fase de compilação de destino como build</value>
   </data>
   <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
-    <value>Expose secret to the build (id=NAME[,type=env|file][,env=VAR|,src=PATH]; defaults to env var NAME)</value>
+    <value>Expor segredo para a compilação (id=NAME[,type=env|file][,env=VAR|,src=PATH]; por predefinição, utiliza a variável de ambiente NAME)</value>
     <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
@@ -2942,6 +2981,10 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Formato de saída (json ou table) (Predefinição: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Formatação de saída (json para saída numa única linha) (Predefinição: JSON indentado)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumentos para passar para o processo init do contentor</value>
@@ -3092,6 +3135,9 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Caminho para armazenamento da sessão</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Caminho para o diretório de armazenamento da sessão</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Sinal a enviar</value>
   </data>
@@ -3135,6 +3181,9 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Não apresentar erro se o volume não existir</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Remover volumes anónimos associados ao contentor</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Diretório de trabalho dentro do contentor</value>
   </data>
@@ -3144,6 +3193,9 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Escrever o ID do contentor no caminho fornecido</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Escrever o ID da imagem no caminho fornecido</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Endereço IP do servidor de nomes DNS no ficheiro resolv.conf</value>
@@ -3176,7 +3228,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Política de obtenção de imagens (always|missing|never) (padrão: never)</value>
+    <value>Image pull policy (always|missing|never) (default: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3207,9 +3259,13 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Mostrar informações detalhadas sobre as sessões listadas.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Tipo de formato inválido especificado. Os tipos de formato suportados são: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Valor de {} inválido: {} não é um tipo de formato reconhecido. Os tipos de formato suportados são: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Valor {} inválido: {} não é uma política de pull reconhecida. As políticas pull suportadas são: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Valor de {} inválido: {} não é um tipo de inspeção reconhecido. Os tipos de inspeção suportados são: {}.</value>

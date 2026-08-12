@@ -240,7 +240,11 @@ void ConsoleState::SetInteractiveMode()
 
     if (m_OutputHandle)
     {
-        m_SavedOutputCodePage = GetConsoleOutputCP();
+        if (!m_SavedOutputCodePage.has_value())
+        {
+            m_SavedOutputCodePage = GetConsoleOutputCP();
+        }
+
         LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
         if (m_restorePolicy == RestorePolicy::Cooperative)
         {
@@ -263,6 +267,21 @@ void ConsoleState::SetInteractiveMode()
 
     m_interactiveModeConfigured = true;
     cleanup.release();
+}
+
+void ConsoleState::SetOutputCodePageUtf8()
+{
+    if (!m_OutputHandle)
+    {
+        return;
+    }
+
+    if (!m_SavedOutputCodePage.has_value())
+    {
+        m_SavedOutputCodePage = GetConsoleOutputCP();
+    }
+
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
 }
 
 ConsoleState::~ConsoleState()

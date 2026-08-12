@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 
 #include "SessionModel.h"
-#include "Reporter.h"
+#include "Terminal.h"
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
@@ -27,18 +27,18 @@ struct SessionInformation
 
 struct SessionService
 {
-    static int Attach(Reporter& reporter, const wsl::windows::wslc::models::Session& session);
-    static int Enter(Reporter& reporter, const std::wstring& storagePath, const std::wstring& displayName);
+    static int Attach(Terminal& terminal, const wsl::windows::wslc::models::Session& session);
+    static int Enter(Terminal& terminal, const std::wstring& storagePath, const std::wstring& displayName);
     static std::vector<SessionInformation> List();
     // Opens an existing session by name. Throws if not found.
     static wsl::windows::wslc::models::Session OpenSession(const std::wstring& name);
     // Opens the default session. Throws WSLC_E_SESSION_NOT_FOUND if no default session exists.
     static wsl::windows::wslc::models::Session OpenDefaultSession();
     // Opens or creates the default session.
-    static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession(Reporter& reporter);
+    static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession(Terminal& terminal);
     // Runs the given command and arguments in a session without a TTY, resolving the executable from PATH.
-    static int Run(Reporter& reporter, const wsl::windows::wslc::models::Session& session, const std::vector<std::string>& arguments);
-    static int TerminateSession(Reporter& reporter, const wsl::windows::wslc::models::Session& session);
+    static int Run(Terminal& terminal, const wsl::windows::wslc::models::Session& session, const std::vector<std::string>& arguments);
+    static int TerminateSession(Terminal& terminal, const wsl::windows::wslc::models::Session& session);
 
 private:
     // Common open-only session lookup with unified error handling.

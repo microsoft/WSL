@@ -89,7 +89,7 @@ class WSLCE2EGlobalTests
 
     WSLC_TEST_METHOD(WSLCE2E_Help_NoColorWhenRedirected)
     {
-        // Captured via anonymous pipe; Reporter must suppress VT escape sequences.
+        // Captured via anonymous pipe; Terminal must suppress VT escape sequences.
         auto result = RunWslc(L"--help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(std::wstring::npos, result.Stdout.value().find(L'\x1b'));
@@ -97,7 +97,7 @@ class WSLCE2EGlobalTests
 
     WSLC_TEST_METHOD(WSLCE2E_Help_ColorOnTerminal)
     {
-        // Pseudo console reports VT support; Reporter should emit SGR sequences.
+        // Pseudo console reports VT support; Terminal should emit SGR sequences.
         auto session = RunWslcInteractive(L"--help", ElevationType::Elevated, PseudoConsole{120, 30});
         session.WaitForExit();
         VERIFY_IS_TRUE(session.GetStdoutData().find('\x1b') != std::string::npos);
@@ -118,7 +118,8 @@ class WSLCE2EGlobalTests
         auto result = RunWslc(L"version --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
-        const auto root = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
+        // The version payload is emitted as one compact object.
+        const auto root = VerifyCompactJsonOutput(result);
         VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, root["Client"]["Version"].get<std::string>());
     }
 

@@ -65,6 +65,43 @@ inline bool EndsWith(const std::basic_string<T>& String, const std::basic_string
     return std::equal(Suffix.rbegin(), Suffix.rend(), String.rbegin());
 }
 
+// Lowercases ASCII 'A'-'Z' only, leaving every other code unit untouched. Unlike std::tolower this is
+// locale-independent (no Turkish-'I' surprises) and has no signed-char UB, which is what you want when
+// normalizing ASCII protocol tokens such as buildx CSV keys.
+template <class T>
+inline std::basic_string<T> AsciiToLower(const std::basic_string_view<T>& String)
+{
+    std::basic_string<T> Result(String);
+    for (auto& Ch : Result)
+    {
+        if (Ch >= static_cast<T>('A') && Ch <= static_cast<T>('Z'))
+        {
+            Ch = static_cast<T>(Ch - static_cast<T>('A') + static_cast<T>('a'));
+        }
+    }
+
+    return Result;
+}
+
+// Trims leading and trailing ASCII whitespace (space, tab, CR, LF, vertical tab, form feed), matching
+// the ASCII subset of Go's strings.TrimSpace. Returns a view into the input, so the input must outlive
+// the result. The stdlib has no trim, so this centralizes the find_first/last_not_of idiom.
+template <class T>
+inline std::basic_string_view<T> TrimAscii(const std::basic_string_view<T>& String)
+{
+    constexpr T Whitespace[] = {
+        static_cast<T>(' '), static_cast<T>('\t'), static_cast<T>('\r'), static_cast<T>('\n'), static_cast<T>('\v'), static_cast<T>('\f'), static_cast<T>('\0')};
+
+    const auto First = String.find_first_not_of(Whitespace);
+    if (First == std::basic_string_view<T>::npos)
+    {
+        return {};
+    }
+
+    const auto Last = String.find_last_not_of(Whitespace);
+    return String.substr(First, Last - First + 1);
+}
+
 template <class T, class TInput>
 inline std::basic_string<T> Join(const std::vector<TInput>& Input, T Separator)
 {
@@ -997,6 +1034,107 @@ inline std::wstring FormatBytes(uint64_t bytes)
     {
         return std::format(L"{} B", bytes);
     }
+}
+
+template <typename TChar>
+inline std::basic_string<TChar> Trim(const std::basic_string<TChar>& input)
+{
+    constexpr TChar whitespace[] = {TChar(' '), TChar('\t'), TChar('\n'), TChar('\r'), TChar('\f'), TChar('\v'), TChar('\0')};
+    const auto first = input.find_first_not_of(whitespace);
+    if (first == std::basic_string<TChar>::npos)
+    {
+        return {};
+    }
+
+    const auto last = input.find_last_not_of(whitespace);
+    return input.substr(first, last - first + 1);
+}
+
+template <typename TChar>
+inline std::basic_string<TChar> UnescapeShell(const std::basic_string<TChar>& input)
+{
+    enum class Quote
+    {
+        None,
+        Single,
+        Double
+    };
+
+    Quote quote = Quote::None;
+    std::basic_string<TChar> output;
+    output.reserve(input.size());
+
+    for (size_t index = 0; index < input.size(); index += 1)
+    {
+        const auto current = input[index];
+        if (quote == Quote::Single)
+        {
+            if (current == TChar('\''))
+            {
+                quote = Quote::None;
+            }
+            else
+            {
+                output.push_back(current);
+            }
+
+            continue;
+        }
+
+        if (current == TChar('\''))
+        {
+            if (quote == Quote::Double)
+            {
+                output.push_back(current);
+            }
+            else
+            {
+                quote = Quote::Single;
+            }
+
+            continue;
+        }
+
+        if (current == TChar('"'))
+        {
+            quote = (quote == Quote::Double) ? Quote::None : Quote::Double;
+            continue;
+        }
+
+        if (current != TChar('\\'))
+        {
+            output.push_back(current);
+            continue;
+        }
+
+        if (++index == input.size())
+        {
+            // return the original string if the escape is invalid.
+            return input;
+        }
+
+        const auto escaped = input[index];
+        if (quote == Quote::None)
+        {
+            // "\\\n" out of escape means continue the line.
+            if (escaped != TChar('\n'))
+            {
+                output.push_back(escaped);
+            }
+        }
+        else if (escaped == TChar('"') || escaped == TChar('\\') || escaped == TChar('$') || escaped == TChar('`'))
+        {
+            output.push_back(escaped);
+        }
+        else if (escaped != TChar('\n'))
+        {
+            output.push_back(current);
+            output.push_back(escaped);
+        }
+    }
+
+    // return the original string if the escape is invalid.
+    return (quote == Quote::None) ? output : input;
 }
 
 } // namespace wsl::shared::string

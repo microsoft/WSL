@@ -69,6 +69,7 @@ namespace Microsoft.WSL.Containers
         void Terminate();
 
         Container CreateContainer(ContainerSettings containerSettings);
+        Container OpenContainer(String nameOrId, ProcessOutputMode initProcessOutputMode);
 
         void PullImage(PullImageOptions options);
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);

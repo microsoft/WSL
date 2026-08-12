@@ -54,7 +54,7 @@ extern bool g_fastTestRun;
 #define DELETE_CONTAINER_ON_SCOPE_EXIT(container) SCOPE_CLEANUP(container.Delete(WSLCSDK::DeleteContainerOption::Force))
 #define DELETE_IMAGE_ON_SCOPE_EXIT(imageName) SCOPE_CLEANUP(m_defaultSession.DeleteImage(imageName))
 
-struct ProcessOutput
+struct CapturedProcessOutput
 {
     uint32_t ExitCode;
     std::wstring StandardOutput;
@@ -105,9 +105,9 @@ class WslcSdkWinRtTests
         VERIFY_ARE_EQUAL(promise.get_future().wait_for(timeout), std::future_status::ready);
     }
 
-    ProcessOutput GetProcessOutput(WSLCSDK::Process const& process)
+    CapturedProcessOutput GetProcessOutput(WSLCSDK::Process const& process)
     {
-        ProcessOutput output;
+        CapturedProcessOutput output;
         output.ExitCode = process.ExitCode();
         output.StandardOutput = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardOutput));
         output.StandardError = ReadStream(process.GetOutputStream(WSLCSDK::ProcessOutputHandle::StandardError));
@@ -161,7 +161,7 @@ class WslcSdkWinRtTests
 
     // Creates and starts a one-shot container, waits for the init process to
     // exit, and returns the exit code.
-    ProcessOutput RunContainerAndWaitForExit(winrt::hstring imageName, RunContainerOptions options = {})
+    CapturedProcessOutput RunContainerAndWaitForExit(winrt::hstring imageName, RunContainerOptions options = {})
     {
         auto procSettings = WSLCSDK::ProcessSettings();
         if (!options.commandLine.empty())
@@ -1852,5 +1852,148 @@ class WslcSdkWinRtTests
         }
 
         gpuSession.Terminate();
+    }
+
+    WSLC_TEST_METHOD(OpenContainer)
+    {
+        constexpr auto c_containerName = L"wslc-winrt-open-test";
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.Name(c_containerName);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        const auto createdId = container.Id();
+
+        // Positive: open by name — IDs must match.
+        {
+            auto opened = m_defaultSession.OpenContainer(c_containerName, WSLCSDK::ProcessOutputMode::Discard);
+            VERIFY_ARE_EQUAL(opened.Id(), createdId);
+        }
+
+        // Positive: open by full 64-character ID.
+        {
+            auto opened = m_defaultSession.OpenContainer(createdId, WSLCSDK::ProcessOutputMode::Discard);
+            VERIFY_ARE_EQUAL(opened.Id(), createdId);
+        }
+
+        // Positive: open by partial ID prefix (12 hex chars — standard short ID).
+        {
+            const auto shortId = winrt::hstring(std::wstring(createdId).substr(0, 12));
+            auto opened = m_defaultSession.OpenContainer(shortId, WSLCSDK::ProcessOutputMode::Discard);
+            VERIFY_ARE_EQUAL(opened.Id(), createdId);
+        }
+
+        // Negative: non-existent name must throw WSLC_E_CONTAINER_NOT_FOUND.
+        VERIFY_THROWS_HR(m_defaultSession.OpenContainer(L"no-such-container", WSLCSDK::ProcessOutputMode::Discard), WSLC_E_CONTAINER_NOT_FOUND);
+
+        // Negative: empty nameOrId must throw E_INVALIDARG.
+        VERIFY_THROWS_HR(m_defaultSession.OpenContainer(L"", WSLCSDK::ProcessOutputMode::Discard), E_INVALIDARG);
+    }
+
+    WSLC_TEST_METHOD(OpenContainerInitProcess)
+    {
+        // Verify InitProcess() behaviour for an opened container:
+        //  - Before Start(), InitProcess() succeeds but the underlying process handle is not yet
+        //    attached, so methods that require a running process (Pid, State) throw.
+        //  - After Start(), the handle is attached and the process is fully usable.
+        constexpr auto c_containerName = L"wslc-winrt-open-initproc-test";
+
+        auto procSettings = WSLCSDK::ProcessSettings();
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"5"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(procSettings);
+        containerSettings.Name(c_containerName);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto opened = m_defaultSession.OpenContainer(c_containerName, WSLCSDK::ProcessOutputMode::Stream);
+
+        // InitProcess() must succeed even before Start() (m_initProcess is always created for opened containers).
+        auto initProcess = opened.InitProcess();
+
+        // The process handle has not been attached yet — Pid() must throw.
+        VERIFY_THROWS_HR(std::ignore = initProcess.Pid(), E_ILLEGAL_METHOD_CALL);
+
+        // Start the opened container; the init process handle will be attached inside Start().
+        opened.Start();
+
+        // Now the init process handle is attached — Pid() must succeed and return a non-zero PID.
+        VERIFY_IS_GREATER_THAN(initProcess.Pid(), 0u);
+
+        opened.Stop(WSLCSDK::Signal::SIGKILL, TimeSpan::zero());
+    }
+
+    WSLC_TEST_METHOD(OpenContainerAndStartStreamMode)
+    {
+        // Verify that opening a container with ProcessOutputMode::Stream allows reading output
+        // from the init process via GetOutputStream after Start().
+        constexpr auto c_containerName = L"wslc-winrt-open-stream-test";
+
+        auto procSettings = WSLCSDK::ProcessSettings();
+        procSettings.CommandLine(
+            winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo STDOUT && echo STDERR >&2"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(procSettings);
+        containerSettings.Name(c_containerName);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto opened = m_defaultSession.OpenContainer(c_containerName, WSLCSDK::ProcessOutputMode::Stream);
+
+        StartContainerAndWaitForInitProcessExit(opened);
+        auto output = GetProcessOutput(opened.InitProcess());
+
+        VERIFY_ARE_EQUAL(output.ExitCode, 0u);
+        VERIFY_ARE_EQUAL(output.StandardOutput, L"STDOUT\n");
+        VERIFY_ARE_EQUAL(output.StandardError, L"STDERR\n");
+    }
+
+    WSLC_TEST_METHOD(OpenContainerAndStartEventMode)
+    {
+        // Verify that opening a container with ProcessOutputMode::Event delivers output via
+        // OutputReceived / ErrorReceived events, and that Exited fires with the correct exit code.
+        constexpr auto c_containerName = L"wslc-winrt-open-event-test";
+
+        auto procSettings = WSLCSDK::ProcessSettings();
+        procSettings.CommandLine(
+            winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo EVENT_OUT && echo EVENT_ERR >&2"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(procSettings);
+        containerSettings.Name(c_containerName);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto opened = m_defaultSession.OpenContainer(c_containerName, WSLCSDK::ProcessOutputMode::Event);
+        auto initProcess = opened.InitProcess();
+
+        std::string stdoutAccum, stderrAccum;
+        std::promise<int32_t> exitPromise;
+
+        auto stdoutRevoker = initProcess.OutputReceived(winrt::auto_revoke, [&](winrt::array_view<const uint8_t> data) {
+            stdoutAccum.append(reinterpret_cast<const char*>(data.data()), data.size());
+        });
+
+        auto stderrRevoker = initProcess.ErrorReceived(winrt::auto_revoke, [&](winrt::array_view<const uint8_t> data) {
+            stderrAccum.append(reinterpret_cast<const char*>(data.data()), data.size());
+        });
+
+        auto exitRevoker = initProcess.Exited(winrt::auto_revoke, [&](int32_t exitCode) { exitPromise.set_value(exitCode); });
+
+        opened.Start();
+
+        auto exitFuture = exitPromise.get_future();
+        VERIFY_ARE_EQUAL(exitFuture.wait_for(30s), std::future_status::ready);
+        VERIFY_ARE_EQUAL(exitFuture.get(), 0);
+
+        VERIFY_ARE_EQUAL(stdoutAccum, "EVENT_OUT\n");
+        VERIFY_ARE_EQUAL(stderrAccum, "EVENT_ERR\n");
     }
 };

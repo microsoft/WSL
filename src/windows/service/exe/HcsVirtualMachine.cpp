@@ -14,6 +14,7 @@ Abstract:
 
 #include "HcsVirtualMachine.h"
 #include <format>
+#include <fstream>
 #include <string>
 #include <string_view>
 #include "hcs_schema.h"
@@ -89,6 +90,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_featureFlags = Settings->FeatureFlags;
     m_networkingMode = Settings->NetworkingMode;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
     m_bootTimeoutMs = Settings->BootTimeoutMs;
 
     // Build HCS settings
@@ -348,7 +350,9 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
 HcsVirtualMachine::~HcsVirtualMachine()
 {
-    std::lock_guard lock(m_lock);
+    // Do not hold m_lock: waiting on m_vmExitEvent and closing the compute system below both block
+    // on in-flight HCS exit/crash callbacks, which may themselves need m_lock. OnExit() is lock-free,
+    // and closing the compute system drains all callbacks, so the rest of teardown needs no lock.
 
     // Wait up to 5 seconds for the VM to terminate gracefully.
     bool forceTerminate = false;
@@ -389,6 +393,7 @@ HcsVirtualMachine::~HcsVirtualMachine()
     {
         try
         {
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
             WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
             std::filesystem::remove(m_vmSavedStateFile);
         }
@@ -501,7 +506,7 @@ try
         }
 
         m_networkEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_hostLoopback.c_str(), m_guestDeviceManager, m_userToken);
     }
     else
     {
@@ -951,6 +956,7 @@ WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSetti
     m_bootTimeoutMs = Settings->BootTimeoutMs;
     m_networkingMode = Settings->NetworkingMode;
     m_featureFlags = Settings->FeatureFlags;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
     m_storageFlags = Settings->StorageFlags;
 }
 
@@ -965,6 +971,7 @@ WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
     settings.BootTimeoutMs = m_bootTimeoutMs;
     settings.NetworkingMode = m_networkingMode;
     settings.FeatureFlags = m_featureFlags;
+    settings.HostLoopback = m_hostLoopback.empty() ? nullptr : m_hostLoopback.c_str();
     settings.StorageFlags = m_storageFlags;
     settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;
     settings.RootVhdTypeOverride = m_rootVhdTypeOverride ? m_rootVhdTypeOverride->c_str() : nullptr;

@@ -132,6 +132,10 @@ bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Con
 
 void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
 {
+    // Process output is UTF-8.
+    wsl::windows::common::ConsoleState console;
+    console.SetOutputCodePageUtf8();
+
     windows::common::io::MultiHandleWait io;
 
     wil::unique_event exitEvent;
@@ -174,13 +178,13 @@ void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_
 }
 
 int ConsoleService::AttachToCurrentConsole(
-    Reporter& reporter, wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process, bool triggerRefresh)
+    Terminal& terminal, wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process, bool triggerRefresh)
 {
     if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsTty))
     {
         if (!RelayInteractiveTty(console, process, process.GetStdHandle(WSLCFDTty).get(), triggerRefresh))
         {
-            reporter.Info(L"[detached]\n");
+            terminal.Info(L"[detached]\n");
             return 0;
         }
     }

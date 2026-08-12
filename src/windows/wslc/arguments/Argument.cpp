@@ -40,7 +40,7 @@ Argument Argument::Create(ArgType type, std::optional<bool> required, std::optio
 {
     switch (type)
     {
-#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, ArgumentKind, Desc) \
+#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, ArgumentKind, ConvertedType, Desc) \
     case ArgType::EnumName: \
         return Argument{ \
             type, \

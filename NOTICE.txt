@@ -486,6 +486,18 @@ Apache-2.0 WITH LLVM-exception
 
 ---------------------------------------------------------
 
+Microsoft.Windows.SDK.NET.Ref 10.0.26100.81 - LicenseRef-scancode-unknown
+
+
+(c) Microsoft Corporation
+Copyright (c) Microsoft Corporation
+
+LicenseRef-scancode-unknown
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
 CommunityToolkit.Mvvm 8.4.0 - MIT
 
 
@@ -625,6 +637,1097 @@ Copyright (c) 2015 THL A29 Limited, a Tencent company, and Milo Yip
 Copyright (c) 1980, 1986, 1993 The Regents of the University of California
 Copyright 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018 The Regents of the University of California
 Copyright (c) 1989 by Hewlett-Packard Company, Palo Alto, Ca. & Digital Equipment Corporation, Maynard, Mass
+
+MIT License
+
+Copyright (c) <year> <copyright holders>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.NETCore.App.Runtime.win-arm64 10.0.10 - MIT
+
+
+Copyright (c) 2021
+Copyright (c) Six Labors
+(c) Microsoft Corporation
+Copyright (c) 2022 FormatJS
+Copyright (c) Andrew Arnott
+Copyright 2019 LLVM Project
+Copyright (c) 1998 Microsoft
+Copyright 2018 Daniel Lemire
+Copyright (c) .NET Foundation
+Copyright 1995-2022 Mark Adler
+Copyright 1995-2024 Mark Adler
+Copyright (c) 2011, Google Inc.
+Copyright (c) 2020 Dan Shechter
+(c) 1997-2005 Sean Eron Anderson
+Copyright (c) 2015 Andrew Gallant
+Copyright (c) 2022, Wojciech Mula
+Copyright (c) 2017 Yoshifumi Kawai
+Copyright (c) 2022, Geoff Langdale
+Copyright (c) 2005-2020 Rich Felker
+Copyright (c) 2012-2021 Yann Collet
+Copyright (c) Microsoft Corporation
+Copyright (c) 2007 James Newton-King
+Copyright (c) 1991-2024 Unicode, Inc.
+Copyright (c) 2013-2017, Alfred Klomp
+Copyright (c) 2018 Nemanja Mijailovic
+Copyright 2012 the V8 project authors
+Copyright (c) 1999 Lucent Technologies
+Copyright (c) 2008-2016, Wojciech Mula
+Copyright (c) 2011-2020 Microsoft Corp
+Copyright (c) 2015-2017, Wojciech Mula
+Copyright (c) 2015-2018, Wojciech Mula
+Copyright (c) 2005-2007, Nick Galbreath
+Copyright (c) 2015 The Chromium Authors
+Copyright (c) 2018 Alexander Chermyanin
+Copyright (c) The Internet Society 1997
+Copyright (c) 2004-2006 Intel Corporation
+Copyright (c) 2011-2015 Intel Corporation
+Copyright (c) 2013-2017, Milosz Krajewski
+Copyright (c) 2016-2017, Matthieu Darbois
+Copyright (c) The Internet Society (2003)
+Copyright (c) .NET Foundation Contributors
+(c) 1995-2024 Jean-loup Gailly and Mark Adler
+Copyright (c) 2020 Mara Bos <m-ou.se@m-ou.se>
+Copyright (c) .NET Foundation and Contributors
+Copyright (c) 2012 - present, Victor Zverovich
+Copyright (c) 2006 Jb Evain (jbevain@gmail.com)
+Copyright (c) 2008-2020 Advanced Micro Devices, Inc.
+Copyright (c) 2019 Microsoft Corporation, Daan Leijen
+Copyright (c) 2011 Novell, Inc (http://www.novell.com)
+Copyright (c) 2015 Xamarin, Inc (http://www.xamarin.com)
+Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors
+Copyright (c) 2014 Ryan Juckett http://www.ryanjuckett.com
+Copyright 1995-2024 Jean-loup Gailly and Mark Adler Qkkbal
+Copyright (c) 1990- 1993, 1996 Open Software Foundation, Inc.
+Portions (c) International Organization for Standardization 1986
+Copyright (c) YEAR W3C(r) (MIT, ERCIM, Keio, Beihang) Disclaimers
+Copyright (c) 2015 THL A29 Limited, a Tencent company, and Milo Yip
+Copyright (c) 1980, 1986, 1993 The Regents of the University of California
+Copyright 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018 The Regents of the University of California
+Copyright (c) 1989 by Hewlett-Packard Company, Palo Alto, Ca. & Digital Equipment Corporation, Maynard, Mass
+
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.Windows.CppWinRT 3.0.260520.1 - MIT
+
+
+(c) Microsoft 2026
+(c) Microsoft Corporation
+Copyright (c) Microsoft Corporation
+
+    MIT License
+
+    Copyright (c) Microsoft Corporation.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.WSL.Containers 2.9.3 - MIT
+
+
+(c) (tm)
+(c) Type I1Ty
+(c) April 2011
+Copyright 2013
+Copyright 2014
+(c) Type ArgTys
+(c) Value A (c)
+(c) CHECK-NEXT T
+(c) Constant One
+(c) Value Sd (c)
+Bbb (c) Constant
+(c) BranchInst BI
+(c) Lower C Upper
+(c) Stmt NumExprs
+(c) Value RHS (c)
+Copyright (c) DFS
+Copyright 2013 DI
+Copyright 2014 DI
+Copyright 2015 DI
+copyright 2013- d
+(c) EUR CHECK-NEXT
+(c) Scale 1 Offset
+(c) State UNQUOTED
+(c) Type IndexType
+Copyright (c) 2008
+Copyright (c) 2009
+Copyright (c) 2010
+Copyright (c) 2011
+Copyright (c) 2012
+Copyright (c) 2014
+Copyright (c) 2016
+Copyright (c) 2019
+(c) Type Int8Ty (c)
+Stmt (c) ExprResult
+(c) CHECK-NEXT Preds
+(c) Offset C- Offset
+(c) Type FloatTy (c)
+Copyright 2010 INRIA
+Copyright 2011 INRIA
+Copyright 2012 INRIA
+Copyright 2014 INRIA
+Copyright 2015 ANSSI
+Copyright 2015 INRIA
+(c) 2023 GitHub, Inc.
+(c) QualType ResultTy
+(c) Type DoubleTy (c)
+(c) 2008 Red Hat, Inc.
+Copyright (c) 2009 THE
+Copyright (c) 2011 THE
+Copyright (c) 2013 IBM
+Copyright 2011 Samsung
+Copyright 2011 Vic Lee
+Copyright 2012 Vic Lee
+Copyright 2014 Vic Lee
+Copyright Jeff Sharkey
+(c) ErrMsg Stream Error
+(c) Metadata Ops MD (c)
+(c) SmallVector NewVars
+(c) TransferBatch B (c)
+(c) Value Alloca Alloc1
+Copyright (c) Microsoft
+(c) BasicBlock Entry (c)
+(c) Branches Context (c)
+Copyright (c) 2012 CHECK
+Copyright 2016 INRIA (c)
+Copyright 2017 Ben Cohen
+(c) GlobalVariable Handle
+(c) Microsoft Corporation
+Copyright 2010-2011 INRIA
+Copyright 2013 Felix Long
+Copyright 2014-2015 INRIA
+copyright 2015, LLVM Team
+(c) 2007-2010 Novell, Inc.
+(c) 2011 Anthony Green (c)
+(c) 2013 DENSO CORPORATION
+Copyright (c) 2010 Rosetta
+Copyright 2003 Google Inc.
+Copyright 2008 Google Inc.
+Copyright 2009 Daniel Mack
+Copyright 2009 Google Inc.
+Copyright 2011 Jiten Pathy
+Copyright 2013 Blaz Bacnik
+Copyright 2014 Wim Taymans
+Copyright 2015 Georg Chini
+Copyright 2015 Google Inc.
+Copyright 2018 Google Inc.
+Copyright 2019 Rangee Gmbh
+Copyright The LLVM project
+(c) SmallVector ToErase Bbb
+(c) Willem van Schaik, 1999
+Copyright (c) 1997, Phillip
+Copyright (c) 2022 FormatJS
+Copyright (c) Andrew Arnott
+Copyright 2005, Google Inc.
+Copyright 2006, Google Inc.
+Copyright 2007, Google Inc.
+Copyright 2008 Sci-Fi Hi-Fi
+Copyright 2008, Google Inc.
+Copyright 2009 Ted Percival
+Copyright 2010-2011 Vic Lee
+Copyright 2010-2012 Vic Lee
+Copyright 2011-2012 Vic Lee
+Copyright 2012 Atrust corp.
+Copyright 2012 Google, Inc.
+Copyright 2013 Albert Zeyer
+Copyright 2013, Google Inc.
+Copyright 2015-2017 Vic Lee
+Copyright 2016 Inuvika Inc.
+Copyright 2019 LLVM Project
+Copyright Kungliga Tekniska
+Copyright (c) 1998 Microsoft
+Copyright (c) 2008, 2009 the
+Copyright (c) 2012 Rob Clark
+Copyright (c) 2018 Simon Ser
+Copyright 2006 Diego Petteno
+Copyright 2006 Shams E. King
+Copyright 2006, Dean Edwards
+Copyright 2008 Colin Guthrie
+Copyright 2009 Canonical Ltd
+Copyright 2009 Colin Guthrie
+Copyright 2009 Tanu Kaskinen
+Copyright 2009-2011 Jay Sorg
+Copyright 2009-2012 Jay Sorg
+Copyright 2010 Arun Raghavan
+Copyright 2010 Colin Guthrie
+Copyright 2011 Canonical Ltd
+Copyright 2011 Colin Guthrie
+Copyright 2013 Hajime Fujita
+Copyright 2018 Daniel Lemire
+(c) CharUnits AlignedSize (c)
+(c) Designator NumDesignators
+(c) SourceRange Range AsmToks
+(c) Value Elt0 Copyright 2014
+Copyright (c) .NET Foundation
+Copyright (c) 1999 Tom Tromey
+Copyright (c) 2008 PULSEAUDIO
+Copyright (c) 2010 Apple Inc.
+Copyright (c) 2012 Modelon AB
+Copyright (c) 2018 Jim Ingham
+Copyright (c) by P.J. Plauger
+Copyright 2008 Matt Gallagher
+Copyright 2009 The Go Authors
+Copyright 2010 Canonical Ltd.
+Copyright 2010 The Go Authors
+Copyright 2010 Zencoder, Inc.
+Copyright 2011 The Go Authors
+Copyright 2012 Gerald Richter
+Copyright 2012 Jason Champion
+Copyright 2012 The Go Authors
+Copyright 2012 Thomas Goddard
+Copyright 2013 Collabora Ltd.
+Copyright 2013 The Go Authors
+Copyright 2014 The Go Authors
+Copyright 2015 Canonical Ltd.
+Copyright 2017 Artur Zaprzala
+Copyright (c) 2000 Software AG
+Copyright (c) 2002 Roger Sayle
+Copyright (c) 2007 Google Inc.
+Copyright (c) 2008 David Daney
+Copyright (c) 2009 Google Inc.
+Copyright (c) 2010 Google Inc.
+Copyright (c) 2012 Jonas Adahl
+Copyright (c) 2013 Jonas Adahl
+Copyright (c) 2015 Armin Novak
+Copyright (c) 2016 Aaron Watry
+Copyright (c) 2017 Google Inc.
+Copyright 2011 Stephen Erisman
+Copyright 2018 Collabora, Ltd.
+Copyright 2019 Collabora, Ltd.
+(c) IdentifierInfo NumExprs (c)
+Copyright (c) 1994 X Consortium
+Copyright (c) 2008 Matteo Frigo
+Copyright (c) 2008 Timo Jyrinki
+Copyright (c) 2009 Chris Wilson
+Copyright (c) 2009 Matteo Frigo
+Copyright (c) 2010 CodeSourcery
+Copyright (c) 2011 Kyle Moffett
+Copyright (c) 2011 Tilera Corp.
+Copyright (c) 2011 Timothy Wall
+Copyright (c) 2011, Google Inc.
+Copyright (c) 2012 Peter Harris
+Copyright (c) 2012 Scott Moreau
+Copyright (c) 2012 Tilera Corp.
+Copyright (c) 2017 Red Hat Inc.
+Copyright (c) 2020 Dan Shechter
+Copyright (c) 2021 Sergio Pedri
+Copyright (c) Mesa contributors
+Copyright 2008-2010 Apple, Inc.
+Copyright 2011-2012 Jiten Pathy
+Copyright 2013 Martin Blanchard
+Copyright 2015 Sven Verdoolaege
+Copyright 2016 Sven Verdoolaege
+Copyright 2017 Sven Verdoolaege
+Copyright 2018 Sven Verdoolaege
+SelectInst SelI (c) SmallVector
+copyright 2003- d, LLVM Project
+(c) 1997-2005 Sean Eron Anderson
+(c) SourceLocation Loc Condition
+(c) StringLiteral NumConstraints
+Copyright (c) 1992 Henry Spencer
+Copyright (c) 1996 Red Hat, Inc.
+Copyright (c) 2000 Red Hat, Inc.
+Copyright (c) 2001 Chris Bagwell
+Copyright (c) 2002 Ranjit Mathew
+Copyright (c) 2004 Anthony Green
+Copyright (c) 2004 Simon Posnjak
+Copyright (c) 2008 Anthony Green
+Copyright (c) 2008 Red Hat, Inc.
+Copyright (c) 2011 Anthony Green
+Copyright (c) 2012 Anthony Green
+Copyright (c) 2013 Red Hat, Inc.
+Copyright (c) 2014 Red Hat, Inc.
+Copyright (c) 2015 Red Hat, Inc.
+Copyright 2004 Joe Marcus Clarke
+Copyright 2008 Nokia Corporation
+Copyright 2009 Intel Corporation
+Copyright 2009 Nokia Corporation
+Copyright 2010 Intel Corporation
+Copyright 2011 Intel Corporation
+Copyright 2012 Intel Corporation
+Copyright 2013 Alexander Couzens
+Copyright 2013 Intel Corporation
+Copyright 2014 Intel Corporation
+Copyright James Newton-King 2008
+copyright 2007- d, The LLDB Team
+copyright 2019, Weston community
+(c) CHECK-NEXT 194 CHECK-NEXT (c)
+Copyright (c) 2000 John Hornkvist
+Copyright (c) 2001 John Hornkvist
+Copyright (c) 2006 Kirill Simonov
+Copyright (c) 2009 The Go Authors
+Copyright (c) 2011 Tim Wiederhake
+Copyright (c) 2012 Alan Hourihane
+Copyright (c) 2012 Canonical Ltd.
+Copyright (c) 2012 Martin Minarik
+Copyright (c) 2012 Openismus GmbH
+Copyright (c) 2013 Collabora Ltd.
+Copyright (c) 2013 David Herrmann
+Copyright (c) 2013 Jason Ekstrand
+Copyright (c) 2013 Richard Hughes
+Copyright (c) 2014 Jason Ekstrand
+Copyright (c) 2015 Andrew Gallant
+Copyright (c) 2015 Collabora Ltd.
+Copyright (c) 2015 Giulio Camuffo
+Copyright (c) 2016 Armin Krezovic
+Copyright (c) 2016 Giulio Camuffo
+Copyright (c) 2019 Collabora Ltd.
+Copyright (c) 2022, Wojciech Mula
+Copyright 2001-2004 Unicode, Inc.
+Copyright 2004 Lennart Poettering
+Copyright 2004-2009 Kitware, Inc.
+Copyright 2006 Lennart Poettering
+Copyright 2006-2009 Kitware, Inc.
+Copyright 2007 Lennart Poettering
+Copyright 2007-2009 Kitware, Inc.
+Copyright 2008 Lennart Poettering
+Copyright 2009 Lennart Poettering
+Copyright 2010 Lennart Poettering
+Copyright 2012 Dmitry Baryshnikov
+Copyright 2012 Lennart Poettering
+Copyright 2013 Matthias Wabersich
+Copyright 2014 Thomas Erbesdobler
+copyright 2007- d, The Clang Team
+copyright 2010- d, The Polly Team
+copyright 2011-2018, LLVM Project
+Copyright (c) 1999-2007 Apple Inc.
+Copyright (c) 1999-2007 Brian Paul
+Copyright (c) 2008 Alexandre Oliva
+Copyright (c) 2009-2019 Polly Team
+Copyright (c) 2011 Collabora, Ltd.
+Copyright (c) 2012 Collabora, Ltd.
+Copyright (c) 2012 Thorsten Glaser
+Copyright (c) 2013 BMW Car IT GmbH
+Copyright (c) 2013 Collabora, Ltd.
+Copyright (c) 2013 Mentor Graphics
+Copyright (c) 2013 Philip Withnall
+Copyright (c) 2013 Tensilica, Inc.
+Copyright (c) 2013 The Chromium OS
+Copyright (c) 2014 Collabora, Ltd.
+Copyright (c) 2015 Collabora, Ltd.
+Copyright (c) 2015 Martin Grasslin
+Copyright (c) 2015the LLVM Project
+Copyright (c) 2016 Benoit Gschwind
+Copyright (c) 2016 Collabora, Ltd.
+Copyright (c) 2017 Collabora, Ltd.
+Copyright (c) 2017 Yoshifumi Kawai
+Copyright (c) 2018 Collabora, Ltd.
+Copyright (c) 2019 Collabora, Ltd.
+Copyright (c) 2022, Geoff Langdale
+Copyright 2009-2010 The Go Authors
+Copyright 2012 Universiteit Leiden
+Copyright 2013 bct electronic GmbH
+Copyright 2015 The Go Authors. (c)
+Copyright 2016-2017 Tobias Grosser
+copyright (c) 2001 Fabrice Bellard
+Copyright (c) 1998 Cygnus Solutions
+Copyright (c) 1998 Geoffrey Keating
+Copyright (c) 2001 David E. O'Brien
+Copyright (c) 2005-2020 Rich Felker
+Copyright (c) 2011 Benjamin Franzke
+Copyright (c) 2011 Charles Scalesse
+Copyright (c) 2012 Benjamin Franzke
+Copyright (c) 2012-2021 Yann Collet
+Copyright (c) 2019 The MLIR Authors
+Copyright (c) 2020 Michael Dietrich
+Copyright (c) Microsoft Corporation
+Copyright 2009, 2010 The Go Authors
+Copyright 2011 Collabora Multimedia
+Copyright 2016 The Chromium Authors
+Copyright 2016, 2017 Tobias Grosser
+Copyright 2017-2018 Collabora, Ltd.
+Copyright 2018-2019 Collabora, Ltd.
+copyright 2011- d, LLVM Project (c)
+(c) .NET Foundation and Contributors
+(c) .NET Foundation and contributors
+Copyright (c) 2000, 2007 Software AG
+Copyright (c) 2001 Alexander Peslyak
+Copyright (c) 2007 James Newton-King
+Copyright (c) 2008 Kristian Hogsberg
+Copyright (c) 2009 Intel Corporation
+Copyright (c) 2010 Intel Corporation
+Copyright (c) 2010 Kristian Hogsberg
+Copyright (c) 2011 Intel Corporation
+Copyright (c) 2011 Kristian Hogsberg
+Copyright (c) 2012 Intel Corporation
+Copyright (c) 2012 John Kare Alsaker
+Copyright (c) 2012 Kristian Hogsberg
+Copyright (c) 2012, 2013 Xilinx, Inc
+Copyright (c) 2012, Victor Lazzarini
+Copyright (c) 2012-2016, Yann Collet
+Copyright (c) 2013 DENSO CORPORATION
+Copyright (c) 2013 Intel Corporation
+Copyright (c) 2013 Jasper St. Pierre
+Copyright (c) 2013 Rafael Antognolli
+Copyright (c) 2014 DENSO CORPORATION
+Copyright (c) 2014, 2015 Google Inc.
+Copyright (c) 2015 Jasper St. Pierre
+Copyright (c) 2015-2017 Red Hat Inc.
+Copyright (c) 2016 DENSO CORPORATION
+Copyright (c) 2018 Intel Corporation
+Copyright (c) 2019 Intel Corporation
+Copyright 2011 Sven Verdoolaege. (c)
+Copyright 2011,2015 Sven Verdoolaege
+Copyright 2011-2013 BMW Car IT GmbH.
+Copyright 2013 Joao Paulo Rechi Vita
+Copyright 2014, 2015 Andrey Semashev
+Copyright 2015-2016 Sven Verdoolaege
+Copyright 2016, 2017 Collabora, Ltd.
+Copyright 2021-2025 - Morten Nielsen
+(c) 2016 Samsung Electronics Co., Ltd
+Copyright (c) 1991-2024 Unicode, Inc.
+Copyright (c) 1996-2003 Red Hat, Inc.
+Copyright (c) 1996-2004 Red Hat, Inc.
+Copyright (c) 1999-2003 Steve Purcell
+Copyright (c) 2004 Renesas Technology
+Copyright (c) 2006 Lennart Poettering
+Copyright (c) 2012-2013 A Tasty Pixel
+Copyright (c) 2013-2017, Alfred Klomp
+Copyright (c) 2016 NVIDIA Corporation
+Copyright (c) 2018 Nemanja Mijailovic
+Copyright 2010-2012 Intel Corporation
+Copyright 2012 the V8 project authors
+Copyright 2013 Christian Hofstaedtler
+Copyright (c) 1996, 1998 Red Hat, Inc.
+Copyright (c) 1998, 2008 Red Hat, Inc.
+Copyright (c) 1999 Lucent Technologies
+Copyright (c) 1999, 2008 Red Hat, Inc.
+Copyright (c) 2002-2004 Tim J. Robbins
+Copyright (c) 2008 Christian Haggstrom
+Copyright (c) 2008, 2010 Red Hat, Inc.
+Copyright (c) 2008-2016, Wojciech Mula
+Copyright (c) 2011, 2012 Anthony Green
+Copyright (c) 2011, 2013 Anthony Green
+Copyright (c) 2011, 2014 Anthony Green
+Copyright (c) 2011-2020 Microsoft Corp
+Copyright (c) 2012, 2013 Anthony Green
+Copyright (c) 2012, 2014 Anthony Green
+Copyright (c) 2014,2018 Collabora Ltd.
+Copyright (c) 2015-2017, Wojciech Mula
+Copyright (c) 2015-2018, Wojciech Mula
+Copyright 2004-2006 Lennart Poettering
+Copyright 2004-2008 Lennart Poettering
+Copyright 2004-2009 Lennart Poettering
+Copyright 2005-2006 Lennart Poettering
+Copyright 2005-2009 Lennart Poettering
+Copyright 2006-2008 Lennart Poettering
+Copyright 2006-2009 Lennart Poettering
+Copyright 2007-2010 by the Sphinx team
+Copyright 2013 Raspberry Pi Foundation
+Copyright 2016 Ismael Jimenez Martinez
+Copyright 2021-2025 - Morten Nielsen A
+(c) 2006 Free Software Foundation, Inc.
+Copyright (c) 1996-1998 John D. Polstra
+Copyright (c) 1998, 2012 Andreas Schwab
+Copyright (c) 2005 Free Standards Group
+Copyright (c) 2005-2007, Nick Galbreath
+Copyright (c) 2005-2014 Lode Vandevenne
+Copyright (c) 2011-2012 Collabora, Ltd.
+Copyright (c) 2012 Philipp Bruschweiler
+Copyright (c) 2012-2013 Collabora, Ltd.
+Copyright (c) 2012-2018 Collabora, Ltd.
+Copyright (c) 2015 The Chromium Authors
+Copyright (c) 2015,2019 Collabora, Ltd.
+Copyright (c) 2018 Alexander Chermyanin
+Copyright (c) Microsoft Corporation.All
+Copyright (c) The Internet Society 1997
+Copyright 2005-2007 Universiteit Leiden
+Copyright 2006-2007 Universiteit Leiden
+Copyright 2010 Red Hat <mjg@redhat.com>
+Copyright 2012 Ecole Normale Superieure
+Copyright 2013 Ecole Normale Superieure
+Copyright 2014 Ecole Normale Superieure
+Copyright 2017 Roman Lebedev. ParamInfo
+Copyright 2018 General Electric Company
+StringRef Copyright (c) 2002 Bo Thorsen
+(c) Stmt NumExprs std::copy Exprs, Exprs
+(c) StringRef NumClobbers // FIXME Avoid
+Copyright (c) 2002-2008, 2012 Kaz Kojima
+Copyright (c) 2010-2011 Benjamin Franzke
+Copyright (c) 2014, 2015 Collabora, Ltd.
+Copyright (c) 2014, 2016 Collabora, Ltd.
+Copyright (c) 2014, 2019 Collabora, Ltd.
+Copyright (c) 2015, 2019 Collabora, Ltd.
+Copyright (c) 2016, 2019 Collabora, Ltd.
+Copyright (c) 2017, 2018 Collabora, Ltd.
+Copyright (c) 2018 DisplayLink (UK) Ltd.
+Copyright (c) 2021-2025 - Morten Nielsen
+Copyright 1992, 1993, 1994 Henry Spencer
+Copyright 2011-2012,2020 Collabora, Ltd.
+Copyright 2016 Thinast Technologies GmbH
+Copyright 2016-2017 Sven Verdoolaege (c)
+Copyright 2018 Thicast Technologies GmbH
+(c) StringLiteral NumClobbers Constraints
+Copyright (c) 1997-2019 Intel Corporation
+Copyright (c) 2004-2006 Intel Corporation
+Copyright (c) 2005 Axis Communications AB
+Copyright (c) 2006-2010 Nokia Corporation
+Copyright (c) 2008-2011 Kristian Hogsberg
+Copyright (c) 2008-2012 Kristian Hogsberg
+Copyright (c) 2008-2013 Kristian Hogsberg
+Copyright (c) 2009 - 2018 Laurent Bugnion
+Copyright (c) 2010-2011 Intel Corporation
+Copyright (c) 2010-2012 Intel Corporation
+Copyright (c) 2010-2013 Intel Corporation
+Copyright (c) 2010-2015 Benjamin Peterson
+Copyright (c) 2011-2012 Intel Corporation
+Copyright (c) 2011-2015 Intel Corporation
+Copyright (c) 2013-2017, Milosz Krajewski
+Copyright (c) 2014 - 2015 Collabora, Ltd.
+Copyright (c) 2016-2017, Matthieu Darbois
+Copyright (c) 2018-2019 Intel Corporation
+Copyright (c) The Internet Society (1998)
+Copyright (c) The Internet Society (2000)
+Copyright (c) The Internet Society (2003)
+Copyright 2008-2013 Joao Paulo Rechi Vita
+Copyright 2010 O.S. Systems Software Ltda
+Copyright 2011 O.S. Systems Software Ltda
+Copyright 2012 Thincast Technologies GmbH
+Copyright 2013 Thincast Technologies GmbH
+Copyright 2014 Thincast Technologies GmbH
+Copyright 2014 Thincast Technologies Gmbh
+Copyright 2015 Thincast Technologies GmbH
+Copyright 2015, Google Inc. InitCache (c)
+Copyright 2016 Thincast Technologies GmbH
+Copyright 2017 Thincast Technologies GmbH
+Copyright 2018 Thincast Technologies GmbH
+Copyright 2019 Thincast Technologies GmbH
+Copyright Iowa State University 2009-2010
+Copyright James Newton-King 2008 Json.NET
+copyright was claimed by the wine project
+Copyright (c) .NET Foundation Contributors
+Copyright (c) 2000 Hewlett Packard Company
+Copyright (c) 2002 Bo Thorsen <bo@suse.de>
+Copyright (c) 2006-2008 Lennart Poettering
+Copyright (c) 2010, 2013 Intel Corporation
+Copyright (c) 2011, 2012 Intel Corporation
+Copyright (c) 2012 Raspberry Pi Foundation
+Copyright (c) 2013 Raspberry Pi Foundation
+Copyright 2012 HP Development Company, LLC
+Copyright 2014, 2016, 2020 Collabora, Ltd.
+Copyright (c) 1996-2003, 2010 Red Hat, Inc.
+Copyright (c) 1998-2016 The OpenSSL Project
+Copyright (c) 2004 eXtensible Systems, Inc.
+Copyright (c) 2008 Free Software Foundation
+Copyright (c) 2009-2014 by the contributors
+Copyright (c) 2009-2015 by the contributors
+Copyright (c) 2009-2016 by the contributors
+Copyright (c) 2009-2019 by the contributors
+Copyright (c) 2010 Red Hat <mjg@redhat.com>
+Copyright (c) 2011 Free Software Foundation
+Copyright (c) 2011-2014 by the contributors
+Copyright (c) 2011-2019 by the contributors
+Copyright (c) 2013 Copyright (c) 2019 Exprs
+Copyright (c) 2013 Imagination Technologies
+Copyright (c) 2015 General Electric Company
+Copyright (c) 2017 Pekka Paalanen pq@iki.fi
+Copyright (c) 2017-2019 by the contributors
+Copyright (c) 2021 Copyright (c) Six Labors
+Copyright 2011 Wolfson Microelectronics PLC
+copyrighted by the Free Software Foundation
+(c) Microsoft Corporation. Med enerett. Hvis
+Copyright (c) 1992, 1993, 1994 Henry Spencer
+Copyright (c) 1993 by Sun Microsystems, Inc.
+Copyright (c) 1996, 1998, 2005 Red Hat, Inc.
+Copyright (c) 1996, 1998, 2007 Red Hat, Inc.
+Copyright (c) 1998, 2008, 2011 Red Hat, Inc.
+Copyright (c) 1999, 2007, 2008 Red Hat, Inc.
+Copyright (c) 2004 by Sun Microsystems, Inc.
+Copyright (c) 2007, 2009, 2010 Red Hat, Inc.
+Copyright (c) 2011, 2012, 2013 Anthony Green
+Copyright (c) 2016 Quentin Sardem FF7 Glidic
+Copyright (c) 2018 Renesas Electronics Corp.
+Copyright 2004-2006, 2009 Lennart Poettering
+Copyright 2011 Jay Sorg <jay.sorg@gmail.com>
+Copyright 2011 Shea Levy <shea@shealevy.com>
+Copyright 2012 Jay Sorg <jay.sorg@gmail.com>
+Copyright 2012,2014 Ecole Normale Superieure
+Copyright 2012-2013 Ecole Normale Superieure
+Copyright 2012-2014 Ecole Normale Superieure
+Copyright 2013-2014 Ecole Normale Superieure
+Copyright 2015 Vic Lee <llyzs.vic@gmail.com>
+Copyright 2017-2018 General Electric Company
+(c) 1995-2024 Jean-loup Gailly and Mark Adler
+(c) Copyright 2014 Thincast Technologies GmbH
+Copyright (c) 2002-2007 Michael J. Fromberger
+Copyright (c) 2009, 2010, 2011, 2012 ARM Ltd.
+Copyright (c) 2012, 2017-2019 Collabora, Ltd.
+Copyright (c) 2014 Pekka Paalanen <pq@iki.fi>
+Copyright (c) 2014 Thincast Technologies GmbH
+Copyright (c) 2015 Thincast Technologies GmbH
+Copyright (c) 2017 Pekka Paalanen <pq@iki.fi>
+Copyright (c) 2018 Thincast Technologies GmbH
+Copyright (c) 2020 Mara Bos <m-ou.se@m-ou.se>
+Copyright 2000 Free Software Foundation, Inc.
+Copyright 2004 Free Software Foundation, Inc.
+Copyright 2015 bernhard.miklautz@thincast.com
+Copyright AssemblyDescription AssemblyProduct
+(c) Copyright 2012 HP Development Company, LLC
+Copyright (c) .NET Foundation and Contributors
+Copyright (c) .NET Foundation and contributors
+Copyright (c) 2008 Ryan McCabe <ryan@numb.org>
+Copyright (c) 2008 Stepan Kasal <kasal@ucw.cz>
+Copyright (c) 2012 - present, Victor Zverovich
+Copyright (c) 2012, 2017, 2018 Collabora, Ltd.
+Copyright (c) 2018 Zodiac Inflight Innovations
+Copyright 2009 Jason Newton <nevion@gmail.com>
+Copyright 2011-2013 Thincast Technologies GmbH
+Copyright 2012 Alam Arias <Alam.GBC@gmail.com>
+Copyright 2015-2016 Thincast Technologies GmbH
+Copyright 2015-2017 Thincast Technologies GmbH
+Copyright 2016,2018 Thincast Technologies GmbH
+Copyright 2016-2017 Thincast Technologies GmbH
+(c) 2003-2004 Randolph Chung <tausq@debian.org>
+Copyright (c) 2003, 2004, 2006, 2008 Kaz Kojima
+Copyright (c) 2006 Jb Evain (jbevain@gmail.com)
+Copyright (c) 2014 Advanced Micro Devices, Inc.
+Copyright (c) 2015 Advanced Micro Devices, Inc.
+Copyright (c) 2015 Samsung Electronics Co., Ltd
+Copyright (c) 2016 Samsung Electronics Co., Ltd
+Copyright 2012 Rolf Eike Beer <eike@sf-mail.de>
+Copyright 2014 Christian Plattner <ccpp@gmx.at>
+Copyright 2016 Christian Plattner <ccpp@gmx.at>
+Copyright 2019 Idan Freiberg <speidy@gmail.com>
+Copyright (c) 1994-1999 Lucent Technologies Inc.
+Copyright (c) 2002, 2007 Bo Thorsen <bo@suse.de>
+Copyright (c) 2007-2008 Free Software Foundation
+Copyright (c) 2009 Jason Newton nevion@gmail.com
+Copyright (c) 2013 Imagination Technologies Ltd.
+Copyright 2011 David Henningsson, Canonical Ltd.
+Copyright 2012 Fujitsu Technology Solutions GmbH
+Copyright 2014 David Henningsson, Canonical Ltd.
+Copyright 2017 Armin Novak <anovak@thincast.com>
+Copyright 2018 Armin Novak <anovak@thincast.com>
+Copyright 2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright extcopyright~ he year the LLVM Project
+(c) Designator NumDesigs NumDesignators NumDesigs
+Copyright (c) 1992, 1993 UNIX International, Inc.
+Copyright (c) 1996-2003, 2007, 2008 Red Hat, Inc.
+Copyright (c) 2004 Free Software Foundation, Inc.
+Copyright (c) 2006 Free Software Foundation, Inc.
+Copyright (c) 2007 Free Software Foundation, Inc.
+Copyright (c) 2008 Free Software Foundation, Inc.
+Copyright (c) 2008-2019 Copyright 2009 Finn Thain
+Copyright (c) 2009 Free Software Foundation, Inc.
+Copyright (c) 2011 Free Software Foundation, Inc.
+Copyright (c) 2012 Free Software Foundation, Inc.
+Copyright (c) 2012, Noah Spurrier <noah@noah.org>
+Copyright (c) 2013-2014, Pexpect development team
+Copyright (c) 2013-2016, Pexpect development team
+Copyright (c) 2014 Free Software Foundation, Inc.
+Copyright (c) 2015 Paul Norman <penorman@mac.com>
+Copyright (c) 2016 Aaron Watry <awatry@gmail.com>
+Copyright (c) 2017, 2018 General Electric Company
+Copyright 2004-2012 Jay Sorg <jay.sorg@gmail.com>
+Copyright 2007-2008 Miguel A. Figueroa-Villanueva
+Copyright 2009,2010 Daniel Mack <daniel@caiaq.de>
+Copyright 2011 Anthony Tong <atong@trustedcs.com>
+Copyright 2013 Peter Meerwald <pmeerw@pmeerw.net>
+Copyright 2014 Peter Meerwald <pmeerw@pmeerw.net>
+copyright (c) 2011 Petr Vanek <petr@scribus.info>
+(c) IdentifierInfo NumExprs std::copy Names, Names
+Copyright (c) 1996, 2007, 2008, 2011 Red Hat, Inc.
+Copyright (c) 1996, MPEG Software Simulation Group
+Copyright (c) 1998 Bjorn Reese and Daniel Stenberg
+Copyright (c) 1998, 2001, 2007, 2008 Red Hat, Inc.
+Copyright (c) 1998, 2007, 2008, 2012 Red Hat, Inc.
+Copyright (c) 2000 Bjorn Reese and Daniel Stenberg
+Copyright (c) 2000, 2003, 2004, 2008 Red Hat, Inc.
+Copyright (c) 2001 Bjorn Reese and Daniel Stenberg
+Copyright (c) 2003-2010 Python Software Foundation
+Copyright (c) 2006 The Android Open Source Project
+Copyright (c) 2008 Andreas Schwab <schwab@suse.de>
+Copyright (c) 2008 The Android Open Source Project
+Copyright (c) 2010 The Android Open Source Project
+Copyright (c) 2011 The Android Open Source Project
+Copyright (c) 2012 Zack Weinberg <zackw@panix.com>
+Copyright (c) 2016 The Android Open Source Project
+Copyright 1992-2018 Free Software Foundation, Inc.
+Copyright 2008-2009 Katholieke Universiteit Leuven
+Copyright 2010 Wim Taymans <wim.taymans@gmail.com>
+Copyright 2013 Armin Novak <armin.novak@gmail.com>
+Copyright 2014 Armin Novak <armin.novak@gmail.com>
+Copyright 2015 Jiang Zihao <zihao.jiang@yahoo.com>
+Copyright 2016 Armin Novak <armin.novak@gmail.com>
+Copyright 2016 Jiang Zihao <zihao.jiang@yahoo.com>
+Copyright (c) 2003 Jakub Jelinek <jakub@redhat.com>
+Copyright (c) 2006, Tim Beaulen <tbscope@gmail.com>
+Copyright (c) 2008 Alan Woodland <ajw05@aber.ac.uk>
+Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+Copyright (c) 2008 Stepan Kasal <skasal@redhat.com>
+Copyright (c) 2011 Plausible Labs Cooperative, Inc.
+Copyright (c) 2012 Qualcomm Innovation Center, Inc.
+Copyright (c) 2013 Hardening <rdp.effort@gmail.com>
+Copyright 2010 David Henningsson <diwic@ubuntu.com>
+Copyright 2013 Zhang Zhaolong <zhangzl2013@126.com>
+Copyright 2019 Mati Shabtay <matishabtay@gmail.com>
+Copyright (c) 2008 Benjamin Kosnik <bkoz@redhat.com>
+Copyright (c) 2008-2020 Advanced Micro Devices, Inc.
+Copyright (c) 2013 Synopsys, Inc. (www.synopsys.com)
+Copyright (c) 2013 Synposys, Inc. (www.synopsys.com)
+Copyright (c) 2014,2015 Advanced Micro Devices, Inc.
+Copyright (c) 2015 Rozhuk Ivan <rozhuk.im@gmail.com>
+Copyright (c) 2015-2017 Samsung Electronics Co., Ltd
+Copyright (c) 2018 Pali Rohar <pali.rohar@gmail.com>
+Copyright (c) 2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright 2006 Alexander Neundorf <neundorf@kde.org>
+Copyright 2010 Alexander Neundorf <neundorf@kde.org>
+Copyright 2011 Nils Andresen <nils@nils-andresen.de>
+Copyright 2012 Alexander Neundorf <neundorf@kde.org>
+Copyright 2012 Alfred Liu <alfred.liu@atruscorp.com>
+Copyright 2012 Corey Clayton <can.of.tuna@gmail.com>
+Copyright 2013 Corey Clayton <can.of.tuna@gmail.com>
+Copyright 2014 Manuel Bachmann <tarnyko@tarnyko.net>
+Copyright 2016 Armin Novak <armin.novak@thincast.om>
+Copyright 2016 Arun Raghavan <mail@arunraghavan.net>
+Copyright 2019 Kobi Mizrachi <kmizrachi18@gmail.com>
+Copyright (c) 1988-2004 Keith Packard and Bart Massey
+Copyright (c) 2002, 2003, 2004, 2006, 2008 Kaz Kojima
+Copyright (c) 2003, 2004, 2006, 2007, 2012 Kaz Kojima
+Copyright (c) 2013 Miodrag Vallat. <miod@openbsd.org>
+Copyright (c) 2014, 2015 Advanced Micro Devices, Inc.
+Copyright (c) 2016 Krzesimir Nowak <qdlacz@gmail.com>
+Copyright (c) 2019 Microsoft Corporation, Daan Leijen
+Copyright (c) Alexi Volkov <alexi@myrealbox.com> 2006
+Copyright 2013 Armin Novak <armin.novak@thincast.com>
+Copyright 2014 Armin Novak <armin.novak@thincast.com>
+Copyright 2015 Armin Novak <armin.novak@thincast.com>
+Copyright 2016 Armin Novak <armin.novak@thincast.com>
+Copyright 2016 David PHAM-VAN <d.phamvan@inuvika.com>
+Copyright 2017 Alexei Lozovsky <a.lozovsky@gmail.com>
+Copyright 2017 Armin Novak <armin.novak@thincast.com>
+Copyright 2018 Armin Novak <armin.novak@thincast.com>
+Copyright 2018-2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright 2019 Armin Novak <armin.novak@thincast.com>
+Copyright (c) 1994-2014 Free Software Foundation, Inc.
+Copyright (c) 1994-2017 Free Software Foundation, Inc.
+Copyright (c) 1995-1998 Eric Young (eay@cryptsoft.com)
+Copyright (c) 1996, 2003-2004, 2007-2008 Red Hat, Inc.
+Copyright (c) 1996-2014 Free Software Foundation, Inc.
+Copyright (c) 1996-2015 Free Software Foundation, Inc.
+Copyright (c) 1996-2017 Free Software Foundation, Inc.
+Copyright (c) 1997-2014 Free Software Foundation, Inc.
+Copyright (c) 1997-2017 Free Software Foundation, Inc.
+Copyright (c) 1999-2013 Free Software Foundation, Inc.
+Copyright (c) 1999-2014 Free Software Foundation, Inc.
+Copyright (c) 1999-2017 Free Software Foundation, Inc.
+Copyright (c) 2001-2014 Free Software Foundation, Inc.
+Copyright (c) 2001-2017 Free Software Foundation, Inc.
+Copyright (c) 2002-2014 Free Software Foundation, Inc.
+Copyright (c) 2002-2017 Free Software Foundation, Inc.
+Copyright (c) 2003-2014 Free Software Foundation, Inc.
+Copyright (c) 2003-2017 Free Software Foundation, Inc.
+Copyright (c) 2004-2014 Free Software Foundation, Inc.
+Copyright (c) 2004-2015 Free Software Foundation, Inc.
+Copyright (c) 2004-2017 Free Software Foundation, Inc.
+Copyright (c) 2006-2014 Free Software Foundation, Inc.
+Copyright (c) 2006-2017 Free Software Foundation, Inc.
+Copyright (c) 2007, 2008 Free Software Foundation, Inc
+Copyright (c) 2008 Sven Verdoolaege <skimo@kotnet.org>
+Copyright (c) 2008-2017 Free Software Foundation, Inc.
+Copyright (c) 2009-2014 Free Software Foundation, Inc.
+Copyright (c) 2009-2017 Free Software Foundation, Inc.
+Copyright (c) 2010-2015 Free Software Foundation, Inc.
+Copyright (c) 2010-2017 Free Software Foundation, Inc.
+Copyright (c) 2011 Novell, Inc (http://www.novell.com)
+Copyright (c) 2011-2013 Free Software Foundation, Inc.
+Copyright (c) 2011-2014 Free Software Foundation, Inc.
+Copyright (c) 2012-2014 Free Software Foundation, Inc.
+Copyright (c) 2012-2015 Free Software Foundation, Inc.
+Copyright (c) 2013 Sam Spilsbury <smspillaz@gmail.com>
+Copyright (c) 2013-2014 Free Software Foundation, Inc.
+Copyright (c) 2013-2015 Free Software Foundation, Inc.
+Copyright (c) Microsoft Corporation. Med enerett. Hvis
+Copyright 2015 Ahmed S. Darwish <darwish.07@gmail.com>
+Copyright 2016 Ahmed S. Darwish <darwish.07@gmail.com>
+Copyright (c) 1989, 1991 Free Software Foundation, Inc.
+Copyright (c) 1991, 1999 Free Software Foundation, Inc.
+Copyright (c) 2002, 2009 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005 Free Software Foundation, Inc.
+Copyright (c) 2004, 2010 Free Software Foundation, Inc.
+Copyright (c) 2006, 2008 Free Software Foundation, Inc.
+Copyright (c) 2008, 2010 Free Software Foundation, Inc.
+Copyright (c) 2011 Daniel Richard G. <skunk@iSKUNK.ORG>
+Copyright (c) 2014 Sebastian Macke <sebastian@macke.de>
+Copyright (c) 2015 Moritz Klammler <moritz@klammler.eu>
+Copyright 2015 Denis Vincent <dvincent@devolutions.net>
+Copyright (c) 1996, 1997, 2003, 2004, 2008 Red Hat, Inc.
+Copyright (c) 1998, 2001, 2007, 2008, 2011, 2014 Red Hat
+Copyright (c) 1998, 2009 Bjorn Reese and Daniel Stenberg
+Copyright (c) 2006 Andreas Schneider <mail@cynapses.org>
+Copyright (c) 2009 Bradley Smith <brad@brad-smith.co.uk>
+Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
+Copyright (c) 2012, 2016. Free Software Foundation, Inc.
+Copyright (c) 2015 Xamarin, Inc (http://www.xamarin.com)
+Copyright 2009 Wim Taymans <wim.taymans@collabora.co.uk>
+Copyright 2010 Wim Taymans <wim.taymans@collabora.co.uk>
+Copyright 2011 Otavio Salvador <otavio@ossystems.com.br>
+Copyright 2012 Hewlett-Packard Development Company, L.P.
+Copyright 2014 Hewlett-Packard Development Company, L.P.
+Copyright 2015 Copyright 2015 Thincast Technologies GmbH
+Copyright 2015 Hewlett-Packard Development Company, L.P.
+(c) Copyright 2014 Armin Novak <armin.novak@thincast.com>
+Copyright (c) 2004 Michael Niedermayer <michaelni@gmx.at>
+Copyright (c) 2008 Kyle Machulis <kyle@nonpolynomial.com>
+Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors
+Copyright (c) 2013 David Herrmann <dh.herrmann@gmail.com>
+Copyright (c) 2013 Jesse Towner <jessetowner@lavabit.com>
+Copyright (c) 2013 Roy Stogner <roystgnr@ices.utexas.edu>
+Copyright (c) 2013 Vasily Khoruzhick <anarsoul@gmail.com>
+Copyright (c) 2015 Armin Novak <armin.novak@thincast.com>
+Copyright (c) 2017 Pedro Lamas, http://www.pedrolamas.com
+Copyright (c) 2018 Armin Novak <armin.novak@thincast.com>
+Copyright 2008 Tungsten Graphics, Inc., Cedar Park, Texas
+Copyright 2011 Martin Fleisz <martin.fleisz@thincast.com>
+Copyright 2011 Roman Barabanov <romanbarabanov@gmail.com>
+Copyright 2012-2013 Corey Clayton <can.of.tuna@gmail.com>
+Copyright 2013 Martin Fleisz <martin.fleisz@thincast.com>
+Copyright 2016 Martin Fleisz <martin.fleisz@thincast.com>
+Copyright 2018 Pascal Bourguignon <pjb@informatimago.com>
+copyright (c) 1991-2011, Thomas G. Lane, Guido Vollbeding
+(c) StringLiteral NumClobbers std::copy Clobbers, Clobbers
+Copyright (c) 2006, Alexander Neundorf, <neundorf@kde.org>
+Copyright (c) 2008, Kevin Kofler, <kevin.kofler@chello.at>
+Copyright (c) 2014 Ryan Juckett http://www.ryanjuckett.com
+Copyright (c) Microsoft Corporation https://aka.ms/privacy
+Copyright 2008-2011 Alexander Neundorf, <neundorf@kde.org>
+Copyright 2012 Alexander Kurtz <kurtz.alex@googlemail.com>
+Copyright 2015-2017 Armin Novak <armin.novak@thincast.com>
+Copyright 2016,2018 Armin Novak <armin.novak@thincast.com>
+Copyright 2016-2017 Armin Novak <armin.novak@thincast.com>
+Copyright 2017 Sebastian Droge <sebastian@centricular.com>
+Copyright 2019 Russell Treleaven <rtreleaven@bunnykick.ca>
+Copyright (c) 2004 Scott James Remnant <scott@netsplit.com>
+Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+Copyright (c) 2009 Steven G. Johnson <stevenj@alum.mit.edu>
+Copyright (c) 2010 Diego Elio Petteno <flameeyes@gmail.com>
+Copyright 2011 Collabora Ltd. 2015 Aldebaran SoftBank Group
+Copyright 2011 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2012 Flavio Ceolin <flavio.ceolin@profusion.mobi>
+Copyright 2012 Laxmikant Rashinkar <LK.Rashinkar@gmail.com>
+Copyright 2013 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2014 Hardening <contact@hardening-consulting.com>
+Copyright 2014 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2015 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2016 Norbert Federa <norbert.federa@thincast.com>
+(c) Copyright 2012 Hewlett-Packard Development Company, L.P.
+(c) Copyright 2014 Hewlett-Packard Development Company, L.P.
+Copyright (c) 2004, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2007, 2008, 2010 Free Software Foundation, Inc
+Copyright (c) 2007, 2009, 2010 Free Software Foundation, Inc
+Copyright (c) 2011 Antonio Ospite <ospite@studenti.unina.it>
+Copyright (c) 2012 Raphael Kubo da Costa <rakuco@webkit.org>
+Copyright (c) 2013 Victor Oliveira <victormatheus@gmail.com>
+Copyright (c) 2014 Collabora Ltd. http://www.collabora.co.uk
+Copyright (c) 2015 Hewlett-Packard Development Company, L.P.
+Copyright 2009 Wim Taymans <wim.taymans@collabora.co.uk.com>
+Copyright 2010 Arun Raghavan <arun.raghavan@collabora.co.uk>
+Copyright 2010 Eduardo Fiss Beloni <beloni@ossystems.com.br>
+Copyright 2011 Arun Raghavan <arun.raghavan@collabora.co.uk>
+Copyright 2011 Eduardo Fiss Beloni <beloni@ossystems.com.br>
+Copyright 2014 David FORT <contact@hardening-consulting.com>
+Copyright 2014 David Fort <contact@hardening-consulting.com>
+Copyright 2015 David FORT <contact@hardening-consulting.com>
+Copyright 2015 David Fort <contact@hardening-consulting.com>
+Copyright 2016 David FORT <contact@hardening-consulting.com>
+Copyright 2016 David Fort <contact@hardening-consulting.com>
+Copyright 2017 David Fort <contact@hardening-consulting.com>
+Copyright 2017 Dorian Ducournau <dorian.ducournau@gmail.com>
+Copyright 2018 David Fort <contact@hardening-consulting.com>
+Copyright 2019 David Fort <contact@hardening-consulting.com>
+Copyright (c) 1990- 1993, 1996 Open Software Foundation, Inc.
+Copyright (c) 1994, 1996, 1997 Free Software Foundation, Inc.
+Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>
+Copyright (c) 2001 Bjorn Reese <breese@users.sourceforge.net>
+Copyright (c) 2001, 2003, 2005 Free Software Foundation, Inc.
+Copyright (c) 2002, 2003, 2009 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005, 2012 Free Software Foundation, Inc.
+Copyright (c) 2004-2010 Marcel Holtmann <marcel@holtmann.org>
+Copyright (c) 2006, 2008, 2010 Free Software Foundation, Inc.
+Copyright (c) 2010, Luigi Toscano, <luigi.toscano@tiscali.it>
+Copyright (c) 2013 Roy Stogner <roystgnr@ices.utexas.edu> (c)
+Copyright (c) 2017 Peter Meerwald-Stadler <pmeerw@pmeerw.net>
+Copyright 2001-2003, 2006-2012 Free Software Foundation, Inc.
+Copyright 2006 Pierre Ossman <ossman@cendio.se> for Cendio AB
+Copyright 2009 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2012 Dmitrij Jasnov <dmitrij.jasnov@ts.fujitsu.com>
+Copyright 2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2012 Peter Meerwald <p.meerwald@bct-electronic.com>
+Copyright 2013 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2013 Peter Meerwald <p.meerwald@bct-electronic.com>
+Copyright 2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2015 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright (c) 1994 The Regents of the University of California
+Copyright (c) 1996, 1998, 1999, 2001, 2007, 2008 Red Hat, Inc.
+Copyright (c) 1996, 1998, 2001, 2002, 2003, 2005 Red Hat, Inc.
+Copyright (c) 1996, 1998, 2005, 2007, 2009, 2010 Red Hat, Inc.
+Copyright (c) 1996,1998,2001-2003,2005,2008,2010 Red Hat, Inc.
+Copyright (c) 1996-2014 Anthony Green, Red Hat, Inc and others
+Copyright 2013 Dell Software <Mike.McDonald@software.dell.com>
+Copyright 2014 Dell Software <Mike.McDonald@software.dell.com>
+Copyright 2014 Mike McDonald <Mike.McDonald@software.dell.com>
+Copyright 2015 Dell Software <Mike.McDonald@software.dell.com>
+Copyright (c) 2014 Hardening <contact@hardening-consulting.com>
+Copyright (c) 2016 Norbert Federa <norbert.federa@thincast.com>
+Portions Copyright 2009 The Go Authors. in LLVM, Diploma Thesis
+Copyright (c) 2008 Nokia Corporation and/or its subsidiary(-ies)
+Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies)
+Copyright (c) 2014 David FORT <contact@hardening-consulting.com>
+Copyright (c) 2015 David FORT <contact@hardening-consulting.com>
+Copyright 1984, 1987, 1989, 1992, 2000 by Stephen L. Moshier (c)
+Copyright 2015-2017 Norbert Federa <norbert.federa@thincast.com>
+Copyright 2016-2017 Norbert Federa <norbert.federa@thincast.com>
+Portions (c) International Organization for Standardization 1986
+Copyright (c) 1992-1996, 1998-2012 Free Software Foundation, Inc.
+Copyright (c) 1996-2001, 2003-2015 Free Software Foundation, Inc.
+Copyright (c) YEAR W3C(r) (MIT, ERCIM, Keio, Beihang) Disclaimers
+Copyright 2012 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright 2012 Feng Wei <wei.feng@freescale.com> , Freescale Ltd.
+Copyright 2013 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright 2015 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright 2018 Bernhard Miklautz <bernhard.miklautz@thincast.com>
+Copyright (c) 2003-2019 University of Illinois at Urbana-Champaign
+Copyright (c) 2004, 2006 The Linux Foundation and its contributors
+Copyright (c) 2007-2018 University of Illinois at Urbana-Champaign
+Copyright (c) 2007-2019 University of Illinois at Urbana-Champaign
+Copyright 2006-2007 Pierre Ossman <ossman@cendio.se> for Cendio AB
+Copyright 2009-2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010-2011 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010-2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2010-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011-2012 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011-2013 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2011-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2012-2013 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2012-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+Copyright 2013-2014 Marc-Andre Moreau <marcandre.moreau@gmail.com>
+(c) StringLiteral NumConstraints std::copy Constraints, Constraints
+Copyright (c) 2001, 2003, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 2001, 2003, 2005, 2011 Free Software Foundation, Inc.
+Copyright (c) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005, 2007, 2009 Free Software Foundation, Inc.
+Copyright (c) 2015 THL A29 Limited, a Tencent company, and Milo Yip
+Copyright 2009-2011 Mathieu Malaterre <mathieu.malaterre@gmail.com>
+Copyright (c) 1992, 1993 The Regents of the University of California
+Copyright (c) 2002, 2003, 2004, 2010, Free Software Foundation, Inc.
+Copyright (c) 2006-2009 Steven J. Bethard <steven.bethard@gmail.com>
+Copyright (c) 2015 Bernhard Miklautz <bernhard.miklautz@shacknet.at>
+Copyright (c) Microsoft Corporation. Med ensamr Sekretessinformation
+Copyright (c) 2014-2015 David FORT <contact@hardening-consulting.com>
+Copyright 2006 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+Copyright 2012 Niels Ole Salscheider <niels_ole@salscheider-online.de>
+Copyright (c) 2000-2007 Vita Nuova Holdings Limited (www.vitanuova.com)
+Copyright 2009 Vincent Filali-Ansary <filali.v@azurdigitalnetworks.net>
+Copyright (c) 2001, 2002, 2003, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 2001, 2002, 2003, 2005, 2009 Free Software Foundation, Inc.
+Copyright (c) 2001, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
+Copyright (c) 2001, 2003, 2005, 2008, 2011 Free Software Foundation, Inc.
+Copyright (c) 2002, 2006, 2007, 2009, 2010 Free Software Foundation, Inc.
+Copyright (c) 2003, 2004, 2005, 2006, 2011 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1980, 1986, 1993 The Regents of the University of California
+Copyright (c) 1992, 1993, 1994 The Regents of the University of California
+Copyright (c) 2019 Pengutronix, Michael Olbrich <m.olbrich@pengutronix.de>
+Copyright (c) 1994,96,97,98,99,2000,2001,2004 Free Software Foundation, Inc.
+Copyright (c) 2004-2005, 2007-2008, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2004-2005, 2007-2009, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2008, 2009, 2012, 2015, 2019 The Free Software Foundation, Inc
+Copyright (c) 2004-2005, 2007, 2009, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2012 Alexandre K. I. de Mendonca <alexandre.keunecke@gmail.com>
+Copyright (c) 2001, 2002, 2003, 2005, 2008, 2010 Free Software Foundation, Inc.
+Copyright (c) 2002, 2003, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+Copyright (c) 2000-2002 Richard W.E. Furse, Paul Barton-Davis, Stefan Westerfeld
+Copyright (c) 1996, 1997, 2000, 2001, 2003, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2001, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 2002, 2003, 2005, 2006, 2007, 2008, 2011 Free Software Foundation, Inc.
+Copyright 2018 Kai Harms <kharms@rangee.com> Copyright.txt or https://cmake.org/licensing
+Copyright (c) 1995, 1996, 1997, 2003, 2004, 2005, 2007, 2009 Free Software Foundation, Inc.
+Copyright (c) 1997, 1999, 2000, 2001, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 1997, 2000, 2001, 2003, 2004, 2005, 2006, 2008 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright 2008-2013 Joao Paulo Rechi Vita Copyrigth 2018-2019 Pali Rohar <pali.rohar@gmail.com>
+Copyright (c) 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2009 Free Software Foundation, Inc.
+Copyright (c) Microsoft Corporation. https://aka.ms/privacy wsl.exe Argument Options... CommandLine
+Copyright 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018 The Regents of the University of California
+Copyright (c) 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2011 Free Software Foundation, Inc.
+Copyright (c) 2000-2002 Oliver Kurth <oku@masqmail.cx> 2003 Lennart Poettering <mzkzygbzna@0pointer.de>
+Copyright (c) 1989 by Hewlett-Packard Company, Palo Alto, Ca. & Digital Equipment Corporation, Maynard, Mass
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2003, 2004, 2005, 2006, 2007, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
+Copyright (c) 2012 Alexandre K. I. de Mendonca <alexandre.keunecke@gmail.com> , Paulo Pizarro <paulo.pizarro@gmail.com>
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2008, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1995, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2010, 2011, 2014 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
 
 MIT License
 

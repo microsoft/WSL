@@ -58,9 +58,9 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
 }
 // clang-format on
 
-void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+void ContainerListCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
-    if (execArgs.Contains(ArgType::Last) && execArgs.GetFlag<ArgType::Latest>())
+    if (execArgs.Contains(ArgType::Last) && execArgs.GetValue<ArgType::Latest>())
     {
         throw CommandException(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"));
     }

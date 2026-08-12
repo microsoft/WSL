@@ -41,7 +41,7 @@ try
     {
         for (const auto& line : m_allLines)
         {
-            m_reporter.Info(L"{}", line);
+            m_terminal.Info(L"{}", line);
         }
     }
 }
@@ -57,7 +57,7 @@ void BuildImageCallback::CollapseWindow()
     if (m_displayedLines > 0)
     {
         // Move cursor up to the start of the display area, then erase to end of screen.
-        m_reporter.Info(L"{}{}", Cursor::Up(m_displayedLines), Erase::ScreenForward);
+        m_terminal.Info(L"{}{}", Cursor::Up(m_displayedLines), Erase::ScreenForward);
         m_displayedLines = 0;
     }
 
@@ -100,7 +100,7 @@ try
         // Skip pull progress updates when output is redirected, show only major steps
         if (!isPullProgress)
         {
-            m_reporter.Info(L"{}", status);
+            m_terminal.Info(L"{}", status);
         }
         return S_OK;
     }
@@ -174,16 +174,16 @@ try
     const auto newlines = wide.substr(bodyLength);
     wide.resize(bodyLength);
 
-    // Pass the color sequences as arguments (not baked into the string) so Reporter strips
+    // Pass the color sequences as arguments (not baked into the string) so Terminal strips
     // them when --no-color is set. The trailing newlines are emitted after the reset.
-    m_reporter.Info(L"{}{}{}{}", Format::Fg::BrightGreen, wide, Format::Default, newlines);
+    m_terminal.Info(L"{}{}{}{}", Format::Fg::BrightGreen, wide, Format::Default, newlines);
     return S_OK;
 }
 CATCH_RETURN();
 
 void BuildImageCallback::Redraw()
 {
-    const int consoleWidth = m_reporter.GetConsoleWidth(Reporter::Level::Info).value_or(c_fallbackConsoleWidth);
+    const int consoleWidth = m_terminal.GetConsoleWidth(Terminal::Level::Info).value_or(c_fallbackConsoleWidth);
 
     const bool showPending = !m_pendingLine.empty();
     const int pullCount = static_cast<int>(m_pullLines.size());
@@ -198,7 +198,7 @@ void BuildImageCallback::Redraw()
     // Build the frame body in one buffer to minimize console writes. The cursor moves,
     // erases, and text lines it holds are non-color VT that only runs when a VT console is
     // attached. The cursor hide/show wrapper and the dim intensity attribute are passed as
-    // Sequence arguments to Reporter (below) so it strips the color ones (Dim/Normal) when
+    // Sequence arguments to Terminal (below) so it strips the color ones (Dim/Normal) when
     // --no-color is set, while leaving the non-color cursor moves intact.
     //
     // m_frameBuffer is a member so its backing allocation is reused across frames -
@@ -249,9 +249,9 @@ void BuildImageCallback::Redraw()
     }
 
     // Emit the frame as a single atomic write. Cursor Hide/Show are non-color and always
-    // rendered here (VT is on); Format::Dim/Normal are color sequences that Reporter strips
+    // rendered here (VT is on); Format::Dim/Normal are color sequences that Terminal strips
     // under --no-color. The buffered body carries the cursor moves, erases, and text lines.
-    m_reporter.Info(L"{}{}{}{}{}", Cursor::Hide, Format::Dim, std::wstring_view{m_frameBuffer}, Format::Normal, Cursor::Show);
+    m_terminal.Info(L"{}{}{}{}{}", Cursor::Hide, Format::Dim, std::wstring_view{m_frameBuffer}, Format::Normal, Cursor::Show);
     m_displayedLines = displayCount;
 }
 

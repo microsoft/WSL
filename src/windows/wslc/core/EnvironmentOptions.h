@@ -13,7 +13,7 @@ Abstract:
 --*/
 #pragma once
 #include "Argument.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 
 #include <vector>
 

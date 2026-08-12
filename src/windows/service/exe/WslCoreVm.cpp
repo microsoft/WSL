@@ -615,7 +615,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 dnsTunnelingSocket.reset();
 
                 m_networkingEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, nullptr, m_guestDeviceManager, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -1000,7 +1000,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::Online))
         {
             const auto diskHandle = wsl::windows::common::disk::OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, m_vmConfig.MountDeviceTimeout);
-            wsl::windows::common::disk::SetOnline(diskHandle.get(), false, m_vmConfig.MountDeviceTimeout);
+            wsl::windows::common::disk::SetOnline(diskHandle.get(), true, m_vmConfig.MountDeviceTimeout);
         }
     });
 
@@ -2742,8 +2742,9 @@ std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Na
     if (ARGUMENT_PRESENT(Name))
     {
         auto mountName = wsl::shared::string::WideToMultiByte(Name);
-        // Throw if the name contains '/' since it is a linux path separator
-        THROW_HR_IF(WSL_E_VM_MODE_INVALID_MOUNT_NAME, mountName.find('/') != std::string::npos);
+        THROW_HR_IF(
+            WSL_E_VM_MODE_INVALID_MOUNT_NAME,
+            mountName.empty() || mountName == "." || mountName == ".." || mountName.find('/') != std::string::npos);
         return mountName;
     }
 

@@ -44,6 +44,12 @@ public:
     COORD GetWindowSize() const;
     void SetInteractiveMode();
 
+    // Sets the console output code page to UTF-8 for the lifetime of this object, restoring the
+    // saved code page on destruction, without altering any console modes. Use for non-interactive
+    // relays that stream raw UTF-8 bytes (e.g. container logs, non-TTY process output) so
+    // multi-byte characters render correctly under any console output code page.
+    void SetOutputCodePageUtf8();
+
 private:
     bool AcquireCoordination();
     void ConfigureInteractiveMode();

@@ -24,6 +24,7 @@ Abstract:
 #include "registry.hpp"
 #include "helpers.hpp"
 #include "svccomm.hpp"
+#include "ConsoleState.h"
 #include "lxfsshares.h"
 #include <userenv.h>
 #include <nlohmann/json.hpp>
@@ -43,8 +44,6 @@ Abstract:
 #define LXSST_FSTAB_BACKUP_COMMAND_LINE L"/bin/bash -c 'cp /etc/fstab /etc/fstab.bak'"
 #define LXSST_FSTAB_SETUP_COMMAND_LINE L"/bin/bash -c 'echo C:\\\\ /mnt/c drvfs metadata 0 0 >> /etc/fstab'"
 #define LXSST_FSTAB_CLEANUP_COMMAND_LINE L"/bin/bash -c \"cp /etc/fstab.bak /etc/fstab\""
-
-#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
 
 #define LXSST_IMPORT_DISTRO_TEST_DIR L"C:\\importtest\\"
 
@@ -570,7 +569,7 @@ class UnitTests
         DistroFileChange defaultLocale(L"/etc/default/locale", LxsstuLaunchWsl(L"test -f /etc/default/locale") == 0);
         DistroFileChange localeConf(L"/etc/locale.conf", LxsstuLaunchWsl(L"test -f /etc/locale.conf") == 0);
 
-        const auto readLang = []() { return LxsstuLaunchWslAndCaptureOutput(L"echo $LANG").first; };
+        const auto readLang = []() { return LxsstuLaunchWslAndCaptureOutput(L"printenv LANG").first; };
 
         // Only /etc/default/locale is present (Debian/Ubuntu).
         {
@@ -585,7 +584,7 @@ class UnitTests
         {
             defaultLocale.Delete();
             localeConf.Delete();
-            localeConf.SetContent(L"LANG=fr_FR.UTF-8\n");
+            localeConf.SetContent(L"LANG=\"fr_FR.UTF-8\"\n");
             TerminateDistribution();
             VERIFY_ARE_EQUAL(readLang(), L"fr_FR.UTF-8\n");
         }
@@ -4604,6 +4603,15 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            // New file should be created with the correct uid.
+            const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
+            const std::wstring testFilePathWindows = L"\\\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST_L L"\\tmp\\oobe_file_test";
+
+            const wil::unique_hfile file(CreateFile(
+                testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            VERIFY_IS_TRUE(file.is_valid());
+            validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.
@@ -7872,6 +7880,44 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             exists.pop_back();
         }
         VERIFY_ARE_EQUAL(exists, std::wstring(L"no"));
+    }
+
+    TEST_METHOD(ConsoleState_SetOutputCodePageUtf8)
+    {
+        // 437 (OEM-US) and 850 (OEM Multilingual) are built-in Windows code pages that are always
+        // available. 437 is the baseline the helper must restore; 850 stands in for another
+        // component changing the code page after the helper first ran.
+        constexpr UINT baselineCodePage = 437;
+        constexpr UINT intermediateCodePage = 850;
+
+        const UINT originalCodePage = GetConsoleOutputCP();
+        auto restore = wil::scope_exit([originalCodePage]() { SetConsoleOutputCP(originalCodePage); });
+
+        // A settable console output code page requires an attached console, which CI and service
+        // contexts often lack. Skip the test when the code page cannot be set so the suite stays stable.
+        if (!SetConsoleOutputCP(baselineCodePage))
+        {
+            LogSkipped("Skipping test: no attached console with a settable output code page");
+            return;
+        }
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP());
+
+        {
+            wsl::windows::common::ConsoleState console;
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8),
+                GetConsoleOutputCP(),
+                L"SetOutputCodePageUtf8 sets the console output code page to UTF-8");
+
+            // Another component changes the code page; a repeated call must re-assert UTF-8.
+            VERIFY_IS_TRUE(static_cast<bool>(SetConsoleOutputCP(intermediateCodePage)));
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8), GetConsoleOutputCP(), L"A repeated call re-asserts UTF-8 after the code page changed");
+        }
+
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
 }; // namespace UnitTests

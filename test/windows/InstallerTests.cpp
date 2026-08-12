@@ -25,7 +25,7 @@ using namespace wsl::windows::common::registry;
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 extern std::wstring g_dumpFolder;
-static std::wstring g_pipelineBuildId;
+extern std::wstring g_pipelineBuildId;
 
 class InstallerTests
 {
@@ -751,7 +751,7 @@ class InstallerTests
     TEST_METHOD(MsiUpgradeFailureRestoresFiles)
     {
 #ifdef WSL_OFFICIAL_BUILD
-        Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
+        WEX::Logging::Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
         return;
 #else
         // End-to-end rollback test: install an older version, then attempt a major
