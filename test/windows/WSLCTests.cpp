@@ -10703,7 +10703,7 @@ class WSLCTests
 
         // Test valid labels
         {
-            WSLCContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
+            WSLCContainerLauncher launcher(c_image, "test-labels", {"echo", "OK"});
 
             for (const auto& [key, value] : labels)
             {
