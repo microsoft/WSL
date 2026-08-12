@@ -26,7 +26,7 @@ enum class RestorePolicy
     // Exclusive restore to the original state captured by this instance.
     Exclusive,
 
-    // Restore only when the state still matches what this instance configured.
+    // Coordinate shared console state and restore it when the last participant exits.
     Cooperative,
 };
 
@@ -51,26 +51,24 @@ public:
     void SetOutputCodePageUtf8();
 
 private:
-    bool AcquireCoordination();
+    void AcquireCoordination();
     void ConfigureInteractiveMode();
-    void ReleaseCoordination();
-    void RestoreConsoleState();
+    void RestoreConsoleState() noexcept;
 
     wil::unique_hfile m_InputHandle;
     wil::unique_hfile m_OutputHandle;
     wil::unique_handle m_coordinationMutex;
+    wil::unique_handle m_coordinationEvent;
     wil::unique_handle m_coordinationMapping;
+    wil::unique_hlocal_security_descriptor m_coordinationSecurityDescriptor;
+    SECURITY_ATTRIBUTES m_coordinationSecurityAttributes{};
+    std::wstring m_coordinationName;
     void* m_coordinationView{};
-    ULONGLONG m_ownerCreationTime{};
     RestorePolicy m_restorePolicy;
     bool m_interactiveModeConfigured{false};
     std::optional<DWORD> m_SavedInputMode{};
-    std::optional<DWORD> m_ConfiguredInputMode{};
     std::optional<UINT> m_SavedInputCodePage{};
-    std::optional<UINT> m_ConfiguredInputCodePage{};
     std::optional<DWORD> m_SavedOutputMode{};
-    std::optional<DWORD> m_ConfiguredOutputMode{};
     std::optional<UINT> m_SavedOutputCodePage{};
-    std::optional<UINT> m_ConfiguredOutputCodePage{};
 };
 } // namespace wsl::windows::common

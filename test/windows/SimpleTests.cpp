@@ -212,22 +212,56 @@ class SimpleTests
         }
     }
 
+    struct ConsoleSnapshot
+    {
+        DWORD InputMode;
+        UINT InputCodePage;
+        DWORD OutputMode;
+        UINT OutputCodePage;
+    };
+
+    static ConsoleSnapshot GetConsoleSnapshot(HANDLE conin, HANDLE conout)
+    {
+        ConsoleSnapshot state{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin, &state.InputMode));
+        state.InputCodePage = GetConsoleCP();
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conout, &state.OutputMode));
+        state.OutputCodePage = GetConsoleOutputCP();
+        return state;
+    }
+
+    static void SetConsoleSnapshot(HANDLE conin, HANDLE conout, const ConsoleSnapshot& state)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(state.InputCodePage));
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(conin, state.InputMode));
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(state.OutputCodePage));
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(conout, state.OutputMode));
+    }
+
+    static void VerifyConsoleSnapshot(const ConsoleSnapshot& expected, const ConsoleSnapshot& actual)
+    {
+        VERIFY_ARE_EQUAL(expected.InputMode, actual.InputMode);
+        VERIFY_ARE_EQUAL(expected.InputCodePage, actual.InputCodePage);
+        VERIFY_ARE_EQUAL(expected.OutputMode, actual.OutputMode);
+        VERIFY_ARE_EQUAL(expected.OutputCodePage, actual.OutputCodePage);
+    }
+
     TEST_METHOD(ConsoleState_WslProcesses_SharedConsole_OutOfOrderRestore)
     {
         wil::unique_hfile conin{CreateFileW(
             L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-        if (!conin)
+        wil::unique_hfile conout{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin || !conout)
         {
-            LogSkipped("Skipping ConsoleState WSL process test: CONIN$ is not available (no attached console)");
+            LogSkipped("Skipping ConsoleState WSL process test: console handles are not available");
             return;
         }
 
-        DWORD originalMode{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &originalMode));
-        auto restoreOriginalMode = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), originalMode); });
-
-        const DWORD baseline = originalMode | ENABLE_PROCESSED_INPUT;
-        VERIFY_WIN32_BOOL_SUCCEEDED(SetConsoleMode(conin.get(), baseline));
+        const auto original = GetConsoleSnapshot(conin.get(), conout.get());
+        auto restoreOriginal = wil::scope_exit([&] { SetConsoleSnapshot(conin.get(), conout.get(), original); });
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetConsoleMode(conin.get(), original.InputMode | ENABLE_PROCESSED_INPUT));
+        const auto baseline = GetConsoleSnapshot(conin.get(), conout.get());
 
         auto [aOutRead, aOutWrite] = CreateSubprocessPipe(false, true);
         auto [aInRead, aInWrite] = CreateSubprocessPipe(true, false);
@@ -238,10 +272,8 @@ class SimpleTests
 
         PartialHandleRead outputA(aOutRead.get());
         outputA.Expect("ready");
-
-        DWORD configured{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &configured));
-        VERIFY_ARE_NOT_EQUAL(baseline, configured);
+        const auto configured = GetConsoleSnapshot(conin.get(), conout.get());
+        VERIFY_ARE_NOT_EQUAL(baseline.InputMode, configured.InputMode);
 
         auto [bOutRead, bOutWrite] = CreateSubprocessPipe(false, true);
         auto [bInRead, bInWrite] = CreateSubprocessPipe(true, false);
@@ -252,39 +284,85 @@ class SimpleTests
 
         PartialHandleRead outputB(bOutRead.get());
         outputB.Expect("ready");
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
 
         SignalControllableProcessExit(aInWrite);
         VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(processA.get(), 15000));
-
         VERIFY_ARE_EQUAL(
             static_cast<DWORD>(WAIT_TIMEOUT),
             WaitForSingleObject(processB.get(), 0),
             L"Process B must still be alive when process A exits for out-of-order restore coverage");
-
-        DWORD afterA{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &afterA));
-        VERIFY_ARE_EQUAL(configured, afterA, L"The console must remain configured while process B is active");
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
 
         SignalControllableProcessExit(bInWrite);
         VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(processB.get(), 15000));
+        VerifyConsoleSnapshot(baseline, GetConsoleSnapshot(conin.get(), conout.get()));
+    }
 
-        DWORD finalMode{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
-        VERIFY_ARE_EQUAL(baseline, finalMode);
+    TEST_METHOD(ConsoleState_WslProcesses_CrashedParticipantDoesNotBlockRestore)
+    {
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        wil::unique_hfile conout{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin || !conout)
+        {
+            LogSkipped("Skipping ConsoleState crash test: console handles are not available");
+            return;
+        }
+
+        const auto original = GetConsoleSnapshot(conin.get(), conout.get());
+        auto restoreOriginal = wil::scope_exit([&] { SetConsoleSnapshot(conin.get(), conout.get(), original); });
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetConsoleMode(conin.get(), original.InputMode | ENABLE_PROCESSED_INPUT));
+        const auto baseline = GetConsoleSnapshot(conin.get(), conout.get());
+
+        auto [aOutRead, aOutWrite] = CreateSubprocessPipe(false, true);
+        auto [aInRead, aInWrite] = CreateSubprocessPipe(true, false);
+        unique_kill_process processA(StartControllableWslProcess(aInRead.get(), aOutWrite.get()));
+        VERIFY_IS_TRUE(processA.get() != nullptr);
+        aOutWrite.reset();
+        aInRead.reset();
+        PartialHandleRead outputA(aOutRead.get());
+        outputA.Expect("ready");
+        const auto configured = GetConsoleSnapshot(conin.get(), conout.get());
+
+        auto [bOutRead, bOutWrite] = CreateSubprocessPipe(false, true);
+        auto [bInRead, bInWrite] = CreateSubprocessPipe(true, false);
+        unique_kill_process processB(StartControllableWslProcess(bInRead.get(), bOutWrite.get()));
+        VERIFY_IS_TRUE(processB.get() != nullptr);
+        bOutWrite.reset();
+        bInRead.reset();
+        PartialHandleRead outputB(bOutRead.get());
+        outputB.Expect("ready");
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
+
+        VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(processA.get(), 0));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(processA.get(), 5000));
+        aInWrite.reset();
+        VERIFY_ARE_EQUAL(
+            static_cast<DWORD>(WAIT_TIMEOUT),
+            WaitForSingleObject(processB.get(), 0),
+            L"Process B must remain active after process A crashes");
+        VerifyConsoleSnapshot(configured, GetConsoleSnapshot(conin.get(), conout.get()));
+
+        SignalControllableProcessExit(bInWrite);
+        VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(processB.get(), 15000));
+        VerifyConsoleSnapshot(baseline, GetConsoleSnapshot(conin.get(), conout.get()));
     }
 
     TEST_METHOD(ConsoleState_WslProcesses_SeparateConsoles_Isolation)
     {
         wil::unique_hfile conin{CreateFileW(
             L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-        if (!conin)
+        wil::unique_hfile conout{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        if (!conin || !conout)
         {
-            LogSkipped("Skipping ConsoleState separate-console test: CONIN$ is not available (no attached console)");
+            LogSkipped("Skipping ConsoleState separate-console test: console handles are not available");
             return;
         }
 
-        DWORD baseline{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
+        const auto baseline = GetConsoleSnapshot(conin.get(), conout.get());
 
         auto [outRead, outWrite] = CreateSubprocessPipe(false, true);
         auto [inRead, inWrite] = CreateSubprocessPipe(true, false);
@@ -296,20 +374,11 @@ class SimpleTests
 
         PartialHandleRead output(outRead.get());
         output.Expect("ready");
-
-        DWORD duringOtherConsole{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &duringOtherConsole));
-        VERIFY_ARE_EQUAL(
-            baseline,
-            duringOtherConsole,
-            L"A WSL process launched in CREATE_NEW_CONSOLE must not mutate this console's input mode");
+        VerifyConsoleSnapshot(baseline, GetConsoleSnapshot(conin.get(), conout.get()));
 
         SignalControllableProcessExit(inWrite);
         VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(process.get(), 15000));
-
-        DWORD finalMode{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &finalMode));
-        VERIFY_ARE_EQUAL(baseline, finalMode);
+        VerifyConsoleSnapshot(baseline, GetConsoleSnapshot(conin.get(), conout.get()));
     }
 
     TEST_METHOD(StringHelpers)

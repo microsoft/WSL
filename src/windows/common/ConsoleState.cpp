@@ -57,23 +57,6 @@ try
 }
 CATCH_LOG()
 
-std::optional<DWORD> TryGetConsoleMode(_In_ HANDLE Handle)
-{
-    DWORD mode{};
-    if (!GetConsoleMode(Handle, &mode))
-    {
-        const auto error = GetLastError();
-        if ((error != ERROR_PIPE_NOT_CONNECTED) && (error != ERROR_INVALID_HANDLE))
-        {
-            LOG_WIN32_MSG(error, "GetConsoleMode failed");
-        }
-
-        return std::nullopt;
-    }
-
-    return mode;
-}
-
 struct ConsoleValues
 {
     DWORD InputMode;
@@ -84,16 +67,7 @@ struct ConsoleValues
 
 struct CoordinationState
 {
-    struct Owner
-    {
-        DWORD ProcessId;
-        ULONG References;
-        ULONGLONG CreationTime;
-    };
-
     ConsoleValues Baseline;
-    ConsoleValues Configured;
-    Owner Owners[128];
 };
 
 class MutexLock
@@ -130,30 +104,6 @@ void ApplyConsoleValues(HANDLE input, HANDLE output, const ConsoleValues& values
     TrySetConsoleMode(input, values.InputMode);
     LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(values.OutputCodePage));
     TrySetConsoleMode(output, values.OutputMode);
-}
-
-std::optional<ULONGLONG> TryGetProcessCreationTime(HANDLE process)
-{
-    FILETIME creation{}, exit{}, kernel{}, user{};
-    if (!GetProcessTimes(process, &creation, &exit, &kernel, &user))
-    {
-        LOG_LAST_ERROR_MSG("GetProcessTimes failed");
-        return std::nullopt;
-    }
-
-    return (static_cast<ULONGLONG>(creation.dwHighDateTime) << 32) | creation.dwLowDateTime;
-}
-
-bool IsOwnerAlive(const CoordinationState::Owner& owner)
-{
-    wil::unique_handle process{OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, owner.ProcessId)};
-    if (!process)
-    {
-        return GetLastError() != ERROR_INVALID_PARAMETER;
-    }
-
-    const auto creationTime = TryGetProcessCreationTime(process.get());
-    return (WaitForSingleObject(process.get(), 0) != WAIT_OBJECT_0) && (!creationTime || (creationTime.value() == owner.CreationTime));
 }
 
 std::optional<ULONG> TryGetConsoleId()
@@ -205,8 +155,15 @@ void ConsoleState::SetInteractiveMode()
         return;
     }
 
-    if ((m_restorePolicy == RestorePolicy::Cooperative) && AcquireCoordination())
+    if (m_restorePolicy == RestorePolicy::Cooperative)
     {
+        if (m_InputHandle || m_OutputHandle)
+        {
+            THROW_HR_IF(E_UNEXPECTED, !m_InputHandle || !m_OutputHandle);
+            THROW_HR_IF(E_UNEXPECTED, m_SavedOutputCodePage.has_value());
+            AcquireCoordination();
+        }
+
         m_interactiveModeConfigured = true;
         return;
     }
@@ -218,10 +175,6 @@ void ConsoleState::SetInteractiveMode()
     {
         m_SavedInputCodePage = GetConsoleCP();
         LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
-        if (m_restorePolicy == RestorePolicy::Cooperative)
-        {
-            m_ConfiguredInputCodePage = GetConsoleCP();
-        }
 
         // Configure for raw input with VT support.
         DWORD mode;
@@ -232,10 +185,6 @@ void ConsoleState::SetInteractiveMode()
         WI_ClearAllFlags(newMode, ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
         ChangeConsoleMode(m_InputHandle.get(), newMode);
         m_SavedInputMode = mode;
-        if (m_restorePolicy == RestorePolicy::Cooperative)
-        {
-            m_ConfiguredInputMode = TryGetConsoleMode(m_InputHandle.get()).value_or(newMode);
-        }
     }
 
     if (m_OutputHandle)
@@ -246,10 +195,6 @@ void ConsoleState::SetInteractiveMode()
         }
 
         LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
-        if (m_restorePolicy == RestorePolicy::Cooperative)
-        {
-            m_ConfiguredOutputCodePage = GetConsoleOutputCP();
-        }
 
         // Configure for VT output.
         DWORD mode;
@@ -259,10 +204,6 @@ void ConsoleState::SetInteractiveMode()
         WI_SetAllFlags(newMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
         ChangeConsoleMode(m_OutputHandle.get(), newMode);
         m_SavedOutputMode = mode;
-        if (m_restorePolicy == RestorePolicy::Cooperative)
-        {
-            m_ConfiguredOutputMode = TryGetConsoleMode(m_OutputHandle.get()).value_or(newMode);
-        }
     }
 
     m_interactiveModeConfigured = true;
@@ -286,17 +227,6 @@ void ConsoleState::SetOutputCodePageUtf8()
 
 ConsoleState::~ConsoleState()
 {
-    if (m_coordinationView)
-    {
-        try
-        {
-            ReleaseCoordination();
-        }
-        CATCH_LOG()
-
-        LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(m_coordinationView));
-    }
-
     RestoreConsoleState();
 }
 
@@ -316,151 +246,121 @@ void ConsoleState::ConfigureInteractiveMode()
     ChangeConsoleMode(m_OutputHandle.get(), outputMode);
 }
 
-bool ConsoleState::AcquireCoordination()
+void ConsoleState::AcquireCoordination()
 {
     const auto consoleId = TryGetConsoleId();
-    if (!consoleId || !m_InputHandle || !m_OutputHandle)
-    {
-        return false;
-    }
+    THROW_HR_IF(E_UNEXPECTED, !consoleId);
 
-    const auto name = std::format(L"Local\\WSL.ConsoleState.v1.{:X}", consoleId.value());
-    m_coordinationMutex.reset(CreateMutexW(nullptr, FALSE, (name + L".Mutex").c_str()));
+    auto token = wil::open_current_access_token();
+    const auto tokenUser = wil::get_token_information<TOKEN_USER>(token.get());
+    const auto userSid = wslutil::SidToString(tokenUser->User.Sid);
+    const auto sddl = std::format(L"D:P(A;;GA;;;SY)(A;;GA;;;{})S:(ML;;NW;;;ME)", userSid.get());
+    PSECURITY_DESCRIPTOR securityDescriptor{};
+    THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &securityDescriptor, nullptr));
+    m_coordinationSecurityDescriptor.reset(securityDescriptor);
+    m_coordinationSecurityAttributes = {sizeof(m_coordinationSecurityAttributes), m_coordinationSecurityDescriptor.get(), FALSE};
+
+    m_coordinationName = std::format(L"Local\\WSL.ConsoleState.v1.{}.{:X}", userSid.get(), consoleId.value());
+    m_coordinationMutex.reset(CreateMutexExW(
+        &m_coordinationSecurityAttributes, (m_coordinationName + L".Mutex").c_str(), 0, SYNCHRONIZE | MUTEX_MODIFY_STATE));
     THROW_LAST_ERROR_IF(!m_coordinationMutex);
-    m_coordinationMapping.reset(
-        CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(CoordinationState), (name + L".Mapping").c_str()));
-    THROW_LAST_ERROR_IF(!m_coordinationMapping);
-    auto view = MapViewOfFile(m_coordinationMapping.get(), FILE_MAP_ALL_ACCESS, 0, 0, sizeof(CoordinationState));
-    THROW_LAST_ERROR_IF(!view);
-    auto unmap = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(view)); });
 
     MutexLock lock(m_coordinationMutex.get());
-    auto& state = *static_cast<CoordinationState*>(view);
-    for (auto& owner : state.Owners)
-    {
-        if (owner.ProcessId && !IsOwnerAlive(owner))
-        {
-            owner = {};
-        }
-    }
 
-    const auto pid = GetCurrentProcessId();
-    const auto creationTime = TryGetProcessCreationTime(GetCurrentProcess());
-    if (!creationTime)
-    {
-        return false;
-    }
+    SetLastError(ERROR_SUCCESS);
+    wil::unique_handle event{CreateEventExW(
+        &m_coordinationSecurityAttributes, (m_coordinationName + L".Event").c_str(), CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE)};
+    THROW_LAST_ERROR_IF(!event);
+    const bool initialize = GetLastError() != ERROR_ALREADY_EXISTS;
 
-    auto owner = std::find_if(std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) {
-        return (value.ProcessId == pid) && (value.CreationTime == creationTime.value());
-    });
-    if (owner == std::end(state.Owners))
-    {
-        owner =
-            std::find_if(std::begin(state.Owners), std::end(state.Owners), [](const auto& value) { return value.ProcessId == 0; });
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TOO_MANY_SESS), owner == std::end(state.Owners));
-        *owner = {pid, 0, creationTime.value()};
-    }
+    SetLastError(ERROR_SUCCESS);
+    wil::unique_handle mapping{CreateFileMappingW(
+        INVALID_HANDLE_VALUE,
+        &m_coordinationSecurityAttributes,
+        PAGE_READWRITE,
+        0,
+        sizeof(CoordinationState),
+        (m_coordinationName + L".Mapping").c_str())};
+    THROW_LAST_ERROR_IF(!mapping);
+    const bool mappingCreated = GetLastError() != ERROR_ALREADY_EXISTS;
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), initialize != mappingCreated);
 
-    const bool initialize =
-        (owner->References == 0) && std::none_of(std::begin(state.Owners), std::end(state.Owners), [&](const auto& value) {
-            return value.ProcessId && (&value != &*owner);
-        });
-    ++owner->References;
+    auto view = MapViewOfFile(mapping.get(), FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, sizeof(CoordinationState));
+    THROW_LAST_ERROR_IF(!view);
+    auto unmapView = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(view)); });
+
     if (initialize)
     {
-        auto rollback = wil::scope_exit([&] { *owner = {}; });
-        state.Baseline = CaptureConsoleValues(m_InputHandle.get(), m_OutputHandle.get());
+        auto& baseline = static_cast<CoordinationState*>(view)->Baseline;
+        baseline = CaptureConsoleValues(m_InputHandle.get(), m_OutputHandle.get());
         auto restore = wil::scope_exit_log(
-            WI_DIAGNOSTICS_INFO, [&] { ApplyConsoleValues(m_InputHandle.get(), m_OutputHandle.get(), state.Baseline); });
+            WI_DIAGNOSTICS_INFO, [&] { ApplyConsoleValues(m_InputHandle.get(), m_OutputHandle.get(), baseline); });
         ConfigureInteractiveMode();
-        state.Configured = CaptureConsoleValues(m_InputHandle.get(), m_OutputHandle.get());
         restore.release();
-        rollback.release();
     }
 
+    m_coordinationEvent = std::move(event);
+    m_coordinationMapping = std::move(mapping);
     m_coordinationView = view;
-    m_ownerCreationTime = creationTime.value();
-    unmap.release();
-    return true;
+    unmapView.release();
 }
 
-void ConsoleState::ReleaseCoordination()
+void ConsoleState::RestoreConsoleState() noexcept
 {
-    MutexLock lock(m_coordinationMutex.get());
-    auto& state = *static_cast<CoordinationState*>(m_coordinationView);
-    const auto pid = GetCurrentProcessId();
-    for (auto& owner : state.Owners)
+    if (m_coordinationView)
     {
-        if ((owner.ProcessId == pid) && (owner.CreationTime == m_ownerCreationTime))
+        try
         {
-            if (--owner.References == 0)
+            MutexLock lock(m_coordinationMutex.get());
+
+            // The mutex prevents a new first participant from creating its event until the previous
+            // last participant has restored the baseline and released all epoch objects.
+            m_coordinationEvent.reset();
+            SetLastError(ERROR_SUCCESS);
+            wil::unique_handle probe{CreateEventExW(
+                &m_coordinationSecurityAttributes, (m_coordinationName + L".Event").c_str(), CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE)};
+            THROW_LAST_ERROR_IF(!probe);
+            const bool lastParticipant = GetLastError() != ERROR_ALREADY_EXISTS;
+            probe.reset();
+
+            if (lastParticipant)
             {
-                owner = {};
+                ApplyConsoleValues(m_InputHandle.get(), m_OutputHandle.get(), static_cast<CoordinationState*>(m_coordinationView)->Baseline);
             }
+
+            LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(m_coordinationView));
+            m_coordinationView = nullptr;
+            m_coordinationMapping.reset();
         }
-        else if (owner.ProcessId && !IsOwnerAlive(owner))
+        CATCH_LOG()
+
+        if (m_coordinationView)
         {
-            owner = {};
+            LOG_IF_WIN32_BOOL_FALSE(UnmapViewOfFile(m_coordinationView));
+            m_coordinationView = nullptr;
         }
+
+        m_coordinationEvent.reset();
+        m_coordinationMapping.reset();
+        m_coordinationMutex.reset();
+        m_coordinationSecurityAttributes = {};
+        m_coordinationSecurityDescriptor.reset();
+        m_coordinationName.clear();
+        return;
     }
 
-    if (std::none_of(std::begin(state.Owners), std::end(state.Owners), [](const auto& owner) { return owner.ProcessId != 0; }))
-    {
-        if (TryGetConsoleMode(m_InputHandle.get()) == state.Configured.InputMode)
-        {
-            TrySetConsoleMode(m_InputHandle.get(), state.Baseline.InputMode);
-        }
-        if (GetConsoleCP() == state.Configured.InputCodePage)
-        {
-            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(state.Baseline.InputCodePage));
-        }
-        if (TryGetConsoleMode(m_OutputHandle.get()) == state.Configured.OutputMode)
-        {
-            TrySetConsoleMode(m_OutputHandle.get(), state.Baseline.OutputMode);
-        }
-        if (GetConsoleOutputCP() == state.Configured.OutputCodePage)
-        {
-            LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(state.Baseline.OutputCodePage));
-        }
-        state = {};
-    }
-}
-
-void ConsoleState::RestoreConsoleState()
-{
     if (m_InputHandle)
     {
         if (m_SavedInputCodePage.has_value())
         {
-            const auto currentCodePage = GetConsoleCP();
-            if ((m_restorePolicy == RestorePolicy::Exclusive) || !m_ConfiguredInputCodePage.has_value() ||
-                (currentCodePage == m_ConfiguredInputCodePage.value()))
-            {
-                LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedInputCodePage.value()));
-            }
-
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedInputCodePage.value()));
             m_SavedInputCodePage.reset();
-            m_ConfiguredInputCodePage.reset();
         }
 
         if (m_SavedInputMode.has_value())
         {
-            if (m_restorePolicy == RestorePolicy::Exclusive)
-            {
-                TrySetConsoleMode(m_InputHandle.get(), m_SavedInputMode.value());
-            }
-            else
-            {
-                const auto currentMode = TryGetConsoleMode(m_InputHandle.get());
-                if (!m_ConfiguredInputMode.has_value() || (currentMode == m_ConfiguredInputMode))
-                {
-                    TrySetConsoleMode(m_InputHandle.get(), m_SavedInputMode.value());
-                }
-            }
-
+            TrySetConsoleMode(m_InputHandle.get(), m_SavedInputMode.value());
             m_SavedInputMode.reset();
-            m_ConfiguredInputMode.reset();
         }
     }
 
@@ -468,34 +368,14 @@ void ConsoleState::RestoreConsoleState()
     {
         if (m_SavedOutputCodePage.has_value())
         {
-            const auto currentCodePage = GetConsoleOutputCP();
-            if ((m_restorePolicy == RestorePolicy::Exclusive) || !m_ConfiguredOutputCodePage.has_value() ||
-                (currentCodePage == m_ConfiguredOutputCodePage.value()))
-            {
-                LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(m_SavedOutputCodePage.value()));
-            }
-
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(m_SavedOutputCodePage.value()));
             m_SavedOutputCodePage.reset();
-            m_ConfiguredOutputCodePage.reset();
         }
 
         if (m_SavedOutputMode.has_value())
         {
-            if (m_restorePolicy == RestorePolicy::Exclusive)
-            {
-                TrySetConsoleMode(m_OutputHandle.get(), m_SavedOutputMode.value());
-            }
-            else
-            {
-                const auto currentMode = TryGetConsoleMode(m_OutputHandle.get());
-                if (!m_ConfiguredOutputMode.has_value() || (currentMode == m_ConfiguredOutputMode))
-                {
-                    TrySetConsoleMode(m_OutputHandle.get(), m_SavedOutputMode.value());
-                }
-            }
-
+            TrySetConsoleMode(m_OutputHandle.get(), m_SavedOutputMode.value());
             m_SavedOutputMode.reset();
-            m_ConfiguredOutputMode.reset();
         }
     }
 }
