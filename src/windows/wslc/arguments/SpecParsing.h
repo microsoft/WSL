@@ -72,16 +72,6 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
 // Parses a --filter spec ("key=value"); the separator is required.
 std::pair<std::string, std::string> ParseFilter(const std::wstring& value);
 
-struct ParsedMount
-{
-    bool IsTmpfs = false;
-    std::wstring VolumeSpec;
-    std::string TmpfsSpec;
-};
-
-// Parses a Docker-style --mount spec into the existing volume or tmpfs representation.
-ParsedMount ParseMount(const std::wstring& value);
-
 // Parses a signal by name ("SIGKILL"/"KILL", case-insensitive) or number ("9") into a WSLCSignal.
 WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 

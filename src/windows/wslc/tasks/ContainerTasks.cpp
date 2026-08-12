@@ -19,6 +19,7 @@ Abstract:
 #include "ContainerService.h"
 #include "ContainerTasks.h"
 #include "ImageModel.h"
+#include "MountSpecParsing.h"
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
@@ -902,6 +903,8 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
             options.Tmpfs.emplace_back(WideToMultiByte(value));
         }
     }
+
+    ValidateUniqueMountDestinations(options);
 
     if (context.Args.Contains(ArgType::Label))
     {

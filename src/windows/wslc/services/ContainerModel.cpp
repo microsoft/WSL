@@ -13,11 +13,63 @@ Abstract:
 
 #include "precomp.h"
 #include "ContainerModel.h"
+#include <unordered_set>
 
 namespace wsl::windows::wslc::models {
 
 using namespace wsl::shared;
 using namespace wsl::shared::string;
+
+namespace {
+
+    std::string NormalizeMountDestination(std::string destination)
+    {
+        std::replace(destination.begin(), destination.end(), '\\', '/');
+
+        std::vector<std::string> components;
+        size_t start = 0;
+        while (start <= destination.size())
+        {
+            const auto end = destination.find('/', start);
+            const auto component = destination.substr(start, end - start);
+            if (!component.empty() && component != ".")
+            {
+                if (component == "..")
+                {
+                    if (!components.empty())
+                    {
+                        components.pop_back();
+                    }
+                }
+                else
+                {
+                    components.emplace_back(component);
+                }
+            }
+
+            if (end == std::string::npos)
+            {
+                break;
+            }
+
+            start = end + 1;
+        }
+
+        std::string result = "/";
+        for (const auto& component : components)
+        {
+            if (result.size() > 1)
+            {
+                result += '/';
+            }
+
+            result += component;
+        }
+
+        return result;
+    }
+
+} // namespace
 
 PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
 {
@@ -331,6 +383,28 @@ TmpfsMount TmpfsMount::Parse(const std::string& value)
     result.m_containerPath = value.substr(0, colonPos);
     result.m_options = value.substr(colonPos + 1);
     return result;
+}
+
+void ValidateUniqueMountDestinations(const ContainerOptions& options)
+{
+    std::unordered_set<std::string> destinations;
+    const auto addDestination = [&](const std::string& destination) {
+        const auto normalizedDestination = NormalizeMountDestination(destination);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::WSLCCLI_DuplicateMountDestinationError(MultiByteToWide(normalizedDestination)),
+            !destinations.emplace(normalizedDestination).second);
+    };
+
+    for (const auto& volumeSpec : options.Volumes)
+    {
+        addDestination(VolumeMount::Parse(volumeSpec).ContainerPath());
+    }
+
+    for (const auto& tmpfsSpec : options.Tmpfs)
+    {
+        addDestination(TmpfsMount::Parse(tmpfsSpec).ContainerPath());
+    }
 }
 
 CidFile::CidFile(const std::optional<std::wstring>& path)

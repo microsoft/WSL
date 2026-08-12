@@ -308,6 +308,8 @@ private:
     std::string m_options;
 };
 
+void ValidateUniqueMountDestinations(const ContainerOptions& options);
+
 class CidFile
 {
 public:

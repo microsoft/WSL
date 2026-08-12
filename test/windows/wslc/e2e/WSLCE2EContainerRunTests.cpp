@@ -1025,24 +1025,20 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_ReadOnly_IsReadOnly)
     {
         auto result = RunWslc(std::format(
-            L"container run --name {} --mount type=volume,source={},target=/data,readonly {} echo ok",
-            WslcContainerName,
+            L"container run --rm --mount type=volume,source={},target=/data {} sh -c \"echo -n original > /data/value\"",
             WslcVolumeName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"ok\n", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
-        const auto inspect = InspectContainer(WslcContainerName);
-        bool found = false;
-        for (const auto& mount : inspect.Mounts)
-        {
-            if (mount.Destination == "/data")
-            {
-                found = true;
-                VERIFY_IS_FALSE(mount.ReadWrite);
-            }
-        }
+        result = RunWslc(std::format(
+            L"container run --rm --mount type=volume,source={},target=/data,readonly {} sh -c \"echo changed > /data/value\"",
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = L"sh: 1: cannot create /data/value: Read-only file system\n", .ExitCode = 2});
 
-        VERIFY_IS_TRUE(found);
+        result = RunWslc(std::format(
+            L"container run --rm --mount type=volume,source={},target=/data {} cat /data/value", WslcVolumeName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"original", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_InvalidType_Fails)
@@ -1051,6 +1047,17 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"for '--mount' flag"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_DuplicateDestination_Fails)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} --mount type=tmpfs,target=/data --mount type=tmpfs,target=/data/ {} true",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Duplicate mount point: /data"));
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WithLabel_Success)

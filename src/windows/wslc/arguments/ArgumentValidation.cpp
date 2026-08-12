@@ -20,6 +20,7 @@ Abstract:
 #include "Exceptions.h"
 #include "ImageService.h"
 #include "Localization.h"
+#include "MountSpecParsing.h"
 #include <algorithm>
 #include <wslc.h>
 
