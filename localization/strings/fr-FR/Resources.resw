@@ -3235,7 +3235,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Image pull policy (always|missing|never) (default: missing)</value>
+    <value>Politique d’extraction d’image (always|missing|never) (par défaut : missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3271,7 +3271,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized pull policy. Supported pull policies are: {}.</value>
+    <value>Valeur {} non valide : {} n’est pas une politique de récupération reconnue. Les politiques de récupération prises en charge sont : {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">

@@ -421,7 +421,7 @@ Linux 이진 파일을 실행하기 위한 인수:
 옵션:
     --cd &lt;Directory&gt;
         지정된 디렉터리를 현재 작업 디렉터리로 설정합니다.
-        ~가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
+        ‘~’가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
         / 문자로 시작하면 절대 Linux 경로로 해석됩니다.
         그렇지 않으면 값이 절대 Windows 경로여야 합니다.
 
@@ -472,7 +472,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 필요한 선택적 구성 요소만 설치하고 배포를 설치하지 않습니다.
 
             --no-launch, -n
-                설치 후 배포를 시작하지 마세요.
+                설치 후 배포를 시작하지 않습니다.
 
             --version &lt;Version&gt;
                 새 배포에 사용할 버전을 지정합니다.
@@ -484,7 +484,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 Microsoft Store 대신 인터넷에서 배포를 다운로드합니다.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        배포판 관련 옵션을 변경합니다.
+        배포판별 옵션을 변경합니다.
 
         옵션:
             --move &lt;Location&gt;
@@ -507,7 +507,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 &lt;디스크&gt;가 가상 하드 디스크를 참조하도록 지정합니다.
 
             --bare
-                디스크를 WSL2에 연결하고 탑재하지는 마세요.
+                디스크를 WSL2에 연결하지만 탑재하지는 않습니다.
 
             --name &lt;Name&gt;
                 탑재 지점의 사용자 지정 이름을 사용하여 디스크를 탑재합니다.
@@ -543,7 +543,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
         이 컴퓨터에서 Linux용 Windows 하위 시스템 패키지를 제거합니다.
 
     --update
-        Linux용 Windows 하위 시스템 패키지를 업데이트합니다.
+        Linux 패키지용 Windows 하위 시스템을 업데이트합니다.
 
         옵션:
             --pre-release
@@ -556,7 +556,7 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         배포를 tar 파일로 내보냅니다.
-        파일 이름은 - for stdout 일 수 있습니다.
+        파일 이름은 ‘- for stdout’일 수 있습니다.
 
         옵션:
             --format &lt;Format&gt;
@@ -578,12 +578,12 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
         지정된 VHD 파일을 새 배포판으로 가져옵니다.
         이 가상 하드 디스크는 ext4 파일 시스템 형식으로 포맷해야 합니다.
 
-    --list, -l [Options]
+    --list, -l [옵션]
         배포를 나열합니다.
 
         옵션:
             --all
-                배포를 포함하여 모든 배포를 나열합니다.
+                배포를 포함하여 모든 배포를 나열합니다
                 현재 설치 중이거나 제거되고 있습니다.
 
             --running
@@ -3234,7 +3234,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Image pull policy (always|missing|never) (default: missing)</value>
+    <value>이미지 끌어오기 정책(always|missing|never)(기본값: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3270,7 +3270,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized pull policy. Supported pull policies are: {}.</value>
+    <value>잘못된 {} 값: {}은(는) 인식된 끌어오기 정책이 아닙니다. 지원되는 풀 정책은 {}입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
