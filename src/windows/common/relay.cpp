@@ -316,7 +316,7 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
     const HANDLE waitObjects[] = {leftOverlapped.hEvent, rightOverlapped.hEvent};
     for (;;)
     {
-        if ((LeftHandle == nullptr) || (RightHandle == nullptr))
+        if ((LeftHandle == nullptr) && (RightHandle == nullptr))
         {
             break;
         }
@@ -584,6 +584,12 @@ try
                 DWORD BytesRead{};
                 if (ReadFile(e.Handle, e.Buffer.data(), static_cast<DWORD>(e.Buffer.size()), &BytesRead, &e.Overlapped))
                 {
+                    if (BytesRead == 0)
+                    {
+                        e.State = Eof;
+                        continue;
+                    }
+
                     // IO is available.
                     Write(i, gsl::make_span(e.Buffer.data(), BytesRead));
 
