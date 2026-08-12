@@ -103,6 +103,10 @@ void Argument::Validate(ArgMap& execArgs) const
         CacheConverted<ArgType::Pull>(execArgs, m_name, validation::GetPullPolicyFromString);
         break;
 
+    case ArgType::Progress:
+        CacheConverted<ArgType::Progress>(execArgs, m_name, validation::GetProgressModeFromString);
+        break;
+
     case ArgType::Signal:
         CacheConverted<ArgType::Signal>(execArgs, m_name, validation::GetWSLCSignalFromString);
         break;

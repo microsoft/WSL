@@ -1022,6 +1022,8 @@ try
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
+    // Progress is requested as JSON so it can be parsed into the formatted progress messages sent to the
+    // client. The raw JSON is a docker implementation detail and is never forwarded.
     std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
@@ -1413,8 +1415,7 @@ try
         }
     };
 
-    // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure).
+    // Docker writes progress to stderr and the final image ID to stdout on success (empty on failure).
     //
     // For dest=- the exporter tarball is written to stdout, so it is relayed to the client handle as the
     // build runs. RelayHandle is an overlapped handle, so a slow client only marks the relay pending and
