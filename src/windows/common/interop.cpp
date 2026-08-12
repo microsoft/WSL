@@ -419,11 +419,13 @@ ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* R
     // N.B. ReadFile will automatically reset the event in the overlapped
     //      structure.
     DWORD ExitCode = 1;
+    DWORD Offset = 0;
+    LX_INIT_WINDOW_SIZE_CHANGED WindowSizeMessage;
     for (;;)
     {
         DWORD BytesRead{};
-        LX_INIT_WINDOW_SIZE_CHANGED WindowSizeMessage;
-        bool Success = ReadFile(MessageHandle, &WindowSizeMessage, sizeof(WindowSizeMessage), &BytesRead, &Overlapped);
+        bool Success = ReadFile(
+            MessageHandle, reinterpret_cast<BYTE*>(&WindowSizeMessage) + Offset, sizeof(WindowSizeMessage) - Offset, &BytesRead, &Overlapped);
         if (!Success)
         {
             const auto LastError = GetLastError();
@@ -467,10 +469,18 @@ ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* R
             break;
         }
 
-        WI_ASSERT((BytesRead == sizeof(WindowSizeMessage)) && (WindowSizeMessage.Header.MessageType == LxInitMessageWindowSizeChanged));
+        Offset += BytesRead;
+        if (Offset != sizeof(WindowSizeMessage))
+        {
+            continue;
+        }
+
+        WI_ASSERT(WindowSizeMessage.Header.MessageType == LxInitMessageWindowSizeChanged);
 
         const COORD Size{static_cast<SHORT>(WindowSizeMessage.Columns), static_cast<SHORT>(WindowSizeMessage.Rows)};
         THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), Size));
+
+        Offset = 0;
     }
 
     return ExitCode;
