@@ -18,6 +18,8 @@ Abstract:
 #include "RootCommand.h"
 #include "TableOutput.h"
 
+#include <algorithm>
+
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::common::vt;
