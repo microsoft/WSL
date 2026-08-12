@@ -18,7 +18,7 @@ jobs:
         contents: read
     steps:
       - name: Checkout actions
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install packages
         run: pip install -r doc/requirements.txt --break-system-packages
@@ -28,7 +28,7 @@ jobs:
         run: mkdocs build -f doc/mkdocs.yml
         shell: bash
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: doc/site
 
@@ -46,4 +46,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
