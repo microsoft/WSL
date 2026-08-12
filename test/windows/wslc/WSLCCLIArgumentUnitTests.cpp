@@ -431,6 +431,14 @@ class WSLCCLIArgumentUnitTests
             const std::string expected = "conv-value";
             VERIFY_IS_TRUE(std::vector<BYTE>(expected.begin(), expected.end()) == secret.Value);
         }
+
+        // string -> ParsedNetworkArgument (docker-style network name and aliases)
+        {
+            auto network = ValidateAndGetCached<ArgType::Network>(L"name=custom,alias=web");
+            VERIFY_ARE_EQUAL(network.Name, std::string("custom"));
+            VERIFY_ARE_EQUAL(network.Aliases.size(), static_cast<size_t>(1));
+            VERIFY_ARE_EQUAL(network.Aliases[0], std::string("web"));
+        }
     }
 
     // Test: Because ArgMap is a multimap and any command may allow an argument to repeat, a single
@@ -510,7 +518,6 @@ class WSLCCLIArgumentUnitTests
             {ArgType::Gpus, L"all"},
             {ArgType::Volume, LR"(C:\hostPath:/containerPath)"},
             {ArgType::WorkDir, L"/app"},
-            {ArgType::Network, L"bridge"},
             {ArgType::NetworkAlias, L"myalias"},
         };
 
