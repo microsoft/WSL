@@ -3022,6 +3022,18 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         }
     }
 
+    auto deleteWithRetry = [&](const std::filesystem::path& path) {
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(path.c_str())); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10),
+                {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
+        }
+        CATCH_LOG_MSG("Failed to delete %ls", path.c_str())
+    };
+
     // For WSL2 distributions, unmount and delete the VHD.
     if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD) || WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_UNMOUNT))
     {
@@ -3039,15 +3051,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
                 // The VHD might be in use so try to delete it for up to 10 seconds.
-                try
-                {
-                    wsl::shared::retry::RetryWithTimeout<void>(
-                        [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
-                        std::chrono::milliseconds(100),
-                        std::chrono::seconds(10),
-                        {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
-                }
-                CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
+                deleteWithRetry(Configuration.VhdFilePath);
             }
         }
     }
@@ -3058,22 +3062,14 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         const auto shortcutIconPath = Configuration.BasePath / c_shortIconName;
         if (std::filesystem::exists(shortcutIconPath))
         {
-            LOG_IF_WIN32_BOOL_FALSE_MSG(DeleteFileW(shortcutIconPath.c_str()), "Failed to delete %ls", shortcutIconPath.c_str());
+            deleteWithRetry(shortcutIconPath);
         }
 
         // Remove start menu entry for the distribution, if any.
         if (Configuration.ShortcutPath.has_value())
         {
             // The shortcut file may be in use. Try to delete it for up to 10 seconds, and then give up.
-            try
-            {
-                wsl::shared::retry::RetryWithTimeout<void>(
-                    [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
-                    std::chrono::milliseconds(100),
-                    std::chrono::seconds(10),
-                    {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
-            }
-            CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
+            deleteWithRetry(Configuration.ShortcutPath.value());
         }
 
         // Remove the terminal profile, if any.
@@ -3084,7 +3080,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
             if (profile.has_value())
             {
-                LOG_IF_WIN32_BOOL_FALSE_MSG(DeleteFileW(profile->c_str()), "Failed to delete %ls", profile->c_str());
+                deleteWithRetry(profile.value());
             }
         }
         CATCH_LOG()
