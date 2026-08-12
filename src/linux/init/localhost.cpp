@@ -298,7 +298,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 for (;;)
                 {
-                    if ((pollDescriptors[0].fd == -1) || (pollDescriptors[1].fd == -1))
+                    if ((pollDescriptors[0].fd == -1) && (pollDescriptors[1].fd == -1))
                     {
                         return;
                     }
