@@ -1367,8 +1367,12 @@ try
 
             if (vertex.cached && reportedCached.insert(vertex.digest).second)
             {
-                flushLine();
-                reportProgress(getStepToken(vertex.name) + " CACHED\n");
+                auto stepToken = getStepToken(vertex.name);
+                if (!stepToken.empty())
+                {
+                    flushLine();
+                    reportProgress(stepToken + " CACHED\n");
+                }
             }
 
             if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
