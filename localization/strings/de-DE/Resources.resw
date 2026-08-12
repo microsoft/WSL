@@ -379,7 +379,7 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linuxaus
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux aus
 
 Verbrauch:
     /l, /list [Option]
