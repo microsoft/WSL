@@ -2389,12 +2389,21 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
 
         const std::vector<WSLCFilter> anonymousVolumeFilters = {{"driver", "guest"}, {"label", "com.docker.volume.anonymous="}};
+        auto verifyAnonymousVolumeMount = [](const auto& inspect) {
+            VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1u);
+            VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "volume");
+            VERIFY_IS_FALSE(inspect.Mounts[0].Name.empty());
+            VERIFY_IS_FALSE(inspect.Mounts[0].Source.has_value());
+            VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, "/volume");
+            VERIFY_IS_TRUE(inspect.Mounts[0].ReadWrite);
+        };
 
         // Session-restart scenario: an anonymous volume-backed container survives a session reset.
         {
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
             auto container = launcher.Launch(*m_defaultSession);
             container.SetDeleteOnClose(false);
+            verifyAnonymousVolumeMount(container.Inspect());
 
             auto containerId = container.Id();
 
@@ -2416,6 +2425,10 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(containers.size(), 1);
             VERIFY_ARE_EQUAL(containers[0].Id, containerId);
+
+            auto recoveredContainer = OpenContainer(m_defaultSession.get(), containerId);
+            recoveredContainer.SetDeleteOnClose(false);
+            verifyAnonymousVolumeMount(recoveredContainer.Inspect());
         }
 
         // Delete container without WSLCDeleteFlagsDeleteVolumes -> anonymous volume is leaked.
@@ -2464,6 +2477,43 @@ class WSLCTests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
 
             VERIFY_ARE_EQUAL(ListVolumes(anonymousVolumeFilters).size(), 0u);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerInspectDockerfileVolumes)
+    {
+        const auto contextDir = std::filesystem::current_path() / "container-inspect-volume-build-context";
+        constexpr auto imageName = "wslc-test-container-inspect-volume:latest";
+        std::filesystem::create_directories(contextDir);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+            LOG_IF_FAILED(DeleteImageNoThrow(imageName, WSLCDeleteImageFlagsForce).first);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "VOLUME [\"/volume-a\", \"/volume-b\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, imageName));
+
+        WSLCContainerLauncher launcher(imageName, "wslc-test-container-inspect-volume");
+        auto container = launcher.Create(*m_defaultSession);
+        const auto inspect = container.Inspect();
+
+        VERIFY_ARE_EQUAL(inspect.Mounts.size(), 2u);
+        for (const auto* destination : {"/volume-a", "/volume-b"})
+        {
+            const auto mount =
+                std::ranges::find_if(inspect.Mounts, [&](const auto& entry) { return entry.Destination == destination; });
+            VERIFY_IS_TRUE(mount != inspect.Mounts.end());
+            VERIFY_ARE_EQUAL(mount->Type, "volume");
+            VERIFY_IS_FALSE(mount->Name.empty());
+            VERIFY_IS_FALSE(mount->Source.has_value());
+            VERIFY_IS_TRUE(mount->ReadWrite);
         }
     }
 
@@ -8348,10 +8398,11 @@ class WSLCTests
         };
 
         // Helper to verify mounts.
-        auto expectMounts = [&](const auto& actualMounts, const std::vector<std::tuple<std::string, std::string, bool>>& expectedMounts) {
+        auto expectMounts = [&](const auto& actualMounts,
+                                const std::vector<std::tuple<std::string, std::string, std::optional<std::filesystem::path>, bool>>& expectedMounts) {
             VERIFY_ARE_EQUAL(actualMounts.size(), expectedMounts.size());
 
-            for (const auto& [expectedDest, expectedType, expectedReadWrite] : expectedMounts)
+            for (const auto& [expectedDest, expectedType, expectedSource, expectedReadWrite] : expectedMounts)
             {
                 auto it = std::ranges::find_if(actualMounts, [&](const auto& mount) { return mount.Destination == expectedDest; });
                 if (it == actualMounts.end())
@@ -8363,9 +8414,12 @@ class WSLCTests
                 VERIFY_IS_FALSE(it->Type.empty());
                 VERIFY_ARE_EQUAL(it->Type, expectedType);
 
-                if (expectedType != "tmpfs")
+                VERIFY_ARE_EQUAL(it->Source.has_value(), expectedSource.has_value());
+                if (expectedSource.has_value())
                 {
-                    VERIFY_IS_FALSE(it->Source.empty());
+                    const std::filesystem::path actualSource(it->Source.value());
+                    VERIFY_IS_TRUE(actualSource.is_absolute());
+                    VERIFY_IS_TRUE(std::filesystem::equivalent(actualSource, expectedSource.value()));
                 }
                 VERIFY_ARE_EQUAL(it->ReadWrite, expectedReadWrite);
             }
@@ -8375,6 +8429,9 @@ class WSLCTests
         {
             auto testFolder = std::filesystem::current_path() / "test-inspect-volume";
             auto testFolderReadOnly = std::filesystem::current_path() / "test-inspect-volume-ro";
+            const std::string guestVolumeName = "test-container-inspect-guest-volume";
+            const std::string vhdVolumeName = "test-container-inspect-vhd-volume";
+            const auto vhdVolumePath = m_storagePath / "volumes" / (vhdVolumeName + ".vhdx");
 
             std::filesystem::create_directories(testFolder);
             std::filesystem::create_directories(testFolderReadOnly);
@@ -8383,7 +8440,12 @@ class WSLCTests
                 std::error_code ec;
                 std::filesystem::remove_all(testFolder, ec);
                 std::filesystem::remove_all(testFolderReadOnly, ec);
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(guestVolumeName.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(vhdVolumeName.c_str()));
             });
+
+            CreateNamedVolume(guestVolumeName, "guest");
+            CreateNamedVolume(vhdVolumeName, "vhd", {}, {{"SizeBytes", "1073741824"}});
 
             WSLCContainerLauncher launcher("debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, "bridge");
 
@@ -8392,6 +8454,8 @@ class WSLCTests
             launcher.AddPort(1236, 8001, AF_INET);
             launcher.AddVolume(testFolder.wstring(), "/test-volume", false);
             launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true);
+            launcher.AddNamedVolume(guestVolumeName, "/test-guest-volume", false);
+            launcher.AddNamedVolume(vhdVolumeName, "/test-vhd-volume", true);
             launcher.AddTmpfs("/mnt/wslc-tmpfs-inspect", "");
 
             auto container = launcher.Launch(*m_defaultSession);
@@ -8419,7 +8483,11 @@ class WSLCTests
             // Verify mounts match what we configured.
             expectMounts(
                 details.Mounts,
-                {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}, {"/mnt/wslc-tmpfs-inspect", "tmpfs", true}});
+                {{"/test-volume", "bind", testFolder, true},
+                 {"/test-volume-ro", "bind", testFolderReadOnly, false},
+                 {"/test-guest-volume", "volume", std::nullopt, true},
+                 {"/test-vhd-volume", "volume", vhdVolumePath, false},
+                 {"/mnt/wslc-tmpfs-inspect", "tmpfs", std::nullopt, true}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
@@ -9475,7 +9543,8 @@ class WSLCTests
                 auto inspect = container.Inspect();
                 VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1);
                 VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, "/volume");
-                VERIFY_ARE_EQUAL(inspect.Mounts[0].Source, (hostFolder / "file.txt").string());
+                VERIFY_IS_TRUE(inspect.Mounts[0].Source.has_value());
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Source.value(), (hostFolder / "file.txt").string());
                 VERIFY_ARE_EQUAL(inspect.Mounts[0].ReadWrite, true);
                 VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "bind");
             };

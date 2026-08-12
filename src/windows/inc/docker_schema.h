@@ -438,11 +438,12 @@ struct ContainerConfig
 struct InspectMount
 {
     std::string Type;
+    std::string Name;
     std::string Source;
     std::string Destination;
     bool RW{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, RW);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Name, Source, Destination, RW);
 };
 
 struct InspectContainer
@@ -454,9 +455,10 @@ struct InspectContainer
     ContainerInspectState State;
     ContainerConfig Config;
     HostConfig HostConfig;
+    std::vector<InspectMount> Mounts;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings);
 };
 
 struct InspectExec

@@ -1599,12 +1599,11 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcInspect.Ports[portKey].push_back(std::move(portBinding));
     }
 
-    // Map volume mounts using WSLC's host-side data.
-    wslcInspect.Mounts.reserve(m_mountedVolumes.size() + dockerInspect.HostConfig.Tmpfs.size());
+    // Map mounts without exposing Linux paths from the utility VM.
+    wslcInspect.Mounts.reserve(m_mountedVolumes.size() + dockerInspect.Mounts.size() + dockerInspect.HostConfig.Tmpfs.size());
     for (const auto& volume : m_mountedVolumes)
     {
         wslc_schema::InspectMount mountInfo{};
-        // TODO: Support different mount types (plan9/VHD) when VHD volumes are implemented.
         mountInfo.Type = "bind";
 
         // For file mounts, reconstruct the original host path from the parent directory and filename.
@@ -1621,6 +1620,28 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
 
         mountInfo.Destination = volume.ContainerPath;
         mountInfo.ReadWrite = !volume.ReadOnly;
+        wslcInspect.Mounts.push_back(std::move(mountInfo));
+    }
+
+    for (const auto& volume : dockerInspect.Mounts)
+    {
+        // N.B. Dockerfile VOLUME declarations are represented by Docker as volume mounts.
+        if (volume.Type != "volume")
+        {
+            continue;
+        }
+
+        wslc_schema::InspectMount mountInfo{};
+        mountInfo.Type = volume.Type;
+        mountInfo.Name = volume.Name;
+        mountInfo.Destination = volume.Destination;
+        mountInfo.ReadWrite = volume.RW;
+
+        if (auto sourcePath = m_runtime.Volumes().GetVolumeSourcePath(volume.Name))
+        {
+            mountInfo.Source = sourcePath->string();
+        }
+
         wslcInspect.Mounts.push_back(std::move(mountInfo));
     }
 

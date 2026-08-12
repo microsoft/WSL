@@ -54,6 +54,8 @@ public:
 
     std::pair<HRESULT, std::string> GetVolumeStatus(_In_ const std::string& Name) const;
 
+    std::optional<std::filesystem::path> GetVolumeSourcePath(_In_ const std::string& Name) const;
+
 private:
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const std::string& volumeName);

@@ -82,6 +82,11 @@ public:
         return m_status;
     }
 
+    std::optional<std::filesystem::path> SourcePath() const override
+    {
+        return m_hostPath;
+    }
+
     void Delete() override;
     std::string Inspect() const override;
     WSLCVolumeInformation GetVolumeInformation() const override;
