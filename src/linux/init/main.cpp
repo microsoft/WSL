@@ -2949,6 +2949,59 @@ try
 }
 CATCH_RETURN_ERRNO();
 
+int ProcessTrimDistributionMessage(gsl::span<gsl::byte> Buffer)
+try
+{
+    auto* Message = gslhelpers::try_get_struct<LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE>(Buffer);
+
+    if (!Message)
+    {
+        LOG_ERROR("Unexpected message size {}", Buffer.size());
+        return -1;
+    }
+
+    wil::unique_fd SocketFd{UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true)};
+    if (!SocketFd)
+    {
+        return -1;
+    }
+
+    const int ChildPid = UtilCreateChildProcess(
+        "TrimDistribution", [Message, Channel = wsl::shared::SocketChannel{std::move(SocketFd), "TrimDistribution"}]() mutable {
+            int ResponseCode = -1;
+            auto ReportStatus = wil::scope_exit([&]() {
+                LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE ResponseMessage{};
+                ResponseMessage.ResponseCode = ResponseCode;
+                ResponseMessage.Header.MessageType = LxMiniInitMessageTrimDistributionResponse;
+                ResponseMessage.Header.MessageSize = sizeof(ResponseMessage);
+
+                Channel.SendMessage(ResponseMessage);
+            });
+
+            const auto DevicePath = GetLunDevicePath(Message->ScsiLun);
+
+            //
+            // Run a full offline filesystem check and discard the free blocks so the host can reclaim
+            // them when the VHD is compacted. This mirrors the offline e2fsck used by
+            // ResizeDistribution: it runs on the detached device without mounting it, and '-E discard'
+            // issues the same block-discard requests that 'fstrim' would on a mounted filesystem.
+            //
+            // This is best-effort: a failure here must not prevent compaction, so the child logs the
+            // error but still reports success.
+            //
+            const auto CommandLine = std::format("/usr/sbin/e2fsck -f -y -E discard '{}'", DevicePath);
+            if (UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0)
+            {
+                LOG_WARNING("Failed to trim {}", DevicePath.c_str());
+            }
+
+            ResponseCode = 0;
+        });
+
+    return (ChildPid < 0) ? -1 : 0;
+}
+CATCH_RETURN_ERRNO();
+
 int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
 
 /*++
@@ -3318,6 +3371,13 @@ try
     {
 
         ProcessResizeDistributionMessage(Buffer);
+        return 0;
+    }
+
+    case LxMiniInitMessageTrimDistribution:
+    {
+
+        ProcessTrimDistributionMessage(Buffer);
         return 0;
     }
 

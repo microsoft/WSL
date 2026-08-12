@@ -191,6 +191,11 @@ public:
     IFACEMETHOD(ResizeDistribution)(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Compacts the virtual disk of a distribution.
+    /// </summary>
+    IFACEMETHOD(CompactDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Sets the default distribution.
     /// </summary>
     IFACEMETHOD(SetDefaultDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
@@ -466,6 +471,12 @@ public:
     /// </summary>
     HRESULT
     ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
+
+    /// <summary>
+    /// Compacts the disk of a distribution.
+    /// </summary>
+    HRESULT
+    CompactDistribution(_In_ LPCGUID DistroGuid);
 
     /// <summary>
     /// Sets the default distribution.

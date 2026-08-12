@@ -75,6 +75,7 @@ Abstract:
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION L's'
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L"--set-sparse"
 #define WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG L"--set-default-user"
+#define WSL_MANAGE_ARG_COMPACT_OPTION_LONG L"--compact"
 #define WSL_MOUNT_ARG L"--mount"
 #define WSL_MOUNT_ARG_VHD_OPTION_LONG L"--vhd"
 #define WSL_MOUNT_ARG_BARE_OPTION_LONG L"--bare"
