@@ -16,6 +16,7 @@ Abstract:
 #include "SessionService.h"
 #include "SpecParsing.h"
 #include "WarningCallback.h"
+#include <filesystem.hpp>
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <relay.hpp>
@@ -266,7 +267,7 @@ void ImageService::Build(
     std::wstring iidPathStr;
     if (iidFilePath.has_value())
     {
-        iidPathStr = std::filesystem::weakly_canonical(std::filesystem::absolute(*iidFilePath)).wstring();
+        iidPathStr = wsl::windows::common::filesystem::GetCanonicalPath(*iidFilePath).wstring();
     }
 
     WSLCBuildImageOptions options{

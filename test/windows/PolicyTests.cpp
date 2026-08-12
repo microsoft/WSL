@@ -481,6 +481,14 @@ class PolicyTest
         VERIFY_ARE_EQUAL(expected, stderrText);
     }
 
+    // Two variants: BuildKit echoes the caller's Dockerfile spelling in the "failed to solve" prefix.
+    static constexpr auto c_denialPatternExplicitAlpine =
+        "*failed to solve: docker.io/library/alpine:latest: could not resolve image due to policy: "
+        "source \"docker-image://docker.io/library/alpine:latest\" denied by policy: source denied by policy*";
+    static constexpr auto c_denialPatternImplicitAlpine =
+        "*failed to solve: alpine:latest: could not resolve image due to policy: "
+        "source \"docker-image://docker.io/library/alpine:latest\" denied by policy: source denied by policy*";
+
     // Verifies WSLContainerRegistryAllowlist blocks `wslc image build` when the FROM base image
     // isn't in the allowlist. Matches the `RegistryAllowlistDenies` pull test.
     WSLC_TEST_METHOD(RegistryAllowlistBlocksImageBuild)
@@ -490,11 +498,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(L"FROM docker.io/library/alpine:latest\n", L"wsl-policy-build-blocked");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"denied by policy") == std::wstring::npos)
-        {
-            LogError("Expected BuildKit source-policy denial mentioning docker.io, got: '%ls'", output.c_str());
-            VERIFY_FAIL();
-        }
+        VerifyPatternMatch(wsl::shared::string::WideToMultiByte(output), c_denialPatternExplicitAlpine);
     }
 
     // Positive path: build must proceed when FROM is on the allowlist.
@@ -537,11 +541,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(dockerfile, L"wsl-policy-build-copyfrom");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"docker.io") == std::wstring::npos || output.find(L"denied by policy") == std::wstring::npos)
-        {
-            LogError("Expected COPY --from=docker.io/... to be blocked, got: '%ls'", output.c_str());
-            VERIFY_FAIL();
-        }
+        VerifyPatternMatch(wsl::shared::string::WideToMultiByte(output), c_denialPatternExplicitAlpine);
     }
 
     WSLC_TEST_METHOD(RegistryAllowlistBlocksImageBuildImplicitDockerIo)
@@ -551,12 +551,7 @@ class PolicyTest
         auto [exitCode, output] = RunImageBuild(L"FROM alpine:latest\n", L"wsl-policy-build-implicit");
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        if (output.find(L"denied by policy") == std::wstring::npos ||
-            (output.find(L"docker.io") == std::wstring::npos && output.find(L"alpine") == std::wstring::npos))
-        {
-            LogError("Expected bare `FROM alpine:latest` to be blocked, got: '%ls'", output.c_str());
-            VERIFY_FAIL();
-        }
+        VerifyPatternMatch(wsl::shared::string::WideToMultiByte(output), c_denialPatternImplicitAlpine);
     }
 
     // Runs `wslc image build` with the supplied Dockerfile content and returns the exit code
@@ -648,23 +643,12 @@ class PolicyTest
         }
     }
 
-    // Pure-function tests for ReadRegistryAllowlistSnapshot (used by `wslc image build` to
-    // decide between fail-open-no-policy, generate-source-policy, and fail-closed paths).
+    // The (HKEY) overload is exercised transitively via FromPoliciesRoot.
     TEST_METHOD(ReadRegistryAllowlistSnapshot_Logic)
     {
-        // Null policies key -> NotConfigured, no hosts.
-        {
-            const auto snapshot = ReadRegistryAllowlistSnapshot(nullptr);
-            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::NotConfigured);
-            VERIFY_IS_TRUE(snapshot.Hosts.empty());
-        }
-
-        const auto policiesKey = OpenPoliciesKey();
-        VERIFY_IS_TRUE(!!policiesKey);
-
         // No sub-key -> NotConfigured.
         {
-            const auto snapshot = ReadRegistryAllowlistSnapshot(policiesKey.get());
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
             VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::NotConfigured);
             VERIFY_IS_TRUE(snapshot.Hosts.empty());
         }
@@ -673,7 +657,7 @@ class PolicyTest
         // items must not silently deny every registry).
         {
             auto revert = SetRegistryAllowlist({L"", L""});
-            const auto snapshot = ReadRegistryAllowlistSnapshot(policiesKey.get());
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
             VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::NotConfigured);
             VERIFY_IS_TRUE(snapshot.Hosts.empty());
         }
@@ -681,25 +665,9 @@ class PolicyTest
         // Sub-key with hosts -> Configured, hosts populated in order.
         {
             auto revert = SetRegistryAllowlist({L"mcr.microsoft.com", L"Docker.IO"});
-            const auto snapshot = ReadRegistryAllowlistSnapshot(policiesKey.get());
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
             VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::Configured);
             VERIFY_ARE_EQUAL(size_t{2}, snapshot.Hosts.size());
-        }
-    }
-
-    TEST_METHOD(ReadRegistryAllowlistSnapshotFromPoliciesRoot_Logic)
-    {
-        {
-            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
-            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::NotConfigured);
-            VERIFY_IS_TRUE(snapshot.Hosts.empty());
-        }
-
-        {
-            auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
-            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
-            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::Configured);
-            VERIFY_ARE_EQUAL(size_t{1}, snapshot.Hosts.size());
         }
     }
 };

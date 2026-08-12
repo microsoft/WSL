@@ -23,6 +23,7 @@ Abstract:
 #include "SessionService.h"
 #include "TableOutput.h"
 #include <wil/result_macros.h>
+#include <filesystem.hpp>
 #include <wslc_schema.h>
 #include <filesystem>
 
@@ -389,7 +390,7 @@ void ContainerCp(CLIExecutionContext& context)
 
         // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
         std::error_code canonicalError;
-        auto absTarget = std::filesystem::weakly_canonical(std::filesystem::absolute(target), canonicalError);
+        auto absTarget = wsl::windows::common::filesystem::GetCanonicalPath(target, canonicalError);
         if (canonicalError)
         {
             absTarget = std::filesystem::absolute(target); // Fall back to absolute if canonicalization fails.

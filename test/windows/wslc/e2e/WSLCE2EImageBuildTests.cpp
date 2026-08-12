@@ -1301,6 +1301,51 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(inspectedId, wsl::windows::common::string::WideToMultiByte(iid));
     }
 
+    // --iidfile must accept a path relative to the caller's current directory. The client is responsible
+    // for making the path absolute before it reaches the service, which rejects non-absolute paths.
+    // std::filesystem::weakly_canonical alone is not sufficient here: --iidfile names a file that does
+    // not exist yet, so there is no leading element to canonicalize and the path is returned unchanged.
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_IidFile_RelativePath)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageIidFileRelative);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-iidfile-relative";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = SharedOutputBuildContext();
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nRUN echo wslc-iidfile-relative-marker > /marker.txt\n");
+
+        // Run wslc from testRoot so the --iidfile argument below resolves against it. Declared after
+        // the directory cleanup so the working directory is restored before the directory is removed.
+        auto originalDirectory = std::filesystem::current_path();
+        auto restoreDirectory = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::current_path(originalDirectory, ec);
+        });
+        std::filesystem::current_path(testRoot);
+
+        const std::wstring relativeIidFile = L"image.id";
+        VERIFY_IS_FALSE(std::filesystem::path(relativeIidFile).is_absolute());
+        VERIFY_IS_FALSE(std::filesystem::exists(testRoot / relativeIidFile));
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --iidfile \"{}\"",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageIidFileRelative.NameAndTag(),
+            relativeIidFile));
+        buildResult.Verify({.ExitCode = 0});
+
+        VERIFY_IS_TRUE(std::filesystem::exists(testRoot / relativeIidFile), L"--iidfile must accept a relative path");
+        const auto iid = ReadFileContent((testRoot / relativeIidFile).wstring());
+        VERIFY_IS_TRUE(iid.starts_with(L"sha256:"), L"iidfile must contain a sha256 digest");
+
+        // The digest written to the iidfile must match the ID the image is stored under.
+        const auto inspectedId = InspectImage(BuiltImageIidFileRelative.NameAndTag()).Id;
+        VERIFY_ARE_EQUAL(inspectedId, wsl::windows::common::string::WideToMultiByte(iid));
+    }
+
     // A failing build must not write the iidfile (matching docker: the file only appears on success).
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_IidFile_BuildFailure_NoFileWritten)
     {
@@ -1498,6 +1543,7 @@ private:
     const TestImage BuiltImageIidFileNotWritable{L"wslc-e2e-build-iidfile-readonly", L"latest", L""};
     const TestImage BuiltImageProgressPlain{L"wslc-e2e-build-progress-plain", L"latest", L""};
     const TestImage BuiltImageProgressQuiet{L"wslc-e2e-build-progress-quiet", L"latest", L""};
+    const TestImage BuiltImageIidFileRelative{L"wslc-e2e-build-iidfile-relative", L"latest", L""};
 
     // Runs `tar.exe -tf <path>` and returns the member listing so tests can assert an exporter produced a
     // valid, non-empty archive that contains an expected entry.

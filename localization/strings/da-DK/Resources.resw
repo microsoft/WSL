@@ -3228,7 +3228,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Politik for billedtræk (always|missing|never) (standard:never)</value>
+    <value>Politik for billedtræk (always|missing|never) (standard:missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3261,6 +3261,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>Ugyldig {}-værdi: {} er ikke en genkendt formattype. Understøttede formattyper er: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Ugyldig {}-værdi: {} er ikke en kendt pull-politik. Understøttede pull-politikker er: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
