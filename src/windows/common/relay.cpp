@@ -297,8 +297,8 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
 
     bool leftReadPending = false;
     bool rightReadPending = false;
-    bool leftReadClosed = false;
-    bool rightReadClosed = false;
+    bool leftReadClosed = (LeftHandle == nullptr);
+    bool rightReadClosed = (RightHandle == nullptr);
     auto cancelReads = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         DWORD bytes;
         if (leftReadPending)
