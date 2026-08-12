@@ -180,10 +180,8 @@ public:
     IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListVolumes)
-    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
-     _In_ ULONG FiltersCount,
-     _Out_ WSLCVolumeInformation** Volumes,
-     _Out_ ULONG* Count) override;
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count)
+        override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneVolumes)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
@@ -197,16 +195,12 @@ public:
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)
-    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
-     _In_ ULONG FiltersCount,
-     _Out_ WSLCNetworkInformation** Networks,
-     _Out_ ULONG* Count) override;
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count)
+        override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneNetworks)
-    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
-     _In_ ULONG FiltersCount,
-     _Out_ WSLCNetworkName** Networks,
-     _Out_ ULONG* NetworksCount) override;
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkName** Networks, _Out_ ULONG* NetworksCount)
+        override;
 
     IFACEMETHOD(Terminate()) override;
 
