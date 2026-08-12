@@ -10686,6 +10686,7 @@ class WSLCTests
     {
         // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
         std::map<std::string, std::string> labels = {{"key1", "value1"}, {"key2", std::string(10000, 'a')}};
+        const std::string c_image = "debian:latest";
 
         // Contains-style rather than exact-equality so the test stays green if the base image ever ships with its own labels.
         auto verifyUserLabelsPresent = [&](const std::map<std::string, std::string>& observed) {
@@ -10714,6 +10715,10 @@ class WSLCTests
             verifyUserLabelsPresent(containerLabels);
             VERIFY_IS_TRUE(containerLabels.find("com.microsoft.wsl.container.metadata") == containerLabels.end());
 
+            const auto inspect = container.Inspect();
+            VERIFY_ARE_EQUAL(c_image, inspect.Config.Image);
+            VERIFY_ARE_EQUAL(inspect.Image, inspect.Config.Image);
+
             // Keep the container alive after the handle is dropped so we can validate labels are persisted across sessions.
             container.SetDeleteOnClose(false);
         }
@@ -10734,6 +10739,8 @@ class WSLCTests
             verifyUserLabelsPresent(inspect.Labels);
             VERIFY_ARE_EQUAL(inspect.Config.Labels, inspect.Labels);
             VERIFY_IS_TRUE(inspect.Config.Labels.find(c_metadataLabel) == inspect.Config.Labels.end());
+            VERIFY_ARE_EQUAL(c_image, inspect.Config.Image);
+            VERIFY_ARE_EQUAL(inspect.Image, inspect.Config.Image);
         }
 
         // Test nullptr key
