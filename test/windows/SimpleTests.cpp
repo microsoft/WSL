@@ -222,10 +222,12 @@ class SimpleTests
             return;
         }
 
-        DWORD baseline{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &baseline));
-        const DWORD scopeExitRestore = baseline;
-        auto restoreBaseline = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), scopeExitRestore); });
+        DWORD originalMode{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(conin.get(), &originalMode));
+        auto restoreOriginalMode = wil::scope_exit([&] { ::SetConsoleMode(conin.get(), originalMode); });
+
+        const DWORD baseline = originalMode | ENABLE_PROCESSED_INPUT;
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetConsoleMode(conin.get(), baseline));
 
         auto [aOutRead, aOutWrite] = CreateSubprocessPipe(false, true);
         auto [aInRead, aInWrite] = CreateSubprocessPipe(true, false);
