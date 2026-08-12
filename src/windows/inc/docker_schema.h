@@ -702,9 +702,11 @@ struct BuildKitVertex
     std::string digest;
     std::string name;
     std::string started;
+    std::string completed;
     std::string error;
+    bool cached{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, completed, error, cached);
 };
 
 struct BuildKitStatus
