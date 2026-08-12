@@ -3205,9 +3205,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
     WSL2_TEST_METHOD(MoveVhdWithAdminOwner)
     {
-        // Regression test for #40716: if the VHD's owner is BUILTIN\Administrators
-        // (as happens after a cross-volume MoveFileEx from an elevated context),
-        // the move must still succeed because setVhdOwner runs as SYSTEM.
+        // Regression test for #40716: a same-volume move must succeed when the VHD
+        // is already owned by BUILTIN\Administrators.
         constexpr auto name = L"move-admin-owner-test-distro";
         constexpr auto firstFolder = L"move-admin-owner-first";
         constexpr auto secondFolder = L"move-admin-owner-second";
@@ -3255,9 +3254,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto newVhdPath = std::format(L"{}\\ext4.vhdx", secondFolder);
         VERIFY_IS_TRUE(std::filesystem::exists(newVhdPath));
 
-        // Verify the VHD owner was preserved. The code reads the owner before
-        // MoveFileEx and restores it afterward. Since we set the owner to
-        // Administrators before this move, it should still be Administrators.
+        // A same-volume move preserves the VHD owner.
         {
             PSID ownerSid = nullptr;
             wil::unique_hlocal descriptor;
