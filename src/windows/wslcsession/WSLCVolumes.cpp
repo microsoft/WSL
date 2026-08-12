@@ -212,16 +212,6 @@ std::pair<HRESULT, std::string> WSLCVolumes::GetVolumeStatus(const std::string& 
     return it->second->Status();
 }
 
-std::optional<std::filesystem::path> WSLCVolumes::GetVolumeSourcePath(const std::string& Name) const
-{
-    auto lock = m_lock.lock_shared();
-
-    auto it = m_volumes.find(Name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(Name), it == m_volumes.end());
-
-    return it->second->SourcePath();
-}
-
 WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::string, std::vector<std::string>>& Filters)
 {
     auto lock = m_lock.lock_exclusive();

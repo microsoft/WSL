@@ -18,9 +18,7 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
-#include <filesystem>
 #include <map>
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -48,12 +46,6 @@ public:
     virtual std::pair<HRESULT, std::string> Status() const
     {
         return {S_OK, {}};
-    }
-
-    // Returns the Windows-side storage path when the volume has one.
-    virtual std::optional<std::filesystem::path> SourcePath() const
-    {
-        return std::nullopt;
     }
 
     // Remove the volume from docker and release any host-side resources

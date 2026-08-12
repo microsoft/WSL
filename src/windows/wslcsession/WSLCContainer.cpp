@@ -1625,7 +1625,12 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
 
     for (const auto& volume : dockerInspect.Mounts)
     {
-        // N.B. Dockerfile VOLUME declarations are represented by Docker as volume mounts.
+        // This block covers non-vhd volumes. This includes:
+        // - Guest volumes mounted via -v
+        // - Volumes mounted as part of the image (via VOLUME)
+        //
+        // TODO: Return mounts once --mount is implemented.
+
         if (volume.Type != "volume")
         {
             continue;
@@ -1636,11 +1641,6 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         mountInfo.Name = volume.Name;
         mountInfo.Destination = volume.Destination;
         mountInfo.ReadWrite = volume.RW;
-
-        if (auto sourcePath = m_runtime.Volumes().GetVolumeSourcePath(volume.Name))
-        {
-            mountInfo.Source = sourcePath->string();
-        }
 
         wslcInspect.Mounts.push_back(std::move(mountInfo));
     }

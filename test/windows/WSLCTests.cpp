@@ -8430,8 +8430,6 @@ class WSLCTests
             auto testFolder = std::filesystem::current_path() / "test-inspect-volume";
             auto testFolderReadOnly = std::filesystem::current_path() / "test-inspect-volume-ro";
             const std::string guestVolumeName = "test-container-inspect-guest-volume";
-            const std::string vhdVolumeName = "test-container-inspect-vhd-volume";
-            const auto vhdVolumePath = m_storagePath / "volumes" / (vhdVolumeName + ".vhdx");
 
             std::filesystem::create_directories(testFolder);
             std::filesystem::create_directories(testFolderReadOnly);
@@ -8441,11 +8439,9 @@ class WSLCTests
                 std::filesystem::remove_all(testFolder, ec);
                 std::filesystem::remove_all(testFolderReadOnly, ec);
                 LOG_IF_FAILED(m_defaultSession->DeleteVolume(guestVolumeName.c_str()));
-                LOG_IF_FAILED(m_defaultSession->DeleteVolume(vhdVolumeName.c_str()));
             });
 
             CreateNamedVolume(guestVolumeName, "guest");
-            CreateNamedVolume(vhdVolumeName, "vhd", {}, {{"SizeBytes", "1073741824"}});
 
             WSLCContainerLauncher launcher("debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, "bridge");
 
@@ -8455,7 +8451,6 @@ class WSLCTests
             launcher.AddVolume(testFolder.wstring(), "/test-volume", false);
             launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true);
             launcher.AddNamedVolume(guestVolumeName, "/test-guest-volume", false);
-            launcher.AddNamedVolume(vhdVolumeName, "/test-vhd-volume", true);
             launcher.AddTmpfs("/mnt/wslc-tmpfs-inspect", "");
 
             auto container = launcher.Launch(*m_defaultSession);
@@ -8486,7 +8481,6 @@ class WSLCTests
                 {{"/test-volume", "bind", testFolder, true},
                  {"/test-volume-ro", "bind", testFolderReadOnly, false},
                  {"/test-guest-volume", "volume", std::nullopt, true},
-                 {"/test-vhd-volume", "volume", vhdVolumePath, false},
                  {"/mnt/wslc-tmpfs-inspect", "tmpfs", std::nullopt, true}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
