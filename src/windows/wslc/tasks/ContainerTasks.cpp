@@ -692,18 +692,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Mount))
     {
-        auto mounts = context.Args.GetAllValues<ArgType::Mount>();
-        for (auto& parsed : mounts)
-        {
-            if (parsed.IsTmpfs)
-            {
-                options.Tmpfs.emplace_back(std::move(parsed.TmpfsSpec));
-            }
-            else
-            {
-                options.Volumes.emplace_back(std::move(parsed.VolumeSpec));
-            }
-        }
+        options.Mounts = context.Args.GetAllValues<ArgType::Mount>();
     }
 
     options.Remove = context.Args.GetValue<ArgType::Remove>();

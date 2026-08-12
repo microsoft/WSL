@@ -20,57 +20,6 @@ namespace wsl::windows::wslc::models {
 using namespace wsl::shared;
 using namespace wsl::shared::string;
 
-namespace {
-
-    std::string NormalizeMountDestination(std::string destination)
-    {
-        std::replace(destination.begin(), destination.end(), '\\', '/');
-
-        std::vector<std::string> components;
-        size_t start = 0;
-        while (start <= destination.size())
-        {
-            const auto end = destination.find('/', start);
-            const auto component = destination.substr(start, end - start);
-            if (!component.empty() && component != ".")
-            {
-                if (component == "..")
-                {
-                    if (!components.empty())
-                    {
-                        components.pop_back();
-                    }
-                }
-                else
-                {
-                    components.emplace_back(component);
-                }
-            }
-
-            if (end == std::string::npos)
-            {
-                break;
-            }
-
-            start = end + 1;
-        }
-
-        std::string result = "/";
-        for (const auto& component : components)
-        {
-            if (result.size() > 1)
-            {
-                result += '/';
-            }
-
-            result += component;
-        }
-
-        return result;
-    }
-
-} // namespace
-
 PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
 {
     static auto parsePort = [](const std::string& value, const std::string& errorMessage) -> uint16_t {
@@ -207,8 +156,7 @@ void PublishPort::Validate() const
 // Source: https://github.com/moby/moby/blob/master/volume/validate.go
 bool VolumeMount::IsValidNamedVolumeName(const std::wstring& name)
 {
-    static const std::wregex namedVolumeRegex(LR"(^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,}$)");
-    return std::regex_match(name, namedVolumeRegex);
+    return mount::IsValidNamedVolumeName(name);
 }
 
 VolumeMount VolumeMount::Parse(const std::wstring& value)
@@ -389,7 +337,7 @@ void ValidateUniqueMountDestinations(const ContainerOptions& options)
 {
     std::unordered_set<std::string> destinations;
     const auto addDestination = [&](const std::string& destination) {
-        const auto normalizedDestination = NormalizeMountDestination(destination);
+        const auto normalizedDestination = mount::NormalizeDestination(destination);
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
             Localization::WSLCCLI_DuplicateMountDestinationError(MultiByteToWide(normalizedDestination)),
@@ -404,6 +352,11 @@ void ValidateUniqueMountDestinations(const ContainerOptions& options)
     for (const auto& tmpfsSpec : options.Tmpfs)
     {
         addDestination(TmpfsMount::Parse(tmpfsSpec).ContainerPath());
+    }
+
+    for (const auto& mount : options.Mounts)
+    {
+        addDestination(mount.Target);
     }
 }
 

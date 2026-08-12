@@ -14,11 +14,14 @@ Abstract:
 
 #pragma once
 
+#include "MountSpecParsing.h"
 #include <wslservice.h>
 #include <wslc.h>
 #include <string>
 
 namespace wsl::windows::wslc::models {
+
+namespace mount = wsl::windows::common::mount;
 
 // Valid formats for container list output.
 enum class FormatType
@@ -56,6 +59,7 @@ struct ContainerOptions
     bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
+    std::vector<mount::Spec> Mounts;
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};

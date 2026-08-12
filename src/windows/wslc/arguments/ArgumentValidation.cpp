@@ -32,6 +32,8 @@ using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 
+namespace mount = wsl::windows::common::mount;
+
 namespace argument::details {
     struct RawArgMapAccess
     {
@@ -219,8 +221,16 @@ void Argument::Validate(ArgMap& execArgs) const
         break;
 
     case ArgType::Mount:
-        CacheConverted<ArgType::Mount>(
-            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseMount(value); });
+        CacheConverted<ArgType::Mount>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                return mount::Parse(value);
+            }
+            catch (const mount::ParseException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_InvalidMountError(value, ex.Reason()));
+            }
+        });
         break;
 
     case ArgType::WorkDir:

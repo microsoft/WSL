@@ -29,6 +29,8 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+namespace mount = wsl::windows::common::mount;
+
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using namespace wsl::windows::common::wslutil;
@@ -138,6 +140,24 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         else
         {
             containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+        }
+    }
+
+    for (const auto& mountSpec : options.Mounts)
+    {
+        switch (mountSpec.MountType)
+        {
+        case mount::Type::Bind:
+            containerLauncher.AddVolume(mountSpec.Source, mountSpec.Target, mountSpec.ReadOnly);
+            break;
+
+        case mount::Type::Volume:
+            containerLauncher.AddNamedVolume(string::WideToMultiByte(mountSpec.Source), mountSpec.Target, mountSpec.ReadOnly);
+            break;
+
+        case mount::Type::Tmpfs:
+            containerLauncher.AddTmpfs(mountSpec.Target, mount::FormatTmpfsOptions(mountSpec));
+            break;
         }
     }
 

@@ -15,169 +15,369 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
-#include "ArgumentValidation.h"
 #include "ContainerModel.h"
-#include "Exceptions.h"
 #include "MountSpecParsing.h"
 
-using namespace wsl::windows::wslc;
+using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::models;
 using namespace WEX::Logging;
 using namespace WEX::Common;
 
 namespace WSLCCLIMountParserUnitTests {
 
+namespace {
+
+    struct ValidMountCase
+    {
+        const wchar_t* Input;
+        mount::Type Type;
+        const wchar_t* Source;
+        const char* Target;
+        bool ReadOnly;
+        std::optional<int64_t> TmpfsSizeBytes;
+        std::optional<uint32_t> TmpfsMode;
+        const char* TmpfsOptions;
+    };
+
+    struct InvalidMountCase
+    {
+        const wchar_t* Input;
+        const wchar_t* ExpectedReason;
+    };
+
+    constexpr ValidMountCase c_validMountCases[] = {
+        {L"source=data-volume,target=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"TYPE=VOLUME,SOURCE=data-volume,TARGET=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=VoLuMe,source=data-volume,target=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=volume,src=data-volume,dst=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=volume,src=data-volume,destination=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=volume,source=first,source=second,target=/data", mount::Type::Volume, L"second", "/data", false, {}, {}, ""},
+        {L"type=volume,source=data-volume,target=/first,target=/second",
+         mount::Type::Volume,
+         L"data-volume",
+         "/second",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,type=bind,source=C:\\data,target=/data", mount::Type::Bind, L"C:\\data", "/data", false, {}, {}, ""},
+        {L"type=volume,source=data-volume,target=/data,readonly", mount::Type::Volume, L"data-volume", "/data", true, {}, {}, ""},
+        {L"type=volume,source=data-volume,target=/data,ro", mount::Type::Volume, L"data-volume", "/data", true, {}, {}, ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=1",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         true,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=t",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         true,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=T",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         true,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=TRUE",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         true,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=true",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         true,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=True",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         true,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=0",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=f",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=F",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=FALSE",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=false",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=False",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,readonly=true,readonly=false",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=bind,\"source=C:\\mount,a\",target=/data", mount::Type::Bind, L"C:\\mount,a", "/data", false, {}, {}, ""},
+        {L"type=bind,source=C:\\mount with spaces,target=/data",
+         mount::Type::Bind,
+         L"C:\\mount with spaces",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=bind,source=C:\\,target=/data", mount::Type::Bind, L"C:\\", "/data", false, {}, {}, ""},
+        {L"type=bind,source=\\\\server\\share,target=/data", mount::Type::Bind, L"\\\\server\\share", "/data", false, {}, {}, ""},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=enabled",
+         mount::Type::Bind,
+         L"C:\\mount",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=data-volume,target=/data,bind-recursive=enabled",
+         mount::Type::Volume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=volume,source=A_,target=/data", mount::Type::Volume, L"A_", "/data", false, {}, {}, ""},
+        {L"type=volume,source=data.volume-1,target=/data", mount::Type::Volume, L"data.volume-1", "/data", false, {}, {}, ""},
+        {L"type=tmpfs,target=/tmp", mount::Type::Tmpfs, L"", "/tmp", false, {}, {}, ""},
+        {L"type=tmpfs,target=/tmp,readonly", mount::Type::Tmpfs, L"", "/tmp", true, {}, {}, "ro"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=0", mount::Type::Tmpfs, L"", "/tmp", false, 0, {}, ""},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1", mount::Type::Tmpfs, L"", "/tmp", false, 1, {}, "size=1"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1024", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1536", mount::Type::Tmpfs, L"", "/tmp", false, 1536, {}, "size=1536"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1k", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1KB", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1KiB", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1MB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1MiB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1GB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 30, {}, "size=1g"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1.5MB", mount::Type::Tmpfs, L"", "/tmp", false, 1536LL << 10, {}, "size=1536k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=+1MB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1e3", mount::Type::Tmpfs, L"", "/tmp", false, 1000, {}, "size=1000"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=0000", mount::Type::Tmpfs, L"", "/tmp", false, {}, 0, ""},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=0700", mount::Type::Tmpfs, L"", "/tmp", false, {}, 0700, "mode=700"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=+0700", mount::Type::Tmpfs, L"", "/tmp", false, {}, 0700, "mode=700"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1MB,tmpfs-mode=0700,readonly",
+         mount::Type::Tmpfs,
+         L"",
+         "/tmp",
+         true,
+         1LL << 20,
+         0700,
+         "ro,mode=700,size=1m"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=0,tmpfs-mode=0000,readonly=false", mount::Type::Tmpfs, L"", "/tmp", false, 0, 0, ""},
+    };
+
+    constexpr InvalidMountCase c_invalidMountCases[] = {
+        {L"", L"invalid field '' must be a key=value pair"},
+        {L",", L"invalid field '' must be a key=value pair"},
+        {L"type=volume,source=data-volume,target=/data,", L"invalid field '' must be a key=value pair"},
+        {L",type=volume,source=data-volume,target=/data", L"invalid field '' must be a key=value pair"},
+        {L"type=bind,\"source=C:\\mount,target=/data", L"malformed CSV"},
+        {L"type=volume,bogus", L"invalid field 'bogus' must be a key=value pair"},
+        {L"type=volume,bogus=value", L"unexpected key 'bogus'"},
+        {L"type", L"invalid field 'type' must be a key=value pair"},
+        {L"source", L"invalid field 'source' must be a key=value pair"},
+        {L"target", L"invalid field 'target' must be a key=value pair"},
+        {L"type=,source=data-volume,target=/data", L"type is required"},
+        {L"type=volume,source=data-volume", L"target is required"},
+        {L"type=volume,source=data-volume,target=", L"target is required"},
+        {L"type=volume,source=data-volume,dst=", L"target is required"},
+        {L"type=cluster,source=data-volume,target=/data", L"mount type 'cluster' is not supported."},
+        {L"type=npipe,source=data-volume,target=/data", L"mount type 'npipe' is not supported."},
+        {L"type=bogus,source=data-volume,target=/data", L"mount type 'bogus' is not supported."},
+        {L"type=CLUSTER,source=data-volume,target=/data", L"mount type 'cluster' is not supported."},
+        {L"type=volume,target=/data", L"anonymous volume mounts are not supported."},
+        {L"type=bind,target=/data", L"source is required"},
+        {L"type=bind,source=relative,target=/data", L"bind source path must be absolute"},
+        {L"type=volume,source=a,target=/data", L"volume source must be a valid named volume"},
+        {L"type=volume,source=data/volume,target=/data", L"volume source must be a valid named volume"},
+        {L"type=volume,source=C:\\mount,target=/data", L"volume source must be a valid named volume"},
+        {L"type=tmpfs,source=data-volume,target=/data", L"source is not supported for tmpfs mounts"},
+        {L"type=volume,source=data-volume,target=/data:part", L"target paths containing ':' are not supported."},
+        {L"type=volume,source=data-volume,target=/data,readonly=no", L"invalid value for readonly: no"},
+        {L"type=volume,source=data-volume,target=/data,readonly=yes", L"invalid value for readonly: yes"},
+        {L"type=volume,source=data-volume,target=/data,readonly=", L"invalid value for readonly: "},
+        {L"type=volume,source=data-volume,target=/data,readonly=2", L"invalid value for readonly: 2"},
+        {L"type=volume,source=data-volume,target=/data,volume-nocopy=no", L"invalid value for volume-nocopy: no"},
+        {L"type=volume,source=data-volume,target=/data,volume-nocopy=", L"invalid value for volume-nocopy: "},
+        {L"type=bind,source=C:\\mount,target=/data,bind-nonrecursive=no", L"invalid value for bind-nonrecursive: no"},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=", L"invalid value for bind-recursive: "},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=Enabled", L"invalid value for bind-recursive: Enabled"},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=bogus", L"invalid value for bind-recursive: bogus"},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=writable",
+         L"option 'bind-recursive=writable' requires 'readonly' to be specified in conjunction"},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=readonly",
+         L"option 'bind-recursive=readonly' requires 'readonly' to be specified in conjunction"},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=readonly,readonly",
+         L"option 'bind-recursive=readonly' requires 'bind-propagation=rprivate' to be specified in conjunction"},
+        {L"type=bind,source=C:\\mount,target=/data,consistency=cached", L"option 'consistency' is not supported."},
+        {L"type=bind,source=C:\\mount,target=/data,bind-propagation=rprivate", L"option 'bind-propagation' is not supported."},
+        {L"type=bind,source=C:\\mount,target=/data,bind-nonrecursive", L"option 'bind-nonrecursive' is not supported."},
+        {L"type=bind,source=C:\\mount,target=/data,bind-nonrecursive=true", L"option 'bind-nonrecursive' is not supported."},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=disabled", L"option 'bind-recursive' is not supported."},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=writable,readonly",
+         L"option 'bind-recursive' is not supported."},
+        {L"type=bind,source=C:\\mount,target=/data,bind-recursive=readonly,readonly,bind-propagation=rprivate",
+         L"option 'bind-recursive' is not supported."},
+        {L"type=volume,source=data-volume,target=/data,volume-nocopy", L"option 'volume-nocopy' is not supported."},
+        {L"type=volume,source=data-volume,target=/data,volume-nocopy=true", L"option 'volume-nocopy' is not supported."},
+        {L"type=volume,source=data-volume,target=/data,volume-label=a=b", L"option 'volume-label' is not supported."},
+        {L"type=volume,source=data-volume,target=/data,volume-driver=local", L"option 'volume-driver' is not supported."},
+        {L"type=volume,source=data-volume,target=/data,volume-opt=a=b", L"option 'volume-opt' is not supported."},
+        {L"type=bind,source=C:\\mount,target=/data,volume-nocopy=true", L"cannot mix 'volume-*' options with mount type 'bind'"},
+        {L"type=volume,source=data-volume,target=/data,bind-propagation=rprivate",
+         L"cannot mix 'bind-*' options with mount type 'volume'"},
+        {L"type=volume,source=data-volume,target=/data,tmpfs-size=1m", L"cannot mix 'tmpfs-*' options with mount type 'volume'"},
+        {L"type=tmpfs,target=/tmp,volume-label=a=b", L"cannot mix 'volume-*' options with mount type 'tmpfs'"},
+        {L"type=tmpfs,target=/tmp,bind-nonrecursive", L"cannot mix 'bind-*' options with mount type 'tmpfs'"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=", L"invalid value for tmpfs-size: "},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=bad", L"invalid value for tmpfs-size: bad"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=-1", L"invalid value for tmpfs-size: -1"},
+        {L"type=tmpfs,target=/tmp,\"tmpfs-size=1,5MB\"", L"invalid value for tmpfs-size: 1,5MB"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1XB", L"invalid value for tmpfs-size: 1XB"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1Ki", L"invalid value for tmpfs-size: 1Ki"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1BB", L"invalid value for tmpfs-size: 1BB"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=nan", L"invalid value for tmpfs-size: nan"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=inf", L"invalid value for tmpfs-size: inf"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=9223372036854775808", L"invalid value for tmpfs-size: 9223372036854775808"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=", L"invalid value for tmpfs-mode: "},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=-1", L"invalid value for tmpfs-mode: -1"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=8", L"invalid value for tmpfs-mode: 8"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=0899", L"invalid value for tmpfs-mode: 0899"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=0x700", L"invalid value for tmpfs-mode: 0x700"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=40000000000", L"invalid value for tmpfs-mode: 40000000000"},
+    };
+
+} // namespace
+
 class WSLCCLIMountParserUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLIMountParserUnitTests)
 
-    static void VerifyVolume(const std::wstring& spec, const std::wstring& expected)
+    TEST_METHOD(Mount_ValidCases)
     {
-        const auto mount = validation::ParseMount(spec);
-        VERIFY_IS_FALSE(mount.IsTmpfs);
-        VERIFY_ARE_EQUAL(expected, mount.VolumeSpec);
-        VERIFY_IS_TRUE(mount.TmpfsSpec.empty());
-    }
-
-    static void VerifyTmpfs(const std::wstring& spec, const std::string& expected)
-    {
-        const auto mount = validation::ParseMount(spec);
-        VERIFY_IS_TRUE(mount.IsTmpfs);
-        VERIFY_ARE_EQUAL(expected, mount.TmpfsSpec);
-        VERIFY_IS_TRUE(mount.VolumeSpec.empty());
-    }
-
-    static void VerifyInvalid(const std::wstring& spec, const std::wstring& expectedReason)
-    {
-        Log::Comment(String().Format(L"Rejecting: %ls", spec.c_str()));
-        try
+        for (const auto& testCase : c_validMountCases)
         {
-            (void)validation::ParseMount(spec);
-            VERIFY_FAIL(L"Expected ArgumentException for invalid mount spec");
-        }
-        catch (const ArgumentException& ex)
-        {
-            const auto& message = ex.Message();
-            VERIFY_IS_TRUE(message.find(L"for '--mount' flag") != std::wstring::npos);
-            VERIFY_IS_TRUE(message.find(expectedReason) != std::wstring::npos);
+            Log::Comment(String().Format(L"Accepting: %ls", testCase.Input));
+
+            const auto actual = mount::Parse(testCase.Input);
+            VERIFY_ARE_EQUAL(static_cast<int>(testCase.Type), static_cast<int>(actual.MountType));
+            VERIFY_ARE_EQUAL(std::wstring(testCase.Source), actual.Source);
+            VERIFY_ARE_EQUAL(std::string(testCase.Target), actual.Target);
+            VERIFY_ARE_EQUAL(testCase.ReadOnly, actual.ReadOnly);
+            VERIFY_ARE_EQUAL(testCase.TmpfsSizeBytes.has_value(), actual.TmpfsSizeBytes.has_value());
+            if (testCase.TmpfsSizeBytes.has_value() && actual.TmpfsSizeBytes.has_value())
+            {
+                VERIFY_ARE_EQUAL(testCase.TmpfsSizeBytes.value(), actual.TmpfsSizeBytes.value());
+            }
+
+            VERIFY_ARE_EQUAL(testCase.TmpfsMode.has_value(), actual.TmpfsMode.has_value());
+            if (testCase.TmpfsMode.has_value() && actual.TmpfsMode.has_value())
+            {
+                VERIFY_ARE_EQUAL(testCase.TmpfsMode.value(), actual.TmpfsMode.value());
+            }
+
+            const auto actualTmpfsOptions = actual.MountType == mount::Type::Tmpfs ? mount::FormatTmpfsOptions(actual) : std::string{};
+            VERIFY_ARE_EQUAL(std::string(testCase.TmpfsOptions), actualTmpfsOptions);
         }
     }
 
-    TEST_METHOD(Mount_KeysAndTypeAreCaseInsensitive)
+    TEST_METHOD(Mount_InvalidCases)
     {
-        VerifyVolume(L"TYPE=VOLUME,SOURCE=data-volume,TARGET=/data", L"data-volume:/data");
+        for (const auto& testCase : c_invalidMountCases)
+        {
+            Log::Comment(String().Format(L"Rejecting: %ls", testCase.Input));
+
+            try
+            {
+                (void)mount::Parse(testCase.Input);
+                VERIFY_FAIL(L"Expected ParseException for invalid mount spec");
+            }
+            catch (const mount::ParseException& ex)
+            {
+                VERIFY_IS_TRUE(ex.Reason().find(testCase.ExpectedReason) != std::wstring::npos);
+            }
+        }
     }
 
-    TEST_METHOD(Mount_AliasesMatchDocker)
+    TEST_METHOD(Mount_DotRelativeBindSourceUsesCurrentDirectory)
     {
-        VerifyVolume(L"type=volume,src=data-volume,dst=/data,ro", L"data-volume:/data:ro");
-        VerifyVolume(L"type=volume,source=data-volume,destination=/data", L"data-volume:/data");
-    }
-
-    TEST_METHOD(Mount_DefaultTypeIsVolume)
-    {
-        VerifyVolume(L"source=data-volume,target=/data", L"data-volume:/data");
-    }
-
-    TEST_METHOD(Mount_ReadOnlyUsesGoBooleanSpellings)
-    {
-        VerifyVolume(L"type=volume,source=data-volume,target=/data,readonly=t", L"data-volume:/data:ro");
-        VerifyVolume(L"type=volume,source=data-volume,target=/data,readonly=TRUE", L"data-volume:/data:ro");
-        VerifyVolume(L"type=volume,source=data-volume,target=/data,readonly=0", L"data-volume:/data");
-        VerifyVolume(L"type=volume,source=data-volume,target=/data,readonly=F", L"data-volume:/data");
-    }
-
-    TEST_METHOD(Mount_CsvQuotedFieldPreservesComma)
-    {
-        VerifyVolume(L"type=bind,\"source=C:\\mount,a\",target=/data", L"C:\\mount,a:/data");
-    }
-
-    TEST_METHOD(Mount_BindRecursiveEnabledIsDefaultBehavior)
-    {
-        VerifyVolume(L"type=bind,source=C:\\mount,target=/data,bind-recursive=enabled", L"C:\\mount:/data");
-    }
-
-    TEST_METHOD(Mount_TmpfsOptionsMatchDockerConversion)
-    {
-        VerifyTmpfs(L"type=tmpfs,target=/tmp,tmpfs-size=1MB,tmpfs-mode=0700,readonly", "/tmp:ro,mode=700,size=1m");
-        VerifyTmpfs(L"type=tmpfs,target=/tmp,tmpfs-size=1.5MB", "/tmp:size=1536k");
-        VerifyTmpfs(L"type=tmpfs,target=/tmp,tmpfs-size=1536", "/tmp:size=1536");
-        VerifyTmpfs(L"type=tmpfs,target=/tmp,tmpfs-size=0,tmpfs-mode=0000", "/tmp");
-    }
-
-    TEST_METHOD(Mount_InvalidFieldsMatchDocker)
-    {
-        VerifyInvalid(L"type=volume,bogus", L"invalid field 'bogus' must be a key=value pair");
-        VerifyInvalid(L"type=volume,bogus=value", L"unexpected key 'bogus'");
-        VerifyInvalid(L"type=volume,source=data-volume,target=/data,readonly=no", L"invalid value for readonly: no");
-        VerifyInvalid(L"type=tmpfs,target=/tmp,tmpfs-size=bad", L"invalid value for tmpfs-size: bad");
-        VerifyInvalid(L"type=tmpfs,target=/tmp,\"tmpfs-size=1,5MB\"", L"invalid value for tmpfs-size: 1,5MB");
-        VerifyInvalid(
-            L"type=tmpfs,target=/tmp,tmpfs-size=9223372036854775808", L"invalid value for tmpfs-size: 9223372036854775808");
-        VerifyInvalid(L"type=tmpfs,target=/tmp,tmpfs-mode=0899", L"invalid value for tmpfs-mode: 0899");
-        VerifyInvalid(L"type=bind,source=C:\\mount,target=/data,bind-recursive=Enabled", L"invalid value for bind-recursive");
-    }
-
-    TEST_METHOD(Mount_RequiredFieldsMatchDocker)
-    {
-        VerifyInvalid(L"type=,source=data-volume,target=/data", L"type is required");
-        VerifyInvalid(L"type=volume,source=data-volume", L"target is required");
-    }
-
-    TEST_METHOD(Mount_OptionTypeConflictsMatchDocker)
-    {
-        VerifyInvalid(
-            L"type=bind,source=C:\\mount,target=/data,volume-nocopy=true",
-            L"cannot mix 'volume-*' options with mount type 'bind'");
-        VerifyInvalid(
-            L"type=volume,source=data-volume,target=/data,bind-propagation=rprivate",
-            L"cannot mix 'bind-*' options with mount type 'volume'");
-        VerifyInvalid(
-            L"type=volume,source=data-volume,target=/data,tmpfs-size=1m",
-            L"cannot mix 'tmpfs-*' options with mount type 'volume'");
-    }
-
-    TEST_METHOD(Mount_BindRecursiveValidationMatchesDocker)
-    {
-        VerifyInvalid(
-            L"type=bind,source=C:\\mount,target=/data,bind-recursive=writable",
-            L"requires 'readonly' to be specified in conjunction");
-        VerifyInvalid(
-            L"type=bind,source=C:\\mount,target=/data,bind-recursive=readonly,readonly",
-            L"requires 'bind-propagation=rprivate' to be specified in conjunction");
-    }
-
-    TEST_METHOD(Mount_UnsupportedBackendFeaturesAreExplicit)
-    {
-        VerifyInvalid(
-            L"type=volume,source=data-volume,target=/data,volume-nocopy", L"option 'volume-nocopy' is not supported by WSLC");
-        VerifyInvalid(
-            L"type=bind,source=C:\\mount,target=/data,consistency=cached", L"option 'consistency' is not supported by WSLC");
-        VerifyInvalid(L"type=cluster,source=data-volume,target=/data", L"mount type 'cluster' is not supported by WSLC");
-        VerifyInvalid(L"type=volume,target=/data", L"anonymous volume mounts are not supported by WSLC");
-    }
-
-    TEST_METHOD(Mount_BackendRepresentationLimitsAreExplicit)
-    {
-        VerifyInvalid(L"type=bind,source=relative,target=/data", L"bind source path must be absolute");
-        VerifyInvalid(L"type=volume,source=C:\\mount,target=/data", L"volume source must be a valid named volume");
-        VerifyInvalid(L"type=tmpfs,source=data-volume,target=/data", L"source is not supported for tmpfs mounts");
-        VerifyInvalid(
-            L"type=volume,source=data-volume,target=/data:part", L"target paths containing ':' are not supported by WSLC");
-    }
-
-    TEST_METHOD(Mount_MalformedCsvIsRejected)
-    {
-        VerifyInvalid(L"type=bind,\"source=C:\\mount,target=/data", L"malformed CSV");
+        const auto expected = (std::filesystem::current_path() / L"mount").lexically_normal().wstring();
+        const auto actual = mount::Parse(L"type=bind,source=.\\mount,target=/data");
+        VERIFY_ARE_EQUAL(expected, actual.Source);
     }
 
     TEST_METHOD(Mount_DuplicateDestinationsAreRejected)
     {
         ContainerOptions options;
-        options.Tmpfs = {"/data", "/data/"};
+        options.Tmpfs = {"/data"};
+        options.Mounts = {
+            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data/"},
+        };
         VERIFY_THROWS(ValidateUniqueMountDestinations(options), wil::ResultException);
 
-        options.Tmpfs = {"/data/../cache"};
+        options.Tmpfs.clear();
+        options.Mounts = {
+            {.MountType = mount::Type::Tmpfs, .Target = "/data/../cache"},
+        };
         options.Volumes = {L"data-volume:/cache"};
         VERIFY_THROWS(ValidateUniqueMountDestinations(options), wil::ResultException);
     }
@@ -187,6 +387,9 @@ class WSLCCLIMountParserUnitTests
         ContainerOptions options;
         options.Tmpfs = {"/cache"};
         options.Volumes = {L"data-volume:/data"};
+        options.Mounts = {
+            {.MountType = mount::Type::Bind, .Source = L"C:\\logs", .Target = "/logs"},
+        };
         VERIFY_NO_THROW(ValidateUniqueMountDestinations(options));
     }
 };
