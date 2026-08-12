@@ -2622,7 +2622,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     WSL2_TEST_METHOD(CorruptedVhd)
     {
         // Create a 100MB vhd without a filesystem.
-        auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
+        auto distroPath = wsl::windows::common::filesystem::GetCanonicalPath(wil::GetCurrentDirectoryW<std::wstring>());
         auto vhdPath = distroPath / L"CorruptedTest.vhdx";
 
         VIRTUAL_STORAGE_TYPE storageType{};
@@ -3083,7 +3083,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", testFolder)));
         }
 
-        auto absolutePath = std::filesystem::weakly_canonical(".").wstring();
+        auto absolutePath = wsl::windows::common::filesystem::GetCanonicalPath(".").wstring();
 
         // Move the distro to a different folder (absolute path)
         {
@@ -4603,6 +4603,15 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            // New file should be created with the correct uid.
+            const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
+            const std::wstring testFilePathWindows = L"\\\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST_L L"\\tmp\\oobe_file_test";
+
+            const wil::unique_hfile file(CreateFile(
+                testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            VERIFY_IS_TRUE(file.is_valid());
+            validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.

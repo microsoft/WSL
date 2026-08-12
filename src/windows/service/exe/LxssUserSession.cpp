@@ -2152,11 +2152,15 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 {
     try
     {
+        auto resetVmTerminationCallback = wil::scope_exit([&]() { m_suppressVmTerminationCallback.store(false); });
+
         auto forceTerminate = [this]() {
             auto vmId = m_vmId.load();
             if (!IsEqualGUID(vmId, GUID_NULL))
             {
                 auto vmIdStr = wsl::shared::string::GuidToString<wchar_t>(vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+
+                m_suppressVmTerminationCallback.store(true);
 
                 auto result = wil::ResultFromException([&]() {
                     auto computeSystem = wsl::windows::common::hcs::OpenComputeSystem(vmIdStr.c_str(), GENERIC_ALL);
@@ -2209,6 +2213,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 
             // Terminate the utility VM.
             _VmTerminate();
+            resetVmTerminationCallback.reset();
 
             // Reset the proxy state.
             // We don't clear it in _VMTerminate because we want to cache results if possible.
@@ -3040,7 +3045,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
                         [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
                         std::chrono::milliseconds(100),
                         std::chrono::seconds(10),
-                        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+                        {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
                 }
                 CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
             }
@@ -3066,7 +3071,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
                     [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
                     std::chrono::milliseconds(100),
                     std::chrono::seconds(10),
-                    []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+                    {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
             }
             CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
         }
@@ -3847,7 +3852,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
     if (Path != nullptr)
     {
-        canonicalPath = std::filesystem::weakly_canonical(Path, error);
+        canonicalPath = wsl::windows::common::filesystem::GetCanonicalPath(Path, error);
         if (error)
         {
             LOG_WIN32(error.value());
@@ -3891,7 +3896,7 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Path != nullptr)
         {
-            auto canonicalDistroPath = std::filesystem::weakly_canonical(configuration.BasePath, error);
+            auto canonicalDistroPath = wsl::windows::common::filesystem::GetCanonicalPath(configuration.BasePath, error);
             if (error)
             {
                 LOG_WIN32(error.value());
@@ -4235,6 +4240,11 @@ void LxssUserSessionImpl::s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSessio
 try
 {
     UNREFERENCED_PARAMETER(VmId);
+
+    if (UserSession->m_suppressVmTerminationCallback.load())
+    {
+        return;
+    }
 
     UserSession->TerminateByClientId(LXSS_CLIENT_ID_WILDCARD);
     return;

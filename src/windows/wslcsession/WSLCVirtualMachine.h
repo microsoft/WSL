@@ -124,6 +124,19 @@ public:
     static inline const char* c_gpuLibrariesPath = "/usr/lib/wsl/lib";
     static inline const char* c_gpuDriversPath = "/usr/lib/wsl/drivers";
 
+    // Path where the guest init writes the BuildKit source-policy JSON when the
+    // WSLContainerRegistryAllowlist policy is configured. /run is tmpfs, so the file
+    // disappears on VM shutdown.
+    static inline const char* c_buildKitPolicyPath = "/run/wsl/buildkit-policy.json";
+
+    // Snapshot of the WSLContainerRegistryAllowlist policy taken at VM boot. A read failure
+    // throws from Initialize; NotConfigured/Configured are the only states BuildImage sees.
+    enum class BuildKitPolicyState
+    {
+        NotConfigured,
+        Configured
+    };
+
     struct ConnectedSocket
     {
         int Fd = -1;
@@ -149,6 +162,12 @@ public:
 
     HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);
     HRESULT UnmountWindowsFolder(_In_ LPCSTR LinuxPath);
+
+    BuildKitPolicyState GetBuildKitPolicyState() const
+    {
+        return m_buildKitPolicyState;
+    }
+
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
     void OnProcessReleased(int Pid);
@@ -211,6 +230,11 @@ private:
     // reserved at boot) and forwards them to the service before virtio devices are created.
     // Called after the root filesystem is mounted.
     void ReadGuestCapabilities();
+
+    // Reads the WSLContainerRegistryAllowlist policy from the registry and, when configured,
+    // hands the BuildKit source-policy JSON to the guest init for materialisation. Cached in
+    // m_buildKitPolicyState for BuildImage to consult per build.
+    void ConfigureBuildKitPolicy();
 
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void MountVirtioFsChild(
@@ -278,6 +302,8 @@ private:
     // Swiotlb pool reserved by the guest kernel (zero when the kernel lacks the WSL patch).
     uint64_t m_hvPciSwiotlbBase = 0;
     uint64_t m_hvPciSwiotlbSize = 0;
+
+    BuildKitPolicyState m_buildKitPolicyState{BuildKitPolicyState::NotConfigured};
 
     // Job object that terminates child processes (wslrelay.exe) when the VM shuts down.
     // Declared before the port relay pipes so it is destroyed after them: any remaining

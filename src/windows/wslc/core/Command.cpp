@@ -43,11 +43,11 @@ Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliase
     }
 }
 
-void Command::OutputHelp(Reporter& reporter, const CommandException* exception) const
+void Command::OutputHelp(Terminal& terminal, const CommandException* exception) const
 {
     constexpr size_t c_helpRowIndent = 2;
     constexpr size_t c_helpColumnPadding = 2;
-    const auto helpLevel = exception ? Reporter::Level::Info : Reporter::Level::Output;
+    const auto helpLevel = exception ? Terminal::Level::Info : Terminal::Level::Output;
 
     // Emphasis sequences for help output.
     static const auto& HelpHeadingEmphasis = Format::Bright;
@@ -57,16 +57,16 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
     static const auto& HelpPlaceholderEmphasis = Format::Fg::BrightCyan;
 
     // Copyright header (dimmed)
-    reporter.Write(helpLevel, L"{}{}{}\n\n", HelpMetaEmphasis, Localization::WSLCCLI_CopyrightHeader(), Format::Default);
+    terminal.Write(helpLevel, L"{}{}{}\n\n", HelpMetaEmphasis, Localization::WSLCCLI_CopyrightHeader(), Format::Default);
 
     // Error if given
     if (exception)
     {
-        reporter.Error(L"{}\n\n", exception->Message());
+        terminal.Error(L"{}\n\n", exception->Message());
     }
 
     // Description
-    reporter.Write(helpLevel, L"{}\n\n", LongDescription());
+    terminal.Write(helpLevel, L"{}\n\n", LongDescription());
 
     // Build command chain from full name (replace ParentSplitChar with spaces, strip root).
     std::wstring commandChain = FullName();
@@ -127,20 +127,20 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
             usageText.pop_back();
         }
 
-        reporter.Write(helpLevel, L"{}{}{}", HelpHeadingEmphasis, usageText, Format::Default);
+        terminal.Write(helpLevel, L"{}{}{}", HelpHeadingEmphasis, usageText, Format::Default);
 
         if (!commands.empty())
         {
             if (!arguments.empty())
             {
-                reporter.Write(helpLevel, L" {}[{}", HelpMetaEmphasis, Format::Default);
+                terminal.Write(helpLevel, L" {}[{}", HelpMetaEmphasis, Format::Default);
             }
             else
             {
-                reporter.Write(helpLevel, L" ");
+                terminal.Write(helpLevel, L" ");
             }
 
-            reporter.Write(
+            terminal.Write(
                 helpLevel,
                 L"{}<{}{}{}{}{}>{}",
                 HelpMetaEmphasis,
@@ -152,13 +152,13 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
                 Format::Default);
             if (!arguments.empty())
             {
-                reporter.Write(helpLevel, L"{}]{}", HelpMetaEmphasis, Format::Default);
+                terminal.Write(helpLevel, L"{}]{}", HelpMetaEmphasis, Format::Default);
             }
         }
 
         if (hasOptions)
         {
-            reporter.Write(
+            terminal.Write(
                 helpLevel,
                 L" {}[<{}{}{}{}{}>]{}",
                 HelpMetaEmphasis,
@@ -172,28 +172,28 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
 
         for (const auto& arg : positionalArgs)
         {
-            reporter.Write(helpLevel, L" ");
+            terminal.Write(helpLevel, L" ");
             if (!arg.Required())
             {
-                reporter.Write(helpLevel, L"{}[{}", HelpMetaEmphasis, Format::Default);
+                terminal.Write(helpLevel, L"{}[{}", HelpMetaEmphasis, Format::Default);
             }
 
-            reporter.Write(
+            terminal.Write(
                 helpLevel, L"{}<{}{}{}{}{}>{}", HelpMetaEmphasis, Format::Default, HelpPlaceholderEmphasis, arg.Name(), Format::Default, HelpMetaEmphasis, Format::Default);
             if (arg.IsUnlimited())
             {
-                reporter.Write(helpLevel, L"{}...{}", HelpMetaEmphasis, Format::Default);
+                terminal.Write(helpLevel, L"{}...{}", HelpMetaEmphasis, Format::Default);
             }
 
             if (!arg.Required())
             {
-                reporter.Write(helpLevel, L"{}]{}", HelpMetaEmphasis, Format::Default);
+                terminal.Write(helpLevel, L"{}]{}", HelpMetaEmphasis, Format::Default);
             }
         }
 
         if (hasForwardArgs)
         {
-            reporter.Write(
+            terminal.Write(
                 helpLevel,
                 L" {}[<{}{}{}{}{}>...]{}",
                 HelpMetaEmphasis,
@@ -205,12 +205,12 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
                 Format::Default);
         }
 
-        reporter.Write(helpLevel, L"\n\n");
+        terminal.Write(helpLevel, L"\n\n");
     }
 
     if (!commandAliases.empty())
     {
-        reporter.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingAliases(), Format::Default);
+        terminal.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingAliases(), Format::Default);
 
         std::wstring aliasLine;
         for (size_t i = 0; i < commandAliases.size(); ++i)
@@ -222,13 +222,13 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
             aliasLine += commandAliases[i];
         }
 
-        reporter.Write(helpLevel, L"{}{}\n\n", std::wstring(c_helpRowIndent, L' '), aliasLine);
+        terminal.Write(helpLevel, L"{}{}\n\n", std::wstring(c_helpRowIndent, L' '), aliasLine);
     }
 
     // Col0: name/command
     // Col1: description (word-wraps at computed column width)
-    const auto MakeHelpTable = [&reporter, helpLevel]() -> TableOutput<2> {
-        TableOutput<2> table{reporter, {L"", L""}, 50, c_helpColumnPadding, helpLevel};
+    const auto MakeHelpTable = [&terminal, helpLevel]() -> TableOutput<2> {
+        TableOutput<2> table{terminal, {L"", L""}, 50, c_helpColumnPadding, helpLevel};
         table.SetShowHeader(false);
         table.SetRowIndent(c_helpRowIndent);
         table.SetColumnConfig(
@@ -243,7 +243,7 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
 
     if (!commands.empty())
     {
-        reporter.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingCommands(), Format::Default);
+        terminal.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingCommands(), Format::Default);
 
         auto table = MakeHelpTable();
         for (const auto& command : commands)
@@ -255,20 +255,20 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
         }
         table.Complete();
 
-        reporter.Write(helpLevel, L"\n{} [{}]\n", Localization::WSLCCLI_HelpForDetails(), WSLC_CLI_HELP_ARG_STRING);
+        terminal.Write(helpLevel, L"\n{} [{}]\n", Localization::WSLCCLI_HelpForDetails(), WSLC_CLI_HELP_ARG_STRING);
     }
 
     if (!arguments.empty())
     {
         if (!commands.empty())
         {
-            reporter.Write(helpLevel, L"\n");
+            terminal.Write(helpLevel, L"\n");
         }
 
         // Arguments table: positional and forward args, name (emphasized) | description
         if (hasArguments || hasForwardArgs)
         {
-            reporter.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingArguments(), Format::Default);
+            terminal.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingArguments(), Format::Default);
 
             auto table = MakeHelpTable();
 
@@ -295,8 +295,8 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
     // Col0: short alias (e.g. "-f")
     // Col1: long name  (e.g. "--force")
     // Col2: description (word-wraps at computed column width)
-    const auto MakeOptionsTable = [&reporter, helpLevel]() -> TableOutput<3> {
-        TableOutput<3> table{reporter, {L"", L"", L""}, {}, 50, c_helpColumnPadding, helpLevel};
+    const auto MakeOptionsTable = [&terminal, helpLevel]() -> TableOutput<3> {
+        TableOutput<3> table{terminal, {L"", L"", L""}, {}, 50, c_helpColumnPadding, helpLevel};
         table.SetShowHeader(false);
         table.SetRowIndent(c_helpRowIndent);
         table.SetColumnConfig(
@@ -315,11 +315,11 @@ void Command::OutputHelp(Reporter& reporter, const CommandException* exception) 
     {
         if (hasArguments || hasForwardArgs)
         {
-            reporter.Write(helpLevel, L"\n");
+            terminal.Write(helpLevel, L"\n");
         }
         else if (!commands.empty() && arguments.empty())
         {
-            reporter.Write(helpLevel, L"\n");
+            terminal.Write(helpLevel, L"\n");
         }
 
         auto table = MakeOptionsTable();
@@ -430,9 +430,9 @@ void Command::ParseArguments(
 // that all required arguments are present. Count limits are enforced during parsing
 // (single-value args are last-wins), so they are not re-checked here.
 // Any defined validation for specific ArgTypes are also run.
-void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
+void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
 {
-    if (source.GetFlag<ArgType::Help>())
+    if (source.GetValue<ArgType::Help>())
     {
         return;
     }
@@ -459,9 +459,9 @@ void Command::ValidateArguments(const ArgMap& source, const std::vector<Argument
 void Command::Execute(CLIExecutionContext& context) const
 {
     // If Help was part of the validated argument set, we will output help instead of executing.
-    if (context.Args.GetFlag<ArgType::Help>())
+    if (context.Args.GetValue<ArgType::Help>())
     {
-        OutputHelp(context.Reporter);
+        OutputHelp(context.Terminal);
     }
     else
     {
@@ -476,7 +476,7 @@ void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
     command->Execute(context);
 }
 
-void Command::ValidateArgumentsInternal(const ArgMap&) const
+void Command::ValidateArgumentsInternal(ArgMap&) const
 {
     // Commands may not need any extra validation; they'll override if they do.
 }

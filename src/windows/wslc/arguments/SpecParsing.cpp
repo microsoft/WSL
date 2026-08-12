@@ -19,6 +19,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "Exceptions.h"
 #include "ImageService.h"
+#include "JsonUtils.h"
 #include "Localization.h"
 #include <algorithm>
 #include <cctype>
@@ -167,10 +168,10 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         // Normalize to an absolute path (the service requires one to mount the file's directory) but do
         // not verify the file exists or is a regular file here: that would be a TOCTOU race with the
         // build, and the file may only be reachable from the service's context. Let the service/BuildKit
-        // reject an unmountable or unreadable file instead. weakly_canonical resolves a relative path
+        // reject an unmountable or unreadable file instead. GetCanonicalPath resolves a relative path
         // against the current directory, collapses '..', and resolves symlinks for the portion of the
         // path that exists; it succeeds for a missing file but still reports genuine errors.
-        auto absPath = std::filesystem::weakly_canonical(srcPath, ec);
+        auto absPath = wsl::windows::common::filesystem::GetCanonicalPath(srcPath, ec);
         if (ec.value() != 0)
         {
             throw ArgumentException(
@@ -612,19 +613,74 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (IsEqual(input, L"json"))
+    // Single source of truth for the accepted format values. It drives both parsing and the error
+    // message's supported-values list, so adding a type here updates both automatically.
+    static constexpr std::pair<std::wstring_view, models::FormatType> c_formatTypes[] = {
+        {L"json", models::FormatType::Json},
+        {L"table", models::FormatType::Table},
+    };
+
+    for (const auto& [name, type] : c_formatTypes)
     {
-        return models::FormatType::Json;
+        if (IsEqual(input, name))
+        {
+            return type;
+        }
     }
-    else if (IsEqual(input, L"table"))
+
+    std::wstring supportedValues;
+    for (const auto& formatType : c_formatTypes)
     {
-        return models::FormatType::Table;
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += formatType.first;
     }
-    else
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
+}
+
+int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (!IsEqual(input, L"json"))
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        constexpr std::wstring_view supportedValues = L"json";
+        throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
     }
+
+    return wsl::shared::c_jsonCompactIndent;
+}
+
+models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName)
+{
+    static constexpr std::pair<std::wstring_view, models::PullPolicy> c_pullPolicies[] = {
+        {L"always", models::PullPolicy::Always},
+        {L"missing", models::PullPolicy::Missing},
+        {L"never", models::PullPolicy::Never},
+    };
+
+    for (const auto& [name, policy] : c_pullPolicies)
+    {
+        if (IsEqual(input, name))
+        {
+            return policy;
+        }
+    }
+
+    std::wstring supportedValues;
+    for (const auto& pullPolicy : c_pullPolicies)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += pullPolicy.first;
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)

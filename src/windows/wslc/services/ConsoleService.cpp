@@ -178,13 +178,13 @@ void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_
 }
 
 int ConsoleService::AttachToCurrentConsole(
-    Reporter& reporter, wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process, bool triggerRefresh)
+    Terminal& terminal, wsl::windows::common::ConsoleState& console, wsl::windows::common::ClientRunningWSLCProcess&& process, bool triggerRefresh)
 {
     if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsTty))
     {
         if (!RelayInteractiveTty(console, process, process.GetStdHandle(WSLCFDTty).get(), triggerRefresh))
         {
-            reporter.Info(L"[detached]\n");
+            terminal.Info(L"[detached]\n");
             return 0;
         }
     }

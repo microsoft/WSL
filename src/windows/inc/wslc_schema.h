@@ -109,8 +109,9 @@ struct ContainerConfig
     std::string WorkingDir;
     std::optional<int> StopTimeout;
     std::optional<HealthConfig> Healthcheck;
+    std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck, Labels);
 };
 
 struct InspectEndpointIPAMConfig

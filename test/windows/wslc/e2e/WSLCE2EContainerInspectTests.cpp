@@ -79,6 +79,20 @@ class WSLCE2EContainerInspectTests
         VERIFY_ARE_EQUAL(WideToMultiByte(TestContainerName1), inspectData[0].Name);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_FormatJson_IsSingleLine)
+    {
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto result = RunWslc(std::format(L"container inspect --format json {}", TestContainerName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL(WideToMultiByte(TestContainerName1), document[0]["Name"].get<std::string>());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_InspectMultiple_Success)
     {
         // Create two containers to inspect at the same time

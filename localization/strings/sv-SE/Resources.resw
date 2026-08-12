@@ -160,7 +160,7 @@ Om du vill tvinga WSL2 att stoppa och koppla från disken kör du 'wsl.exe {}'.<
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.</value>
+    <value>Monteringsnamnet får inte vara tomt, '.', '..' eller innehålla '/'. Försök igen med ett giltigt monteringsnamn.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -998,8 +998,8 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <value>Containeravbildningsregistret {} blockeras av datorprincipen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>Att skapa containeravbildningar blockeras eftersom en lista över tillåtna containerregister konfigureras av datorprincipen. Avbildningsversioner kan hämta basavbildningar från godtyckliga register och kan inte begränsas till listan över tillåtna på ett tillförlitligt sätt.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>Principen för containerregistrets lista över tillåtna är ogiltig. Kontrollera att WSLContainerRegistryAllowlist-värdena under Software\Policies\WSL har konfigurerats korrekt.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Kör wsl.exe --set-version {} 2 för att uppgradera till WSL2.</value>
@@ -1985,6 +1985,18 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>Antalet millisekunder som en virtuell dator är inaktiv innan den stängs av.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>Fortsätt köra WSL</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>Fortsätt att köra distributioner och den virtuella WSL-dator som är värd för dem från att stängas av automatiskt när de har varit inaktiva.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Fortsätt köra WSL.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Fortsätt att köra distributioner och den virtuella WSL-dator som är värd för dem från att stängas av automatiskt när de har varit inaktiva.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Återställ tidsgräns</value>
   </data>
@@ -1993,6 +2005,21 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Antalet millisekunder som en virtuell dator är inaktiv innan den stängs av.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>Tidsgräns för inaktivitet för distribution</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>Antalet millisekunder som en distribution är inaktiv innan den avslutas.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Återställ tidsgräns</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Tidsgräns för inaktivitet för distribution</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Antalet millisekunder som en distribution är inaktiv innan den avslutas.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Tillämpa ändringar</value>
@@ -2956,6 +2983,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Utdataformat (json eller table) (standard: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>Utdataformatering (json för enradsutdata) (standard: indragen JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argument som skickas till containerns init-process</value>
   </data>
@@ -3105,6 +3136,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Sökväg för sessionslagring</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Sökväg till katalogen för sessionslagring</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signal att skicka</value>
   </data>
@@ -3148,6 +3182,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
     <value>Rapportera det inte som ett fel om volymen inte finns</value>
   </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>Ta bort anonyma volymer som är kopplade till containern</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Arbetskatalog i containern</value>
   </data>
@@ -3157,6 +3194,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Skriv container-ID:t till den angivna sökvägen</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Skriv avbildnings-id:t till den angivna sökvägen</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adress för DNS-namnservern i resolv.conf</value>
@@ -3189,7 +3229,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Policy för hämtning av bilder (always|missing|never) (standard:never)</value>
+    <value>Image pull policy (always|missing|never) (default: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3220,9 +3260,13 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Visa detaljerad information om de listade sessionerna.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Ogiltig formattyp angiven. Stödda formattyper är: json, table</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>Ogiltigt {}-värde: {} är inte en känd formattyp. Formattyper som stöds är: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Ogiltigt {}-värde: {} är inte en känd pull-princip. Pull-principer som stöds är: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Ogiltigt {}-värde: {} är inte en känd kontrolltyp. Inspektionstyper som stöds är: {}.</value>

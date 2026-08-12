@@ -78,7 +78,7 @@ class WSLCE2ENetworkListTests
         result = RunWslc(L"network list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        auto networks = FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+        auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
         VERIFY_ARE_EQUAL(2U, networks.size());
 
         std::vector<std::string> names;

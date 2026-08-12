@@ -67,7 +67,7 @@ class WSLCE2EImageListTests
         // Get the expected image ID from JSON output.
         auto jsonResult = RunWslc(L"image list --format json");
         jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(jsonResult.Stdout.value().c_str());
+        const auto images = ParseNdjsonOutputAs<ImageInformation>(jsonResult);
 
         std::string debianId;
         for (const auto& image : images)
@@ -128,7 +128,7 @@ class WSLCE2EImageListTests
         const auto result = RunWslc(L"image list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(result.Stdout.value().c_str());
+        const auto images = ParseNdjsonOutputAs<ImageInformation>(result);
 
         VERIFY_IS_GREATER_THAN_OR_EQUAL(images.size(), 2u);
 
@@ -188,7 +188,7 @@ class WSLCE2EImageListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"image list --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(r.Stdout.value().c_str());
+            const auto images = ParseNdjsonOutputAs<ImageInformation>(r);
             std::set<std::wstring> names;
             for (const auto& image : images)
             {
@@ -234,7 +234,7 @@ class WSLCE2EImageListTests
         auto result = RunWslc(L"image list --format json --filter dangling=false");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(result.Stdout.value().c_str());
+        auto images = ParseNdjsonOutputAs<ImageInformation>(result);
         bool foundDebian = false;
         for (const auto& image : images)
         {
@@ -250,7 +250,7 @@ class WSLCE2EImageListTests
         result = RunWslc(L"image list --format json --filter dangling=true");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        images = wsl::shared::FromJson<std::vector<ImageInformation>>(result.Stdout.value().c_str());
+        images = ParseNdjsonOutputAs<ImageInformation>(result);
         for (const auto& image : images)
         {
             VERIFY_IS_FALSE(
@@ -267,7 +267,7 @@ class WSLCE2EImageListTests
             RunWslc(std::format(L"image list --format json --filter reference={} --filter dangling=false", DebianImage.Name));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(result.Stdout.value().c_str());
+        const auto images = ParseNdjsonOutputAs<ImageInformation>(result);
         bool foundDebian = false;
         for (const auto& image : images)
         {
@@ -286,7 +286,7 @@ class WSLCE2EImageListTests
         // Pull the full image id from JSON output (always untruncated).
         auto jsonResult = RunWslc(L"image list --format json");
         jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(jsonResult.Stdout.value().c_str());
+        const auto images = ParseNdjsonOutputAs<ImageInformation>(jsonResult);
 
         std::string fullDebianId;
         for (const auto& image : images)

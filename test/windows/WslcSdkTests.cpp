@@ -816,6 +816,26 @@ class WslcSdkTests
         }
     }
 
+    WSLC_TEST_METHOD(SessionHostLoopbackDisabled)
+    {
+        constexpr uint16_t c_hostLoopbackTestPort = 1237;
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", c_hostLoopbackTestPort);
+        UniqueWebServer server(endpoint.c_str(), L"sdk-loopback-enabled");
+        ExpectHttpResponse(endpoint.c_str(), HTTP_STATUS_OK, true);
+
+        const auto command = std::format(
+            "if python3 -c \"import http.client,socket;"
+            "a=socket.getaddrinfo('host.wslc.internal',{},socket.AF_INET,socket.SOCK_STREAM)[0][4];"
+            "c=http.client.HTTPConnection(*a,timeout=5);"
+            "c.request('GET','/');"
+            "c.getresponse().read()\";"
+            "then echo enabled; else echo disabled; fi",
+            c_hostLoopbackTestPort);
+        auto output = RunContainerAndCapture(m_defaultSession, "python:3.12-alpine", {"/bin/sh", "-c", command.c_str()});
+
+        VERIFY_ARE_EQUAL("disabled\n", output.stdoutOutput);
+    }
+
     WSLC_TEST_METHOD(ContainerPortMapping)
     {
         // Negative: null mappings with nonzero count must fail.
