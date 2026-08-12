@@ -2622,7 +2622,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     WSL2_TEST_METHOD(CorruptedVhd)
     {
         // Create a 100MB vhd without a filesystem.
-        auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
+        auto distroPath = wsl::windows::common::filesystem::GetCanonicalPath(wil::GetCurrentDirectoryW<std::wstring>());
         auto vhdPath = distroPath / L"CorruptedTest.vhdx";
 
         VIRTUAL_STORAGE_TYPE storageType{};
@@ -3083,7 +3083,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", testFolder)));
         }
 
-        auto absolutePath = std::filesystem::weakly_canonical(".").wstring();
+        auto absolutePath = wsl::windows::common::filesystem::GetCanonicalPath(".").wstring();
 
         // Move the distro to a different folder (absolute path)
         {

@@ -167,10 +167,10 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         // Normalize to an absolute path (the service requires one to mount the file's directory) but do
         // not verify the file exists or is a regular file here: that would be a TOCTOU race with the
         // build, and the file may only be reachable from the service's context. Let the service/BuildKit
-        // reject an unmountable or unreadable file instead. weakly_canonical resolves a relative path
+        // reject an unmountable or unreadable file instead. GetCanonicalPath resolves a relative path
         // against the current directory, collapses '..', and resolves symlinks for the portion of the
         // path that exists; it succeeds for a missing file but still reports genuine errors.
-        auto absPath = std::filesystem::weakly_canonical(srcPath, ec);
+        auto absPath = wsl::windows::common::filesystem::GetCanonicalPath(srcPath, ec);
         if (ec.value() != 0)
         {
             throw ArgumentException(
