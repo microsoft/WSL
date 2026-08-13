@@ -1219,6 +1219,22 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(static_cast<int64_t>(512), byName["nproc"].second);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_CapAdd)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --cap-add NET_ADMIN --cap-add SYS_TIME {} true",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ulimit_Invalid)
     {
         auto result = RunWslc(std::format(L"container create --ulimit nofile --name {} {}", WslcContainerName, DebianImage.NameAndTag()));

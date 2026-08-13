@@ -293,6 +293,7 @@ struct HostConfig
     std::optional<std::vector<std::string>> Dns;
     std::optional<std::vector<std::string>> DnsSearch;
     std::optional<std::vector<std::string>> DnsOptions;
+    std::optional<std::vector<std::string>> CapAdd;
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
     // Docker wire type is int64. 0 means "use daemon default" — same as omitting
@@ -307,7 +308,7 @@ struct HostConfig
     std::optional<std::vector<Ulimit>> Ulimits;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, CapAdd, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct InspectEndpointIPAMConfig

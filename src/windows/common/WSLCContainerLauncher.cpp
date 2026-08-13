@@ -204,6 +204,11 @@ void WSLCContainerLauncher::SetDnsOptions(std::vector<std::string>&& DnsOptions)
     m_dnsOptions = std::move(DnsOptions);
 }
 
+void WSLCContainerLauncher::SetCapAdd(std::vector<std::string>&& CapAdd)
+{
+    m_capAdd = std::move(CapAdd);
+}
+
 void WSLCContainerLauncher::SetMemoryLimit(std::int64_t Bytes)
 {
     m_memoryBytes = Bytes;
@@ -400,6 +405,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     if (!dnsOptionsStorage.empty())
     {
         options.DnsOptions = {dnsOptionsStorage.data(), static_cast<ULONG>(dnsOptionsStorage.size())};
+    }
+
+    std::vector<const char*> capAddStorage;
+    for (const auto& capability : m_capAdd)
+    {
+        capAddStorage.push_back(capability.c_str());
+    }
+
+    if (!capAddStorage.empty())
+    {
+        options.CapAdd = {capAddStorage.data(), static_cast<ULONG>(capAddStorage.size())};
     }
 
     if (!m_workingDirectory.empty())

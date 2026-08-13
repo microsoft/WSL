@@ -745,6 +745,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 
     options.Ulimits = context.Args.GetAllValues<ArgType::Ulimit>();
 
+    if (context.Args.Contains(ArgType::CapAdd))
+    {
+        auto capabilities = context.Args.GetAllValues<ArgType::CapAdd>();
+        options.CapAdd.reserve(capabilities.size());
+        for (const auto& capability : capabilities)
+        {
+            options.CapAdd.emplace_back(WideToMultiByte(capability));
+        }
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.GetValue<ArgType::Command>()));

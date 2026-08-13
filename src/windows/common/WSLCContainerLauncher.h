@@ -89,6 +89,7 @@ public:
     void SetDnsServers(std::vector<std::string>&& DnsServers);
     void SetDnsSearchDomains(std::vector<std::string>&& DnsSearchDomains);
     void SetDnsOptions(std::vector<std::string>&& DnsOptions);
+    void SetCapAdd(std::vector<std::string>&& CapAdd);
     void SetMemoryLimit(std::int64_t Bytes);
     void SetNanoCpus(std::int64_t NanoCpus);
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
@@ -123,6 +124,7 @@ private:
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
+    std::vector<std::string> m_capAdd;
     std::vector<std::string> m_additionalNetworks;
     std::vector<std::string> m_primaryNetworkAliases;
     std::vector<WSLCLabel> m_labels;

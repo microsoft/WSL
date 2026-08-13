@@ -43,6 +43,7 @@ _(BuildLabel,       "label",                L"l",             Kind::Value,      
 _(BuildOutput,      "output",               L"o",             Kind::Value,      BuildOutput,  Localization::WSLCCLI_OutputArgDescription()) \
 _(BuildPull,        "pull",                 NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_BuildPullArgDescription()) \
 _(BuildTarget,      "target",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildTargetArgDescription()) \
+_(CapAdd,           "cap-add",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapAddArgDescription()) \
 _(CIDFile,          "cidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CIDFileArgDescription()) \
 _(Command,          "command",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \

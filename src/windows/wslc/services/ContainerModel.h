@@ -74,6 +74,7 @@ struct ContainerOptions
     std::vector<std::string> DnsServers;
     std::vector<std::string> DnsSearchDomains;
     std::vector<std::string> DnsOptions;
+    std::vector<std::string> CapAdd;
     std::vector<std::string> Networks;
     std::vector<std::string> NetworkAliases;
     std::vector<std::string> Tmpfs;

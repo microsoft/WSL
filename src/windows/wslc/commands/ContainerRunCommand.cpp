@@ -31,6 +31,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, true),
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
+        Argument::Create(ArgType::CapAdd, false, Limit::Unlimited),
         Argument::Create(ArgType::CIDFile),
         Argument::Create(ArgType::Cpus),
         Argument::Create(ArgType::Detach),

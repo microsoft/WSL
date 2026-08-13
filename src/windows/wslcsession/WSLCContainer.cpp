@@ -1556,6 +1556,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
     wslcInspect.HostConfig.Memory = dockerInspect.HostConfig.Memory;
     wslcInspect.HostConfig.NanoCpus = dockerInspect.HostConfig.NanoCpus;
+    wslcInspect.HostConfig.CapAdd = dockerInspect.HostConfig.CapAdd.value_or(std::vector<std::string>{});
 
     if (dockerInspect.HostConfig.Ulimits.has_value())
     {
@@ -1763,6 +1764,11 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             containerOptions.DnsOptions.Count);
 
         request.HostConfig.DnsOptions = StringArrayToVector(containerOptions.DnsOptions);
+    }
+
+    if (containerOptions.CapAdd.Count > 0)
+    {
+        request.HostConfig.CapAdd = StringArrayToVector(containerOptions.CapAdd);
     }
 
     if (containerOptions.InitProcessOptions.User != nullptr)

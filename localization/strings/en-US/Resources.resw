@@ -3205,6 +3205,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Write the container ID to the provided path</value>
   </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities</value>
+  </data>
   <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
     <value>Write the image ID to the provided path</value>
   </data>

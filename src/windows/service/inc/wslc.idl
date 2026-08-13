@@ -325,6 +325,8 @@ typedef struct _WSLCContainerOptions
     LONGLONG HealthTimeoutNs;
     LONGLONG HealthStartPeriodNs;
     LONG HealthRetries;
+
+    WSLCStringArray CapAdd;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
