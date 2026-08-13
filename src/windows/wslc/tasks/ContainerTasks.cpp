@@ -1013,7 +1013,9 @@ void StopContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
-    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGTERM);
+
+    // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
+    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
 
     if (context.Args.Contains(ArgType::Time))
     {
