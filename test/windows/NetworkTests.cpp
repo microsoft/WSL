@@ -2156,7 +2156,7 @@ class NetworkTests
         auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
 
         // Perl one-liner: socket() + listen() with no bind(), print the kernel-assigned
-        // port via getsockname(), then accept() (blocking) to keep the socket alive.
+        // port via getsockname(), then accept connections while keeping the socket alive.
         const std::wstring wslCmd =
             L"perl -MSocket -e '"
             L"$|=1;"
@@ -2164,7 +2164,7 @@ class NetworkTests
             L"listen(S,5) or die;"
             L"my $port=(sockaddr_in(getsockname(S)))[0];"
             L"print \"PORT=$port\\n\";"
-            L"accept(C,S);"
+            L"while(accept(C,S)){close(C);}"
             L"'";
         auto cmd = LxssGenerateWslCommandLine(wslCmd.data());
 
@@ -2230,8 +2230,7 @@ class NetworkTests
         auto [guestProcess, assignedPort] = BindGuestPortViaListenOnly();
 
         // Port resolution is asynchronous (deferred to a background thread) for the case where
-        // the socket wasn't already bound. Retry until the host port tracker registers the port,
-        // blocking the host bind.
+        // the socket wasn't already bound. Retry until the host can connect through the port mapping.
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
             [&assignedPort]() {
                 wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
@@ -2239,8 +2238,9 @@ class NetworkTests
 
                 SOCKADDR_IN addr{};
                 addr.sin_family = AF_INET;
+                addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
                 addr.sin_port = htons(assignedPort);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
+                THROW_LAST_ERROR_IF(connect(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
             },
             std::chrono::seconds(1),
             std::chrono::seconds(30)));
