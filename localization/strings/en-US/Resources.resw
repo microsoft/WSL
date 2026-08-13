@@ -3405,7 +3405,7 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Network name</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the network names only</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Remove all unused networks.</value>
