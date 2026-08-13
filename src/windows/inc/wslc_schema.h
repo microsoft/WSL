@@ -102,6 +102,7 @@ struct HealthConfig
 
 struct ContainerConfig
 {
+    std::string Image;
     std::optional<std::vector<std::string>> Env;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
@@ -111,7 +112,7 @@ struct ContainerConfig
     std::optional<HealthConfig> Healthcheck;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck, Labels);
 };
 
 struct InspectEndpointIPAMConfig

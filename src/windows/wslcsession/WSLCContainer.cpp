@@ -1566,6 +1566,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         }
     }
 
+    wslcInspect.Config.Image = m_image;
     wslcInspect.Config.Env = dockerInspect.Config.Env;
     wslcInspect.Config.Cmd = dockerInspect.Config.Cmd;
     wslcInspect.Config.Entrypoint = dockerInspect.Config.Entrypoint;
