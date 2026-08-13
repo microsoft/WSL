@@ -2626,7 +2626,7 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
     <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
-    <comment>{Locked="SIGKILL"}{Locked="--signal"}Command line arguments should not be translated</comment>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>List containers.</value>
