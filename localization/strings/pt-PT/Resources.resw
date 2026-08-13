@@ -302,6 +302,9 @@ e "wsl.exe --install &lt;Distro&gt;" para instalar.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversão em curso, esta operação poderá demorar alguns minutos.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Compaction in progress, this may take a few minutes.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>A distribuição já é a versão pedida.</value>
   </data>
@@ -394,215 +397,218 @@ Utilização:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Todos os direitos reservados.
-Para informações de privacidade sobre este produto, visite https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.
 
-Utilização: wsl.exe [Argument] [Options...] [CommandLine]
+Usage: wsl.exe [Argument] [Options...] [CommandLine]
 
-Argumentos para executar binários do Linux:
+Arguments for running Linux binaries:
 
-    Se nenhuma linha de comandos for fornecida, o wsl.exe inicia a shell predefinida.
+    If no command line is provided, wsl.exe launches the default shell.
 
     --exec, -e &lt;CommandLine&gt;
-        Executa o comando especificado sem utilizar a shell predefinida do Linux.
+        Execute the specified command without using the default Linux shell.
 
     --shell-type &lt;standard|login|none&gt;
-        Executa o comando especificado com o tipo de shell fornecido.
+        Execute the specified command with the provided shell type.
 
     --
-        Passa a linha de comandos restante tal como está.
+        Pass the remaining command line as-is.
 
-Opções:
+Options:
     --cd &lt;Directory&gt;
-        Define o diretório especificado como o diretório de trabalho atual.
-        Se ~ for utilizado, será utilizado o caminho raiz do utilizador do Linux. Se o caminho começar
-        por um caráter /, será interpretado como caminho absoluto do Linux.
-        Caso contrário, o valor deve ser um caminho absoluto do Windows.
+        Sets the specified directory as the current working directory.
+        If ~ is used the Linux user's home path will be used. If the path begins
+        with a / character, it will be interpreted as an absolute Linux path.
+        Otherwise, the value must be an absolute Windows path.
 
     --distribution, -d &lt;DistroName&gt;
-        Executa a distribuição especificada.
+        Run the specified distribution.
 
     --distribution-id &lt;DistroGuid&gt;
-        Executa o ID da distribuição especificada.
+        Run the specified distribution ID.
 
     --user, -u &lt;UserName&gt;
-        Executa como o utilizador especificado.
+        Run as the specified user.
 
     --system
-        Inicia uma shell para a distribuição do sistema.
+        Launches a shell for the system distribution.
 
-Argumentos para gerir o Subsistema Windows para Linux:
+Arguments for managing Windows Subsystem for Linux:
 
     --help
-        Apresenta informações de utilização.
+        Display usage information.
 
     --debug-shell
-        Abre uma shell de depuração do WSL2 para fins de diagnóstico.
+        Open a WSL2 debug shell for diagnostics purposes.
 
     --install [Distro] [Options...]
-        Instala uma distribuição do Subsistema Windows para Linux.
-        Para obter uma lista de distribuições válidas, utilize 'wsl.exe --list --online'
+        Install a Windows Subsystem for Linux distribution.
+        For a list of valid distributions, use 'wsl.exe --list --online'.
 
-        Opções:
+        Options:
             --enable-wsl1
-                Ativa o suporte WSL1.
+                Enable WSL1 support.
 
             --fixed-vhd
-                Cria um disco de tamanho fixo para armazenar a distribuição.
+                Create a fixed-size disk to store the distribution.
 
             --from-file &lt;Path&gt;
-                Instala uma distribuição a partir de um ficheiro local.
+                Install a distribution from a local file.
 
             --legacy
-                Utiliza o manifesto de distribuição legado.
+                Use the legacy distribution manifest.
 
             --location &lt;Location&gt;
-                Define o caminho de instalação da distribuição.
+                Set the install path for the distribution.
 
             --name &lt;Name&gt;
-                Define o nome da distribuição. 
+                Set the name of the distribution.
 
             --no-distribution
-                Instala apenas os componentes opcionais necessários. Não instala uma distribuição.
+                Only install the required optional components, does not install a distribution.
 
             --no-launch, -n
-                Não inicia a distribuição após a instalação.
+                Do not launch the distribution after install.
 
             --version &lt;Version&gt;
-                Especifica a versão a utilizar na nova distribuição.
+                Specifies the version to use for the new distribution.
 
             --vhd-size &lt;MemoryString&gt;
-                Especifica o tamanho do disco para armazenar a distribuição.
+                Specifies the size of the disk to store the distribution.
 
             --web-download
-                Transfere a distribuição da Internet, em vez de pela Microsoft Store.
+                Download the distribution from the internet instead of the Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Altera as opções específicas da distribuição.
+        Changes distro specific options.
 
-        Opções:
+        Options:
             --move &lt;Location&gt;
-                Move a distribuição para uma nova localização.
+                Move the distribution to a new location.
 
             --set-sparse, -s &lt;true|false&gt;
-                Define o VHD da distribuição para ser disperso, permitindo que o espaço em disco seja automaticamente recuperado.
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user &lt;Username&gt;
-                Define o utilizador predefinido da distribuição.
+                Set the default user of the distribution.
 
             --resize &lt;MemoryString&gt;
-                Redimensiona o disco da distribuição ao tamanho especificado.
+                Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount &lt;Disk&gt;
-        Liga e monta um disco físico ou virtual em todas as distribuições do WSL 2.
+        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
-        Opções:
+        Options:
             --vhd
-                Especifica que &lt;Disk&gt; se refere a um disco rígido virtual.
+                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
 
             --bare
-                Liga o disco ao WSL2, mas sem o montar.
+                Attach the disk to WSL2, but don't mount it.
 
             --name &lt;Name&gt;
-                Monta o disco com um nome personalizado para o ponto de montagem.
+                Mount the disk using a custom name for the mountpoint.
 
             --type &lt;Type&gt;
-                O sistema de ficheiros a utilizar ao montar um disco. Se não for especificado, é predefinido como ext4.
+                Filesystem to use when mounting a disk, if not specified defaults to ext4.
 
             --options &lt;Options&gt;
-                Opções de montagem adicionais.
+                Additional mount options.
 
             --partition &lt;Index&gt;
-                Índice da partição a montar. Se não for especificado, é predefinido para todo o disco.
+                Index of the partition to mount, if not specified defaults to the whole disk.
 
     --set-default-version &lt;Version&gt;
-        Altera a versão de instalação predefinida para novas distribuições.
+        Changes the default install version for new distributions.
 
     --shutdown
-        Termina imediatamente todas as distribuições em execução e o WSL 2
-        máquina virtual utilitária leve.
+        Immediately terminates all running distributions and the WSL 2
+        lightweight utility virtual machine.
 
-        Opções:
+        Options:
             --force
-                Termina a máquina virtual WSL 2 mesmo que esteja a decorrer uma operação. Pode causar perda de dados.
+                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
 
     --status
-        Mostra o estado do Subsistema Windows para Linux.
+        Show the status of Windows Subsystem for Linux.
 
     --unmount [Disk]
-        Desmonta e desliga um disco de todas as distribuições do WSL 2.
-        Desmonta e desliga todos os discos se for chamado sem argumento.
+        Unmounts and detaches a disk from all WSL2 distributions.
+        Unmounts and detaches all disks if called without argument.
 
     --uninstall
-        Desinstala o pacote do Subsistema Windows para Linux a partir deste computador. 
+        Uninstalls the Windows Subsystem for Linux package from this machine.
 
     --update
-        Atualiza o pacote do Subsistema Windows para Linux.
+        Update the Windows Subsystem for Linux package.
 
-        Opções:
+        Options:
             --pre-release
-                Transfere uma versão de pré-lançamento, se estiver disponível.
+                Download a pre-release version if available.
 
     --version, -v
-        Apresenta informações da versão.
+        Display version information.
 
-Argumentos para gerir distribuições no Subsistema Windows para Linux:
+Arguments for managing distributions in Windows Subsystem for Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exporta a distribuição para um ficheiro tar.
-        O nome de ficheiro pode ser - para stdout.
+        Exports the distribution to a tar file.
+        The filename can be - for stdout.
 
-        Opções:
+        Options:
             --format &lt;Format&gt;
-                Especifica o formato de exportação. Valores suportados: tar, tar.gz, tar.xz, vhd.
+                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Importa o ficheiro tar especificado como nova distribuição.
-        O nome de ficheiro pode ser - para stdin.
+        Imports the specified tar file as a new distribution.
+        The filename can be - for stdin.
 
-        Opções:
+        Options:
             --version &lt;Version&gt;
-                Especifica a versão a utilizar para a nova distribuição.
+                Specifies the version to use for the new distribution.
 
             --vhd
-                Especifica que o ficheiro fornecido é um ficheiro .vhd ou .vhdx, não um ficheiro tar.
-                Esta operação faz uma cópia do ficheiro VHD na localização de instalação especificada.
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importa o ficheiro VHD especificado como nova distribuição.
-        Este disco rígido virtual tem de ser formatado com o tipo de sistema de ficheiros ext4.
+        Imports the specified VHD file as a new distribution.
+        This virtual hard disk must be formatted with the ext4 filesystem type.
 
     --list, -l [Options]
-        Lista as distribuições.
+        Lists distributions.
 
-        Opções:
+        Options:
             --all
-                Lista todas as distribuições, incluindo as distribuições que estão
-                atualmente a ser instaladas ou desinstaladas.
+                List all distributions, including distributions that are
+                currently being installed or uninstalled.
 
             --running
-                Lista apenas as distribuições que estão atualmente em execução.
+                List only distributions that are currently running.
 
             --quiet, -q
-                Mostra apenas os nomes das distribuições.
+                Only show distribution names.
 
             --verbose, -v
-                Mostra informações detalhadas sobre todas as distribuições.
+                Show detailed information about all distributions.
 
             --online, -o
-                Mostra uma lista de distribuições disponíveis para instalação com 'wsl.exe --install'.
+                Displays a list of available distributions for install with 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Define a distribuição como predefinição.
+        Sets the distribution as the default.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Altera a versão da distribuição especificada.
+        Changes the version of the specified distribution.
 
     --terminate, -t &lt;Distro&gt;
-        Termina a distribuição especificada.
+        Terminates the specified distribution.
 
     --unregister &lt;Distro&gt;
-        Anula o registo da distribuição e elimina o sistema de ficheiros raiz.</value>
+        Unregisters the distribution and deletes the root filesystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -611,7 +617,8 @@ Argumentos para gerir distribuições no Subsistema Windows para Linux:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ A reverter para a rede NAT.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Não foi possível concluir a operação porque o VHD está atualmente a ser utilizado. Para forçar o WSL a parar, utilize: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Compaction is only supported on .vhdx files.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} não é um booleano válido, &lt;verdadeiro|falso&gt;</value>
@@ -3224,8 +3235,8 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Tipo de progressão (formato: none|ansi) (padrão: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Definir o tipo de saída de progresso (auto, tty, plain, quiet) (predefinição: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Política de obtenção de imagens (always|missing|never) (padrão: missing)</value>
@@ -3265,6 +3276,10 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Valor {} inválido: {} não é uma política de pull reconhecida. As políticas pull suportadas são: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Valor de {} inválido: {} não é um tipo de progresso reconhecido. Os tipos de progresso suportados são: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">

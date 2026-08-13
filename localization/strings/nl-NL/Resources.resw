@@ -302,6 +302,9 @@ en 'wsl.exe --install &lt;Distro&gt;' om te installeren.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversie wordt uitgevoerd. Dit kan enkele minuten duren.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>De compressie wordt uitgevoerd. Dit kan enkele minuten duren.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>De distributie is al de aangevraagde versie.</value>
   </data>
@@ -394,215 +397,218 @@ Gebruik:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Alle rechten voorbehouden.
-Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.
+    <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.
 
-Gebruik: wsl.exe [Argument] [Opties...] [Opdrachtregel]
+Usage: wsl.exe [Argument] [Options...] [CommandLine]
 
-Argumenten voor het uitvoeren van binaire Linux-bestanden:
+Arguments for running Linux binaries:
 
-    Als er geen opdrachtregel is opgegeven, wordt de standaardshell gestart met wsl.exe.
+    If no command line is provided, wsl.exe launches the default shell.
 
     --exec, -e &lt;CommandLine&gt;
-        De opgegeven opdracht uitvoeren zonder de standaardshell voor Linux te gebruiken.
+        Execute the specified command without using the default Linux shell.
 
     --shell-type &lt;standard|login|none&gt;
-        De opgegeven opdracht uitvoeren met het opgegeven shelltype.
+        Execute the specified command with the provided shell type.
 
     --
-        De resterende opdrachtregel in de huidige staat doorgeven.
+        Pass the remaining command line as-is.
 
-Opties:
+Options:
     --cd &lt;Directory&gt;
-        De opgegeven map instellen als de huidige werkmap.
-        Als ~ wordt gebruikt, wordt het basispad van de Linux-gebruiker gebruikt. Als het pad begint
-        met een /-teken, wordt het geïnterpreteerd als een absoluut Linux-pad.
-        Anders moet de waarde een absoluut Windows-pad zijn.
+        Sets the specified directory as the current working directory.
+        If ~ is used the Linux user's home path will be used. If the path begins
+        with a / character, it will be interpreted as an absolute Linux path.
+        Otherwise, the value must be an absolute Windows path.
 
     --distribution, -d &lt;DistroName&gt;
-        De opgegeven distributie uitvoeren.
+        Run the specified distribution.
 
     --distribution-id &lt;DistroGuid&gt;
-        De opgegeven distributie-id uitvoeren.
+        Run the specified distribution ID.
 
     --user, -u &lt;UserName&gt;
-        Uitvoeren als de opgegeven gebruiker.
+        Run as the specified user.
 
     --system
-        Een shell voor de systeemdistributie starten.
+        Launches a shell for the system distribution.
 
-Argumenten voor het beheren van het Windows-subsysteem voor Linux:
+Arguments for managing Windows Subsystem for Linux:
 
     --help
-        Gebruiksgegevens weergeven.
+        Display usage information.
 
     --debug-shell
-        Een WSL2-foutopsporingsshell voor diagnostische doeleinden openen.
+        Open a WSL2 debug shell for diagnostics purposes.
 
     --install [Distro] [Options...]
-        Een Windows-subsysteem voor Linux-distributie installeren.
-        Gebruik 'wsl.exe --list --online' voor een lijst met geldige distributies.
+        Install a Windows Subsystem for Linux distribution.
+        For a list of valid distributions, use 'wsl.exe --list --online'.
 
-        Opties:
+        Options:
             --enable-wsl1
-                WSL1-ondersteuning inschakelen.
+                Enable WSL1 support.
 
             --fixed-vhd
-                Een schijf met een vaste grootte maken om de distributie op te slaan.
+                Create a fixed-size disk to store the distribution.
 
             --from-file &lt;Path&gt;
-                Een distributie installeren vanaf een lokaal bestand.
+                Install a distribution from a local file.
 
             --legacy
-                Het verouderde distributiemanifest gebruiken.
+                Use the legacy distribution manifest.
 
             --location &lt;Location&gt;
-                Het installatiepad voor de distributie instellen.
+                Set the install path for the distribution.
 
             --name &lt;Name&gt;
-                De naam van de distributie instellen.
+                Set the name of the distribution.
 
             --no-distribution
-                Door alleen de vereiste optionele onderdelen te installeren, wordt geen distributie geïnstalleerd.
+                Only install the required optional components, does not install a distribution.
 
             --no-launch, -n
-                De distributie niet na de installatie starten.
+                Do not launch the distribution after install.
 
             --version &lt;Version&gt;
-                Specificeert de versie die moet worden gebruikt voor de nieuwe distributie.
+                Specifies the version to use for the new distribution.
 
             --vhd-size &lt;MemoryString&gt;
-                Specificeert de grootte van de schijf om de distributie op te slaan.
+                Specifies the size of the disk to store the distribution.
 
             --web-download
-                De distributie downloaden van internet in plaats van Microsoft Store.
+                Download the distribution from the internet instead of the Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Hiermee worden specifieke opties voor de distributie gewijzigd.
+        Changes distro specific options.
 
-        Opties:
+        Options:
             --move &lt;Location&gt;
-                De distributie naar een nieuwe locatie verplaatsen.
+                Move the distribution to a new location.
 
             --set-sparse, -s &lt;true|false&gt;
-                De VHD van de distributie instellen op sparse, zodat schijfruimte automatisch opnieuw kan worden geclaimd.
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user &lt;Username&gt;
-                De standaardgebruiker van de distributie instellen.
+                Set the default user of the distribution.
 
             --resize &lt;MemoryString&gt;
-                De grootte van de schijf van de distributie wijzigen in de opgegeven grootte.
+                Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount &lt;Disk&gt;
-        Hiermee wordt een fysieke of virtuele schijf in alle WSL 2-distributies toegevoegd en gekoppeld.
+        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
-        Opties:
+        Options:
             --vhd
-                Hiermee geef je aan dat &lt;Disk&gt; naar een virtuele harde schijf verwijst.
+                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
 
             --bare
-                De schijf toevoegen aan WSL2, maar niet koppelen.
+                Attach the disk to WSL2, but don't mount it.
 
             --name &lt;Name&gt;
-                De schijf koppelen met een aangepaste naam voor het koppelpunt.
+                Mount the disk using a custom name for the mountpoint.
 
             --type &lt;Type&gt;
-                Het bestandssysteem dat moet worden gebruikt bij het koppelen van een schijf wordt, indien niet opgegeven, standaard ingesteld op ext4.
+                Filesystem to use when mounting a disk, if not specified defaults to ext4.
 
             --options &lt;Options&gt;
-                Aanvullende koppelingsopties.
+                Additional mount options.
 
             --partition &lt;Index&gt;
-                De index van de partitie die moet worden gekoppeld wordt, indien niet opgegeven, standaard ingesteld op de hele schijf.
+                Index of the partition to mount, if not specified defaults to the whole disk.
 
     --set-default-version &lt;Version&gt;
-        Hiermee wijzig je de standaardinstallatieversie voor nieuwe distributies.
+        Changes the default install version for new distributions.
 
     --shutdown
-        Hiermee beëindig je onmiddellijk alle actieve distributies en de WSL 2
-        lichtgewicht virtuele machine voor hulpprogramma's.
+        Immediately terminates all running distributions and the WSL 2
+        lightweight utility virtual machine.
 
-        Opties:
+        Options:
             --force
-                De WSL 2-VM beëindigen, zelfs als er een bewerking wordt uitgevoerd. Dit kan gegevensverlies veroorzaken.
+                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
 
     --status
-        De status van het Windows-subsysteem voor Linux weergeven.
+        Show the status of Windows Subsystem for Linux.
 
     --unmount [Disk]
-        Hiermee wordt een schijf ontkoppeld en losgemaakt van alle WSL2-distributies.
-        Hiermee worden alle schijven ontkoppeld en losgemaakt bij een aanroep zonder argument.
+        Unmounts and detaches a disk from all WSL2 distributions.
+        Unmounts and detaches all disks if called without argument.
 
     --uninstall
-        Hiermee verwijder je het Windows-subsysteem voor Linux-pakket van deze computer.
+        Uninstalls the Windows Subsystem for Linux package from this machine.
 
     --update
-        Het Windows-subsysteem voor Linux-pakket bijwerken.
+        Update the Windows Subsystem for Linux package.
 
-        Opties:
+        Options:
             --pre-release
-                Een voorlopige versie downloaden, indien beschikbaar.
+                Download a pre-release version if available.
 
     --version, -v
-        Versiegegevens weergeven.
+        Display version information.
 
-Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linux:
+Arguments for managing distributions in Windows Subsystem for Linux:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Opties]
-        Hiermee exporteer je de distributie naar een TAR-bestand.
-        De bestandsnaam kan - zijn voor stdout.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        Exports the distribution to a tar file.
+        The filename can be - for stdout.
 
-        Opties:
+        Options:
             --format &lt;Format&gt;
-                Specificeert de exportindeling. Ondersteunde waarden: tar, tar.gz, tar.xz, vhd.
+                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Opties]
-        Hiermee importeer je het opgegeven TAR-bestand als een nieuwe distributie.
-        De bestandsnaam kan - zijn voor stdin.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        Imports the specified tar file as a new distribution.
+        The filename can be - for stdin.
 
-        Opties:
+        Options:
             --version &lt;Version&gt;
-                Hiermee geef je de versie op die moet worden gebruikt voor de nieuwe distributie.
+                Specifies the version to use for the new distribution.
 
             --vhd
-                Hiermee geef je op dat het opgegeven bestand een VHD- of VHDX-bestand is en geen TAR-bestand.
-                Met deze bewerking wordt een kopie gemaakt van het VHD-bestand op de opgegeven installatielocatie.
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Hiermee importeer je het opgegeven VHD-bestand als een nieuwe distributie.
-        Deze virtuele harde schijf moet zijn geformatteerd met het ext4-type bestandssysteem.
+        Imports the specified VHD file as a new distribution.
+        This virtual hard disk must be formatted with the ext4 filesystem type.
 
-    --list, -l [Opties]
-        Hiermee wordt een lijst met distributies weergegeven.
+    --list, -l [Options]
+        Lists distributions.
 
-        Opties:
+        Options:
             --all
-                Alle distributies weergeven, inclusief distributies die
-                momenteel worden geïnstalleerd of verwijderd.
+                List all distributions, including distributions that are
+                currently being installed or uninstalled.
 
             --running
-                Alleen distributies weergeven die momenteel worden uitgevoerd.
+                List only distributions that are currently running.
 
             --quiet, -q
-                Alleen distributienamen weergeven.
+                Only show distribution names.
 
             --verbose, -v
-                Gedetailleerde informatie over alle distributies weergeven.
+                Show detailed information about all distributions.
 
             --online, -o
-                Geeft een lijst weer met beschikbare distributies voor installatie met 'wsl.exe --install'.
+                Displays a list of available distributions for install with 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Hiermee stel je de distributie als standaard in.
+        Sets the distribution as the default.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Hiermee wijzig je de versie van de opgegeven distributie.
+        Changes the version of the specified distribution.
 
     --terminate, -t &lt;Distro&gt;
-        Hiermee wordt de opgegeven distributie beëindigd.
+        Terminates the specified distribution.
 
     --unregister &lt;Distro&gt;
-        De registratie van de distributie ongedaan maken en het hoofdbestandssysteem verwijderen.</value>
+        Unregisters the distribution and deletes the root filesystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -611,7 +617,8 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ Terugvallen op NAT-netwerken.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>De bewerking kan niet worden voltooid omdat de VHD momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Compactie wordt alleen ondersteund op .vhdx-bestanden.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} is geen geldige booleaanse waarde, &lt;waar|onwaar&gt;</value>
@@ -3224,8 +3235,8 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Voortgangstype (formaat: none|ansi) (standaard: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Type voortgangsuitvoer instellen (auto, tty, plain, quiet) (standaard: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Beleid voor het ophalen van afbeeldingen (always|missing|never) (standaard: missing)</value>
@@ -3265,6 +3276,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} is geen herkend pull-beleid. Ondersteund pull-beleid is: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: {} is geen herkend voortgangstype. Ondersteunde voortgangstypen zijn: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
