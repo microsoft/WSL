@@ -236,11 +236,7 @@ void KillContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
-    WSLCSignal signal = WSLCSignalSIGKILL;
-    if (context.Args.Contains(ArgType::Signal))
-    {
-        signal = context.Args.GetValue<ArgType::Signal>();
-    }
+    const auto signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGKILL);
 
     for (const auto& id : containerIds)
     {
@@ -1017,10 +1013,7 @@ void StopContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
-    if (context.Args.Contains(ArgType::Signal))
-    {
-        options.Signal = context.Args.GetValue<ArgType::Signal>();
-    }
+    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGTERM);
 
     if (context.Args.Contains(ArgType::Time))
     {
