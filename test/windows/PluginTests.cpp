@@ -211,7 +211,7 @@ class PluginTests
         ConfigurePlugin(PluginTestType::MountFolderAccess, testFolder.c_str());
 
         constexpr auto ExpectedOutput =
-            LR"(Plugin loaded. TestMode=25
+            LR"(Plugin loaded. TestMode=18
                 VM created (settings->CustomConfigurationFlags=0)
                 /bin/sh: line 1: /test-plugin-access/plugin-test.txt: Permission denied
                 Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13

@@ -38,13 +38,6 @@ enum class PluginTestType
     FailToRegisterUnregisterDistro,
     RunDistroCommand,
     GetUsername,
-    WslcSuccess,
-    WslcSessionRejected,
-    WslcContainerRejected,
-    WslcImagePull,
-    WslcVmRestart,
-    WslcVmStopCommitted,
-    WslcVmNeverStarted,
     MountFolderAccess
 };
 
