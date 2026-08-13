@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <fstream>
 #include <wil/network.h>
 #include <wil/resource.h>
@@ -30,9 +31,9 @@ class WSLCE2EContainerCreateTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(AlpineImage);
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsLoaded(HelloWorldImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(HelloWorldImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), HostEnvVariableValue2.c_str()));
@@ -43,9 +44,6 @@ class WSLCE2EContainerCreateTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(AlpineImage);
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(HelloWorldImage);
         EnsureNetworkDoesNotExist(TestNetworkName);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
@@ -1417,11 +1415,11 @@ class WSLCE2EContainerCreateTests
         // to arm before either resource exists.
         auto cleanup = wil::scope_exit([&] {
             EnsureContainerDoesNotExist(WslcContainerName);
-            EnsureImageIsDeleted(PublishAllImage);
+            TestImageRegistry::Instance().Delete(PublishAllImage);
         });
 
         // Load the Python base image so the test image can be built offline.
-        EnsureImageIsLoaded(PythonImage);
+        TestImageRegistry::Instance().EnsureLoaded(PythonImage);
 
         // Build an image that exposes a TCP and a UDP port and ships a server that listens on both,
         // so publish-all can be exercised end to end.

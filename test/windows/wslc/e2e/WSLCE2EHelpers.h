@@ -126,8 +126,6 @@ wsl::windows::common::wslc_schema::Network InspectNetwork(const std::wstring& ne
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
-void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
-void EnsureImageIsDeleted(const TestImage& image);
 void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureNoUntaggedImages();

@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,7 +26,7 @@ class WSLCE2EContainerRemoveTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         BuildAnonymousVolumeImage();
         return true;
     }
@@ -35,8 +36,7 @@ class WSLCE2EContainerRemoveTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureVolumeDoesNotExist(TestVolumeName);
-        EnsureImageIsDeleted(AnonymousVolumeImage);
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(AnonymousVolumeImage);
         return true;
     }
 

@@ -16,6 +16,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "Argument.h"
 #include <wslutil.h>
 
@@ -49,7 +50,7 @@ class WSLCE2ERegistryTests
     WSLC_TEST_METHOD(WSLCE2E_Registry_LoginLogout_PushPull_AuthFlow)
     {
         const auto& debianImage = DebianTestImage();
-        EnsureImageIsLoaded(debianImage);
+        TestImageRegistry::Instance().EnsureLoaded(debianImage);
 
         auto session = OpenDefaultElevatedSession();
 

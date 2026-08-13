@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "WSLCSessionDefaults.h"
 #include "Argument.h"
 
@@ -428,7 +429,7 @@ class WSLCE2EGlobalTests
         auto session = TestSession::Create(sessionName);
 
         // Load the Debian image into the test session to avoid hitting Docker Hub rate limits.
-        EnsureImageIsLoaded(DebianTestImage(), session.Name());
+        TestImageRegistry::Instance().EnsureLoaded(DebianTestImage(), session.Name());
 
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"--session INVALID_SESSION_NAME container list");

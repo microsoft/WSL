@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,13 +26,13 @@ class WSLCE2EImagePruneTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
@@ -57,12 +58,12 @@ class WSLCE2EImagePruneTests
         // 1. Tag debian as prune-target:v1
         // 2. Delete the original debian:latest tag so prune-target:v1 is the only reference
         // 3. Tag alpine as prune-target:v1, overwriting it — debian image is now dangling
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
         auto cleanup = wil::scope_exit([&]() {
             RunWslc(L"image prune");
             RunWslc(L"image delete prune-target:v1");
-            EnsureImageIsDeleted(AlpineImage);
-            EnsureImageIsLoaded(DebianImage);
+            TestImageRegistry::Instance().Delete(AlpineImage);
+            TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         });
 
         RunWslc(std::format(L"image tag {} prune-target:v1", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
@@ -92,7 +93,7 @@ class WSLCE2EImagePruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_AllFlag)
     {
-        auto cleanup = wil::scope_exit([&]() { EnsureImageIsLoaded(DebianImage); });
+        auto cleanup = wil::scope_exit([&]() { TestImageRegistry::Instance().EnsureLoaded(DebianImage); });
 
         // --all should prune unused images (not just dangling)
         const auto result = RunWslc(L"image prune --all");
@@ -131,12 +132,12 @@ class WSLCE2EImagePruneTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_Filter_LabelPreservesDangling)
     {
         // Create a dangling debian image (same trick as WSLCE2E_Image_Prune_DanglingImage).
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
         auto cleanup = wil::scope_exit([&]() {
             RunWslc(L"image prune");
             RunWslc(L"image delete prune-target:v1");
-            EnsureImageIsDeleted(AlpineImage);
-            EnsureImageIsLoaded(DebianImage);
+            TestImageRegistry::Instance().Delete(AlpineImage);
+            TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         });
 
         RunWslc(std::format(L"image tag {} prune-target:v1", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});

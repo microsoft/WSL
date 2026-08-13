@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -26,18 +27,18 @@ class WSLCE2EImageDeleteTests
     TEST_METHOD_SETUP(MethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
-        EnsureImageIsDeleted(NoPruneTaggedImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
+        TestImageRegistry::Instance().Delete(NoPruneTaggedImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
-        EnsureImageIsDeleted(NoPruneTaggedImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
+        TestImageRegistry::Instance().Delete(NoPruneTaggedImage);
         return true;
     }
 
@@ -64,7 +65,7 @@ class WSLCE2EImageDeleteTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UnusedImage_Success)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
@@ -73,8 +74,8 @@ class WSLCE2EImageDeleteTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MultipleUnusedImages_Success)
     {
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
         VerifyImageIsNotUsed(DebianImage);
         VerifyImageIsNotUsed(AlpineImage);
 
@@ -84,7 +85,7 @@ class WSLCE2EImageDeleteTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UsedImage_Failure)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
         auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -109,7 +110,7 @@ class WSLCE2EImageDeleteTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_DeleteForce_UsedImage_Success)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
         auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -125,8 +126,8 @@ class WSLCE2EImageDeleteTests
     {
         // Tag debian a second time, then remove via the alias with --no-prune.
         // The alias must disappear while the original tag stays resolvable.
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsDeleted(NoPruneTaggedImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().Delete(NoPruneTaggedImage);
 
         auto tagResult = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), NoPruneTaggedImage.NameAndTag()));
         tagResult.Verify({.Stderr = L"", .ExitCode = 0});
