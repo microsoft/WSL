@@ -825,9 +825,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     {
         auto networks = context.Args.GetAllValues<ArgType::Network>();
         options.Networks.reserve(options.Networks.size() + networks.size());
-        for (const auto& value : networks)
+        for (auto& parsed : networks)
         {
-            options.Networks.emplace_back(WideToMultiByte(value));
+            auto& network = options.Networks.emplace_back();
+            network.Name = std::move(parsed.Name);
+            network.Aliases = std::move(parsed.Aliases);
         }
     }
 

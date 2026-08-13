@@ -94,7 +94,7 @@ _(Link,             "link",                 NO_ALIAS,         Kind::Value,      
 _(LinkLocalIp,      "link-local-ip",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_LinkLocalIpArgDescription()) \
 _(Memory,           "memory",               L"m",             Kind::Value,      int64_t,      Localization::WSLCCLI_MemoryArgDescription()) \
 _(Name,             "name",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NameArgDescription()) \
-_(Network,          "network",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkArgDescription()) \
+_(Network,          "network",              NO_ALIAS,         Kind::Value,      ParsedNetworkArgument, Localization::WSLCCLI_NetworkArgDescription()) \
 _(NetworkAlias,     "network-alias",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkAliasArgDescription()) \
 _(NetworkName,      "network-name",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_NetworkNameArgDescription()) \
 /*_(NoDNS,            "no-dns",               NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoDNSArgDescription())*/ \
