@@ -17,6 +17,7 @@ Abstract:
 #include <cstdint>
 #include <exception>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -42,16 +43,27 @@ struct Spec
     std::optional<uint32_t> TmpfsMode;
 };
 
-class ParseException : public std::exception
+enum class ValidationError
+{
+    InvalidSpecification,
+    DuplicateDestination,
+};
+
+class ValidationException : public std::exception
 {
 public:
-    explicit ParseException(std::wstring reason) : m_reason(std::move(reason))
+    explicit ValidationException(std::wstring reason) : m_reason(std::move(reason))
+    {
+    }
+
+    ValidationException(ValidationError error, std::wstring reason, std::string destination) :
+        m_error(error), m_reason(std::move(reason)), m_destination(std::move(destination))
     {
     }
 
     const char* what() const noexcept override
     {
-        return "invalid mount specification";
+        return "invalid mount";
     }
 
     const std::wstring& Reason() const noexcept
@@ -59,11 +71,25 @@ public:
         return m_reason;
     }
 
+    ValidationError Error() const noexcept
+    {
+        return m_error;
+    }
+
+    const std::string& Destination() const noexcept
+    {
+        return m_destination;
+    }
+
 private:
+    ValidationError m_error = ValidationError::InvalidSpecification;
     std::wstring m_reason;
+    std::string m_destination;
 };
 
-Spec Parse(const std::wstring& value);
+Spec ParseDockerMountString(const std::wstring& value);
+void ValidateMountSpec(const Spec& mount);
+void ValidateMountCollection(std::span<const Spec> mounts);
 std::string FormatTmpfsOptions(const Spec& mount);
 std::string NormalizeDestination(std::string destination);
 bool IsValidNamedVolumeName(std::wstring_view name);

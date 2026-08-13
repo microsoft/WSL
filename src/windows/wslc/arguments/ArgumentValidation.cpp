@@ -224,9 +224,11 @@ void Argument::Validate(ArgMap& execArgs) const
         CacheConverted<ArgType::Mount>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
             try
             {
-                return mount::Parse(value);
+                auto mountSpec = mount::ParseDockerMountString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
             }
-            catch (const mount::ParseException& ex)
+            catch (const mount::ValidationException& ex)
             {
                 throw ArgumentException(Localization::WSLCCLI_InvalidMountError(value, ex.Reason()));
             }

@@ -335,6 +335,20 @@ TmpfsMount TmpfsMount::Parse(const std::string& value)
 
 void ValidateUniqueMountDestinations(const ContainerOptions& options)
 {
+    try
+    {
+        mount::ValidateMountCollection(options.Mounts);
+    }
+    catch (const mount::ValidationException& ex)
+    {
+        if (ex.Error() == mount::ValidationError::DuplicateDestination)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_DuplicateMountDestinationError(MultiByteToWide(ex.Destination())));
+        }
+
+        throw;
+    }
+
     std::unordered_set<std::string> destinations;
     const auto addDestination = [&](const std::string& destination) {
         const auto normalizedDestination = mount::NormalizeDestination(destination);

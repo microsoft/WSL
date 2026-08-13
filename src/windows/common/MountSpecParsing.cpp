@@ -24,6 +24,7 @@ Abstract:
 #include <limits>
 #include <regex>
 #include <system_error>
+#include <unordered_set>
 #include <vector>
 
 using namespace wsl::shared;
@@ -124,7 +125,7 @@ namespace {
 
     [[noreturn]] void ThrowInvalid(std::wstring reason)
     {
-        throw ParseException(std::move(reason));
+        throw ValidationException(std::move(reason));
     }
 
     KeyValue SplitKeyValue(const std::wstring& value)
@@ -302,7 +303,7 @@ namespace {
 
 } // namespace
 
-Spec Parse(const std::wstring& value)
+Spec ParseDockerMountString(const std::wstring& value)
 {
     const auto fields = SplitCsvFields(value);
     if (!fields.has_value())
@@ -461,10 +462,6 @@ Spec Parse(const std::wstring& value)
     {
         ThrowInvalid(L"type is required");
     }
-    if (mount.Target.empty())
-    {
-        ThrowInvalid(L"target is required");
-    }
 
     if (mount.HasVolumeOptions && mount.Type != L"volume")
     {
@@ -518,45 +515,6 @@ Spec Parse(const std::wstring& value)
         ThrowInvalid(std::format(L"option '{}' is not supported.", mount.UnsupportedOption.value()));
     }
 
-    if (mount.Target.find(L':') != std::wstring::npos)
-    {
-        ThrowInvalid(L"target paths containing ':' are not supported.");
-    }
-
-    if (!mount.Target.starts_with(L'/'))
-    {
-        ThrowInvalid(L"target path must be absolute");
-    }
-
-    if (type == Type::Tmpfs)
-    {
-        if (!mount.Source.empty())
-        {
-            ThrowInvalid(L"source is not supported for tmpfs mounts");
-        }
-    }
-    else
-    {
-        if (mount.Source.empty())
-        {
-            if (type == Type::Volume)
-            {
-                ThrowInvalid(L"anonymous volume mounts are not supported.");
-            }
-
-            ThrowInvalid(L"source is required");
-        }
-
-        if (type == Type::Bind && !std::filesystem::path(mount.Source).is_absolute())
-        {
-            ThrowInvalid(L"bind source path must be absolute");
-        }
-        if (type == Type::Volume && !IsValidNamedVolumeName(mount.Source))
-        {
-            ThrowInvalid(L"volume source must be a valid named volume");
-        }
-    }
-
     return {
         .MountType = type,
         .Source = std::move(mount.Source),
@@ -565,6 +523,89 @@ Spec Parse(const std::wstring& value)
         .TmpfsSizeBytes = mount.TmpfsSizeBytes,
         .TmpfsMode = mount.TmpfsMode,
     };
+}
+
+void ValidateMountSpec(const Spec& mount)
+{
+    if (mount.Target.empty())
+    {
+        ThrowInvalid(L"target is required");
+    }
+
+    if (mount.Target.find(':') != std::string::npos)
+    {
+        ThrowInvalid(L"target paths containing ':' are not supported.");
+    }
+
+    if (!mount.Target.starts_with('/'))
+    {
+        ThrowInvalid(L"target path must be absolute");
+    }
+
+    if (mount.MountType != Type::Tmpfs && (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value()))
+    {
+        ThrowInvalid(L"tmpfs options are only supported for tmpfs mounts");
+    }
+
+    if (mount.TmpfsSizeBytes.has_value() && mount.TmpfsSizeBytes.value() < 0)
+    {
+        ThrowInvalid(L"tmpfs size must not be negative");
+    }
+
+    switch (mount.MountType)
+    {
+    case Type::Bind:
+        if (mount.Source.empty())
+        {
+            ThrowInvalid(L"source is required");
+        }
+
+        if (!std::filesystem::path(mount.Source).is_absolute())
+        {
+            ThrowInvalid(L"bind source path must be absolute");
+        }
+        break;
+
+    case Type::Volume:
+        if (mount.Source.empty())
+        {
+            ThrowInvalid(L"anonymous volume mounts are not supported.");
+        }
+
+        if (!IsValidNamedVolumeName(mount.Source))
+        {
+            ThrowInvalid(L"volume source must be a valid named volume");
+        }
+        break;
+
+    case Type::Tmpfs:
+        if (!mount.Source.empty())
+        {
+            ThrowInvalid(L"source is not supported for tmpfs mounts");
+        }
+        break;
+
+    default:
+        ThrowInvalid(L"mount type is not supported");
+    }
+}
+
+void ValidateMountCollection(std::span<const Spec> mounts)
+{
+    std::unordered_set<std::string> destinations;
+    for (const auto& mount : mounts)
+    {
+        ValidateMountSpec(mount);
+
+        auto destination = NormalizeDestination(mount.Target);
+        if (!destinations.emplace(destination).second)
+        {
+            throw ValidationException(
+                ValidationError::DuplicateDestination,
+                std::format(L"duplicate mount point: {}", MultiByteToWide(destination)),
+                std::move(destination));
+        }
+    }
 }
 
 std::string FormatTmpfsOptions(const Spec& mount)

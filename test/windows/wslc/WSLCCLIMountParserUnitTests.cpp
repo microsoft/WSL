@@ -27,6 +27,13 @@ namespace WSLCCLIMountParserUnitTests {
 
 namespace {
 
+    mount::Spec ParseAndValidate(const std::wstring& value)
+    {
+        auto mountSpec = mount::ParseDockerMountString(value);
+        mount::ValidateMountSpec(mountSpec);
+        return mountSpec;
+    }
+
     struct ValidMountCase
     {
         const wchar_t* Input;
@@ -323,7 +330,7 @@ class WSLCCLIMountParserUnitTests
         {
             Log::Comment(String().Format(L"Accepting: %ls", testCase.Input));
 
-            const auto actual = mount::Parse(testCase.Input);
+            const auto actual = ParseAndValidate(testCase.Input);
             VERIFY_ARE_EQUAL(static_cast<int>(testCase.Type), static_cast<int>(actual.MountType));
             VERIFY_ARE_EQUAL(std::wstring(testCase.Source), actual.Source);
             VERIFY_ARE_EQUAL(std::string(testCase.Target), actual.Target);
@@ -353,10 +360,10 @@ class WSLCCLIMountParserUnitTests
 
             try
             {
-                (void)mount::Parse(testCase.Input);
-                VERIFY_FAIL(L"Expected ParseException for invalid mount spec");
+                (void)ParseAndValidate(testCase.Input);
+                VERIFY_FAIL(L"Expected ValidationException for invalid mount spec");
             }
-            catch (const mount::ParseException& ex)
+            catch (const mount::ValidationException& ex)
             {
                 VERIFY_IS_TRUE(ex.Reason().find(testCase.ExpectedReason) != std::wstring::npos);
             }
@@ -366,8 +373,70 @@ class WSLCCLIMountParserUnitTests
     TEST_METHOD(Mount_DotRelativeBindSourceUsesCurrentDirectory)
     {
         const auto expected = (std::filesystem::current_path() / L"mount").lexically_normal().wstring();
-        const auto actual = mount::Parse(L"type=bind,source=.\\mount,target=/data");
+        const auto actual = ParseAndValidate(L"type=bind,source=.\\mount,target=/data");
         VERIFY_ARE_EQUAL(expected, actual.Source);
+    }
+
+    TEST_METHOD(Mount_TypedSpecsAreValidated)
+    {
+        const mount::Spec relativeBind{
+            .MountType = mount::Type::Bind,
+            .Source = L"relative",
+            .Target = "/data",
+        };
+        VERIFY_THROWS(mount::ValidateMountSpec(relativeBind), mount::ValidationException);
+
+        const mount::Spec relativeTarget{
+            .MountType = mount::Type::Volume,
+            .Source = L"data-volume",
+            .Target = "data",
+        };
+        VERIFY_THROWS(mount::ValidateMountSpec(relativeTarget), mount::ValidationException);
+
+        const mount::Spec tmpfsWithSource{
+            .MountType = mount::Type::Tmpfs,
+            .Source = L"data-volume",
+            .Target = "/data",
+        };
+        VERIFY_THROWS(mount::ValidateMountSpec(tmpfsWithSource), mount::ValidationException);
+
+        const mount::Spec bindWithTmpfsOptions{
+            .MountType = mount::Type::Bind,
+            .Source = L"C:\\data",
+            .Target = "/data",
+            .TmpfsSizeBytes = 1024,
+        };
+        VERIFY_THROWS(mount::ValidateMountSpec(bindWithTmpfsOptions), mount::ValidationException);
+
+        const mount::Spec negativeTmpfsSize{
+            .MountType = mount::Type::Tmpfs,
+            .Target = "/data",
+            .TmpfsSizeBytes = -1,
+        };
+        VERIFY_THROWS(mount::ValidateMountSpec(negativeTmpfsSize), mount::ValidationException);
+
+        const mount::Spec tmpfs{
+            .MountType = mount::Type::Tmpfs,
+            .Target = "/data",
+            .TmpfsSizeBytes = 1024,
+            .TmpfsMode = 0700,
+        };
+        VERIFY_NO_THROW(mount::ValidateMountSpec(tmpfs));
+
+        const mount::Spec duplicateMounts[] = {
+            {.MountType = mount::Type::Tmpfs, .Target = "/data"},
+            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data/"},
+        };
+        try
+        {
+            mount::ValidateMountCollection(duplicateMounts);
+            VERIFY_FAIL(L"Expected ValidationException for duplicate destinations");
+        }
+        catch (const mount::ValidationException& ex)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::ValidationError::DuplicateDestination), static_cast<int>(ex.Error()));
+            VERIFY_ARE_EQUAL(std::string("/data"), ex.Destination());
+        }
     }
 
     TEST_METHOD(Mount_DuplicateDestinationsAreRejected)
