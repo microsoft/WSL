@@ -65,14 +65,12 @@ std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
             }
         };
 
-        // Query IPv4 listening sockets.
         {
             message.sdiag_family = AF_INET;
             auto transaction = channel.CreateTransaction(message, SOCK_DIAG_BY_FAMILY, NLM_F_DUMP);
             transaction.Execute(onMessage);
         }
 
-        // Query IPv6 listening sockets.
         {
             message.sdiag_family = AF_INET6;
             auto transaction = channel.CreateTransaction(message, SOCK_DIAG_BY_FAMILY, NLM_F_DUMP);
@@ -169,7 +167,6 @@ bool IsSameSockAddr(const sockaddr_storage& left, const sockaddr_storage& right)
     return false;
 }
 
-// Monitor listening TCP sockets using sock_diag netlink interface.
 int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
 {
     NetlinkChannel netlinkChannel(SOCK_RAW, NETLINK_SOCK_DIAG);
@@ -180,7 +177,6 @@ int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
     {
         auto sockets = QueryListeningSockets(netlinkChannel);
 
-        // Stop any relays that no longer match listening ports.
         std::erase_if(relays, [&](const auto& entry) {
             auto found =
                 std::find_if(sockets.begin(), sockets.end(), [&](const auto& socket) { return IsSameSockAddr(entry, socket); });
@@ -197,7 +193,6 @@ int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
             return remove;
         });
 
-        // Create relays for any new ports.
         std::for_each(sockets.begin(), sockets.end(), [&](const auto& socket) {
             auto found =
                 std::find_if(relays.begin(), relays.end(), [&](const auto& entry) { return IsSameSockAddr(entry, socket); });
@@ -215,13 +210,11 @@ int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
             }
         });
 
-        // Ensure all start / stop operations were successful.
         if (result < 0)
         {
             break;
         }
 
-        // Sleep before scanning again.
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
@@ -247,14 +240,12 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
             return;
         }
 
-        // Accept a connection and start a relay worker thread.
         wil::unique_fd relaySocket{UtilAcceptVsock(listenSocket, hvSocketAddress)};
         THROW_LAST_ERROR_IF(!relaySocket);
 
         std::thread([relaySocket = std::move(relaySocket)]() {
             try
             {
-                // Read a message to determine which TCP port to connect to.
                 std::vector<gsl::byte> buffer(sizeof(LX_INIT_START_SOCKET_RELAY));
                 auto bytesRead = UtilReadBuffer(relaySocket.get(), buffer);
                 if (bytesRead == 0)
@@ -265,10 +256,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                 auto* message = gslhelpers::try_get_struct<LX_INIT_START_SOCKET_RELAY>(gsl::make_span(buffer.data(), bytesRead));
                 THROW_ERRNO_IF(EINVAL, !message || (message->Header.MessageType != LxInitMessageStartSocketRelay));
 
-                // Connect to the actual socket address and set up a relay.
-                //
-                // N.B. During the time setting up the relay the server may have
-                // stopped listening.
                 sockaddr* socketAddress;
                 int socketAddressSize;
                 sockaddr_in sockaddrIn{};
@@ -304,10 +291,8 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                     return;
                 }
 
-                // Resize the buffer to be the requested size.
                 buffer.resize(message->BufferSize);
 
-                // Begin relaying data.
                 int outFd[2] = {tcpSocket.get(), relaySocket.get()};
                 pollfd pollDescriptors[] = {{relaySocket.get(), POLLIN}, {tcpSocket.get(), POLLIN}};
 
@@ -323,7 +308,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                     bytesRead = 0;
                     for (int Index = 0; Index < COUNT_OF(pollDescriptors); Index += 1)
                     {
-                        if (pollDescriptors[Index].revents & POLLIN)
+                        if (pollDescriptors[Index].revents & (POLLIN | POLLERR | POLLHUP))
                         {
                             bytesRead = UtilReadBuffer(pollDescriptors[Index].fd, buffer);
                             if (bytesRead == 0)
@@ -350,12 +335,9 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
     return;
 }
 
-// Create a thread to monitor for connections to relay.
 int StartLocalhostRelay(wsl::shared::SocketChannel& channel, int GuestRelayFd, bool ScanForPorts)
 try
 {
-    // If the other end of a socket is reset, write will result in EPIPE. Ignore
-    // this signal and just use the write return value.
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
 
     sockaddr_vm hvSocketAddress = {};
@@ -370,7 +352,6 @@ try
     wil::unique_fd listenSocket{GuestRelayFd};
     THROW_LAST_ERROR_IF(!listenSocket);
 
-    // Create a thread to accept incoming connections from the host listener
     std::thread([hvSocketAddress, listenSocket = std::move(listenSocket)]() {
         try
         {
@@ -412,13 +393,11 @@ int RunPortTracker(int Argc, char** Argv)
                             " fd]"
                             " [" INIT_PORT_TRACKER_NETWORKING_MODE_ARG " mode]\n";
 
-    // This is only supported on VM mode.
     if (!UtilIsUtilityVm())
     {
         return -1;
     }
 
-    // Initialize error and telemetry logging.
     InitializeLogging(true);
 
     int BpfFd = -1;
@@ -456,8 +435,6 @@ int RunPortTracker(int Argc, char** Argv)
 
     if (localhostRelay)
     {
-        // This needs to be the first message sent over the PortTrackerFd channel,
-        // before running the seccomp dispatcher loop.
         const int ret = StartLocalhostRelay(*hvSocketChannel, GuestRelayFd, !synchronousMode);
         if (ret < 0)
         {
@@ -484,9 +461,6 @@ int RunPortTracker(int Argc, char** Argv)
     seccompDispatcher->RegisterHandler(
         __NR_bind, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
 
-    // listen() can perform an implicit autobind (assigning an ephemeral port) when called on a
-    // socket that was never explicitly bind()'d. That autobind is otherwise invisible to the
-    // port tracker, so listen() needs to be intercepted the same way bind() is.
     seccompDispatcher->RegisterHandler(
         __NR_listen, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
 
