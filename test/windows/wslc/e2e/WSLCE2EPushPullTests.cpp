@@ -56,8 +56,8 @@ class WSLCE2EPushPullTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_PushPull)
     {
-        const auto& debianImage = DebianTestImage();
-        TestImageRegistry::Instance().EnsureLoaded(debianImage);
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         // Start a local registry without auth.
         auto session = OpenDefaultElevatedSession();
@@ -67,7 +67,7 @@ class WSLCE2EPushPullTests
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
             // Tag the image for the local registry.
-            auto registryImage = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
+            auto registryImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
 
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
@@ -96,8 +96,8 @@ class WSLCE2EPushPullTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Pull_QuietOption)
     {
-        const auto& debianImage = DebianTestImage();
-        TestImageRegistry::Instance().EnsureLoaded(debianImage);
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         auto session = OpenDefaultElevatedSession();
 
@@ -106,7 +106,7 @@ class WSLCE2EPushPullTests
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
             // Tag and push the image so it can be pulled back from the registry.
-            auto registryImage = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
+            auto registryImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
             RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});

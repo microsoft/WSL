@@ -236,19 +236,15 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::Network:
     {
-        for (const auto& value : RawArgMapAccess::GetAll<ArgType::Network>(execArgs))
-        {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
-            }
-
-            if (IsEqual(value, L"host", true))
+        CacheConverted<ArgType::Network>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            auto parsed = validation::ParseNetworkArgument(value, name);
+            if (IsEqual(parsed.Name, "host", true))
             {
                 throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }
-        }
+
+            return parsed;
+        });
         break;
     }
 
