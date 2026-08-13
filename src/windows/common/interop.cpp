@@ -470,7 +470,6 @@ ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* R
         io::MultiHandleWait::CancelOnCompleted);
 
     wait.AddHandle(std::make_unique<io::EventHandle>(io::HandleWrapper{Result->Process.get()}, processExit), io::MultiHandleWait::CancelOnCompleted);
-
     wait.Run(std::nullopt);
     return exitCode;
 }
