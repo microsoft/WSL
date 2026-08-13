@@ -2393,7 +2393,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1u);
             VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "volume");
             VERIFY_IS_FALSE(inspect.Mounts[0].Name.empty());
-            VERIFY_IS_FALSE(inspect.Mounts[0].Source.has_value());
+            VERIFY_IS_TRUE(inspect.Mounts[0].Source.empty());
             VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, "/volume");
             VERIFY_IS_TRUE(inspect.Mounts[0].ReadWrite);
         };
@@ -2512,7 +2512,7 @@ class WSLCTests
             VERIFY_IS_TRUE(mount != inspect.Mounts.end());
             VERIFY_ARE_EQUAL(mount->Type, "volume");
             VERIFY_IS_FALSE(mount->Name.empty());
-            VERIFY_IS_FALSE(mount->Source.has_value());
+            VERIFY_IS_TRUE(mount->Source.empty());
             VERIFY_IS_TRUE(mount->ReadWrite);
         }
     }
@@ -8414,12 +8414,15 @@ class WSLCTests
                 VERIFY_IS_FALSE(it->Type.empty());
                 VERIFY_ARE_EQUAL(it->Type, expectedType);
 
-                VERIFY_ARE_EQUAL(it->Source.has_value(), expectedSource.has_value());
                 if (expectedSource.has_value())
                 {
-                    const std::filesystem::path actualSource(it->Source.value());
+                    const std::filesystem::path actualSource(it->Source);
                     VERIFY_IS_TRUE(actualSource.is_absolute());
                     VERIFY_IS_TRUE(std::filesystem::equivalent(actualSource, expectedSource.value()));
+                }
+                else
+                {
+                    VERIFY_IS_TRUE(it->Source.empty());
                 }
                 VERIFY_ARE_EQUAL(it->ReadWrite, expectedReadWrite);
             }
@@ -9537,8 +9540,7 @@ class WSLCTests
                 auto inspect = container.Inspect();
                 VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1);
                 VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, "/volume");
-                VERIFY_IS_TRUE(inspect.Mounts[0].Source.has_value());
-                VERIFY_ARE_EQUAL(inspect.Mounts[0].Source.value(), (hostFolder / "file.txt").string());
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Source, (hostFolder / "file.txt").string());
                 VERIFY_ARE_EQUAL(inspect.Mounts[0].ReadWrite, true);
                 VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "bind");
             };

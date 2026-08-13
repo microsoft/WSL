@@ -250,7 +250,7 @@ private:
 
         VERIFY_IS_TRUE(mount != inspect.Mounts.end(), L"Container inspect did not return the anonymous volume mount");
         VERIFY_IS_FALSE(mount->Name.empty(), L"Container inspect returned an empty anonymous volume name");
-        VERIFY_IS_FALSE(mount->Source.has_value(), L"Anonymous volume source must be null");
+        VERIFY_IS_TRUE(mount->Source.empty(), L"Anonymous volume source must be empty");
         VERIFY_ARE_EQUAL(mount->Destination, "/data");
 
         const auto volumeName = wsl::shared::string::MultiByteToWide(mount->Name);

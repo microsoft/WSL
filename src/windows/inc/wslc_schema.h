@@ -32,7 +32,7 @@ struct InspectMount
 {
     std::string Type;
     std::string Name;
-    std::optional<std::string> Source;
+    std::string Source;
     std::string Destination;
     bool ReadWrite{};
 
