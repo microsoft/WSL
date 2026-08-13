@@ -3047,6 +3047,7 @@ try
         auto it = m_networks.find(dockerNetwork.Name);
         if (it == m_networks.end())
         {
+            WSL_LOG("ListedUnknownNetwork", TraceLoggingValue(dockerNetwork.Name.c_str(), "NetworkName"));
             continue;
         }
 
