@@ -302,6 +302,9 @@
   <data name="MessageConversionStart" xml:space="preserve">
     <value>正在进行转换，这可能需要几分钟时间。</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>正在进行压缩，这可能需要几分钟时间。</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>该分发已是请求的版本。</value>
   </data>
@@ -394,215 +397,218 @@
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>版权所有 (c) Microsoft Corporation。保留所有权利。
-有关此产品的隐私信息，请访问 https://aka.ms/privacy。
+    <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.
 
-用法: wsl.exe [Argument][Options...][CommandLine]
+Usage: wsl.exe [Argument] [Options...] [CommandLine]
 
-运行 Linux 二进制文件的参数:
+Arguments for running Linux binaries:
 
-    如果未提供命令行，wsl.exe 将启动默认 shell。
+    If no command line is provided, wsl.exe launches the default shell.
 
     --exec, -e &lt;CommandLine&gt;
-        在不使用默认 Linux shell 的情况下执行指定的命令。
+        Execute the specified command without using the default Linux shell.
 
     --shell-type &lt;standard|login|none&gt;
-        使用提供的 shell 类型执行指定的命令。
+        Execute the specified command with the provided shell type.
 
     --
-        按原样传递剩余的命令行。
+        Pass the remaining command line as-is.
 
-选项:
+Options:
     --cd &lt;Directory&gt;
-        将指定目录设置为当前工作目录。
-        如果使用 ~，则将使用 Linux 用户的主路径。如果路径以
-        / 字符开始，它将被解释为绝对 Linux 路径。
-        否则，该值必须是绝对 Windows 路径。
+        Sets the specified directory as the current working directory.
+        If ~ is used the Linux user's home path will be used. If the path begins
+        with a / character, it will be interpreted as an absolute Linux path.
+        Otherwise, the value must be an absolute Windows path.
 
     --distribution, -d &lt;DistroName&gt;
-        运行指定的分发。
+        Run the specified distribution.
 
     --distribution-id &lt;DistroGuid&gt;
-        运行指定的分发 ID。
+        Run the specified distribution ID.
 
     --user, -u &lt;UserName&gt;
-        以指定用户身份运行。
+        Run as the specified user.
 
     --system
-        为系统分发启动 shell。
+        Launches a shell for the system distribution.
 
-用于管理适用于 Linux 的 Windows 子系统的参数:
+Arguments for managing Windows Subsystem for Linux:
 
     --help
-        显示使用情况信息。
+        Display usage information.
 
     --debug-shell
-        出于诊断目的打开 WSL2 调试 shell。
+        Open a WSL2 debug shell for diagnostics purposes.
 
     --install [Distro] [Options...]
-        安装适用于 Linux 的 Windows 子系统分发。
-        有关有效分发的列表，请使用 'wsl.exe --list --online'。
+        Install a Windows Subsystem for Linux distribution.
+        For a list of valid distributions, use 'wsl.exe --list --online'.
 
-        选项:
+        Options:
             --enable-wsl1
-                启用 WSL1 支持。
+                Enable WSL1 support.
 
             --fixed-vhd
-                创建固定大小的磁盘来存储分发。
+                Create a fixed-size disk to store the distribution.
 
             --from-file &lt;Path&gt;
-                从本地文件安装分发。
+                Install a distribution from a local file.
 
             --legacy
-                使用旧分发清单。
+                Use the legacy distribution manifest.
 
             --location &lt;Location&gt;
-                设置分发的安装路径。
+                Set the install path for the distribution.
 
             --name &lt;Name&gt;
-                设置分发的名称。
+                Set the name of the distribution.
 
             --no-distribution
-                仅安装所需的可选组件，不安装分发。
+                Only install the required optional components, does not install a distribution.
 
             --no-launch, -n
-                安装后不要启动分发。
+                Do not launch the distribution after install.
 
             --version &lt;Version&gt;
-                指定要用于新分发的版本。
+                Specifies the version to use for the new distribution.
 
             --vhd-size &lt;MemoryString&gt;
-                指定用于存储分发的磁盘的大小。
+                Specifies the size of the disk to store the distribution.
 
             --web-download
-                从 Internet 而不是 Microsoft Store 下载分发。
+                Download the distribution from the internet instead of the Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        更改发行版特定选项。
+        Changes distro specific options.
 
-        选项:
+        Options:
             --move &lt;Location&gt;
-                将分发移到新位置。
+                Move the distribution to a new location.
 
             --set-sparse, -s &lt;true|false&gt;
-                将发行版的 VHD 设置为稀疏，从而允许自动回收磁盘空间。
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user &lt;Username&gt;
-                设置分发的默认用户。
+                Set the default user of the distribution.
 
             --resize &lt;MemoryString&gt;
-                将分发的磁盘大小调整为指定大小。
+                Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount &lt;Disk&gt;
-        在所有 WSL 2 分发中附加和装载物理磁盘或虚拟磁盘。
+        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
-        选项:
+        Options:
             --vhd
-                指定 &lt;Disk&gt; 是指虚拟硬盘。
+                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
 
             --bare
-                将磁盘附加到 WSL2，但不要装载它。
+                Attach the disk to WSL2, but don't mount it.
 
             --name &lt;Name&gt;
-                使用装入点的自定义名称装载磁盘。
+                Mount the disk using a custom name for the mountpoint.
 
             --type &lt;Type&gt;
-                装载磁盘时要使用的文件系统(如果未指定)默认为 ext4。
+                Filesystem to use when mounting a disk, if not specified defaults to ext4.
 
             --options &lt;Options&gt;
-                其他装载选项。
+                Additional mount options.
 
             --partition &lt;Index&gt;
-                要装载的分区的索引(如果未指定)默认为整个磁盘。
+                Index of the partition to mount, if not specified defaults to the whole disk.
 
     --set-default-version &lt;Version&gt;
-        更改新发行版的默认安装版本。
+        Changes the default install version for new distributions.
 
     --shutdown
-        立即终止所有正在运行的发行版和 WSL 2
-        轻型实用工具虚拟机。
+        Immediately terminates all running distributions and the WSL 2
+        lightweight utility virtual machine.
 
-        选项:
+        Options:
             --force
-                即使正在执行操作，也终止 WSL 2 虚拟机。可能导致数据丢失。
+                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
 
     --status
-        显示适用于 Linux 的 Windows 子系统状态。
+        Show the status of Windows Subsystem for Linux.
 
-    --unmount [磁盘]
-        从所有 WSL2 分发中卸载和分离磁盘。
-        如果在没有参数的情况下调用，则卸载和分离所有磁盘。
+    --unmount [Disk]
+        Unmounts and detaches a disk from all WSL2 distributions.
+        Unmounts and detaches all disks if called without argument.
 
     --uninstall
-        从此计算机卸载适用于 Linux 的 Windows 子系统包。
+        Uninstalls the Windows Subsystem for Linux package from this machine.
 
     --update
-        更新适用于 Linux 的 Windows 子系统包。
+        Update the Windows Subsystem for Linux package.
 
-        选项:
+        Options:
             --pre-release
-                下载预发行版本(如果可用)。
+                Download a pre-release version if available.
 
     --version, -v
-        显示版本信息。
+        Display version information.
 
-用于在适用于 Linux 的 Windows 子系统中管理分发的参数:
+Arguments for managing distributions in Windows Subsystem for Linux:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [选项]
-        将分发导出到 tar 文件。
-        文件名可以是 - for stdout。
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        Exports the distribution to a tar file.
+        The filename can be - for stdout.
 
-        选项:
+        Options:
             --format &lt;Format&gt;
-                指定导出格式。支持的值: tar、tar.gz、tar.xz、vhd。
+                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [选项]
-        将指定的 tar 文件作为新分发导入。
-        文件名可以是 - for stdin。
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        Imports the specified tar file as a new distribution.
+        The filename can be - for stdin.
 
-        选项:
+        Options:
             --version &lt;Version&gt;
-                指定要用于新分发的版本。
+                Specifies the version to use for the new distribution.
 
             --vhd
-                指定所提供的文件是 .vhd 还是 .vhdx 文件，而不是 tar 文件。
-                此操作在指定的安装位置创建 VHD 文件的副本。
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        将指定的 VHD 文件作为新分发导入。
-        必须使用 ext4 文件系统类型设置此虚拟硬盘的格式。
+        Imports the specified VHD file as a new distribution.
+        This virtual hard disk must be formatted with the ext4 filesystem type.
 
-    --list, -l [选项]
-        列出分发。
+    --list, -l [Options]
+        Lists distributions.
 
-        选项:
+        Options:
             --all
-                列出所有分发，包括当前
-                正在安装或卸载的分发。
+                List all distributions, including distributions that are
+                currently being installed or uninstalled.
 
             --running
-                仅列出当前正在运行的分发。
+                List only distributions that are currently running.
 
             --quiet, -q
-                仅显示分发名称。
+                Only show distribution names.
 
             --verbose, -v
-                显示有关所有分发的详细信息。
+                Show detailed information about all distributions.
 
             --online, -o
-                显示适合通过 'wsl --install' 安装的可用分发列表。
+                Displays a list of available distributions for install with 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        将分发设置为默认值。
+        Sets the distribution as the default.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        更改指定分发的版本。
+        Changes the version of the specified distribution.
 
     --terminate, -t &lt;Distro&gt;
-        终止指定的分发。
+        Terminates the specified distribution.
 
     --unregister &lt;Distro&gt;
-        取消注册分发并删除根文件系统。</value>
+        Unregisters the distribution and deletes the root filesystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -611,7 +617,8 @@
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ Windows 版本: {}</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>无法完成该操作，因为 VHD 当前正在使用中。强制 WSL 停止使用: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>仅支持对 .vhdx 文件进行压缩。</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} 不是有效的布尔值，&lt;true|false&gt;</value>
@@ -3223,8 +3234,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>进度类型(格式: none|ansi)(默认: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Set type of progress output (auto, tty, plain, quiet) (default: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>映像拉取策略(always|missing|never) (默认: missing)</value>
@@ -3264,6 +3275,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>无效的 {} 值: {} 不是可识别的拉取策略。支持的拉取策略为: {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Invalid {} value: {} is not a recognized progress type. Supported progress types are: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">

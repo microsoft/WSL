@@ -302,6 +302,9 @@ A 'wsl.exe --list --online' parancs használatával listázhatja az elérhető d
   <data name="MessageConversionStart" xml:space="preserve">
     <value>A konvertálás folyamatban van, ez eltarthat néhány percig.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Compaction in progress, this may take a few minutes.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>A disztribúció már a kért verzióval rendelkezik.</value>
   </data>
@@ -394,7 +397,7 @@ Használat:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Szerzői jog (c) Microsoft Corporation. Minden jog fenntartva.
+    <value>Copyright (C) Microsoft Corporation. Minden jog fenntartva.
 További információ a termékről: https://aka.ms/privacy.
 
 Használat: wsl.exe [Argumentum] [Kapcsolók...] [Parancssor]
@@ -443,7 +446,7 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
         WSL-disztribúció telepítése.
         Az érvényes disztribúciók listája a 'wsl.exe --list --online' paranccsal jeleníthető meg.
 
-        Kapcsolók:
+        Beállítások:
             --enable-wsl1
                 A WSL1-támogatás engedélyezése.
 
@@ -459,16 +462,16 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
             --location &lt;Hely&gt;
                 A disztribúció telepítési útvonalának beállítása.
 
-            --name &lt;Név&gt;
+            --name &lt;Name&gt;
                 A disztribúció nevének beállítása.
 
             --no-distribution
                 Csak a szükséges választható összetevők telepítése, a disztribúció telepítésének mellőzése.
 
             --no-launch, -n
-                A disztribúció telepítés utáni elindításának mellőzése.
+                Telepítés után ne indítsa el a disztribúciót.
 
-            --version &lt;Verzió&gt;
+            --version &lt;Version&gt;
                 Az új disztribúcióhoz használandó verzió megadása.
 
             --vhd-size &lt;MemoriaSztring&gt;
@@ -480,7 +483,7 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
     --manage &lt;Disztribúció&gt; &lt;Kapcsolók...&gt;
         A disztribúcióspecifikus beállítások módosítása.
 
-        Kapcsolók:
+        Beállítások:
             --move &lt;Hely&gt;
                 A disztribúció áthelyezése egy új helyre.
 
@@ -493,89 +496,92 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
             --resize &lt;MemoriaSztring&gt;
                 A disztribúció lemezének átméretezése a megadott méretre.
 
-    --mount &lt;Lemez&gt;
+            --compact
+                WSL 2-disztribúció VHDX-fájljának tömörítése.
+
+    --mount &lt;Disk&gt;
         Fizikai vagy virtuális lemez hozzárendelése és csatlakoztatása az összes WSL 2-disztribúcióban.
 
-        Kapcsolók:
+        Beállítások:
             --vhd
-                Annak megadása, hogy a &lt;Lemez&gt; virtuális merevlemezre vonatkozik.
+                Megadja, hogy a &lt;Lemez&gt; virtuális merevlemezre hivatkozik.
 
             --bare
                 A lemezt WSL2-höz való hozzárendelése csatlakoztatás nélkül.
 
-            --name &lt;Név&gt;
-                A lemez csatlakoztatása egyéni csatlakoztatásipont-név használatával.
+            --name &lt;Name&gt;
+                A lemez csatlakoztatása a egyéni csatlakoztatásipont-név használatával.
 
-            --type &lt;Típus&gt;
+            --type &lt;Type&gt;
                 Lemez csatlakoztatásához használandó fájlrendszer. Ha nincs megadva, az alapértelmezett érték az ext4.
 
-            --options &lt;Kapcsolók&gt;
-                További csatlakoztatási lehetőségek.
+            --options &lt;Options&gt;
+                További felcsatolási lehetőségek.
 
             --partition &lt;Index&gt;
-                A csatlakoztatni kívánt partíció indexe. Ha nincs megadva, az alapértelmezett érték a teljes lemez.
+                A felcsatolni kívánt partíció indexe, ha nincs megadva alapértelmezett érték a teljes lemezre.
 
-    --set-default-version &lt;Verzió&gt;
+    --set-default-version &lt;Version&gt;
         Az új disztribúciók alapértelmezett telepítési verziójának módosítása.
 
     --shutdown
-        Az összes futó disztribúció és a WSL 2
-        egyszerűsített segédprogram virtuális gépének azonnali leállítása.
+        Azonnal leállítja az összes futó disztribúciót és a WSL 2
+        egyszerűsített segédprogram virtuális gépet.
 
-        Kapcsolók:
+        Beállítások:
             --force
                 A WSL 2 virtuális gép leállítása még akkor is, ha egy művelet folyamatban van. Adatvesztést okozhat.
 
     --status
         A Linuxos Windows-alrendszer állapotának megjelenítése.
 
-    --unmount [Lemez]
-        Lemez leválasztása és és a hozzárendelés megszüntetése a WSL2 összes disztribúciójára vonatkozóan.
-        Az összes lemez leválasztása és a hozzárendelésük megszüntetése, ha a meghívás argumentum nélkül történik.
+    --unmount [Disk]
+        Lemez lecsatolása és leválasztása a WSL2 összes disztribúciójáról.
+        Lecsatolja és leválasztja az összes lemezt, ha argumentum nélkül hívják meg.
 
     --uninstall
-        A Linuxos Windows-alrendszer csomag eltávolítása erről a gépről.
+        Eltávolítja a Linuxos Windows-alrendszer csomagot erről a gépről.
 
     --update
-        0A Linuxos Windows-alrendszer csomagjának frissítése.
+        A Linuxos Windows-alrendszer csomagjának frissítése.
 
-        Kapcsolók:
+        Beállítások:
             --pre-release
-                Előzetes verzió letöltése, ha elérhető.
+                Ha elérhető, töltsön le egy előzetes verziót.
 
     --version, -v
         Verzióinformációk megjelenítése.
 
-A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló argumentumok:
+A Linuxos Windows-alrendszer-beli disztribúciók kezelésére szolgáló argumentumok:
 
-    --export &lt;Disztribúció&gt; &lt;Fájlnév&gt; [Kapcsolók]
-        A disztribúció exportálása .tar fájlba.
-        A fájlnév stdout esetén kötőjel (-) is lehet.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        A disztribúciót exportálja tar kiterjesztésű fájlba.
+        A fájlnév a következő lehet: stdout.
 
-        Kapcsolók:
+        Beállítások:
             --format &lt;Formátum&gt;
                 Az exportálási formátum megadása. Támogatott értékek: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Disztribúció&gt; &lt;TelepítésiHely&gt; &lt;Fájlnév&gt; [Kapcsolók]
-        A megadott .tar fájl importálása új disztribúcióként.
-        A fájlnév stdin esetén kötőjel (-) is lehet.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        A megadott, tar kiterjesztésű fájl importálása új disztribúcióként.
+        A fájlnév a következő lehet: stdin.
 
-        Kapcsolók:
-            --version &lt;Verzió&gt;
+        Beállítások:
+            --version &lt;Version&gt;
                 Az új disztribúcióhoz használandó verzió megadása.
 
             --vhd
                 Azt adja meg, hogy a megadott fájl .vhd vagy .vhdx fájl, nem .tar fájl.
                 Ez a művelet másolatot készít a VHD-fájlról a megadott telepítési helyen.
 
-    --import-in-place &lt;Disztribúció&gt; &lt;Fájlnév&gt;
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         A megadott VHD-fájl importálása új disztribúcióként.
         Ezt a virtuális merevlemezt az ext4 fájlrendszertípussal kell formázni.
 
-    --list, -l [Kapcsolók]
+    --list, -l [Options]
         A disztribúciók listázása.
 
-        Kapcsolók:
+        Beállítások:
             --all
                 Az összes disztribúciót listázza, beleértve a
                 jelenleg telepítés vagy eltávolítás alatt állókat is.
@@ -590,18 +596,18 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
                 Az összes disztribúció részletes adatainak megjelenítése.
 
             --online, -o
-                A 'wsl.exe --install' paranccsal telepíthető elérhető disztribúciók listájának megjelenítése.
+                Megjeleníti a 'wsl.exe --install' paranccsal telepíthető, elérhető disztribúciók listáját.
 
-    --set-default, -s &lt;Disztribúció&gt;
-        A disztribúció beállítása alapértelmezettként.
+    --set-default, -s &lt;Distro&gt;
+        Az adott disztribúció beállítása alapértelmezettként.
 
-    --set-version &lt;Disztribúció&gt; &lt;Verzió&gt;
+    --set-version &lt;Distro&gt; &lt;Version&gt;
         A megadott disztribúció verziójának módosítása.
 
-    --terminate, -t &lt;Disztribúció&gt;
-        A megadott disztribúció leállítása.
+    --terminate, -t &lt;Distro&gt;
+        Leállítja a megadott disztribúciót.
 
-    --unregister &lt;Disztribúció&gt;
+    --unregister &lt;Distro&gt;
         A disztribúció regisztrációjának megszüntetése és a gyökérszintű fájlrendszer törlése.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
@@ -611,7 +617,8 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ Visszaállás NAT-hálózatkezelésre.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>A művelet nem fejeződhetett be, mert a VHD jelenleg használatban van. A WSL leállításának kényszerítéséhez használja ezt: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Compaction is only supported on .vhdx files.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>A(z) {} nem érvényes logikai érték, &lt;true|false&gt;</value>
@@ -3224,8 +3235,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Folyamat típusa (formátum: none|ansi) (alapértelmezett: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Set type of progress output (auto, tty, plain, quiet) (default: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Lemezképlekérési házirend (always|missing|never) (alapértelmezett: missing)</value>
@@ -3265,6 +3276,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Érvénytelen {} érték: {} nem egy felismert lekérési házirend. A támogatott lekérési házirendek: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a(z) {} nem felismerhető folyamattípus. A támogatott folyamattípusok a következők: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
