@@ -22,7 +22,6 @@ Abstract:
 #include "JsonUtils.h"
 #include "Localization.h"
 #include <algorithm>
-#include <cctype>
 #include <charconv>
 #include <chrono>
 #include <cmath>

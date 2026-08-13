@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "MountSpecParsing.h"
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <charconv>
@@ -22,6 +23,8 @@ Abstract:
 #include <format>
 #include <limits>
 #include <regex>
+#include <system_error>
+#include <vector>
 
 using namespace wsl::shared;
 using namespace wsl::shared::string;
@@ -243,8 +246,8 @@ namespace {
             }
         }
 
-        constexpr double c_int64Limit = 9223372036854775808.0;
-        if (!std::isfinite(bytes) || bytes >= c_int64Limit)
+        constexpr double c_int64ExclusiveUpperBound = static_cast<double>(uint64_t{1} << std::numeric_limits<int64_t>::digits);
+        if (!std::isfinite(bytes) || bytes >= c_int64ExclusiveUpperBound)
         {
             return std::nullopt;
         }
