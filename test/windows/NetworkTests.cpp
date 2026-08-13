@@ -2240,7 +2240,26 @@ class NetworkTests
                 addr.sin_family = AF_INET;
                 addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
                 addr.sin_port = htons(assignedPort);
-                THROW_LAST_ERROR_IF(connect(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+                if (connect(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR)
+                {
+                    const auto connectError = WSAGetLastError();
+                    SOCKADDR_IN localAddr{};
+                    int localAddrLength = sizeof(localAddr);
+                    if (getsockname(sock.get(), reinterpret_cast<SOCKADDR*>(&localAddr), &localAddrLength) == SOCKET_ERROR)
+                    {
+                        LogInfo("connect() to port %u failed with %d; getsockname() failed with %d", assignedPort, connectError, WSAGetLastError());
+                    }
+                    else
+                    {
+                        LogInfo(
+                            "connect() to port %u failed with %d; local source port is %u",
+                            assignedPort,
+                            connectError,
+                            ntohs(localAddr.sin_port));
+                    }
+
+                    THROW_WIN32(connectError);
+                }
             },
             std::chrono::seconds(1),
             std::chrono::seconds(30)));
