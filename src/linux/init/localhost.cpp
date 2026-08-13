@@ -515,8 +515,7 @@ int RunPortTracker(int Argc, char** Argv)
         }
 
         auto& ifRequest = *reinterpret_cast<ifreq*>(ifreqMemory->data());
-        memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
-        request.InterfaceName[sizeof(request.InterfaceName) - 1] = '\0';
+        memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName) - 1);
         request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
         const auto& reply = hvSocketChannel->Transaction(request);
 
