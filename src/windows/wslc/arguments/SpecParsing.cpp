@@ -682,6 +682,37 @@ models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std:
     throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
 }
 
+models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    static constexpr std::pair<std::wstring_view, models::ProgressMode> c_progressModes[] = {
+        {L"auto", models::ProgressMode::Auto},
+        {L"tty", models::ProgressMode::Tty},
+        {L"plain", models::ProgressMode::Plain},
+        {L"quiet", models::ProgressMode::Quiet},
+    };
+
+    for (const auto& [name, mode] : c_progressModes)
+    {
+        if (IsEqual(input, name))
+        {
+            return mode;
+        }
+    }
+
+    std::wstring supportedValues;
+    for (const auto& progressMode : c_progressModes)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += progressMode.first;
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidProgressTypeError(argName, input, supportedValues));
+}
+
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
     if (IsEqual(input, L"image"))

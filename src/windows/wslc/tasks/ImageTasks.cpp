@@ -131,8 +131,16 @@ void BuildImage(CLIExecutionContext& context)
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.GetValue<ArgType::NoCache>());
     WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.GetValue<ArgType::BuildPull>());
 
+    auto progressMode = context.Args.GetValue<ArgType::Progress>(ProgressMode::Auto);
+
+    // Resolve Auto based on whether progress output (stderr) is an interactive VT console.
+    if (progressMode == ProgressMode::Auto)
+    {
+        progressMode = context.Terminal.IsVTEnabled(Terminal::Level::Info) ? ProgressMode::Tty : ProgressMode::Plain;
+    }
+
     auto cancelEvent = context.CreateCancelEvent();
-    BuildImageCallback callback(context.Terminal, cancelEvent, context.Args.GetValue<ArgType::Verbose>());
+    BuildImageCallback callback(context.Terminal, cancelEvent, context.Args.GetValue<ArgType::Verbose>(), progressMode);
     services::ImageService::Build(
         session, contextPath, tags, buildArgs, labels, secrets, dockerfilePath, target, output, iidFilePath, flags, &callback, cancelEvent);
 }

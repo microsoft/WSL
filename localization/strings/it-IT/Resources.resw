@@ -3234,7 +3234,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Image pull policy (always|missing|never) (default: missing)</value>
+    <value>Criterio di pull delle immagini (always|missing|never) (standard: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">

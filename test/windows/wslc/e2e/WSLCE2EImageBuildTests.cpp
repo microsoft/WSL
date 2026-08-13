@@ -1259,12 +1259,18 @@ class WSLCE2EImageBuildTests
         cachedBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto cachedId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_EQUAL(firstId, cachedId, L"Repeated build without --no-cache should reuse the cached layer");
+        VERIFY_IS_TRUE(
+            cachedBuild.StderrContainsSubstring(L"[2/2] CACHED"),
+            L"A reused layer must be reported as cached in the build output");
 
         // --no-cache must re-run the non-deterministic step, producing a new id.
         auto noCacheBuild = RunWslc(buildCmd + L" --no-cache");
         noCacheBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto noCacheId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
+        VERIFY_IS_FALSE(
+            noCacheBuild.StderrContainsSubstring(L"[2/2] CACHED"),
+            L"A step re-run under --no-cache must not be reported as cached");
     }
 
     // --iidfile writes the built image's ID to the given host path on success, matching docker build
@@ -1430,6 +1436,81 @@ class WSLCE2EImageBuildTests
         VERIFY_IS_FALSE(contents.starts_with(L"sha256:"), L"a failed iidfile write must not leave an image ID behind");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressInvalid_Fails)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-bad";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\n");
+
+        // Invalid --progress values are rejected client-side before any build runs.
+        auto buildResult =
+            RunWslc(std::format(L"build \"{}\" -f \"{}\" --progress=bogus", contextDir.wstring(), dockerfilePath.wstring()));
+        VERIFY_ARE_EQUAL(1u, buildResult.ExitCode.value_or(0u));
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L"is not a recognized progress type") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressPlain_NoEscapeSequences_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageProgressPlain);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-plain";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"plain-ok\"]\n");
+
+        // plain emits progress text but never color/cursor VT escape sequences (ESC, 0x1b).
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --progress=plain",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageProgressPlain.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(buildResult.Stderr.has_value());
+        VERIFY_IS_TRUE(buildResult.Stderr->find(L'\x1b') == std::wstring::npos, L"plain mode must not emit VT escape sequences");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_ProgressQuiet_NoProgressOutput_Success)
+    {
+        auto imageCleanup = DeleteImageOnExit(BuiltImageProgressQuiet);
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-progress-quiet";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"quiet-ok\"]\n");
+
+        // quiet suppresses all progress output on a successful build.
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --progress=quiet",
+            contextDir.wstring(),
+            dockerfilePath.wstring(),
+            BuiltImageProgressQuiet.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        if (buildResult.Stderr.has_value())
+        {
+            VERIFY_IS_TRUE(buildResult.Stderr->empty(), L"quiet mode must not emit build progress on success");
+        }
+    }
+
 private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
@@ -1466,6 +1547,8 @@ private:
     const TestImage BuiltImageOutputCacheOnly{L"wslc-e2e-build-output-cacheonly", L"latest", L""};
     const TestImage BuiltImageIidFile{L"wslc-e2e-build-iidfile", L"latest", L""};
     const TestImage BuiltImageIidFileNotWritable{L"wslc-e2e-build-iidfile-readonly", L"latest", L""};
+    const TestImage BuiltImageProgressPlain{L"wslc-e2e-build-progress-plain", L"latest", L""};
+    const TestImage BuiltImageProgressQuiet{L"wslc-e2e-build-progress-quiet", L"latest", L""};
     const TestImage BuiltImageIidFileRelative{L"wslc-e2e-build-iidfile-relative", L"latest", L""};
 
     // Runs `tar.exe -tf <path>` and returns the member listing so tests can assert an exporter produced a

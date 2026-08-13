@@ -3228,7 +3228,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Image pull policy (always|missing|never) (default: missing)</value>
+    <value>Lemezképlekérési házirend (always|missing|never) (alapértelmezett: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3264,7 +3264,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized pull policy. Supported pull policies are: {}.</value>
+    <value>Érvénytelen {} érték: {} nem egy felismert lekérési házirend. A támogatott lekérési házirendek: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">

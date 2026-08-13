@@ -492,6 +492,18 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::CompactDistribution(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CompactDistribution(DistroGuid);
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -1871,6 +1883,58 @@ try
 }
 CATCH_RETURN()
 
+HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
+try
+{
+    auto runAsUser = wil::CoImpersonateClient();
+    std::filesystem::path vhdPath;
+    LXSS_DISTRO_CONFIGURATION configuration{};
+
+    {
+        std::lock_guard lock(m_instanceLock);
+        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
+        const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+        configuration = s_GetDistributionConfiguration(registration);
+        RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+        vhdPath = configuration.VhdFilePath;
+        if (wsl::shared::string::IsEqual(vhdPath.extension().c_str(), wsl::windows::common::wslutil::c_vhdFileExtension, true))
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageCompactVhdNotSupported());
+        }
+
+        _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+
+        // Trim the filesystem before compaction so the host can reclaim the freed blocks.
+        //
+        // WSL2 does not mount ext4 with 'discard' and does not run fsck at boot, so blocks freed
+        // inside the guest are still marked as allocated in the VHD and a bare compaction reclaims
+        // little space. Attaching the (now stopped) distribution's VHD to the utility VM and running
+        // an offline fsck with block discard releases those blocks, then ejecting flushes the change
+        // back to the VHD before it is compacted below.
+        //
+        // This is best-effort: any failure here must not prevent compaction.
+        try
+        {
+            _CreateVm();
+            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+            auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
+            m_utilityVm->TrimDistribution(lun);
+        }
+        CATCH_LOG();
+    }
+
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
+
+    THROW_IF_FAILED_MSG(
+        wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); }),
+        "Failed to compact VHD: %ls",
+        vhdPath.c_str());
+    return S_OK;
+}
+CATCH_RETURN()
+
 HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StderrHandle)
 {
     RETURN_HR_IF(E_INVALIDARG, ((Version != LXSS_WSL_VERSION_1) && (Version != LXSS_WSL_VERSION_2)));
@@ -3022,6 +3086,18 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         }
     }
 
+    auto deleteWithRetry = [&](const std::filesystem::path& path) {
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(path.c_str())); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10),
+                {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
+        }
+        CATCH_LOG_MSG("Failed to delete %ls", path.c_str())
+    };
+
     // For WSL2 distributions, unmount and delete the VHD.
     if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD) || WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_UNMOUNT))
     {
@@ -3039,15 +3115,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
                 // The VHD might be in use so try to delete it for up to 10 seconds.
-                try
-                {
-                    wsl::shared::retry::RetryWithTimeout<void>(
-                        [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
-                        std::chrono::milliseconds(100),
-                        std::chrono::seconds(10),
-                        {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
-                }
-                CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
+                deleteWithRetry(Configuration.VhdFilePath);
             }
         }
     }
@@ -3058,22 +3126,14 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         const auto shortcutIconPath = Configuration.BasePath / c_shortIconName;
         if (std::filesystem::exists(shortcutIconPath))
         {
-            LOG_IF_WIN32_BOOL_FALSE_MSG(DeleteFileW(shortcutIconPath.c_str()), "Failed to delete %ls", shortcutIconPath.c_str());
+            deleteWithRetry(shortcutIconPath);
         }
 
         // Remove start menu entry for the distribution, if any.
         if (Configuration.ShortcutPath.has_value())
         {
             // The shortcut file may be in use. Try to delete it for up to 10 seconds, and then give up.
-            try
-            {
-                wsl::shared::retry::RetryWithTimeout<void>(
-                    [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
-                    std::chrono::milliseconds(100),
-                    std::chrono::seconds(10),
-                    {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
-            }
-            CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
+            deleteWithRetry(Configuration.ShortcutPath.value());
         }
 
         // Remove the terminal profile, if any.
@@ -3084,7 +3144,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
             if (profile.has_value())
             {
-                LOG_IF_WIN32_BOOL_FALSE_MSG(DeleteFileW(profile->c_str()), "Failed to delete %ls", profile->c_str());
+                deleteWithRetry(profile.value());
             }
         }
         CATCH_LOG()
