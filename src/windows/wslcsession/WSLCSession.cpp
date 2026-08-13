@@ -1248,6 +1248,7 @@ try
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
+    std::set<std::string> reportedCached;
     std::set<std::string> reportedErrors;
     std::map<std::string, std::string> digestToStageName;
     bool needsNewline = false; // true when the last log chunk didn't end with \n
@@ -1280,6 +1281,23 @@ try
         }
 
         return {};
+    };
+
+    // Returns the leading step token from a BuildKit vertex name, e.g. "[2/3]" from "[2/3] RUN make".
+    // Falls back to the full name when there is no bracketed prefix.
+    auto getStepToken = [](const std::string& name) -> std::string {
+        if (name.empty() || name[0] != '[')
+        {
+            return name;
+        }
+
+        auto close = name.find(']');
+        if (close == std::string::npos)
+        {
+            return name;
+        }
+
+        return name.substr(0, close + 1);
     };
 
     auto logPrefix = [](const std::string& name) -> std::string {
@@ -1345,6 +1363,16 @@ try
             {
                 flushLine();
                 reportProgress(vertex.name + "\n");
+            }
+
+            if (vertex.cached && reportedCached.insert(vertex.digest).second)
+            {
+                auto stepToken = getStepToken(vertex.name);
+                if (!stepToken.empty())
+                {
+                    flushLine();
+                    reportProgress(stepToken + " CACHED\n");
+                }
             }
 
             if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)

@@ -1259,12 +1259,18 @@ class WSLCE2EImageBuildTests
         cachedBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto cachedId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_EQUAL(firstId, cachedId, L"Repeated build without --no-cache should reuse the cached layer");
+        VERIFY_IS_TRUE(
+            cachedBuild.StderrContainsSubstring(L"[2/2] CACHED"),
+            L"A reused layer must be reported as cached in the build output");
 
         // --no-cache must re-run the non-deterministic step, producing a new id.
         auto noCacheBuild = RunWslc(buildCmd + L" --no-cache");
         noCacheBuild.Verify({.Stdout = L"", .ExitCode = 0});
         const auto noCacheId = InspectImage(BuiltImageNoCache.NameAndTag()).Id;
         VERIFY_ARE_NOT_EQUAL(firstId, noCacheId, L"--no-cache must rebuild the non-deterministic RUN step");
+        VERIFY_IS_FALSE(
+            noCacheBuild.StderrContainsSubstring(L"[2/2] CACHED"),
+            L"A step re-run under --no-cache must not be reported as cached");
     }
 
     // --iidfile writes the built image's ID to the given host path on success, matching docker build
