@@ -46,6 +46,7 @@ class WSLCE2EContainerCreateTests
         EnsureImageIsDeleted(AlpineImage);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(HelloWorldImage);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
         EnsureNetworkDoesNotExist(TestNetworkName);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
@@ -61,6 +62,7 @@ class WSLCE2EContainerCreateTests
         VolumeTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
         VolumeTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
         EnsureNetworkDoesNotExist(TestNetworkName);
         return true;
     }
@@ -709,6 +711,128 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"", .ExitCode = 1});
         VERIFY_IS_TRUE(
             result.StderrContainsSubstring(L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_Tmpfs_Success)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --mount type=tmpfs,target=/wslc-tmpfs {} sh -c \"echo -n 'tmpfs_test' > "
+            L"/wslc-tmpfs/data && cat /wslc-tmpfs/data\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"tmpfs_test", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_Bind_Success)
+    {
+        WriteTestFileContent(VolumeTestFile1, "WSLC Mount Bind Test");
+
+        const auto hostDirectory = VolumeTestFile1.parent_path();
+        const auto fileName = VolumeTestFile1.filename().wstring();
+        auto result = RunWslc(std::format(
+            L"container create --name {} --mount \"type=bind,source={},target=/data,readonly\" {} cat /data/{}",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            DebianImage.NameAndTag(),
+            fileName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"WSLC Mount Bind Test", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_Volume_Success)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --mount type=volume,source={},target=/data {} sh -c \"echo -n 'WSLC Mount Volume "
+            L"Test' > /data/test.txt\"",
+            WslcContainerName,
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        result = RunWslc(std::format(
+            L"container create --name {} --mount type=volume,source={},target=/data {} cat /data/test.txt",
+            WslcContainerName,
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"WSLC Mount Volume Test", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_ReadOnly_IsReadOnly)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --mount type=volume,source={},target=/data {} sh -c \"echo -n original > /data/value\"",
+            WslcContainerName,
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        result = RunWslc(std::format(
+            L"container create --name {} --mount type=volume,source={},target=/data,readonly {} sh -c \"echo changed > "
+            L"/data/value\"",
+            WslcContainerName,
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"sh: 1: cannot create /data/value: Read-only file system\n", .ExitCode = 2});
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        result = RunWslc(std::format(
+            L"container create --name {} --mount type=volume,source={},target=/data {} cat /data/value",
+            WslcContainerName,
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"original", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_InvalidType_Fails)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --mount type=bogus,target=/x {} true", WslcContainerName, DebianImage.NameAndTag()));
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"for '--mount' flag"));
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_RelativeTarget_Fails)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --mount type=tmpfs,target=data {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"target path must be absolute"));
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_DuplicateDestination_Fails)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --mount type=tmpfs,target=/data --mount type=tmpfs,target=/data/ {} true",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Duplicate mount point: /data"));
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_WorkDir)
@@ -1535,6 +1659,9 @@ private:
 
     // Test network name
     const std::wstring TestNetworkName = L"wslc-test-network";
+
+    // Test named volume
+    const std::wstring WslcVolumeName = L"wslc-test-volume";
 
     // Test environment variables
     const std::wstring HostEnvVariableName = L"WSLC_TEST_HOST_ENV";

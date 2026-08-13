@@ -1047,6 +1047,20 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"tmpfs_test", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_Bind_Success)
+    {
+        WriteTestFileContent(EnvTestFile1, "WSLC Mount Bind Test");
+
+        const auto hostDirectory = EnvTestFile1.parent_path();
+        const auto fileName = EnvTestFile1.filename().wstring();
+        auto result = RunWslc(std::format(
+            L"container run --rm --mount \"type=bind,source={},target=/data,readonly\" {} cat /data/{}",
+            hostDirectory.wstring(),
+            DebianImage.NameAndTag(),
+            fileName));
+        result.Verify({.Stdout = L"WSLC Mount Bind Test", .Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_Volume_Success)
     {
         auto result = RunWslc(std::format(

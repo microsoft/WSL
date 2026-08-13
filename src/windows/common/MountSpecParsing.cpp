@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "MountSpecParsing.h"
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <filesystem>
@@ -513,9 +514,15 @@ Spec Parse(const std::wstring& value)
     {
         ThrowInvalid(std::format(L"option '{}' is not supported.", mount.UnsupportedOption.value()));
     }
+
     if (mount.Target.find(L':') != std::wstring::npos)
     {
         ThrowInvalid(L"target paths containing ':' are not supported.");
+    }
+
+    if (!mount.Target.starts_with(L'/'))
+    {
+        ThrowInvalid(L"target path must be absolute");
     }
 
     if (type == Type::Tmpfs)
