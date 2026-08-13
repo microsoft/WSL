@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "interop.hpp"
+#include "HandleIO.h"
 #include "helpers.hpp"
 #include "socket.hpp"
 #include "hvsocket.hpp"
@@ -408,82 +409,70 @@ std::string FormatCommandLine(gsl::span<gsl::byte> CommandLineData, USHORT Comma
 DWORD
 ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* Result)
 {
-    OVERLAPPED Overlapped = {0};
-    const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
-    Overlapped.hEvent = OverlappedEvent.get();
-    const HANDLE WaitHandles[] = {Overlapped.hEvent, Result->Process.get()};
+    namespace io = wsl::windows::common::io;
 
-    // Read messages from the message handle. Break out of the loop if the pipe
-    // is connection is closed or the process exits.
-    //
-    // N.B. ReadFile will automatically reset the event in the overlapped
-    //      structure.
-    DWORD ExitCode = 1;
-    DWORD Offset = 0;
-    LX_INIT_WINDOW_SIZE_CHANGED WindowSizeMessage;
-    for (;;)
-    {
-        DWORD BytesRead{};
-        bool Success = ReadFile(
-            MessageHandle, reinterpret_cast<BYTE*>(&WindowSizeMessage) + Offset, sizeof(WindowSizeMessage) - Offset, &BytesRead, &Overlapped);
-        if (!Success)
-        {
-            const auto LastError = GetLastError();
-            if ((LastError != ERROR_BROKEN_PIPE) && (LastError != ERROR_HANDLE_EOF))
-            {
-                THROW_LAST_ERROR_IF(LastError != ERROR_IO_PENDING);
+    DWORD exitCode = 1;
+    size_t pendingSize = 0;
+    LX_INIT_WINDOW_SIZE_CHANGED pendingMessage{};
 
-                auto CancelIo = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-                    CancelIoEx(MessageHandle, &Overlapped);
-                    GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, TRUE);
-                });
+    auto processExit = [&] {
+        THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(Result->Process.get(), &exitCode));
 
-                const DWORD WaitStatus = WaitForMultipleObjects(RTL_NUMBER_OF(WaitHandles), WaitHandles, FALSE, INFINITE);
-                if (WaitStatus == WAIT_OBJECT_0)
+        // Close the pseudoconsole, this causes all pending data to be flushed.
+        Result->PseudoConsole.reset();
+    };
+
+    io::MultiHandleWait wait;
+    wait.AddHandle(
+        std::make_unique<io::ReadHandle>(
+            io::HandleWrapper{MessageHandle},
+            [&](const gsl::span<char>& input) {
+                if (input.empty())
                 {
-                    Success = GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, FALSE);
-                    CancelIo.release();
+                    const DWORD waitStatus = WaitForSingleObject(Result->Process.get(), 0);
+                    if (waitStatus == WAIT_OBJECT_0)
+                    {
+                        processExit();
+                    }
+                    else
+                    {
+                        THROW_HR_IF(E_UNEXPECTED, waitStatus != WAIT_TIMEOUT);
+                        if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
+                        {
+                            THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(Result->Process.get(), 1));
+                        }
+                    }
+
+                    return;
                 }
-                else if (WaitStatus == (WAIT_OBJECT_0 + 1))
+
+                auto remaining = input;
+                while (!remaining.empty())
                 {
-                    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(Result->Process.get(), &ExitCode));
+                    const size_t bytesToCopy = (std::min)(remaining.size(), sizeof(pendingMessage) - pendingSize);
+                    std::copy_n(remaining.data(), bytesToCopy, reinterpret_cast<char*>(&pendingMessage) + pendingSize);
+                    pendingSize += bytesToCopy;
+                    remaining = remaining.subspan(bytesToCopy);
 
-                    // Close the pseudoconsole, this causes all pending data to be flushed.
-                    Result->PseudoConsole.reset();
-                    break;
+                    if (pendingSize == sizeof(pendingMessage))
+                    {
+                        THROW_HR_IF(
+                            E_UNEXPECTED,
+                            (pendingMessage.Header.MessageType != LxInitMessageWindowSizeChanged) ||
+                                (pendingMessage.Header.MessageSize != sizeof(pendingMessage)));
+
+                        const COORD size{static_cast<SHORT>(pendingMessage.Columns), static_cast<SHORT>(pendingMessage.Rows)};
+                        THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), size));
+                        pendingSize = 0;
+                    }
                 }
-                else
-                {
-                    THROW_HR(E_UNEXPECTED);
-                }
-            }
-        }
+            }),
+        io::MultiHandleWait::CancelOnCompleted);
 
-        if ((!Success) || (BytesRead == 0))
-        {
-            if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
-            {
-                THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(Result->Process.get(), 1));
-            }
+    wait.AddHandle(std::make_unique<io::EventHandle>(io::HandleWrapper{Result->Process.get()}, processExit), io::MultiHandleWait::CancelOnCompleted);
 
-            break;
-        }
-
-        Offset += BytesRead;
-        if (Offset != sizeof(WindowSizeMessage))
-        {
-            continue;
-        }
-
-        WI_ASSERT(WindowSizeMessage.Header.MessageType == LxInitMessageWindowSizeChanged);
-
-        const COORD Size{static_cast<SHORT>(WindowSizeMessage.Columns), static_cast<SHORT>(WindowSizeMessage.Rows)};
-        THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), Size));
-
-        Offset = 0;
-    }
-
-    return ExitCode;
+    wait.Run(std::nullopt);
+    return exitCode;
 }
 
 } // namespace
