@@ -2639,10 +2639,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>顯示容器的詳細資訊。</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>終止容器。</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>終止容器。</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>列出容器。</value>
@@ -2697,6 +2698,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>停止容器。</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>要傳送 (預設訊號： 容器的設定 STOPSIGNAL，如果未設定，則 SIGTERM)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>管理映像。</value>
@@ -3076,6 +3081,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>{} 值無效： 網路名稱不可為空白或空白字元</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>{} 值無效： 只能指定一次網路名稱</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>無效的 {} 值：不支援的網路選項 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>不支援主機模式網路</value>
   </data>
@@ -3156,7 +3169,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>工作階段儲存目錄的路徑</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>要傳送的訊號</value>
+    <value>要傳送到容器的訊號 (預設：SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>目前或現有的影像參考採用影像名稱[:tag]格式</value>
@@ -3403,7 +3417,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>網路名稱</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>僅輸出網路名稱</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>移除所有未使用的網路。</value>
