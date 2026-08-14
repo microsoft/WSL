@@ -19,6 +19,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "SpecParsing.h"
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 #include <charconv>

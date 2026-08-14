@@ -173,10 +173,12 @@ class WSLCE2EImageBuildTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Pull_Success)
     {
         // A local registry acts as the private image source that --pull re-resolves the base image from.
+        EnsureImageIsLoaded(AlpineTestImage());
+
         auto session = OpenDefaultElevatedSession();
         auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", c_registryPort);
 
-        auto registryImage = TagImageForRegistry(DebianTestImage().NameAndTag(), string::MultiByteToWide(registryAddress));
+        auto registryImage = TagImageForRegistry(AlpineTestImage().NameAndTag(), string::MultiByteToWide(registryAddress));
         auto registryImageCleanup = DeleteImageOnExit(registryImage);
 
         RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});

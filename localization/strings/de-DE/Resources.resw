@@ -309,7 +309,7 @@ und "wsl.exe --install &lt;Distro&gt;".</value>
     <value>Konvertierung wird ausgeführt. Dieser Vorgang kann einige Minuten dauern.</value>
   </data>
   <data name="MessageCompactionStart" xml:space="preserve">
-    <value>Compaction in progress, this may take a few minutes.</value>
+    <value>Die Komprimierung wird ausgeführt. Dieser Vorgang kann einige Minuten dauern.</value>
   </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>Die Distribution ist bereits die angeforderte Version.</value>
@@ -403,218 +403,218 @@ Syntax:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. Alle Rechte vorbehalten.
+Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/privacy.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Syntax: wsl.exe [Argument] [Optionen...] [CommandLine]
 
-Arguments for running Linux binaries:
+Argumente für die Ausführung von Linux-Binärdateien:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Wenn keine Befehlszeile angegeben ist, startet wsl.exe die Standardshell.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Den angegebenen Befehl ausführen, ohne die Linux-Standardshell zu verwenden.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Den angegebenen Befehl mit dem angegebenen Shelltyp ausführen.
 
     --
-        Pass the remaining command line as-is.
+        Die verbleibende Befehlszeile unverändert übergeben.
 
-Options:
+Optionen:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Legt das angegebene Verzeichnis als aktuelles Arbeitsverzeichnis fest.
+        Wenn ~ verwendet wird, wird der Heimatpfad des Linux-Benutzers verwendet. Wenn der Pfad
+        mit einem /-Zeichen beginnt, wird er als absoluter Linux-Pfad interpretiert.
+        Andernfalls muss der Wert ein absoluter Windows-Pfad sein.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Die angegebene Verteilung ausführen.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Die angegebene Verteilungs-ID ausführen.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Als angegebener Benutzer ausführen.
 
     --system
-        Launches a shell for the system distribution.
+        Startet eine Shell für die Systemverteilung.
 
-Arguments for managing Windows Subsystem for Linux:
+Argumente für die Verwaltung des Windows-Subsystems für Linux:
 
     --help
-        Display usage information.
+        Nutzungsinformationen anzeigen.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Eine WSL2-Debugshell zu Diagnosezwecken öffnen.
 
-    --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+    --install [Verteilung] [Optionen...]
+        Ein Windows-Subsystem für die Linux-Verteilung installieren.
+        Verwenden Sie 'wsl.exe --list --online', um eine Liste gültiger Verteilungen zu erhalten.
 
-        Options:
+        Optionen:
             --enable-wsl1
-                Enable WSL1 support.
+                WSL1-Unterstützung aktivieren.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Erstellen Sie einen Datenträger mit fester Größe, um die Verteilung zu speichern.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Eine Verteilung aus einer lokalen Datei installieren.
 
             --legacy
-                Use the legacy distribution manifest.
+                Das Legacy-Verteilungsmanifest verwenden.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Den Installationspfad für die Verteilung festlegen.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Den Namen der Verteilung festlegen.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Nur die erforderlichen optionalen Komponenten und keine Distribution installieren.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Starten Sie die Distribution nach der Installation nicht.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Gibt die Version an, die für die neue Distribution verwendet werden soll.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Gibt die Größe des Datenträgers an, auf dem die Verteilung gespeichert werden soll.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Laden Sie die Distribution aus dem Internet und nicht aus dem Microsoft Store herunter.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Ändert distributionsspezifische Optionen.
 
-        Options:
+        Optionen:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                Die Verteilung an einen neuen Speicherort verschieben.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Für die VHD-Verteilung als platzsparende Datei festlegen, sodass Speicherplatz automatisch freigegeben werden kann.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Den Standardbenutzer der Verteilung festlegen.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Passen Sie die Größe des Datenträgers der Verteilung auf die angegebene Größe an.
 
             --compact
-                Compact the VHDX file of a WSL 2 distribution.
+                Komprimiert die VHDX-Datei einer WSL 2-Distribution.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Fügt einen physischen oder virtuellen Datenträger an alle WSL2-Distributionen an und bindet ihn ein.
 
-        Options:
+        Optionen:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Gibt an, dass &lt;Disk&gt; auf eine virtuelle Festplatte verweist.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Fügt den Datenträger an WSL2 an, aber stellt ihn nicht bereit.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Mounten Sie die Festplatte unter Verwendung eines benutzerdefinierten Namens für den Mountpoint.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Dateisystem, das beim Einbinden eines Datenträgers verwendet werden soll. Wenn nicht angegeben, ist der Standardwert ext4.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Zusätzliche Optionen zum Mounten.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                Der Index der zu mountenden Partition. Sofern nicht angegeben, wird standardmäßig der gesamte Datenträger verwendet.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Ändert die Standardinstallationsversion für neue Distributionen.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Beendet sofort alle ausgeführten Distributionen und die WSL 2-
+        leichte virtuelle Maschine für Dienstprogramme.
 
-        Options:
+        Optionen:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Beenden Sie den virtuellen WSL 2-Computer, auch wenn gerade ein Vorgang ausgeführt wird. Kann zu Datenverlusten führen.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Zeigt den Status von Windows-Subsystem für Linux an.
 
-    --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+    --unmount [Datenträger]
+        Hebt die Bereitstellung und trennt einen Datenträger von allen WSL2-Distributionen.
+        Hebt die Bereitstellung auf und trennt alle Datenträger, wenn ohne Argument aufgerufen.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Deinstalliert das Paket „Windows-Subsystem für Linux“ von diesem Rechner.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Aktualisieren Sie das Paket „Windows-Subsystem für Linux.“
 
-        Options:
+        Optionen:
             --pre-release
-                Download a pre-release version if available.
+                Laden Sie gegebenenfalls eine Vorabversion herunter.
 
     --version, -v
-        Display version information.
+        Versionsinformationen anzeigen.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Argumente für die Verwaltung von Distributionen von Windows-Subsystem für Linux:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Optionen]
+        Exportiert die Distribution in eine tar-Datei.
+        Der Dateiname kann – für stdout sein.
 
-        Options:
+        Optionen:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Gibt das Exportformat an. Unterstützte Werte: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+        Importiert die angegebene tar-Datei als neue Verteilung.
+        Der Dateiname kann – für stdin sein.
 
-        Options:
+        Optionen:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Gibt die Version an, die für die neue Distribution verwendet werden soll.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Gibt an, dass die angegebene Datei eine .vhd- oder .vhdx-Datei und keine TAR-Datei ist.
+                Dieser Vorgang erstellt eine Kopie der VHD-Datei am angegebenen Installationsspeicherort.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Importiert die angegebene VHD-Datei als neue Distribution.
+        Diese virtuelle Festplatte muss mit dem Dateisystemtyp EXT4 formatiert sein.
 
-    --list, -l [Options]
-        Lists distributions.
+    --list, -l [Optionen]
+        Listet Verteilungen auf.
 
-        Options:
+        Optionen:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Listet alle Distributionen auf, einschließlich Distributionen, die
+                wird derzeit installiert oder deinstalliert.
 
             --running
-                List only distributions that are currently running.
+                Listet nur Distributionen auf, die derzeit ausgeführt werden.
 
             --quiet, -q
-                Only show distribution names.
+                Nur Verteilungsnamen anzeigen.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Detaillierte Informationen zu allen Distributionen anzeigen.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Zeigt eine Liste der verfügbaren Distributionen für die Installation mit 'wsl.exe --install' an.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Legt die Distribution als Standard fest.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Ändert die Version der angegebenen Distribution.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Beendet die angegebene Distribution.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Hebt die Registrierung der Verteilung auf und löscht das Stammdateisystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -1075,7 +1075,7 @@ Fallback auf NAT-Netzwerk.</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
-    <value>Compaction is only supported on .vhdx files.</value>
+    <value>Die Komprimierung wird nur für .vhdx-Dateien unterstützt.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -2639,10 +2639,11 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Detaillierte Informationen zu einem Container anzeigen.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Container beenden.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Beendet Container.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Container auflisten.</value>
@@ -2697,6 +2698,10 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Beendet Container.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Bilder verwalten.</value>
@@ -3076,6 +3081,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Ungültiger {}-Wert: Der Netzwerkname darf nicht leer sein oder nur aus Leerzeichen bestehen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Ungültiger {}-Wert: Der Netzwerkname kann nur einmal angegeben werden.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Das Hostmodusnetzwerk wird nicht unterstützt</value>
   </data>
@@ -3156,7 +3169,8 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Pfad zum Verzeichnis für den Sitzungsspeicher</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Zu sendendes Signal</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuelle oder vorhandene Bildreferenz im Format image-name[:tag]</value>
@@ -3403,7 +3417,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Netzwerkname</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Gibt nur die Netzwerknamen aus</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Entfernen Sie alle ungenutzten Netzwerke.</value>
