@@ -3011,15 +3011,6 @@ try
             dockerNetworks = m_runtime.Docker().ListNetworks(filters);
         }
         CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
-
-        for (const auto& dockerNetwork : dockerNetworks)
-        {
-            // Only report networks that we manage.
-            if (!m_networks.contains(dockerNetwork.Name))
-            {
-                WSL_LOG("ListedUnknownNetwork", TraceLoggingValue(dockerNetwork.Name.c_str(), "NetworkName"));
-            }
-        }
     }
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
