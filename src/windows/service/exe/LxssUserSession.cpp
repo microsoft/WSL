@@ -923,77 +923,47 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
 
     RETURN_HR_IF(E_NOTIMPL, WI_IsFlagClear(distro.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
-    // Build the final vhd path.
-    std::filesystem::path newVhdPath = Location;
-    RETURN_HR_IF(E_INVALIDARG, newVhdPath.empty());
+    std::filesystem::path destDir(Location);
+    RETURN_HR_IF(E_INVALIDARG, destDir.empty());
 
-    newVhdPath /= distro.VhdFilePath.filename();
+    const std::filesystem::path destPath = destDir / distro.VhdFilePath.filename();
 
-    auto impersonate = wil::CoImpersonateClient();
+    // Cross-volume MoveFileEx creates a new file using the impersonation token's
+    // default owner. Normalize that owner to the caller's user SID so elevated moves
+    // do not produce a VHD owned by BUILTIN\Administrators.
+    auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
+    TOKEN_OWNER tokenOwner{tokenUser->User.Sid};
+    THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(userToken.get(), TokenOwner, &tokenOwner, sizeof(tokenOwner)));
 
-    // Create the distribution base folder
-    std::error_code error;
-    std::filesystem::create_directories(Location, error);
-    if (error.value())
     {
-        THROW_WIN32(error.value());
+        auto impersonate = wil::impersonate_token(userToken.get());
+
+        std::error_code error;
+        std::filesystem::create_directories(destDir, error);
+        if (error.value())
+        {
+            THROW_WIN32(error.value());
+        }
+
+        THROW_IF_WIN32_BOOL_FALSE(MoveFileExW(distro.VhdFilePath.c_str(), destPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
     }
 
-    // Read the original VHD owner before the move so we can restore it after.
-    // Cross-volume MoveFileEx may set the owner to BUILTIN\Administrators for
-    // elevated callers, which breaks HcsGrantVmAccess (needs WRITE_DAC via
-    // ownership) from non-elevated contexts.
-    PSID originalOwner = nullptr;
-    wil::unique_hlocal originalDescriptor;
-    THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
-        distro.VhdFilePath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &originalOwner, nullptr, nullptr, nullptr, &originalDescriptor));
-
-    // Move the VHD to the new location.
-    THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
-
-    // Restore the original VHD owner on the moved file. Open the file while impersonating
-    // the caller, then use ReOpenFile to add WRITE_OWNER as SYSTEM with SE_RESTORE_NAME
-    // (needed since a cross-volume MoveFileEx may leave the file owned by
-    // BUILTIN\Administrators). ReOpenFile reuses the already-open file object instead of
-    // resolving the path again.
-    auto setVhdOwner = [&originalOwner](const std::filesystem::path& vhdPath) {
-        wil::unique_hfile vhdHandle(CreateFileW(
-            vhdPath.c_str(), READ_CONTROL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
-        THROW_LAST_ERROR_IF(!vhdHandle);
-
-        auto runAsSelf = wil::run_as_self();
-        auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
-
-        wil::unique_hfile privilegedHandle(ReOpenFile(
-            vhdHandle.get(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_FLAG_OPEN_REPARSE_POINT));
-        THROW_LAST_ERROR_IF(!privilegedHandle);
-
-        THROW_IF_WIN32_ERROR(::SetSecurityInfo(
-            privilegedHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
-    };
-
-    // Install the rollback before fixing up ownership so a failure there (e.g. the caller
-    // lacking access on the moved file) still moves the VHD back instead of leaving the
-    // registration pointing at a file that no longer exists at the old location.
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(
-            newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+        auto impersonate = wil::impersonate_token(userToken.get());
+        if (!MoveFileExW(destPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            LOG_LAST_ERROR();
+            return;
+        }
 
-        // Fix ownership on the reverted VHD in case MoveFileEx copied across volumes.
-        LOG_IF_FAILED(wil::ResultFromException([&] { setVhdOwner(distro.VhdFilePath); }));
-
-        // Write the location back to the original path in case the second registry write failed. Otherwise, this is a no-op.
-        registration.Write(Property::BasePath, distro.BasePath.c_str());
+        LOG_IF_FAILED(wil::ResultFromException(
+            WI_DIAGNOSTICS_INFO, [&]() { registration.Write(Property::BasePath, distro.BasePath.c_str()); }));
     });
 
-    setVhdOwner(newVhdPath);
-
-    // Update the registry location
     registration.Write(Property::BasePath, Location);
-    registration.Write(Property::VhdFileName, newVhdPath.filename().c_str());
+    registration.Write(Property::VhdFileName, destPath.filename().c_str());
 
     revert.release();
-
     return S_OK;
 }
 
