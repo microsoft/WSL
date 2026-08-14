@@ -192,7 +192,8 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
         missingComponents.emplace_back(c_optionalFeatureNameWsl);
     }
 
-    if (!IsOptionalComponentInstalled(c_optionalFeatureNameVmp))
+    if (!IsOptionalComponentInstalled(c_optionalFeatureNameVmp) ||
+        !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
     {
         missingComponents.emplace_back(c_optionalFeatureNameVmp);
     }
