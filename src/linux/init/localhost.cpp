@@ -321,24 +321,22 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                     THROW_LAST_ERROR_IF(poll(pollDescriptors, COUNT_OF(pollDescriptors), -1) < 0);
 
-                    bytesRead = 0;
                     for (int Index = 0; Index < COUNT_OF(pollDescriptors); Index += 1)
                     {
                         if (pollDescriptors[Index].revents & (POLLIN | POLLERR | POLLHUP))
                         {
                             bytesRead = UtilReadBuffer(pollDescriptors[Index].fd, buffer);
-                            if (bytesRead == 0)
+                            if (bytesRead > 0)
+                            {
+                                if (UtilWriteBuffer(outFd[Index], buffer.data(), bytesRead) < 0)
+                                {
+                                    return;
+                                }
+                            }
+                            else
                             {
                                 pollDescriptors[Index].fd = -1;
                                 shutdown(outFd[Index], SHUT_WR);
-                            }
-                            else if (bytesRead < 0)
-                            {
-                                return;
-                            }
-                            else if (UtilWriteBuffer(outFd[Index], buffer.data(), bytesRead) < 0)
-                            {
-                                return;
                             }
                         }
                     }
