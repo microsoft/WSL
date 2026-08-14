@@ -76,7 +76,8 @@ void ParseArgumentsStateMachine::ThrowIfError() const
     else if (m_state.Type() && m_invocationItr == m_invocation.end())
     {
         const auto* argument = FindArgument(m_state.Type().value());
-        throw ArgumentException(Localization::WSLCCLI_MissingArgumentError(m_state.Arg()), argument);
+        const auto message = Localization::WSLCCLI_MissingArgumentError(m_state.Arg());
+        throw argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
     }
 }
 
@@ -160,7 +161,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ApplyFlagValue(Arg
     if (!boolVal.has_value())
     {
         const auto* argument = FindArgument(type);
-        return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg), argument);
+        const auto message = Localization::WSLCCLI_FlagInvalidBooleanError(currArg);
+        return argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
     }
 
     SetFlag(type, boolVal.value());

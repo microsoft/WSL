@@ -51,14 +51,6 @@ struct ArgumentException : CommandException
     {
     }
 
-    ArgumentException(std::wstring_view message, const Argument* argument) : CommandException(message)
-    {
-        if (argument != nullptr)
-        {
-            m_arguments.emplace_back(*argument);
-        }
-    }
-
     ArgumentException(std::wstring_view message, Argument argument) : CommandException(message), m_arguments{std::move(argument)}
     {
     }
