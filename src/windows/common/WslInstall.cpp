@@ -23,6 +23,7 @@ Abstract:
 extern HINSTANCE g_dllInstance;
 
 constexpr LPCWSTR c_optionalFeatureInstallStatus = L"InstallStatus";
+constexpr DWORD c_optionalFeatureQueryTimeout = 30'000;
 
 using wsl::shared::Localization;
 using namespace wsl::windows::common::distribution;
@@ -260,7 +261,7 @@ bool WslInstall::IsOptionalComponentInstalled(LPCWSTR component)
     const auto commandLine = std::format(L"{} /Online /English /Get-FeatureInfo /FeatureName:{}", dismPath.native(), component);
 
     wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
-    const auto result = process.RunAndCaptureOutput();
+    const auto result = process.RunAndCaptureOutput(c_optionalFeatureQueryTimeout);
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(result.ExitCode), result.ExitCode != ERROR_SUCCESS, "Failed to query optional component: %ls", component);
 
