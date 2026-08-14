@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 
-#pragma warning(disable : 4200 4214)
+#pragma warning(disable : 4200 4214 4875)
 
 #ifdef __cplusplus
 #define _WINSOCKAPI_

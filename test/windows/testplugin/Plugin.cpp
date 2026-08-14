@@ -100,6 +100,21 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
             return E_ABORT;
         }
     }
+    else if (g_testType == PluginTestType::MountFolderAccess)
+    {
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        const auto mountSource = ReadString(key.get(), nullptr, c_mountFolder);
+
+        RETURN_IF_FAILED(
+            g_api->MountFolder(Session->SessionId, mountSource.c_str(), L"/test-plugin-access", false, L"test-plugin-access"));
+
+        std::vector<const char*> arguments = {"/bin/sh", "-c", "{ echo test > /test-plugin-access/plugin-test.txt; } 2>&1", nullptr};
+        wil::unique_socket socket;
+        RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, arguments[0], arguments.data(), &socket));
+
+        const auto output = ReadFromSocket(socket.get());
+        g_logfile.write(output.data(), output.size());
+    }
     else if (g_testType == PluginTestType::ApiErrors)
     {
         auto result = g_api->MountFolder(Session->SessionId, L"C:\\DoesNotExit", L"/dummy", true, L"test-plugin-mount");
@@ -349,7 +364,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::GetUsername));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::MountFolderAccess));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;
