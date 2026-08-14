@@ -124,7 +124,7 @@ class WSLCE2EVolumeListTests
         const auto result = RunWslc(L"volume list --filter dangling=maybe");
         VERIFY_ARE_EQUAL(1, result.ExitCode);
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter 'dangling=maybe'"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter 'dangling=[maybe]'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_Filter_Driver)
