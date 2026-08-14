@@ -87,6 +87,8 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerProcessOptionsInternal* initProcessOptions;
     PCSTR networkMode;
     WslcContainerFlags containerFlags;
+    PCSTR const* capabilityAdditions;
+    uint32_t capabilityAdditionsCount;
 
 } WslcContainerOptionsInternal;
 

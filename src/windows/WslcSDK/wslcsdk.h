@@ -57,7 +57,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 104
+#define WSLC_CONTAINER_OPTIONS_SIZE 120
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -265,6 +265,11 @@ STDAPI WslcSetContainerSettingsNamedVolumes(
     _In_ WslcContainerSettings* containerSettings,
     _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
     _In_ uint32_t namedVolumeCount);
+
+STDAPI WslcSetContainerSettingsCapabilityAdditions(
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(capabilityCount) PCSTR const* capabilities,
+    _In_ uint32_t capabilityCount);
 
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);

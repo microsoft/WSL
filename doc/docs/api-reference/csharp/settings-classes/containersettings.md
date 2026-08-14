@@ -16,6 +16,7 @@ public sealed class ContainerSettings
     public bool EnableAutoRemove { get; set; }
     public bool EnableGpu { get; set; }
     public bool Privileged { get; set; }
+    public IList<string> CapabilityAdditions { get; set; }
     public IList<ContainerPortMapping> PortMappings { get; set; }
     public IList<ContainerVolume> Volumes { get; set; }
     public IList<ContainerNamedVolume> NamedVolumes { get; set; }
@@ -24,7 +25,7 @@ public sealed class ContainerSettings
 
 Notes:
 
-- `PortMappings`, `Volumes`, and `NamedVolumes` are mutable collections.
+- `CapabilityAdditions`, `PortMappings`, `Volumes`, and `NamedVolumes` are mutable collections.
 - `InitProcess` is optional.
 - `NetworkingMode` is nullable; `null` means “leave default behavior”.
 
@@ -43,6 +44,7 @@ var containerSettings = new ContainerSettings("docker.io/library/alpine:latest")
     InitProcess = init,
     NetworkingMode = ContainerNetworkingMode.Bridged,
     EnableAutoRemove = true,
+    CapabilityAdditions = new List<string> { "NET_ADMIN", "SYS_TIME" },
     PortMappings = new List<ContainerPortMapping>
     {
         new(8080, 80, PortProtocol.TCP)

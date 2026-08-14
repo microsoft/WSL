@@ -891,7 +891,11 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ContainerInspect)
     {
-        auto container = m_defaultSession.CreateContainer(WSLCSDK::ContainerSettings(L"debian:latest"));
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.CapabilityAdditions(
+            winrt::single_threaded_vector<winrt::hstring>({L"NET_ADMIN", L"SYS_TIME"}));
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
         auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
 
         const auto inspectJson = container.Inspect();
@@ -902,6 +906,8 @@ class WslcSdkWinRtTests
 
         // The inspect JSON must contain the container ID.
         VERIFY_IS_TRUE(winrt::to_string(inspectJson).find(winrt::to_string(id)) != std::string::npos);
+        VERIFY_IS_TRUE(winrt::to_string(inspectJson).find("NET_ADMIN") != std::string::npos);
+        VERIFY_IS_TRUE(winrt::to_string(inspectJson).find("SYS_TIME") != std::string::npos);
 
         container.Delete(WSLCSDK::DeleteContainerOption::None);
         cleanup.release();

@@ -47,6 +47,8 @@ struct ContainerSettings : ContainerSettingsT<ContainerSettings>
     void Volumes(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerVolume> const& value);
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> NamedVolumes();
     void NamedVolumes(winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> const& value);
+    winrt::Windows::Foundation::Collections::IVector<hstring> CapabilityAdditions();
+    void CapabilityAdditions(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
 
     WslcContainerSettings* ToStructPointer();
 
@@ -64,11 +66,14 @@ private:
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerVolume>()};
     winrt::Windows::Foundation::Collections::IVector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume> m_namedVolumes{
         winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ContainerNamedVolume>()};
+    winrt::Windows::Foundation::Collections::IVector<hstring> m_capabilityAdditions{winrt::single_threaded_vector<hstring>()};
 
     std::unique_ptr<WslcContainerSettings> m_containerSettings;
     std::vector<WslcContainerPortMapping> m_portMappingsStructs;
     std::vector<WslcContainerVolume> m_volumesStructs;
     std::vector<WslcContainerNamedVolume> m_namedVolumesStructs;
+    std::vector<std::string> m_capabilityAdditionStrings;
+    std::vector<PCSTR> m_capabilityAdditionPointers;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

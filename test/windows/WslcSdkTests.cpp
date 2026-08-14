@@ -1155,6 +1155,9 @@ class WslcSdkTests
         UniqueContainer container;
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        const char* capabilities[] = {"NET_ADMIN", "SYS_TIME"};
+        VERIFY_SUCCEEDED(
+            WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, ARRAYSIZE(capabilities)));
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
 
         wil::unique_cotaskmem_ansistring inspectData;
@@ -1168,6 +1171,26 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
 
         VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
+        VERIFY_ARE_EQUAL(2u, inspectObject.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(std::ranges::any_of(
+            inspectObject.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+    }
+
+    WSLC_TEST_METHOD(ContainerCapabilityAdditionsValidation)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        const char* capabilities[] = {"NET_ADMIN"};
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, nullptr, 1), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilities, 0), E_INVALIDARG);
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsCapabilityAdditions(&containerSettings, nullptr, 0));
+
+        const char* capabilitiesWithNull[] = {nullptr};
+        VERIFY_ARE_EQUAL(
+            WslcSetContainerSettingsCapabilityAdditions(&containerSettings, capabilitiesWithNull, 1), E_INVALIDARG);
     }
 
     WSLC_TEST_METHOD(ContainerExec)

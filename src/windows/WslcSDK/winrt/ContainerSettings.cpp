@@ -231,6 +231,26 @@ void ContainerSettings::NamedVolumes(winrt::Windows::Foundation::Collections::IV
     m_namedVolumes = value;
 }
 
+winrt::Windows::Foundation::Collections::IVector<hstring> ContainerSettings::CapabilityAdditions()
+{
+    return m_capabilityAdditions;
+}
+
+void ContainerSettings::CapabilityAdditions(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
+{
+    if (m_containerSettings)
+    {
+        throw winrt::hresult_illegal_state_change(L"Cannot change capability additions after container has been initialized");
+    }
+
+    if (!value)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Value cannot be null");
+    }
+
+    m_capabilityAdditions = value;
+}
+
 WslcContainerSettings* ContainerSettings::ToStructPointer()
 {
     if (!m_containerSettings)
@@ -315,6 +335,28 @@ WslcContainerSettings* ContainerSettings::ToStructPointer()
 
             winrt::check_hresult(WslcSetContainerSettingsNamedVolumes(
                 m_containerSettings.get(), m_namedVolumesStructs.data(), static_cast<uint32_t>(m_namedVolumesStructs.size())));
+        }
+
+        if (m_capabilityAdditions.Size() > 0)
+        {
+            m_capabilityAdditionStrings.clear();
+            m_capabilityAdditionStrings.reserve(m_capabilityAdditions.Size());
+            for (const auto& capability : m_capabilityAdditions)
+            {
+                m_capabilityAdditionStrings.push_back(winrt::to_string(capability));
+            }
+
+            m_capabilityAdditionPointers.clear();
+            m_capabilityAdditionPointers.reserve(m_capabilityAdditionStrings.size());
+            for (const auto& capability : m_capabilityAdditionStrings)
+            {
+                m_capabilityAdditionPointers.push_back(capability.c_str());
+            }
+
+            winrt::check_hresult(WslcSetContainerSettingsCapabilityAdditions(
+                m_containerSettings.get(),
+                m_capabilityAdditionPointers.data(),
+                static_cast<uint32_t>(m_capabilityAdditionPointers.size())));
         }
     }
 

@@ -16,6 +16,7 @@
 - `EnableAutoRemove()` / setter
 - `EnableGpu()` / setter
 - `Privileged()` / setter
+- `CapabilityAdditions()` / setter
 - `PortMappings()` / setter
 - `Volumes()` / setter
 - `NamedVolumes()` / setter
@@ -38,6 +39,11 @@ containerSettings.DomainName(L"localdomain");
 containerSettings.EnableAutoRemove(false);
 containerSettings.EnableGpu(false);
 containerSettings.Privileged(false);
+
+auto capabilities = single_threaded_vector<hstring>();
+capabilities.Append(L"NET_ADMIN");
+capabilities.Append(L"SYS_TIME");
+containerSettings.CapabilityAdditions(capabilities);
 
 auto ports = single_threaded_vector<ContainerPortMapping>();
 ports.Append(ContainerPortMapping{ 8080, 80, PortProtocol::TCP });

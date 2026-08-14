@@ -341,6 +341,8 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
     m_ulimits = ConvertArray<WSLCUlimit>(Options.Ulimits, Options.UlimitsCount);
     m_value.Ulimits = m_ulimits.empty() ? nullptr : m_ulimits.data();
     m_value.UlimitsCount = Options.UlimitsCount;
+
+    m_value.CapAdd = Convert(Options.CapAdd);
 }
 
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)

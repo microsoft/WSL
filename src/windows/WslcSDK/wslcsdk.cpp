@@ -780,6 +780,8 @@ try
     containerOptions.HostName = internalContainerSettings->HostName;
     containerOptions.DomainName = internalContainerSettings->DomainName;
     containerOptions.Flags = ConvertFlags(internalContainerSettings->containerFlags);
+    containerOptions.CapAdd = {
+        internalContainerSettings->capabilityAdditions, static_cast<ULONG>(internalContainerSettings->capabilityAdditionsCount)};
 
     CopyProcessSettingsToRuntime(containerOptions.InitProcessOptions, internalContainerSettings->initProcessOptions);
 
@@ -1101,6 +1103,28 @@ try
 
     internalType->namedVolumes = namedVolumes;
     internalType->namedVolumesCount = namedVolumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsCapabilityAdditions(
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(capabilityCount) PCSTR const* capabilities,
+    _In_ uint32_t capabilityCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(
+        E_INVALIDARG, (capabilities == nullptr && capabilityCount != 0) || (capabilities != nullptr && capabilityCount == 0));
+
+    for (uint32_t index = 0; index < capabilityCount; ++index)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, capabilities[index]);
+    }
+
+    internalType->capabilityAdditions = capabilities;
+    internalType->capabilityAdditionsCount = capabilityCount;
 
     return S_OK;
 }
