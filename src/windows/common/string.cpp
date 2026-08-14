@@ -377,13 +377,8 @@ std::wstring wsl::windows::common::string::FormatStorageSize(uint64_t Bytes, Sto
         ++unitIndex;
     }
 
-    if (unitIndex == 0)
-    {
-        return IncludeSpace ? std::format(L"{} {}", Bytes, units[unitIndex]) : std::format(L"{}{}", Bytes, units[unitIndex]);
-    }
-
-    return IncludeSpace ? std::format(L"{:.{}f} {}", value, DecimalPlaces, units[unitIndex])
-                        : std::format(L"{:.{}f}{}", value, DecimalPlaces, units[unitIndex]);
+    const auto formattedValue = unitIndex == 0 ? std::to_wstring(Bytes) : std::format(L"{:.{}f}", value, DecimalPlaces);
+    return std::format(L"{}{}{}", formattedValue, IncludeSpace ? L" " : L"", units[unitIndex]);
 }
 
 std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
