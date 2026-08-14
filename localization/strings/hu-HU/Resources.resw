@@ -303,7 +303,7 @@ A 'wsl.exe --list --online' parancs használatával listázhatja az elérhető d
     <value>A konvertálás folyamatban van, ez eltarthat néhány percig.</value>
   </data>
   <data name="MessageCompactionStart" xml:space="preserve">
-    <value>Compaction in progress, this may take a few minutes.</value>
+    <value>A tömörítés folyamatban van, ez eltarthat néhány percig.</value>
   </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>A disztribúció már a kért verzióval rendelkezik.</value>
@@ -1069,7 +1069,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
-    <value>Compaction is only supported on .vhdx files.</value>
+    <value>A tömörítés csak .vhdx fájlok esetén támogatott.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -2633,10 +2633,11 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Tároló részletes adatainak megjelenítése.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Tárolók leállítása.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Leállítja a tárolókat.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Tárolók listázása.</value>
@@ -2691,6 +2692,10 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Leállítja a tárolókat.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Képek kezelése.</value>
@@ -3070,6 +3075,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Érvénytelen {} érték: a hálózatnév nem lehet üres vagy szóköz</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a hálózatnevet csak egyszer lehet megadni</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Érvénytelen {} érték: nem támogatott hálózati beállítás: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>a gazdagép módú hálózatkezelés nem támogatott</value>
   </data>
@@ -3150,7 +3163,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>A munkamenet-tároló könyvtár elérési útja</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Küldendő jelzés</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Jelenlegi vagy meglévő lemezkép-hivatkozás image-name[:tag] formátumban</value>
@@ -3235,7 +3249,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Set type of progress output (auto, tty, plain, quiet) (default: auto)</value>
+    <value>A folyamatkimenet típusa (auto, tty, plain, quiet) (alapértelmezett: auto)</value>
     <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
@@ -3397,7 +3411,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Hálózat neve</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Csak a hálózatneveket adja ki</value>
+    <value>Csak a hálózati azonosítókat jelenítse meg</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Távolítsa el az összes nem használt hálózatot.</value>

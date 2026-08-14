@@ -303,7 +303,7 @@ Dağıtımları yüklemek için 'wsl.exe --install &lt;Distro&gt;' komutunu kull
     <value>Dönüştürme devam ediyor, bu işlem birkaç dakika sürebilir.</value>
   </data>
   <data name="MessageCompactionStart" xml:space="preserve">
-    <value>Compaction in progress, this may take a few minutes.</value>
+    <value>Birleştirme devam ediyor, bu işlem birkaç dakika sürebilir.</value>
   </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>Dağıtım zaten istenen sürüm.</value>
@@ -397,218 +397,218 @@ Kullanım:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Telif Hakkı (C) Microsoft Corporation. Tüm hakları saklıdır.
+Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfasını ziyaret edin.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Kullanım: wsl.exe [Bağımsız Değişken] [Seçenekler...] [KomutSatırı]
 
-Arguments for running Linux binaries:
+Linux ikili dosyalarını çalıştırmak için bağımsız değişkenler:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Komut satırı sağlanmamışsa wsl.exe varsayılan kabuğu başlatır.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Varsayılan Linux kabuğunu kullanmadan belirtilen komutu yürütür.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Belirtilen komutu sağlanan kabuk türüyle yürütür.
 
     --
-        Pass the remaining command line as-is.
+        Kalan komut satırını olduğu gibi geçirin.
 
-Options:
+Seçenekler:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Belirtilen dizini geçerli çalışma dizini olarak ayarlar.
+        ~ kullanılıyorsa Linux kullanıcısının giriş yolu kullanılır. Yol
+        / karakteriyle başlarsa mutlak bir Linux yolu olarak yorumlanır.
+        Aksi takdirde değerin mutlak bir Windows yolu olması gerekir.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Belirtilen dağıtımı çalıştırır.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Belirtilen dağıtım kimliğini çalıştırır.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Belirtilen kullanıcı olarak çalıştırır.
 
     --system
-        Launches a shell for the system distribution.
+        Sistem dağıtımı için bir kabuk başlatır.
 
-Arguments for managing Windows Subsystem for Linux:
+Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler:
 
     --help
-        Display usage information.
+        Kullanım bilgilerini görüntüler.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Tanılama amacıyla bir WSL2 hata ayıklama kabuğu açar.
 
-    --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+    --install [Dağıtım] [Seçenekler...]
+        Linux için Windows Alt Sistemi dağıtımını yükler.
+        Geçerli dağıtımların listesi için 'wsl.exe --list --online' kullanın.
 
-        Options:
+        Seçenekler:
             --enable-wsl1
-                Enable WSL1 support.
+                WSL1 desteğini etkinleştirir.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Dağıtımı depolamak için sabit boyutlu bir disk oluşturun.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Yerel dosyadan bir dağıtım yükler.
 
             --legacy
-                Use the legacy distribution manifest.
+                Eski dağıtım bildirimini kullanır.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Dağıtımın yükleme yolunu ayarlar.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Dağıtımın adını ayarlar.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Yalnızca gerekli isteğe bağlı bileşenleri yükler, dağıtımı yüklemez.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Yüklemeden sonra dağıtımı başlatmaz.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Yeni dağıtım için kullanılacak sürümü belirtir.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Dağıtımın depolanacağı diskin boyutunu belirtir.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Dağıtımı Microsoft Store yerine internetten indirir.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Dağıtıma özgü seçenekleri değiştirir.
 
-        Options:
+        Seçenekler:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                Dağıtımı yeni bir konuma taşır.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Dağıtım VHD'sini aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Dağıtımın varsayılan kullanıcısını ayarlar.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Dağıtımın diskini belirtilen boyuta yeniden boyutlandırır.
 
             --compact
-                Compact the VHDX file of a WSL 2 distribution.
+                WSL 2 dağıtımının VHDX dosyasını sıkıştırır.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Tüm WSL 2 dağıtımlarında fiziksel veya sanal diski ekler ve bağlar.
 
-        Options:
+        Seçenekler:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                &lt;Disk&gt;'in sanal bir sabit diske başvurduğunu belirtir.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Diski WSL2'ye ekleme, ancak bağlamama.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Bağlama noktası için özel bir ad kullanarak diski bağlar.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Bir diski takarken dosya sistemi kullanılır, belirtilmemişse varsayılan ext4 olur.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Ek bağlama seçenekleri.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                Bağlanacak bölümün dizinine, belirtilmemişse varsayılan olarak tüm diske ayarlanır.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Yeni dağıtımlar için varsayılan yükleme sürümünü değiştirir.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Çalışan tüm dağıtımları ve WSL 2
+        basit yardımcı yazılım sanal makinesini anında sonlandırır.
 
-        Options:
+        Seçenekler:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Devam eden bir işlem olsa bile WSL 2 sanal makinesini sonlandırır. Veri kaybına neden olabilir.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Linux için Windows Alt Sistemi'nin durumunu gösterir.
 
     --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+        Bir diskin tüm WSL2 dağıtımlarından bağlantısını keser ve ayırır.
+        Bağımsız değişken olmadan çağrılırsa tüm disklerin bağlantısını keser ve ayırır.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Bu makineden Linux için Windows Alt Sistemi paketini kaldırır.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Linux için Windows Alt Sistemi'nin durumunu güncelleştirir.
 
-        Options:
+        Seçenekler:
             --pre-release
-                Download a pre-release version if available.
+                Varsa bir yayın öncesi sürümü indirir.
 
     --version, -v
-        Display version information.
+        Sürüm bilgilerini görüntüler.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız değişkenler:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Seçenekler]
+        Dağıtımı bir tar dosyasına dışarı aktarır.
+        Dosya adı - for stdout olabilir.
 
-        Options:
+        Seçenekler:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Dışarı aktarma biçimini belirtir. Desteklenen değerler: tar, tar.gz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+        Belirtilen tar dosyasını yeni bir dağıtım olarak içeri aktarır.
+        Dosya adı - for stdin olabilir.
 
-        Options:
+        Seçenekler:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Yeni dağıtım için kullanılacak sürümü belirtir.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Sağlanan dosyanın tar dosyası değil, .vhd veya .vhdx dosyası olduğunu belirtir.
+                Bu işlem, belirtilen yükleme konumunda VHD dosyasının bir kopyasını oluşturur.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Belirtilen VHD dosyasını yeni bir dağıtım olarak içeri aktarır.
+        Bu sanal sabit diskin ext4 dosya sistemi türüyle biçimlendirilmesi gerekir.
 
     --list, -l [Options]
-        Lists distributions.
+        Dağıtımları listeler.
 
-        Options:
+        Seçenekler:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Şu anda yüklenmekte veya kaldırılmakta olan
+                dağıtımlar da dahil olmak üzere tüm dağıtımları listeler.
 
             --running
-                List only distributions that are currently running.
+                Yalnızca şu anda çalışmakta olan dağıtımları listeler.
 
             --quiet, -q
-                Only show distribution names.
+                Yalnızca dağıtım adlarını gösterir.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Tüm dağıtımlar hakkında ayrıntılı bilgi gösterir.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                'wsl.exe --install' ile yüklenebilecek kullanılabilir dağıtımların listesini görüntüler.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Dağıtımı varsayılan olarak ayarlar.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Belirtilen dağıtımın sürümünü değiştirir.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Belirtilen dağıtımı sonlandırır.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Dağıtımın kaydını kaydırır ve kök dosya sistemini siler.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -1069,7 +1069,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
-    <value>Compaction is only supported on .vhdx files.</value>
+    <value>Sıkıştırma yalnızca .vhdx dosyalarında desteklenir.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -2633,10 +2633,11 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Bir kapsayıcı hakkında ayrıntılı bilgi gösterir.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kapsayıcıları sonlandır.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Kapsayıcıları sonlandırır.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Kapsayıcıları listele.</value>
@@ -2691,6 +2692,10 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Kapsayıcıları durdurur.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Görüntüleri yönet.</value>
@@ -3070,6 +3075,14 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Geçersiz {} değeri: ağ adı boş veya boşluk olamaz</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Geçersiz {} değeri: ağ adı yalnızca bir kez belirtilebilir</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>ana bilgisayar modu ağı desteklenmiyor</value>
   </data>
@@ -3150,7 +3163,8 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Oturum depolama dizininin yolu</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Gönderilecek sinyal</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde geçerli veya mevcut resim referansı</value>
@@ -3397,7 +3411,7 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Ağ adı</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Yalnızca ağ adlarının çıkışını oluşturur</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Kullanılmayan tüm ağları kaldırın.</value>

@@ -404,217 +404,217 @@ WSL1을 사용하려면 "Windows Subsystem for Linux” 선택적 구성 요소�
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
     <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+이 제품의 개인 정보 보호에 관한 정보는 https://aka.ms/privacy에서 확인하세요.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+사용법: wsl.exe [Argument] [Options...] [CommandLine]
 
-Arguments for running Linux binaries:
+Linux 이진 파일을 실행하기 위한 인수:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    명령줄이 제공되지 않으면 wsl.exe는 기본 셸을 시작합니다.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        기본 Linux 셸을 사용하지 않고 지정된 명령을 실행합니다.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        제공된 셸 형식으로 지정된 명령을 실행합니다.
 
     --
-        Pass the remaining command line as-is.
+        나머지 명령줄을 있는 그대로 전달합니다.
 
-Options:
+옵션:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        지정된 디렉터리를 현재 작업 디렉터리로 설정합니다.
+        ‘~’가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
+        / 문자로 시작하면 절대 Linux 경로로 해석됩니다.
+        그렇지 않으면 값이 절대 Windows 경로여야 합니다.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        지정된 배포를 실행합니다.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        지정된 배포 ID를 실행합니다.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        지정된 사용자로 실행합니다.
 
     --system
-        Launches a shell for the system distribution.
+        시스템 배포에 대한 셸을 시작합니다.
 
-Arguments for managing Windows Subsystem for Linux:
+Linux용 Windows 하위 시스템을 관리하기 위한 인수:
 
     --help
-        Display usage information.
+        사용 정보를 표시합니다.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        진단을 위해 WSL2 디버그 셸을 엽니다.
 
     --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+        Linux 배포용 Windows 하위 시스템을 설치합니다.
+        유효한 배포 목록의 경우 'wsl.exe --list --online'을 사용합니다.
 
-        Options:
+        옵션:
             --enable-wsl1
-                Enable WSL1 support.
+                WSL1 지원을 사용하도록 설정합니다.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                배포를 저장할 고정 크기 디스크를 만듭니다.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                로컬 파일에서 배포를 설치합니다.
 
             --legacy
-                Use the legacy distribution manifest.
+                레거시 배포 매니페스트를 사용합니다.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                배포에 대한 설치 경로를 설정합니다.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                배포의 이름을 설정합니다.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                필요한 선택적 구성 요소만 설치하고 배포를 설치하지 않습니다.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                설치 후 배포를 시작하지 않습니다.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                새 배포에 사용할 버전을 지정합니다.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                배포를 저장할 디스크의 크기를 지정합니다.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Microsoft Store 대신 인터넷에서 배포를 다운로드합니다.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        배포판별 옵션을 변경합니다.
 
-        Options:
+        옵션:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                배포를 새 위치로 이동합니다.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                배포판의 VHD를 스파스로 설정하여 디스크 공간을 자동으로 회수할 수 있도록 합니다.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                배포의 기본 사용자를 설정합니다.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                배포 디스크의 크기를 지정된 크기로 조정합니다.
 
             --compact
-                Compact the VHDX file of a WSL 2 distribution.
+                WSL 2 배포의 VHDX 파일을 압축합니다.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        모든 WSL 2 배포에서 실제 또는 가상 디스크를 연결하고 탑재합니다.
 
-        Options:
+        옵션:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                &lt;Disk&gt;가 가상 하드 디스크를 참조하도록 지정합니다.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                디스크를 WSL2에 연결하고 탑재하지는 마세요.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                탑재 지점의 사용자 지정 이름을 사용하여 디스크를 탑재합니다.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                디스크를 탑재할 때 사용할 파일 시스템이 지정되지 않은 경우 기본적으로 ext4입니다.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                추가 탑재 옵션입니다.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                탑재할 파티션의 인덱스가 지정되지 않은 경우 기본값은 전체 디스크입니다.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        새 배포에 대한 기본 설치 버전을 변경합니다.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        실행 중인 모든 배포와 WSL 2를 즉시 종료합니다.
+        경량 유틸리티 가상 머신입니다.
 
-        Options:
+        옵션:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                작업이 진행 중인 경우에도 WSL 2 가상 머신을 종료합니다. 데이터 손실을 초래할 수 있습니다.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Linux용 Windows 하위 시스템 상태를 표시합니다.
 
     --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+        모든 WSL2 배포에서 디스크를 해제하고 분리합니다.
+        인수 없이 호출되는 경우 모든 디스크를 해제하고 분리합니다.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        이 컴퓨터에서 Linux용 Windows 하위 시스템 패키지를 제거합니다.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Linux 패키지용 Windows 하위 시스템을 업데이트합니다.
 
-        Options:
+        옵션:
             --pre-release
-                Download a pre-release version if available.
+                사용 가능한 경우 시험판 버전을 다운로드합니다.
 
     --version, -v
-        Display version information.
+        버전 정보를 표시합니다.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+        배포를 tar 파일로 내보냅니다.
+        파일 이름은 - for stdout일 수 있습니다.
 
-        Options:
+        옵션:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                내보내기 형식을 지정합니다. 지원되는 값: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+        지정된 tar 파일을 새 배포로 가져옵니다.
+        파일 이름은 - for stdin 일 수 있습니다.
 
-        Options:
+        옵션:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                새 배포에 사용할 버전을 지정합니다.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                제공된 파일이 tar 파일이 아닌 .vhd 또는 .vhdx 파일임을 지정합니다.
+                이 작업은 지정된 설치 위치에 VHD 파일의 복사본을 만듭니다.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        지정된 VHD 파일을 새 배포판으로 가져옵니다.
+        이 가상 하드 디스크는 ext4 파일 시스템 형식으로 포맷해야 합니다.
 
     --list, -l [Options]
-        Lists distributions.
+        배포를 나열합니다.
 
-        Options:
+        옵션:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                현재 설치 중이거나 제거되고 있는 배포를 포함하여
+                모든 배포를 나열합니다.
 
             --running
-                List only distributions that are currently running.
+                현재 실행 중인 배포만 나열합니다.
 
             --quiet, -q
-                Only show distribution names.
+                배포 이름만 표시합니다.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                모든 배포에 대한 자세한 정보를 표시합니다.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                'wsl.exe --install'을 사용하여 설치에 사용할 수 있는 배포 목록을 표시합니다.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        배포를 기본값으로 설정합니다.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        지정된 배포의 버전을 변경합니다.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        지정된 배포를 종료합니다.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        배포를 등록 취소하고 루트 파일 시스템을 삭제합니다.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -2639,10 +2639,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너에 대한 자세한 정보를 표시합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>컨테이너를 종료합니다.</value>
+    <value>실행 중인 컨테이너를 하나 이상 종료합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>컨테이너를 종료합니다.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>컨테이너를 나열합니다.</value>
@@ -2697,6 +2698,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>컨테이너를 중지합니다.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>보낼 신호(기본값: 컨테이너의 구성된 STOPSIGNAL 또는 구성되지 않은 경우 SIGTERM)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>이미지를 관리합니다.</value>
@@ -3076,6 +3081,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>잘못된 {} 값: 네트워크 이름은 비워 두거나 공백일 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>잘못된 {} 값: 네트워크 이름은 한 번만 지정할 수 있습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>호스트 모드 네트워킹은 지원되지 않습니다.</value>
   </data>
@@ -3156,7 +3169,8 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>세션 스토리지 디렉터리의 경로</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>보낼 신호</value>
+    <value>컨테이너로 보낼 신호(기본값: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] 형식의 현재 또는 기존 이미지 참조</value>
@@ -3403,7 +3417,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>네트워크 이름</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>네트워크 이름만 출력합니다.</value>
+    <value>네트워크 ID만 표시</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>사용하지 않는 네트워크를 모두 제거하세요.</value>
