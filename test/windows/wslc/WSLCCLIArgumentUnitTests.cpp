@@ -55,13 +55,13 @@ class WSLCCLIArgumentUnitTests
         return true;
     }
 
-    TEST_METHOD(ArgumentException_NullArgumentOmitsHelp)
+    TEST_METHOD(ArgumentException_OptionalArgumentHelp)
     {
-        const ArgumentException withoutArgument{L"error", static_cast<const Argument*>(nullptr)};
+        const ArgumentException withoutArgument{L"error"};
         VERIFY_IS_TRUE(withoutArgument.Arguments().empty());
 
         const auto argument = Argument::Create(ArgType::Verbose);
-        const ArgumentException withArgument{L"error", &argument};
+        const ArgumentException withArgument{L"error", argument};
         VERIFY_ARE_EQUAL(1u, withArgument.Arguments().size());
         VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
     }
