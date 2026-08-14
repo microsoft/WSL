@@ -3008,7 +3008,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkInformation** Networks, ULONG* Count)
 try
 {
     WSLCExecutionContext context(this);
@@ -3019,12 +3019,27 @@ try
     *Networks = nullptr;
     *Count = 0;
 
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    const bool filtered = !filters.empty();
+
+    if (filtered)
+    {
+        // Scope the filtered query to WSLC-managed networks.
+        filters["label"].push_back(WSLCNetworkManagedLabel);
+    }
+
     auto lock = AcquireLease();
+
     std::lock_guard networksLock(m_networksLock);
 
-    if (m_networks.empty())
+    std::vector<docker_schema::Network> dockerNetworks;
+    if (filtered)
     {
-        return S_OK;
+        try
+        {
+            dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+        }
+        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
     }
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
@@ -3032,10 +3047,20 @@ try
     ULONG index = 0;
     for (const auto& [name, entry] : m_networks)
     {
+        if (filtered && std::ranges::find_if(dockerNetworks, [&](const auto& n) { return n.Name == name; }) == dockerNetworks.end())
+        {
+            continue;
+        }
+
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
         index++;
+    }
+
+    if (index == 0)
+    {
+        return S_OK;
     }
 
     *Networks = output.release();
