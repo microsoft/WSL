@@ -82,11 +82,12 @@ struct Ulimit
 struct InspectHostConfig
 {
     std::string NetworkMode;
+    std::int64_t ShmSize{};
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::vector<Ulimit> Ulimits;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct HealthConfig

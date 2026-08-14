@@ -170,6 +170,13 @@ class WSLCCLIArgumentUnitTests
         VERIFY_THROWS(validation::GetProgressModeFromString(L"TTY"), ArgumentException); // Case-sensitive: only lowercase accepted
         VERIFY_THROWS(validation::GetProgressModeFromString(L"fancy"), ArgumentException);
 
+        // Verify Docker-style memory size conversion.
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(1'610'612'736), validation::GetMemorySizeFromString(L"1.5G"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(314'572), validation::GetMemorySizeFromString(L"0.3MiB"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(32), validation::GetMemorySizeFromString(L"32.3"));
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"-1.5G"), ArgumentException);
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"9223372036854775808"), ArgumentException);
+
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
         VERIFY_THROWS(validation::ValidateGpus({L"none"}, L"gpusArg"), ArgumentException);
@@ -380,7 +387,7 @@ class WSLCCLIArgumentUnitTests
 
         // string -> int64_t (memory sizes). The cached value matches the converter's result.
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Memory>(L"512M"), validation::GetMemorySizeFromString(L"512M"));
-        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::ShmSize>(L"64M"), validation::GetMemorySizeFromString(L"64M"));
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::ShmSize>(L"1.5G"), static_cast<int64_t>(1'610'612'736));
 
         // string -> int64_t (durations, in nanoseconds)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthInterval>(L"30s"), validation::GetDurationNanosFromString(L"30s"));

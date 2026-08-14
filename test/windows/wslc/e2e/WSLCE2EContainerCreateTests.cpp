@@ -884,13 +884,12 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_ShmSize)
     {
-        auto result = RunWslc(
-            std::format(L"container create --shm-size 128M --name {} {} df -h /dev/shm", WslcContainerName, DebianImage.NameAndTag()));
+        auto result =
+            RunWslc(std::format(L"container create --shm-size 1.5G --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout->find(L"128M") != std::wstring::npos);
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(1'610'612'736), inspect.HostConfig.ShmSize);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_ShmSize_Invalid)

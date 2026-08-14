@@ -13,6 +13,9 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <charconv>
+#include <cmath>
+#include <limits>
 
 std::vector<std::string> wsl::windows::common::string::InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize)
 {
@@ -284,6 +287,108 @@ std::string wsl::windows::common::string::WideToMultiByte(_In_opt_ LPCWSTR Sourc
 std::string wsl::windows::common::string::WideToMultiByte(_In_ std::wstring_view Source)
 {
     return WideToMultiByte(Source.data(), Source.length());
+}
+
+std::optional<uint64_t> wsl::windows::common::string::ParseStorageSize(std::wstring_view String, StorageSizeUnit Unit)
+{
+    std::wstring_view number;
+    std::wstring_view suffix;
+    const auto space = String.find(L' ');
+    if (space != std::wstring_view::npos)
+    {
+        number = String.substr(0, space);
+        suffix = String.substr(space + 1);
+    }
+    else
+    {
+        const auto numberEnd = String.find_last_of(L"0123456789.");
+        if (numberEnd == std::wstring_view::npos)
+        {
+            return {};
+        }
+
+        number = String.substr(0, numberEnd + 1);
+        suffix = String.substr(numberEnd + 1);
+    }
+
+    auto narrowNumber = WideToMultiByte(number);
+    if (!narrowNumber.empty() && narrowNumber.front() == '+')
+    {
+        narrowNumber.erase(0, 1);
+    }
+
+    double value{};
+    const auto result = std::from_chars(narrowNumber.data(), narrowNumber.data() + narrowNumber.size(), value, std::chars_format::general);
+    if (result.ec != std::errc() || result.ptr != narrowNumber.data() + narrowNumber.size() || !std::isfinite(value) || value < 0)
+    {
+        return {};
+    }
+
+    uint64_t multiplier = 1;
+    if (!suffix.empty())
+    {
+        auto normalizedSuffix = wsl::shared::string::AsciiToLower(suffix);
+        if (normalizedSuffix != L"b")
+        {
+            if (normalizedSuffix.size() > 3 || (normalizedSuffix.size() == 2 && normalizedSuffix[1] != L'b') ||
+                (normalizedSuffix.size() == 3 && normalizedSuffix.substr(1) != L"ib"))
+            {
+                return {};
+            }
+
+            constexpr std::wstring_view c_memoryUnits = L"kmgtp";
+            const auto unitIndex = c_memoryUnits.find(normalizedSuffix[0]);
+            if (unitIndex == std::wstring_view::npos)
+            {
+                return {};
+            }
+
+            const uint64_t base = Unit == StorageSizeUnit::Decimal ? 1000 : 1024;
+            for (size_t index = 0; index <= unitIndex; ++index)
+            {
+                multiplier *= base;
+            }
+        }
+    }
+
+    const double bytes = value * static_cast<double>(multiplier);
+    if (!std::isfinite(bytes) || bytes >= static_cast<double>(std::numeric_limits<uint64_t>::max()))
+    {
+        return {};
+    }
+
+    return static_cast<uint64_t>(bytes);
+}
+
+std::wstring wsl::windows::common::string::FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace)
+{
+    constexpr size_t c_unitCount = 7;
+    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{L"B", L"KB", L"MB", L"GB", L"TB", L"PB", L"EB"};
+    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB", L"EiB"};
+
+    const double base = Unit == StorageSizeUnit::Decimal ? 1000.0 : 1024.0;
+    const auto& units = Unit == StorageSizeUnit::Decimal ? c_decimalUnits : c_binaryUnits;
+
+    double value = static_cast<double>(Bytes);
+    size_t unitIndex = 0;
+    while (value >= base && unitIndex + 1 < c_unitCount)
+    {
+        value /= base;
+        ++unitIndex;
+    }
+
+    if (unitIndex == 0)
+    {
+        return IncludeSpace ? std::format(L"{} {}", Bytes, units[unitIndex]) : std::format(L"{}{}", Bytes, units[unitIndex]);
+    }
+
+    return IncludeSpace ? std::format(L"{:.{}f} {}", value, DecimalPlaces, units[unitIndex])
+                        : std::format(L"{:.{}f}{}", value, DecimalPlaces, units[unitIndex]);
+}
+
+std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
+{
+    return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
 }
 
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
