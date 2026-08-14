@@ -3000,28 +3000,20 @@ try
     }
 
     auto lock = AcquireLease();
-    if (filtered)
-    {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
-    }
 
     std::lock_guard networksLock(m_networksLock);
 
-    std::optional<std::unordered_set<std::string>> dockerNames;
+    std::vector<docker_schema::Network> dockerNetworks;
     if (filtered)
     {
-        std::vector<docker_schema::Network> dockerNetworks;
         try
         {
             dockerNetworks = m_runtime.Docker().ListNetworks(filters);
         }
         CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
 
-        dockerNames.emplace();
         for (const auto& dockerNetwork : dockerNetworks)
         {
-            dockerNames->insert(dockerNetwork.Name);
-
             // Only report networks that we manage.
             if (!m_networks.contains(dockerNetwork.Name))
             {
@@ -3030,17 +3022,12 @@ try
         }
     }
 
-    if (m_networks.empty())
-    {
-        return S_OK;
-    }
-
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
 
     ULONG index = 0;
     for (const auto& [name, entry] : m_networks)
     {
-        if (dockerNames.has_value() && !dockerNames->contains(name))
+        if (filtered && std::ranges::find_if(dockerNetworks, [&](const auto& n) { return n.Name == name; }) == dockerNetworks.end())
         {
             continue;
         }
@@ -3049,6 +3036,11 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
         index++;
+    }
+
+    if (index == 0)
+    {
+        return S_OK;
     }
 
     *Networks = output.release();
