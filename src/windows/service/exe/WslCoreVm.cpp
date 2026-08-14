@@ -2064,7 +2064,8 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-    wsl::windows::common::hcs::AddPlan9Share(m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags);
+    wsl::windows::common::hcs::AddPlan9Share(
+        m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags, m_userToken.get());
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
@@ -2182,7 +2183,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         sharePath.push_back(L'\\');
     }
 
-    sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
+    sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
 
     std::wstring effectiveOptions(Options);
 
@@ -2487,6 +2488,24 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     {
         THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageFailedToResizeDisk());
     }
+}
+
+void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
+{
+    auto lock = m_lock.lock_exclusive();
+
+    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message;
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = LxMiniInitMessageTrimDistribution;
+    message.ScsiLun = Lun;
+
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send(message);
+
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "TrimDistribution", {m_terminatingEvent.get()}};
+
+    const auto& resultMessage = channel.ReceiveMessage<LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE>();
+    THROW_HR_IF(E_FAIL, resultMessage.ResponseCode != 0);
 }
 
 void WslCoreVm::SaveAttachedDisksState()

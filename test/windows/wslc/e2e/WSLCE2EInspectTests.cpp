@@ -160,6 +160,8 @@ class WSLCE2EInspectTests
         auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
         VERIFY_IS_TRUE(json.is_array() && !json.empty());
         VERIFY_IS_TRUE(json[0].contains("Config") && json[0]["Config"].contains("Labels"));
+        VERIFY_IS_TRUE(json[0]["Config"].contains("Image"));
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), json[0]["Config"]["Image"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_InheritsImageLabels)

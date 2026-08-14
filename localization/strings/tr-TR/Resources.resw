@@ -302,6 +302,9 @@ Dağıtımları yüklemek için 'wsl.exe --install &lt;Distro&gt;' komutunu kull
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Dönüştürme devam ediyor, bu işlem birkaç dakika sürebilir.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Birleştirme devam ediyor, bu işlem birkaç dakika sürebilir.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>Dağıtım zaten istenen sürüm.</value>
   </data>
@@ -394,7 +397,7 @@ Kullanım:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Telif Hakkı (c) Microsoft Corporation. Tüm hakları saklıdır.
+    <value>Telif Hakkı (C) Microsoft Corporation. Tüm hakları saklıdır.
 Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfasını ziyaret edin.
 
 Kullanım: wsl.exe [Bağımsız Değişken] [Seçenekler...] [KomutSatırı]
@@ -410,12 +413,12 @@ Linux ikili dosyalarını çalıştırmak için bağımsız değişkenler:
         Belirtilen komutu sağlanan kabuk türüyle yürütür.
 
     --
-        Kalan komut satırını olduğu gibi geçirir.
+        Kalan komut satırını olduğu gibi geçirin.
 
 Seçenekler:
     --cd &lt;Directory&gt;
         Belirtilen dizini geçerli çalışma dizini olarak ayarlar.
-        ~ kullanılıyorsa Linux kullanıcı giriş yolu kullanılır. Yol
+        ~ kullanılıyorsa Linux kullanıcısının giriş yolu kullanılır. Yol
         / karakteriyle başlarsa mutlak bir Linux yolu olarak yorumlanır.
         Aksi takdirde değerin mutlak bir Windows yolu olması gerekir.
 
@@ -440,7 +443,7 @@ Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler
         Tanılama amacıyla bir WSL2 hata ayıklama kabuğu açar.
 
     --install [Dağıtım] [Seçenekler...]
-        Linux için Windows Alt Sistemi dağıtımı yükler.
+        Linux için Windows Alt Sistemi dağıtımını yükler.
         Geçerli dağıtımların listesi için 'wsl.exe --list --online' kullanın.
 
         Seçenekler:
@@ -485,13 +488,16 @@ Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler
                 Dağıtımı yeni bir konuma taşır.
 
             --set-sparse, -s &lt;true|false&gt;
-                Dağıtım VHD'inin aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
+                Dağıtım VHD'sini aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
 
             --set-default-user &lt;Username&gt;
                 Dağıtımın varsayılan kullanıcısını ayarlar.
 
             --resize &lt;MemoryString&gt;
                 Dağıtımın diskini belirtilen boyuta yeniden boyutlandırır.
+
+            --compact
+                WSL 2 dağıtımının VHDX dosyasını sıkıştırır.
 
     --mount &lt;Disk&gt;
         Tüm WSL 2 dağıtımlarında fiziksel veya sanal diski ekler ve bağlar.
@@ -501,7 +507,7 @@ Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler
                 &lt;Disk&gt;'in sanal bir sabit diske başvurduğunu belirtir.
 
             --bare
-                Diski WSL2'ye ekler, ancak bağlamaz.
+                Diski WSL2'ye ekleme, ancak bağlamama.
 
             --name &lt;Name&gt;
                 Bağlama noktası için özel bir ad kullanarak diski bağlar.
@@ -513,7 +519,7 @@ Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler
                 Ek bağlama seçenekleri.
 
             --partition &lt;Index&gt;
-                Bağlanacak bölümün dizini, belirtilmemişse varsayılan olarak tüm diske ayarlanır.
+                Bağlanacak bölümün dizinine, belirtilmemişse varsayılan olarak tüm diske ayarlanır.
 
     --set-default-version &lt;Version&gt;
         Yeni dağıtımlar için varsayılan yükleme sürümünü değiştirir.
@@ -524,7 +530,7 @@ Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler
 
         Seçenekler:
             --force
-                Devam eden bir işlem olsa bile WSL 2 sanal makinesini sonlandırın. Veri kaybına neden olabilir.
+                Devam eden bir işlem olsa bile WSL 2 sanal makinesini sonlandırır. Veri kaybına neden olabilir.
 
     --status
         Linux için Windows Alt Sistemi'nin durumunu gösterir.
@@ -556,7 +562,7 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
             --format &lt;Format&gt;
                 Dışarı aktarma biçimini belirtir. Desteklenen değerler: tar, tar.gz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Seçenekler]
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
         Belirtilen tar dosyasını yeni bir dağıtım olarak içeri aktarır.
         Dosya adı - for stdin olabilir.
 
@@ -572,7 +578,7 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
         Belirtilen VHD dosyasını yeni bir dağıtım olarak içeri aktarır.
         Bu sanal sabit diskin ext4 dosya sistemi türüyle biçimlendirilmesi gerekir.
 
-    --list, -l [Seçenekler]
+    --list, -l [Options]
         Dağıtımları listeler.
 
         Seçenekler:
@@ -602,7 +608,7 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
         Belirtilen dağıtımı sonlandırır.
 
     --unregister &lt;Distro&gt;
-        Dağıtımın kaydını siler ve kök dosya sistemini siler.</value>
+        Dağıtımın kaydını kaydırır ve kök dosya sistemini siler.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -611,7 +617,8 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ NAT ağ bağlantısına geri dönülüyor.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>İşlem tamamlanamadı çünkü VHD şu anda kullanımda. WSL'yi durmaya zorlamak için şu komutu kullanın: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Sıkıştırma yalnızca .vhdx dosyalarında desteklenir.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} geçerli bir boole değil, &lt;true|false&gt;</value>
@@ -2622,10 +2633,11 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Bir kapsayıcı hakkında ayrıntılı bilgi gösterir.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kapsayıcıları sonlandır.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Kapsayıcıları sonlandırır.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Kapsayıcıları listele.</value>
@@ -2680,6 +2692,10 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Kapsayıcıları durdurur.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Görüntüleri yönet.</value>
@@ -3059,6 +3075,14 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Geçersiz {} değeri: ağ adı boş veya boşluk olamaz</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Geçersiz {} değeri: ağ adı yalnızca bir kez belirtilebilir</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>ana bilgisayar modu ağı desteklenmiyor</value>
   </data>
@@ -3139,7 +3163,8 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Oturum depolama dizininin yolu</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Gönderilecek sinyal</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde geçerli veya mevcut resim referansı</value>
@@ -3224,11 +3249,11 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>İlerleme türü (biçim: none|ansi) (varsayılan: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>İlerleme çıktısı türünü ayarla (auto, tty, plain, quiet) (varsayılan: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Görüntü çekme ilkesi (always|missing|never) (varsayılan:never)</value>
+    <value>Görüntü çekme ilkesi (always|missing|never) (varsayılan: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3261,6 +3286,14 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>Geçersiz {} değeri: {} tanınan bir biçim türü değil. Desteklenen biçim türleri: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Geçersiz {} değeri: {} tanınmış bir çekme ilkesi değil. Desteklenen çekme ilkeleri: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Geçersiz {} değeri: {} tanınan bir ilerleme türü değil. Desteklenen ilerleme türleri: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3378,7 +3411,7 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Ağ adı</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Yalnızca ağ adlarının çıkışını oluşturur</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Kullanılmayan tüm ağları kaldırın.</value>

@@ -51,7 +51,7 @@ namespace {
     template <ArgType A, typename Converter>
     void CacheConverted(ArgMap& execArgs, const std::wstring& argName, Converter&& convert)
     {
-        using value_t = typename details::ArgConvertedTypeMapping<A>::value_t;
+        using value_t = typename wsl::windows::wslc::argument::details::ArgConvertedTypeMapping<A>::value_t;
         using converted_t = decltype(convert(std::declval<const std::wstring&>(), std::declval<const std::wstring&>()));
         static_assert(
             std::is_same_v<converted_t, value_t>,
@@ -101,6 +101,10 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::Pull:
         CacheConverted<ArgType::Pull>(execArgs, m_name, validation::GetPullPolicyFromString);
+        break;
+
+    case ArgType::Progress:
+        CacheConverted<ArgType::Progress>(execArgs, m_name, validation::GetProgressModeFromString);
         break;
 
     case ArgType::Signal:
@@ -242,19 +246,15 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::Network:
     {
-        for (const auto& value : RawArgMapAccess::GetAll<ArgType::Network>(execArgs))
-        {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
-            }
-
-            if (IsEqual(value, L"host", true))
+        CacheConverted<ArgType::Network>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            auto parsed = validation::ParseNetworkArgument(value, name);
+            if (IsEqual(parsed.Name, "host", true))
             {
                 throw ExecutionException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }
-        }
+
+            return parsed;
+        });
         break;
     }
 

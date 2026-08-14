@@ -302,6 +302,9 @@ and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversion in progress, this may take a few minutes.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Compaction in progress, this may take a few minutes.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>The distribution is already the requested version.</value>
   </data>
@@ -493,6 +496,9 @@ Arguments for managing Windows Subsystem for Linux:
             --resize &lt;MemoryString&gt;
                 Resize the disk of the distribution to the specified size.
 
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
+
     --mount &lt;Disk&gt;
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
@@ -611,7 +617,8 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ Falling back to NAT networking.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Compaction is only supported on .vhdx files.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} is not a valid boolean, &lt;true|false&gt;</value>
@@ -2622,10 +2633,11 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Display detailed information about a container.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kill containers.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Kills containers.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>List containers.</value>
@@ -2680,6 +2692,10 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Stops containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Manage images.</value>
@@ -3059,6 +3075,14 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Invalid {} value: network name cannot be empty or whitespace</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Invalid {} value: network name can only be specified once</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>host mode networking is not supported</value>
   </data>
@@ -3139,7 +3163,8 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Path to the session storage directory</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Current or existing image reference in the image-name[:tag] format</value>
@@ -3224,11 +3249,11 @@ On first run, creates the file with all settings commented out at their defaults
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Progress type (format: none|ansi) (default: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Set type of progress output (auto, tty, plain, quiet) (default: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Image pull policy (always|missing|never) (default:never)</value>
+    <value>Image pull policy (always|missing|never) (default: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3261,6 +3286,14 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>Invalid {} value: {} is not a recognised format type. Supported format types are: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Invalid {} value: {} is not a recognised pull policy. Supported pull policies are: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Invalid {} value: {} is not a recognised progress type. Supported progress types are: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3378,7 +3411,7 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Network name</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the network names only</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Remove all unused networks.</value>

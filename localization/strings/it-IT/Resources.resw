@@ -308,6 +308,9 @@ e 'wsl.exe --install &lt;Distro&gt;' per l'installazione.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversione in corso. L'operazione potrebbe richiedere alcuni minuti.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Compattazione in corso. L'operazione potrebbe durare alcuni minuti.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>La distribuzione è già nella versione richiesta.</value>
   </data>
@@ -472,7 +475,7 @@ Argomenti per la gestione del sottosistema Windows per Linux:
                 Installa solo i componenti facoltativi necessari, senza installare una distribuzione.
 
             --no-launch, -n
-                Non avviare la distribuzione dopo l'installazione.
+                lancioNon avviare la distribuzione dopo l'installazione.
 
             --version &lt;Version&gt;
                 Specifica la versione da usare per la nuova distribuzione.
@@ -499,12 +502,15 @@ Argomenti per la gestione del sottosistema Windows per Linux:
             --resize &lt;MemoryString&gt;
                 Ridimensiona il disco della distribuzione alle dimensioni specificate.
 
-    --mount &lt;Disk&gt;
-        Collega e monta un disco fisico o virtuale in tutte le distribuzioni WSL2.
+            --compact
+                Compatta il file VHDX di una distribuzione WSL 2.
+
+    --mount &lt;Disco&gt;
+        Collega e monta un disco fisico in tutte le distribuzioni WSL2.
 
         Opzioni:
             --vhd
-                Specifica che &lt;Disk&gt; fa riferimento a un disco rigido virtuale.
+                Specifica che &lt;DiscK&gt; fa riferimento a un disco rigido virtuale.
 
             --bare
                 Collega il disco a WSL2, senza montarlo.
@@ -525,7 +531,7 @@ Argomenti per la gestione del sottosistema Windows per Linux:
         Modifica la versione di installazione predefinita per le nuove distribuzioni.
 
     --shutdown
-        Termina immediatamente tutte le distribuzioni in esecuzione e
+        Termina immediatamente tutte le distribuzioni in esecuzione e WSL 2
         la macchina virtuale dell'utilità leggera WSL2.
 
         Opzioni:
@@ -587,10 +593,10 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
                 sono in fase di installazione o disinstallazione.
 
             --running
-                Elenca solo le distribuzioni attualmente in esecuzione.
+                Elencare solo le distribuzioni attualmente in esecuzione.
 
             --quiet, -q
-                Mostra solo i nomi delle distribuzioni.
+                Mostrare solo i nomi delle distribuzioni.
 
             --verbose, -v
                 Mostra informazioni dettagliate su tutte le distribuzioni.
@@ -617,7 +623,8 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1066,6 +1073,10 @@ Fallback alla rete NAT.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Non è stato possibile completare l'operazione perché il VHD è in uso. Per forzare l'arresto di WSL, usa: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>La compattazione è supportata solo per i file .vhdx.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} non è un valore booleano valido, &lt;true|false&gt;</value>
@@ -2628,10 +2639,11 @@ Esempio: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Visualizza informazioni dettagliate su un contenitore.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Termina i contenitori.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Termina contenitori.</value>
+    <value>Termina uno o più contenitori in esecuzione inviando SIGKILL per impostazione predefinita o il segnale specificato con --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Elenca i contenitori.</value>
@@ -2686,6 +2698,10 @@ Esempio: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Arresta contenitori.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Segnale da inviare (impostazione predefinita: il contenitore è configurato STOPSIGNAL o SIGTERM se non è configurato alcun contenitore)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Gestisci immagini.</value>
@@ -3065,6 +3081,14 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Valore {} non valido: il nome della rete non può essere vuoto o contenere spazi vuoti</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Valore {} non valido: il nome della rete può essere specificato una sola volta</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Valore {} non valido: opzione di rete non supportata '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>la rete in modalità host non è supportata</value>
   </data>
@@ -3145,7 +3169,8 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Percorso della directory di archiviazione della sessione</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Segnale da inviare</value>
+    <value>Segnale da inviare al contenitore (impostazione predefinita: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Riferimento all'immagine corrente o esistente nel formato nome-immagine[:tag]</value>
@@ -3230,11 +3255,11 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Tipo di stato (formato: none|ansi) (impostazione predefinita: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Imposta il tipo di output dello stato (auto, tty, plain, quiet) (impostazione predefinita: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Criterio di pull delle immagini (always|missing|never) (impostazione predefinita: never)</value>
+    <value>Criterio di pull delle immagini (always|missing|never) (standard: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3267,6 +3292,14 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>Valore {} non valido: {} non è un tipo di formato riconosciuto. I tipi di formato supportati sono: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Valore {} non valido: {} non è un criterio pull riconosciuto. I criteri pull supportati sono: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Valore {} non valido: {} non è un tipo di avanzamento riconosciuto. I tipi di stato supportati sono: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3384,7 +3417,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Nome di rete</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Visualizza solo i nomi delle reti</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Rimuovi tutte le reti inutilizzate.</value>

@@ -308,6 +308,9 @@ WSL2 でディスクを強制的に停止してデタッチするには、'wsl.e
   <data name="MessageConversionStart" xml:space="preserve">
     <value>変換中です。これには数分かかる場合があります。</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>圧縮が進行中です。これには数分かかる場合があります。</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>ディストリビューションは既に、要求されているバージョンです。</value>
   </data>
@@ -499,8 +502,11 @@ Linux 用 Windows サブシステムを管理するための引数:
             --resize &lt;MemoryString&gt;
                 ディストリビューションのディスクのサイズを指定したサイズに変更します。
 
-    --mount &lt;Disk&gt;
-        物理ディスクまたは仮想ディスクをすべての WSL 2 ディストリビューションにアタッチしてマウントします。
+            --compact
+                WSL 2 ディストリビューションの VHDX ファイルを圧縮します。
+
+    --mount &lt;ディスク&gt;
+        物理または仮想ディスクをすべての WSL 2 ディストリビューションにアタッチしてマウントします。
 
         オプション:
             --vhd
@@ -509,24 +515,24 @@ Linux 用 Windows サブシステムを管理するための引数:
             --bare
                 ディスクを WSL2 にアタッチしますが、マウントはしません。
 
-            --name &lt;Name&gt;
-                マウントポイントにカスタム名を使用してディスクをマウントします。
+            --name &lt;名前&gt;
+                マウントポイントのカスタム名を使用してディスクをマウントします。
 
             --type &lt;Type&gt;
-                ディスクをマウントするときに使用するファイルシステム。指定しない場合は既定で ext4 になります。
+                ディスクのマウント時に使用するファイルシステム (指定されていない場合は既定値の ext4)。
 
             --options &lt;Options&gt;
                 追加のマウント オプション。
 
             --partition &lt;Index&gt;
-                マウントするパーティションのインデックス。指定しない場合は既定でディスク全体になります。
+                マウントするパーティションのインデックス (指定されていない場合は既定でディスク全体)。
 
-    --set-default-version &lt;Version&gt;
+    --set-default-version &lt;バージョン&gt;
         新しいディストリビューションの既定のインストール バージョンを変更します。
 
     --shutdown
         実行中のすべてのディストリビューションと WSL 2 の
-        軽量ユーティリティ仮想マシンを直ちに終了します。
+        簡易ユーティリティ仮想マシンを直ちに終了します。
 
         オプション:
             --force
@@ -535,28 +541,28 @@ Linux 用 Windows サブシステムを管理するための引数:
     --status
         Linux 用 Windows サブシステムの状態を表示します。
 
-    --unmount [Disk]
-        すべての WSL2 ディストリビューションからディスクのマウントを解除してデタッチします。
+    --unmount [ディスク]
+        すべての WSL2 ディストリビューションから、ディスクをマウント解除してデタッチします。
         引数を指定せずに呼び出した場合、すべてのディスクのマウントを解除してデタッチします。
 
     --uninstall
-        このマシンから Linux 用 Windows サブシステム パッケージをアンインストールします。
+        このコンピューターから Linux 用 Windows サブシステム パッケージをアンインストールします。
 
     --update
         Linux 用 Windows サブシステム パッケージを更新します。
 
         オプション:
             --pre-release
-                利用可能な場合、プレリリース バージョンをダウンロードします。
+                プレリリース バージョンが利用可能な場合にダウンロードします。
 
     --version, -v
         バージョン情報を表示します。
 
-Linux 用 Windows サブシステムでディストリビューションを管理するための引数:
+Linux 用 Windows サブシステムのディストリビューションを管理するための引数:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         ディストリビューションを tar ファイルにエクスポートします。
-        stdout の場合は、ファイル名に - を使用できます。
+        stdout の場合はファイル名に - を使用できます。
 
         オプション:
             --format &lt;Format&gt;
@@ -564,10 +570,10 @@ Linux 用 Windows サブシステムでディストリビューションを管�
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
         指定された tar ファイルを新しいディストリビューションとしてインポートします。
-        stdin の場合は、ファイル名に - を使用できます。
+        stdin の場合はファイル名に - を使用できます。
 
         オプション:
-            --version &lt;Version&gt;
+            --version &lt;バージョン&gt;
                 新しいディストリビューションに使用するバージョンを指定します。
 
             --vhd
@@ -575,8 +581,8 @@ Linux 用 Windows サブシステムでディストリビューションを管�
                 この操作により、指定したインストール場所に VHD ファイルのコピーが作成されます。
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        指定した VHD ファイルを新しいディストリビューションとしてインポートします。
-        この仮想ハード ディスクは、ext4 ファイルシステムの種類でフォーマットする必要があります。
+        指定された VHD ファイルを新しいディストリビューションとしてインポートします。
+        この仮想ハード ディスクは、ext4 ファイルシステム タイプでフォーマットする必要があります。
 
     --list, -l [Options]
         ディストリビューションを一覧表示します。
@@ -584,7 +590,7 @@ Linux 用 Windows サブシステムでディストリビューションを管�
         オプション:
             --all
                 すべてのディストリビューションを一覧表示します。これには、
-                現在インストール中またはアンインストール中のディストリビューションが含まれます。
+                現在インストールまたはアンインストールされているディストリビューションも含まれます。
 
             --running
                 現在実行中のディストリビューションのみを一覧表示します。
@@ -599,7 +605,7 @@ Linux 用 Windows サブシステムでディストリビューションを管�
                 'wsl.exe --install' を使用してインストールできるディストリビューションの一覧を表示します。
 
     --set-default, -s &lt;Distro&gt;
-        このディストリビューションを既定として設定します。
+        ディストリビューションを既定として設定します。
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
         指定されたディストリビューションのバージョンを変更します。
@@ -608,7 +614,7 @@ Linux 用 Windows サブシステムでディストリビューションを管�
         指定されたディストリビューションを終了します。
 
     --unregister &lt;Distro&gt;
-        このディストリビューションの登録を解除し、ルート ファイルシステムを削除します。</value>
+        ディストリビューションの登録を解除し、ルート ファイルシステムを削除します。</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -617,7 +623,8 @@ Linux 用 Windows サブシステムでディストリビューションを管�
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1066,6 +1073,10 @@ NAT ネットワークにフォールバックしています。</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>VHD が現在使用中のため、操作を完了できませんでした。WSL の使用を強制的に停止するには: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>圧縮は .vhdx ファイルでのみサポートされています。</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} は有効なブール値 &lt;true|false&gt; ではありません</value>
@@ -2628,10 +2639,11 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>コンテナーに関する詳細情報を表示します。</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>コンテナーを中止します。</value>
+    <value>1 つ以上の実行中のコンテナーを強制終了します。</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>コンテナーを中止します。</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>コンテナーを一覧表示します。</value>
@@ -2686,6 +2698,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>コンテナーを停止します。</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>送信するシグナル (既定値: コンテナーに構成された STOPSIGNAL、または構成されていない場合は SIGTERM)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>イメージを管理します。</value>
@@ -3065,6 +3081,14 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>無効な {} 値: ネットワーク名を空または空白にすることはできません</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>無効な {} 値: ネットワーク名は 1 回のみ指定できます</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>無効な {} 値: サポートされていないネットワーク オプション '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>ホスト モード ネットワーキングはサポートされていません</value>
   </data>
@@ -3145,7 +3169,8 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>セッション ストレージ ディレクトリへのパス</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>送信するシグナル</value>
+    <value>コンテナーに送信するシグナル (デフォルト: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] 形式の現在または既存のイメージ参照</value>
@@ -3230,11 +3255,11 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>進行状況の種類 (形式: none|ansi) (既定値: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>進行状況の出力タイプを設定します (auto、tty、plain、quiet) (既定: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>イメージのプル ポリシー (always|missing|never) (既定値: never)</value>
+    <value>イメージのプル ポリシー (always|missing|never) (既定値: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3267,6 +3292,14 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>無効な {} 値: {} は認識された形式の種類ではありません。サポートされている形式の種類: {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>無効な {} 値: {} は認識されたプル ポリシーではありません。サポートされているプル ポリシーは {} です。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>無効な {} 値: {} は認識された進行状況の種類ではありません。サポートされている進行状況の種類: {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3384,7 +3417,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>ネットワーク名</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>ネットワーク名のみを出力します</value>
+    <value>ネットワーク ID のみを表示</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>未使用のネットワークをすべて削除します。</value>

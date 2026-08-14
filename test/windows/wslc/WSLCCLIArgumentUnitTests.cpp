@@ -173,6 +173,14 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Never);
         VERIFY_THROWS(validation::GetPullPolicyFromString(L"invalid"), ArgumentException);
 
+        // Verify build progress mode
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"auto"), ProgressMode::Auto);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"tty"), ProgressMode::Tty);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"plain"), ProgressMode::Plain);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"quiet"), ProgressMode::Quiet);
+        VERIFY_THROWS(validation::GetProgressModeFromString(L"TTY"), ArgumentException); // Case-sensitive: only lowercase accepted
+        VERIFY_THROWS(validation::GetProgressModeFromString(L"fancy"), ArgumentException);
+
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
         VERIFY_THROWS(validation::ValidateGpus({L"none"}, L"gpusArg"), ArgumentException);
@@ -442,6 +450,14 @@ class WSLCCLIArgumentUnitTests
             const std::string expected = "conv-value";
             VERIFY_IS_TRUE(std::vector<BYTE>(expected.begin(), expected.end()) == secret.Value);
         }
+
+        // string -> ParsedNetworkArgument (docker-style network name and aliases)
+        {
+            auto network = ValidateAndGetCached<ArgType::Network>(L"name=custom,alias=web");
+            VERIFY_ARE_EQUAL(network.Name, std::string("custom"));
+            VERIFY_ARE_EQUAL(network.Aliases.size(), static_cast<size_t>(1));
+            VERIFY_ARE_EQUAL(network.Aliases[0], std::string("web"));
+        }
     }
 
     // Test: Because ArgMap is a multimap and any command may allow an argument to repeat, a single
@@ -521,7 +537,6 @@ class WSLCCLIArgumentUnitTests
             {ArgType::Gpus, L"all"},
             {ArgType::Volume, LR"(C:\hostPath:/containerPath)"},
             {ArgType::WorkDir, L"/app"},
-            {ArgType::Network, L"bridge"},
             {ArgType::NetworkAlias, L"myalias"},
         };
 
@@ -592,12 +607,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(2));
     }
 
-    // Test: A validate-only argument (checked during validation but not converted into a cached
-    // value) is validated on demand when read, so a value added after the up-front pass is checked
-    // exactly as a command-line value. These arguments have no converted cache, so the earlier
-    // converted-path tests do not cover them; the read path still runs their range/format checks.
-    // Network rejects "host" mode and unsupported values.
-    TEST_METHOD(ArgumentValidate_OnDemandValidateOnlyArgIsChecked)
+    // Test: Arguments are validated on demand when read, so a value added after the up-front pass is
+    // checked exactly as a command-line value.
+    TEST_METHOD(ArgumentValidate_OnDemandArgIsChecked)
     {
         ArgMap labels;
         labels.Add(ArgType::BuildLabel, std::wstring(L"foo"));
@@ -611,12 +623,14 @@ class WSLCCLIArgumentUnitTests
         invalidLabel.Add(ArgType::BuildLabel, std::wstring(L"=value"));
         VERIFY_THROWS(invalidLabel.GetAllValues<ArgType::BuildLabel>(), wil::ResultException);
 
-        // Valid value, no prior validation pass: the read validates on demand and returns the raw value.
+        // Valid value, no prior validation pass: the read validates and converts on demand.
         ArgMap valid;
-        valid.Add(ArgType::Network, std::wstring(L"bridge"));
+        valid.Add(ArgType::Network, std::wstring(L"name=custom,alias=web"));
         auto networks = valid.GetAllValues<ArgType::Network>();
         VERIFY_ARE_EQUAL(networks.size(), static_cast<size_t>(1));
-        VERIFY_ARE_EQUAL(networks[0], std::wstring(L"bridge"));
+        VERIFY_ARE_EQUAL(networks[0].Name, std::string("custom"));
+        VERIFY_ARE_EQUAL(networks[0].Aliases.size(), static_cast<size_t>(1));
+        VERIFY_ARE_EQUAL(networks[0].Aliases[0], std::string("web"));
 
         // Invalid value, no prior validation pass: the read validates on demand and throws, matching
         // the failure the up-front pass raises for the same value.

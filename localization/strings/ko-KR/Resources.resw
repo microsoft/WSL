@@ -308,6 +308,9 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
   <data name="MessageConversionStart" xml:space="preserve">
     <value>변환이 진행 중입니다. 이 작업은 몇 분 정도 걸릴 수 있습니다.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>압축이 진행 중입니다. 이 작업은 몇 분 정도 걸릴 수 있습니다.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>배포는 이미 요청된 버전입니다.</value>
   </data>
@@ -421,7 +424,7 @@ Linux 이진 파일을 실행하기 위한 인수:
 옵션:
     --cd &lt;Directory&gt;
         지정된 디렉터리를 현재 작업 디렉터리로 설정합니다.
-        ~가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
+        ‘~’가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
         / 문자로 시작하면 절대 Linux 경로로 해석됩니다.
         그렇지 않으면 값이 절대 Windows 경로여야 합니다.
 
@@ -472,7 +475,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 필요한 선택적 구성 요소만 설치하고 배포를 설치하지 않습니다.
 
             --no-launch, -n
-                설치 후 배포를 시작하지 마세요.
+                설치 후 배포를 시작하지 않습니다.
 
             --version &lt;Version&gt;
                 새 배포에 사용할 버전을 지정합니다.
@@ -484,7 +487,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 Microsoft Store 대신 인터넷에서 배포를 다운로드합니다.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        배포판 관련 옵션을 변경합니다.
+        배포판별 옵션을 변경합니다.
 
         옵션:
             --move &lt;Location&gt;
@@ -499,12 +502,15 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
             --resize &lt;MemoryString&gt;
                 배포 디스크의 크기를 지정된 크기로 조정합니다.
 
+            --compact
+                WSL 2 배포의 VHDX 파일을 압축합니다.
+
     --mount &lt;Disk&gt;
         모든 WSL 2 배포에서 실제 또는 가상 디스크를 연결하고 탑재합니다.
 
         옵션:
             --vhd
-                &lt;디스크&gt;가 가상 하드 디스크를 참조하도록 지정합니다.
+                &lt;Disk&gt;가 가상 하드 디스크를 참조하도록 지정합니다.
 
             --bare
                 디스크를 WSL2에 연결하고 탑재하지는 마세요.
@@ -525,7 +531,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
         새 배포에 대한 기본 설치 버전을 변경합니다.
 
     --shutdown
-        실행 중인 모든 배포와 WSL 2을 즉시 종료합니다.
+        실행 중인 모든 배포와 WSL 2를 즉시 종료합니다.
         경량 유틸리티 가상 머신입니다.
 
         옵션:
@@ -543,7 +549,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
         이 컴퓨터에서 Linux용 Windows 하위 시스템 패키지를 제거합니다.
 
     --update
-        Linux용 Windows 하위 시스템 패키지를 업데이트합니다.
+        Linux 패키지용 Windows 하위 시스템을 업데이트합니다.
 
         옵션:
             --pre-release
@@ -556,7 +562,7 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         배포를 tar 파일로 내보냅니다.
-        파일 이름은 - for stdout 일 수 있습니다.
+        파일 이름은 - for stdout일 수 있습니다.
 
         옵션:
             --format &lt;Format&gt;
@@ -583,8 +589,8 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
         옵션:
             --all
-                배포를 포함하여 모든 배포를 나열합니다.
-                현재 설치 중이거나 제거되고 있습니다.
+                현재 설치 중이거나 제거되고 있는 배포를 포함하여
+                모든 배포를 나열합니다.
 
             --running
                 현재 실행 중인 배포만 나열합니다.
@@ -617,7 +623,8 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1066,6 +1073,10 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>VHD가 현재 사용 중이므로 작업을 완료할 수 없습니다. WSL을 강제로 사용 중지하려면: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>압축은 .vhdx 파일에서만 지원됩니다.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{}은(는) 올바른 부울이 아닙니다&lt;true|false&gt;</value>
@@ -2628,10 +2639,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너에 대한 자세한 정보를 표시합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>컨테이너를 종료합니다.</value>
+    <value>실행 중인 컨테이너를 하나 이상 종료합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>컨테이너를 종료합니다.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>컨테이너를 나열합니다.</value>
@@ -2686,6 +2698,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>컨테이너를 중지합니다.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>보낼 신호(기본값: 컨테이너의 구성된 STOPSIGNAL 또는 구성되지 않은 경우 SIGTERM)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>이미지를 관리합니다.</value>
@@ -3065,6 +3081,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>잘못된 {} 값: 네트워크 이름은 비워 두거나 공백일 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>잘못된 {} 값: 네트워크 이름은 한 번만 지정할 수 있습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>호스트 모드 네트워킹은 지원되지 않습니다.</value>
   </data>
@@ -3145,7 +3169,8 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>세션 스토리지 디렉터리의 경로</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>보낼 신호</value>
+    <value>컨테이너로 보낼 신호(기본값: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] 형식의 현재 또는 기존 이미지 참조</value>
@@ -3230,11 +3255,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>진행 유형(형식: none|ansi) (기본값: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>진행률 출력 유형(auto, tty, plain, quiet) 설정(기본값: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>이미지 끌어오기 정책(always|missing|never) (default:never)</value>
+    <value>이미지 끌어오기 정책(always|missing|never)(기본값: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3267,6 +3292,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
     <value>잘못된 {} 값: {}은(는) 인식할 수 있는 형식 형식이 아닙니다. 지원되는 형식 형식은 {}입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>잘못된 {} 값: {}은(는) 인식된 끌어오기 정책이 아닙니다. 지원되는 풀 정책은 {}입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>잘못된 {} 값: {}은(는) 인식할 수 있는 진행 유형이 아닙니다. 지원되는 진행 유형은 {}입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3384,7 +3417,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>네트워크 이름</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>네트워크 이름만 출력합니다.</value>
+    <value>네트워크 ID만 표시</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>사용하지 않는 네트워크를 모두 제거하세요.</value>

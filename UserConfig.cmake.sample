@@ -65,6 +65,6 @@ endif()
 # #   fix   - automatically fix formatting and re-stage files
 # set(WSL_PRE_COMMIT_MODE "warn")
 
-# # Uncomment to change how many test sources share a unity translation unit (default: 2).
-# # Use 0 to disable unity builds and compile every test file separately.
-# set(WSL_TEST_UNITY_BATCH_SIZE 4)
+# # Uncomment to change how many sources share a unity translation unit (default: 0).
+# # Use 0 to disable unity builds and compile every file separately.
+# set(WSL_UNITY_BATCH_SIZE 4)
