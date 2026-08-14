@@ -915,7 +915,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
     // Lookup the distribution configuration
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation, nullptr, TOKEN_ADJUST_DEFAULT);
     const auto lxssKey = s_OpenLxssUserKey();
     _ValidateDistributionNameAndPathNotInUse(lxssKey.get(), Location, nullptr);
 
