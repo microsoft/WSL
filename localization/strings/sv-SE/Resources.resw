@@ -397,218 +397,218 @@ Användning:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. Med ensamrätt.
+Sekretessinformation för den här produkten finns på https://aka.ms/privacy.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Användning: wsl.exe [Argument] [Options...] [CommandLine]
 
-Arguments for running Linux binaries:
+Argument för att köra Linux-binärfiler:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Om ingen kommandorad anges startar wsl.exe standardgränssnittet.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Kör det angivna kommandot utan att använda standardgränssnittet för Linux.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Kör det angivna kommandot med den angivna gränssnittstypen.
 
     --
-        Pass the remaining command line as-is.
+        Skicka den återstående kommandoraden som den är.
 
-Options:
+Alternativ:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Anger den angivna katalogen som aktuell arbetskatalog.
+        Om ~ används kommer Linux-användarens hemsökväg att användas. Om sökvägen börjar
+        med ett /-tecken tolkas det som en absolut Linux-sökväg.
+        Annars måste värdet vara en absolut Windows-sökväg.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Kör den angivna distributionen.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Kör det angivna distributions-ID:t.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Kör som den angivna användaren.
 
     --system
-        Launches a shell for the system distribution.
+        Startar ett gränssnitt för systemdistributionen.
 
-Arguments for managing Windows Subsystem for Linux:
+Argument för att hantera Windows-undersystem för Linux:
 
     --help
-        Display usage information.
+        Visa användningsinformation.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Öppna ett WSL2-felsökningsgränssnitt i diagnostiksyfte.
 
     --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+        Installera ett Windows-undersystem för Linux distribution.
+        Om du vill ha en lista över giltiga distributioner använder du 'wsl.exe --list --online'.
 
-        Options:
+        Alternativ:
             --enable-wsl1
-                Enable WSL1 support.
+                Aktivera WSL1-stöd.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Skapa en disk med fast storlek för att lagra distributionen.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Installera en distribution från en lokal fil.
 
             --legacy
-                Use the legacy distribution manifest.
+                Använd det äldre distributionsmanifestet.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Ange installationssökvägen för distributionen.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Ange ett namn på distributionen.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Installera endast de valfria komponenter som krävs, ingen distribution installeras.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Starta inte distributionen efter installationen.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Anger vilken version som ska användas för den nya distributionen.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Anger storleken på disken för att lagra distributionen.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Ladda ned distributionen från Internet i stället för Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Ändrar distributionsspecifika alternativ.
 
-        Options:
-            --move &lt;Location&gt;
-                Move the distribution to a new location.
+        Alternativ:
+            --move &lt;Plats&gt;
+                Flytta distributionen till en ny plats.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Ange att VHD-distributionen ska vara sparsam, vilket gör att diskutrymmet automatiskt kan frigöras.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Ange standardanvändaren för distributionen.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Ändra storlek på disken för fördelningen till den angivna storleken.
 
             --compact
-                Compact the VHDX file of a WSL 2 distribution.
+                Komprimera VHDX-filen för en WSL 2-distribution.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Ansluter och monterar en fysisk eller virtuell disk i alla WSL 2-distributioner.
 
-        Options:
+        Alternativ:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Anger att &lt;Disk&gt; refererar till en virtuell hårddisk.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Anslut disken till WSL2, men montera den inte.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Montera disken med ett anpassat namn för monteringspunkten.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Filsystem som ska användas vid montering av en disk, om inget anges används ext4 som standard.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Fler monteringsalternativ.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                Index för partitionen som ska monteras, om inget anges är standardvärdet hela disken.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Ändrar standardinstallationsversionen för nya distributioner.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Avslutar omedelbart alla distributioner som körs och WSL 2
+        den virtuella datorn med förenklat verktyg.
 
-        Options:
+        Alternativ:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Avsluta den virtuella WSL 2-datorn även om en åtgärd pågår. Kan orsaka dataförlust.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Visa statusen för Windows-undersystem för Linux.
 
     --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+        Demonterar och kopplar bort en disk från alla WSL2-distributioner.
+        Demonterar och kopplar bort alla diskar om de anropas utan argument.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Avinstallerar Windows-undersystem för Linux-paketet från den här datorn.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Uppdatera Windows-undersystem för Linux-paketet.
 
-        Options:
+        Alternativ:
             --pre-release
-                Download a pre-release version if available.
+                Ladda ned en förhandsversion om den är tillgänglig.
 
     --version, -v
-        Display version information.
+        Övrig versionsinformation.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Argument för att hantera distributioner i Windows-undersystem för Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+        Exporterar fördelningen till en TAR-fil.
+        Filnamnet kan vara - för stdout.
 
-        Options:
+        Alternativ:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Anger exportformatet. Värden som stöds: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+        Importerar den angivna tar-filen som en ny distribution.
+        Filnamnet kan vara - för stdin.
 
-        Options:
+        Alternativ:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Anger vilken version som ska användas för den nya distributionen.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Anger att den angivna filen är en VHD- fil eller en VHDX-fil, inte en TAR-fil.
+                Den här åtgärden gör en kopia av VHD-filen på den angivna installationsplatsen.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Importerar den angivna VHD-filen som en ny distribution.
+        Den här virtuella hårddisken måste vara formaterad med filsystemtypen ext4.
 
     --list, -l [Options]
-        Lists distributions.
+        Listar distributioner.
 
-        Options:
+        Alternativ:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Lista alla distributioner, inklusive distributioner som
+                håller på att installeras eller avinstalleras.
 
             --running
-                List only distributions that are currently running.
+                Lista endast distributioner som körs för närvarande.
 
             --quiet, -q
-                Only show distribution names.
+                Visa endast distributionsnamn.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Visa detaljerad information om alla distributioner.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Visar en lista över tillgängliga distributioner för installation med 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Anger fördelningen som standard.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Ändrar den angivna distributionens version.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Avslutar den angivna distributionen.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Avregistrerar distributionen och tar bort rotfilsystemet.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -1069,7 +1069,7 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
-    <value>Compaction is only supported on .vhdx files.</value>
+    <value>Komprimering stöds endast för .vhdx-filer.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -2634,10 +2634,11 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Visa detaljerad information om containern.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Avsluta behållare.</value>
+    <value>Avsluta en eller flera körande containrar.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Avslutar containrar.</value>
+    <value>Dödar en eller flera körande containrar genom att skicka SIGKILL som standard, eller den signal som anges med --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Lista containrar.</value>
@@ -2692,6 +2693,10 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Stoppar containrar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal att skicka (standard: containerns konfigurerade STOPSIGNAL eller SIGTERM om ingen har konfigurerats)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Hantera bilder.</value>
@@ -3071,6 +3076,14 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Ogiltigt {}-värde: nätverksnamnet får inte vara tomt eller innehålla blanksteg</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Ogiltigt {}-värde: nätverksnamnet kan bara anges en gång</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Nätverk i värdläge stöds inte</value>
   </data>
@@ -3151,7 +3164,8 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Sökväg till katalogen för sessionslagring</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal att skicka</value>
+    <value>Signal som ska skickas till containern (standard: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuell eller befintlig bildreferens i formatet image-name[:tag]</value>
@@ -3236,7 +3250,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Set type of progress output (auto, tty, plain, quiet) (default: auto)</value>
+    <value>Ange typ av förloppsutdata (auto, tty, plain, quiet) (standard: auto)</value>
     <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
@@ -3398,7 +3412,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Nätverksnamn</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Matar endast ut nätverksnamnen</value>
+    <value>Visa endast nätverks-ID:n</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Ta bort alla oanvända nätverk.</value>
