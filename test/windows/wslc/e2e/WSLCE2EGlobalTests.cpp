@@ -26,6 +26,8 @@ using namespace wsl::shared;
 
 namespace {
 
+    const std::wstring c_copyrightPrefix = L"Copyright (c) Microsoft Corporation.";
+
     // Returns the expected default session name for the current user (e.g. "wslc-cli-admin-benhill").
     std::wstring GetExpectedDefaultSessionName(bool elevated)
     {
@@ -75,16 +77,71 @@ class WSLCE2EGlobalTests
         auto result = RunWslc(L"--help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage: wslc"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc")));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Help_ErrorRoutesToStderr)
+    WSLC_TEST_METHOD(WSLCE2E_Help_CommandErrorRoutesToStderr)
     {
-        // Help on error must land on stderr; stdout must remain empty.
         auto result = RunWslc(L"INVALID_CMD");
         VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
         VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Unrecognized command: 'INVALID_CMD'"));
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage: wslc"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingCommands()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc")));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ArgumentErrorRoutesToStderr)
+    {
+        auto result = RunWslc(L"container create");
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage: wslc container create"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedArguments()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_ImageIdArgDescription()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_ContainerCreateLongDesc()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_NameArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_ImageIdArgDescription() + L"\r\n\r\n" +
+            Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc container create")));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ArgumentConflictShowsRelevantArguments)
+    {
+        auto result = RunWslc(L"container list --last 1 --latest");
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_LastArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_LatestArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedOptions()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_AllArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_LatestArgDescription() + L"\r\n\r\n" + Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc container list")));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_OptionErrorUsesOptionTerminology)
+    {
+        auto result = RunWslc(L"list -a=falseee");
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_FlagInvalidBooleanError(L"-a=falseee")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedOptions()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_AllArgDescription()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedArguments()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_AllArgDescription() + L"\r\n\r\n" + Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc list")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Help_NoColorWhenRedirected)

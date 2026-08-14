@@ -75,7 +75,9 @@ void ParseArgumentsStateMachine::ThrowIfError() const
     // If the next argument was to be a value, but none was provided, convert it to an exception.
     else if (m_state.Type() && m_invocationItr == m_invocation.end())
     {
-        throw ArgumentException(Localization::WSLCCLI_MissingArgumentError(m_state.Arg()));
+        const auto* argument = FindArgument(m_state.Type().value());
+        const auto message = Localization::WSLCCLI_MissingArgumentError(m_state.Arg());
+        throw argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
     }
 }
 
@@ -158,7 +160,9 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ApplyFlagValue(Arg
     const auto boolVal = string::ParseBool(std::wstring(unquoted).c_str(), /*AllowExtendedForms*/ true);
     if (!boolVal.has_value())
     {
-        return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
+        const auto* argument = FindArgument(type);
+        const auto message = Localization::WSLCCLI_FlagInvalidBooleanError(currArg);
+        return argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
     }
 
     SetFlag(type, boolVal.value());
@@ -394,7 +398,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         if (currArg[currentPos] != WSLC_CLI_ARG_SPLIT_CHAR)
         {
             // There are more characters but it's not '=' - this is invalid
-            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
+            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *firstArg);
         }
 
         // Value is adjoined after '='
@@ -436,7 +440,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             if (currArg[nextPos] != WSLC_CLI_ARG_SPLIT_CHAR)
             {
                 // There are more characters but it's not '=' - this is invalid
-                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
+                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *nextArg);
             }
 
             // Value is adjoined after '='

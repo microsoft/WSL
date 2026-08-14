@@ -88,6 +88,10 @@ struct Argument
     {
         return m_type;
     }
+    bool IsOption() const
+    {
+        return m_type == argument::Kind::Flag || m_type == argument::Kind::Value;
+    }
     Limit Limit() const
     {
         return m_limit;
