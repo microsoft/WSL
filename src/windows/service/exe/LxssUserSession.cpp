@@ -949,6 +949,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     // Cross-volume MoveFileEx creates a new file using the impersonation token's
     // default owner. Normalize that owner to the caller's user SID so elevated moves
     // do not produce a VHD owned by BUILTIN\Administrators.
+    auto originalTokenOwner = wil::get_token_information<TOKEN_OWNER>(userToken.get());
     auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
     TOKEN_OWNER tokenOwner{tokenUser->User.Sid};
     THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(userToken.get(), TokenOwner, &tokenOwner, sizeof(tokenOwner)));
@@ -967,6 +968,8 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     }
 
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        LOG_IF_WIN32_BOOL_FALSE(SetTokenInformation(userToken.get(), TokenOwner, originalTokenOwner.get(), sizeof(*originalTokenOwner)));
+
         auto impersonate = wil::impersonate_token(userToken.get());
         if (!MoveFileExW(destPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
         {
