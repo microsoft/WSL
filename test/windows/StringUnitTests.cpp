@@ -197,7 +197,7 @@ class StringUnitTests
             {119'856'765, StorageSizeUnit::Decimal, 2, false, L"119.86MB"},
             {1'000'000'000'000ULL, StorageSizeUnit::Decimal, 2, false, L"1.00TB"},
             {1'000'000'000'000'000ULL, StorageSizeUnit::Decimal, 2, false, L"1.00PB"},
-            {1'000'000'000'000'000'000ULL, StorageSizeUnit::Decimal, 2, false, L"1.00EB"},
+            {1'000'000'000'000'000'000ULL, StorageSizeUnit::Decimal, 2, false, L"1000.00PB"},
             {1'023, StorageSizeUnit::Binary, 2, true, L"1023 B"},
             {1'024, StorageSizeUnit::Binary, 0, false, L"1KiB"},
             {1'536, StorageSizeUnit::Binary, 1, false, L"1.5KiB"},
@@ -205,7 +205,7 @@ class StringUnitTests
             {1'610'612'736, StorageSizeUnit::Binary, 1, false, L"1.5GiB"},
             {1ULL << 40, StorageSizeUnit::Binary, 2, false, L"1.00TiB"},
             {1ULL << 50, StorageSizeUnit::Binary, 2, false, L"1.00PiB"},
-            {1ULL << 60, StorageSizeUnit::Binary, 2, false, L"1.00EiB"},
+            {1ULL << 60, StorageSizeUnit::Binary, 2, false, L"1024.00PiB"},
         };
 
         for (const auto& TestCase : TestCases)
@@ -228,6 +228,8 @@ class StringUnitTests
         VerifyRoundTrip(32, StorageSizeUnit::Decimal, 0, true);
         VerifyRoundTrip(1'500, StorageSizeUnit::Decimal, 1);
         VerifyRoundTrip(1'536, StorageSizeUnit::Binary, 1);
+        VerifyRoundTrip(1'000'000'000'000'000'000ULL, StorageSizeUnit::Decimal, 2);
+        VerifyRoundTrip(1ULL << 60, StorageSizeUnit::Binary, 2);
 
         uint64_t decimalFactor = 1'000;
         uint64_t binaryFactor = 1'024;

@@ -1184,6 +1184,8 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize)
     {
+        auto cleanup = wil::scope_exit([&] { EnsureContainerDoesNotExist(WslcContainerName); });
+
         auto result =
             RunWslc(std::format(L"container run --shm-size 1.5G --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});

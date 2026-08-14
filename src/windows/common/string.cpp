@@ -362,9 +362,9 @@ std::optional<uint64_t> wsl::windows::common::string::ParseStorageSize(std::wstr
 
 std::wstring wsl::windows::common::string::FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace)
 {
-    constexpr size_t c_unitCount = 7;
-    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{L"B", L"KB", L"MB", L"GB", L"TB", L"PB", L"EB"};
-    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB", L"EiB"};
+    constexpr size_t c_unitCount = 6;
+    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{L"B", L"KB", L"MB", L"GB", L"TB", L"PB"};
+    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB"};
 
     const double base = Unit == StorageSizeUnit::Decimal ? 1000.0 : 1024.0;
     const auto& units = Unit == StorageSizeUnit::Decimal ? c_decimalUnits : c_binaryUnits;
