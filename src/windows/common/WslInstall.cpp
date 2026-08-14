@@ -192,7 +192,7 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
         missingComponents.emplace_back(c_optionalFeatureNameWsl);
     }
 
-    if (!wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
+    if (!IsOptionalComponentInstalled(c_optionalFeatureNameVmp))
     {
         missingComponents.emplace_back(c_optionalFeatureNameVmp);
     }
@@ -249,6 +249,33 @@ void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& comp
     const auto key =
         wsl::windows::common::registry::CreateKey(lxssKey.get(), c_optionalFeatureInstallStatus, KEY_ALL_ACCESS, nullptr, REG_OPTION_VOLATILE);
     wsl::windows::common::registry::WriteString(key.get(), nullptr, nullptr, wsl::shared::string::Join(installedComponents, L',').c_str());
+}
+
+bool WslInstall::IsOptionalComponentInstalled(LPCWSTR component)
+{
+    std::wstring systemDirectory;
+    THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
+
+    const auto dismPath = std::filesystem::path(std::move(systemDirectory)) / L"dism.exe";
+    const auto commandLine = std::format(L"{} /Online /English /Get-FeatureInfo /FeatureName:{}", dismPath.native(), component);
+
+    wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+    const auto result = process.RunAndCaptureOutput();
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(result.ExitCode), result.ExitCode != ERROR_SUCCESS, "Failed to query optional component: %ls", component);
+
+    constexpr std::wstring_view c_statePrefix = L"State :";
+    for (const auto& line : wsl::shared::string::Split(result.Stdout, L'\n'))
+    {
+        const auto trimmed = wsl::shared::string::TrimAscii<wchar_t>(line);
+        if (wsl::shared::string::StartsWith(trimmed, c_statePrefix))
+        {
+            const auto state = wsl::shared::string::TrimAscii<wchar_t>(trimmed.substr(c_statePrefix.size()));
+            return wsl::shared::string::IsEqual(state, L"Enabled", true);
+        }
+    }
+
+    THROW_HR_MSG(E_UNEXPECTED, "Failed to parse optional component state: %ls", component);
 }
 
 std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(

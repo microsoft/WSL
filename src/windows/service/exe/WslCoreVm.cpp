@@ -24,6 +24,7 @@ Abstract:
 #include "WslCoreFirewallSupport.h"
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
+#include "WslInstall.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -146,6 +147,17 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(_In_ const wil::shared_handle& User
 void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken)
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
+
+    // Check if VirtualMachinePlatform is installed.
+    try
+    {
+        if (!WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameVmp))
+        {
+            wsl::windows::common::notifications::DisplayOptionalComponentsNotification();
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageVirtualMachinePlatformNotInstalled());
+        }
+    }
+    CATCH_LOG()
 
     // create a restricted version of the token.
     m_userToken = UserToken;
@@ -682,7 +694,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
             {
                 wsl::windows::common::notifications::DisplayOptionalComponentsNotification();
-                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformNotInstalled());
+                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformRequiredForNetworking());
             }
 
             // Fall back to no networking.
