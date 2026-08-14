@@ -1186,7 +1186,7 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(
             L"container run --rm --shm-size 1.5G {} sh -c \"df -B1 /dev/shm --output=size | sed 1d\"", DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L" 1610612736\n", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = L"1610612736\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize_Invalid)

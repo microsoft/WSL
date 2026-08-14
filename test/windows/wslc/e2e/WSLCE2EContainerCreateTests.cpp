@@ -893,7 +893,7 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L" 1610612736\n", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = L"1610612736\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_ShmSize_Invalid)
