@@ -302,6 +302,9 @@ ja asenna wsl.exe --install &lt;Distro&gt;.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Muuntaminen on meneillään. Tämä voi kestää muutamia minuutteja.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Tiivistys on käynnissä. Tämä voi kestää muutaman minuutin.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>Jakelu on jo pyydetty versio.</value>
   </data>
@@ -394,7 +397,7 @@ Käyttö:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Tekijänoikeus (c) Microsoft Corporation. Kaikki oikeudet pidätetään.
+    <value>Copyright (c) Microsoft Corporation. Kaikki oikeudet pidätetään.
 Lisätietoja tämän tuotteen tietosuojasta löytyy osoitteesta https://aka.ms/privacy.
 
 Käyttö: wsl.exe [Argumentti] [Asetukset...] [Komentorivi]
@@ -485,13 +488,16 @@ Argumentit Windows-alijärjestelmän Linuxille hallintaan:
                 Siirrä jakelu uuteen sijaintiin.
 
             --set-sparse, -s &lt;true|false&gt;
-                Määritä jakelun VHD harvaksi, jolloin levytilaa voidaan vapauttaa automaattisesti.
+                Määritä jakelun VHD sparse-tiedostoksi, jolloin levytila voidaan vapauttaa automaattisesti.
 
             --set-default-user &lt;Username&gt;
                 Määritä jakelun oletuskäyttäjä.
 
             --resize &lt;MemoryString&gt;
                 Muuta jakelun levyn koko määritettyyn kokoon.
+
+            --compact
+                Tiivistä WSL 2 -jakelun VHDX-tiedosto.
 
     --mount &lt;Disk&gt;
         Liittää ja ottaa käyttöön fyysisen tai virtuaalilevyn kaikissa WSL2-jakeluissa.
@@ -507,13 +513,13 @@ Argumentit Windows-alijärjestelmän Linuxille hallintaan:
                 Ota levy käyttöön käyttäen mukautettua nimeä käyttöönottopisteelle.
 
             --type &lt;Type&gt;
-                Tiedostojärjestelmä levyn käyttöönoton yhteydessä. Jos sitä ei ole määritetty, käytetään oletusarvoa ext4.
+                Tiedostojärjestelmä, jota käytetään levyn käyttöönotossa, jos sitä ei ole määritetty, käytetään oletusarvoa ext4.
 
             --options &lt;Options&gt;
                 Käyttöönoton lisäasetukset.
 
             --partition &lt;Index&gt;
-                Käyttöön otettavan osion indeksi. Jos sitä ei ole määritetty, käytetään oletusarvoisesti koko levyä.
+                Käyttöön otettavan osion indeksi, jos sitä ei ole määritetty, käytetään oletusarvoisesti koko levyä.
 
     --set-default-version &lt;Version&gt;
         Muuttaa uusien jakeluiden oletusasennusversiota.
@@ -524,20 +530,20 @@ Argumentit Windows-alijärjestelmän Linuxille hallintaan:
 
         Asetuksia:
             --force
-                Lopeta WSL 2 -virtuaalikone, vaikka toiminto olisi käynnissä. Voi aiheuttaa tietojen menettämisen.
+                Lopeta WSL 2 -virtuaalikone, vaikka toiminto olisi käynnissä. Voi aiheuttaa tietojen menetyksen.
 
     --status
         Näytä Windows-alijärjestelmän Linuxille tila.
 
     --unmount [Levy]
         Poistaa levyn käytöstä ja irrottaa sen kaikista WSL2-jakeluista.
-        Poistaa käytöstä kaikki levyt ja irrottaa ne, jos sitä kutsutaan ilman argumenttia.
+        Poistaa mounttauksen ja irrottaa kaikki levyt, jos komento annetaan ilman argumenttia.
 
     --uninstall
         Poistaa Windows-alijärjestelmä Linuxille -paketin tästä tietokoneesta.
 
     --update
-        Päivitä Windows-alijärjestelmä Linuxille -paketti.
+        Päivitä Windows-alijärjestelmän Linuxille -paketti.
 
         Asetuksia:
             --pre-release
@@ -546,14 +552,14 @@ Argumentit Windows-alijärjestelmän Linuxille hallintaan:
     --version, -v
         Näytä versiotiedot.
 
-Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
+Windows-alijärjestelmässä Linuxille olevien jakeluiden hallinnan argumentit:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Asetukset]
         Vie jakelun tar-tiedostoon.
         Tiedostonimi voi olla - STDOUT-siirrännälle.
 
         Asetuksia:
-            --format &lt;Format&gt;
+            --format &lt;Muotoilu&gt;
                 Määrittää vientimuodon. Tuetut arvot: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Asetukset]
@@ -566,7 +572,7 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
 
             --vhd
                 Määrittää, että annettu tiedosto on .vhd- tai .vhdx-tiedosto, ei tar-tiedosto.
-                Tämä toiminto tekee VHD-tiedostosta kopion määritetyssä asennussijainnissa.
+                Tämä toiminto tekee kopion VHD-tiedostosta määritettyyn asennussijaintiin.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Tuo määritetyn VHD-tiedoston uutena jakeluna.
@@ -575,10 +581,10 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
     --list, -l [Asetukset]
         Näyttää luettelon jakeluista.
 
-        Asetuksia:
+        Asetukset:
             --all
                 Näytä luettelo kaikista jakeluista, mukaan lukien jakelut, joita
-                asennetaan tai joiden asennusta poistetaan parhaillaan.
+                parhaillaan asennettuna tai poistettuna.
 
             --running
                 Näytä vain parhaillaan käynnissä olevien jakeluiden luettelo.
@@ -590,10 +596,10 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
                 Näytä yksityiskohtaiset tiedot kaikista jakeluista.
 
             --online, -o
-                Näyttää luettelon asennettavissa olevista jakeluista argumentilla wsl.exe --install'.
+                Näyttää luettelon asennettavissa olevista jakeluista argumentilla 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Määrittää jakelun oletukseksi.
+        Määrittää jakauman oletukseksi.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
         Muuttaa määritetyn jakelun versiota.
@@ -611,7 +617,8 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ Palataan nat-verkkopalveluun.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Toimintoa ei voitu suorittaa loppuun, koska VHD on parhaillaan käytössä. WSL:n käytön lopettaminen: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Tiivistämistä tuetaan vain .vhdx-tiedostoissa.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} ei ole kelvollinen totuusarvo, &lt;true|false&gt;</value>
@@ -2622,10 +2633,11 @@ Esimerkki: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Näytä yksityiskohtaisia tietoja säilöstä.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Lopeta säilöt.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Lopettaa säilöt.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Luettele säilöt.</value>
@@ -2680,6 +2692,10 @@ Esimerkki: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Pysäyttää säilöt.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Kuvien hallinta.</value>
@@ -3059,6 +3075,14 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Virheellinen {}-arvo: verkon nimi ei voi olla tyhjä tai sisältää välilyöntejä</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Virheellinen {}-arvo: verkon nimi voidaan määrittää vain kerran</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Isäntätilan verkkoa ei tueta</value>
   </data>
@@ -3139,7 +3163,8 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Istunnon tallennushakemiston polku</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Lähetettävä signaali</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Nykyinen tai olemassa oleva kuvaviittaus muodossa image-name[:tag]</value>
@@ -3224,8 +3249,8 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Edistymisen tyyppi (muoto: none|ansi) (oletus: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Aseta edistymisen tulostustyyppi (auto, tty, plain, quiet) (oletus: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Kuvan latauskäytäntö (always|missing|never) (oletus: missing)</value>
@@ -3265,6 +3290,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Virheellinen {}-arvo: {} ei ole tunnistettu pull-käytännöksi. Tuetut pull-käytännöt ovat: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Virheellinen {}-arvo: {} ei ole tunnistettu edistymistyyppi. Tuetut edistymistyypit ovat: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3382,7 +3411,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Verkon nimi</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Antaa tuloksena pelkät verkkojen nimet</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Poista kaikki käyttämättömät verkot.</value>

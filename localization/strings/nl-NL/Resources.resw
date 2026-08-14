@@ -302,6 +302,9 @@ en 'wsl.exe --install &lt;Distro&gt;' om te installeren.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversie wordt uitgevoerd. Dit kan enkele minuten duren.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>De compressie wordt uitgevoerd. Dit kan enkele minuten duren.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>De distributie is al de aangevraagde versie.</value>
   </data>
@@ -394,7 +397,7 @@ Gebruik:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Alle rechten voorbehouden.
+    <value>Copyright (C) Microsoft Corporation. Alle rechten voorbehouden.
 Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.
 
 Gebruik: wsl.exe [Argument] [Opties...] [Opdrachtregel]
@@ -459,7 +462,7 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
             --location &lt;Location&gt;
                 Het installatiepad voor de distributie instellen.
 
-            --name &lt;Name&gt;
+            --name &lt;Naam&gt;
                 De naam van de distributie instellen.
 
             --no-distribution
@@ -468,7 +471,7 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
             --no-launch, -n
                 De distributie niet na de installatie starten.
 
-            --version &lt;Version&gt;
+            --version &lt;Versie&gt;
                 Specificeert de versie die moet worden gebruikt voor de nieuwe distributie.
 
             --vhd-size &lt;MemoryString&gt;
@@ -493,17 +496,20 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
             --resize &lt;MemoryString&gt;
                 De grootte van de schijf van de distributie wijzigen in de opgegeven grootte.
 
-    --mount &lt;Disk&gt;
-        Hiermee wordt een fysieke of virtuele schijf in alle WSL 2-distributies toegevoegd en gekoppeld.
+            --compact
+                Comprimeert het VHDX-bestand van een WSL 2-distributie.
+
+    --mount &lt;Schijf&gt;
+        Een fysieke of virtuele schijf toevoegen en koppelen in alle WSL 2-distributies.
 
         Opties:
             --vhd
-                Hiermee geef je aan dat &lt;Disk&gt; naar een virtuele harde schijf verwijst.
+                Hiermee geeft u aan dat &lt;Disk&gt; naar een virtuele harde schijf verwijst.
 
             --bare
                 De schijf toevoegen aan WSL2, maar niet koppelen.
 
-            --name &lt;Name&gt;
+            --name &lt;Naam&gt;
                 De schijf koppelen met een aangepaste naam voor het koppelpunt.
 
             --type &lt;Type&gt;
@@ -515,11 +521,11 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
             --partition &lt;Index&gt;
                 De index van de partitie die moet worden gekoppeld wordt, indien niet opgegeven, standaard ingesteld op de hele schijf.
 
-    --set-default-version &lt;Version&gt;
-        Hiermee wijzig je de standaardinstallatieversie voor nieuwe distributies.
+    --set-default-version &lt;Versie&gt;
+        Hiermee wijzigt u de standaardinstallatieversie voor nieuwe distributies.
 
     --shutdown
-        Hiermee beëindig je onmiddellijk alle actieve distributies en de WSL 2
+        Hiermee beëindigt u onmiddellijk alle actieve distributies en de WSL 2
         lichtgewicht virtuele machine voor hulpprogramma's.
 
         Opties:
@@ -529,12 +535,12 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
     --status
         De status van het Windows-subsysteem voor Linux weergeven.
 
-    --unmount [Disk]
-        Hiermee wordt een schijf ontkoppeld en losgemaakt van alle WSL2-distributies.
-        Hiermee worden alle schijven ontkoppeld en losgemaakt bij een aanroep zonder argument.
+    --unmount [Schijf]
+        Hiermee wordt een schijf ontkoppeld en ontkoppeld van alle WSL2-distributies.
+        Hiermee worden alle schijven ontkoppeld en losgemaakt als deze zonder argument worden aangeroepen.
 
     --uninstall
-        Hiermee verwijder je het Windows-subsysteem voor Linux-pakket van deze computer.
+        Hiermee verwijdert u het Windows-subsysteem voor Linux-pakket van deze computer.
 
     --update
         Het Windows-subsysteem voor Linux-pakket bijwerken.
@@ -548,8 +554,8 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
 
 Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linux:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Opties]
-        Hiermee exporteer je de distributie naar een TAR-bestand.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        Hiermee exporteert u de distributie naar een TAR-bestand.
         De bestandsnaam kan - zijn voor stdout.
 
         Opties:
@@ -557,12 +563,12 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
                 Specificeert de exportindeling. Ondersteunde waarden: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Opties]
-        Hiermee importeer je het opgegeven TAR-bestand als een nieuwe distributie.
+        Hiermee importeert u het opgegeven TAR-bestand als een nieuwe distributie.
         De bestandsnaam kan - zijn voor stdin.
 
         Opties:
-            --version &lt;Version&gt;
-                Hiermee geef je de versie op die moet worden gebruikt voor de nieuwe distributie.
+            --version &lt;Versie&gt;
+                Hiermee geeft u de versie op die moet worden gebruikt voor de nieuwe distributie.
 
             --vhd
                 Hiermee geef je op dat het opgegeven bestand een VHD- of VHDX-bestand is en geen TAR-bestand.
@@ -593,10 +599,10 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
                 Geeft een lijst weer met beschikbare distributies voor installatie met 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Hiermee stel je de distributie als standaard in.
+        Hiermee stelt u de distributie als standaard in.
 
-    --set-version &lt;Distro&gt; &lt;Version&gt;
-        Hiermee wijzig je de versie van de opgegeven distributie.
+    --set-version &lt;Distro&gt; &lt;Versie&gt;
+        Hiermee wijzigt u de versie van de opgegeven distributie.
 
     --terminate, -t &lt;Distro&gt;
         Hiermee wordt de opgegeven distributie beëindigd.
@@ -611,7 +617,8 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ Terugvallen op NAT-netwerken.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>De bewerking kan niet worden voltooid omdat de VHD momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Compactie wordt alleen ondersteund op .vhdx-bestanden.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} is geen geldige booleaanse waarde, &lt;waar|onwaar&gt;</value>
@@ -2622,10 +2633,11 @@ Voorbeeld: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Toon gedetailleerde informatie over een container.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Containers beëindigen.</value>
+    <value>Beëindig een of meer actieve containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Beëindigt containers.</value>
+    <value>Beëindigt een of meer actieve containers door standaard SIGKILL te verzenden, of het signaal dat is opgegeven met --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Containers weergeven.</value>
@@ -2680,6 +2692,10 @@ Voorbeeld: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Stopt containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signaal dat moet worden verzonden (standaard: de geconfigureerde STOPSIGNAL van de container of SIGTERM als er geen is geconfigureerd)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Installatiekopieën beheren.</value>
@@ -3059,6 +3075,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Ongeldige {}-waarde: de netwerknaam mag niet leeg zijn of een spatie bevatten</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: de netwerknaam kan slechts één keer worden opgegeven</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Ongeldige {} waarde: niet-ondersteunde netwerkoptie '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Netwerken in hostmodus worden niet ondersteund</value>
   </data>
@@ -3139,7 +3163,8 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Pad naar de sessieopslagmap</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signaal om te verzenden</value>
+    <value>Signaal dat naar de container wordt verzonden (standaard: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Huidige of bestaande afbeeldingsverwijzing in de indeling voor de afbeeldingsnaam [:tag]</value>
@@ -3224,8 +3249,8 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Voortgangstype (formaat: none|ansi) (standaard: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Type voortgangsuitvoer instellen (auto, tty, plain, quiet) (standaard: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Beleid voor het ophalen van afbeeldingen (always|missing|never) (standaard: missing)</value>
@@ -3265,6 +3290,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} is geen herkend pull-beleid. Ondersteund pull-beleid is: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: {} is geen herkend voortgangstype. Ondersteunde voortgangstypen zijn: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3382,7 +3411,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Netwerknaam</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Hiermee worden alleen de netwerknamen weergegeven</value>
+    <value>Toon alleen netwerk-id's</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Verwijder alle ongebruikte netwerken.</value>

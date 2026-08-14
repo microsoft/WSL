@@ -308,6 +308,9 @@ et 'wsl.exe --install &lt;Distro&gt;' à installer.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversion en cours. Cette opération peut prendre quelques minutes.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Compactage en cours, cette opération peut prendre quelques minutes.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>La distribution présente déjà la version demandée.</value>
   </data>
@@ -404,9 +407,9 @@ Utilisation :
     <value>Copyright (c) Microsoft Corporation. Tous droits réservés.
 Pour plus d’informations sur la confidentialité de ce produit, veuillez consulter https://aka.ms/privacy.
 
-Utilisation : wsl.exe [Argument] [Options...] [Ligne de commande]
+Utilisation : wsl.exe [Argument] [Options...] [Ligne de commande]
 
-Arguments pour l’exécution des fichiers binaires Linux :
+Arguments pour l’exécution des fichiers binaires Linux :
 
     Si aucune ligne de commande n’est fournie, wsl.exe lance l’interpréteur de commandes par défaut.
 
@@ -417,10 +420,10 @@ Arguments pour l’exécution des fichiers binaires Linux :
         Exécute la commande spécifiée avec le type d’interpréteur de commandes fourni.
 
     --
-        Passe la ligne de commande restante « en l’état ».
+        Passe la ligne de commande restante « en l’état ».
 
 Options :
-    --cd &lt;Directory&gt;
+    --cd &lt;Répertoire&gt;
         Définit le répertoire spécifié comme répertoire de travail actuel.
         Si ~ est utilisé, le chemin d’accès personnel de l’utilisateur Linux est utilisé. Si le chemin commence
         par un caractère /, il est interprété en tant que chemin d’accès Linux absolu.
@@ -438,7 +441,7 @@ Options :
     --system
         Lance un interpréteur de commandes pour la distribution du système.
 
-Arguments pour la gestion du sous-système Windows pour Linux :
+Arguments pour la gestion du sous-système Windows pour Linux :
 
     --help
         Affiche les informations d’utilisation.
@@ -457,7 +460,7 @@ Arguments pour la gestion du sous-système Windows pour Linux :
             --fixed-vhd
                 Crée un disque de taille fixe pour stocker la distribution.
 
-            --from-file &lt;Path&gt;
+            --from-file &lt;Chemin&gt;
                 Installe une distribution à partir d’un fichier local.
 
             --legacy
@@ -487,12 +490,12 @@ Arguments pour la gestion du sous-système Windows pour Linux :
     --manage &lt;Distro&gt; &lt;Options...&gt;
         Modifie les options spécifiques à la distribution.
 
-        Options :
+        Options : 
             --move &lt;Location&gt;
                 Déplace la distribution vers un nouvel emplacement.
 
             --set-sparse, -s &lt;true|false&gt;
-                Définit le VHD de la distribution pour qu’il soit clairsemé. Cela permet de récupérer automatiquement de l’espace disque.
+                Définit le VHD de la distribution pour qu’il soit creux. Cela permet de récupérer automatiquement de l’espace disque.
 
             --set-default-user &lt;Username&gt;
                 Définit l’utilisateur par défaut de la distribution.
@@ -500,18 +503,21 @@ Arguments pour la gestion du sous-système Windows pour Linux :
             --resize &lt;MemoryString&gt;
                 Redimensionne le disque de la distribution à la taille spécifiée.
 
+            --compact
+                Compactez le fichier VHDX d’une distribution WSL 2.
+
     --mount &lt;Disk&gt;
         Attache et monte un disque physique ou virtuel dans toutes les distributions WSL 2.
 
-        Options :
+        Options : 
             --vhd
-                Spécifie que &lt;Disque&gt; fait référence à un disque dur virtuel.
+                Spécifie que &lt;Disk&gt; fait référence à un disque dur virtuel.
 
             --bare
-                Attache le disque à WSL2, mais ne le monte pas.
+                Attachez le disque à WSL2, mais ne le montez pas.
 
-            --name &lt;Name&gt;
-                Monte le disque à l’aide d’un nom personnalisé pour le point de montage.
+            --name &lt;Nom&gt;
+                Montez le disque à l’aide d’un nom personnalisé pour le point de montage.
 
             --type &lt;Type&gt;
                 Le système de fichiers à utiliser lors du montage d’un disque, s’il n’est pas spécifié par défaut, est ext4.
@@ -526,15 +532,15 @@ Arguments pour la gestion du sous-système Windows pour Linux :
         Modifie la version d’installation par défaut pour les nouvelles distributions.
 
     --shutdown
-        Arrête immédiatement toutes les distributions en cours d’exécution ainsi que WSL 2
+        Arrête immédiatement toutes les distributions en cours d’exécution et WSL 2
         machine virtuelle utilitaire légère.
 
-        Options :
+        Options : 
             --force
-                Terminez la machine virtuelle WSL 2 même si une opération est en cours. Peut entraîner une perte de données.
+                Terminez la machine virtuelle WSL 2 même si une opération est en cours. Peut entraîner une perte de données.
 
     --status
-        Afficher l’état du Sous-système Windows pour Linux.
+        Afficher le statut du sous-système Windows pour Linux.
 
     --unmount [Disk]
         Démonte et détache un disque de toutes les distributions WSL2.
@@ -546,7 +552,7 @@ Arguments pour la gestion du sous-système Windows pour Linux :
     --update
         Mettez à jour le package Sous-système Windows pour Linux.
 
-        Options : 
+        Options : 
             --pre-release
                 Téléchargez une version préliminaire si disponible.
 
@@ -557,17 +563,17 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         Exporte la distribution dans un fichier tar.
-        Le nom de fichier peut être - pour stdout.
+        Le nom de fichier peut être – pour stdout.
 
-        Options :
+        Options : 
             --format &lt;Format&gt;
                 Spécifie le format d’exportation. Valeurs prises en charge : tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
         Importe le fichier tar spécifié en tant que nouvelle distribution.
-        Le nom de fichier peut être : pour stdin.
+        Le nom de fichier peut être – pour stdin.
 
-        Options :
+        Options : 
             --version &lt;Version&gt;
                 Spécifie la version à utiliser pour la nouvelle distribution.
 
@@ -582,19 +588,19 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
     --list, -l [Options]
         Répertorie les distributions.
 
-        Options :
+        Options : 
             --all
-                Répertorier toutes les distributions, y compris les distributions qui sont
+                Répertoriez toutes les distributions, y compris les distributions qui sont
                 en cours d’installation ou de désinstallation.
 
             --running
-                Répertorie uniquement les distributions en cours d’exécution.
+                Répertoriez uniquement les distributions en cours d’exécution.
 
             --quiet, -q
-                Afficher uniquement les noms de distribution.
+                Affichez uniquement les noms de distribution.
 
             --verbose, -v
-                Afficher des informations détaillées sur toutes les distributions.
+                Affichez des informations détaillées sur toutes les distributions.
 
             --online, -o
                 Affiche la liste des distributions disponibles pour l’installation avec 'wsl.exe --install'.
@@ -618,7 +624,8 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1067,6 +1074,10 @@ Retour à la mise en réseau NAT.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>L'opération n'a pas pu être effectuée car le VHD est actuellement utilisé. Pour forcer l'arrêt de WSL, utilisez : wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>La compaction n’est prise en charge que sur les fichiers .vhdx.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} n’est pas un booléen valide, &lt;true|false&gt;</value>
@@ -2629,10 +2640,11 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Afficher des informations détaillées sur un conteneur.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Détruire les conteneurs.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Détruit les conteneurs.</value>
+    <value>Tue un ou plusieurs conteneurs en cours d'exécution en envoyant SIGKILL par défaut, ou le signal spécifié avec --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Listez les conteneurs.</value>
@@ -2687,6 +2699,10 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Arrête les conteneurs.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Gérer les images.</value>
@@ -3066,6 +3082,14 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Valeur {} non valide : le nom du réseau ne peut pas être vide ou contenir des espaces blancs</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Valeur {} non valide : le nom du réseau ne peut être spécifié qu’une seule fois</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>la mise en réseau en mode hôte n’est pas prise en charge</value>
   </data>
@@ -3146,7 +3170,8 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Chemin d’accès au répertoire de stockage de la session</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal à envoyer</value>
+    <value>Signal à envoyer au conteneur (par défaut : SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Référence d’image actuelle ou existante au format nom_image[ :tag]</value>
@@ -3231,8 +3256,8 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Type de progression (format: none|ansi) (default: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Définir le type de sortie de progression (auto, tty, plain, quiet) (par défaut : auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Politique d’extraction d’image (always|missing|never) (par défaut : missing)</value>
@@ -3272,6 +3297,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Valeur {} non valide : {} n’est pas une politique de récupération reconnue. Les politiques de récupération prises en charge sont : {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Valeur {} non valide : {} n’est pas un type de progression reconnu. Les types de progression pris en charge sont : {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3389,7 +3418,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Nom du réseau</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Affiche uniquement les noms des réseaux</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Supprimez tous les réseaux inutilisés.</value>

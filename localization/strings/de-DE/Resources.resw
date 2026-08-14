@@ -308,6 +308,9 @@ und "wsl.exe --install &lt;Distro&gt;".</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Konvertierung wird ausgeführt. Dieser Vorgang kann einige Minuten dauern.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Die Komprimierung wird ausgeführt. Dieser Vorgang kann einige Minuten dauern.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>Die Distribution ist bereits die angeforderte Version.</value>
   </data>
@@ -379,24 +382,24 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux aus
+    <value>Führt Verwaltungsvorgänge im Windows-Subsystem für Linux durch
 
-Verbrauch:
+Syntax:
     /l, /list [Option]
-        Listet registrierte Distributionen auf.
-       /all – Optional alle Distributionen auflisten, einschließlich Distributionen, die
+        Listet registrierte Verteilungen auf.
+        /all – Optional alle Distributionen auflisten, einschließlich Verteilungen, die
                zurzeit installiert oder deinstalliert werden.
 
-        /running – Listet nur Distributionen auf, die derzeit ausgeführt werden.
+        /running – Listet nur Verteilungen auf, die derzeit ausgeführt werden.
 
     /s, /setdefault &lt;DistributionName&gt;
         Legt die Distribution als Standard fest.
 
     /t, /terminate &lt;DistributionName&gt;
-        Beendet die Distribution.
+        Beendet die Verteilung.
 
     /u, /unregister &lt;DistributionName&gt;
-        Hebt die Registrierung der Distribution auf und löscht das Stammdateisystem.</value>
+        Hebt die Registrierung der Verteilung auf und löscht das Stammdateisystem.</value>
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
@@ -488,16 +491,19 @@ Argumente für die Verwaltung des Windows-Subsystems für Linux:
 
         Optionen:
             --move &lt;Location&gt;
-                Verschieben Sie die Distribution an einen neuen Speicherort.
+                Die Verteilung an einen neuen Speicherort verschieben.
 
             --set-sparse, -s &lt;true|false&gt;
-                Stellen Sie die VHDX der Distribution auf „Geringe Dichte“ ein, damit Speicherplatz automatisch zurückgewonnen werden kann.
+                Für die VHD-Verteilung als platzsparende Datei festlegen, sodass Speicherplatz automatisch freigegeben werden kann.
 
             --set-default-user &lt;Username&gt;
                 Den Standardbenutzer der Verteilung festlegen.
 
             --resize &lt;MemoryString&gt;
-                Passen Sie die Größe des Datenträgers der Distribution auf die angegebene Größe an.
+                Passen Sie die Größe des Datenträgers der Verteilung auf die angegebene Größe an.
+
+            --compact
+                Komprimiert die VHDX-Datei einer WSL 2-Distribution.
 
     --mount &lt;Disk&gt;
         Fügt einen physischen oder virtuellen Datenträger an alle WSL2-Distributionen an und bindet ihn ein.
@@ -507,40 +513,40 @@ Argumente für die Verwaltung des Windows-Subsystems für Linux:
                 Gibt an, dass &lt;Disk&gt; auf eine virtuelle Festplatte verweist.
 
             --bare
-                Fügen Sie den Datenträger an WSL2 an, aber binden Sie ihn nicht ein.
+                Fügt den Datenträger an WSL2 an, aber stellt ihn nicht bereit.
 
             --name &lt;Name&gt;
-                Binden Sie den Datenträger unter Verwendung eines benutzerdefinierten Namens für den Einbindepunkt ein.
+                Mounten Sie die Festplatte unter Verwendung eines benutzerdefinierten Namens für den Mountpoint.
 
             --type &lt;Type&gt;
-                Beim Einbinden eines Datenträgers zu verwendendes Dateisystem. Wenn nicht angegeben, wird standardmäßig ext4 verwendet.
+                Dateisystem, das beim Einbinden eines Datenträgers verwendet werden soll. Wenn nicht angegeben, ist der Standardwert ext4.
 
             --options &lt;Options&gt;
-                Zusätzliche Optionen zum Einbinden.
+                Zusätzliche Optionen zum Mounten.
 
             --partition &lt;Index&gt;
-                Der Index der einzubindenden Partition. Sofern nicht angegeben, wird standardmäßig der gesamte Datenträger verwendet.
+                Der Index der zu mountenden Partition. Sofern nicht angegeben, wird standardmäßig der gesamte Datenträger verwendet.
 
     --set-default-version &lt;Version&gt;
         Ändert die Standardinstallationsversion für neue Distributionen.
 
     --shutdown
-        Beendet sofort alle ausgeführten Distributionen und die WSL 2.
-        virtueller Computer mit einfachem Hilfsprogramm.
+        Beendet sofort alle ausgeführten Distributionen und die WSL 2-
+        leichte virtuelle Maschine für Dienstprogramme.
 
         Optionen:
             --force
-                Beenden Sie den virtuellen WSL 2-Computer, auch wenn gerade ein Vorgang ausgeführt wird. Kann zu Datenverlust führen.
+                Beenden Sie den virtuellen WSL 2-Computer, auch wenn gerade ein Vorgang ausgeführt wird. Kann zu Datenverlusten führen.
 
     --status
-        Zeigt den Status des Windows-Subsystems für Linux an.
+        Zeigt den Status von Windows-Subsystem für Linux an.
 
     --unmount [Datenträger]
-        Demountet und trennt einen Datenträger von allen WSL2-Distributionen.
-        Demountet und trennt alle Datenträger, wenn der Aufruf ohne Argument erfolgt.
+        Hebt die Bereitstellung und trennt einen Datenträger von allen WSL2-Distributionen.
+        Hebt die Bereitstellung auf und trennt alle Datenträger, wenn ohne Argument aufgerufen.
 
     --uninstall
-        Deinstalliert das Paket „Windows-Subsystem für Linux“ von diesem Computer.
+        Deinstalliert das Paket „Windows-Subsystem für Linux“ von diesem Rechner.
 
     --update
         Aktualisieren Sie das Paket „Windows-Subsystem für Linux.“
@@ -552,45 +558,45 @@ Argumente für die Verwaltung des Windows-Subsystems für Linux:
     --version, -v
         Versionsinformationen anzeigen.
 
-Argumente für die Verwaltung von Distributionen in Windows-Subsystem für Linux:
+Argumente für die Verwaltung von Distributionen von Windows-Subsystem für Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Optionen]
-        Exportiert die Distribution in eine TAR-Datei.
-        Der Dateiname kann „-“ für stdout sein.
+        Exportiert die Distribution in eine tar-Datei.
+        Der Dateiname kann – für stdout sein.
 
         Optionen:
             --format &lt;Format&gt;
                 Gibt das Exportformat an. Unterstützte Werte: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Optionen]
-        Importiert die angegebene TAR-Datei als neue Distribution.
-        Der Dateiname kann „-“ für stdin sein.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        Importiert die angegebene tar-Datei als neue Verteilung.
+        Der Dateiname kann – für stdin sein.
 
         Optionen:
             --version &lt;Version&gt;
                 Gibt die Version an, die für die neue Distribution verwendet werden soll.
 
             --vhd
-                Gibt an, dass es sich bei der bereitgestellten Datei um eine VHDX-Datei handelt, nicht um eine TAR-Datei.
-                Dieser Vorgang erstellt eine Kopie der VHDX-Datei am angegebenen Installationsspeicherort.
+                Gibt an, dass die angegebene Datei eine .vhd- oder .vhdx-Datei und keine TAR-Datei ist.
+                Dieser Vorgang erstellt eine Kopie der VHD-Datei am angegebenen Installationsspeicherort.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importiert die angegebene VHDX-Datei als neue Distribution.
+        Importiert die angegebene VHD-Datei als neue Distribution.
         Diese virtuelle Festplatte muss mit dem Dateisystemtyp EXT4 formatiert sein.
 
     --list, -l [Optionen]
-        Listet Distributionen auf.
+        Listet Verteilungen auf.
 
         Optionen:
             --all
                 Listet alle Distributionen auf, einschließlich Distributionen, die
-                derzeit installiert oder deinstalliert werden.
+                wird derzeit installiert oder deinstalliert.
 
             --running
                 Listet nur Distributionen auf, die derzeit ausgeführt werden.
 
             --quiet, -q
-                Nur Distributionsnamen anzeigen.
+                Nur Verteilungsnamen anzeigen.
 
             --verbose, -v
                 Detaillierte Informationen zu allen Distributionen anzeigen.
@@ -608,7 +614,7 @@ Argumente für die Verwaltung von Distributionen in Windows-Subsystem für Linux
         Beendet die angegebene Distribution.
 
     --unregister &lt;Distro&gt;
-        Hebt die Registrierung der Distribution auf und löscht das Stammdateisystem.</value>
+        Hebt die Registrierung der Verteilung auf und löscht das Stammdateisystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -617,7 +623,8 @@ Argumente für die Verwaltung von Distributionen in Windows-Subsystem für Linux
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1066,6 +1073,10 @@ Fallback auf NAT-Netzwerk.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Der Vorgang konnte nicht abgeschlossen werden, da die VHD zurzeit verwendet wird. So erzwingen Sie, dass WSL die Verwendung beendet: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Die Komprimierung wird nur für .vhdx-Dateien unterstützt.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} ist kein gültiger boolescher Wert, &lt;true|false&gt;</value>
@@ -2628,10 +2639,11 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Detaillierte Informationen zu einem Container anzeigen.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Container beenden.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Beendet Container.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Container auflisten.</value>
@@ -2686,6 +2698,10 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Beendet Container.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Bilder verwalten.</value>
@@ -3065,6 +3081,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Ungültiger {}-Wert: Der Netzwerkname darf nicht leer sein oder nur aus Leerzeichen bestehen.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Ungültiger {}-Wert: Der Netzwerkname kann nur einmal angegeben werden.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Das Hostmodusnetzwerk wird nicht unterstützt</value>
   </data>
@@ -3145,7 +3169,8 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Pfad zum Verzeichnis für den Sitzungsspeicher</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Zu sendendes Signal</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuelle oder vorhandene Bildreferenz im Format image-name[:tag]</value>
@@ -3230,8 +3255,8 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Fortschrittstyp (Format: none|ansi) (Standard: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Typ der Statusausgabe festlegen (auto, tty, plain quiet) (Standard: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Richtlinie zum Abrufen von Bildern (always|missing|never) (Standard: missing)</value>
@@ -3271,6 +3296,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Ungültiger {}-Wert: {} ist keine bekannte Pull-Richtlinie. Unterstützte Pullrichtlinien: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Ungültiger {}-Wert: {} ist kein bekannter Fortschrittstyp. Unterstützte Fortschrittstypen sind: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3388,7 +3417,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Netzwerkname</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Gibt nur die Netzwerknamen aus</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Entfernen Sie alle ungenutzten Netzwerke.</value>

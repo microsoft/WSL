@@ -302,6 +302,9 @@ a wsl.exe --install &lt;Distro&gt;.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Probíhá převod. Může to trvat několik minut.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Probíhá komprimace, může to trvat několik minut.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>Distribuce je již požadovanou verzí.</value>
   </data>
@@ -394,215 +397,218 @@ Využití:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Všechna práva vyhrazena.
-Informace o ochraně osobních údajů k tomuto produktu najdete na stránce https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.
 
-Použití: wsl.exe [Argument] [Options...] [CommandLine]
+Usage: wsl.exe [Argument] [Options...] [CommandLine]
 
-Argumenty pro spouštění binárních souborů Linuxu:
+Arguments for running Linux binaries:
 
-    Pokud není zadaný žádný příkazový řádek, spustí wsl.exe výchozí prostředí.
+    If no command line is provided, wsl.exe launches the default shell.
 
     --exec, -e &lt;CommandLine&gt;
-        Spustí zadaný příkaz bez použití výchozího linuxového prostředí.
+        Execute the specified command without using the default Linux shell.
 
     --shell-type &lt;standard|login|none&gt;
-        Spustí zadaný příkaz se zadaným typem prostředí.
+        Execute the specified command with the provided shell type.
 
     --
-        Předá zbývající příkazový řádek tak, jak je.
+        Pass the remaining command line as-is.
 
-Možnosti:
+Options:
     --cd &lt;Directory&gt;
-        Nastaví zadaný adresář jako aktuální pracovní adresář.
-        Pokud se použije ~, použije se domovská cesta uživatele Linuxu. Pokud cesta začíná
-        znakem /, bude interpretována jako absolutní cesta Linuxu.
-        V opačném případě musí být hodnota absolutní cestou systému Windows.
+        Sets the specified directory as the current working directory.
+        If ~ is used the Linux user's home path will be used. If the path begins
+        with a / character, it will be interpreted as an absolute Linux path.
+        Otherwise, the value must be an absolute Windows path.
 
     --distribution, -d &lt;DistroName&gt;
-        Spustí zadanou distribuci.
+        Run the specified distribution.
 
     --distribution-id &lt;DistroGuid&gt;
-        Spustí ID zadané distribuce.
+        Run the specified distribution ID.
 
     --user, -u &lt;UserName&gt;
-        Spustí jako zadaný uživatel.
+        Run as the specified user.
 
     --system
-        Spustí prostředí pro distribuci systému.
+        Launches a shell for the system distribution.
 
-Argumenty pro správu Subsystému Windows pro Linux:
+Arguments for managing Windows Subsystem for Linux:
 
     --help
-        Zobrazí informace o použití.
+        Display usage information.
 
     --debug-shell
-        Otevře prostředí ladění WSL2 pro diagnostické účely.
+        Open a WSL2 debug shell for diagnostics purposes.
 
     --install [Distro] [Options...]
-        Nainstaluje distribuci Subsystému Windows pro Linux.
-        Seznam platných distribucí zobrazíte pomocí příkazu 'wsl.exe --list --online'.
+        Install a Windows Subsystem for Linux distribution.
+        For a list of valid distributions, use 'wsl.exe --list --online'.
 
-        Možnosti:
+        Options:
             --enable-wsl1
-                Povolí podporu WSL1.
+                Enable WSL1 support.
 
             --fixed-vhd
-                Vytvořte disk s pevnou velikostí pro uložení distribuce.
+                Create a fixed-size disk to store the distribution.
 
             --from-file &lt;Path&gt;
-                Nainstaluje distribuci z místního souboru.
+                Install a distribution from a local file.
 
             --legacy
-                Použije starší verzi manifestu distribuce.
+                Use the legacy distribution manifest.
 
             --location &lt;Location&gt;
-                Nastaví instalační cestu pro distribuci.
+                Set the install path for the distribution.
 
             --name &lt;Name&gt;
-                Nastaví název distribuce.
+                Set the name of the distribution.
 
             --no-distribution
-                Nainstaluje pouze požadované volitelné součásti, nenainstaluje distribuci.
+                Only install the required optional components, does not install a distribution.
 
             --no-launch, -n
-                Po instalaci nespustí distribuci.
+                Do not launch the distribution after install.
 
             --version &lt;Version&gt;
-                Určuje verzi, která se má použít pro novou distribuci.
+                Specifies the version to use for the new distribution.
 
             --vhd-size &lt;MemoryString&gt;
-                Určuje velikost disku pro uložení distribuce.
+                Specifies the size of the disk to store the distribution.
 
             --web-download
-                Stáhne distribuci z internetu namísto z Microsoft Storu.
+                Download the distribution from the internet instead of the Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Změní specifické možnosti distribuce.
+        Changes distro specific options.
 
-        Možnosti:
+        Options:
             --move &lt;Location&gt;
-                Přesuňte distribuci do nového umístění.
+                Move the distribution to a new location.
 
             --set-sparse, -s &lt;true|false&gt;
-                Nastavte VHD distribuce na zhuštěný, což umožní automatické uvolnění místa na disku.
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user &lt;Username&gt;
-                Nastaví výchozího uživatele distribuce.
+                Set the default user of the distribution.
 
             --resize &lt;MemoryString&gt;
-                Změní velikost disku distribuce na zadanou velikost.
+                Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount &lt;Disk&gt;
-        Propojí a připojí fyzický nebo virtuální disk ve všech distribucích WSL 2.
+        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
-        Možnosti:
+        Options:
             --vhd
-                Určuje, že &lt;Disk&gt; odkazuje na VHD.
+                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
 
             --bare
-                Propojí disk s WSL2, ale nepřipojí ho.
+                Attach the disk to WSL2, but don't mount it.
 
             --name &lt;Name&gt;
-                Připojí disk pomocí vlastního názvu přípojného bodu.
+                Mount the disk using a custom name for the mountpoint.
 
             --type &lt;Type&gt;
-                Systém souborů, který se má použít při připojování disku. Pokud není zadaný, výchozí hodnota je ext4.
+                Filesystem to use when mounting a disk, if not specified defaults to ext4.
 
             --options &lt;Options&gt;
-                Další možnosti připojení.
+                Additional mount options.
 
             --partition &lt;Index&gt;
-                Index oddílu, který se má připojit. Pokud není zadaný, výchozí hodnota je celý disk.
+                Index of the partition to mount, if not specified defaults to the whole disk.
 
     --set-default-version &lt;Version&gt;
-        Změní výchozí verzi instalace pro nové distribuce.
+        Changes the default install version for new distributions.
 
     --shutdown
-        Okamžitě ukončí všechny spuštěné distribuce a
-        odlehčený užitkový virtuální počítač WSL 2.
+        Immediately terminates all running distributions and the WSL 2
+        lightweight utility virtual machine.
 
-        Možnosti:
+        Options:
             --force
-                Ukončí virtuální stroj WSL 2, i když probíhá operace. Může způsobit ztrátu dat.
+                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
 
     --status
-        Zobrazí stav Subsystému Windows pro Linux.
+        Show the status of Windows Subsystem for Linux.
 
     --unmount [Disk]
-        Odpojí disk a zruší jeho propojení u všech distribucí WSL2.
-        Pokud proběhlo volání bez argumentu, odpojí se všechny disky a zruší se jejich propojení.
+        Unmounts and detaches a disk from all WSL2 distributions.
+        Unmounts and detaches all disks if called without argument.
 
     --uninstall
-        Odinstaluje balíček Subsystému Windows pro Linux z tohoto počítače.
+        Uninstalls the Windows Subsystem for Linux package from this machine.
 
     --update
-        Aktualizuje balíček Subsystému Windows pro Linux.
+        Update the Windows Subsystem for Linux package.
 
-        Možnosti:
+        Options:
             --pre-release
-                Stáhne předběžnou verzi, pokud je k dispozici.
+                Download a pre-release version if available.
 
     --version, -v
-        Zobrazí informace o verzi.
+        Display version information.
 
-Argumenty pro správu distribucí v Subsystému Windows pro Linux:
+Arguments for managing distributions in Windows Subsystem for Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exportuje distribuci do souboru tar.
-        Název souboru může být - pro stdout.
+        Exports the distribution to a tar file.
+        The filename can be - for stdout.
 
-        Možnosti:
+        Options:
             --format &lt;Format&gt;
-                Určuje formát exportu. Podporované hodnoty: tar, tar.gz, vhd.
+                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Importuje zadaný soubor tar jako novou distribuci.
-        Název souboru může být - pro stdin.
+        Imports the specified tar file as a new distribution.
+        The filename can be - for stdin.
 
-        Možnosti:
+        Options:
             --version &lt;Version&gt;
-                Určuje verzi, která se má použít pro novou distribuci.
+                Specifies the version to use for the new distribution.
 
             --vhd
-                Určuje, že poskytnutý soubor je soubor .vhd nebo .vhdx, nikoli soubor tar.
-                Tato operace vytvoří kopii souboru VHD v zadaném umístění instalace.
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importuje zadaný soubor .VHD jako novou distribuci.
-        Tento VHD musí být naformátovaný typem systému souborů ext4.
+        Imports the specified VHD file as a new distribution.
+        This virtual hard disk must be formatted with the ext4 filesystem type.
 
     --list, -l [Options]
-        Vypíše distribuce.
+        Lists distributions.
 
-        Možnosti:
+        Options:
             --all
-                Vypíše všechny distribuce, včetně distribucí, které se
-                právě instalují nebo odinstalovávají.
+                List all distributions, including distributions that are
+                currently being installed or uninstalled.
 
             --running
-                Vypíše pouze distribuce, které jsou aktuálně spuštěné.
+                List only distributions that are currently running.
 
             --quiet, -q
-                Zobrazí pouze názvy distribucí.
+                Only show distribution names.
 
             --verbose, -v
-                Zobrazí podrobné informace o všech distribucích.
+                Show detailed information about all distributions.
 
             --online, -o
-                Zobrazí seznam dostupných distribucí pro instalaci pomocí 'wsl.exe --install'.
+                Displays a list of available distributions for install with 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Nastaví distribuci jako výchozí.
+        Sets the distribution as the default.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Změní verzi zadané distribuce.
+        Changes the version of the specified distribution.
 
     --terminate, -t &lt;Distro&gt;
-        Ukončí zadanou distribuci.
+        Terminates the specified distribution.
 
     --unregister &lt;Distro&gt;
-        Zruší registraci distribuce a odstraní kořenový systém souborů.</value>
+        Unregisters the distribution and deletes the root filesystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -611,7 +617,8 @@ Argumenty pro správu distribucí v Subsystému Windows pro Linux:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1060,6 +1067,10 @@ Návrat k sítím NAT.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>Operaci nešlo dokončit, protože se VHD právě používá. Vynucení ukončení používání WSL: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>Komprimace je podporována pouze v souborech .vhdx.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} není platná logická hodnota, &lt;true|false&gt;</value>
@@ -2622,10 +2633,11 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Zobrazit podrobné informace o kontejneru.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Ukončit kontejnery.</value>
+    <value>Kill one or more running containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Ukončí kontejnery.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Vypsat kontejnery.</value>
@@ -2680,6 +2692,10 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Zastaví kontejnery.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Spravovat image.</value>
@@ -3059,6 +3075,14 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Neplatná hodnota {}: název sítě nemůže být prázdný ani obsahovat prázdné znaky.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Neplatná hodnota {}: název sítě lze zadat pouze jednou.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Invalid {} value: unsupported network option '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Síť v hostitelském režimu není podporována</value>
   </data>
@@ -3139,7 +3163,8 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Cesta k adresáři úložiště relace</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signál k odeslání</value>
+    <value>Signal to send to the container (default: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuální nebo existující odkaz na obrázek ve formátu image-name[:tag]</value>
@@ -3224,8 +3249,8 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Typ průběhu (formát: none|ansi) (výchozí: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Nastavit typ výstupu průběhu (auto, tty, plain, quiet) (výchozí: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Zásada stahování image (always|missing|never) (výchozí: missing)</value>
@@ -3265,6 +3290,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
     <value>Neplatná hodnota {}: {} není rozpoznaná zásada stahování. Podporované zásady přijetí změn: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Neplatná hodnota {}: {} není rozpoznaný typ průběhu. Podporované typy průběhu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3382,7 +3411,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Název sítě</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Vypíše pouze názvy sítí</value>
+    <value>Only display network IDs</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Odstraňte všechny nepoužívané sítě.</value>
