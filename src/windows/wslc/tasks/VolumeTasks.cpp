@@ -124,7 +124,8 @@ void GetVolumes(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    context.Data.Add<Data::Volumes>(VolumeService::List(session));
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
+    context.Data.Add<Data::Volumes>(VolumeService::List(session, filters));
 }
 
 void InspectVolumes(CLIExecutionContext& context)

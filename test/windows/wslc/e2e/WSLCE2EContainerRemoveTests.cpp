@@ -256,7 +256,7 @@ private:
         return result.GetStdoutLines();
     }
 
-    // A before/after diff is the only option: `volume list` has no --filter and reports no labels.
+    // Anonymous volumes have auto-generated names, so a before/after diff is the way to identify the new one.
     static std::wstring GetNewAnonymousVolumeName(const std::vector<std::wstring>& before)
     {
         std::vector<std::wstring> added;
