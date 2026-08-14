@@ -886,12 +886,14 @@ class WSLCE2EContainerCreateTests
     {
         auto cleanup = wil::scope_exit([&] { EnsureContainerDoesNotExist(WslcContainerName); });
 
-        auto result =
-            RunWslc(std::format(L"container create --shm-size 1.5G --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container create --shm-size 1.5G --name {} {} sh -c \"df -B1 /dev/shm --output=size | sed 1d\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto inspect = InspectContainer(WslcContainerName);
-        VERIFY_ARE_EQUAL(static_cast<int64_t>(1'610'612'736), inspect.HostConfig.ShmSize);
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L" 1610612736\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_ShmSize_Invalid)
