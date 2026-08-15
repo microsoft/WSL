@@ -2204,11 +2204,15 @@ Användning:
     <value>Obligatoriska argument saknas: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Required option not provided: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Visar hjälp om det markerade kommandot</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Flera ömsesidigt uteslutande argument har angetts: {}</value>
+    <value>Multiple mutually exclusive options provided: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2244,7 +2248,11 @@ Användning:
     <value>Inaktivera utmatningsfärg.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Om du vill ha mer information om ett speciellt kommando kan du skicka den till hjälpargumentet.</value>
+    <value>For more details on a specific command, pass it the help option.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Run '{} --help' for more information.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Kommandon:</value>
@@ -2261,8 +2269,14 @@ Användning:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Argument:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Related options:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Related arguments:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Argumentnamnet kändes inte igen för det aktuella kommandot: "{}"</value>
+    <value>Option name was not recognized for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2284,35 +2298,35 @@ Användning:
     <value>Behållar-ID</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Argumentvärde saknas: "{}"</value>
+    <value>Missing option value: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Argumentalias kändes inte igen för det aktuella kommandot: "{}"</value>
+    <value>Option alias was not recognized for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Ogiltig argumentspecifierare: "{}"</value>
+     <value>Invalid option specifier: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Angränsande flaggalias hittades inte: "{}"</value>
+     <value>Adjoined option alias not found: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Angränsande alias är inte en flagga: "{}"</value>
+     <value>Adjoined option alias is not a flag: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Ogiltig argumentspecifierare: "{}"</value>
+     <value>Invalid option specifier: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Flaggargumentet kan inte innehålla ett angränsande värde: "{}"</value>
+     <value>Option cannot contain an adjoined value: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Ogiltigt booleskt värde för flaggargumentet '{}'. Förväntade sant, falskt, 1 eller 0.</value>
+     <value>Ogiltigt booleskt värde för alternativet: '{}'. Förväntades sant, falskt, 1, 0, t eller f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2320,7 +2334,7 @@ Användning:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Argumentnamnet saknas vid: "{}"</value>
+     <value>Missing option name at: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2332,7 +2346,7 @@ Användning:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasargument med ett värde måste vara sist i aliaskedjan: "{}"</value>
+     <value>Alias options with a value must be last in the alias chain: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2475,7 +2489,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Det går inte att ange nätverksalias när flera nätverk begärs. Använd ett enda --network argument.</value>
+    <value>Det går inte att ange nätverksalias när flera nätverk begärs. Använd ett enda --network alternativ.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2962,7 +2976,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Ogiltigt {}-argumentvärde: '{}'. Ett positivt antal processorer förväntades (t.ex. 0.5, 1, 2)</value>
+    <value>Ogiltigt {}-alternativvärde: '{}'. Ett positivt antal processorer förväntades (t.ex. 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2990,7 +3004,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Filtrera utdata baserat på angivna villkor</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Ogiltigt argument {} för flaggan '-f, --filter': felaktigt filterformat (förväntat namn=värde)</value>
+    <value>Invalid value "{}" for the '-f, --filter' option: bad format of filter (expected name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Följ loggutdata</value>
@@ -3081,7 +3095,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
-    <value>Invalid {} value: unsupported network option '{}'</value>
+    <value>Ogiltigt {}-värde: nätverksalternativet ''{}'' stöds inte</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
@@ -3269,7 +3283,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Ogiltigt {}-argumentvärde: '{}'. Förväntad &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (använd -1 för obegränsat)</value>
+    <value>Ogiltigt {}-alternativvärde: '{}'. Förväntad &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (använd -1 för obegränsat)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3306,11 +3320,11 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Ogiltigt {} argumentvärde: {}</value>
+    <value>Invalid {} option value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Ogiltigt {}-argumentvärde: '{}'. En Unix-epoktidsstämpel eller en RFC3339 datum/tid (t.ex. 2024-01-15T10:30:00Z) förväntades</value>
+    <value>Ogiltigt {}-alternativvärde: '{}'. En Unix-epoktidsstämpel eller en RFC3339 datum/tid (t.ex. 2024-01-15T10:30:00Z) förväntades</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3318,11 +3332,11 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Ogiltigt {} argumentvärde: ''{}''. En minnesstorlek förväntades (t.ex. 256M, 1G)</value>
+    <value>Invalid {} option value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Ogiltigt {} argumentvärde: ''{}''. En varaktighet förväntades (t.ex. 30s, 1m30s)</value>
+    <value>Invalid {} option value: '{}'. Expected a duration (e.g. 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3499,10 +3513,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Matar endast ut volymnamnen</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Det går inte att skriva bilden till terminalen. Använd -o-flaggan eller omdirigera stdout.</value>
+    <value>Cannot write image to terminal. Use the -o option or redirect stdout.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Det går inte att exportera containern till terminalen. Använd -o-flaggan eller omdirigera stdout.</value>
+    <value>Cannot export container to terminal. Use the -o option or redirect stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Förväntat format: &lt;host path | named volume&gt;:&lt;container path&gt;[:läge]</value>

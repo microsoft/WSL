@@ -2204,11 +2204,15 @@ Gebruik:
     <value>Vereist argument niet ingevoerd: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Vereiste optie niet opgegeven: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Toont informatie over de geselecteerde opdracht</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Meerdere elkaar uitsluitende argumenten opgegeven: '{}'</value>
+    <value>Meerdere elkaar uitsluitende opties opgegeven: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2244,7 +2248,11 @@ Gebruik:
     <value>Kleuruitvoer uitschakelen.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Geef het Help-argument door voor meer informatie over een specifieke opdracht.</value>
+    <value>Geef de Help-optie door voor meer informatie over een specifieke opdracht.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Run '{} --help' for more information.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Opdrachten:</value>
@@ -2261,8 +2269,14 @@ Gebruik:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Argumenten:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Verwante opties:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Gerelateerde argumenten:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Argumentnaam is niet herkend voor de huidige opdracht: '{}'</value>
+    <value>De optienaam is niet herkend voor de huidige opdracht: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2284,35 +2298,35 @@ Gebruik:
     <value>Container-id</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Ontbrekende argumentwaarde: '{}'</value>
+    <value>Ontbrekende optiewaarde: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Argumentalias is niet herkend voor de huidige opdracht: '{}'</value>
+    <value>Optiealias is niet herkend voor de huidige opdracht: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Aanduiding ongeldig argument: '{}'</value>
+     <value>Ongeldige optiespecificatie: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Verbonden vlagalias niet gevonden: '{}'</value>
+     <value>Verbonden optiealias niet gevonden: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Verbonden alias is geen vlag: '{}'</value>
+     <value>Verbonden optiealias is geen vlag: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Aanduiding ongeldig argument: '{}'</value>
+     <value>Ongeldige optiespecificatie: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Vlagargument mag geen verbonden waarde bevatten: '{}'</value>
+     <value>Optie mag geen aangehechte waarde bevatten: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Ongeldige booleaanse waarde voor vlagargument: '{}'. Verwacht true, false, 1 of 0.</value>
+     <value>Ongeldige booleaanse waarde voor optie: '{}'. Verwacht true, false, 1, 0, t of f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2320,7 +2334,7 @@ Gebruik:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Ontbrekende argumentnaam bij: '{}'</value>
+     <value>Ontbrekende optienaam bij: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2332,7 +2346,7 @@ Gebruik:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasargumenten met een waarde moeten als laatste in de aliasreeks staan: '{}'</value>
+     <value>Aliasopties met een waarde moeten als laatste in de aliasreeks staan: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2475,7 +2489,7 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Netwerkaliassen kunnen niet worden opgegeven als er meerdere netwerken worden aangevraagd. Gebruik één --network argument.</value>
+    <value>Netwerkaliassen kunnen niet worden opgegeven als er meerdere netwerken worden aangevraagd. Gebruik één --network optie.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2961,7 +2975,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een positief aantal CPU's verwacht (bijvoorbeeld 0.5, 1, 2)</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een positief aantal CPU's verwacht (bijvoorbeeld 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2989,7 +3003,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Filter de uitvoer op basis van de opgegeven voorwaarden</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Ongeldig argument {} voor '-f, --filter' vlag: ongeldige indeling van filter (verwachte naam=waarde)</value>
+    <value>Ongeldige waarde {} voor '-f, --filter' optie: ongeldige indeling van filter (verwachte naam=waarde)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Logboekuitvoer volgen</value>
@@ -3268,7 +3282,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Verwachte &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (gebruik -1 voor onbeperkt)</value>
+    <value>Ongeldige {} optiewaarde: {}. Verwachte &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (gebruik -1 voor onbeperkt)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3305,11 +3319,11 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Ongeldige {} parameterwaarde: {}</value>
+    <value>Ongeldige waarde voor optie {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een Unix epoche-tijdstempel of een RFC3339 datum/tijd (bijvoorbeeld 2024-01-15T10:30:00Z) verwacht</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een Unix epoche-tijdstempel of een RFC3339 datum/tijd (bijvoorbeeld 2024-01-15T10:30:00Z) verwacht</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3317,11 +3331,11 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een duur verwacht (bijvoorbeeld 30s, 1m30s)</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een duur verwacht (bijvoorbeeld 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3498,10 +3512,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Voert alleen de volumenamen uit</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Kan de installatiekopieën niet naar de terminal schrijven. Gebruik de -o-vlag of omleidings-stdout.</value>
+    <value>Kan de afbeelding niet naar de terminal schrijven. Gebruik de -o-optie of leid stdout om.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Kan container niet naar de terminal exporteren. Gebruik de -o-vlag of omleidings-stdout.</value>
+    <value>Kan container niet naar de terminal exporteren. Gebruik de -o-optie of leid stdout om.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Verwachte indeling: &lt;hostpad | benoemd volume&gt;:&lt;containerpad&gt;[:modus]</value>

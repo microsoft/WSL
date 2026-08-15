@@ -397,218 +397,218 @@ Využití:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. Všechna práva vyhrazena.
+Informace o ochraně osobních údajů k tomuto produktu najdete na stránce https://aka.ms/privacy.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Použití: wsl.exe [Argument] [Options...] [CommandLine]
 
-Arguments for running Linux binaries:
+Argumenty pro spouštění binárních souborů Linuxu:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Pokud není zadaný žádný příkazový řádek, spustí wsl.exe výchozí prostředí.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Spustí zadaný příkaz bez použití výchozího linuxového prostředí.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Spustí zadaný příkaz se zadaným typem prostředí.
 
     --
-        Pass the remaining command line as-is.
+        Předá zbývající příkazový řádek tak, jak je.
 
-Options:
+Možnosti:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Nastaví zadaný adresář jako aktuální pracovní adresář.
+        Pokud se použije ~, použije se domovská cesta uživatele Linuxu. Pokud cesta začíná
+        znakem /, bude interpretována jako absolutní cesta Linuxu.
+        V opačném případě musí být hodnota absolutní cestou systému Windows.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Spustí zadanou distribuci.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Spustí ID zadané distribuce.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Spustí jako zadaný uživatel.
 
     --system
-        Launches a shell for the system distribution.
+        Spustí prostředí pro distribuci systému.
 
-Arguments for managing Windows Subsystem for Linux:
+Argumenty pro správu Subsystému Windows pro Linux:
 
     --help
-        Display usage information.
+        Zobrazí informace o použití.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Otevře prostředí ladění WSL2 pro diagnostické účely.
 
     --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+        Nainstaluje distribuci Subsystému Windows pro Linux.
+        Seznam platných distribucí zobrazíte pomocí příkazu 'wsl.exe --list --online'.
 
-        Options:
+        Možnosti:
             --enable-wsl1
-                Enable WSL1 support.
+                Povolí podporu WSL1.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Vytvořte disk s pevnou velikostí pro uložení distribuce.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Nainstaluje distribuci z místního souboru.
 
             --legacy
-                Use the legacy distribution manifest.
+                Použije starší verzi manifestu distribuce.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Nastaví instalační cestu pro distribuci.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Nastaví název distribuce.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Nainstaluje pouze požadované volitelné součásti, nenainstaluje distribuci.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Po instalaci nespustí distribuci.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Určuje verzi, která se má použít pro novou distribuci.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Určuje velikost disku pro uložení distribuce.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Stáhne distribuci z internetu namísto z Microsoft Storu.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Změní specifické možnosti distribuce.
 
-        Options:
+        Možnosti:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                Přesune distribuci do nového umístění.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Nastavte VHD virtuální pevný disk distribuce na zhuštěný, což umožní automatické uvolnění místa na disku.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Nastaví výchozího uživatele distribuce.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Změní velikost disku distribuce na zadanou velikost.
 
             --compact
-                Compact the VHDX file of a WSL 2 distribution.
+                Zkomprimuje soubor VHDX distribuce WSL 2.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Propojí a připojí fyzický nebo virtuální disk ve všech distribucích WSL 2.
 
-        Options:
+        Možnosti:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Určuje, že &lt;Disk&gt; odkazuje na virtuální pevný disk.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Propojí disk s WSL2, ale nepřipojí ho.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Připojí disk pomocí vlastního názvu přípojného bodu.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Systém souborů, který se má použít při připojování disku. Pokud není zadaný, výchozí hodnota je ext4.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Další možnosti připojení.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                Index oddílu, který se má připojit. Pokud není zadaný, výchozí hodnota je celý disk.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Změní výchozí verzi instalace pro nové distribuce.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Okamžitě ukončí všechny spuštěné distribuce a WSL 2
+        odlehčený užitkový virtuální počítač.
 
-        Options:
+        Možnosti:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Ukončí virtuální stroj WSL 2, i když probíhá operace. Může způsobit ztrátu dat.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Zobrazí stav Subsystému Windows pro Linux.
 
     --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+        Odpojí disk a zruší jeho propojení u všech distribucí WSL2.
+        Pokud proběhlo volání bez argumentu, odpojí se všechny disky a zruší se jejich propojení.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Odinstaluje balíček Subsystému Windows pro Linux z tohoto počítače.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Aktualizuje balíček Subsystému Windows pro Linux.
 
-        Options:
+        Možnosti:
             --pre-release
-                Download a pre-release version if available.
+                Stáhne předběžnou verzi, pokud je k dispozici.
 
     --version, -v
-        Display version information.
+        Zobrazí informace o verzi.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Argumenty pro správu distribucí v Subsystému Windows pro Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+        Exportuje distribuci do souboru tar.
+        Název souboru může být - pro stdout.
 
-        Options:
+        Možnosti:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Určuje formát exportu. Podporované hodnoty: tar, tar.gz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+        Importuje zadaný soubor tar jako novou distribuci.
+        Název souboru může být - pro stdin.
 
-        Options:
+        Možnosti:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Určuje verzi, která se má použít pro novou distribuci.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Určuje, že poskytnutý soubor je soubor .vhd nebo .vhdx, nikoli soubor tar.
+                Tato operace vytvoří kopii souboru VHD v zadaném umístění instalace.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Importuje zadaný soubor VHD jako novou distribuci.
+        Tento virtuální pevný disk musí být naformátovaný typem systému souborů ext4.
 
     --list, -l [Options]
-        Lists distributions.
+        Vypíše distribuce.
 
-        Options:
+        Možnosti:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Vypíše všechny distribuce, včetně distribucí, které se
+                právě instalují nebo odinstalovávají.
 
             --running
-                List only distributions that are currently running.
+                Vypíše pouze distribuce, které jsou aktuálně spuštěny.
 
             --quiet, -q
-                Only show distribution names.
+                Zobrazí pouze názvy distribucí.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Zobrazí podrobné informace o všech distribucích.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Zobrazí seznam dostupných distribucí pro instalaci pomocí 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Nastaví distribuci jako výchozí.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Změní verzi zadané distribuce.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Ukončí zadanou distribuci.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Zruší registraci distribuce a odstraní kořenový systém souborů.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -2204,11 +2204,15 @@ Využití:
     <value>Nebyl zadán požadovaný argument: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Required option not provided: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Zobrazí nápovědu k vybranému příkazu</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Bylo poskytnuto několik vzájemně se vylučujících argumentů: '{}'</value>
+    <value>Multiple mutually exclusive options provided: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2244,7 +2248,11 @@ Využití:
     <value>Zakázat barevný výstup.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Pokud chcete získat podrobnosti o konkrétním příkazu, předejte ho do argumentu help.</value>
+    <value>For more details on a specific command, pass it the help option.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Run '{} --help' for more information.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Příkazy:</value>
@@ -2261,8 +2269,14 @@ Využití:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Argumenty:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Related options:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Related arguments:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Nebyl rozpoznán název argumentu pro aktuální příkaz: '{}'</value>
+    <value>Option name was not recognized for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2284,35 +2298,35 @@ Využití:
     <value>ID kontejneru</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Chybí hodnota argumentu: '{}'</value>
+    <value>Missing option value: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Nebyl rozpoznán alias argumentu pro aktuální příkaz: '{}'</value>
+    <value>Option alias was not recognized for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Neplatný specifikátor argumentu: '{}'</value>
+     <value>Invalid option specifier: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Nenašel se sousedící alias typu příznak: '{}'</value>
+     <value>Adjoined option alias not found: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Sousedící alias není příznak: '{}'</value>
+     <value>Adjoined option alias is not a flag: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Neplatný specifikátor argumentu: '{}'</value>
+     <value>Invalid option specifier: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Argument příznaku nemůže obsahovat sousedící hodnotu: '{}'</value>
+     <value>Option cannot contain an adjoined value: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Neplatná logická hodnota pro argument příznaku: '{}'. Očekávala se hodnota true, false, 1 nebo 0.</value>
+     <value>Neplatná logická hodnota pro možnost: '{}'. Očekávala se hodnota true, false, 1, 0, t nebo f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2320,7 +2334,7 @@ Využití:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Chybí název argumentu v: '{}'</value>
+     <value>Missing option name at: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2332,7 +2346,7 @@ Využití:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Argumenty aliasu s hodnotou musí být poslední v řetězci aliasů: '{}'</value>
+     <value>Alias options with a value must be last in the alias chain: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2475,7 +2489,7 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network option.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2633,10 +2647,10 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Zobrazit podrobné informace o kontejneru.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kill one or more running containers.</value>
+    <value>Ukončí jeden nebo více spuštěných kontejnerů.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <value>Ukončí jeden nebo více spuštěných kontejnerů. Ve výchozím nastavení odešle SIGKILL, případně signál zadaný pomocí --signal.</value>
     <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
@@ -2694,7 +2708,7 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Zastaví kontejnery.</value>
   </data>
   <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
-    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <value>Signál, který se má odeslat (výchozí: nakonfigurovaný STOPSIGNAL kontejneru, nebo SIGTERM, pokud není nakonfigurovaný žádný)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
@@ -2961,7 +2975,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Neplatná hodnota argumentu {}: '{}'. Očekával se kladný počet procesorů (např. 0.5, 1, 2)</value>
+    <value>Neplatná hodnota možnosti {}: '{}'. Očekával se kladný počet procesorů (např. 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2989,7 +3003,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Filtrovat výstup na základě zadaných podmínek</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Neplatný argument "{}" pro příznak '-f, --filter': chybný formát filtru (očekává se name=value)</value>
+    <value>Invalid value "{}" for the '-f, --filter' option: bad format of filter (expected name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Sledovat výstup protokolu</value>
@@ -3080,7 +3094,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
-    <value>Invalid {} value: unsupported network option '{}'</value>
+    <value>Neplatná hodnota {}: nepodporovaná síťová možnost {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
@@ -3163,7 +3177,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Cesta k adresáři úložiště relace</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send to the container (default: SIGKILL)</value>
+    <value>Signál, který se má odeslat kontejneru (výchozí: SIGKILL)</value>
     <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
@@ -3268,7 +3282,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Neplatná hodnota argumentu {}: '{}'. Očekávaný &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (použijte -1 pro neomezený počet)</value>
+    <value>Neplatná hodnota možnosti {}: '{}'. Očekávaný &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (použijte -1 pro neomezený počet)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3305,11 +3319,11 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Neplatná hodnota argumentu {}: {}</value>
+    <value>Invalid {} option value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Neplatná hodnota argumentu {}: '{}'. Očekávalo se časové razítko epochy systému Unix nebo datum a čas RFC3339 (např. 2024-01-15T10:30:00Z).</value>
+    <value>Neplatná hodnota možnosti {}: '{}'. Očekávalo se časové razítko epochy systému Unix nebo datum a čas RFC3339 (např. 2024-01-15T10:30:00Z).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3317,11 +3331,11 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Neplatná hodnota argumentu {}: {} Očekávaná velikost paměti (např. 256M, 1G)</value>
+    <value>Invalid {} option value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Neplatná hodnota argumentu {}: {}. Očekává se doba trvání (např. 30s, 1m30s)</value>
+    <value>Invalid {} option value: '{}'. Expected a duration (e.g. 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3411,7 +3425,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Název sítě</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Only display network IDs</value>
+    <value>Zobrazit pouze ID sítě</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Odstraňte všechny nepoužívané sítě.</value>
@@ -3498,10 +3512,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Vypíše jenom názvy svazků</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Nelze zapsat obrázek do terminálu. Použijte příznak -o nebo přesměrujte stdout.</value>
+    <value>Cannot write image to terminal. Use the -o option or redirect stdout.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Kontejner nelze exportovat do terminálu. Použijte příznak -o nebo přesměrujte stdout.</value>
+    <value>Cannot export container to terminal. Use the -o option or redirect stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Očekávaný formát: &lt;cesta k hostiteli | pojmenovaný svazek&gt;:&lt;cesta ke kontejneru&gt;[:mode]</value>
