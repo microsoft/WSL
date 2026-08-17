@@ -2549,6 +2549,21 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
 
     Result = -1;
     auto ReportStatus = wil::scope_exit([&Channel, &Result, MessageType = Message->Header.MessageType]() {
+        wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
+
+        if (MessageType != LxMiniInitMessageExport && Result == 0)
+        {
+            PostProcessImportedDistribution(message, DISTRO_PATH);
+        }
+
+        sync();
+
+        if (umount(DISTRO_PATH) < 0)
+        {
+            LOG_ERROR("umount({}) failed, {}", DISTRO_PATH, errno);
+            Result = -1;
+        }
+
         if (MessageType == LxMiniInitMessageExport)
         {
             if (UtilWriteBuffer(Channel.Socket(), &Result, sizeof(Result)) < 0)
@@ -2558,13 +2573,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
         }
         else
         {
-            wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
             message->Result = Result;
-            if (Result == 0)
-            {
-                PostProcessImportedDistribution(message, DISTRO_PATH);
-            }
-
             Channel.SendMessage<LX_MINI_INIT_IMPORT_RESULT>(message.Span());
         }
     });
