@@ -54,7 +54,7 @@ namespace {
     template <ArgType A, typename Converter>
     void CacheConverted(ArgMap& execArgs, const std::wstring& argName, Converter&& convert)
     {
-        using value_t = typename details::ArgConvertedTypeMapping<A>::value_t;
+        using value_t = typename wsl::windows::wslc::argument::details::ArgConvertedTypeMapping<A>::value_t;
         using converted_t = decltype(convert(std::declval<const std::wstring&>(), std::declval<const std::wstring&>()));
         static_assert(
             std::is_same_v<converted_t, value_t>,
@@ -106,6 +106,10 @@ void Argument::Validate(ArgMap& execArgs) const
         CacheConverted<ArgType::Pull>(execArgs, m_name, validation::GetPullPolicyFromString);
         break;
 
+    case ArgType::Progress:
+        CacheConverted<ArgType::Progress>(execArgs, m_name, validation::GetProgressModeFromString);
+        break;
+
     case ArgType::Signal:
         CacheConverted<ArgType::Signal>(execArgs, m_name, validation::GetWSLCSignalFromString);
         break;
@@ -146,7 +150,17 @@ void Argument::Validate(ArgMap& execArgs) const
         if (execArgs.Contains(ArgType::HealthCmd) || execArgs.Contains(ArgType::HealthInterval) || execArgs.Contains(ArgType::HealthTimeout) ||
             execArgs.Contains(ArgType::HealthStartPeriod) || execArgs.Contains(ArgType::HealthRetries))
         {
-            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError());
+            std::vector<Argument> conflictingArguments{*this};
+            for (const auto type :
+                 {ArgType::HealthCmd, ArgType::HealthInterval, ArgType::HealthTimeout, ArgType::HealthStartPeriod, ArgType::HealthRetries})
+            {
+                if (execArgs.Contains(type))
+                {
+                    conflictingArguments.emplace_back(Argument::Create(type));
+                }
+            }
+
+            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError(), std::move(conflictingArguments));
         }
         break;
 
@@ -254,19 +268,15 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::Network:
     {
-        for (const auto& value : RawArgMapAccess::GetAll<ArgType::Network>(execArgs))
-        {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+        CacheConverted<ArgType::Network>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            auto parsed = validation::ParseNetworkArgument(value, name);
+            if (IsEqual(parsed.Name, "host", true))
             {
-                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
+                throw ExecutionException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }
 
-            if (IsEqual(value, L"host", true))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
-            }
-        }
+            return parsed;
+        });
         break;
     }
 

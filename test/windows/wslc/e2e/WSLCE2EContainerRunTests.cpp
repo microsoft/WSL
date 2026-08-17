@@ -915,8 +915,7 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"host mode networking is not supported"));
+        result.Verify({.Stdout = L"", .Stderr = wsl::shared::Localization::WSLCCLI_NetworkHostModeNotSupportedError() + L"\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -967,6 +966,41 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_DockerStyleMultiNetwork_Success)
+    {
+        const auto secondNetworkName = TestNetworkName + L"-2";
+        EnsureNetworkDoesNotExist(secondNetworkName);
+
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(L"network create --driver bridge {}", secondNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupSecondNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(secondNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container run --name {} --network name={},alias=db,alias=primary "
+            L"--network name={},alias=cache,alias=replica {} true",
+            WslcContainerName,
+            TestNetworkName,
+            secondNetworkName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
+        const auto secondNetwork = wsl::shared::string::WideToMultiByte(secondNetworkName);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(secondNetwork));
+        const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+        const auto& secondEndpoint = inspect.NetworkSettings.Networks.at(secondNetwork);
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "primary") != endpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(secondEndpoint.Aliases, "cache") != secondEndpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(secondEndpoint.Aliases, "replica") != secondEndpoint.Aliases.end());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_NoNetwork_Rejected)
     {
         auto result =
@@ -994,9 +1028,8 @@ class WSLCE2EContainerRunTests
             WslcContainerName,
             DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(
-            result.StderrContainsSubstring(L"Network aliases cannot be specified when multiple networks are requested. Use a "
-                                           L"single --network argument.\r\nError code: E_INVALIDARG"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            wsl::shared::Localization::MessageWslcAliasAmbiguousWithMultipleNetworks() + L"\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_EmptyValue_Rejected)
@@ -1203,7 +1236,8 @@ class WSLCE2EContainerRunTests
             auto result =
                 RunWslc(std::format(L"container run --rm --stop-timeout abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid stop-timeout argument value: abc"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                wsl::shared::Localization::WSLCCLI_InvalidIntegerArgumentError(L"stop-timeout", L"abc")));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -1237,7 +1271,7 @@ class WSLCE2EContainerRunTests
                 RunWslc(std::format(L"container run --rm --shm-size invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid shm-size argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)"));
+                wsl::shared::Localization::WSLCCLI_InvalidMemorySizeError(L"shm-size", L"invalid")));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -1245,8 +1279,8 @@ class WSLCE2EContainerRunTests
             auto result =
                 RunWslc(std::format(L"container run --rm --shm-size 128X --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid shm-size argument value: '128X'. Expected a memory size (e.g. 256M, 1G)"));
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidMemorySizeError(L"shm-size", L"128X")));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
@@ -1294,7 +1328,8 @@ class WSLCE2EContainerRunTests
         auto result = RunWslc(
             std::format(L"container run --rm --health-timeout invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid health-timeout argument value"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            wsl::shared::Localization::WSLCCLI_InvalidDurationError(L"health-timeout", L"invalid")));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1396,8 +1431,7 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(L"container run --rm --cpus 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidCpusError(L"cpus", L"0")));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1407,7 +1441,7 @@ class WSLCE2EContainerRunTests
             RunWslc(std::format(L"container run --rm --memory invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
         VERIFY_IS_TRUE(
-            result.StderrContainsSubstring(L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)"));
+            result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidMemorySizeError(L"memory", L"invalid")));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -1416,8 +1450,8 @@ class WSLCE2EContainerRunTests
         auto result =
             RunWslc(std::format(L"container run --rm --ulimit nofile --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)"));
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidUlimitError(L"ulimit", L"nofile")));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 

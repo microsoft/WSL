@@ -1022,6 +1022,8 @@ try
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
+    // Progress is requested as JSON so it can be parsed into the formatted progress messages sent to the
+    // client. The raw JSON is a docker implementation detail and is never forwarded.
     std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
@@ -1246,6 +1248,7 @@ try
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
+    std::set<std::string> reportedCached;
     std::set<std::string> reportedErrors;
     std::map<std::string, std::string> digestToStageName;
     bool needsNewline = false; // true when the last log chunk didn't end with \n
@@ -1278,6 +1281,23 @@ try
         }
 
         return {};
+    };
+
+    // Returns the leading step token from a BuildKit vertex name, e.g. "[2/3]" from "[2/3] RUN make".
+    // Falls back to the full name when there is no bracketed prefix.
+    auto getStepToken = [](const std::string& name) -> std::string {
+        if (name.empty() || name[0] != '[')
+        {
+            return name;
+        }
+
+        auto close = name.find(']');
+        if (close == std::string::npos)
+        {
+            return name;
+        }
+
+        return name.substr(0, close + 1);
     };
 
     auto logPrefix = [](const std::string& name) -> std::string {
@@ -1343,6 +1363,16 @@ try
             {
                 flushLine();
                 reportProgress(vertex.name + "\n");
+            }
+
+            if (vertex.cached && reportedCached.insert(vertex.digest).second)
+            {
+                auto stepToken = getStepToken(vertex.name);
+                if (!stepToken.empty())
+                {
+                    flushLine();
+                    reportProgress(stepToken + " CACHED\n");
+                }
             }
 
             if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
@@ -1413,8 +1443,7 @@ try
         }
     };
 
-    // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure).
+    // Docker writes progress to stderr and the final image ID to stdout on success (empty on failure).
     //
     // For dest=- the exporter tarball is written to stdout, so it is relayed to the client handle as the
     // build runs. RelayHandle is an overlapped handle, so a slow client only marks the relay pending and
@@ -2979,7 +3008,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkInformation** Networks, ULONG* Count)
 try
 {
     WSLCExecutionContext context(this);
@@ -2990,12 +3019,27 @@ try
     *Networks = nullptr;
     *Count = 0;
 
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    const bool filtered = !filters.empty();
+
+    if (filtered)
+    {
+        // Scope the filtered query to WSLC-managed networks.
+        filters["label"].push_back(WSLCNetworkManagedLabel);
+    }
+
     auto lock = AcquireLease();
+
     std::lock_guard networksLock(m_networksLock);
 
-    if (m_networks.empty())
+    std::vector<docker_schema::Network> dockerNetworks;
+    if (filtered)
     {
-        return S_OK;
+        try
+        {
+            dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+        }
+        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
     }
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
@@ -3003,10 +3047,20 @@ try
     ULONG index = 0;
     for (const auto& [name, entry] : m_networks)
     {
+        if (filtered && std::ranges::find_if(dockerNetworks, [&](const auto& n) { return n.Name == name; }) == dockerNetworks.end())
+        {
+            continue;
+        }
+
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
         index++;
+    }
+
+    if (index == 0)
+    {
+        return S_OK;
     }
 
     *Networks = output.release();

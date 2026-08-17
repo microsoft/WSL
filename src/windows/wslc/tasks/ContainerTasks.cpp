@@ -238,11 +238,7 @@ void KillContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
-    WSLCSignal signal = WSLCSignalSIGKILL;
-    if (context.Args.Contains(ArgType::Signal))
-    {
-        signal = context.Args.GetValue<ArgType::Signal>();
-    }
+    const auto signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGKILL);
 
     for (const auto& id : containerIds)
     {
@@ -831,9 +827,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     {
         auto networks = context.Args.GetAllValues<ArgType::Network>();
         options.Networks.reserve(options.Networks.size() + networks.size());
-        for (const auto& value : networks)
+        for (auto& parsed : networks)
         {
-            options.Networks.emplace_back(WideToMultiByte(value));
+            auto& network = options.Networks.emplace_back();
+            network.Name = std::move(parsed.Name);
+            network.Aliases = std::move(parsed.Aliases);
         }
     }
 
@@ -1031,10 +1029,9 @@ void StopContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
-    if (context.Args.Contains(ArgType::Signal))
-    {
-        options.Signal = context.Args.GetValue<ArgType::Signal>();
-    }
+
+    // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
+    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
 
     if (context.Args.Contains(ArgType::Time))
     {

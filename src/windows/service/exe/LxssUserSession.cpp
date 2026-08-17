@@ -492,6 +492,18 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::CompactDistribution(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CompactDistribution(DistroGuid);
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -929,77 +941,58 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
 
     RETURN_HR_IF(E_NOTIMPL, WI_IsFlagClear(distro.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
-    // Build the final vhd path.
-    std::filesystem::path newVhdPath = Location;
-    RETURN_HR_IF(E_INVALIDARG, newVhdPath.empty());
+    std::filesystem::path destDir(Location);
+    RETURN_HR_IF(E_INVALIDARG, destDir.empty());
 
-    newVhdPath /= distro.VhdFilePath.filename();
+    const std::filesystem::path destPath = destDir / distro.VhdFilePath.filename();
 
-    auto impersonate = wil::CoImpersonateClient();
-
-    // Create the distribution base folder
-    std::error_code error;
-    std::filesystem::create_directories(Location, error);
-    if (error.value())
+    // Cross-volume MoveFileEx creates a new file using the impersonation token's
+    // default owner. Normalize that owner to the caller's user SID so elevated moves
+    // do not produce a VHD owned by BUILTIN\Administrators.
+    PSID originalVhdOwner = nullptr;
+    wil::unique_hlocal originalSecurityDescriptor;
     {
-        THROW_WIN32(error.value());
+        auto impersonate = wil::impersonate_token(userToken.get());
+        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+            distro.VhdFilePath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &originalVhdOwner, nullptr, nullptr, nullptr, &originalSecurityDescriptor));
     }
 
-    // Read the original VHD owner before the move so we can restore it after.
-    // Cross-volume MoveFileEx may set the owner to BUILTIN\Administrators for
-    // elevated callers, which breaks HcsGrantVmAccess (needs WRITE_DAC via
-    // ownership) from non-elevated contexts.
-    PSID originalOwner = nullptr;
-    wil::unique_hlocal originalDescriptor;
-    THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
-        distro.VhdFilePath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &originalOwner, nullptr, nullptr, nullptr, &originalDescriptor));
+    auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
+    TOKEN_OWNER tokenOwner{tokenUser->User.Sid};
+    THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(userToken.get(), TokenOwner, &tokenOwner, sizeof(tokenOwner)));
 
-    // Move the VHD to the new location.
-    THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
+    {
+        auto impersonate = wil::impersonate_token(userToken.get());
 
-    // Restore the original VHD owner on the moved file. Open the file while impersonating
-    // the caller, then use ReOpenFile to add WRITE_OWNER as SYSTEM with SE_RESTORE_NAME
-    // (needed since a cross-volume MoveFileEx may leave the file owned by
-    // BUILTIN\Administrators). ReOpenFile reuses the already-open file object instead of
-    // resolving the path again.
-    auto setVhdOwner = [&originalOwner](const std::filesystem::path& vhdPath) {
-        wil::unique_hfile vhdHandle(CreateFileW(
-            vhdPath.c_str(), READ_CONTROL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
-        THROW_LAST_ERROR_IF(!vhdHandle);
+        std::error_code error;
+        std::filesystem::create_directories(destDir, error);
+        if (error.value())
+        {
+            THROW_WIN32(error.value());
+        }
 
-        auto runAsSelf = wil::run_as_self();
-        auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
+        THROW_IF_WIN32_BOOL_FALSE(MoveFileExW(distro.VhdFilePath.c_str(), destPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
+    }
 
-        wil::unique_hfile privilegedHandle(ReOpenFile(
-            vhdHandle.get(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_FLAG_OPEN_REPARSE_POINT));
-        THROW_LAST_ERROR_IF(!privilegedHandle);
-
-        THROW_IF_WIN32_ERROR(::SetSecurityInfo(
-            privilegedHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
-    };
-
-    // Install the rollback before fixing up ownership so a failure there (e.g. the caller
-    // lacking access on the moved file) still moves the VHD back instead of leaving the
-    // registration pointing at a file that no longer exists at the old location.
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(
-            newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+        TOKEN_OWNER originalOwner{originalVhdOwner};
+        LOG_IF_WIN32_BOOL_FALSE(SetTokenInformation(userToken.get(), TokenOwner, &originalOwner, sizeof(originalOwner)));
 
-        // Fix ownership on the reverted VHD in case MoveFileEx copied across volumes.
-        LOG_IF_FAILED(wil::ResultFromException([&] { setVhdOwner(distro.VhdFilePath); }));
+        auto impersonate = wil::impersonate_token(userToken.get());
+        if (!MoveFileExW(destPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            LOG_LAST_ERROR();
+            return;
+        }
 
-        // Write the location back to the original path in case the second registry write failed. Otherwise, this is a no-op.
-        registration.Write(Property::BasePath, distro.BasePath.c_str());
+        LOG_IF_FAILED(wil::ResultFromException(
+            WI_DIAGNOSTICS_INFO, [&]() { registration.Write(Property::BasePath, distro.BasePath.c_str()); }));
     });
 
-    setVhdOwner(newVhdPath);
-
-    // Update the registry location
     registration.Write(Property::BasePath, Location);
-    registration.Write(Property::VhdFileName, newVhdPath.filename().c_str());
+    registration.Write(Property::VhdFileName, destPath.filename().c_str());
 
     revert.release();
-
     return S_OK;
 }
 
@@ -1867,6 +1860,58 @@ try
         wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE);
     }
 
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
+try
+{
+    auto runAsUser = wil::CoImpersonateClient();
+    std::filesystem::path vhdPath;
+    LXSS_DISTRO_CONFIGURATION configuration{};
+
+    {
+        std::lock_guard lock(m_instanceLock);
+        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
+        const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+        configuration = s_GetDistributionConfiguration(registration);
+        RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+        vhdPath = configuration.VhdFilePath;
+        if (wsl::shared::string::IsEqual(vhdPath.extension().c_str(), wsl::windows::common::wslutil::c_vhdFileExtension, true))
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageCompactVhdNotSupported());
+        }
+
+        _ConversionBegin(configuration.DistroId, LxssDistributionStateCompacting);
+
+        // Trim the filesystem before compaction so the host can reclaim the freed blocks.
+        //
+        // WSL2 does not mount ext4 with 'discard' and does not run fsck at boot, so blocks freed
+        // inside the guest are still marked as allocated in the VHD and a bare compaction reclaims
+        // little space. Attaching the (now stopped) distribution's VHD to the utility VM and running
+        // an offline fsck with block discard releases those blocks, then ejecting flushes the change
+        // back to the VHD before it is compacted below.
+        //
+        // This is best-effort: any failure here must not prevent compaction.
+        try
+        {
+            _CreateVm();
+            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+            auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
+            m_utilityVm->TrimDistribution(lun);
+        }
+        CATCH_LOG();
+    }
+
+    auto compactionComplete = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ConversionComplete(configuration.DistroId); });
+
+    THROW_IF_FAILED_MSG(
+        wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); }),
+        "Failed to compact VHD: %ls",
+        vhdPath.c_str());
     return S_OK;
 }
 CATCH_RETURN()
@@ -3022,6 +3067,18 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         }
     }
 
+    auto deleteWithRetry = [&](const std::filesystem::path& path) {
+        try
+        {
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(path.c_str())); },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10),
+                {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
+        }
+        CATCH_LOG_MSG("Failed to delete %ls", path.c_str())
+    };
+
     // For WSL2 distributions, unmount and delete the VHD.
     if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD) || WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_UNMOUNT))
     {
@@ -3039,15 +3096,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
                 // The VHD might be in use so try to delete it for up to 10 seconds.
-                try
-                {
-                    wsl::shared::retry::RetryWithTimeout<void>(
-                        [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
-                        std::chrono::milliseconds(100),
-                        std::chrono::seconds(10),
-                        {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
-                }
-                CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
+                deleteWithRetry(Configuration.VhdFilePath);
             }
         }
     }
@@ -3058,22 +3107,14 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         const auto shortcutIconPath = Configuration.BasePath / c_shortIconName;
         if (std::filesystem::exists(shortcutIconPath))
         {
-            LOG_IF_WIN32_BOOL_FALSE_MSG(DeleteFileW(shortcutIconPath.c_str()), "Failed to delete %ls", shortcutIconPath.c_str());
+            deleteWithRetry(shortcutIconPath);
         }
 
         // Remove start menu entry for the distribution, if any.
         if (Configuration.ShortcutPath.has_value())
         {
             // The shortcut file may be in use. Try to delete it for up to 10 seconds, and then give up.
-            try
-            {
-                wsl::shared::retry::RetryWithTimeout<void>(
-                    [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
-                    std::chrono::milliseconds(100),
-                    std::chrono::seconds(10),
-                    {HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)});
-            }
-            CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
+            deleteWithRetry(Configuration.ShortcutPath.value());
         }
 
         // Remove the terminal profile, if any.
@@ -3084,7 +3125,7 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
             if (profile.has_value())
             {
-                LOG_IF_WIN32_BOOL_FALSE_MSG(DeleteFileW(profile->c_str()), "Failed to delete %ls", profile->c_str());
+                deleteWithRetry(profile.value());
             }
         }
         CATCH_LOG()

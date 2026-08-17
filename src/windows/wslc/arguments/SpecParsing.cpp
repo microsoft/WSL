@@ -458,6 +458,80 @@ std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
 }
 
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName)
+{
+    ParsedNetworkArgument result;
+
+    auto parseOptions = [&](std::wstring_view options, bool requireName) {
+        bool parsedName = false;
+        for (const auto part : SplitPreserveEmpty(options, L','))
+        {
+            const auto separator = part.find(L'=');
+            if (separator == std::wstring_view::npos || separator == 0)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{part}));
+            }
+
+            const auto key = part.substr(0, separator);
+            const auto optionValue = part.substr(separator + 1);
+            if (key == L"name")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+                }
+
+                if (parsedName)
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(argName));
+                }
+
+                parsedName = true;
+                result.Name = WideToMultiByte(std::wstring{optionValue});
+            }
+            else if (key == L"alias")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(argName));
+                }
+
+                result.Aliases.emplace_back(WideToMultiByte(std::wstring{optionValue}));
+            }
+            else
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{key}));
+            }
+        }
+
+        if (requireName && !parsedName)
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+    };
+
+    if (value.find(L'=') != std::wstring_view::npos)
+    {
+        parseOptions(value, true);
+    }
+    else
+    {
+        if (IsEmptyOrWhitespace(value))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+
+        result.Name = WideToMultiByte(std::wstring{value});
+    }
+
+    if (result.Name.empty())
+    {
+        throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+    }
+
+    return result;
+}
+
 // Map of signal names to WSLCSignal enum values
 static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
     {L"SIGHUP", WSLCSignalSIGHUP},   {L"SIGINT", WSLCSignalSIGINT},     {L"SIGQUIT", WSLCSignalSIGQUIT},
@@ -680,6 +754,37 @@ models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std:
     }
 
     throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
+}
+
+models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    static constexpr std::pair<std::wstring_view, models::ProgressMode> c_progressModes[] = {
+        {L"auto", models::ProgressMode::Auto},
+        {L"tty", models::ProgressMode::Tty},
+        {L"plain", models::ProgressMode::Plain},
+        {L"quiet", models::ProgressMode::Quiet},
+    };
+
+    for (const auto& [name, mode] : c_progressModes)
+    {
+        if (IsEqual(input, name))
+        {
+            return mode;
+        }
+    }
+
+    std::wstring supportedValues;
+    for (const auto& progressMode : c_progressModes)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += progressMode.first;
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidProgressTypeError(argName, input, supportedValues));
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)

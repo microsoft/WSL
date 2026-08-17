@@ -305,9 +305,10 @@ class WSLCCLIParserUnitTests
                 sm.ThrowIfError();
             }
         }
-        catch (const ArgumentException&)
+        catch (const ArgumentException& exception)
         {
             threw = true;
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_InvalidNameError(L"--doesnotexist"), exception.Message());
         }
 
         VERIFY_IS_TRUE(threw);
@@ -330,9 +331,10 @@ class WSLCCLIParserUnitTests
             }
             sm.ThrowIfError();
         }
-        catch (const ArgumentException&)
+        catch (const ArgumentException& exception)
         {
             threw = true;
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_MissingArgumentError(L"--signal"), exception.Message());
         }
 
         VERIFY_IS_TRUE(threw);
@@ -637,9 +639,10 @@ class WSLCCLIParserUnitTests
             }
             sm.ThrowIfError();
         }
-        catch (const ArgumentException&)
+        catch (const ArgumentException& exception)
         {
             threw = true;
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_FlagInvalidBooleanError(L"--verbose=maybe"), exception.Message());
         }
 
         VERIFY_IS_TRUE(threw);

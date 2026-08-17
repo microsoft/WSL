@@ -9,6 +9,14 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 # Object library for WSLC components.
 # Used to build the executable and also unit testing components.
 add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
+
+if (DEFINED WSL_UNITY_BATCH_SIZE AND WSL_UNITY_BATCH_SIZE GREATER 0)
+    set_target_properties(wslclib PROPERTIES
+        UNITY_BUILD ON
+        UNITY_BUILD_MODE BATCH
+        UNITY_BUILD_BATCH_SIZE ${WSL_UNITY_BATCH_SIZE})
+endif ()
+
 target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS})
 
 target_link_libraries(wslclib
