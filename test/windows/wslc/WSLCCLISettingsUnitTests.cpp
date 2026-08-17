@@ -153,13 +153,13 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
-    TEST_METHOD(LoadSettings_DockerStorageSizes_YieldsExpectedValues)
+    TEST_METHOD(LoadSettings_StorageSizeFormats_YieldExpectedValues)
     {
         auto dir = UniqueTempDir();
         WriteFile(
             dir / L"settings.yaml",
             "session:\n"
-            "  memorySize: 1.5GiB\n"
+            "  memorySize: \" 1.5GiB\"\n"
             "  maxStorageSize: 20.5GB\n");
 
         UserSettingsTest s{dir};
