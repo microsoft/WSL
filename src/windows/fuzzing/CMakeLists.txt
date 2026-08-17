@@ -63,7 +63,8 @@ function(add_fuzzing_harness TARGET)
     set(ONEFUZZ_ENTRIES "${ONEFUZZ_ENTRIES}" PARENT_SCOPE)
 endfunction()
 
-configure_file(setup.ps1 ${FUZZING_OUT_DIR}/setup.ps1 COPYONLY)
+# OneFuzz runs a script named 'setup.ps1' from the drop, so the source script is renamed here.
+configure_file(${CMAKE_SOURCE_DIR}/tools/test/fuzzing-setup.ps1 ${FUZZING_OUT_DIR}/setup.ps1 COPYONLY)
 
 add_fuzzing_harness(WslcCliArgumentFuzzing
     TARGET_NAME cliArgumentParser
