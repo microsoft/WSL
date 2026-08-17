@@ -290,6 +290,12 @@ void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mo
         mount.TmpfsMode = Mount.TmpfsMode.value();
     }
 
+    if (Mount.TmpfsOptions.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsOptions);
+        mount.TmpfsOptions = m_mountTmpfsOptions.emplace_back(Mount.TmpfsOptions.value()).c_str();
+    }
+
     m_mounts.push_back(mount);
 }
 
@@ -308,15 +314,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Ke
 
 void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& ContainerPath, const std::string& Options)
 {
-    // Store a copy of the path/options strings to the launcher to ensure the pointers in WSLCTmpfsMount remain valid.
-    const auto& containerPath = m_tmpfsContainerPaths.emplace_back(ContainerPath);
-    const auto& options = m_tmpfsOptions.emplace_back(Options);
-
-    WSLCTmpfsMount tmpfs{};
-    tmpfs.Destination = containerPath.c_str();
-    tmpfs.Options = options.c_str();
-
-    m_tmpfsMounts.push_back(tmpfs);
+    AddMount({
+        .MountType = mount::Type::Tmpfs,
+        .Target = ContainerPath,
+        .TmpfsOptions = Options,
+    });
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name)
@@ -456,9 +458,6 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     options.LabelsCount = static_cast<ULONG>(m_labels.size());
     options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;
-
-    options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
-    options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
     options.ContainerNetwork.NetworkMode = m_networkMode.c_str();
 

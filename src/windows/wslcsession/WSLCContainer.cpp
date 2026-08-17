@@ -600,6 +600,17 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
             type != mount::Type::Bind && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsCreateSourceIfMissing),
             "Mount at index %lu specifies create-source-if-missing for a non-bind mount",
             i);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            type != mount::Type::Tmpfs && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsOptions),
+            "Mount at index %lu specifies tmpfs options for a non-tmpfs mount",
+            i);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsOptions) &&
+                WI_IsAnyFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode),
+            "Mount at index %lu combines legacy and structured tmpfs options",
+            i);
 
         mounts.push_back({
             .MountType = type,
@@ -610,6 +621,9 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
                                                                                              : mount::BindSourcePolicy::RequireExisting,
             .TmpfsSizeBytes = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize) ? std::optional<int64_t>{value.TmpfsSizeBytes} : std::nullopt,
             .TmpfsMode = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsMode) ? std::optional<uint32_t>{value.TmpfsMode} : std::nullopt,
+            .TmpfsOptions = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsOptions)
+                                ? std::optional<std::string>{value.TmpfsOptions != nullptr ? value.TmpfsOptions : ""}
+                                : std::nullopt,
         });
     }
 
@@ -2170,6 +2184,12 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             break;
 
         case wsl::windows::common::mount::Type::Tmpfs:
+            if (mount.TmpfsOptions.has_value())
+            {
+                request.HostConfig.Tmpfs[mount.Target] = mount.TmpfsOptions.value();
+                continue;
+            }
+
             dockerMount.Type = "tmpfs";
             if (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value())
             {

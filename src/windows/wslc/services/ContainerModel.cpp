@@ -258,21 +258,6 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(const std::wstring& fil
     return envVars;
 }
 
-TmpfsMount TmpfsMount::Parse(const std::string& value)
-{
-    TmpfsMount result{};
-    auto colonPos = value.find(':');
-    if (colonPos == std::string::npos)
-    {
-        result.m_containerPath = value;
-        return result;
-    }
-
-    result.m_containerPath = value.substr(0, colonPos);
-    result.m_options = value.substr(colonPos + 1);
-    return result;
-}
-
 void ValidateUniqueMountDestinations(const ContainerOptions& options)
 {
     try
@@ -287,25 +272,6 @@ void ValidateUniqueMountDestinations(const ContainerOptions& options)
         }
 
         throw;
-    }
-
-    std::unordered_set<std::string> destinations;
-    const auto addDestination = [&](const std::string& destination) {
-        const auto normalizedDestination = mount::NormalizeDestination(destination);
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::WSLCCLI_DuplicateMountDestinationError(MultiByteToWide(normalizedDestination)),
-            !destinations.emplace(normalizedDestination).second);
-    };
-
-    for (const auto& tmpfsSpec : options.Tmpfs)
-    {
-        addDestination(TmpfsMount::Parse(tmpfsSpec).ContainerPath());
-    }
-
-    for (const auto& mount : options.Mounts)
-    {
-        addDestination(mount.Target);
     }
 }
 

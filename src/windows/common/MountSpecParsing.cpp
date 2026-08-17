@@ -522,6 +522,19 @@ Spec ParseDockerVolumeString(const std::wstring& value)
     };
 }
 
+Spec ParseDockerTmpfsString(const std::wstring& value)
+{
+    const auto colon = value.find(L':');
+    const auto target = value.substr(0, colon);
+    const auto options = colon == std::wstring::npos ? std::wstring_view{} : std::wstring_view{value}.substr(colon + 1);
+
+    return {
+        .MountType = Type::Tmpfs,
+        .Target = WideToMultiByte(target),
+        .TmpfsOptions = WideToMultiByte(std::wstring{options}),
+    };
+}
+
 void ValidateMountSpec(const Spec& mount)
 {
     if (mount.Target.empty())
@@ -534,7 +547,7 @@ void ValidateMountSpec(const Spec& mount)
         ThrowValidation(Localization::WSLCCLI_MountTargetAbsoluteError());
     }
 
-    if (mount.MountType != Type::Tmpfs && (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value()))
+    if (mount.MountType != Type::Tmpfs && (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value() || mount.TmpfsOptions.has_value()))
     {
         ThrowValidation(Localization::WSLCCLI_MountTmpfsOptionsTypeError());
     }
@@ -598,6 +611,11 @@ void ValidateMountCollection(std::span<const Spec> mounts)
 std::string FormatTmpfsOptions(const Spec& mount)
 {
     WI_ASSERT(mount.MountType == Type::Tmpfs);
+
+    if (mount.TmpfsOptions.has_value())
+    {
+        return mount.TmpfsOptions.value();
+    }
 
     std::vector<std::string> options;
     if (mount.ReadOnly)

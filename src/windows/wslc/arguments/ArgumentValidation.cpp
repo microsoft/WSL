@@ -245,6 +245,21 @@ void Argument::Validate(ArgMap& execArgs) const
         });
         break;
 
+    case ArgType::TMPFS:
+        CacheConverted<ArgType::TMPFS>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerTmpfsString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(ex.Reason());
+            }
+        });
+        break;
+
     case ArgType::Mount:
         CacheConverted<ArgType::Mount>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
             try

@@ -114,6 +114,7 @@ private:
     std::vector<WSLCMountSpec> m_mounts;
     std::deque<std::wstring> m_mountSources;
     std::deque<std::string> m_mountTargets;
+    std::deque<std::string> m_mountTmpfsOptions;
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
@@ -135,9 +136,6 @@ private:
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
-    std::vector<WSLCTmpfsMount> m_tmpfsMounts;
-    std::deque<std::string> m_tmpfsContainerPaths;
-    std::deque<std::string> m_tmpfsOptions;
     std::int64_t m_memoryBytes = 0;
     std::int64_t m_nanoCpus = 0;
     std::vector<WSLCUlimit> m_ulimits;

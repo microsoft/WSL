@@ -131,7 +131,7 @@ _(Tail,             "tail",                 L"n",             Kind::Value,      
 _(Tag,              "tag",                  L"t",             Kind::Value,      NoConversion, Localization::WSLCCLI_TagArgDescription()) \
 _(Target,           "target",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,             "time",                 L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
-_(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_TMPFSArgDescription()) \
+_(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      ParsedMount,  Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,              "tty",                  L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,             "type",                 L"t",             Kind::Value,      InspectType,  Localization::WSLCCLI_TypeArgDescription()) \
 _(Ulimit,           "ulimit",               NO_ALIAS,         Kind::Value,      UlimitValue,  Localization::WSLCCLI_UlimitArgDescription()) \

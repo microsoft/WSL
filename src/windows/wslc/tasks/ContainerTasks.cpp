@@ -830,11 +830,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::TMPFS))
     {
         auto tmpfs = context.Args.GetAllValues<ArgType::TMPFS>();
-        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
-        for (const auto& value : tmpfs)
-        {
-            options.Tmpfs.emplace_back(WideToMultiByte(value));
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(tmpfs.begin()), std::make_move_iterator(tmpfs.end()));
     }
 
     ValidateUniqueMountDestinations(options);

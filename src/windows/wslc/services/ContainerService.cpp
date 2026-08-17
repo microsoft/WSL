@@ -259,12 +259,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
     }
 
-    for (const auto& tmpfsSpec : options.Tmpfs)
-    {
-        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
-        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
-    }
-
     for (const auto& [key, value] : options.Labels)
     {
         containerLauncher.AddLabel(key, value);

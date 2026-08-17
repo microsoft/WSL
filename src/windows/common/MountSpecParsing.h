@@ -48,6 +48,7 @@ struct Spec
     BindSourcePolicy BindSource = BindSourcePolicy::RequireExisting;
     std::optional<int64_t> TmpfsSizeBytes;
     std::optional<uint32_t> TmpfsMode;
+    std::optional<std::string> TmpfsOptions;
 };
 
 enum class ValidationError
@@ -114,6 +115,7 @@ public:
 
 Spec ParseDockerMountString(const std::wstring& value);
 Spec ParseDockerVolumeString(const std::wstring& value);
+Spec ParseDockerTmpfsString(const std::wstring& value);
 void ValidateMountSpec(const Spec& mount);
 void ValidateMountCollection(std::span<const Spec> mounts);
 std::string FormatTmpfsOptions(const Spec& mount);

@@ -681,8 +681,7 @@ class WSLCE2EContainerCreateTests
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs wslc-tmpfs {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_MountTargetAbsoluteError()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_EmptyDestination_Fails)
@@ -690,8 +689,7 @@ class WSLCE2EContainerCreateTests
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs :size=64k {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(
-            result.StderrContainsSubstring(L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_MountTargetRequiredError()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_Tmpfs_Success)

@@ -520,13 +520,12 @@ class WSLCCLIMountParserUnitTests
     TEST_METHOD(Mount_DuplicateDestinationsAreRejected)
     {
         ContainerOptions options;
-        options.Tmpfs = {"/data"};
         options.Mounts = {
+            mount::ParseDockerTmpfsString(L"/data"),
             {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data/"},
         };
         VERIFY_THROWS(ValidateUniqueMountDestinations(options), wil::ResultException);
 
-        options.Tmpfs.clear();
         options.Mounts = {
             {.MountType = mount::Type::Tmpfs, .Target = "/data/../cache"},
             {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/cache"},
@@ -537,8 +536,8 @@ class WSLCCLIMountParserUnitTests
     TEST_METHOD(Mount_UniqueDestinationsAreAccepted)
     {
         ContainerOptions options;
-        options.Tmpfs = {"/cache"};
         options.Mounts = {
+            mount::ParseDockerTmpfsString(L"/cache"),
             {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data"},
             {.MountType = mount::Type::Bind, .Source = L"C:\\logs", .Target = "/logs"},
         };

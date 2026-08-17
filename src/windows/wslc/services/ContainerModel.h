@@ -87,7 +87,6 @@ struct ContainerOptions
     std::vector<std::string> DnsOptions;
     std::vector<ContainerNetwork> Networks;
     std::vector<std::string> NetworkAliases;
-    std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
     std::optional<std::wstring> CidFile{};
     std::optional<int64_t> MemoryBytes{};
@@ -308,23 +307,6 @@ private:
     std::string m_containerPath;
     bool m_isReadOnlyMode = false;
     bool m_isNamedVolume = false;
-};
-
-struct TmpfsMount
-{
-    std::string ContainerPath() const
-    {
-        return m_containerPath;
-    }
-    std::string Options() const
-    {
-        return m_options;
-    }
-    static TmpfsMount Parse(const std::string& value);
-
-private:
-    std::string m_containerPath;
-    std::string m_options;
 };
 
 void ValidateUniqueMountDestinations(const ContainerOptions& options);
