@@ -14,16 +14,13 @@ Abstract:
 
 #include "precomp.h"
 #include "MountSpecParsing.h"
+#include "string.hpp"
 #include <algorithm>
 #include <array>
-#include <cctype>
-#include <charconv>
-#include <cmath>
 #include <filesystem>
 #include <format>
 #include <limits>
 #include <regex>
-#include <system_error>
 #include <unordered_set>
 #include <vector>
 
@@ -165,105 +162,13 @@ namespace {
 
     std::optional<int64_t> ParseDockerRamInBytes(const std::wstring& value)
     {
-        const auto input = WideToMultiByte(value);
-        const auto separator = input.find_last_of("01234567890. ");
-        if (separator == std::string::npos)
+        const auto parsed = wsl::windows::common::string::ParseStorageSize(value, wsl::windows::common::string::StorageSizeUnit::Binary);
+        if (!parsed.has_value() || parsed.value() > std::numeric_limits<int64_t>::max())
         {
             return std::nullopt;
         }
 
-        std::string number;
-        std::string suffix;
-        if (input[separator] == ' ')
-        {
-            number = input.substr(0, separator);
-            suffix = input.substr(separator + 1);
-        }
-        else
-        {
-            number = input.substr(0, separator + 1);
-            suffix = input.substr(separator + 1);
-        }
-
-        if (number.empty() || std::isspace(static_cast<unsigned char>(number.front())))
-        {
-            return std::nullopt;
-        }
-
-        std::string_view numberView(number);
-        if (numberView.front() == '+')
-        {
-            numberView.remove_prefix(1);
-            if (numberView.empty())
-            {
-                return std::nullopt;
-            }
-        }
-
-        double parsed{};
-        const auto parseResult =
-            std::from_chars(numberView.data(), numberView.data() + numberView.size(), parsed, std::chars_format::general);
-        if (parseResult.ec != std::errc() || parseResult.ptr != numberView.data() + numberView.size() || !std::isfinite(parsed) || parsed < 0)
-        {
-            return std::nullopt;
-        }
-
-        double bytes = parsed;
-        if (!suffix.empty())
-        {
-            suffix = AsciiToLower(std::string_view(suffix));
-            if (suffix.size() > 3)
-            {
-                return std::nullopt;
-            }
-
-            if (suffix.front() == 'b')
-            {
-                if (suffix.size() != 1)
-                {
-                    return std::nullopt;
-                }
-            }
-            else
-            {
-                uint64_t factor{};
-                switch (suffix.front())
-                {
-                case 'k':
-                    factor = 1ULL << 10;
-                    break;
-                case 'm':
-                    factor = 1ULL << 20;
-                    break;
-                case 'g':
-                    factor = 1ULL << 30;
-                    break;
-                case 't':
-                    factor = 1ULL << 40;
-                    break;
-                case 'p':
-                    factor = 1ULL << 50;
-                    break;
-                default:
-                    return std::nullopt;
-                }
-
-                if ((suffix.size() == 2 && suffix[1] != 'b') || (suffix.size() == 3 && suffix.substr(1) != "ib"))
-                {
-                    return std::nullopt;
-                }
-
-                bytes *= static_cast<double>(factor);
-            }
-        }
-
-        constexpr double c_int64ExclusiveUpperBound = static_cast<double>(uint64_t{1} << std::numeric_limits<int64_t>::digits);
-        if (!std::isfinite(bytes) || bytes >= c_int64ExclusiveUpperBound)
-        {
-            return std::nullopt;
-        }
-
-        return static_cast<int64_t>(bytes);
+        return static_cast<int64_t>(parsed.value());
     }
 
     std::optional<uint32_t> ParseDockerTmpfsMode(const std::wstring& value)
