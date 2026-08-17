@@ -27,6 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> VolumeListCommand::GetArguments() const
 {
     return {
+        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Quiet, false, std::nullopt, Localization::WSLCCLI_VolumeListQuietArgDesc()),
     };
