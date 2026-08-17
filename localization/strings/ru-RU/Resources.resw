@@ -2211,11 +2211,15 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Обязательный аргумент не указан: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Не указан обязательный параметр: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Отображает справку по выбранной команде</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Указано несколько взаимоисключающих аргументов: {}</value>
+    <value>Указано несколько взаимоисключающих параметров: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2251,7 +2255,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Отключить цветной вывод.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Для более подробной информации о конкретной команде передайте ей аргумент справки.</value>
+    <value>Для более подробной информации о конкретной команде передайте ей параметр справки.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Для получения дополнительных сведений выполните команду '{} --help'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Команды:</value>
@@ -2268,8 +2276,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Аргументы:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Связанные параметры:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Связанные аргументы:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Имя аргумента не распознано для текущей команды: "{}"</value>
+    <value>Имя параметра не распознано для текущей команды: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2291,35 +2305,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>ИД контейнера</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Отсутствует значение аргумента: "{}"</value>
+    <value>Отсутствует значение параметра: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Псевдоним аргумента не был распознан для текущей команды: "{}"</value>
+    <value>Псевдоним параметра не был распознан для текущей команды: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Неверный указатель аргумента: "{}"</value>
+     <value>Недопустимый указатель параметра: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Псевдоним присоединенного флага не найден: "{}"</value>
+     <value>Присоединенный псевдоним флага не найден: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Присоединенный псевдоним не является флагом: "{}"</value>
+     <value>Присоединенный псевдоним параметра не является флагом: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Неверный указатель аргумента: "{}"</value>
+     <value>Недопустимый указатель параметра: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Аргумент флага не может содержать присоединенное значение: "{}"</value>
+     <value>Параметр не может содержать присоединенное значение: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Недопустимое логическое значение для аргумента флага: "{}". Ожидается значение true, false, 1 или 0.</value>
+     <value>Недопустимое логическое значение для параметра: "{}". Ожидается true, false, 1, 0, t или f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2327,7 +2341,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Отсутствует имя аргумента в: "{}"</value>
+     <value>Отсутствует имя параметра в: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2339,7 +2353,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Аргументы псевдонима со значением должны быть последними в цепочке псевдонимов: "{}"</value>
+     <value>Параметры псевдонима со значением должны быть последними в цепочке псевдонимов: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2482,7 +2496,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <value>Сетевые псевдонимы нельзя указывать, если запрашивается несколько сетей. Используйте один параметр --network .</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2640,10 +2654,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Отобразить подробную информацию о контейнере.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kill one or more running containers.</value>
+    <value>Завершение работы одного или нескольких запущенных контейнеров.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <value>Завершение работы одного или нескольких запущенных контейнеров. Для этого по умолчанию отправляется SIGKILL. Также может быть отправлен сигнал, указанный с помощью --signal.</value>
     <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
@@ -2701,7 +2715,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Останавливает контейнеры.</value>
   </data>
   <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
-    <value>Signal to send (default: the container's configured STOPSIGNAL, or SIGTERM if none is configured)</value>
+    <value>Сигнал для отправки (по умолчанию — настроенный сигнал STOPSIGNAL контейнера или SIGTERM, если он не настроен)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
@@ -2968,7 +2982,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Недопустимое значение аргумента {}: "{}". Ожидается положительное число ЦП (например, 0.5, 1, 2)</value>
+    <value>Недопустимое значение параметра {}: "{}". Ожидается положительное число ЦП (например, 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2996,7 +3010,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Отфильтровать вывод по заданным условиям</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Недопустимый аргумент "{}" для '-f, флаг --filter': неправильный формат фильтра (ожидается имя=значение)</value>
+    <value>Недопустимое значение "{}" для параметра "-f", --filter': неправильный формат фильтра (ожидаемое имя=значение)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Отслеживать вывод журнала.</value>
@@ -3087,7 +3101,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
-    <value>Invalid {} value: unsupported network option '{}'</value>
+    <value>Недопустимое значение {}: неподдерживаемый сетевой параметр {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
@@ -3275,7 +3289,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Недопустимое значение аргумента {}: "{}". Ожидаемый &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (используйте -1 для неограниченного количества)</value>
+    <value>Недопустимое значение параметра {}: "{}". Ожидаемый &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (используйте -1 для неограниченного количества)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3312,11 +3326,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Недопустимое значение аргумента {}: {}</value>
+    <value>Недопустимое значение параметра {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Недопустимое значение аргумента {}: "{}". Ожидается метка времени эпохи Unix или дата и время RFC3339 (например, 2024-01-15T10:30:00Z)</value>
+    <value>Недопустимое значение параметра {}: "{}". Ожидается метка времени эпохи Unix или дата и время RFC3339 (например, 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3324,11 +3338,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Недопустимое значение аргумента {}: "{}". Ожидается объем памяти (например, 256M, 1G)</value>
+    <value>Недопустимое значение параметра {}: "{}". Ожидается объем памяти (например, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Недопустимое значение аргумента {}: "{}". Ожидаемая длительность (например, 30s, 1m30s)</value>
+    <value>Недопустимое значение параметра {}: "{}". Ожидаемая длительность (например, 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3418,7 +3432,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Сетевое имя</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Only display network IDs</value>
+    <value>Показывать только сетевые идентификаторы</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Удалите все неиспользуемые сети.</value>
@@ -3505,10 +3519,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Вывести только имена томов</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Невозможно записать образ в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
+    <value>Невозможно записать образ в терминал. Используйте параметр -o или перенаправьте StdOut.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Не удалось экспортировать контейнер в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
+    <value>Не удалось экспортировать контейнер в терминал. Используйте параметр -o или перенаправьте StdOut.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Ожидаемый формат: host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
