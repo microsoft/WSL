@@ -120,6 +120,44 @@ class WSLCTests
         return true;
     }
 
+    TEST_METHOD(ComposeSessionBasicLifecycle)
+    {
+        const auto composePath = std::filesystem::current_path() / std::format("compose-{}.yaml", GetCurrentProcessId());
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove(composePath, error);
+        });
+
+        {
+            std::ofstream composeFile(composePath);
+            composeFile << "services:\n"
+                           "  basic:\n"
+                           "    name: wslc-compose-basic\n"
+                           "    image: wslc-registry:latest\n";
+        }
+
+        wil::com_ptr<IWSLCComposeSession> composeSession;
+        VERIFY_SUCCEEDED(m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
+        VERIFY_IS_NOT_NULL(composeSession.get());
+
+        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+        VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, containers.size());
+        VERIFY_ARE_EQUAL(std::string("wslc-compose-basic"), std::string(containers[0].Name));
+        VERIFY_ARE_EQUAL(WslcContainerStateCreated, containers[0].State);
+
+        VERIFY_SUCCEEDED(composeSession->Start());
+        containers.reset();
+        VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, containers[0].State);
+
+        VERIFY_SUCCEEDED(composeSession->Attach());
+        VERIFY_SUCCEEDED(composeSession->Stop(10));
+        containers.reset();
+        VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, containers[0].State);
+    }
+
     WSLCSessionSettings GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone)
     {
         WSLCSessionSettings settings{};

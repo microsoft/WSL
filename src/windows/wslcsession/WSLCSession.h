@@ -155,6 +155,7 @@ public:
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
+    IFACEMETHOD(CreateComposeSession)(_In_ LPCWSTR Path, _Out_ IWSLCComposeSession** ComposeSession) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
         _Out_ WSLCContainerEntry** Containers,
@@ -332,6 +333,7 @@ private:
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
 
     void OnImageDeleted(const std::string& ImageId) noexcept;
+    void PullImageLockHeld(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback);
 
     void OnContainerdExited();
     void OnDockerdExited();
@@ -367,6 +369,8 @@ private:
     // WSLCVolumes has its own internal srwlock and does not require the runtime lock.
     std::mutex m_containersLock;
     std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
+    std::mutex m_composeSessionsLock;
+    std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<IWSLCComposeSession>> m_composeSessions;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::shared_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};

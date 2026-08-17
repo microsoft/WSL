@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCSession.h"
+#include "WSLCComposeSession.h"
 #include "WSLCExecutionContext.h"
 #include "WSLCContainer.h"
 #include "WSLCNetworkMetadata.h"
@@ -24,6 +25,7 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
+#include <yaml-cpp/yaml.h>
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -222,6 +224,72 @@ std::string GenerateContainerName(int retry)
     }
 
     return name;
+}
+
+struct ComposeContainerDefinition
+{
+    std::string Name;
+    std::string Image;
+};
+
+[[noreturn]] void ThrowInvalidComposeFile(const std::filesystem::path& Path, std::wstring_view Details)
+{
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcComposeFileInvalid(Path.wstring(), Details));
+}
+
+std::vector<ComposeContainerDefinition> ParseComposeFile(const std::filesystem::path& Path)
+{
+    const auto root = YAML::LoadFile(Path.string());
+    const auto services = root["services"];
+    if (!services || !services.IsMap() || services.size() == 0)
+    {
+        ThrowInvalidComposeFile(Path, L"the file must contain a non-empty services map");
+    }
+
+    std::vector<ComposeContainerDefinition> definitions;
+    definitions.reserve(services.size());
+    for (const auto& service : services)
+    {
+        if (!service.first.IsScalar() || !service.second.IsMap())
+        {
+            ThrowInvalidComposeFile(Path, L"each service must be a map");
+        }
+
+        const auto serviceName = service.first.as<std::string>();
+        const auto& settings = service.second;
+        for (const auto& setting : settings)
+        {
+            const auto key = setting.first.as<std::string>();
+            if (key != "name" && key != "container_name" && key != "image")
+            {
+                //ThrowInvalidComposeFile(Path, std::format(L"the '{}' property is not supported", wsl::shared::string::MultiByteToWide(key)));
+            }
+        }
+
+        const auto image = settings["image"];
+        if (!image || !image.IsScalar())
+        {
+            ThrowInvalidComposeFile(
+                Path, std::format(L"the '{}' service must specify an image", wsl::shared::string::MultiByteToWide(serviceName)));
+        }
+
+        const auto nameNode = settings["name"] ? settings["name"] : settings["container_name"];
+        const auto name = nameNode ? nameNode.as<std::string>() : serviceName;
+        if (name.empty())
+        {
+            ThrowInvalidComposeFile(Path, std::format(L"the '{}' service has an empty name", wsl::shared::string::MultiByteToWide(serviceName)));
+        }
+
+        const auto imageName = image.as<std::string>();
+        if (imageName.empty())
+        {
+            ThrowInvalidComposeFile(Path, std::format(L"the '{}' service has an empty image", wsl::shared::string::MultiByteToWide(serviceName)));
+        }
+
+        definitions.push_back({.Name = name, .Image = imageName});
+    }
+
+    return definitions;
 }
 
 } // namespace
@@ -924,12 +992,19 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
+    auto runtime = m_runtime.Acquire();
+    PullImageLockHeld(Image, RegistryAuthenticationInformation, ProgressCallback);
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLCSession::PullImageLockHeld(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+{
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
     EnforceRegistryAllowlist(repo);
 
-    auto runtime = m_runtime.Acquire();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     if (!tagOrDigest.has_value())
@@ -944,14 +1019,11 @@ try
         registryAuth = std::string(RegistryAuthenticationInformation);
     }
 
-    auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
+    auto requestContext = m_runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
     OnImageCreated(Image);
-
-    return S_OK;
 }
-CATCH_RETURN();
 
 HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
@@ -2255,6 +2327,80 @@ try
         TraceLoggingValue(m_creatorProcessName.c_str(), "CreatorProcess"));
 
     return result;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::CreateComposeSession(LPCWSTR Path, IWSLCComposeSession** ComposeSession)
+try
+{
+    WSLCExecutionContext context(this);
+    RETURN_HR_IF_NULL(E_POINTER, Path);
+    RETURN_HR_IF_NULL(E_POINTER, ComposeSession);
+    *ComposeSession = nullptr;
+
+    std::error_code error;
+    const auto configPath = std::filesystem::canonical(Path, error);
+    THROW_IF_WIN32_ERROR_MSG(error.value(), "Failed to resolve compose path %ls", Path);
+
+    auto key = configPath.wstring();
+    std::ranges::transform(key, key.begin(), [](wchar_t value) { return std::towlower(value); });
+
+    std::lock_guard composeLock(m_composeSessionsLock);
+    if (const auto existing = m_composeSessions.find(key); existing != m_composeSessions.end())
+    {
+        return existing->second.CopyTo(ComposeSession);
+    }
+
+    std::vector<ComposeContainerDefinition> definitions;
+    try
+    {
+        definitions = ParseComposeFile(configPath);
+    }
+    catch (const YAML::Exception& exception)
+    {
+        ThrowInvalidComposeFile(configPath, wsl::shared::string::MultiByteToWide(exception.what()));
+    }
+
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
+    auto cleanup = wil::scope_exit([&] {
+        for (const auto& container : containers)
+        {
+            LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+        }
+    });
+
+    auto lease = AcquireLease();
+    for (const auto& definition : definitions)
+    {
+        const std::string networkMode{"bridge"};
+        WSLCContainerOptions options{};
+        options.Image = definition.Image.c_str();
+        options.Name = definition.Name.c_str();
+        options.ContainerNetwork.NetworkMode = networkMode.c_str();
+
+        Microsoft::WRL::ComPtr<IWSLCContainer> container;
+        HRESULT result = wil::ResultFromException([&]() { CreateContainerImpl(&options, &container); });
+        if (result == WSLC_E_IMAGE_NOT_FOUND)
+        {
+            PullImageLockHeld(definition.Image.c_str(), nullptr, nullptr);
+            CreateContainerImpl(&options, &container);
+        }
+        else
+        {
+            THROW_IF_FAILED(result);
+        }
+
+        containers.emplace_back(std::move(container));
+    }
+
+    Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
+    THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, configPath.wstring(), containers));
+    Microsoft::WRL::ComPtr<IWSLCComposeSession> composeInterface;
+    THROW_IF_FAILED(composeSession.As(&composeInterface));
+    auto [entry, inserted] = m_composeSessions.emplace(std::move(key), std::move(composeInterface));
+    WI_ASSERT(inserted);
+    cleanup.release();
+    return entry->second.CopyTo(ComposeSession);
 }
 CATCH_RETURN();
 

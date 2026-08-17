@@ -10,6 +10,7 @@ set(SOURCES
     # Session and container implementation
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
+    WSLCComposeSession.cpp
     WSLCContainer.cpp
     WSLCVirtualMachine.cpp
 
@@ -39,6 +40,7 @@ set(HEADERS
     OptionParser.h
     ServiceProcessLauncher.h
     WSLCContainer.h
+    WSLCComposeSession.h
     WSLCContainerMetadata.h
     WindowsCertStore.h
     WSLCProcess.h
@@ -62,6 +64,7 @@ add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
 target_link_libraries(wslcsession
                       ${COMMON_LINK_LIBRARIES}
+                      yaml-cpp
                       common
                       legacy_stdio_definitions
                       VirtDisk.lib
