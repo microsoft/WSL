@@ -19,11 +19,11 @@ Abstract:
 #include "Distribution.h"
 #include "HandleConsoleProgressBar.h"
 #include "svccomm.hpp"
+#include "WmiService.h"
 
 extern HINSTANCE g_dllInstance;
 
 constexpr LPCWSTR c_optionalFeatureInstallStatus = L"InstallStatus";
-constexpr DWORD c_optionalFeatureQueryTimeout = 30'000;
 
 using wsl::shared::Localization;
 using namespace wsl::windows::common::distribution;
@@ -193,7 +193,7 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
         missingComponents.emplace_back(c_optionalFeatureNameWsl);
     }
 
-    if (!IsOptionalComponentInstalled(c_optionalFeatureNameVmp) || !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
+    if (!wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
     {
         missingComponents.emplace_back(c_optionalFeatureNameVmp);
     }
@@ -254,29 +254,18 @@ void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& comp
 
 bool WslInstall::IsOptionalComponentInstalled(LPCWSTR component)
 {
-    std::wstring systemDirectory;
-    THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
+    constexpr int32_t c_enabled = 1;
 
-    const auto dismPath = std::filesystem::path(std::move(systemDirectory)) / L"dism.exe";
-    const auto commandLine = std::format(L"{} /Online /English /Get-FeatureInfo /FeatureName:{}", dismPath.native(), component);
+    wsl::core::WmiService service(L"ROOT\\CIMV2");
+    wsl::core::WmiEnumerate optionalFeatures(service);
+    const auto query = std::format(L"SELECT InstallState FROM Win32_OptionalFeature WHERE Name = '{}'", component);
+    const auto& results = optionalFeatures.query(query.c_str());
+    const auto result = results.begin();
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == results.end(), "Optional component not found: %ls", component);
 
-    wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
-    const auto result = process.RunAndCaptureOutput(c_optionalFeatureQueryTimeout);
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(result.ExitCode), result.ExitCode != ERROR_SUCCESS, "Failed to query optional component: %ls", component);
-
-    constexpr std::wstring_view c_statePrefix = L"State :";
-    for (const auto& line : wsl::shared::string::Split(result.Stdout, L'\n'))
-    {
-        const auto trimmed = wsl::shared::string::TrimAscii<wchar_t>(line);
-        if (wsl::shared::string::StartsWith(trimmed, c_statePrefix))
-        {
-            const auto state = wsl::shared::string::TrimAscii<wchar_t>(trimmed.substr(c_statePrefix.size()));
-            return wsl::shared::string::IsEqual(state, L"Enabled", true);
-        }
-    }
-
-    THROW_HR_MSG(E_UNEXPECTED, "Failed to parse optional component state: %ls", component);
+    int32_t installState{};
+    THROW_HR_IF_MSG(E_UNEXPECTED, !result->get(L"InstallState", &installState), "Invalid optional component state: %ls", component);
+    return installState == c_enabled;
 }
 
 std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
