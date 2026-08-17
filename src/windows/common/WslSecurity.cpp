@@ -135,7 +135,7 @@ bool wsl::windows::common::security::IsTokenElevated(_In_ HANDLE token)
     return (GetUserBasicIntegrityLevel(token) == SECURITY_MANDATORY_HIGH_RID);
 }
 
-wil::unique_handle wsl::windows::common::security::GetUserToken(_In_ TOKEN_TYPE tokenType, _In_ RPC_BINDING_HANDLE handle)
+wil::unique_handle wsl::windows::common::security::GetUserToken(_In_ TOKEN_TYPE tokenType, _In_ RPC_BINDING_HANDLE handle, _In_ DWORD additionalAccess)
 {
     wil::unique_handle contextToken;
 
@@ -157,7 +157,12 @@ wil::unique_handle wsl::windows::common::security::GetUserToken(_In_ TOKEN_TYPE 
 
     wil::unique_handle newToken;
     THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(
-        contextToken.get(), TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, nullptr, SecurityImpersonation, tokenType, &newToken));
+        contextToken.get(),
+        TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES | additionalAccess,
+        nullptr,
+        SecurityImpersonation,
+        tokenType,
+        &newToken));
 
     return newToken;
 }

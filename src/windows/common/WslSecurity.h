@@ -100,7 +100,7 @@ DWORD GetUserBasicIntegrityLevel(_In_ HANDLE token);
 /// <summary>
 /// Returns the user token for the current client.
 /// </summary>
-wil::unique_handle GetUserToken(_In_ TOKEN_TYPE tokenType, _In_ RPC_BINDING_HANDLE handle = nullptr);
+wil::unique_handle GetUserToken(_In_ TOKEN_TYPE tokenType, _In_ RPC_BINDING_HANDLE handle = nullptr, _In_ DWORD additionalAccess = 0);
 
 /// <summary>
 /// Queries if the provided token is elevated.
