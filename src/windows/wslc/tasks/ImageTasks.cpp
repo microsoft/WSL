@@ -22,7 +22,6 @@ Abstract:
 #include "ImageProgressCallback.h"
 #include "TableOutput.h"
 #include "Task.h"
-#include <chrono>
 #include <format>
 #include <unordered_map>
 #include <wslutil.h>
@@ -112,26 +111,6 @@ namespace {
         }
 
         return std::format("{:.3g}{}", size, units[unit]);
-    }
-
-    // Formats a unix timestamp the way docker does, matching Go's time.Time.String()
-    // layout "2006-01-02 15:04:05 -0700 MST" (e.g. "2026-07-12 17:00:00 -0700 PDT").
-    std::string FormatDockerTimestamp(LONGLONG timestamp)
-    {
-        const auto time =
-            std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
-
-        try
-        {
-            const auto* zone = std::chrono::current_zone();
-            return std::format("{:%F %T %z} {}", std::chrono::zoned_time{zone, time}, zone->get_info(time).abbrev);
-        }
-        catch (...)
-        {
-            // The time zone database is unavailable, so report UTC rather than failing the command.
-            LOG_CAUGHT_EXCEPTION();
-            return std::format("{:%F %T} +0000 UTC", time);
-        }
     }
 
     // Builds the docker-compatible representation of an image, shared by the table and json output

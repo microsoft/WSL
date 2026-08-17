@@ -295,3 +295,21 @@ std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, b
 {
     return TruncateIdImpl(id, shortenLength);
 }
+
+std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timestamp)
+{
+    const auto time =
+        std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
+
+    try
+    {
+        const auto* zone = std::chrono::current_zone();
+        return std::format("{:%F %T %z} {}", std::chrono::zoned_time{zone, time}, zone->get_info(time).abbrev);
+    }
+    catch (...)
+    {
+        // The time zone database is unavailable, so report UTC rather than failing the caller.
+        LOG_CAUGHT_EXCEPTION();
+        return std::format("{:%F %T} +0000 UTC", time);
+    }
+}
