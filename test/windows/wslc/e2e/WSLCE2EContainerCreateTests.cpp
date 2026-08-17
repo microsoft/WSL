@@ -798,8 +798,7 @@ class WSLCE2EContainerCreateTests
             WslcContainerName,
             source.wstring(),
             AlpineImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(std::format(L"Bind source path does not exist: '{}'", source.wstring())));
+        result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::MessageWslcBindSourcePathNotFound(source.wstring())), .ExitCode = 1});
         VERIFY_IS_FALSE(std::filesystem::exists(source));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
@@ -916,8 +915,7 @@ class WSLCE2EContainerCreateTests
             L"container create --name {} --mount type=tmpfs,target=/data --mount type=tmpfs,target=/data/ {} true",
             WslcContainerName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data")));
+        result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data")), .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 

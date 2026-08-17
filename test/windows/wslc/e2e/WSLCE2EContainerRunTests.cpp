@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EContainerRunTests
 {
@@ -1096,11 +1097,11 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_InvalidType_Fails)
     {
-        auto result = RunWslc(std::format(L"container run --rm --mount type=bogus,target=/x {} true", DebianImage.NameAndTag()));
-        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"for '--mount' option"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"uses an unsupported feature"));
+        constexpr auto mount = L"type=bogus,target=/x";
+        auto result = RunWslc(std::format(L"container run --rm --mount {} {} true", mount, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_UnsupportedMountError(mount, Localization::WSLCCLI_MountTypeUnsupportedError(L"bogus"))));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_DuplicateDestination_Fails)
@@ -1109,8 +1110,7 @@ class WSLCE2EContainerRunTests
             L"container run --rm --name {} --mount type=tmpfs,target=/data --mount type=tmpfs,target=/data/ {} true",
             WslcContainerName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Duplicate mount point: /data"));
+        result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data")), .ExitCode = 1});
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
