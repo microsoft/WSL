@@ -23,6 +23,18 @@ using SOCKADDR_INET = union _SOCKADDR_INET;
 
 namespace wsl::windows::common::string {
 
+enum class StorageSizeUnit
+{
+    Decimal,
+    Binary
+};
+
+std::optional<uint64_t> ParseStorageSize(std::wstring_view String, StorageSizeUnit Unit);
+
+std::wstring FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace = false);
+
+std::wstring FormatBytes(uint64_t Bytes);
+
 std::vector<std::string> InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize);
 
 bool IsPathComponentEqual(const std::wstring_view String1, const std::wstring_view String2);

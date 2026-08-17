@@ -6,6 +6,7 @@ set(SOURCES
     Plan9Tests.cpp
     DrvFsTests.cpp
     FilesystemUnitTests.cpp
+    StringUnitTests.cpp
     Common.cpp
     PluginTests.cpp
     PolicyTests.cpp
