@@ -1155,6 +1155,10 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
             {
                 transition->ExpectedEvent = ContainerEvent::Destroy;
             }
+            else
+            {
+                transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
+            }
 
             return;
         }

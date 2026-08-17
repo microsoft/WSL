@@ -27,6 +27,7 @@ Abstract:
 
 using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
+using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::RunningWSLCContainer;
 using wsl::windows::common::RunningWSLCProcess;
 using wsl::windows::common::WSLCContainerLauncher;
@@ -8454,6 +8455,86 @@ class WSLCTests
         // The exec process exit event must be signaled within a reasonable timeout.
         VERIFY_IS_TRUE(exitEvent.wait(30 * 1000));
         VERIFY_ARE_EQUAL(process.GetExitCode(), 128 + WSLCSignalSIGKILL);
+    }
+
+    // Stopping a container releases every in-flight exec from inside the Docker 'die' event callback. Several execs are
+    // required: releasing them unregisters their event callbacks while the tracker is dispatching that same event.
+    WSLC_TEST_METHOD(ExecContainerStopManyExecs)
+    {
+        constexpr unsigned int c_execCount = 8;
+
+        WSLCContainerLauncher launcher("debian:latest", "test-exec-stop-many", {"sleep", "99999"}, {}, "none");
+        auto container = launcher.Launch(*m_defaultSession);
+
+        std::vector<ClientRunningWSLCProcess> processes;
+        std::vector<wil::unique_event> exitEvents;
+        processes.reserve(c_execCount);
+        exitEvents.reserve(c_execCount);
+
+        for (unsigned int i = 0; i < c_execCount; ++i)
+        {
+            processes.emplace_back(WSLCProcessLauncher({}, {"sleep", "99999"}).Launch(container.Get()));
+            exitEvents.emplace_back(processes.back().GetExitEvent());
+        }
+
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+        // No exec may be skipped when the container releases them.
+        for (unsigned int i = 0; i < c_execCount; ++i)
+        {
+            VERIFY_IS_TRUE(exitEvents[i].wait(30 * 1000));
+            VERIFY_ARE_EQUAL(processes[i].GetExitCode(), 128 + WSLCSignalSIGKILL);
+        }
+
+        // Lifecycle events must still be delivered once the stop has been processed.
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
+    // Exec() registers its event callback while holding the container lock, concurrently with the Docker event thread
+    // delivering exec_die for other execs on the same container.
+    WSLC_TEST_METHOD(ExecContainerEventStress)
+    {
+        constexpr unsigned int c_threadCount = 4;
+        constexpr unsigned int c_iterationsPerThread = 25;
+
+        WSLCContainerLauncher launcher("debian:latest", "test-exec-event-stress", {"sleep", "99999"}, {}, "none");
+        auto container = launcher.Launch(*m_defaultSession);
+
+        std::atomic<unsigned int> failures = 0;
+        std::vector<std::thread> threads;
+        threads.reserve(c_threadCount);
+
+        for (unsigned int t = 0; t < c_threadCount; ++t)
+        {
+            threads.emplace_back([&]() {
+                for (unsigned int i = 0; i < c_iterationsPerThread; ++i)
+                {
+                    // N.B. Each process is released without waiting, so its callback is unregistered while exec_die
+                    // events are still being dispatched.
+                    auto [result, process] = WSLCProcessLauncher({}, {"/bin/true"}).LaunchNoThrow(container.Get());
+                    if (FAILED(result))
+                    {
+                        LogError("Exec unexpected HR: 0x%08x", result);
+                        ++failures;
+                        return;
+                    }
+                }
+            });
+        }
+
+        for (auto& thread : threads)
+        {
+            thread.join();
+        }
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
+
+        // The event stream must still be live after the exec_die storm.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
     }
 
     void RunPortMappingsTest(IWSLCSession& session, const std::string& containerNetworkType, bool virtionet)
