@@ -716,8 +716,9 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_Tmpfs_Success)
     {
         auto result = RunWslc(std::format(
-            L"container create --name {} --mount type=tmpfs,target=/path:tmpfs {} sh -c \"echo -n 'tmpfs_test' > "
-            L"/path:tmpfs/data && cat /path:tmpfs/data\"",
+            L"container create --name {} --mount type=tmpfs,target=/path:tmpfs,tmpfs-size=1MB,tmpfs-mode=0700 {} sh -c "
+            L"\"echo -n 'tmpfs_test' > /path:tmpfs/data && cat /path:tmpfs/data && echo && stat -c '%a' /path:tmpfs && "
+            L"df -k /path:tmpfs | awk 'NR == 2 {{print $2}}'\"",
             WslcContainerName,
             DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -730,7 +731,7 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(inspect.Mounts[0].ReadWrite);
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"tmpfs_test", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = L"tmpfs_test\n700\n1024\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_Tmpfs_PreservesMountForm)
@@ -849,6 +850,26 @@ class WSLCE2EContainerCreateTests
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify({.Stdout = L"WSLC Mount Volume Test", .Stderr = L"", .ExitCode = 0});
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        result = RunWslc(std::format(
+            L"container create --rm --name {} --mount type=volume,target=/anonymous {} sh -c "
+            L"\"echo -n anonymous-volume > /anonymous/value && cat /anonymous/value\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto anonymousInspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(1u, anonymousInspect.Mounts.size());
+        VERIFY_ARE_EQUAL("volume", anonymousInspect.Mounts[0].Type);
+        VERIFY_IS_FALSE(anonymousInspect.Mounts[0].Name.empty());
+        VERIFY_IS_TRUE(anonymousInspect.Mounts[0].Source.empty());
+        VERIFY_ARE_EQUAL("/anonymous", anonymousInspect.Mounts[0].Destination);
+        VERIFY_IS_TRUE(anonymousInspect.Mounts[0].ReadWrite);
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"anonymous-volume", .Stderr = L"", .ExitCode = 0});
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_ReadOnly_IsReadOnly)

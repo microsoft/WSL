@@ -62,6 +62,7 @@ namespace {
     };
 
     constexpr ValidMountCase c_validMountCases[] = {
+        {L"type=volume,target=/data", mount::Type::Volume, L"", "/data", false, {}, {}, ""},
         {L"source=data-volume,target=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
         {L"type=volume,source=data-volume,target=/path:voldir",
          mount::Type::Volume,
@@ -270,7 +271,6 @@ namespace {
         {L"type=npipe,source=data-volume,target=/data", Localization::WSLCCLI_MountTypeUnsupportedError(L"npipe"), ExpectedException::Unsupported},
         {L"type=bogus,source=data-volume,target=/data", Localization::WSLCCLI_MountTypeUnsupportedError(L"bogus"), ExpectedException::Unsupported},
         {L"type=CLUSTER,source=data-volume,target=/data", Localization::WSLCCLI_MountTypeUnsupportedError(L"cluster"), ExpectedException::Unsupported},
-        {L"type=volume,target=/data", Localization::WSLCCLI_MountAnonymousVolumeUnsupportedError(), ExpectedException::Unsupported},
         {L"type=bind,target=/data", Localization::WSLCCLI_MountSourceRequiredError(), ExpectedException::Validation},
         {L"type=bind,source=relative,target=/data", Localization::WSLCCLI_MountBindSourceAbsoluteError(), ExpectedException::Validation},
         {L"type=volume,source=a,target=/data", Localization::WSLCCLI_MountVolumeSourceInvalidError(), ExpectedException::Validation},
@@ -346,6 +346,8 @@ namespace {
         {L"type=bind,source=C:\\mount,target=/data,volume-nocopy=true",
          Localization::WSLCCLI_MountOptionFamilyMismatchError(L"volume-*", L"bind")},
         {L"type=volume,source=data-volume,target=/data,bind-propagation=rprivate",
+         Localization::WSLCCLI_MountOptionFamilyMismatchError(L"bind-*", L"volume")},
+        {L"type=volume,source=data-volume,target=/data,bind-recursive=enabled",
          Localization::WSLCCLI_MountOptionFamilyMismatchError(L"bind-*", L"volume")},
         {L"type=volume,source=data-volume,target=/data,tmpfs-size=1m",
          Localization::WSLCCLI_MountOptionFamilyMismatchError(L"tmpfs-*", L"volume")},

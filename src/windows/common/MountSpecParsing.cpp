@@ -343,6 +343,21 @@ Spec ParseDockerMountString(const std::wstring& value)
             ThrowParse(Localization::WSLCCLI_MountFieldKeyValueRequiredError(field));
         }
 
+        switch (definition->OptionFamily)
+        {
+        case Family::General:
+            break;
+        case Family::Bind:
+            mount.HasBindOptions = true;
+            break;
+        case Family::Volume:
+            mount.HasVolumeOptions = true;
+            break;
+        case Family::Tmpfs:
+            mount.HasTmpfsOptions = true;
+            break;
+        }
+
         switch (definition->Id)
         {
         case Field::Type:
@@ -387,7 +402,6 @@ Spec ParseDockerMountString(const std::wstring& value)
             break;
 
         case Field::BindPropagation:
-            mount.HasBindOptions = true;
             mount.BindPropagation = AsciiToLower(std::wstring_view(keyValue.Value));
             break;
 
@@ -397,7 +411,6 @@ Spec ParseDockerMountString(const std::wstring& value)
                 ThrowParse(Localization::WSLCCLI_MountInvalidValueError(key, keyValue.Value));
             }
 
-            mount.HasBindOptions = true;
             break;
 
         case Field::BindRecursive:
@@ -406,7 +419,6 @@ Spec ParseDockerMountString(const std::wstring& value)
                 break;
             }
 
-            mount.HasBindOptions = true;
             RecordUnsupportedOption(mount, key);
             if (keyValue.Value == L"disabled")
             {
@@ -431,13 +443,11 @@ Spec ParseDockerMountString(const std::wstring& value)
                 ThrowParse(Localization::WSLCCLI_MountInvalidValueError(L"volume-nocopy", keyValue.Value));
             }
 
-            mount.HasVolumeOptions = true;
             break;
 
         case Field::VolumeLabel:
         case Field::VolumeDriver:
         case Field::VolumeOption:
-            mount.HasVolumeOptions = true;
             break;
 
         case Field::TmpfsSize:
@@ -447,7 +457,6 @@ Spec ParseDockerMountString(const std::wstring& value)
                 ThrowParse(Localization::WSLCCLI_MountInvalidValueError(key, keyValue.Value));
             }
 
-            mount.HasTmpfsOptions = true;
             break;
 
         case Field::TmpfsMode:
@@ -457,7 +466,6 @@ Spec ParseDockerMountString(const std::wstring& value)
                 ThrowParse(Localization::WSLCCLI_MountInvalidValueError(key, keyValue.Value));
             }
 
-            mount.HasTmpfsOptions = true;
             break;
         }
 
@@ -571,12 +579,7 @@ void ValidateMountSpec(const Spec& mount)
         break;
 
     case Type::Volume:
-        if (mount.Source.empty())
-        {
-            ThrowUnsupported(Localization::WSLCCLI_MountAnonymousVolumeUnsupportedError());
-        }
-
-        if (!IsValidNamedVolumeName(mount.Source))
+        if (!mount.Source.empty() && !IsValidNamedVolumeName(mount.Source))
         {
             ThrowValidation(Localization::WSLCCLI_MountVolumeSourceInvalidError());
         }

@@ -3031,30 +3031,30 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
     <value>The field '{}' must be a key=value pair.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="key=value"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountUnexpectedKeyError" xml:space="preserve">
     <value>The key '{}' is unexpected in '{}'.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidValueError" xml:space="preserve">
     <value>The value for '{}' is invalid: '{}'.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidBindRecursiveValueError" xml:space="preserve">
     <value>The value for '{}' is invalid: '{}'. Valid values are "enabled", "disabled", "writable", and "readonly".</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="enabled"}{Locked="disabled"}{Locked="writable"}{Locked="readonly"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
     <value>The mount type is required.</value>
   </data>
   <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
     <value>Options matching '{}' cannot be used with mount type '{}'.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
     <value>Option '{}' requires the 'readonly' option.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="readonly"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
     <value>Option 'bind-recursive=readonly' requires the 'bind-propagation=rprivate' option.</value>
@@ -3062,11 +3062,11 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
     <value>Mount type '{}' is not supported.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
     <value>Option '{}' is not supported.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
     <value>The mount target is required.</value>
@@ -3088,9 +3088,6 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
     <value>The bind source path must be absolute.</value>
     <comment>{Locked="bind"}Command line arguments should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MountAnonymousVolumeUnsupportedError" xml:space="preserve">
-    <value>Anonymous volume mounts are not supported.</value>
   </data>
   <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
     <value>The volume source must be a valid named volume.</value>
