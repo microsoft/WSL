@@ -132,6 +132,10 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
+    // Command and runtime supplied status description. Not serialized yet: the json output still
+    // reports the raw state fields below.
+    std::string Command;
+    std::string Status;
     WSLCContainerState State;
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};

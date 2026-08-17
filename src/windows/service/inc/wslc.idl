@@ -31,6 +31,8 @@ cpp_quote("#endif")
 #define WSLC_MAX_VOLUME_DRIVER_LENGTH 255
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
 #define WSLC_MAX_IMAGE_ID_LENGTH 255
+#define WSLC_MAX_CONTAINER_COMMAND_LENGTH 4095
+#define WSLC_MAX_CONTAINER_STATUS_LENGTH 127
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 #define WSLC_EPHEMERAL_PORT 0
@@ -42,6 +44,8 @@ cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
 cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_ID_LENGTH 255")
+cpp_quote("#define WSLC_MAX_CONTAINER_COMMAND_LENGTH 4095")
+cpp_quote("#define WSLC_MAX_CONTAINER_STATUS_LENGTH 127")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
@@ -373,6 +377,10 @@ typedef struct _WSLCContainerEntry
 {
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
+    // Command the container runs, as reported by the runtime. Truncated if it exceeds the buffer.
+    char Command[WSLC_MAX_CONTAINER_COMMAND_LENGTH + 1];
+    // Human readable state description built by the runtime, e.g. "Up 5 minutes" or "Exited (0) 2 hours ago".
+    char Status[WSLC_MAX_CONTAINER_STATUS_LENGTH + 1];
     WSLCContainerId Id;
     ULONGLONG StateChangedAt;
     ULONGLONG CreatedAt;

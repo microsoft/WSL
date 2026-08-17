@@ -81,7 +81,7 @@ class WSLCE2EContainerListTests
 
         // Verify we found the container in the list output
         VERIFY_IS_TRUE(foundContainerLine.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"created"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"Created"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_NoOptions_RunningContainers)
@@ -110,7 +110,7 @@ class WSLCE2EContainerListTests
 
         // Verify we found the container in the list output
         VERIFY_IS_TRUE(foundContainerLine.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"running"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"Up "));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_NoOptions_ExcludesCreatedContainers)
@@ -137,6 +137,33 @@ class WSLCE2EContainerListTests
         }
 
         VERIFY_IS_FALSE(isListed);
+    }
+
+    // The table layout must match `docker container list` so users can rely on column order.
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_TableFormat_MatchesDockerColumnOrder)
+    {
+        const auto result = RunWslc(L"container list --all");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_FALSE(outputLines.empty());
+
+        const auto& header = outputLines.front();
+        size_t position = 0;
+        for (const auto& column :
+             {Localization::WSLCCLI_TableHeaderContainerId(),
+              Localization::WSLCCLI_TableHeaderImage(),
+              Localization::WSLCCLI_TableHeaderCommand(),
+              Localization::WSLCCLI_TableHeaderCreated(),
+              Localization::WSLCCLI_TableHeaderStatus(),
+              Localization::WSLCCLI_TableHeaderPorts(),
+              Localization::WSLCCLI_TableHeaderNames()})
+        {
+            const auto found = header.find(column, position);
+            VERIFY_ARE_NOT_EQUAL(
+                std::wstring::npos, found, std::format(L"Column '{}' missing or out of order in '{}'", column, header).c_str());
+            position = found + column.size();
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_QuietOption_OutputsIdsOnly)

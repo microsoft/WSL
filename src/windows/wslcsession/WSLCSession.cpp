@@ -2562,6 +2562,12 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
+
+        // Commands and status descriptions have no bound imposed by the runtime, so truncate them
+        // rather than failing the listing.
+        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Command, std::size(output[index].Command), dockerContainer.Command.c_str(), _TRUNCATE) == EINVAL);
+        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Status, std::size(output[index].Status), dockerContainer.Status.c_str(), _TRUNCATE) == EINVAL);
+
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);

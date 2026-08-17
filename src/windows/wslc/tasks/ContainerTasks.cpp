@@ -551,34 +551,37 @@ void ListContainers(CLIExecutionContext& context)
         using enum ColumnOverflow;
 
         // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
+        auto table = trunc ? wsl::windows::wslc::TableOutput<7>(
                                  context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderCommand(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}}}},
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}}}},
                                  containers.size())
-                           : wsl::windows::wslc::TableOutput<6>(
+                           : wsl::windows::wslc::TableOutput<7>(
                                  context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderName(),
                                   Localization::WSLCCLI_TableHeaderImage(),
+                                  Localization::WSLCCLI_TableHeaderCommand(),
                                   Localization::WSLCCLI_TableHeaderCreated(),
                                   Localization::WSLCCLI_TableHeaderStatus(),
-                                  Localization::WSLCCLI_TableHeaderPorts()});
+                                  Localization::WSLCCLI_TableHeaderPorts(),
+                                  Localization::WSLCCLI_TableHeaderNames()});
 
         // Add each container as a row
         for (const auto& container : containers)
         {
             table.WriteRow({
                 MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
-                MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
+                ContainerService::FormatCommand(container.Command, trunc),
                 ContainerService::FormatRelativeTime(container.CreatedAt),
-                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
+                ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt),
                 ContainerService::FormatPorts(container.State, container.Ports),
+                MultiByteToWide(container.Name),
             });
         }
 

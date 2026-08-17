@@ -427,6 +427,59 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
+std::wstring ContainerService::FormatCommand(const std::string& command, bool truncate)
+{
+    constexpr size_t c_maxDisplayWidth = 20;
+
+    auto wide = wsl::shared::string::MultiByteToWide(command);
+    if (truncate)
+    {
+        // Count code points rather than code units so a surrogate pair is never split.
+        size_t codePoints = 0;
+        size_t index = 0;
+        size_t cutoff = 0;
+        for (; index < wide.size(); ++codePoints)
+        {
+            if (codePoints == c_maxDisplayWidth - 1)
+            {
+                cutoff = index;
+            }
+
+            index += (IS_HIGH_SURROGATE(wide[index]) && (index + 1 < wide.size()) && IS_LOW_SURROGATE(wide[index + 1])) ? 2 : 1;
+        }
+
+        if (codePoints > c_maxDisplayWidth)
+        {
+            wide.resize(cutoff);
+            wide += L'\u2026';
+        }
+    }
+
+    std::wstring quoted{L'"'};
+    for (const auto character : wide)
+    {
+        if (character == L'"' || character == L'\\')
+        {
+            quoted += L'\\';
+        }
+
+        quoted += character;
+    }
+
+    quoted += L'"';
+    return quoted;
+}
+
+std::wstring ContainerService::FormatStatus(const std::string& status, WSLCContainerState state, ULONGLONG stateChangedAt)
+{
+    if (!status.empty())
+    {
+        return wsl::shared::string::MultiByteToWide(status);
+    }
+
+    return ContainerStateToString(state, stateChangedAt);
+}
+
 std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
 {
     if (state != WslcContainerStateRunning || ports.empty())
@@ -603,6 +656,8 @@ std::vector<ContainerInformation> ContainerService::List(
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
+        entry.Command = current.Command;
+        entry.Status = current.Status;
         entry.State = current.State;
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;

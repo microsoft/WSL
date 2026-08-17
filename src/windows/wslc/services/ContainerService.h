@@ -26,6 +26,14 @@ struct ContainerService
     static std::wstring FormatRelativeTime(ULONGLONG timestamp);
     static std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
     static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
+
+    // Renders a container command the way docker does: optionally shortened to 20 characters with a
+    // trailing ellipsis, then wrapped in double quotes.
+    static std::wstring FormatCommand(const std::string& command, bool truncate);
+
+    // Renders a container status, preferring the description supplied by the runtime and falling back
+    // to a locally built one when it is unavailable.
+    static std::wstring FormatStatus(const std::string& status, WSLCContainerState state, ULONGLONG stateChangedAt);
     static int Attach(Terminal& terminal, models::Session& session, const std::string& id);
     static int Run(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);
     static models::CreateContainerResult Create(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);

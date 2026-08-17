@@ -698,6 +698,9 @@ struct ContainerInfo
     std::vector<std::string> Names;
     std::string Image;
     std::string ImageID;
+    std::string Command;
+    // Human readable state description built by the daemon, e.g. "Up 5 minutes" or "Exited (0) 2 hours ago".
+    std::string Status;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
     std::vector<Mount> Mounts;
@@ -706,7 +709,8 @@ struct ContainerInfo
     HostConfig HostConfig;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, ImageID, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ContainerInfo, Id, Names, Image, ImageID, Command, Status, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
 };
 
 struct BuildKitVertex

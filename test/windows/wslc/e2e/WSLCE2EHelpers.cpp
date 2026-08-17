@@ -151,6 +151,22 @@ TestSession::~TestSession()
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status, const std::wstring& sessionName)
 {
+    // The status column reports the runtime's description, e.g. "Up 5 seconds", so map the logical
+    // state callers pass in onto the text that description starts with.
+    std::wstring expectedStatus = status;
+    if (status == L"created")
+    {
+        expectedStatus = L"Created";
+    }
+    else if (status == L"running")
+    {
+        expectedStatus = L"Up ";
+    }
+    else if (status == L"exited")
+    {
+        expectedStatus = L"Exited (";
+    }
+
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
@@ -166,8 +182,8 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
         if (line.find(containerNameOrId) != std::wstring::npos)
         {
             const std::wstring message = L"Container '" + containerNameOrId + L"' found in container list output but status '" +
-                                         status + L"' was not found in the same line";
-            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(status), message.c_str());
+                                         expectedStatus + L"' was not found in the same line";
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(expectedStatus), message.c_str());
             return;
         }
     }
