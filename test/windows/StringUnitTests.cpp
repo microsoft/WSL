@@ -31,7 +31,7 @@ struct StorageSizeTextRoundTripCase
 void VerifyDockerStorageSize(const std::string& Input, StorageSizeUnit Unit, std::optional<uint64_t> Expected)
 {
     const auto wideInput = wsl::shared::string::MultiByteToWide(Input);
-    VERIFY_ARE_EQUAL(ParseStorageSize(wideInput, Unit), Expected);
+    VERIFY_ARE_EQUAL(Expected, ParseStorageSize(wideInput, Unit));
 }
 
 std::vector<std::string> DockerSuffixes(char Unit)
@@ -98,10 +98,10 @@ class StringUnitTests
 
         for (const auto& [Input, Expected] : TestCases)
         {
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(Input), Expected);
+            VERIFY_ARE_EQUAL(Expected, wsl::shared::string::ParseMemorySize(Input));
 
             const auto wideInput = wsl::shared::string::MultiByteToWide(Input);
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(wideInput.c_str()), Expected);
+            VERIFY_ARE_EQUAL(Expected, wsl::shared::string::ParseMemorySize(wideInput.c_str()));
         }
     }
 
@@ -143,6 +143,13 @@ class StringUnitTests
             VerifyDockerStorageSize("32.B", Unit, 32);
             VerifyDockerStorageSize("32. b", Unit, 32);
             VerifyDockerStorageSize("32. B", Unit, 32);
+            VerifyDockerStorageSize("9007199254740991", Unit, 9'007'199'254'740'991);
+            VerifyDockerStorageSize("9007199254740992", Unit, 9'007'199'254'740'992);
+            VerifyDockerStorageSize("9007199254740993", Unit, 9'007'199'254'740'993);
+            VerifyDockerStorageSize("9223372036854775806", Unit, 9'223'372'036'854'775'806);
+            VerifyDockerStorageSize("9223372036854775807", Unit, 9'223'372'036'854'775'807);
+            VerifyDockerStorageSize("9223372036854775808", Unit, 9'223'372'036'854'775'808ULL);
+            VerifyDockerStorageSize("18446744073709551615", Unit, std::numeric_limits<uint64_t>::max());
         }
 
         VerifyDockerStorageSize("32.5kB", StorageSizeUnit::Decimal, 32'500);
@@ -151,6 +158,10 @@ class StringUnitTests
         VerifyDockerStorageSize(".3kB", StorageSizeUnit::Decimal, 300);
         VerifyDockerStorageSize("32.3 mb", StorageSizeUnit::Binary, 33'869'004);
         VerifyDockerStorageSize("0.3MB", StorageSizeUnit::Binary, 314'572);
+        VerifyDockerStorageSize("18446744073709551K", StorageSizeUnit::Decimal, 18'446'744'073'709'551'000ULL);
+        VerifyDockerStorageSize("18446744073709552K", StorageSizeUnit::Decimal, std::nullopt);
+        VerifyDockerStorageSize("18014398509481983K", StorageSizeUnit::Binary, 18'446'744'073'709'550'592ULL);
+        VerifyDockerStorageSize("18014398509481984K", StorageSizeUnit::Binary, std::nullopt);
     }
 
     TEST_METHOD(ParseStorageSize_DockerInvalidForms)
@@ -210,18 +221,17 @@ class StringUnitTests
 
         for (const auto& TestCase : TestCases)
         {
-            VERIFY_ARE_EQUAL(
-                FormatStorageSize(TestCase.Bytes, TestCase.Unit, TestCase.DecimalPlaces, TestCase.IncludeSpace), TestCase.Expected);
+            VERIFY_ARE_EQUAL(TestCase.Expected, FormatStorageSize(TestCase.Bytes, TestCase.Unit, TestCase.DecimalPlaces, TestCase.IncludeSpace));
         }
 
-        VERIFY_ARE_EQUAL(FormatBytes(119'856'765), std::wstring{L"119.86 MB"});
+        VERIFY_ARE_EQUAL(std::wstring{L"119.86 MB"}, FormatBytes(119'856'765));
     }
 
     TEST_METHOD(StorageSize_BytesToTextRoundTrips)
     {
         const auto VerifyRoundTrip = [](uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace = false) {
             const auto text = FormatStorageSize(Bytes, Unit, DecimalPlaces, IncludeSpace);
-            VERIFY_ARE_EQUAL(ParseStorageSize(text, Unit), std::optional<uint64_t>{Bytes});
+            VERIFY_ARE_EQUAL(std::optional<uint64_t>{Bytes}, ParseStorageSize(text, Unit));
         };
 
         VerifyRoundTrip(0, StorageSizeUnit::Decimal, 0);
@@ -265,8 +275,8 @@ class StringUnitTests
             VERIFY_IS_TRUE(bytes.has_value());
 
             const auto text = FormatStorageSize(bytes.value(), TestCase.Unit, TestCase.DecimalPlaces, TestCase.IncludeSpace);
-            VERIFY_ARE_EQUAL(text, TestCase.Text);
-            VERIFY_ARE_EQUAL(ParseStorageSize(text, TestCase.Unit), bytes);
+            VERIFY_ARE_EQUAL(TestCase.Text, text);
+            VERIFY_ARE_EQUAL(bytes, ParseStorageSize(text, TestCase.Unit));
         }
     }
 };

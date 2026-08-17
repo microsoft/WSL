@@ -317,13 +317,6 @@ std::optional<uint64_t> wsl::windows::common::string::ParseStorageSize(std::wstr
         narrowNumber.erase(0, 1);
     }
 
-    double value{};
-    const auto result = std::from_chars(narrowNumber.data(), narrowNumber.data() + narrowNumber.size(), value, std::chars_format::general);
-    if (result.ec != std::errc() || result.ptr != narrowNumber.data() + narrowNumber.size() || !std::isfinite(value) || value < 0)
-    {
-        return {};
-    }
-
     uint64_t multiplier = 1;
     if (!suffix.empty())
     {
@@ -349,6 +342,27 @@ std::optional<uint64_t> wsl::windows::common::string::ParseStorageSize(std::wstr
                 multiplier *= base;
             }
         }
+    }
+
+    if (!narrowNumber.empty() && narrowNumber.find_first_not_of("0123456789") == std::string::npos)
+    {
+        uint64_t value{};
+        const auto result = std::from_chars(narrowNumber.data(), narrowNumber.data() + narrowNumber.size(), value);
+        if (result.ec != std::errc() || result.ptr != narrowNumber.data() + narrowNumber.size() ||
+            value > std::numeric_limits<uint64_t>::max() / multiplier)
+        {
+            return {};
+        }
+
+        return value * multiplier;
+    }
+
+    // Fractional and exponent forms require floating-point parsing and may lose precision above 2^53.
+    double value{};
+    const auto result = std::from_chars(narrowNumber.data(), narrowNumber.data() + narrowNumber.size(), value, std::chars_format::general);
+    if (result.ec != std::errc() || result.ptr != narrowNumber.data() + narrowNumber.size() || !std::isfinite(value) || value < 0)
+    {
+        return {};
     }
 
     const double bytes = value * static_cast<double>(multiplier);

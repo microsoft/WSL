@@ -174,6 +174,8 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(static_cast<int64_t>(1'610'612'736), validation::GetMemorySizeFromString(L"1.5G"));
         VERIFY_ARE_EQUAL(static_cast<int64_t>(314'572), validation::GetMemorySizeFromString(L"0.3MiB"));
         VERIFY_ARE_EQUAL(static_cast<int64_t>(32), validation::GetMemorySizeFromString(L"32.3"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(9'007'199'254'740'993), validation::GetMemorySizeFromString(L"9007199254740993"));
+        VERIFY_ARE_EQUAL(std::numeric_limits<int64_t>::max(), validation::GetMemorySizeFromString(L"9223372036854775807"));
         VERIFY_THROWS(validation::GetMemorySizeFromString(L"-1.5G"), ArgumentException);
         VERIFY_THROWS(validation::GetMemorySizeFromString(L"9223372036854775808"), ArgumentException);
 
