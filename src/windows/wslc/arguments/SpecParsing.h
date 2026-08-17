@@ -104,7 +104,7 @@ models::ProgressMode GetProgressModeFromString(const std::wstring& input, const 
 // Parses an inspect target ("image"/"container"/"network"/"volume") into an InspectType.
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
-// Parses a memory size (e.g. "512m", "1g") into a byte count.
+// Parses a Docker-style memory size (e.g. "512m", "1.5g") into a byte count.
 int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName = {});
 
 // Parses a Go-style duration (e.g. "1.5h", "500ms") into nanoseconds.
