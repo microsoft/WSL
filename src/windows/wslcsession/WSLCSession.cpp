@@ -3031,8 +3031,6 @@ try
 
     auto lock = AcquireLease();
 
-    std::lock_guard networksLock(m_networksLock);
-
     std::vector<docker_schema::Network> dockerNetworks;
     if (filtered)
     {
@@ -3042,6 +3040,8 @@ try
         }
         CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
     }
+
+    std::lock_guard networksLock(m_networksLock);
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
 
