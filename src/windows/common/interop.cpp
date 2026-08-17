@@ -412,8 +412,9 @@ ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* R
     namespace io = wsl::windows::common::io;
 
     DWORD exitCode = 1;
-    size_t pendingSize = 0;
-    LX_INIT_WINDOW_SIZE_CHANGED pendingMessage{};
+    std::vector<char> pending;
+
+    static_assert(sizeof(LX_INIT_WINDOW_SIZE_CHANGED) % alignof(LX_INIT_WINDOW_SIZE_CHANGED) == 0);
 
     auto processExit = [&] {
         THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(Result->Process.get(), &exitCode));
@@ -446,26 +447,30 @@ ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* R
                     return;
                 }
 
+                std::vector<char> stitchedInput;
                 auto remaining = input;
-                while (!remaining.empty())
+                if (!pending.empty())
                 {
-                    const size_t bytesToCopy = (std::min)(remaining.size(), sizeof(pendingMessage) - pendingSize);
-                    std::copy_n(remaining.data(), bytesToCopy, reinterpret_cast<char*>(&pendingMessage) + pendingSize);
-                    pendingSize += bytesToCopy;
-                    remaining = remaining.subspan(bytesToCopy);
-
-                    if (pendingSize == sizeof(pendingMessage))
-                    {
-                        THROW_HR_IF(
-                            E_UNEXPECTED,
-                            (pendingMessage.Header.MessageType != LxInitMessageWindowSizeChanged) ||
-                                (pendingMessage.Header.MessageSize != sizeof(pendingMessage)));
-
-                        const COORD size{static_cast<SHORT>(pendingMessage.Columns), static_cast<SHORT>(pendingMessage.Rows)};
-                        THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), size));
-                        pendingSize = 0;
-                    }
+                    stitchedInput.reserve(pending.size() + input.size());
+                    stitchedInput.insert(stitchedInput.end(), pending.begin(), pending.end());
+                    stitchedInput.insert(stitchedInput.end(), input.begin(), input.end());
+                    pending.clear();
+                    remaining = gsl::make_span(stitchedInput);
                 }
+
+                while (remaining.size() >= sizeof(LX_INIT_WINDOW_SIZE_CHANGED))
+                {
+                    const auto* message = gslhelpers::get_struct<const LX_INIT_WINDOW_SIZE_CHANGED>(remaining);
+                    THROW_HR_IF(
+                        E_UNEXPECTED,
+                        (message->Header.MessageType != LxInitMessageWindowSizeChanged) || (message->Header.MessageSize != sizeof(*message)));
+
+                    const COORD size{static_cast<SHORT>(message->Columns), static_cast<SHORT>(message->Rows)};
+                    THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), size));
+                    remaining = remaining.subspan(sizeof(*message));
+                }
+
+                pending.assign(remaining.begin(), remaining.end());
             }),
         io::MultiHandleWait::CancelOnCompleted);
 
