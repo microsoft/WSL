@@ -1099,7 +1099,8 @@ class WSLCE2EContainerRunTests
         auto result = RunWslc(std::format(L"container run --rm --mount type=bogus,target=/x {} true", DebianImage.NameAndTag()));
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"for '--mount' flag"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"for '--mount' option"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"uses an unsupported feature"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_DuplicateDestination_Fails)

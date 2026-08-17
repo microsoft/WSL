@@ -2471,6 +2471,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Failed to create volume '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcBindSourcePathNotFound" xml:space="preserve">
+    <value>Bind source path does not exist: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBindSourcePathError" xml:space="preserve">
+    <value>Failed to access bind source path '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcTooManyVirtioFsShares" xml:space = "preserve" >
     <value>Too many volumes have been mounted (limit: {}). Restart the session to mount more volumes. This will be fixed in a future release.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2976,12 +2984,93 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Invalid argument "{}" for '-f, --filter' flag: bad format of filter (expected name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
-    <value>Invalid argument "{}" for '--mount' flag: {}</value>
+    <value>Invalid argument "{}" for '--mount' option: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedMountError" xml:space="preserve">
+    <value>Argument "{}" for '--mount' option uses an unsupported feature: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DuplicateMountDestinationError" xml:space="preserve">
     <value>Duplicate mount point: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountMalformedCsvError" xml:space="preserve">
+    <value>The CSV input is malformed.</value>
+    <comment>{Locked="CSV"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
+    <value>The field '{}' must be a key=value pair.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="key=value"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountUnexpectedKeyError" xml:space="preserve">
+    <value>The key '{}' is unexpected in '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountInvalidValueError" xml:space="preserve">
+    <value>The value for '{}' is invalid: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountInvalidBindRecursiveValueError" xml:space="preserve">
+    <value>The value for '{}' is invalid: '{}'. Valid values are "enabled", "disabled", "writable", and "readonly".</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="enabled"}{Locked="disabled"}{Locked="writable"}{Locked="readonly"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
+    <value>The mount type is required.</value>
+  </data>
+  <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
+    <value>Options matching '{}' cannot be used with mount type '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
+    <value>Option '{}' requires the 'readonly' option.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="readonly"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
+    <value>Option 'bind-recursive=readonly' requires the 'bind-propagation=rprivate' option.</value>
+    <comment>{Locked="bind-recursive=readonly"}{Locked="bind-propagation=rprivate"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
+    <value>Mount type '{}' is not supported.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
+    <value>Option '{}' is not supported.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
+    <value>The mount target is required.</value>
+  </data>
+  <data name="WSLCCLI_MountTargetAbsoluteError" xml:space="preserve">
+    <value>The mount target path must be absolute.</value>
+  </data>
+  <data name="WSLCCLI_MountTmpfsOptionsTypeError" xml:space="preserve">
+    <value>The tmpfs options are supported only for tmpfs mounts.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTmpfsSizeNegativeError" xml:space="preserve">
+    <value>The tmpfs size cannot be negative.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountSourceRequiredError" xml:space="preserve">
+    <value>The mount source is required.</value>
+  </data>
+  <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
+    <value>The bind source path must be absolute.</value>
+    <comment>{Locked="bind"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountAnonymousVolumeUnsupportedError" xml:space="preserve">
+    <value>Anonymous volume mounts are not supported.</value>
+  </data>
+  <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
+    <value>The volume source must be a valid named volume.</value>
+  </data>
+  <data name="WSLCCLI_MountTmpfsSourceUnsupportedError" xml:space="preserve">
+    <value>The source option is not supported for tmpfs mounts.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeUnsupportedGenericError" xml:space="preserve">
+    <value>The mount type is not supported.</value>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Follow log output</value>

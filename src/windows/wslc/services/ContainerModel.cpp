@@ -339,7 +339,7 @@ void ValidateUniqueMountDestinations(const ContainerOptions& options)
     {
         mount::ValidateMountCollection(options.Mounts);
     }
-    catch (const mount::ValidationException& ex)
+    catch (const mount::MountException& ex)
     {
         if (ex.Error() == mount::ValidationError::DuplicateDestination)
         {

@@ -49,21 +49,21 @@ enum class ValidationError
     DuplicateDestination,
 };
 
-class ValidationException : public std::exception
+class MountException : public std::exception
 {
 public:
-    explicit ValidationException(std::wstring reason) : m_reason(std::move(reason))
+    explicit MountException(std::wstring reason) : m_reason(std::move(reason))
     {
     }
 
-    ValidationException(ValidationError error, std::wstring reason, std::string destination) :
+    MountException(ValidationError error, std::wstring reason, std::string destination) :
         m_error(error), m_reason(std::move(reason)), m_destination(std::move(destination))
     {
     }
 
     const char* what() const noexcept override
     {
-        return "invalid mount";
+        return "mount error";
     }
 
     const std::wstring& Reason() const noexcept
@@ -85,6 +85,24 @@ private:
     ValidationError m_error = ValidationError::InvalidSpecification;
     std::wstring m_reason;
     std::string m_destination;
+};
+
+class MountParseException : public MountException
+{
+public:
+    using MountException::MountException;
+};
+
+class MountUnsupportedException : public MountException
+{
+public:
+    using MountException::MountException;
+};
+
+class MountValidationException : public MountException
+{
+public:
+    using MountException::MountException;
 };
 
 Spec ParseDockerMountString(const std::wstring& value);

@@ -24,6 +24,8 @@ Abstract:
 #include "WSLCProcessIO.h"
 #include "WSLCVolumes.h"
 #include "APICompat.h"
+#include "MountSpecParsing.h"
+#include <unordered_set>
 
 namespace apicompat = wsl::windows::common::apicompat;
 
@@ -414,9 +416,21 @@ auto MountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& par
 
     for (auto& volume : volumes)
     {
-        // Create a new directory if it doesn't exist.
-        if (!std::filesystem::exists(volume.HostPath))
+        std::error_code error;
+        const auto sourceExists = std::filesystem::exists(volume.HostPath, error);
+        if (error)
         {
+            throw wsl::windows::common::mount::MountValidationException(
+                Localization::MessageWslcBindSourcePathError(volume.HostPath, error.message()));
+        }
+
+        if (!sourceExists)
+        {
+            if (!volume.CreateSourceIfMissing)
+            {
+                throw wsl::windows::common::mount::MountValidationException(Localization::MessageWslcBindSourcePathNotFound(volume.HostPath));
+            }
+
             auto result = wil::CreateDirectoryDeepNoThrow(volume.HostPath.c_str());
             if (FAILED(result))
             {
@@ -431,6 +445,18 @@ auto MountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& par
     }
 
     return std::move(errorCleanup);
+}
+
+auto MountVolumesWithUserError(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& parentVM)
+{
+    try
+    {
+        return MountVolumes(volumes, parentVM);
+    }
+    catch (const wsl::windows::common::mount::MountValidationException& ex)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, ex.Reason());
+    }
 }
 
 WSLCContainerState DockerStateToWSLCState(ContainerState state)
@@ -519,6 +545,183 @@ std::map<std::string, std::string> StripInternalLabels(std::map<std::string, std
 std::map<std::string, std::string> StripInternalLabels(std::optional<std::map<std::string, std::string>>&& labels)
 {
     return StripInternalLabels(std::move(labels).value_or(std::map<std::string, std::string>{}));
+}
+
+std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WSLCContainerOptions& containerOptions)
+{
+    namespace mount = wsl::windows::common::mount;
+
+    THROW_HR_IF(E_INVALIDARG, containerOptions.MountsCount > 0 && containerOptions.Mounts == nullptr);
+
+    std::vector<mount::Spec> mounts;
+    mounts.reserve(containerOptions.MountsCount);
+    for (ULONG i = 0; i < containerOptions.MountsCount; ++i)
+    {
+        const auto& value = containerOptions.Mounts[i];
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, value.Target, "Mount at index %lu has null Target", i);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsAnyFlagSet(value.Flags, ~WSLCMountSpecFlagsValid),
+            "Mount at index %lu has invalid flags: 0x%x",
+            i,
+            value.Flags);
+
+        mount::Type type;
+        switch (value.Type)
+        {
+        case WSLCMountTypeBind:
+            type = mount::Type::Bind;
+            break;
+
+        case WSLCMountTypeVolume:
+            type = mount::Type::Volume;
+            break;
+
+        case WSLCMountTypeTmpfs:
+            type = mount::Type::Tmpfs;
+            break;
+
+        default:
+            THROW_HR_MSG(E_INVALIDARG, "Mount at index %lu has invalid type: %d", i, value.Type);
+        }
+
+        mounts.push_back({
+            .MountType = type,
+            .Source = value.Source != nullptr ? value.Source : L"",
+            .Target = value.Target,
+            .ReadOnly = static_cast<bool>(value.ReadOnly),
+            .TmpfsSizeBytes = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize) ? std::optional<int64_t>{value.TmpfsSizeBytes} : std::nullopt,
+            .TmpfsMode = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsMode) ? std::optional<uint32_t>{value.TmpfsMode} : std::nullopt,
+        });
+    }
+
+    try
+    {
+        mount::ValidateMountCollection(mounts);
+        for (const auto& mount : mounts)
+        {
+            if (mount.MountType == mount::Type::Bind)
+            {
+                std::error_code error;
+                const auto sourceExists = std::filesystem::exists(mount.Source, error);
+                if (error)
+                {
+                    throw mount::MountValidationException(Localization::MessageWslcBindSourcePathError(mount.Source, error.message()));
+                }
+
+                if (!sourceExists)
+                {
+                    throw mount::MountValidationException(Localization::MessageWslcBindSourcePathNotFound(mount.Source));
+                }
+            }
+        }
+    }
+    catch (const mount::MountException& ex)
+    {
+        if (ex.Error() == mount::ValidationError::DuplicateDestination)
+        {
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG, Localization::WSLCCLI_DuplicateMountDestinationError(wsl::shared::string::MultiByteToWide(ex.Destination())));
+        }
+
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, ex.Reason());
+    }
+
+    std::unordered_set<std::string> destinations;
+    const auto addDestination = [&](const char* destination) {
+        THROW_HR_IF_NULL(E_INVALIDARG, destination);
+
+        const auto normalizedDestination = mount::NormalizeDestination(destination);
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::WSLCCLI_DuplicateMountDestinationError(wsl::shared::string::MultiByteToWide(normalizedDestination)),
+            !destinations.emplace(normalizedDestination).second);
+    };
+
+    for (const auto& mount : mounts)
+    {
+        addDestination(mount.Target.c_str());
+    }
+
+    THROW_HR_IF(E_INVALIDARG, containerOptions.VolumesCount > 0 && containerOptions.Volumes == nullptr);
+    for (ULONG i = 0; i < containerOptions.VolumesCount; ++i)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes[i].HostPath, "Volumes[%lu].HostPath is null", i);
+        addDestination(containerOptions.Volumes[i].ContainerPath);
+    }
+
+    THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
+    for (ULONG i = 0; i < containerOptions.NamedVolumesCount; ++i)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.NamedVolumes[i].Name, "NamedVolume at index %lu has null Name", i);
+        addDestination(containerOptions.NamedVolumes[i].ContainerPath);
+    }
+
+    THROW_HR_IF(E_INVALIDARG, containerOptions.TmpfsCount > 0 && containerOptions.Tmpfs == nullptr);
+    for (ULONG i = 0; i < containerOptions.TmpfsCount; ++i)
+    {
+        addDestination(containerOptions.Tmpfs[i].Destination);
+    }
+
+    return mounts;
+}
+
+struct PreparedBindMount
+{
+    WSLCVolumeMount Volume;
+    std::string DockerSource;
+};
+
+enum class MissingBindSource
+{
+    Create,
+    Reject,
+};
+
+PreparedBindMount PrepareBindMount(const std::wstring& source, const std::string& target, bool readOnly, MissingBindSource missingSource)
+{
+    GUID volumeId;
+    THROW_IF_FAILED(CoCreateGuid(&volumeId));
+
+    auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
+    std::filesystem::path hostPath = source;
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(source), !hostPath.is_absolute());
+
+    std::wstring sourceFilename;
+    {
+        std::error_code ec;
+        hostPath = std::filesystem::canonical(hostPath, ec);
+        if (!ec)
+        {
+            if (std::filesystem::is_regular_file(hostPath))
+            {
+                sourceFilename = hostPath.filename().wstring();
+                hostPath = hostPath.parent_path();
+            }
+        }
+        else if (ec == std::errc::no_such_file_or_directory)
+        {
+            hostPath = source;
+        }
+        else
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(source, ec.message()));
+        }
+    }
+
+    auto dockerSource = sourceFilename.empty() ? parentVMPath : std::format("{}/{}", parentVMPath, sourceFilename);
+    return {
+        .Volume =
+            {
+                .HostPath = std::move(hostPath),
+                .ParentVMPath = std::move(parentVMPath),
+                .ContainerPath = target,
+                .ReadOnly = readOnly,
+                .SourceFilename = std::move(sourceFilename),
+                .CreateSourceIfMissing = missingSource == MissingBindSource::Create,
+            },
+        .DockerSource = std::move(dockerSource),
+    };
 }
 
 void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::windows::common::docker_schema::CreateContainer& request)
@@ -900,7 +1103,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
         !unavailableVolumes.empty());
 
-    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_runtime.Vm());
+    auto volumeCleanup = MountVolumesWithUserError(m_mountedVolumes, m_runtime.Vm());
 
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
     MapPorts();
@@ -1600,7 +1803,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     }
 
     // Map volume mounts using WSLC's host-side data.
-    wslcInspect.Mounts.reserve(m_mountedVolumes.size() + dockerInspect.HostConfig.Tmpfs.size());
+    wslcInspect.Mounts.reserve(m_mountedVolumes.size() + dockerInspect.HostConfig.Tmpfs.size() + dockerInspect.HostConfig.Mounts.size());
     for (const auto& volume : m_mountedVolumes)
     {
         wslc_schema::InspectMount mountInfo{};
@@ -1634,6 +1837,20 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         // (e.g. "ro") for inspect output; Docker enforces actual mount behavior.
         mountInfo.ReadWrite = true;
         wslcInspect.Mounts.push_back(std::move(mountInfo));
+    }
+
+    // Bind mounts are populated from m_mountedVolumes so their inspect source is the Windows host path.
+    for (const auto& mount : dockerInspect.HostConfig.Mounts)
+    {
+        if (mount.Type == "volume" || mount.Type == "tmpfs")
+        {
+            wslc_schema::InspectMount mountInfo{};
+            mountInfo.Type = mount.Type;
+            mountInfo.Source = mount.Source;
+            mountInfo.Destination = mount.Target;
+            mountInfo.ReadWrite = !mount.ReadOnly;
+            wslcInspect.Mounts.push_back(std::move(mountInfo));
+        }
     }
 
     // Config.Labels is the Docker-shape location; top-level Labels is a legacy alias.
@@ -1676,6 +1893,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto& virtualMachine = runtime.Vm();
     auto& DockerClient = runtime.Docker();
     auto& EventTracker = runtime.Events();
+    const auto mounts = ConvertAndValidateMounts(containerOptions);
 
     common::docker_schema::CreateContainer request;
     request.Image = containerOptions.Image;
@@ -1837,72 +2055,21 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.Healthcheck = std::move(health);
     }
 
-    if (containerOptions.VolumesCount > 0)
-    {
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
-    }
-
     // Build bind mount list from container options.
     std::vector<WSLCVolumeMount> volumes;
-    volumes.reserve(containerOptions.VolumesCount);
+    volumes.reserve(containerOptions.VolumesCount + mounts.size());
 
     std::vector<std::string> binds;
     binds.reserve(containerOptions.VolumesCount);
 
     for (ULONG i = 0; i < containerOptions.VolumesCount; i++)
     {
-        GUID volumeId;
-        THROW_IF_FAILED(CoCreateGuid(&volumeId));
-
-        auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
         auto volume = containerOptions.Volumes[i];
-
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.HostPath, "Volumes[%lu].HostPath is null", i);
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
-
-        std::filesystem::path hostPath = volume.HostPath;
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(volume.HostPath), !hostPath.is_absolute());
-
-        std::wstring sourceFilename;
-
-        {
-            // Resolve symlinks.
-            std::error_code ec;
-            hostPath = std::filesystem::canonical(hostPath, ec);
-            if (!ec)
-            {
-                // When the host path is a file, mount the parent directory in the VM
-                // and bind only the specific file into the container via Docker.
-                if (std::filesystem::is_regular_file(hostPath))
-                {
-                    sourceFilename = hostPath.filename().wstring();
-                    hostPath = hostPath.parent_path();
-                }
-            }
-            else
-            {
-                if (ec == std::errc::no_such_file_or_directory)
-                {
-                    // Path doesn't exist, assume directory.
-                    hostPath = volume.HostPath;
-                }
-                else
-                {
-                    THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(volume.HostPath, ec.message()));
-                }
-            }
-        }
-
-        volumes.push_back(WSLCVolumeMount{hostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly), sourceFilename});
-
-        auto options = volume.ReadOnly ? "ro" : "rw";
-        auto bindSource = sourceFilename.empty() ? parentVMPath : std::format("{}/{}", parentVMPath, sourceFilename);
-        auto bind = std::format("{}:{}:{}", bindSource, volume.ContainerPath, options);
-
-        binds.push_back(std::move(bind));
+        auto prepared =
+            PrepareBindMount(volume.HostPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly), MissingBindSource::Create);
+        binds.push_back(std::format("{}:{}:{}", prepared.DockerSource, volume.ContainerPath, volume.ReadOnly ? "ro" : "rw"));
+        volumes.push_back(std::move(prepared.Volume));
     }
-
-    request.HostConfig.Binds = std::move(binds);
 
     // Process tmpfs mounts from container options.
     if (containerOptions.TmpfsCount > 0)
@@ -1920,6 +2087,47 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     ProcessNamedVolumes(containerOptions, request);
+
+    for (const auto& mount : mounts)
+    {
+        common::docker_schema::Mount dockerMount{
+            .Target = mount.Target,
+            .ReadOnly = mount.ReadOnly,
+        };
+
+        switch (mount.MountType)
+        {
+        case wsl::windows::common::mount::Type::Bind:
+        {
+            // Docker's colon-delimited bind format cannot represent ':' in the target.
+            auto prepared = PrepareBindMount(mount.Source, mount.Target, mount.ReadOnly, MissingBindSource::Reject);
+            dockerMount.Source = std::move(prepared.DockerSource);
+            dockerMount.Type = "bind";
+            volumes.push_back(std::move(prepared.Volume));
+            break;
+        }
+
+        case wsl::windows::common::mount::Type::Volume:
+            dockerMount.Source = wsl::shared::string::WideToMultiByte(mount.Source);
+            dockerMount.Type = "volume";
+            break;
+
+        case wsl::windows::common::mount::Type::Tmpfs:
+            dockerMount.Type = "tmpfs";
+            if (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value())
+            {
+                dockerMount.TmpfsOptions = common::docker_schema::MountTmpfsOptions{
+                    .SizeBytes = mount.TmpfsSizeBytes.value_or(0),
+                    .Mode = mount.TmpfsMode.value_or(0),
+                };
+            }
+            break;
+        }
+
+        request.HostConfig.Mounts.push_back(std::move(dockerMount));
+    }
+
+    request.HostConfig.Binds = std::move(binds);
 
     // Configure GPU support if requested.
     if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsGpu))
@@ -2058,8 +2266,12 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.Labels[WSLCContainerMetadataLabel] = SerializeContainerMetadata(metadata);
     request.Labels.insert(requestedLabels.begin(), requestedLabels.end());
 
-    // Send the request to docker.
-    auto result = DockerClient.CreateContainer(request, containerName);
+    // Docker validates structured bind sources during container creation, so their VM paths must exist here.
+    // Release the temporary shares before returning; Start remounts them for the container lifetime.
+    auto result = [&]() {
+        auto volumeCleanup = MountVolumesWithUserError(volumes, virtualMachine);
+        return DockerClient.CreateContainer(request, containerName);
+    }();
 
     // Surface any warnings returned by Docker (e.g., deprecated features, configuration issues).
     for (const auto& warning : result.Warnings)
@@ -2113,10 +2325,18 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // Collect the names of referenced docker named volumes so Start() can verify
     // they are available before running the container.
     std::vector<std::string> namedVolumes;
-    namedVolumes.reserve(containerOptions.NamedVolumesCount);
+    namedVolumes.reserve(containerOptions.NamedVolumesCount + mounts.size());
     for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
     {
         namedVolumes.emplace_back(containerOptions.NamedVolumes[i].Name);
+    }
+
+    for (const auto& mount : mounts)
+    {
+        if (mount.MountType == wsl::windows::common::mount::Type::Volume)
+        {
+            namedVolumes.emplace_back(wsl::shared::string::WideToMultiByte(mount.Source));
+        }
     }
 
     auto mergedLabels = StripInternalLabels(std::move(inspectData.Config.Labels));

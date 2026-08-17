@@ -123,9 +123,19 @@ namespace {
         bool HadSeparator;
     };
 
-    [[noreturn]] void ThrowInvalid(std::wstring reason)
+    [[noreturn]] void ThrowValidation(std::wstring reason)
     {
-        throw ValidationException(std::move(reason));
+        throw MountValidationException(std::move(reason));
+    }
+
+    [[noreturn]] void ThrowParse(std::wstring reason)
+    {
+        throw MountParseException(std::move(reason));
+    }
+
+    [[noreturn]] void ThrowUnsupported(std::wstring reason)
+    {
+        throw MountUnsupportedException(std::move(reason));
     }
 
     KeyValue SplitKeyValue(const std::wstring& value)
@@ -308,7 +318,7 @@ Spec ParseDockerMountString(const std::wstring& value)
     const auto fields = SplitCsvFields(value);
     if (!fields.has_value())
     {
-        ThrowInvalid(L"malformed CSV");
+        ThrowParse(Localization::WSLCCLI_MountMalformedCsvError());
     }
 
     DockerMountSpec mount;
@@ -322,15 +332,15 @@ Spec ParseDockerMountString(const std::wstring& value)
         {
             if (!keyValue.HadSeparator)
             {
-                ThrowInvalid(std::format(L"invalid field '{}' must be a key=value pair", field));
+                ThrowParse(Localization::WSLCCLI_MountFieldKeyValueRequiredError(field));
             }
 
-            ThrowInvalid(std::format(L"unexpected key '{}' in '{}'", key, field));
+            ThrowParse(Localization::WSLCCLI_MountUnexpectedKeyError(key, field));
         }
 
         if (!keyValue.HadSeparator && !definition->AllowsBareForm)
         {
-            ThrowInvalid(std::format(L"invalid field '{}' must be a key=value pair", field));
+            ThrowParse(Localization::WSLCCLI_MountFieldKeyValueRequiredError(field));
         }
 
         switch (definition->Id)
@@ -369,7 +379,7 @@ Spec ParseDockerMountString(const std::wstring& value)
             }
             else
             {
-                ThrowInvalid(std::format(L"invalid value for {}: {}", key, keyValue.Value));
+                ThrowParse(Localization::WSLCCLI_MountInvalidValueError(key, keyValue.Value));
             }
             break;
 
@@ -384,7 +394,7 @@ Spec ParseDockerMountString(const std::wstring& value)
         case Field::BindNonRecursive:
             if (keyValue.HadSeparator && !ParseBool(keyValue.Value.c_str(), true).has_value())
             {
-                ThrowInvalid(std::format(L"invalid value for {}: {}", key, keyValue.Value));
+                ThrowParse(Localization::WSLCCLI_MountInvalidValueError(key, keyValue.Value));
             }
 
             mount.HasBindOptions = true;
@@ -413,13 +423,12 @@ Spec ParseDockerMountString(const std::wstring& value)
                 break;
             }
 
-            ThrowInvalid(std::format(
-                L"invalid value for {}: {} (must be \"enabled\", \"disabled\", \"writable\", or \"readonly\")", key, keyValue.Value));
+            ThrowParse(Localization::WSLCCLI_MountInvalidBindRecursiveValueError(key, keyValue.Value));
 
         case Field::VolumeNoCopy:
             if (keyValue.HadSeparator && !ParseBool(keyValue.Value.c_str(), true).has_value())
             {
-                ThrowInvalid(std::format(L"invalid value for volume-nocopy: {}", keyValue.Value));
+                ThrowParse(Localization::WSLCCLI_MountInvalidValueError(L"volume-nocopy", keyValue.Value));
             }
 
             mount.HasVolumeOptions = true;
@@ -435,7 +444,7 @@ Spec ParseDockerMountString(const std::wstring& value)
             mount.TmpfsSizeBytes = ParseDockerRamInBytes(keyValue.Value);
             if (!mount.TmpfsSizeBytes.has_value())
             {
-                ThrowInvalid(std::format(L"invalid value for {}: {}", key, keyValue.Value));
+                ThrowParse(Localization::WSLCCLI_MountInvalidValueError(key, keyValue.Value));
             }
 
             mount.HasTmpfsOptions = true;
@@ -445,7 +454,7 @@ Spec ParseDockerMountString(const std::wstring& value)
             mount.TmpfsMode = ParseDockerTmpfsMode(keyValue.Value);
             if (!mount.TmpfsMode.has_value())
             {
-                ThrowInvalid(std::format(L"invalid value for {}: {}", key, keyValue.Value));
+                ThrowParse(Localization::WSLCCLI_MountInvalidValueError(key, keyValue.Value));
             }
 
             mount.HasTmpfsOptions = true;
@@ -460,35 +469,35 @@ Spec ParseDockerMountString(const std::wstring& value)
 
     if (mount.Type.empty())
     {
-        ThrowInvalid(L"type is required");
+        ThrowParse(Localization::WSLCCLI_MountTypeRequiredError());
     }
 
     if (mount.HasVolumeOptions && mount.Type != L"volume")
     {
-        ThrowInvalid(std::format(L"cannot mix 'volume-*' options with mount type '{}'", mount.Type));
+        ThrowParse(Localization::WSLCCLI_MountOptionFamilyMismatchError(L"volume-*", mount.Type));
     }
     if (mount.HasBindOptions && mount.Type != L"bind")
     {
-        ThrowInvalid(std::format(L"cannot mix 'bind-*' options with mount type '{}'", mount.Type));
+        ThrowParse(Localization::WSLCCLI_MountOptionFamilyMismatchError(L"bind-*", mount.Type));
     }
     if (mount.HasTmpfsOptions && mount.Type != L"tmpfs")
     {
-        ThrowInvalid(std::format(L"cannot mix 'tmpfs-*' options with mount type '{}'", mount.Type));
+        ThrowParse(Localization::WSLCCLI_MountOptionFamilyMismatchError(L"tmpfs-*", mount.Type));
     }
 
     if (mount.BindReadOnlyNonRecursive && !mount.ReadOnly)
     {
-        ThrowInvalid(L"option 'bind-recursive=writable' requires 'readonly' to be specified in conjunction");
+        ThrowParse(Localization::WSLCCLI_MountOptionRequiresReadonlyError(L"bind-recursive=writable"));
     }
     if (mount.BindReadOnlyForceRecursive)
     {
         if (!mount.ReadOnly)
         {
-            ThrowInvalid(L"option 'bind-recursive=readonly' requires 'readonly' to be specified in conjunction");
+            ThrowParse(Localization::WSLCCLI_MountOptionRequiresReadonlyError(L"bind-recursive=readonly"));
         }
         if (mount.BindPropagation != L"rprivate")
         {
-            ThrowInvalid(L"option 'bind-recursive=readonly' requires 'bind-propagation=rprivate' to be specified in conjunction");
+            ThrowParse(Localization::WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError());
         }
     }
 
@@ -507,12 +516,12 @@ Spec ParseDockerMountString(const std::wstring& value)
     }
     else
     {
-        ThrowInvalid(std::format(L"mount type '{}' is not supported.", mount.Type));
+        ThrowUnsupported(Localization::WSLCCLI_MountTypeUnsupportedError(mount.Type));
     }
 
     if (mount.UnsupportedOption.has_value())
     {
-        ThrowInvalid(std::format(L"option '{}' is not supported.", mount.UnsupportedOption.value()));
+        ThrowUnsupported(Localization::WSLCCLI_MountOptionUnsupportedError(mount.UnsupportedOption.value()));
     }
 
     return {
@@ -529,27 +538,22 @@ void ValidateMountSpec(const Spec& mount)
 {
     if (mount.Target.empty())
     {
-        ThrowInvalid(L"target is required");
-    }
-
-    if (mount.Target.find(':') != std::string::npos)
-    {
-        ThrowInvalid(L"target paths containing ':' are not supported.");
+        ThrowValidation(Localization::WSLCCLI_MountTargetRequiredError());
     }
 
     if (!mount.Target.starts_with('/'))
     {
-        ThrowInvalid(L"target path must be absolute");
+        ThrowValidation(Localization::WSLCCLI_MountTargetAbsoluteError());
     }
 
     if (mount.MountType != Type::Tmpfs && (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value()))
     {
-        ThrowInvalid(L"tmpfs options are only supported for tmpfs mounts");
+        ThrowValidation(Localization::WSLCCLI_MountTmpfsOptionsTypeError());
     }
 
     if (mount.TmpfsSizeBytes.has_value() && mount.TmpfsSizeBytes.value() < 0)
     {
-        ThrowInvalid(L"tmpfs size must not be negative");
+        ThrowValidation(Localization::WSLCCLI_MountTmpfsSizeNegativeError());
     }
 
     switch (mount.MountType)
@@ -557,36 +561,36 @@ void ValidateMountSpec(const Spec& mount)
     case Type::Bind:
         if (mount.Source.empty())
         {
-            ThrowInvalid(L"source is required");
+            ThrowValidation(Localization::WSLCCLI_MountSourceRequiredError());
         }
 
         if (!std::filesystem::path(mount.Source).is_absolute())
         {
-            ThrowInvalid(L"bind source path must be absolute");
+            ThrowValidation(Localization::WSLCCLI_MountBindSourceAbsoluteError());
         }
         break;
 
     case Type::Volume:
         if (mount.Source.empty())
         {
-            ThrowInvalid(L"anonymous volume mounts are not supported.");
+            ThrowUnsupported(Localization::WSLCCLI_MountAnonymousVolumeUnsupportedError());
         }
 
         if (!IsValidNamedVolumeName(mount.Source))
         {
-            ThrowInvalid(L"volume source must be a valid named volume");
+            ThrowValidation(Localization::WSLCCLI_MountVolumeSourceInvalidError());
         }
         break;
 
     case Type::Tmpfs:
         if (!mount.Source.empty())
         {
-            ThrowInvalid(L"source is not supported for tmpfs mounts");
+            ThrowValidation(Localization::WSLCCLI_MountTmpfsSourceUnsupportedError());
         }
         break;
 
     default:
-        ThrowInvalid(L"mount type is not supported");
+        ThrowUnsupported(Localization::WSLCCLI_MountTypeUnsupportedGenericError());
     }
 }
 
@@ -600,9 +604,9 @@ void ValidateMountCollection(std::span<const Spec> mounts)
         auto destination = NormalizeDestination(mount.Target);
         if (!destinations.emplace(destination).second)
         {
-            throw ValidationException(
+            throw MountValidationException(
                 ValidationError::DuplicateDestination,
-                std::format(L"duplicate mount point: {}", MultiByteToWide(destination)),
+                Localization::WSLCCLI_DuplicateMountDestinationError(MultiByteToWide(destination)),
                 std::move(destination));
         }
     }

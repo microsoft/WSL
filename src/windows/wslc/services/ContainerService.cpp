@@ -145,20 +145,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
 
     for (const auto& mountSpec : options.Mounts)
     {
-        switch (mountSpec.MountType)
-        {
-        case mount::Type::Bind:
-            containerLauncher.AddVolume(mountSpec.Source, mountSpec.Target, mountSpec.ReadOnly);
-            break;
-
-        case mount::Type::Volume:
-            containerLauncher.AddNamedVolume(string::WideToMultiByte(mountSpec.Source), mountSpec.Target, mountSpec.ReadOnly);
-            break;
-
-        case mount::Type::Tmpfs:
-            containerLauncher.AddTmpfs(mountSpec.Target, mount::FormatTmpfsOptions(mountSpec));
-            break;
-        }
+        containerLauncher.AddMount(mountSpec);
     }
 
     containerLauncher.SetContainerFlags(containerFlags);

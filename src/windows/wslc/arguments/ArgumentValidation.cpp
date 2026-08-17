@@ -228,7 +228,11 @@ void Argument::Validate(ArgMap& execArgs) const
                 mount::ValidateMountSpec(mountSpec);
                 return mountSpec;
             }
-            catch (const mount::ValidationException& ex)
+            catch (const mount::MountUnsupportedException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_UnsupportedMountError(value, ex.Reason()));
+            }
+            catch (const mount::MountException& ex)
             {
                 throw ArgumentException(Localization::WSLCCLI_InvalidMountError(value, ex.Reason()));
             }

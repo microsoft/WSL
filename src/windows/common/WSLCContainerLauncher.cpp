@@ -254,6 +254,46 @@ void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::stri
     m_namedVolumes.push_back(volume);
 }
 
+void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mount)
+{
+    WSLCMountSpec mount{};
+    switch (Mount.MountType)
+    {
+    case mount::Type::Bind:
+        mount.Type = WSLCMountTypeBind;
+        break;
+
+    case mount::Type::Volume:
+        mount.Type = WSLCMountTypeVolume;
+        break;
+
+    case mount::Type::Tmpfs:
+        mount.Type = WSLCMountTypeTmpfs;
+        break;
+    }
+
+    if (!Mount.Source.empty())
+    {
+        mount.Source = m_mountSources.emplace_back(Mount.Source).c_str();
+    }
+
+    mount.Target = m_mountTargets.emplace_back(Mount.Target).c_str();
+    mount.ReadOnly = Mount.ReadOnly ? TRUE : FALSE;
+    if (Mount.TmpfsSizeBytes.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsSize);
+        mount.TmpfsSizeBytes = Mount.TmpfsSizeBytes.value();
+    }
+
+    if (Mount.TmpfsMode.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsMode);
+        mount.TmpfsMode = Mount.TmpfsMode.value();
+    }
+
+    m_mounts.push_back(mount);
+}
+
 void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Key, const std::string& Value)
 {
     // Store a copy of the key/value strings to the launcher to ensure the pointers in WSLCLabel remain valid.
@@ -412,6 +452,9 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     options.NamedVolumesCount = static_cast<ULONG>(m_namedVolumes.size());
     options.NamedVolumes = m_namedVolumes.size() > 0 ? m_namedVolumes.data() : nullptr;
+
+    options.MountsCount = static_cast<ULONG>(m_mounts.size());
+    options.Mounts = m_mounts.size() > 0 ? m_mounts.data() : nullptr;
 
     options.LabelsCount = static_cast<ULONG>(m_labels.size());
     options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;
