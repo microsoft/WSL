@@ -150,22 +150,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
-    // Add volumes if specified
-    for (const auto& volumeSpec : options.Volumes)
-    {
-        auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = volume.Host();
-        auto container = volume.ContainerPath();
-        if (volume.IsNamedVolume())
-        {
-            containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
-        }
-        else
-        {
-            containerLauncher.AddVolume(host, container, volume.IsReadOnly());
-        }
-    }
-
     for (const auto& mountSpec : options.Mounts)
     {
         containerLauncher.AddMount(mountSpec);

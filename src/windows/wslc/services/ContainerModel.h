@@ -76,7 +76,6 @@ struct ContainerOptions
     bool NoHealthcheck = false;
     bool Gpu = false;
     std::vector<std::string> Ports;
-    std::vector<std::wstring> Volumes;
     std::vector<mount::Spec> Mounts;
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
@@ -309,16 +308,6 @@ private:
     std::string m_containerPath;
     bool m_isReadOnlyMode = false;
     bool m_isNamedVolume = false;
-
-    static bool IsReadOnlyMode(const std::wstring& mode)
-    {
-        return mode == L"ro";
-    }
-
-    static bool IsValidMode(const std::wstring& mode)
-    {
-        return IsReadOnlyMode(mode) || mode == L"rw";
-    }
 };
 
 struct TmpfsMount

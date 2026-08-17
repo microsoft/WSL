@@ -595,11 +595,19 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
             THROW_HR_MSG(E_INVALIDARG, "Mount at index %lu has invalid type: %d", i, value.Type);
         }
 
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            type != mount::Type::Bind && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsCreateSourceIfMissing),
+            "Mount at index %lu specifies create-source-if-missing for a non-bind mount",
+            i);
+
         mounts.push_back({
             .MountType = type,
             .Source = value.Source != nullptr ? value.Source : L"",
             .Target = value.Target,
             .ReadOnly = static_cast<bool>(value.ReadOnly),
+            .BindSource = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsCreateSourceIfMissing) ? mount::BindSourcePolicy::CreateIfMissing
+                                                                                             : mount::BindSourcePolicy::RequireExisting,
             .TmpfsSizeBytes = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize) ? std::optional<int64_t>{value.TmpfsSizeBytes} : std::nullopt,
             .TmpfsMode = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsMode) ? std::optional<uint32_t>{value.TmpfsMode} : std::nullopt,
         });
@@ -612,6 +620,11 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
         {
             if (mount.MountType == mount::Type::Bind)
             {
+                if (mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
+                {
+                    continue;
+                }
+
                 std::error_code error;
                 const auto sourceExists = std::filesystem::exists(mount.Source, error);
                 if (error)
@@ -2141,7 +2154,10 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         case wsl::windows::common::mount::Type::Bind:
         {
             // Docker's colon-delimited bind format cannot represent ':' in the target.
-            auto prepared = PrepareBindMount(mount.Source, mount.Target, mount.ReadOnly, MissingBindSource::Reject);
+            const auto missingSource = mount.BindSource == wsl::windows::common::mount::BindSourcePolicy::CreateIfMissing
+                                           ? MissingBindSource::Create
+                                           : MissingBindSource::Reject;
+            auto prepared = PrepareBindMount(mount.Source, mount.Target, mount.ReadOnly, missingSource);
             dockerMount.Source = std::move(prepared.DockerSource);
             dockerMount.Type = "bind";
             volumes.push_back(std::move(prepared.Volume));
@@ -2374,7 +2390,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     for (const auto& mount : mounts)
     {
-        if (mount.MountType == wsl::windows::common::mount::Type::Volume)
+        if (mount.MountType == wsl::windows::common::mount::Type::Volume && !mount.Source.empty())
         {
             namedVolumes.emplace_back(wsl::shared::string::WideToMultiByte(mount.Source));
         }

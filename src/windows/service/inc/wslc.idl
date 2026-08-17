@@ -257,9 +257,10 @@ typedef enum _WSLCMountSpecFlags
     WSLCMountSpecFlagsNone = 0,
     WSLCMountSpecFlagsTmpfsSize = 1,
     WSLCMountSpecFlagsTmpfsMode = 2,
+    WSLCMountSpecFlagsCreateSourceIfMissing = 4,
 } WSLCMountSpecFlags;
 
-cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode)")
+cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing)")
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCMountSpecFlags);")
 
 typedef struct _WSLCMountSpec

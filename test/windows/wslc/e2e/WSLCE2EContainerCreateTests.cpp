@@ -354,8 +354,7 @@ class WSLCE2EContainerCreateTests
                 RunWslc(std::format(L"container run --name {} --volume :/containerPath {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: ':/containerPath'. Host path cannot be empty. Expected format: <host path | "
-                L"named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeHostPathEmpty(L":/containerPath", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -364,8 +363,7 @@ class WSLCE2EContainerCreateTests
                 std::format(L"container run --name {} --volume C:\\hostPath::ro {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath::ro'. Container path cannot be empty. Expected format: <host path "
-                L"| named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeContainerPathEmpty(L"C:\\hostPath::ro", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -374,17 +372,15 @@ class WSLCE2EContainerCreateTests
                 std::format(L"container run --name {} --volume :/containerPath:ro {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: ':/containerPath:ro'. Host path cannot be empty. Expected format: <host path | "
-                L"named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeHostPathEmpty(L":/containerPath:ro", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(L"container run --name {} --volume \"\" {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(
-                result.StderrContainsSubstring(L"Invalid volume specifications: ''. Expected format: <host path | named "
-                                               L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                Localization::WSLCCLI_VolumeInvalidSpec(L"", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -393,8 +389,7 @@ class WSLCE2EContainerCreateTests
                 RunWslc(std::format(L"container run --name {} --volume C:\\hostPath: {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath:'. Container path cannot be empty. Expected format: <host path | "
-                L"named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeContainerPathEmpty(L"C:\\hostPath:", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -403,17 +398,15 @@ class WSLCE2EContainerCreateTests
                 RunWslc(std::format(L"container run --name {} --volume C:\\hostPath:ro {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath:ro'. Container path must be an absolute path (starting with '/'). "
-                L"Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeContainerPathNotAbsolute(L"C:\\hostPath:ro", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(L"container run --name {} --volume :ro {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(
-                result.StderrContainsSubstring(L"Invalid volume specifications: ':ro'. Expected format: <host path | named "
-                                               L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                Localization::WSLCCLI_VolumeInvalidSpec(L":ro", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -422,8 +415,7 @@ class WSLCE2EContainerCreateTests
                 std::format(L"container run --name {} --volume C:\\hostPath::rw {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath::rw'. Container path cannot be empty. Expected format: <host path "
-                L"| named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeContainerPathEmpty(L"C:\\hostPath::rw", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -431,10 +423,8 @@ class WSLCE2EContainerCreateTests
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath:invalid_mode {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath:/containerPath:invalid_mode'. Container path must be an absolute "
-                L"path (starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: "
-                L"E_INVALIDARG"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_VolumeContainerPathNotAbsolute(
+                L"C:\\hostPath:/containerPath:invalid_mode", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -442,10 +432,8 @@ class WSLCE2EContainerCreateTests
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath:ro:extra {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath:/containerPath:ro:extra'. Container path must be an absolute path "
-                L"(starting with '/'). Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: "
-                L"E_INVALIDARG"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_VolumeContainerPathNotAbsolute(
+                L"C:\\hostPath:/containerPath:ro:extra", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -453,9 +441,8 @@ class WSLCE2EContainerCreateTests
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath: {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath:/containerPath:'. Container path cannot be empty. Expected "
-                L"format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_VolumeContainerPathEmpty(
+                L"C:\\hostPath:/containerPath:", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -464,9 +451,7 @@ class WSLCE2EContainerCreateTests
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume \"::/container:ro\" {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(
-                result.StderrContainsSubstring(L"Invalid volume specifications: '::/container:ro'. Host path ':' is not a valid "
-                                               L"Windows path.\r\nError code: E_INVALIDARG"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_VolumeHostPathInvalid(L"::/container:ro", L":")));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
@@ -481,8 +466,7 @@ class WSLCE2EContainerCreateTests
                 std::format(L"container run --name {} --volume \"C:\\hostPath\" {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: 'C:\\hostPath'. Container path must be an absolute path (starting with '/'). "
-                L"Expected format: <host path | named volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeContainerPathNotAbsolute(L"C:\\hostPath", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -490,8 +474,7 @@ class WSLCE2EContainerCreateTests
             auto result = RunWslc(std::format(L"container run --name {} --volume \":\" {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: ':'. Container path cannot be empty. Expected format: <host path | named "
-                L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeContainerPathEmpty(L":", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -501,8 +484,7 @@ class WSLCE2EContainerCreateTests
                 RunWslc(std::format(L"container run --name {} --volume \"::\" {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
             VERIFY_IS_TRUE(result.StderrContainsSubstring(
-                L"Invalid volume specifications: '::'. Container path cannot be empty. Expected format: <host path | named "
-                L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+                Localization::WSLCCLI_VolumeContainerPathEmpty(L"::", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -510,9 +492,8 @@ class WSLCE2EContainerCreateTests
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume \"e2e_test\" {}", WslcContainerName, AlpineImage.NameAndTag()));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(
-                result.StderrContainsSubstring(L"Invalid volume specifications: 'e2e_test'. Expected format: <host path | named "
-                                               L"volume>:<container path>[:mode]\r\nError code: E_INVALIDARG"));
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                Localization::WSLCCLI_VolumeInvalidSpec(L"e2e_test", Localization::WSLCCLI_VolumeFormatUsage())));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
@@ -932,12 +913,20 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_DuplicateDestination_Fails)
     {
-        auto result = RunWslc(std::format(
-            L"container create --name {} --mount type=tmpfs,target=/data --mount type=tmpfs,target=/data/ {} true",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data")), .ExitCode = 1});
-        EnsureContainerDoesNotExist(WslcContainerName);
+        constexpr std::wstring_view duplicateMountArguments[] = {
+            L"--mount type=tmpfs,target=/data --mount type=tmpfs,target=/data/",
+            L"--tmpfs /data --volume data-volume:/data/",
+            L"--tmpfs /data --mount type=volume,source=data-volume,target=/data/",
+            L"--volume data-volume:/data --mount type=tmpfs,target=/data/",
+        };
+
+        for (const auto arguments : duplicateMountArguments)
+        {
+            const auto result =
+                RunWslc(std::format(L"container create --name {} {} {} true", WslcContainerName, arguments, DebianImage.NameAndTag()));
+            result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data")), .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_WorkDir)

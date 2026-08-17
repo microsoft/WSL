@@ -212,14 +212,6 @@ namespace {
          {},
          {},
          ""},
-        {L"type=volume,source=data-volume,target=/data,bind-recursive=enabled",
-         mount::Type::Volume,
-         L"data-volume",
-         "/data",
-         false,
-         {},
-         {},
-         ""},
         {L"type=volume,source=A_,target=/data", mount::Type::Volume, L"A_", "/data", false, {}, {}, ""},
         {L"type=volume,source=data.volume-1,target=/data", mount::Type::Volume, L"data.volume-1", "/data", false, {}, {}, ""},
         {L"type=tmpfs,target=/tmp", mount::Type::Tmpfs, L"", "/tmp", false, {}, {}, ""},
@@ -439,6 +431,23 @@ class WSLCCLIMountParserUnitTests
         }
     }
 
+    TEST_METHOD(Volume_ValidCases)
+    {
+        const auto bind = mount::ParseDockerVolumeString(LR"(C:\hostPath:/data:ro)");
+        VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Bind), static_cast<int>(bind.MountType));
+        VERIFY_ARE_EQUAL(std::wstring(LR"(C:\hostPath)"), bind.Source);
+        VERIFY_ARE_EQUAL(std::string("/data"), bind.Target);
+        VERIFY_IS_TRUE(bind.ReadOnly);
+        VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(bind.BindSource));
+
+        const auto volume = mount::ParseDockerVolumeString(L"named-volume:/data");
+        VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Volume), static_cast<int>(volume.MountType));
+        VERIFY_ARE_EQUAL(std::wstring(L"named-volume"), volume.Source);
+        VERIFY_ARE_EQUAL(std::string("/data"), volume.Target);
+        VERIFY_IS_FALSE(volume.ReadOnly);
+        VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::RequireExisting), static_cast<int>(volume.BindSource));
+    }
+
     TEST_METHOD(Mount_DotRelativeBindSourceUsesCurrentDirectory)
     {
         const auto expected = (std::filesystem::current_path() / L"mount").lexically_normal().wstring();
@@ -520,8 +529,8 @@ class WSLCCLIMountParserUnitTests
         options.Tmpfs.clear();
         options.Mounts = {
             {.MountType = mount::Type::Tmpfs, .Target = "/data/../cache"},
+            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/cache"},
         };
-        options.Volumes = {L"data-volume:/cache"};
         VERIFY_THROWS(ValidateUniqueMountDestinations(options), wil::ResultException);
     }
 
@@ -529,8 +538,8 @@ class WSLCCLIMountParserUnitTests
     {
         ContainerOptions options;
         options.Tmpfs = {"/cache"};
-        options.Volumes = {L"data-volume:/data"};
         options.Mounts = {
+            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data"},
             {.MountType = mount::Type::Bind, .Source = L"C:\\logs", .Target = "/logs"},
         };
         VERIFY_NO_THROW(ValidateUniqueMountDestinations(options));

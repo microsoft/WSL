@@ -33,12 +33,19 @@ enum class Type
     Tmpfs,
 };
 
+enum class BindSourcePolicy
+{
+    RequireExisting,
+    CreateIfMissing,
+};
+
 struct Spec
 {
     Type MountType = Type::Volume;
     std::wstring Source;
     std::string Target;
     bool ReadOnly = false;
+    BindSourcePolicy BindSource = BindSourcePolicy::RequireExisting;
     std::optional<int64_t> TmpfsSizeBytes;
     std::optional<uint32_t> TmpfsMode;
 };
@@ -106,6 +113,7 @@ public:
 };
 
 Spec ParseDockerMountString(const std::wstring& value);
+Spec ParseDockerVolumeString(const std::wstring& value);
 void ValidateMountSpec(const Spec& mount);
 void ValidateMountCollection(std::span<const Spec> mounts);
 std::string FormatTmpfsOptions(const Spec& mount);

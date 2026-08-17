@@ -111,12 +111,7 @@ private:
     std::string m_image;
     std::string m_name;
     std::vector<WSLCPortMapping> m_ports;
-    std::vector<WSLCVolume> m_volumes;
-    std::vector<WSLCNamedVolume> m_namedVolumes;
     std::vector<WSLCMountSpec> m_mounts;
-    std::deque<std::wstring> m_hostPaths;
-    std::deque<std::string> m_volumeNames;
-    std::deque<std::string> m_containerPaths;
     std::deque<std::wstring> m_mountSources;
     std::deque<std::string> m_mountTargets;
     std::string m_networkMode;

@@ -163,7 +163,7 @@ namespace {
     std::optional<int64_t> ParseDockerRamInBytes(const std::wstring& value)
     {
         const auto parsed = wsl::windows::common::string::ParseStorageSize(value, wsl::windows::common::string::StorageSizeUnit::Binary);
-        if (!parsed.has_value() || parsed.value() > std::numeric_limits<int64_t>::max())
+        if (!parsed.has_value() || parsed.value() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
         {
             return std::nullopt;
         }
@@ -444,6 +444,81 @@ Spec ParseDockerMountString(const std::wstring& value)
         .ReadOnly = mount.ReadOnly,
         .TmpfsSizeBytes = mount.TmpfsSizeBytes,
         .TmpfsMode = mount.TmpfsMode,
+    };
+}
+
+Spec ParseDockerVolumeString(const std::wstring& value)
+{
+    const auto formatUsage = Localization::WSLCCLI_VolumeFormatUsage();
+    const auto lastColon = value.rfind(L':');
+    if (lastColon == std::wstring::npos)
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeInvalidSpec(value, formatUsage));
+    }
+
+    auto splitColon = lastColon;
+    bool readOnly = false;
+    std::wstring_view lastToken{value.data() + lastColon + 1, value.size() - lastColon - 1};
+    if (lastToken == L"ro" || lastToken == L"rw")
+    {
+        readOnly = lastToken == L"ro";
+        if (lastColon == 0)
+        {
+            ThrowParse(Localization::WSLCCLI_VolumeInvalidSpec(value, formatUsage));
+        }
+
+        splitColon = value.rfind(L':', lastColon - 1);
+        if (splitColon == std::wstring::npos)
+        {
+            ThrowParse(Localization::WSLCCLI_VolumeInvalidSpec(value, formatUsage));
+        }
+    }
+
+    const auto targetEnd = lastToken == L"ro" || lastToken == L"rw" ? lastColon : value.size();
+    const auto target = value.substr(splitColon + 1, targetEnd - splitColon - 1);
+    if (target.empty())
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeContainerPathEmpty(value, formatUsage));
+    }
+
+    if (target.front() != L'/')
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeContainerPathNotAbsolute(value, formatUsage));
+    }
+
+    const auto rawSource = value.substr(0, splitColon);
+    if (rawSource.empty())
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeHostPathEmpty(value, formatUsage));
+    }
+
+    if (IsValidNamedVolumeName(rawSource))
+    {
+        return {
+            .MountType = Type::Volume,
+            .Source = rawSource,
+            .Target = WideToMultiByte(target),
+            .ReadOnly = readOnly,
+        };
+    }
+
+    std::wstring source;
+    if (FAILED(wil::GetFullPathNameW(rawSource.c_str(), source)))
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeHostPathInvalid(value, rawSource));
+    }
+
+    if (GetFileAttributesW(source.c_str()) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_INVALID_NAME)
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeHostPathInvalid(value, rawSource));
+    }
+
+    return {
+        .MountType = Type::Bind,
+        .Source = std::move(source),
+        .Target = WideToMultiByte(target),
+        .ReadOnly = readOnly,
+        .BindSource = BindSourcePolicy::CreateIfMissing,
     };
 }
 

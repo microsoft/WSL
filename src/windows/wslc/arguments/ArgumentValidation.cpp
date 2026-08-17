@@ -231,7 +231,18 @@ void Argument::Validate(ArgMap& execArgs) const
         break;
 
     case ArgType::Volume:
-        validation::ValidateVolumeMount(RawArgMapAccess::GetAll<ArgType::Volume>(execArgs));
+        CacheConverted<ArgType::Volume>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerVolumeString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(ex.Reason());
+            }
+        });
         break;
 
     case ArgType::Mount:
@@ -323,14 +334,6 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLCSignalFromString(value, argName);
-    }
-}
-
-void ValidateVolumeMount(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = models::VolumeMount::Parse(value);
     }
 }
 

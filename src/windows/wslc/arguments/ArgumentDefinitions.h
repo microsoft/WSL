@@ -140,7 +140,7 @@ _(Username,         "username",             L"u",             Kind::Value,      
 _(Verbose,          "verbose",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_VerboseArgDescription()) \
 _(Version,          "version",              L"v",             Kind::Flag,       NoConversion, Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,          "virtualization",       NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_VirtualArgDescription())*/ \
-_(Volume,           "volume",               L"v",             Kind::Value,      NoConversion, Localization::WSLCCLI_VolumeArgDescription()) \
+_(Volume,           "volume",               L"v",             Kind::Value,      ParsedMount,  Localization::WSLCCLI_VolumeArgDescription()) \
 _(VolumeName,       "volume-name",          NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_VolumeNameArgDescription()) \
 _(Volumes,          "volumes",              L"v",             Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveVolumesArgDescription()) \
 _(WorkDir,          "workdir",              L"w",             Kind::Value,      NoConversion, Localization::WSLCCLI_WorkingDirArgDescription()) \

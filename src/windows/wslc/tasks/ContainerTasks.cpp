@@ -659,16 +659,13 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAllValues<ArgType::Volume>();
-        options.Volumes.reserve(options.Volumes.size() + volumes.size());
-        for (const auto& volume : volumes)
-        {
-            options.Volumes.emplace_back(volume);
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(volumes.begin()), std::make_move_iterator(volumes.end()));
     }
 
     if (context.Args.Contains(ArgType::Mount))
     {
-        options.Mounts = context.Args.GetAllValues<ArgType::Mount>();
+        auto mounts = context.Args.GetAllValues<ArgType::Mount>();
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(mounts.begin()), std::make_move_iterator(mounts.end()));
     }
 
     options.Remove = context.Args.GetValue<ArgType::Remove>();

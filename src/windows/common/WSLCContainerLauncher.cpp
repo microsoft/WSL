@@ -229,29 +229,23 @@ void WSLCContainerLauncher::AddUlimit(const std::string& Name, std::int64_t Soft
 
 void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
-    // Store a copy of the path strings to the launcher to ensure the pointers in WSLCVolume remain valid.
-    const auto& hostPath = m_hostPaths.emplace_back(HostPath);
-    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
-
-    WSLCVolume vol{};
-    vol.HostPath = hostPath.c_str();
-    vol.ContainerPath = containerPath.c_str();
-    vol.ReadOnly = ReadOnly ? TRUE : FALSE;
-
-    m_volumes.push_back(vol);
+    AddMount({
+        .MountType = mount::Type::Bind,
+        .Source = HostPath,
+        .Target = ContainerPath,
+        .ReadOnly = ReadOnly,
+        .BindSource = mount::BindSourcePolicy::CreateIfMissing,
+    });
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly)
 {
-    const auto& name = m_volumeNames.emplace_back(Name);
-    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
-
-    WSLCNamedVolume volume{};
-    volume.Name = name.c_str();
-    volume.ContainerPath = containerPath.c_str();
-    volume.ReadOnly = ReadOnly ? TRUE : FALSE;
-
-    m_namedVolumes.push_back(volume);
+    AddMount({
+        .MountType = mount::Type::Volume,
+        .Source = wsl::shared::string::MultiByteToWide(Name),
+        .Target = ContainerPath,
+        .ReadOnly = ReadOnly,
+    });
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mount)
@@ -279,6 +273,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mo
 
     mount.Target = m_mountTargets.emplace_back(Mount.Target).c_str();
     mount.ReadOnly = Mount.ReadOnly ? TRUE : FALSE;
+    if (Mount.MountType == mount::Type::Bind && Mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsCreateSourceIfMissing);
+    }
+
     if (Mount.TmpfsSizeBytes.has_value())
     {
         WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsSize);
@@ -451,12 +450,6 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     {
         options.InitProcessOptions.CurrentDirectory = m_workingDirectory.c_str();
     }
-
-    options.VolumesCount = static_cast<ULONG>(m_volumes.size());
-    options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
-
-    options.NamedVolumesCount = static_cast<ULONG>(m_namedVolumes.size());
-    options.NamedVolumes = m_namedVolumes.size() > 0 ? m_namedVolumes.data() : nullptr;
 
     options.MountsCount = static_cast<ULONG>(m_mounts.size());
     options.Mounts = m_mounts.size() > 0 ? m_mounts.data() : nullptr;
