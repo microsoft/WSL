@@ -65,8 +65,8 @@ WslCoreInstance::WslCoreInstance(
 
     if (result.Result != 0)
     {
-        // N.B. EUCLEAN (117) can be returned if the disk's journal is corrupted.
-        if ((result.Result == EINVAL || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk)
+        // N.B. EFSBADCRC (74) or EFSCORRUPTED (117) can be returned if the disk's journal is corrupted.
+        if ((result.Result == EINVAL || result.Result == 74 || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk)
         {
             THROW_HR(WSL_E_DISK_CORRUPTED);
         }
