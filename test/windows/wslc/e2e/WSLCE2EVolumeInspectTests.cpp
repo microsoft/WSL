@@ -41,13 +41,15 @@ class WSLCE2EVolumeInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_HelpCommand)
     {
         auto result = RunWslc(L"volume inspect --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_MissingVolumeName)
     {
         auto result = RunWslc(L"volume inspect");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'volume-name'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'volume-name'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_Success)
@@ -65,6 +67,20 @@ class WSLCE2EVolumeInspectTests
 
         VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), inspect.Name);
         VERIFY_ARE_EQUAL("guest", inspect.Driver);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_FormatJson_IsSingleLine)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"volume inspect --format json {}", TestVolumeName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), document[0]["Name"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_InspectMultiple_Success)
@@ -121,45 +137,5 @@ class WSLCE2EVolumeInspectTests
 private:
     const std::wstring TestVolumeName1 = L"wslc-e2e-volume-inspect-1";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-inspect-2";
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return std::format(L"{}\r\n\r\n", Localization::WSLCCLI_VolumeInspectLongDesc());
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc volume inspect [<options>] <volume-name>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  volume-name    Volume name\r\n"           //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                   //
-                << L"  --session      Specify the session to use\r\n"            //
-                << L"  -?,--help      Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

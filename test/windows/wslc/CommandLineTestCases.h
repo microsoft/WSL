@@ -25,6 +25,15 @@ COMMAND_LINE_TEST_CASE(L"-?", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
 COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
+// Global options (RootCommand::GetGlobalArguments). These must be accepted by
+// the root-level options-only pass before any subcommand is resolved. A
+// non-exhaustive sampling — the parser-level matrix lives in ParserTestCases.h.
+COMMAND_LINE_TEST_CASE(L"--session foo image list --verbose", L"list", true)
+// Cases that fail because the unknown/misplaced option falls through to a
+// command that doesn't accept it:
+COMMAND_LINE_TEST_CASE(L"--notaglobal system list", L"root", false)     // Unknown option falls through to root, which rejects it
+COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", false) // --session is global; must come before the subcommand
+
 // System command tests
 COMMAND_LINE_TEST_CASE(L"system -?", L"system", true)
 COMMAND_LINE_TEST_CASE(L"system session list", L"list", true)
@@ -32,18 +41,18 @@ COMMAND_LINE_TEST_CASE(L"system session list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --verbose --help", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"system session list extraarg", L"list", false)
-COMMAND_LINE_TEST_CASE(L"system session shell session1", L"shell", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session shell", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"system session shell", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"system session run ls", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run echo foo", L"run", true) // Command with trailing arguments
 COMMAND_LINE_TEST_CASE(L"system session run ls -la", L"run", true)   // Flags after the command are forwarded
-COMMAND_LINE_TEST_CASE(L"system session run --session session1 ls", L"run", true)
-COMMAND_LINE_TEST_CASE(L"system session run --session session1 echo foo", L"run", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run ls", L"run", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run echo foo", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run \"ls -la /tmp\"", L"run", true)
 COMMAND_LINE_TEST_CASE(L"system session run", L"run", false)                    // Missing required command positional
-COMMAND_LINE_TEST_CASE(L"system session run --session session1", L"run", false) // Missing required command positional
+COMMAND_LINE_TEST_CASE(L"--session session1 system session run", L"run", false) // Missing required command positional
 COMMAND_LINE_TEST_CASE(L"system session run --notanarg ls", L"run", false)      // Invalid flag before command
-COMMAND_LINE_TEST_CASE(L"system session terminate session1", L"terminate", true)
+COMMAND_LINE_TEST_CASE(L"--session session1 system session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage", L"enter", true)
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage --name my-session", L"enter", true)
@@ -60,13 +69,13 @@ COMMAND_LINE_TEST_CASE(L"list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ls", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ps", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --no-trunc", L"list", true)
-COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
 COMMAND_LINE_TEST_CASE(L"container prune", L"prune", true)
-COMMAND_LINE_TEST_CASE(L"container prune --session foo", L"prune", true)
+COMMAND_LINE_TEST_CASE(L"--session foo container prune", L"prune", true)
 COMMAND_LINE_TEST_CASE(L"run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm -it --entrypoint bash archlinux:latest -c \"echo 123\"", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm --entrypoint /bin/bash debian:latest -c ls", L"run", true)
@@ -83,10 +92,15 @@ COMMAND_LINE_TEST_CASE(
     true)
 COMMAND_LINE_TEST_CASE(L"container run ubuntu bash -c 'echo Hello World'", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --pull=always ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --pull missing ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --pull never ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --pull invalid ubuntu", L"run", false)
 COMMAND_LINE_TEST_CASE(L"container run --cidfile C:\\temp\\cidfile ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run -it --name foo ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --rm -it --name foo ubuntu", L"run", true)
-COMMAND_LINE_TEST_CASE(L"stop", L"stop", true)
+COMMAND_LINE_TEST_CASE(L"stop", L"stop", false)           // Missing required container-id positional
+COMMAND_LINE_TEST_CASE(L"container stop", L"stop", false) // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal 9", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal SIGALRM", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal sigkill", L"stop", true)
@@ -97,6 +111,10 @@ COMMAND_LINE_TEST_CASE(L"container start --attach cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"container start -a cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"create ubuntu:latest", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --pull=always ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --pull missing ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --pull never ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --pull invalid ubuntu", L"create", false)
 COMMAND_LINE_TEST_CASE(L"container create --cidfile C:\\temp\\cidfile --name foo ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"create --workdir /app ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"create -w /app ubuntu", L"create", true)
@@ -140,6 +158,27 @@ COMMAND_LINE_TEST_CASE(L"create --gpus all ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --gpus all ubuntu sh", L"create", true)
 COMMAND_LINE_TEST_CASE(L"create --gpus none ubuntu", L"create", false) // Only 'all' is supported
 COMMAND_LINE_TEST_CASE(L"create --gpus", L"create", false)             // Missing value for --gpus
+// Health check tests for container run
+COMMAND_LINE_TEST_CASE(L"run --health-cmd \"exit 0\" ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(
+    L"run --health-interval 30s --health-timeout 5s --health-retries 3 --health-start-period 10s ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --health-interval 1m30s ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --health-interval notaduration ubuntu", L"run", false) // Invalid duration
+COMMAND_LINE_TEST_CASE(L"run --health-timeout -5s ubuntu", L"run", false)           // Negative duration
+COMMAND_LINE_TEST_CASE(L"run --health-retries abc ubuntu", L"run", false)           // Non-numeric retries
+COMMAND_LINE_TEST_CASE(L"run --health-retries -1 ubuntu", L"run", false)            // Negative retries
+COMMAND_LINE_TEST_CASE(L"run --health-interval ubuntu", L"run", false)              // Missing value for --health-interval
+COMMAND_LINE_TEST_CASE(L"run --health-cmd", L"run", false)                          // Missing value for --health-cmd
+// Health check tests for container create
+COMMAND_LINE_TEST_CASE(L"create --health-cmd \"exit 0\" ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(
+    L"container create --health-cmd \"curl -f http://localhost/\" --health-interval 30s --health-timeout 5s --health-retries 3 "
+    L"--health-start-period 10s ubuntu",
+    L"create",
+    true)
+COMMAND_LINE_TEST_CASE(L"create --health-start-period 500ms ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --health-timeout invalid ubuntu", L"create", false) // Invalid duration
+COMMAND_LINE_TEST_CASE(L"create --health-retries 2.5 ubuntu", L"create", false)     // Non-integer retries
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
@@ -152,10 +191,23 @@ COMMAND_LINE_TEST_CASE(L"kill cont1 --signal sigkill", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"container kill cont1 -s KILL", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"inspect cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"container inspect cont1", L"inspect", true)
+// --format on the inspect family: json is the only accepted value, so `table` is rejected here.
+COMMAND_LINE_TEST_CASE(L"inspect --format json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"inspect --format table cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"inspect --type container --format json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"inspect --format badformat cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"container inspect --format json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"container inspect --format table cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"container inspect --format badformat cont1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"remove cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container remove cont1 cont2", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"rm cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container rm cont1 cont2", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm --volumes cont1", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm -v cont1 cont2", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm --force --volumes cont1", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"container rm -fv cont1", L"remove", true) // Combined short flags
+COMMAND_LINE_TEST_CASE(L"container rm -v", L"remove", false)       // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container attach cont", L"attach", true)
 COMMAND_LINE_TEST_CASE(L"container attach", L"attach", false)
 // Stats command tests
@@ -172,6 +224,28 @@ COMMAND_LINE_TEST_CASE(L"container export --output foo cont1", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export -o foo cont1", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export cont1 --output foo", L"export", true)
 COMMAND_LINE_TEST_CASE(L"container export cont1 -o foo", L"export", true)
+
+// Cp command tests
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - mycontainer:/usr/local/etc", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp - cont1:/path/to/deep/dir", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp somefile cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp --archive - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=true - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=false - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp --archive=true - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp --archive=false - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=1 - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=0 - cont1:/path", L"cp", true)
+COMMAND_LINE_TEST_CASE(L"container cp -a=invalid - cont1:/path", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --archive=invalid - cont1:/path", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp -", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp - ", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --unknown - cont1:/path", L"cp", false)
+COMMAND_LINE_TEST_CASE(L"container cp --help", L"cp", true)
 
 // Logs command
 COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)
@@ -198,6 +272,18 @@ COMMAND_LINE_TEST_CASE(L"container logs --until 1700000000 cont1", L"logs", true
 COMMAND_LINE_TEST_CASE(L"container logs --since 1700000000 --until 1700001000 cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --since abc cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --until abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --until 2024-01-15T10:30:00Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+05:30 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.123456789Z cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-13-15T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T25:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15 cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00Zextra cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 1960-01-15T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-02-31T10:30:00Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.Z cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+0530 cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --follow --timestamps --since 100 --tail 5 cont1", L"logs", true)
 
 // Image command
@@ -230,12 +316,28 @@ COMMAND_LINE_TEST_CASE(L"image list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"pull ubuntu --quiet", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"pull ubuntu -q", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 --force --no-prune", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"image rm cont1 cont2 cont3 --force --no-prune", L"remove", true)
+COMMAND_LINE_TEST_CASE(L"image inspect --format json img1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"image inspect --format table img1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"image inspect --format badformat img1", L"inspect", false)
+
+// Network and volume inspect --format tests
+COMMAND_LINE_TEST_CASE(L"network inspect --format json net1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"network inspect --format table net1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"network inspect --format badformat net1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"volume inspect --format json vol1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"volume inspect --format table vol1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"volume inspect --format badformat vol1", L"inspect", false)
 
 // Version command tests
 COMMAND_LINE_TEST_CASE(L"version", L"version", true)
 COMMAND_LINE_TEST_CASE(L"version --help", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version --format json", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version --format table", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version --format invalid", L"version", false)
 COMMAND_LINE_TEST_CASE(L"version extraarg", L"version", false)
 // Settings command
 COMMAND_LINE_TEST_CASE(L"settings", L"settings", true)

@@ -1,5 +1,16 @@
-# File containing policy for file ownership
-
-# Reviewers for all files in the repository
+# Default ownership
 * @microsoft/wsl-maintainers
-* @microsoft/wslc-team
+
+# WSLC
+/src/windows/wslc/         @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/windows/wslcsession/  @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/windows/WslcSDK/      @microsoft/wsl-maintainers @microsoft/wslc-team
+/test/windows/wslc/        @microsoft/wsl-maintainers @microsoft/wslc-team
+
+# WSLC surfaces in shared components
+/src/windows/common/WSLC*          @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/windows/service/exe/WSLC*     @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/windows/service/inc/wslc.idl  @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/windows/service/inc/WSLC*.idl @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/windows/inc/wslc_schema.h     @microsoft/wsl-maintainers @microsoft/wslc-team
+/src/linux/init/WSLC*              @microsoft/wsl-maintainers @microsoft/wslc-team

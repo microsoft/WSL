@@ -28,8 +28,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::ImageId, true, Limit::Unlimited),
+        Argument::Create(ArgType::InspectFormat),
     };
 }
 
@@ -45,8 +45,8 @@ std::wstring ImageInspectCommand::LongDescription() const
 
 void ImageInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << InspectImages;
 }
 } // namespace wsl::windows::wslc

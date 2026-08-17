@@ -16,12 +16,14 @@ Abstract:
 
 #include "ServiceProcessLauncher.h"
 #include "WSLCSession.h"
+#include "WSLCIdleState.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLCProcessControl.h"
 #include "IORelay.h"
 #include "COMImplClass.h"
 #include "wslc_schema.h"
+#include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
 #include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
@@ -31,6 +33,7 @@ namespace wsl::windows::service::wslc {
 
 class WSLCContainer;
 class WSLCSession;
+class WSLCSessionRuntime;
 class WSLCVolumes;
 
 class unique_com_disconnect
@@ -63,7 +66,7 @@ struct ContainerPortMapping
     uint16_t ContainerPort{};
 };
 
-class WSLCContainerImpl
+class WSLCContainerImpl : public std::enable_shared_from_this<WSLCContainerImpl>
 {
 public:
     NON_COPYABLE(WSLCContainerImpl);
@@ -71,7 +74,7 @@ public:
 
     WSLCContainerImpl(
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
         std::string&& Id,
         std::string&& Name,
@@ -79,13 +82,9 @@ public:
         std::string NetworkMode,
         std::vector<WSLCVolumeMount>&& volumes,
         std::vector<std::string>&& namedVolumes,
-        WSLCVolumes& Volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay,
         WSLCContainerState InitialState,
         std::uint64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
@@ -93,11 +92,15 @@ public:
 
     ~WSLCContainerImpl();
 
+    void Initialize();
+
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
+    void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
+    void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
     void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
     void GetCreatedAt(_Out_ ULONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
@@ -117,9 +120,10 @@ public:
     WSLCContainerState State() const noexcept;
     std::vector<WSLCPortMapping> GetPorts() const;
 
-    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
+    // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
+    void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    void OnProcessReleased(DockerExecProcessControl* process) noexcept;
+    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -130,29 +134,21 @@ public:
         return m_containerFlags;
     }
 
-    static std::unique_ptr<WSLCContainerImpl> Create(
+    static std::shared_ptr<WSLCContainerImpl> Create(
         const WSLCContainerOptions& Options,
         const std::string& Name,
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
-        WSLCVolumes& Volumes,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
-    static std::unique_ptr<WSLCContainerImpl> Open(
+    static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
-        WSLCVirtualMachine& virtualMachine,
+        WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        WSLCVolumes& Volumes,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        DockerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient,
-        IORelay& Relay);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
 private:
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
@@ -177,6 +173,10 @@ private:
     void MapPorts();
     void UnmapPorts();
 
+    // Acquires or releases the activity hold so it is held exactly while the container is Running,
+    // keeping the session's VM alive across idle teardown.
+    __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
+
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
     mutable wil::srwlock m_lock;
@@ -186,7 +186,7 @@ private:
     WSLCProcessFlags m_initProcessFlags{};
     WSLCContainerFlags m_containerFlags{};
     mutable std::mutex m_processesLock;
-    __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
+    __guarded_by(m_processesLock) std::vector<std::weak_ptr<DockerExecProcessControl>> m_processes;
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
@@ -202,40 +202,47 @@ private:
     // Must be acquired before m_lock when both are needed.
     std::mutex m_stopLock;
 
-    DockerHTTPClient& m_dockerClient;
+    // The container outlives any single VM: it survives idle-termination and is reused when the VM
+    // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
+    // fetched from the (stable) runtime at each use rather than cached, since a cached reference
+    // would dangle across a restart. They are only valid while a VM lease is held.
+    WSLCSessionRuntime& m_runtime;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
     IWSLCPluginNotifier* m_pluginNotifier;
-    WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;
 
     std::vector<std::string> m_namedVolumes;
-    WSLCVolumes& m_volumes;
 
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
-    DockerEventTracker& m_eventTracker;
     DockerEventTracker::EventTrackingReference m_containerEvents;
-    IORelay& m_ioRelay;
     std::string m_networkMode;
+
+    // Held (non-empty) exactly while the container is Running so the session's VM stays alive even
+    // when no client holds the wrapper (e.g. a detached `run -d` container). Maintained by
+    // UpdateActivityHoldLockHeld(); released automatically when the container is destroyed.
+    ActivityRef m_activityHold;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IFastRundown, ISupportErrorInfo>,
-      public COMImplClass<WSLCContainerImpl>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
+      public COMImplClass<WSLCContainerImpl, std::weak_ptr<WSLCContainerImpl>>
 {
 
 public:
-    WSLCContainer(WSLCContainerImpl* impl, WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
+    WSLCContainer(WSLCSession& session, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
+    IFACEMETHOD(UploadArchive)(_In_ WSLCHandle TarHandle, _In_ LPCSTR DestPath, _In_ ULONGLONG ContentSize) override;
+    IFACEMETHOD(DownloadArchive)(_In_ LPCSTR SrcPath, _In_ WSLCHandle OutHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
@@ -248,6 +255,11 @@ public:
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
     IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
+
+    // IWSLCCompatContainer.
+    IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;
+    IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
+    IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

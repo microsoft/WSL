@@ -13,14 +13,20 @@ Abstract:
 --*/
 
 #pragma once
+#include <algorithm>
+#include <cctype>
+#include <cwctype>
 #include <set>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <sstream>
 #include <fstream>
+#include <optional>
 #include <gsl/gsl>
 #include <format>
 #include <source_location>
+#include <type_traits>
 
 #ifndef WIN32
 #include <string.h>
@@ -64,6 +70,43 @@ inline bool EndsWith(const std::basic_string<T>& String, const std::basic_string
     return std::equal(Suffix.rbegin(), Suffix.rend(), String.rbegin());
 }
 
+// Lowercases ASCII 'A'-'Z' only, leaving every other code unit untouched. Unlike std::tolower this is
+// locale-independent (no Turkish-'I' surprises) and has no signed-char UB, which is what you want when
+// normalizing ASCII protocol tokens such as buildx CSV keys.
+template <class T>
+inline std::basic_string<T> AsciiToLower(const std::basic_string_view<T>& String)
+{
+    std::basic_string<T> Result(String);
+    for (auto& Ch : Result)
+    {
+        if (Ch >= static_cast<T>('A') && Ch <= static_cast<T>('Z'))
+        {
+            Ch = static_cast<T>(Ch - static_cast<T>('A') + static_cast<T>('a'));
+        }
+    }
+
+    return Result;
+}
+
+// Trims leading and trailing ASCII whitespace (space, tab, CR, LF, vertical tab, form feed), matching
+// the ASCII subset of Go's strings.TrimSpace. Returns a view into the input, so the input must outlive
+// the result. The stdlib has no trim, so this centralizes the find_first/last_not_of idiom.
+template <class T>
+inline std::basic_string_view<T> TrimAscii(const std::basic_string_view<T>& String)
+{
+    constexpr T Whitespace[] = {
+        static_cast<T>(' '), static_cast<T>('\t'), static_cast<T>('\r'), static_cast<T>('\n'), static_cast<T>('\v'), static_cast<T>('\f'), static_cast<T>('\0')};
+
+    const auto First = String.find_first_not_of(Whitespace);
+    if (First == std::basic_string_view<T>::npos)
+    {
+        return {};
+    }
+
+    const auto Last = String.find_last_not_of(Whitespace);
+    return String.substr(First, Last - First + 1);
+}
+
 template <class T, class TInput>
 inline std::basic_string<T> Join(const std::vector<TInput>& Input, T Separator)
 {
@@ -99,6 +142,27 @@ inline std::vector<std::basic_string<T>> Split(const std::basic_string<T>& Strin
 }
 
 template <class T>
+inline std::vector<std::basic_string_view<T>> SplitPreserveEmpty(const std::basic_string_view<T> String, T Separator)
+{
+    std::vector<std::basic_string_view<T>> Output;
+    size_t Start = 0;
+    while (Start <= String.size())
+    {
+        const auto End = String.find(Separator, Start);
+        if (End == std::basic_string_view<T>::npos)
+        {
+            Output.emplace_back(String.substr(Start));
+            break;
+        }
+
+        Output.emplace_back(String.substr(Start, End - Start));
+        Start = End + 1;
+    }
+
+    return Output;
+}
+
+template <class T>
 inline std::vector<std::basic_string<T>> SplitByMultipleSeparators(const std::basic_string<T>& String, const std::basic_string<T>& Separators)
 {
     std::vector<std::basic_string<T>> Output;
@@ -127,6 +191,149 @@ inline std::vector<std::basic_string<T>> SplitByMultipleSeparators(const std::ba
     }
 
     return Output;
+}
+
+// Splits a single CSV record into fields using the grammar Go's encoding/csv applies to one record
+// (which docker buildx relies on via go-csvvalue), so a spec is parsed the way buildx would:
+//   - fields are separated by commas;
+//   - a field may be wrapped in double quotes, in which case a comma is a literal character and a
+//     doubled quote ("") is a single literal quote;
+//   - an unquoted field may not contain a double quote (Go's non-lazy ErrBareQuote).
+// Returns std::nullopt when the record is malformed: an unterminated quoted field, text immediately
+// after a closing quote, or a bare quote in an unquoted field.
+//
+// Deviation from Go/RFC 4180: this parses exactly one record. Go would treat an unquoted CR/LF as a
+// record separator; here CR/LF are always ordinary field characters (never a record separator), which
+// is what a single-line command-line spec needs.
+template <class T>
+inline std::optional<std::vector<std::basic_string<T>>> SplitCsvFields(const std::basic_string<T>& Record)
+{
+    constexpr T Quote = static_cast<T>('"');
+    constexpr T Comma = static_cast<T>(',');
+
+    std::vector<std::basic_string<T>> Fields;
+    std::basic_string<T> Field;
+    const size_t Length = Record.size();
+    size_t Index = 0;
+
+    while (true)
+    {
+        Field.clear();
+        if (Index < Length && Record[Index] == Quote)
+        {
+            ++Index;
+            bool Closed = false;
+            while (Index < Length)
+            {
+                if (Record[Index] == Quote)
+                {
+                    // A doubled quote inside a quoted field is a single literal quote.
+                    if (Index + 1 < Length && Record[Index + 1] == Quote)
+                    {
+                        Field.push_back(Quote);
+                        Index += 2;
+                        continue;
+                    }
+
+                    ++Index;
+                    Closed = true;
+                    break;
+                }
+
+                Field.push_back(Record[Index]);
+                ++Index;
+            }
+
+            if (!Closed)
+            {
+                return std::nullopt; // unterminated quoted field
+            }
+
+            // After a closing quote only a comma (end of field) or end of record is valid.
+            if (Index < Length && Record[Index] != Comma)
+            {
+                return std::nullopt;
+            }
+        }
+        else
+        {
+            while (Index < Length && Record[Index] != Comma)
+            {
+                // Go (non-lazy) rejects a bare double quote in an unquoted field (ErrBareQuote).
+                if (Record[Index] == Quote)
+                {
+                    return std::nullopt;
+                }
+
+                Field.push_back(Record[Index]);
+                ++Index;
+            }
+        }
+
+        Fields.push_back(Field);
+        if (Index >= Length)
+        {
+            break;
+        }
+
+        ++Index; // consume the ',' and start the next field
+    }
+
+    return Fields;
+}
+
+// CSV-escapes a single field for round-tripping through JoinCsvFields/SplitCsvFields: if the field
+// contains a comma, a double quote, CR, LF, or a leading/trailing space it is wrapped in double quotes
+// with each embedded quote doubled; otherwise it is returned unchanged. This is not a byte-for-byte
+// match of Go's encoding/csv writer (which quotes only a leading space and leaves an empty field
+// unquoted); it is the minimal quoting needed for every field to parse back via SplitCsvFields.
+template <class T>
+inline std::basic_string<T> CsvEscapeField(const std::basic_string<T>& Field)
+{
+    constexpr T Quote = static_cast<T>('"');
+    const T Special[] = {static_cast<T>(','), Quote, static_cast<T>('\r'), static_cast<T>('\n'), static_cast<T>(0)};
+
+    const bool NeedsQuote = Field.find_first_of(Special) != std::basic_string<T>::npos ||
+                            (!Field.empty() && (Field.front() == static_cast<T>(' ') || Field.back() == static_cast<T>(' ')));
+    if (!NeedsQuote)
+    {
+        return Field;
+    }
+
+    std::basic_string<T> Result;
+    Result.reserve(Field.size() + 2);
+    Result.push_back(Quote);
+    for (const T Ch : Field)
+    {
+        if (Ch == Quote)
+        {
+            Result.push_back(Quote);
+        }
+
+        Result.push_back(Ch);
+    }
+
+    Result.push_back(Quote);
+    return Result;
+}
+
+// Joins fields into a single CSV record, escaping each field as needed (see CsvEscapeField). The
+// result parses back to the original fields via SplitCsvFields.
+template <class T>
+inline std::basic_string<T> JoinCsvFields(const std::vector<std::basic_string<T>>& Fields)
+{
+    std::basic_string<T> Record;
+    for (size_t Index = 0; Index < Fields.size(); ++Index)
+    {
+        if (Index != 0)
+        {
+            Record.push_back(static_cast<T>(','));
+        }
+
+        Record += CsvEscapeField(Fields[Index]);
+    }
+
+    return Record;
 }
 
 inline const char* FromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
@@ -311,8 +518,27 @@ inline bool IsEqual(const std::wstring_view String1, const std::wstring_view Str
     return (Compare(String1, String2, CaseInsensitive) == String1.size());
 }
 
+template <class T>
+inline bool IsEmptyOrWhitespace(const std::basic_string_view<T> String)
+{
+    return String.empty() || std::all_of(String.begin(), String.end(), [](T Ch) {
+               if constexpr (std::is_same_v<T, wchar_t>)
+               {
+                   return std::iswspace(static_cast<wint_t>(Ch));
+               }
+               else
+               {
+                   return std::isspace(static_cast<unsigned char>(Ch));
+               }
+           });
+}
+
+// Parses a boolean from a string. By default only "1"/"0" and "true"/"false"
+// (case-insensitive) are recognized. When AllowExtendedForms is true the single
+// character forms "t"/"f" (case-insensitive) are also accepted, matching the full
+// set understood by Go's strconv.ParseBool (and therefore the Docker CLI).
 template <typename T>
-inline std::optional<bool> ParseBool(const T* String)
+inline std::optional<bool> ParseBool(const T* String, bool AllowExtendedForms = false)
 {
     if (!String)
     {
@@ -322,14 +548,16 @@ inline std::optional<bool> ParseBool(const T* String)
     const std::basic_string_view<T> StringView(String);
     constexpr T One[] = {T('1'), T('\0')};
     constexpr T True[] = {T('t'), T('r'), T('u'), T('e'), T('\0')};
-    if (IsEqual(StringView, One) || IsEqual(StringView, True, true))
+    constexpr T ShortTrue[] = {T('t'), T('\0')};
+    if (IsEqual(StringView, One) || IsEqual(StringView, True, true) || (AllowExtendedForms && IsEqual(StringView, ShortTrue, true)))
     {
         return true;
     }
 
     constexpr T Zero[] = {T('0'), T('\0')};
     constexpr T False[] = {T('f'), T('a'), T('l'), T('s'), T('e'), T('\0')};
-    if (IsEqual(StringView, Zero) || IsEqual(StringView, False, true))
+    constexpr T ShortFalse[] = {T('f'), T('\0')};
+    if (IsEqual(StringView, Zero) || IsEqual(StringView, False, true) || (AllowExtendedForms && IsEqual(StringView, ShortFalse, true)))
     {
         return false;
     }
@@ -849,6 +1077,107 @@ inline std::wstring FormatBytes(uint64_t bytes)
     }
 }
 
+template <typename TChar>
+inline std::basic_string<TChar> Trim(const std::basic_string<TChar>& input)
+{
+    constexpr TChar whitespace[] = {TChar(' '), TChar('\t'), TChar('\n'), TChar('\r'), TChar('\f'), TChar('\v'), TChar('\0')};
+    const auto first = input.find_first_not_of(whitespace);
+    if (first == std::basic_string<TChar>::npos)
+    {
+        return {};
+    }
+
+    const auto last = input.find_last_not_of(whitespace);
+    return input.substr(first, last - first + 1);
+}
+
+template <typename TChar>
+inline std::basic_string<TChar> UnescapeShell(const std::basic_string<TChar>& input)
+{
+    enum class Quote
+    {
+        None,
+        Single,
+        Double
+    };
+
+    Quote quote = Quote::None;
+    std::basic_string<TChar> output;
+    output.reserve(input.size());
+
+    for (size_t index = 0; index < input.size(); index += 1)
+    {
+        const auto current = input[index];
+        if (quote == Quote::Single)
+        {
+            if (current == TChar('\''))
+            {
+                quote = Quote::None;
+            }
+            else
+            {
+                output.push_back(current);
+            }
+
+            continue;
+        }
+
+        if (current == TChar('\''))
+        {
+            if (quote == Quote::Double)
+            {
+                output.push_back(current);
+            }
+            else
+            {
+                quote = Quote::Single;
+            }
+
+            continue;
+        }
+
+        if (current == TChar('"'))
+        {
+            quote = (quote == Quote::Double) ? Quote::None : Quote::Double;
+            continue;
+        }
+
+        if (current != TChar('\\'))
+        {
+            output.push_back(current);
+            continue;
+        }
+
+        if (++index == input.size())
+        {
+            // return the original string if the escape is invalid.
+            return input;
+        }
+
+        const auto escaped = input[index];
+        if (quote == Quote::None)
+        {
+            // "\\\n" out of escape means continue the line.
+            if (escaped != TChar('\n'))
+            {
+                output.push_back(escaped);
+            }
+        }
+        else if (escaped == TChar('"') || escaped == TChar('\\') || escaped == TChar('$') || escaped == TChar('`'))
+        {
+            output.push_back(escaped);
+        }
+        else if (escaped != TChar('\n'))
+        {
+            output.push_back(current);
+            output.push_back(escaped);
+        }
+    }
+
+    // return the original string if the escape is invalid.
+    return (quote == Quote::None) ? output : input;
+}
+
 } // namespace wsl::shared::string
 
 template <>
@@ -931,6 +1260,11 @@ struct std::formatter<std::source_location, wchar_t>
     }
 };
 
+// char -> wchar_t formatting is only used by the Windows components. libc++ (used to
+// build the Linux components) now provides these as deleted specializations per C++23
+// [format.formatter.spec], which would collide, so restrict them to Windows.
+#ifdef WIN32
+
 template <>
 struct std::formatter<char*, wchar_t>
 {
@@ -994,6 +1328,8 @@ struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
         return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
+
+#endif // WIN32
 
 template <>
 struct std::formatter<std::filesystem::path, wchar_t>

@@ -18,9 +18,11 @@ Abstract:
 #include "Defaults.h"
 #include "ProgressCallback.h"
 #include "CrashDumpCallback.h"
+#include "install.h"
 #include "Localization.h"
 #include "WslInstall.h"
 #include "wslutil.h"
+#include "APICompat.h"
 #include "WindowsUpdateIntegration.h"
 
 using namespace std::string_view_literals;
@@ -207,7 +209,7 @@ static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstC
     return S_OK;
 }
 
-bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
+bool CopyProcessSettingsToRuntime(WSLCCompatProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
 {
     if (initProcessOptions)
     {
@@ -305,13 +307,13 @@ WslRuntimeState CheckWslRuntimeState()
     return DoesWslRuntimeVersionSupportWslc(version) ? WslRuntimeState::InstalledWithWslcSupport : WslRuntimeState::InstalledWithoutWslcSupport;
 }
 
-std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
+std::pair<wil::com_ptr<IWSLCCompatSessionManager>, HRESULT> CreateSessionManagerRaw()
 {
-    wil::com_ptr<IWSLCSessionManager> result;
+    wil::com_ptr<IWSLCCompatSessionManager> result;
     HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&result));
     if (SUCCEEDED(hr))
     {
-        const WSLCVersion clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        const WSLCCompatVersion clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
         BOOL isSupported = FALSE;
         THROW_IF_FAILED(result->IsClientVersionSupported(&clientVersion, &isSupported));
 
@@ -331,7 +333,7 @@ std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
     return {result, hr};
 }
 
-wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
+wil::com_ptr<IWSLCCompatSessionManager> CreateSessionManager()
 {
     auto [result, hr] = CreateSessionManagerRaw();
 
@@ -423,17 +425,17 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
-    wil::com_ptr<IWSLCSessionManager> sessionManager = CreateSessionManager();
+    wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
 
     auto result = std::make_unique<WslcSessionImpl>();
-    WSLCSessionSettings runtimeSettings{};
+    WSLCCompatSessionSettings runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
     runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeBytes / _1MB;
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
-    runtimeSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+    runtimeSettings.NetworkingMode = WSLCNetworkingModeConsomme;
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
@@ -499,7 +501,7 @@ try
     std::string uidStr;
     std::string gidStr;
 
-    std::vector<WSLCDriverOption> driverOpts;
+    std::vector<WSLCCompatDriverOption> driverOpts;
     driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
 
     if (options->type == WSLC_VHD_TYPE_FIXED)
@@ -519,13 +521,13 @@ try
         driverOpts.push_back({"Gid", gidStr.c_str()});
     }
 
-    WSLCVolumeOptions volumeOptions{};
+    WSLCCompatVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
     volumeOptions.Driver = "vhd";
     volumeOptions.DriverOpts = driverOpts.data();
     volumeOptions.DriverOptsCount = static_cast<ULONG>(driverOpts.size());
 
-    WSLCVolumeInformation volumeInfo{};
+    WSLCCompatVolumeInformation volumeInfo{};
     return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
 }
 CATCH_RETURN();
@@ -770,8 +772,8 @@ try
 
     auto result = std::make_unique<WslcContainerImpl>();
 
-    WSLCContainerOptions containerOptions{};
-    std::unique_ptr<WSLCPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
+    WSLCCompatContainerOptions containerOptions{};
+    std::unique_ptr<WSLCCompatPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
 
     containerOptions.Image = internalContainerSettings->image;
     containerOptions.Name = internalContainerSettings->runtimeName;
@@ -781,14 +783,14 @@ try
 
     CopyProcessSettingsToRuntime(containerOptions.InitProcessOptions, internalContainerSettings->initProcessOptions);
 
-    std::unique_ptr<WSLCVolume[]> convertedVolumes;
+    std::unique_ptr<WSLCCompatVolume[]> convertedVolumes;
     if (internalContainerSettings->volumes && internalContainerSettings->volumesCount)
     {
-        convertedVolumes = std::make_unique<WSLCVolume[]>(internalContainerSettings->volumesCount);
+        convertedVolumes = std::make_unique<WSLCCompatVolume[]>(internalContainerSettings->volumesCount);
         for (uint32_t i = 0; i < internalContainerSettings->volumesCount; ++i)
         {
             const WslcContainerVolume& internalVolume = internalContainerSettings->volumes[i];
-            WSLCVolume& convertedVolume = convertedVolumes[i];
+            WSLCCompatVolume& convertedVolume = convertedVolumes[i];
 
             convertedVolume.HostPath = internalVolume.windowsPath;
             convertedVolume.ContainerPath = internalVolume.containerPath;
@@ -798,14 +800,14 @@ try
         containerOptions.VolumesCount = static_cast<ULONG>(internalContainerSettings->volumesCount);
     }
 
-    std::unique_ptr<WSLCNamedVolume[]> convertedNamedVolumes;
+    std::unique_ptr<WSLCCompatNamedVolume[]> convertedNamedVolumes;
     if (internalContainerSettings->namedVolumes && internalContainerSettings->namedVolumesCount)
     {
-        convertedNamedVolumes = std::make_unique<WSLCNamedVolume[]>(internalContainerSettings->namedVolumesCount);
+        convertedNamedVolumes = std::make_unique<WSLCCompatNamedVolume[]>(internalContainerSettings->namedVolumesCount);
         for (uint32_t i = 0; i < internalContainerSettings->namedVolumesCount; ++i)
         {
             const WslcContainerNamedVolume& internalVolume = internalContainerSettings->namedVolumes[i];
-            WSLCNamedVolume& convertedVolume = convertedNamedVolumes[i];
+            WSLCCompatNamedVolume& convertedVolume = convertedNamedVolumes[i];
 
             convertedVolume.Name = internalVolume.name;
             convertedVolume.ContainerPath = internalVolume.containerPath;
@@ -817,11 +819,11 @@ try
 
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
-        convertedPorts = std::make_unique<WSLCPortMapping[]>(internalContainerSettings->portsCount);
+        convertedPorts = std::make_unique<WSLCCompatPortMapping[]>(internalContainerSettings->portsCount);
         for (uint32_t i = 0; i < internalContainerSettings->portsCount; ++i)
         {
             const WslcContainerPortMapping& internalPort = internalContainerSettings->ports[i];
-            WSLCPortMapping& convertedPort = convertedPorts[i];
+            WSLCCompatPortMapping& convertedPort = convertedPorts[i];
 
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
@@ -906,6 +908,43 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcOpenContainer(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, container);
+    *container = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, nameOrId);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalSession = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+
+    auto result = std::make_unique<WslcContainerImpl>();
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->OpenContainer(nameOrId, &result->container))))
+    {
+        wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
+        *container = reinterpret_cast<WslcContainer>(result.release());
+    }
+
+    return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, callbacks);
+    auto internalType = CheckAndGetInternalType(container);
+
+    internalType->ioCallbackOptions.onStdOut = callbacks->onStdOut;
+    internalType->ioCallbackOptions.onStdErr = callbacks->onStdErr;
+    internalType->ioCallbackOptions.onExit = callbacks->onExit;
+    internalType->ioCallbackOptions.callbackContext = context;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
@@ -918,11 +957,11 @@ try
     // TODO: Consider if we should just override flags when callbacks were provided instead.
     RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
 
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr, nullptr))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags)))))
     {
         if (hasIOCallback)
         {
-            wil::com_ptr<IWSLCProcess> process;
+            wil::com_ptr<IWSLCCompatProcess> process;
             RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
             wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
             internalType->ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
@@ -1079,11 +1118,11 @@ try
     auto internalProcessSettings = CheckAndGetInternalType(newProcessSettings);
     RETURN_HR_IF(E_INVALIDARG, internalProcessSettings->commandLine == nullptr || internalProcessSettings->commandLineCount == 0);
 
-    WSLCProcessOptions runtimeOptions{};
+    WSLCCompatProcessOptions runtimeOptions{};
     CopyProcessSettingsToRuntime(runtimeOptions, internalProcessSettings);
 
     auto result = std::make_unique<WslcProcessImpl>();
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalContainer->container->Exec(&runtimeOptions, nullptr, &result->process))))
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalContainer->container->Exec(&runtimeOptions, &result->process))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
 
@@ -1104,7 +1143,7 @@ CATCH_RETURN();
 STDAPI WslcGetContainerID(WslcContainer container, CHAR containerID[WSLC_CONTAINER_ID_BUFFER_SIZE])
 try
 {
-    static_assert(WSLC_CONTAINER_ID_BUFFER_SIZE == sizeof(WSLCContainerId), "Container ID lengths differ.");
+    static_assert(WSLC_CONTAINER_ID_BUFFER_SIZE == sizeof(WSLCCompatContainerId), "Container ID lengths differ.");
 
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
@@ -1398,9 +1437,15 @@ static HRESULT WslcImportSessionImageImpl(
     WslcSessionImpl* internalSession, PCSTR imageName, const WslcImportImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
+    wil::unique_cotaskmem_ansistring imageId;
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length(), nullptr));
+        wsl::windows::common::apicompat::Convert(ToCOMInputHandle(imageFile.Handle())),
+        imageName,
+        progressCallback.get(),
+        imageFile.Length(),
+        nullptr,
+        &imageId));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1437,8 +1482,8 @@ static HRESULT WslcLoadSessionImageImpl(
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length(), nullptr));
+    return errorInfoWrapper.CaptureResult(internalSession->session->LoadImage(
+        wsl::windows::common::apicompat::Convert(ToCOMInputHandle(imageFile.Handle())), progressCallback.get(), imageFile.Length(), nullptr));
 }
 
 STDAPI WslcLoadSessionImage(
@@ -1474,11 +1519,11 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, nameOrID);
 
-    WSLCDeleteImageOptions options{};
+    WSLCCompatDeleteImageOptions options{};
     options.Image = nameOrID;
     // TODO: Flags? (Force and NoPrune)
 
-    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImageInformation;
+    wil::unique_cotaskmem_array_ptr<WSLCCompatDeletedImageInformation> deletedImageInformation;
 
     return errorInfoWrapper.CaptureResult(
         internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
@@ -1496,7 +1541,7 @@ try
     RETURN_HR_IF_NULL(E_INVALIDARG, options->repo);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->tag);
 
-    WSLCTagImageOptions runtimeOptions{};
+    WSLCCompatTagImageOptions runtimeOptions{};
     runtimeOptions.Image = options->image;
     runtimeOptions.Repo = options->repo;
     runtimeOptions.Tag = options->tag;
@@ -1528,6 +1573,7 @@ STDAPI WslcSessionAuthenticate(
     _In_z_ PCSTR username,
     _In_z_ PCSTR password,
     _Outptr_result_z_ PSTR* identityToken,
+    _Out_opt_ WslcIdentityTokenType* tokenType,
     _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
@@ -1540,12 +1586,36 @@ try
     RETURN_HR_IF_NULL(E_POINTER, identityToken);
 
     *identityToken = nullptr;
+    if (tokenType != nullptr)
+    {
+        *tokenType = WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN;
+    }
 
-    wil::unique_cotaskmem_ansistring token;
-    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &token));
+    wil::unique_cotaskmem_ansistring rawToken;
+    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &rawToken));
     if (SUCCEEDED(hr))
     {
-        *identityToken = token.release();
+        std::string authHeader;
+        WslcIdentityTokenType type;
+
+        if (rawToken && strlen(rawToken.get()) > 0)
+        {
+            authHeader = BuildRegistryAuthHeader(std::string{rawToken.get()});
+            type = WSLC_IDENTITY_TOKEN_TYPE_TOKEN;
+        }
+        else
+        {
+            authHeader = BuildRegistryAuthHeader(std::string{username}, std::string{password});
+            type = WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS;
+        }
+
+        auto result = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(authHeader.c_str());
+        *identityToken = result.release();
+
+        if (tokenType != nullptr)
+        {
+            *tokenType = type;
+        }
     }
 
     return errorInfoWrapper;
@@ -1556,7 +1626,7 @@ STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*c
 try
 {
     static_assert(
-        sizeof(decltype(WslcImageInfo::name)) == sizeof(decltype(WSLCImageInformation::Image)), "Image name size mismatch.");
+        sizeof(decltype(WslcImageInfo::name)) == sizeof(decltype(WSLCCompatImageInformation::Image)), "Image name size mismatch.");
 
     RETURN_HR_IF_NULL(E_POINTER, images);
     *images = nullptr;
@@ -1567,7 +1637,7 @@ try
 
     // TODO: Many filtering options are available via WSLC_LIST_IMAGES_OPTIONS
 
-    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> imageInformation;
+    wil::unique_cotaskmem_array_ptr<WSLCCompatImageInformation> imageInformation;
 
     RETURN_IF_FAILED(internalType->session->ListImages(nullptr, &imageInformation, imageInformation.size_address<ULONG>()));
 
@@ -1578,14 +1648,14 @@ try
         for (size_t i = 0; i < imageInformation.size(); ++i)
         {
             WslcImageInfo& currentResult = result[i];
-            WSLCImageInformation& currentImage = imageInformation[i];
+            WSLCCompatImageInformation& currentImage = imageInformation[i];
 
             static_assert(std::is_trivial_v<WslcImageInfo>, "WslcImageInfo must be trivial.");
             currentResult = {};
 
             THROW_HR_IF(
                 E_UNEXPECTED,
-                memcpy_s(currentResult.name, sizeof(decltype(WslcImageInfo::name)), currentImage.Image, sizeof(decltype(WSLCImageInformation::Image))) !=
+                memcpy_s(currentResult.name, sizeof(decltype(WslcImageInfo::name)), currentImage.Image, sizeof(decltype(WSLCCompatImageInformation::Image))) !=
                     0);
             ConvertSHA256Hash(currentImage.Hash, currentResult.sha256);
             currentResult.sizeBytes = currentImage.Size;
@@ -1643,9 +1713,9 @@ try
     static_assert(std::is_trivial_v<WslcVersion>, "WslcVersion must be trivial");
     *version = {};
 
-    wil::com_ptr<IWSLCSessionManager> sessionManager = CreateSessionManager();
+    wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
 
-    WSLCVersion runtimeVersion{};
+    WSLCCompatVersion runtimeVersion{};
     RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));
 
     version->major = runtimeVersion.Major;
@@ -1656,33 +1726,43 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
+STDAPI WslcInstallWithDependencies(
+    _In_ WslcComponentFlags components, _In_ WslcInstallOptions options, _In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 try
 {
-    HRESULT result = S_OK;
-    bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
-    auto runtimeResult = CreateSessionManagerRaw().second;
+    // Reject unknown flag bits.
+    constexpr WslcComponentFlags c_knownComponents =
+        WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM | WSLC_COMPONENT_FLAG_WSL_PACKAGE | WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE;
+    RETURN_HR_IF(E_INVALIDARG, (components & ~c_knownComponents) != WSLC_COMPONENT_FLAG_NONE);
+    constexpr WslcInstallOptions c_knownOptions = WSLC_INSTALL_OPTION_REPAIR;
+    RETURN_HR_IF(E_INVALIDARG, (options & ~c_knownOptions) != WSLC_INSTALL_OPTION_NONE);
 
-    if (!needsVirtualMachine && SUCCEEDED(runtimeResult))
+    // This API cannot update the SDK that the client is using.
+    RETURN_HR_IF(WSLC_E_SDK_UPDATE_NEEDED, WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE));
+
+    HRESULT result = S_OK;
+
+    if (components == WSLC_COMPONENT_FLAG_NONE)
     {
         return result;
     }
 
-    THROW_HR_IF(runtimeResult, runtimeResult != REGDB_E_CLASSNOTREG && runtimeResult != WSLC_E_SDK_UPDATE_NEEDED);
-
-    // Installing these components requires elevation.
-    auto token = wil::open_current_access_token();
+    // Installing components requires elevation.
     RETURN_HR_IF(
         HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
-        !wsl::windows::common::security::IsTokenElevated(token.get()) && !wsl::windows::common::security::IsTokenLocalSystem(token.get()));
+        !wsl::windows::common::security::IsTokenElevated(GetCurrentThreadEffectiveToken()) &&
+            !wsl::windows::common::security::IsTokenLocalSystem(nullptr));
 
-    if (needsVirtualMachine)
+    bool isRepair = WI_IsFlagSet(options, WSLC_INSTALL_OPTION_REPAIR);
+
+    if (WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM))
     {
         if (progressCallback)
         {
             progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 0, 1, context);
         }
 
+        // No difference between install and repair, just let DISM attempt to enable the feature.
         auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameVmp, false);
         if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
         {
@@ -1701,7 +1781,7 @@ try
         }
     }
 
-    if (!SUCCEEDED(runtimeResult))
+    if (WI_IsFlagSet(components, WSLC_COMPONENT_FLAG_WSL_PACKAGE))
     {
         std::function<void(uint32_t)> callback;
         if (progressCallback)
@@ -1711,8 +1791,27 @@ try
             };
         }
 
-        wsl::windows::common::WindowsUpdateContext wuContext;
-        wuContext.RunUpdateFlow(true, callback);
+        using WindowsUpdateContext = wsl::windows::common::WindowsUpdateContext;
+        WindowsUpdateContext wuContext;
+        wuContext.RunUpdateFlow(
+            isRepair ? WindowsUpdateContext::UpdateOptions::ResetProductRegistration : WindowsUpdateContext::UpdateOptions::EnsureProductRegistration,
+            callback);
+
+        if (wuContext.GetUpdateCount() == 0)
+        {
+            // During the preview period, the package may not be published yet, so fall back to getting it from GH.
+            // When moving to GA, change this to an error like WSL_E_NO_UPDATE_AVAILABLE or similar.
+            if (callback)
+            {
+                callback(0);
+            }
+            // Use pre-release builds and repair semantics (required since this function uses the SDK binary version as a filter).
+            wsl::windows::common::install::UpdatePackage(true, true, false);
+            if (callback)
+            {
+                callback(100);
+            }
+        }
     }
 
     return result;

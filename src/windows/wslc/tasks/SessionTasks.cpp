@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "Argument.h"
+#include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
 #include "SessionService.h"
 #include "SessionTasks.h"
@@ -19,7 +20,6 @@ Abstract:
 #include "Task.h"
 
 using namespace wsl::shared;
-using namespace wsl::shared::string;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
@@ -29,44 +29,57 @@ namespace wsl::windows::wslc::task {
 
 void AttachToSession(CLIExecutionContext& context)
 {
-    std::wstring sessionId;
-    if (context.Args.Contains(ArgType::SessionId))
-    {
-        sessionId = context.Args.Get<ArgType::SessionId>();
-    }
-
-    context.ExitCode = SessionService::Attach(sessionId);
+    auto& session = context.Data.Get<Data::Session>();
+    context.ExitCode = SessionService::Attach(context.Terminal, session);
 }
 
-void CreateSession(CLIExecutionContext& context)
+void OpenSessionIfSpecified(CLIExecutionContext& context)
 {
-    if (context.Args.Contains(ArgType::Session))
+    if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        // User specified a session name — open only, don't create.
-        const auto& sessionName = context.Args.Get<ArgType::Session>();
+        const auto& sessionName = context.GlobalArgs.GetValue<ArgType::Session>();
         context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
-        return;
     }
+}
 
-    // Create/open the default session.
-    context.Data.Add<Data::Session>(SessionService::CreateDefaultSession());
+void OpenOrCreateDefaultSession(CLIExecutionContext& context)
+{
+    if (!context.Data.Contains(Data::Session))
+    {
+        context.Data.Add<Data::Session>(SessionService::OpenOrCreateDefaultSession(context.Terminal));
+    }
+}
+
+void OpenDefaultSession(CLIExecutionContext& context)
+{
+    if (!context.Data.Contains(Data::Session))
+    {
+        context.Data.Add<Data::Session>(SessionService::OpenDefaultSession());
+    }
+}
+
+void ResolveSession(CLIExecutionContext& context)
+{
+    OpenSessionIfSpecified(context);
+    OpenOrCreateDefaultSession(context);
 }
 
 void ListSessions(CLIExecutionContext& context)
 {
     auto sessions = SessionService::List();
-    if (context.Args.Contains(ArgType::Verbose))
+    if (context.Args.GetValue<ArgType::Verbose>())
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
+        context.Terminal.Output(L"[wslc] Found {} session{}\n", sessions.size(), plural);
     }
 
     TableOutput<3> table(
+        context.Terminal,
         {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
 
     for (const auto& session : sessions)
     {
-        table.OutputLine({
+        table.WriteRow({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
             session.DisplayName,
@@ -78,44 +91,35 @@ void ListSessions(CLIExecutionContext& context)
 
 void TerminateSession(CLIExecutionContext& context)
 {
-    std::wstring sessionId;
-    if (context.Args.Contains(ArgType::SessionId))
-    {
-        sessionId = context.Args.Get<ArgType::SessionId>();
-    }
-
-    context.ExitCode = SessionService::TerminateSession(sessionId);
+    auto& session = context.Data.Get<Data::Session>();
+    context.ExitCode = SessionService::TerminateSession(context.Terminal, session);
 }
 
 void RunInSession(CLIExecutionContext& context)
 {
-    std::wstring sessionName;
-    if (context.Args.Contains(ArgType::Session))
-    {
-        sessionName = context.Args.Get<ArgType::Session>();
-    }
+    auto& session = context.Data.Get<Data::Session>();
 
     std::vector<std::string> arguments;
-    arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(context.Args.Get<ArgType::Command>()));
+    arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(context.Args.GetValue<ArgType::Command>()));
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
-        for (const auto& arg : context.Args.Get<ArgType::ForwardArgs>())
+        for (const auto& arg : context.Args.GetValue<ArgType::ForwardArgs>())
         {
             arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(arg));
         }
     }
 
-    context.ExitCode = SessionService::Run(sessionName, arguments);
+    context.ExitCode = SessionService::Run(context.Terminal, session, arguments);
 }
 
 void EnterSession(CLIExecutionContext& context)
 {
-    auto storagePath = std::filesystem::absolute(context.Args.Get<ArgType::StoragePath>());
+    auto storagePath = std::filesystem::absolute(context.Args.GetValue<ArgType::StoragePath>());
 
     std::wstring sessionName;
     if (context.Args.Contains(ArgType::Name))
     {
-        sessionName = context.Args.Get<ArgType::Name>();
+        sessionName = context.Args.GetValue<ArgType::Name>();
     }
     else
     {
@@ -124,7 +128,7 @@ void EnterSession(CLIExecutionContext& context)
         sessionName = wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::None);
     }
 
-    context.ExitCode = SessionService::Enter(storagePath.wstring(), sessionName);
+    context.ExitCode = SessionService::Enter(context.Terminal, storagePath.wstring(), sessionName);
 }
 
 } // namespace wsl::windows::wslc::task

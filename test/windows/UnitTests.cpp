@@ -18,17 +18,20 @@ Abstract:
 #include "install.h"
 #include <AclAPI.h>
 #include <fstream>
+#include <sstream>
 #include <filesystem>
 #include "wslservice.h"
 #include "registry.hpp"
 #include "helpers.hpp"
 #include "svccomm.hpp"
+#include "ConsoleState.h"
 #include "lxfsshares.h"
 #include <userenv.h>
 #include <nlohmann/json.hpp>
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
+#include "retryshared.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -41,8 +44,6 @@ Abstract:
 #define LXSST_FSTAB_BACKUP_COMMAND_LINE L"/bin/bash -c 'cp /etc/fstab /etc/fstab.bak'"
 #define LXSST_FSTAB_SETUP_COMMAND_LINE L"/bin/bash -c 'echo C:\\\\ /mnt/c drvfs metadata 0 0 >> /etc/fstab'"
 #define LXSST_FSTAB_CLEANUP_COMMAND_LINE L"/bin/bash -c \"cp /etc/fstab.bak /etc/fstab\""
-
-#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
 
 #define LXSST_IMPORT_DISTRO_TEST_DIR L"C:\\importtest\\"
 
@@ -513,6 +514,89 @@ class UnitTests
         {
             auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
             VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
+        }
+    }
+
+    WSL2_TEST_METHOD(SharedMountSurvivesDistroTermination)
+    {
+        constexpr auto peerDistroName = L"mount-guard-peer-test";
+
+        auto validate = [&](const std::string& automountRoot) {
+            const auto extraConfig = automountRoot.empty() ? "" : std::format("[automount]\nroot={}\n", automountRoot);
+            const auto effectiveAutomountRoot = automountRoot.empty() ? "/mnt" : automountRoot;
+            const auto mountPoint = std::format(L"{}/wsl/mount-guard-test", wsl::shared::string::MultiByteToWide(effectiveAutomountRoot));
+
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+            auto cleanupSystemd = EnableSystemd(extraConfig);
+
+            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+            auto cleanupPeer = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+
+            auto cleanupPeerSystemd = EnableSystemd(extraConfig, peerDistroName);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)), 0L);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
+                0L);
+            auto cleanupMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"sh -c 'umount {0} 2>/dev/null || true; rmdir {0} 2>/dev/null || true'", mountPoint));
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- findmnt -n {}", peerDistroName, mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- grep -qx survived {}/marker", peerDistroName, mountPoint)), 0L);
+
+            TerminateDistribution(peerDistroName);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"findmnt -n {}", mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"grep -qx survived {}/marker", mountPoint)), 0L);
+        };
+
+        validate("");
+        validate("/wsl-test-mount");
+    }
+
+    WSL2_TEST_METHOD(ConfigUpdateLanguage)
+    {
+        // Validates that init populates $LANG from the distro locale configuration file.
+        // ConfigUpdateLanguage reads /etc/default/locale first, then /etc/locale.conf, and uses
+        // the first file that exists. See ConfigUpdateLanguage in src/linux/init/config.cpp.
+
+        DistroFileChange defaultLocale(L"/etc/default/locale", LxsstuLaunchWsl(L"test -f /etc/default/locale") == 0);
+        DistroFileChange localeConf(L"/etc/locale.conf", LxsstuLaunchWsl(L"test -f /etc/locale.conf") == 0);
+
+        const auto readLang = []() { return LxsstuLaunchWslAndCaptureOutput(L"printenv LANG").first; };
+
+        // Only /etc/default/locale is present (Debian/Ubuntu).
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            defaultLocale.SetContent(L"LANG=de_DE.UTF-8\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"de_DE.UTF-8\n");
+        }
+
+        // Only /etc/locale.conf is present (Fedora, Arch, openSUSE, ...).
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            localeConf.SetContent(L"LANG=\"fr_FR.UTF-8\"\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"fr_FR.UTF-8\n");
+        }
+
+        // Both files are present: /etc/default/locale takes precedence because it is read first.
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            defaultLocale.SetContent(L"LANG=ja_JP.UTF-8\n");
+            localeConf.SetContent(L"LANG=en_US.UTF-8\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"ja_JP.UTF-8\n");
         }
     }
 
@@ -1352,6 +1436,29 @@ class UnitTests
         VERIFY_ARE_EQUAL(output, ExpectedOutput);
     }
 
+    static std::wstring ExpectedUsageMessage()
+    {
+        std::wstring expectedUsageMessage;
+        for (auto e : wsl::shared::Localization::MessageWslUsage())
+        {
+            if (e == L'\n')
+            {
+                expectedUsageMessage += L'\r';
+            }
+
+            expectedUsageMessage += e;
+        }
+
+        return expectedUsageMessage + L"\r\n";
+    }
+
+    static void VerifyInvalidUsage(const std::wstring& Cmd)
+    {
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(Cmd.c_str(), -1);
+        VERIFY_ARE_EQUAL(ExpectedUsageMessage(), output);
+        VERIFY_ARE_EQUAL(error, L"");
+    }
+
     TEST_METHOD(ErrorMessages)
     {
         if (LxsstuVmMode()) // wsl --mount and bridged networking only exist in WSL2.
@@ -1431,6 +1538,10 @@ class UnitTests
                 L"--manage test_distro --resize 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
+
+            // wsl.exe --manage --compact requires WSL2.
+            ValidateErrorMessage(
+                L"--manage test_distro --compact", L"This operation is only supported by WSL2.", L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
 
         ValidateErrorMessage(
@@ -1545,20 +1656,7 @@ class UnitTests
 
         VerifyOutput(L"--install --no-distribution", L"The operation completed successfully. \r\n");
 
-        {
-            std::wstring expectedUsageMessage;
-            for (auto e : wsl::shared::Localization::MessageWslUsage())
-            {
-                if (e == L'\n')
-                {
-                    expectedUsageMessage += L'\r';
-                }
-
-                expectedUsageMessage += e;
-            }
-
-            VerifyOutput(L"--manage --move .", expectedUsageMessage + L"\r\n", -1);
-        }
+        VerifyInvalidUsage(L"--manage --move .");
     }
 
     TEST_METHOD(CommandLineParsing)
@@ -1582,6 +1680,11 @@ class UnitTests
         VerifyOutput(L"--exec echo -n \\\"a\\\"", L"\"a\"");
         VerifyOutput(L"--exec echo -n \"a\"\"b\"", L"a\"b");
         VerifyOutput(L"--exec echo -n \\\"", L"\"");
+    }
+
+    TEST_METHOD(ManageInvalidUsage)
+    {
+        VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
     }
 
     // This test validates that the help messages for wsl.exe and wsl.config are correctly displayed.
@@ -1689,6 +1792,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -2147,7 +2253,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=InvalidMode",
-            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
+            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
             L"[wsl2]\n");
         validateWarnings(
             L"networkingMode=a\\m", std::format(L"wsl: Invalid escaped character: 'm' in {}:2\r\n", wslConfigPath), L"[wsl2]\n");
@@ -2166,7 +2272,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=",
-            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
 
         validateWarnings(
             L"ipv6=true\nipv6=false",
@@ -2486,8 +2592,18 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Keys that are only created by the MSI.
         const std::vector<LPCWSTR> serviceKeys{
             L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns\\WSLDVC_PACKAGE",
-            L"SOFTWARE\\Classes\\CLSID\\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}",
-            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"};
+            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}",
+            L"SOFTWARE\\Classes\\CLSID\\{2C3E9A41-7B5D-4F18-93D6-A8C2E4F7B1D9}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{E3146082-A0DA-43A7-813B-A89EEE8C7628}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{4F9C8B23-D6E1-4A85-BF2A-E7C5D8F931A6}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{9C9C7131-D756-48FA-BD49-734E75AF37C0}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}\\InProcServer32",
+            L"SOFTWARE\\Classes\\Interface\\{27394DCF-6383-4E4E-BB0A-C13D4E5F6071}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{D2F47B8A-1E3C-4D9F-A6B5-7C8E9F0A1B2C}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{E3F58C9B-2F4D-4E0A-B7C6-8D9F0A1B2C3D}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{F406DACB-3050-4F1B-A8D7-9E0A1B2C3D4E}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{05172EBD-4161-4C2C-99E8-AF1B2C3D4E5F}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}\\ProxyStubClsid32"};
 
         for (const auto* keyName : serviceKeys)
         {
@@ -2528,7 +2644,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     WSL2_TEST_METHOD(CorruptedVhd)
     {
         // Create a 100MB vhd without a filesystem.
-        auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
+        auto distroPath = wsl::windows::common::filesystem::GetCanonicalPath(wil::GetCurrentDirectoryW<std::wstring>());
         auto vhdPath = distroPath / L"CorruptedTest.vhdx";
 
         VIRTUAL_STORAGE_TYPE storageType{};
@@ -2989,7 +3105,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", testFolder)));
         }
 
-        auto absolutePath = std::filesystem::weakly_canonical(".").wstring();
+        auto absolutePath = wsl::windows::common::filesystem::GetCanonicalPath(".").wstring();
 
         // Move the distro to a different folder (absolute path)
         {
@@ -3111,9 +3227,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
     WSL2_TEST_METHOD(MoveVhdWithAdminOwner)
     {
-        // Regression test for #40716: if the VHD's owner is BUILTIN\Administrators
-        // (as happens after a cross-volume MoveFileEx from an elevated context),
-        // the move must still succeed because setVhdOwner runs as SYSTEM.
+        // Regression test for #40716: a same-volume move must succeed when the VHD
+        // is already owned by BUILTIN\Administrators.
         constexpr auto name = L"move-admin-owner-test-distro";
         constexpr auto firstFolder = L"move-admin-owner-first";
         constexpr auto secondFolder = L"move-admin-owner-second";
@@ -3161,9 +3276,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto newVhdPath = std::format(L"{}\\ext4.vhdx", secondFolder);
         VERIFY_IS_TRUE(std::filesystem::exists(newVhdPath));
 
-        // Verify the VHD owner was preserved. The code reads the owner before
-        // MoveFileEx and restores it afterward. Since we set the owner to
-        // Administrators before this move, it should still be Administrators.
+        // A same-volume move preserves the VHD owner.
         {
             PSID ownerSid = nullptr;
             wil::unique_hlocal descriptor;
@@ -3217,6 +3330,146 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
+    }
+
+    // Verifies that VHD-mutating manage operations (--resize, --set-sparse, --move) are rejected while a
+    // long-running conversion/export holds the distribution lock, rather than racing with it on the VHD.
+    WSL2_TEST_METHOD(ManageRejectedWhileLocked)
+    {
+        constexpr auto name = L"manage-locked-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        // Start an export to a pipe we deliberately don't drain. Use a tiny buffer so the export blocks
+        // as soon as it writes any data, regardless of the test distro's size, deterministically holding
+        // the distribution in the "Exporting" locked state.
+        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true, 1);
+
+        std::thread exportThread([&]() { LxsstuLaunchWsl(std::format(L"--export {} -", name), nullptr, writePipe.get()); });
+
+        auto joinExport = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            // Close the read end so the blocked export fails with a broken pipe and returns, then join.
+            readPipe.reset();
+            if (exportThread.joinable())
+            {
+                exportThread.join();
+            }
+        });
+
+        // Wait until the service reports the distribution as Exporting (i.e. the lock is held), retrying for up
+        // to two minutes so a slow machine doesn't flake before the export acquires the lock.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
+                bool locked = false;
+                std::wistringstream stream(out);
+                for (std::wstring line; std::getline(stream, line);)
+                {
+                    if (line.find(name) != std::wstring::npos && line.find(L"Exporting") != std::wstring::npos)
+                    {
+                        locked = true;
+                        break;
+                    }
+                }
+
+                THROW_HR_IF(E_ABORT, !locked);
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::minutes(2),
+            [] { return wil::ResultFromCaughtException() == E_ABORT; });
+
+        // Each VHD-mutating manage operation must be rejected with E_ILLEGAL_STATE_CHANGE while the lock is held.
+        auto verifyRejected = [&](const std::wstring& command) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command, -1);
+            VERIFY_IS_TRUE(out.find(L"E_ILLEGAL_STATE_CHANGE") != std::wstring::npos);
+        };
+
+        verifyRejected(std::format(L"--manage {} --resize 2GB", name));
+        verifyRejected(std::format(L"--manage {} --set-sparse false", name));
+
+        const auto moveTarget = std::filesystem::absolute(L"manage-locked-move-target").wstring();
+        verifyRejected(std::format(L"--manage {} --move \"{}\"", name, moveTarget));
+    }
+
+    WSL2_TEST_METHOD(Compact)
+    {
+        constexpr auto name = L"compact-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        WslShutdown();
+
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        auto getVhdSizeOnDisk = [](const std::filesystem::path& path) {
+            DWORD highPart{};
+            SetLastError(NO_ERROR);
+            const auto lowPart = GetCompressedFileSizeW(path.c_str(), &highPart);
+            THROW_LAST_ERROR_IF(lowPart == INVALID_FILE_SIZE && GetLastError() != NO_ERROR);
+
+            ULARGE_INTEGER size{};
+            size.LowPart = lowPart;
+            size.HighPart = highPart;
+            return size.QuadPart;
+        };
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
+        const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+            L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
+            L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
+            name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeAfterWrite = getVhdSizeOnDisk(vhdPath);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeBeforeWrite + minimumCompactionDelta);
+
+        // Delete the file but do NOT trim from inside the guest: reclaiming the freed blocks now
+        // depends on the trim that '--compact' performs on the host before compacting the VHD.
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync'", name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeBeforeCompact = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        const auto sizeAfterCompact = getVhdSizeOnDisk(vhdPath);
+        LogInfo(
+            "Compact test VHD size on disk: before write=%llu, after write=%llu, before compact=%llu, after compact=%llu",
+            static_cast<unsigned long long>(sizeBeforeWrite),
+            static_cast<unsigned long long>(sizeAfterWrite),
+            static_cast<unsigned long long>(sizeBeforeCompact),
+            static_cast<unsigned long long>(sizeAfterCompact));
+
+        VERIFY_IS_TRUE(sizeBeforeCompact >= sizeAfterCompact);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeAfterCompact + minimumCompactionDelta);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+        VERIFY_ARE_EQUAL(err, L"");
     }
 
     WSL2_TEST_METHOD(FileOffsets)
@@ -3563,7 +3816,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 {NetworkingConfiguration::Nat, NetworkingConfiguration::Nat},
                 {NetworkingConfiguration::Bridged, NetworkingConfiguration::Bridged},
                 {NetworkingConfiguration::Mirrored, NetworkingConfiguration::Mirrored},
-                {NetworkingConfiguration::VirtioProxy, NetworkingConfiguration::VirtioProxy},
+                {NetworkingConfiguration::Consomme, NetworkingConfiguration::Consomme},
             };
 
             // tuple: WslConfigSetting, expectedValue, actualValue
@@ -4447,6 +4700,15 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            // New file should be created with the correct uid.
+            const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
+            const std::wstring testFilePathWindows = L"\\\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST_L L"\\tmp\\oobe_file_test";
+
+            const wil::unique_hfile file(CreateFile(
+                testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            VERIFY_IS_TRUE(file.is_valid());
+            validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.
@@ -6768,6 +7030,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
     WSL2_TEST_METHOD(CGroupv1)
     {
+        // cgroupv1 conflicts with the per-distro cgroup hierarchy
+        WslConfigChange config(LxssGenerateTestConfig({.isolateDistroCgroup = false}));
+
         auto expectedMount = [](const char* path, const wchar_t* expected) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
 
@@ -6790,7 +7055,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
 
         // Validate that having cgroup_no_v1=all causes the distribution to fall back to v2.
-        WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
+        config.Update(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all", .isolateDistroCgroup = false}));
 
         expectedMount("/sys/fs/cgroup/unified", L"");
         expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
@@ -7446,6 +7711,203 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
             VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }
+    }
+
+    TEST_METHOD(DownloadToHiddenSystemTempFolder)
+    {
+        // Avoid contaminating the real temp folder.
+        const auto testTempFolder = std::filesystem::temp_directory_path() / L"wsl-download-test";
+        std::filesystem::create_directories(testTempFolder);
+        auto cleanupTempFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            std::error_code error;
+            std::filesystem::remove_all(testTempFolder, error);
+        });
+
+        const auto originalAttributes = GetFileAttributesW(testTempFolder.c_str());
+        VERIFY_IS_TRUE(originalAttributes != INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(SetFileAttributesW(testTempFolder.c_str(), originalAttributes | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM));
+
+        ScopedEnvVariable temp(L"TEMP", testTempFolder.wstring());
+        ScopedEnvVariable tmp(L"TMP", testTempFolder.wstring());
+
+        VERIFY_IS_TRUE(std::filesystem::equivalent(std::filesystem::temp_directory_path(), testTempFolder));
+
+        constexpr USHORT port = 6666;
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", port);
+        constexpr auto fileName = L"downloaded-file.bin";
+        constexpr auto fileContent = L"wsl download test content";
+        UniqueWebServer server(endpoint.c_str(), fileContent);
+
+        const auto url = endpoint + fileName;
+        const auto noProgress = [](uint64_t, uint64_t) {};
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket probe{socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+                THROW_LAST_ERROR_IF(!probe);
+
+                sockaddr_in address{};
+                address.sin_family = AF_INET;
+                address.sin_port = htons(port);
+                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+                THROW_LAST_ERROR_IF(connect(probe.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+            },
+            std::chrono::milliseconds(500),
+            std::chrono::seconds(5));
+
+        const auto firstPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        auto readFile = [](const std::filesystem::path& Path) {
+            std::ifstream file(Path, std::ios::binary);
+            VERIFY_IS_TRUE(file.good());
+            return std::string{std::istreambuf_iterator<char>(file), {}};
+        };
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).filename().wstring(), std::wstring(fileName));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_ARE_EQUAL(readFile(firstPath), wsl::shared::string::WideToMultiByte(fileContent));
+
+        const auto secondPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).filename().wstring(), std::wstring(L"downloaded-file (2).bin"));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_IS_TRUE(std::filesystem::exists(secondPath));
+        VERIFY_ARE_EQUAL(readFile(secondPath), wsl::shared::string::WideToMultiByte(fileContent));
+    }
+
+    void ValidateIsolatedCgroupLayout(bool systemd)
+    {
+        constexpr auto secondDistroName = L"cgroup-test-distro";
+
+        // Ensure no stale state from a previous run.
+        LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
+        LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+        });
+
+        // Import the second distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", secondDistroName, g_testDistroPath)), 0L);
+
+        std::optional<decltype(EnableSystemd())> systemdCleanup;
+        std::optional<decltype(EnableSystemd())> systemdCleanup2;
+        if (systemd)
+        {
+            systemdCleanup.emplace(EnableSystemd());
+            systemdCleanup2.emplace(EnableSystemd("", secondDistroName));
+        }
+
+        auto getCgroup = [](LPCWSTR distro) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} cat -e /proc/self/cgroup", distro));
+            return out;
+        };
+
+        const auto cgroup1 = getCgroup(LXSS_DISTRO_NAME_TEST_L);
+        const auto cgroup2 = getCgroup(secondDistroName);
+
+        LogInfo("test_distro cgroup: %ls", cgroup1.c_str());
+        LogInfo("%ls cgroup: %ls", secondDistroName, cgroup2.c_str());
+
+        const std::wstring prefix = L"0::/wsl-user/distro-";
+        VERIFY_IS_TRUE(cgroup1.starts_with(prefix));
+        VERIFY_IS_TRUE(cgroup2.starts_with(prefix));
+        VERIFY_ARE_NOT_EQUAL(cgroup1, cgroup2);
+
+        // Terminate both distros -- this should trigger cleanup of their per-distro cgroups.
+        TerminateDistribution(LXSS_DISTRO_NAME_TEST_L);
+        TerminateDistribution(secondDistroName);
+
+        // Re-start the default test_distro and confirm that exactly one distro-<pid> cgroup remains:
+        // the one belonging to the distro we just started to perform the check.  The stale cgroups of
+        // the two terminated distros must have been removed.
+        //
+        // N.B. Mini_init cleans up per-distro cgroups asynchronously from its SIGCHLD reaper after
+        // wsl --terminate returns. On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
+        // can still be in flight when this check runs, so retry until cleanup completes.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out2, _] =
+                    LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
+                THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayout)
+    {
+        ValidateIsolatedCgroupLayout(false);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutSystemd)
+    {
+        ValidateIsolatedCgroupLayout(true);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutDisabled)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.isolateDistroCgroup = false}));
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/self/cgroup");
+        while (!out.empty() && (out.back() == L'\n' || out.back() == L'\r'))
+        {
+            out.pop_back();
+        }
+
+        LogInfo("cgroup with isolateDistroCgroup=false: %ls", out.c_str());
+
+        VERIFY_ARE_EQUAL(out, std::wstring(L"0::/"));
+
+        auto [exists, __] =
+            LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"[ -d /sys/fs/cgroup/wsl-user ] && echo yes || echo no\"");
+        while (!exists.empty() && (exists.back() == L'\n' || exists.back() == L'\r'))
+        {
+            exists.pop_back();
+        }
+        VERIFY_ARE_EQUAL(exists, std::wstring(L"no"));
+    }
+
+    TEST_METHOD(ConsoleState_SetOutputCodePageUtf8)
+    {
+        // 437 (OEM-US) and 850 (OEM Multilingual) are built-in Windows code pages that are always
+        // available. 437 is the baseline the helper must restore; 850 stands in for another
+        // component changing the code page after the helper first ran.
+        constexpr UINT baselineCodePage = 437;
+        constexpr UINT intermediateCodePage = 850;
+
+        const UINT originalCodePage = GetConsoleOutputCP();
+        auto restore = wil::scope_exit([originalCodePage]() { SetConsoleOutputCP(originalCodePage); });
+
+        // A settable console output code page requires an attached console, which CI and service
+        // contexts often lack. Skip the test when the code page cannot be set so the suite stays stable.
+        if (!SetConsoleOutputCP(baselineCodePage))
+        {
+            LogSkipped("Skipping test: no attached console with a settable output code page");
+            return;
+        }
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP());
+
+        {
+            wsl::windows::common::ConsoleState console;
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8),
+                GetConsoleOutputCP(),
+                L"SetOutputCodePageUtf8 sets the console output code page to UTF-8");
+
+            // Another component changes the code page; a repeated call must re-assert UTF-8.
+            VERIFY_IS_TRUE(static_cast<bool>(SetConsoleOutputCP(intermediateCodePage)));
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8), GetConsoleOutputCP(), L"A repeated call re-asserts UTF-8 after the code page changed");
+        }
+
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
 }; // namespace UnitTests

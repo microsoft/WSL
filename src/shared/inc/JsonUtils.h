@@ -34,13 +34,26 @@ namespace wsl::shared {
 
 constexpr int c_jsonPrettyPrintIndent = 2;
 
+// A negative indent makes nlohmann::json::dump() emit the document on a single line.
+constexpr int c_jsonCompactIndent = -1;
+
+struct EmptyObject
+{
+};
+
+inline void to_json(nlohmann::json& j, const EmptyObject&)
+{
+    j = nlohmann::json::object();
+}
+
+inline void from_json(const nlohmann::json&, EmptyObject&)
+{
+}
+
 template <typename T>
 std::string ToJson(const T& Value, int indent = -1)
 {
-    nlohmann::json json;
-    to_json(json, Value);
-
-    return json.dump(indent);
+    return nlohmann::json(Value).dump(indent);
 }
 
 template <typename T>
@@ -196,13 +209,13 @@ struct adl_serializer<WSLCNetworkInformation>
 {
     static void to_json(json& j, const WSLCNetworkInformation& network)
     {
-        j = json{{"Name", std::string(network.Name)}, {"Id", std::string(network.Id)}, {"Driver", std::string(network.Driver)}};
+        j = json{{"Name", std::string(network.Name)}, {"ID", std::string(network.Id)}, {"Driver", std::string(network.Driver)}};
     }
 
     static void from_json(const json& j, WSLCNetworkInformation& network)
     {
         std::string name = j.at("Name").get<std::string>();
-        std::string id = j.at("Id").get<std::string>();
+        std::string id = j.at("ID").get<std::string>();
         std::string driver = j.at("Driver").get<std::string>();
 
         strncpy_s(network.Name, sizeof(network.Name), name.c_str(), _TRUNCATE);

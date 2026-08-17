@@ -26,9 +26,7 @@ namespace wsl::windows::wslc {
 // Container Prune Command
 std::vector<Argument> ContainerPruneCommand::GetArguments() const
 {
-    return {
-        Argument::Create(ArgType::Session),
-    };
+    return {};
 }
 
 std::wstring ContainerPruneCommand::ShortDescription() const
@@ -43,8 +41,8 @@ std::wstring ContainerPruneCommand::LongDescription() const
 
 void ContainerPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneContainers;
 }
 } // namespace wsl::windows::wslc

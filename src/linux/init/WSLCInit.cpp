@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "util.h"
+#include "drvfs.h"
 #include "SocketChannel.h"
 #include "message.h"
 #include "localhost.h"
@@ -152,6 +153,25 @@ try
     const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
     THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
 
+    constexpr auto c_binPath = "/usr/bin";
+    if (std::filesystem::is_directory(LXSS_LIB_PATH))
+    {
+        for (const auto& entry : std::filesystem::directory_iterator(LXSS_LIB_PATH))
+        {
+            const auto fileName = entry.path().filename().string();
+            if (fileName.find(".so") != std::string::npos || !entry.is_regular_file())
+            {
+                continue;
+            }
+
+            const auto target = std::format("{}/{}", c_binPath, fileName);
+            if (UtilMountFile(entry.path().c_str(), target.c_str()) < 0)
+            {
+                LOG_ERROR("UtilMountFile({}, {}) failed {}", entry.path().c_str(), target, errno);
+            }
+        }
+    }
+
     return 0;
 }
 CATCH_RETURN_ERRNO()
@@ -187,6 +207,43 @@ void HandleMessageImpl(
     }
 
     Transaction.Send<WSLC_GET_DISK::TResponse>(writer.Span());
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_LISTDIR& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    wsl::shared::MessageWriter<WSLC_LISTDIR_RESULT> writer;
+
+    try
+    {
+        const auto* path = wsl::shared::string::FromMessageBuffer<WSLC_LISTDIR>(Buffer);
+        THROW_ERRNO_IF(EINVAL, path == nullptr);
+
+        wil::unique_dir dir{opendir(path)};
+        THROW_LAST_ERROR_IF(!dir);
+
+        std::vector<std::string> entries;
+        for (dirent64* entry = readdir64(dir.get()); entry != nullptr; entry = readdir64(dir.get()))
+        {
+            const std::string_view name{entry->d_name};
+            if (name == "." || name == "..")
+            {
+                continue;
+            }
+
+            entries.emplace_back(name);
+        }
+
+        auto pointers = wsl::shared::string::StringPointersFromArray(entries, false);
+        writer.WriteStringArray(writer->EntriesIndex, pointers.data(), pointers.size());
+        writer->Result = 0;
+    }
+    catch (...)
+    {
+        writer->Result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.Send<WSLC_LISTDIR::TResponse>(writer.Span());
 }
 
 void HandleMessageImpl(
@@ -340,6 +397,13 @@ void HandleMessageImpl(
             }
             else if (UtilWriteBuffer(socket.get(), relayBuffer.data(), bytesRead) < 0)
             {
+                if (errno == ECONNRESET || errno == EPIPE)
+                {
+                    // The other side of the socket has been closed. This isn't necessarily an error, so stop relaying this direction.
+                    pollDescriptors[1].fd = -1;
+                    continue;
+                }
+
                 LOG_ERROR("write failed {}", errno);
                 break;
             }
@@ -605,8 +669,9 @@ void HandleMessageImpl(
     Transaction.Send(Response);
 }
 
-void HandleMessageImpl(
-    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+template <typename TMessage>
+void HandleMountMessage(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const TMessage& Message, const gsl::span<gsl::byte>& Buffer)
 {
     WSLC_MOUNT_RESULT response{};
     response.Header.MessageType = WSLC_MOUNT_RESULT::Type;
@@ -623,10 +688,11 @@ void HandleMessageImpl(
             return "";
         };
 
-        mountutil::ParsedOptions options;
+        const char* mountOptions = readField(Message.OptionsIndex);
+        mountutil::ParsedOptions options{};
         if (Message.OptionsIndex > 0)
         {
-            options = mountutil::MountParseFlags(wsl::shared::string::FromSpan(Buffer, Message.OptionsIndex));
+            options = mountutil::MountParseFlags(mountOptions);
         }
 
         const char* source = readField(Message.SourceIndex);
@@ -653,7 +719,16 @@ void HandleMessageImpl(
         THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLC_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLC_MOUNT::OverlayFs));
 
         auto type = readField(Message.TypeIndex);
-        THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        if constexpr (std::is_same_v<TMessage, WSLC_MOUNT_VIRTIOFS>)
+        {
+            const char* childName = readField(Message.ChildNameIndex);
+            THROW_ERRNO_IF(EINVAL, !wsl::shared::string::IsEqual(type, VIRTIO_FS_TYPE));
+            THROW_LAST_ERROR_IF(MountVirtioFsChild(source, childName, target, mountOptions) < 0);
+        }
+        else
+        {
+            THROW_LAST_ERROR_IF(UtilMount(source, target, type, options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
+        }
 
         // Workaround for a Linux bug where virtiofs permissions aren't properly propagated when an overlay is mounted on top of a virtiofs share before the permissions have been fetched.
         // TODO: Remove once fixed upstream.
@@ -756,6 +831,18 @@ void HandleMessageImpl(
 }
 
 void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    HandleMountMessage(Channel, Transaction, Message, Buffer);
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT_VIRTIOFS& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    HandleMountMessage(Channel, Transaction, Message, Buffer);
+}
+
+void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_EXEC& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto Executable = wsl::shared::string::FromSpan(Buffer, Message.ExecutableIndex);
@@ -781,6 +868,12 @@ void HandleMessageImpl(
     Transaction.SendResultMessage<uint32_t>(SocketAddress.svm_port);
     Channel.Close();
     UtilSetThreadName("PortRelay");
+
+    // If the host end of a relay socket is reset, a write will raise SIGPIPE. Ignore it so
+    // the failure surfaces as an EPIPE return value (handled by the relay loop) instead of
+    // terminating this forked PortRelay process and tearing down the vsock accept listener.
+    THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
+
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
@@ -798,6 +891,40 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transac
     if (result == 0)
     {
         result = rmdir(path) < 0 ? errno : 0;
+    }
+
+    Transaction.SendResultMessage<int32_t>(result);
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_WRITE_FILE& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    if (Message.PathIndex >= Buffer.size() || Message.ContentIndex > Buffer.size() ||
+        Message.ContentLength > Buffer.size() - Message.ContentIndex)
+    {
+        Transaction.SendResultMessage<int32_t>(EINVAL);
+        return;
+    }
+
+    const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
+    const auto content = Buffer.subspan(Message.ContentIndex, Message.ContentLength);
+
+    int result = 0;
+    if (UtilMkdirPath(path, 0755, true) < 0)
+    {
+        result = errno;
+    }
+    else
+    {
+        wil::unique_fd fd{open(path, Message.OpenFlags, Message.Permissions)};
+        if (!fd)
+        {
+            result = errno;
+        }
+        else if (UtilWriteBuffer(fd.get(), content) != static_cast<ssize_t>(content.size()))
+        {
+            result = errno;
+        }
     }
 
     Transaction.SendResultMessage<int32_t>(result);
@@ -952,7 +1079,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

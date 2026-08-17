@@ -27,8 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkRemoveCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::NetworkName, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::NetworkName, true, Limit::Unlimited),
+        Argument::Create(ArgType::Force, std::nullopt, std::nullopt, Localization::WSLCCLI_NetworkForceArgDescription()),
     };
 }
 
@@ -44,7 +44,7 @@ std::wstring NetworkRemoveCommand::LongDescription() const
 
 void NetworkRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << DeleteNetworks;
 }
 } // namespace wsl::windows::wslc

@@ -28,6 +28,31 @@ constexpr auto c_pluginPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lx
 constexpr WSLVersion Version = {wsl::shared::VersionMajor, wsl::shared::VersionMinor, wsl::shared::VersionRevision};
 
 thread_local std::optional<std::wstring> g_pluginErrorMessage;
+thread_local bool g_inWslcPluginNotification = false;
+
+// Plugin-originated calls into the WSLC plugin API never acquire a VM lease: a plugin is a side
+// effect of the session's own activity, never a reason to bring a VM up. The call is served by
+// whatever VM is already running -- including one committed to stopping, which is what lets a plugin
+// do last-minute work from its OnWslcVmStopping handler without deadlocking against the teardown it
+// is blocking -- and is rejected with WSLC_E_VM_NOT_RUNNING when there is no VM.
+constexpr BOOL c_pluginAcquireVmLease = FALSE;
+
+class WslcPluginNotificationContext
+{
+public:
+    WslcPluginNotificationContext() : m_previous(std::exchange(g_inWslcPluginNotification, true))
+    {
+    }
+
+    ~WslcPluginNotificationContext()
+    {
+        g_inWslcPluginNotification = m_previous;
+    }
+
+private:
+    ExecutionContext m_executionContext{Context::Plugin};
+    bool m_previous;
+};
 
 extern "C" {
 HRESULT MountFolder(WSLSessionId Session, LPCWSTR WindowsPath, LPCWSTR LinuxPath, BOOL ReadOnly, LPCWSTR Name)
@@ -127,7 +152,7 @@ try
     RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
 
     auto session = ResolveWslcSession(Session);
-    auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly);
+    auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly, c_pluginAcquireVmLease);
 
     WSL_LOG(
         "WslcPluginMountFolderCall",
@@ -149,7 +174,7 @@ try
 
     auto session = ResolveWslcSession(Session);
 
-    auto result = session->UnmountWindowsFolder(Mountpoint);
+    auto result = session->UnmountWindowsFolder(Mountpoint, c_pluginAcquireVmLease);
 
     WSL_LOG(
         "WslcPluginUnmountFolderCall",
@@ -197,7 +222,7 @@ try
 
     wil::com_ptr<IWSLCProcess> process;
     int errnoValue = 0;
-    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, &process, &errnoValue);
+    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, c_pluginAcquireVmLease, &process, &errnoValue);
 
     if (Errno != nullptr)
     {
@@ -565,9 +590,14 @@ void PluginManager::ThrowIfFatalPluginError() const
     }
 }
 
+bool PluginManager::IsInWslcNotification() noexcept
+{
+    return g_inWslcPluginNotification;
+}
+
 void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -588,7 +618,7 @@ void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
 
 void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -609,7 +639,7 @@ void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session)
 HRESULT PluginManager::OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
 try
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -632,7 +662,7 @@ CATCH_RETURN()
 
 void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -654,7 +684,7 @@ void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Sessio
 
 void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -674,7 +704,7 @@ void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LP
 
 void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId) const
 {
-    ExecutionContext context(Context::Plugin);
+    WslcPluginNotificationContext context;
 
     for (const auto& e : m_plugins)
     {
@@ -686,6 +716,44 @@ void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LP
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
                 TraceLoggingValue(Session->SessionId, "SessionId"),
                 TraceLoggingValue(ImageId, "ImageId"),
+                TraceLoggingValue(result, "Result"));
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
+    }
+}
+
+void PluginManager::OnWslcVmStarted(const WSLCSessionInformation* Session) const
+{
+    WslcPluginNotificationContext context;
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.WslcVmStarted != nullptr)
+        {
+            const auto result = e.hooks.WslcVmStarted(Session);
+            WSL_LOG(
+                "PluginOnWslcVmStartedCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(result, "Result"));
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
+    }
+}
+
+void PluginManager::OnWslcVmStopping(const WSLCSessionInformation* Session) const
+{
+    WslcPluginNotificationContext context;
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.WslcVmStopping != nullptr)
+        {
+            const auto result = e.hooks.WslcVmStopping(Session);
+            WSL_LOG(
+                "PluginOnWslcVmStoppingCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"),
                 TraceLoggingValue(result, "Result"));
             LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
         }

@@ -24,7 +24,8 @@ Abstract:
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
-using namespace wsl::windows::common;
+
+namespace wslutil = wsl::windows::common::wslutil;
 
 namespace {
     // The bridge IP assigned to the first container started in a fresh session. The registry is always
@@ -227,9 +228,10 @@ class WSLCE2ETlsRegistryTests
             auto [registry, address] = StartLocalRegistry(session.Session(), "", "", c_registryPort, certDir.wstring());
             VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_registryPort), address);
 
-            RunWslcAndVerify(std::format(L"image tag {} {} --session {}", image.NameAndTag(), registryImage, session.Name()), {.ExitCode = 0});
+            RunWslcAndVerify(
+                std::format(L"--session \"{}\" image tag {} {}", session.Name(), image.NameAndTag(), registryImage), {.ExitCode = 0});
 
-            auto result = RunWslc(std::format(L"push {} --session {}", registryImage, session.Name()));
+            auto result = RunWslc(std::format(L"--session \"{}\" push {}", session.Name(), registryImage));
             VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0), L"Push should fail while the CA is not trusted");
             VERIFY_IS_TRUE(result.Stderr.has_value());
             VERIFY_IS_TRUE(
@@ -251,9 +253,10 @@ class WSLCE2ETlsRegistryTests
             auto [registry, address] = StartLocalRegistry(session.Session(), "", "", c_registryPort, certDir.wstring());
             VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_registryPort), address);
 
-            RunWslcAndVerify(std::format(L"image tag {} {} --session {}", image.NameAndTag(), registryImage, session.Name()), {.ExitCode = 0});
+            RunWslcAndVerify(
+                std::format(L"--session \"{}\" image tag {} {}", session.Name(), image.NameAndTag(), registryImage), {.ExitCode = 0});
 
-            auto result = RunWslc(std::format(L"push {} --session {}", registryImage, session.Name()));
+            auto result = RunWslc(std::format(L"--session \"{}\" push {}", session.Name(), registryImage));
             VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1), L"Push should succeed once the CA is trusted");
         }
     }

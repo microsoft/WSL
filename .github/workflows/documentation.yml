@@ -3,13 +3,38 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    paths: ['doc/**']
+  pull_request:
+    paths: ['doc/**']
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  Build:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: read
+    steps:
+      - name: Checkout actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install packages
+        run: pip install -r doc/requirements.txt --break-system-packages
+        shell: bash
+
+      - name: Build documentation
+        run: mkdocs build -f doc/mkdocs.yml
+        shell: bash
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: doc/site
+
   DeployDocs:
+    needs: Build
+    if: github.event_name == 'push'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -19,21 +44,6 @@ jobs:
         pages: write
         id-token: write
     steps:
-      - name: Checkout actions
-        uses: actions/checkout@v4
-
-      - name: Install packages
-        run: pip install mkdocs-mermaid2-plugin mkdocs --break-system-packages
-        shell: bash
-
-      - name: Build documentation
-        run:  mkdocs build -f doc/mkdocs.yml
-        shell: bash
-
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: doc/site
-
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

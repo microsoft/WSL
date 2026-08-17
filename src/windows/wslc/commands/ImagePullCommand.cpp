@@ -28,9 +28,9 @@ std::vector<Argument> ImagePullCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
+        Argument::Create(ArgType::Quiet, std::nullopt, std::nullopt, Localization::WSLCCLI_PullQuietArgDescription()),
         // Argument::Create(ArgType::Scheme),
         // Argument::Create(ArgType::Progress),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -46,8 +46,8 @@ std::wstring ImagePullCommand::LongDescription() const
 
 void ImagePullCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PullImage;
 }
 } // namespace wsl::windows::wslc

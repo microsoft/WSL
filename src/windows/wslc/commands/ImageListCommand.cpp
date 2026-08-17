@@ -28,11 +28,10 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Filter, false, NO_LIMIT),
+        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Verbose)};
 }
 
@@ -48,9 +47,9 @@ std::wstring ImageListCommand::LongDescription() const
 
 void ImageListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
-        << GetImages     //
+    context               //
+        << ResolveSession //
+        << GetImages      //
         << ListImages;
 }
 } // namespace wsl::windows::wslc

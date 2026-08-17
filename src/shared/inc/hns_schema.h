@@ -300,19 +300,28 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
         {DeviceType::VirtualCellular, "VirtualCellular"},
     })
 
+enum class CreateDeviceFlags
+{
+    None = 0,
+    DisableDAD = 1
+};
+
+DEFINE_ENUM_FLAG_OPERATORS(CreateDeviceFlags);
+
 struct CreateDeviceRequest
 {
     DeviceType type{};
     std::wstring deviceName;
     std::optional<GUID> lowerEdgeAdapterId;
     std::optional<std::wstring> lowerEdgeDeviceName;
+    CreateDeviceFlags flags{CreateDeviceFlags::None};
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(CreateDeviceRequest, type, deviceName, lowerEdgeAdapterId, lowerEdgeDeviceName);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(CreateDeviceRequest, type, deviceName, lowerEdgeAdapterId, lowerEdgeDeviceName, flags);
 
 inline void to_json(nlohmann::json& j, const CreateDeviceRequest& request)
 {
-    j = nlohmann::json{{"type", request.type}, {"deviceName", request.deviceName}};
+    j = nlohmann::json{{"type", request.type}, {"deviceName", request.deviceName}, {"flags", request.flags}};
 
     if (request.lowerEdgeAdapterId.has_value())
     {

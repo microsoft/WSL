@@ -160,7 +160,7 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
-    <value>지정한 탑재 이름에 잘못된 '/' 문자가 있습니다. 잘못된 문자 없이 다시 시도하세요.</value>
+    <value>마운트 이름은 '.', '..'또는 '/'를 포함할 수 없습니다. 올바른 마운트 이름으로 다시 시도하세요.</value>
     <comment>"mount" is a technical term meaning to make a disk/filesystem accessible. Use the standard technical term in your locale, or keep "mount" if commonly used.</comment>
   </data>
   <data name="MessageDiskMounted" xml:space="preserve">
@@ -308,6 +308,9 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
   <data name="MessageConversionStart" xml:space="preserve">
     <value>변환이 진행 중입니다. 이 작업은 몇 분 정도 걸릴 수 있습니다.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>압축이 진행 중입니다. 이 작업은 몇 분 정도 걸릴 수 있습니다.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>배포는 이미 요청된 버전입니다.</value>
   </data>
@@ -421,7 +424,7 @@ Linux 이진 파일을 실행하기 위한 인수:
 옵션:
     --cd &lt;Directory&gt;
         지정된 디렉터리를 현재 작업 디렉터리로 설정합니다.
-        ~가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
+        ‘~’가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
         / 문자로 시작하면 절대 Linux 경로로 해석됩니다.
         그렇지 않으면 값이 절대 Windows 경로여야 합니다.
 
@@ -472,7 +475,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 필요한 선택적 구성 요소만 설치하고 배포를 설치하지 않습니다.
 
             --no-launch, -n
-                설치 후 배포를 시작하지 마세요.
+                설치 후 배포를 시작하지 않습니다.
 
             --version &lt;Version&gt;
                 새 배포에 사용할 버전을 지정합니다.
@@ -484,7 +487,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 Microsoft Store 대신 인터넷에서 배포를 다운로드합니다.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        배포판 관련 옵션을 변경합니다.
+        배포판별 옵션을 변경합니다.
 
         옵션:
             --move &lt;Location&gt;
@@ -499,12 +502,15 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
             --resize &lt;MemoryString&gt;
                 배포 디스크의 크기를 지정된 크기로 조정합니다.
 
+            --compact
+                WSL 2 배포의 VHDX 파일을 압축합니다.
+
     --mount &lt;Disk&gt;
         모든 WSL 2 배포에서 실제 또는 가상 디스크를 연결하고 탑재합니다.
 
         옵션:
             --vhd
-                &lt;디스크&gt;가 가상 하드 디스크를 참조하도록 지정합니다.
+                &lt;Disk&gt;가 가상 하드 디스크를 참조하도록 지정합니다.
 
             --bare
                 디스크를 WSL2에 연결하고 탑재하지는 마세요.
@@ -525,7 +531,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
         새 배포에 대한 기본 설치 버전을 변경합니다.
 
     --shutdown
-        실행 중인 모든 배포와 WSL 2을 즉시 종료합니다.
+        실행 중인 모든 배포와 WSL 2를 즉시 종료합니다.
         경량 유틸리티 가상 머신입니다.
 
         옵션:
@@ -543,7 +549,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
         이 컴퓨터에서 Linux용 Windows 하위 시스템 패키지를 제거합니다.
 
     --update
-        Linux용 Windows 하위 시스템 패키지를 업데이트합니다.
+        Linux 패키지용 Windows 하위 시스템을 업데이트합니다.
 
         옵션:
             --pre-release
@@ -556,7 +562,7 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         배포를 tar 파일로 내보냅니다.
-        파일 이름은 - for stdout 일 수 있습니다.
+        파일 이름은 - for stdout일 수 있습니다.
 
         옵션:
             --format &lt;Format&gt;
@@ -583,8 +589,8 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
         옵션:
             --all
-                배포를 포함하여 모든 배포를 나열합니다.
-                현재 설치 중이거나 제거되고 있습니다.
+                현재 설치 중이거나 제거되고 있는 배포를 포함하여
+                모든 배포를 나열합니다.
 
             --running
                 현재 실행 중인 배포만 나열합니다.
@@ -617,7 +623,8 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1004,8 +1011,8 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>컨테이너 이미지 레지스트리 '{}'이(가) 컴퓨터 정책에 의해 차단되었습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>컴퓨터 정책에 따라 컨테이너 레지스트리 허용 목록이 구성되어 컨테이너 이미지 빌드가 차단되었습니다. 이미지 빌드는 임의의 레지스트리에서 기본 이미지를 가져올 수 있으며 허용 목록으로 안정적으로 제한할 수 없습니다.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>컨테이너 레지스트리 허용 목록 정책이 잘못되었습니다. Software\Policies\WSL 아래의 WSLContainerRegistryAllowlist 값이 올바르게 구성되었는지 확인합니다.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>'wsl.exe --set-version {} 2'를 실행하여 WSL2로 업그레이드하세요.</value>
@@ -1066,6 +1073,10 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>VHD가 현재 사용 중이므로 작업을 완료할 수 없습니다. WSL을 강제로 사용 중지하려면: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>압축은 .vhdx 파일에서만 지원됩니다.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{}은(는) 올바른 부울이 아닙니다&lt;true|false&gt;</value>
@@ -1136,9 +1147,9 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p를 사용할 수 없습니다. vsock 전송을 사용하여 9p로 대체합니다.</value>
   </data>
-  <data name="MessageVirtioProxyRequiresVirtio" xml:space="preserve">
-    <value>wsl2.virtio를 사용하지 않도록 설정하면 VirtioProxy 네트워킹이 지원되지 않습니다. networkingMode {}(으)로 대체합니다.</value>
-    <comment>{Locked="wsl2.virtio"}{Locked="VirtioProxy"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageConsommeRequiresVirtio" xml:space="preserve">
+    <value>wsl2.virtio를 사용하지 않도록 설정하면 Consomme 네트워킹이 지원되지 않습니다. networkingMode {}(으)로 대체합니다.</value>
+    <comment>{Locked="wsl2.virtio"}{Locked="Consomme"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwiotlbKernelUnsupported" xml:space="preserve">
     <value>실행 중인 커널에 virtio 장치 성능을 크게 향상시키는 패치가 없습니다. 이 최적화를 사용하도록 설정하려면 최신 WSL 커널로 업데이트하세요.</value>
@@ -1204,6 +1215,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>'{}'을(를) 번역하지 못했습니다</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageCgroupV1IncompatibleWithDistroIsolation" xml:space="preserve">
+    <value>Cgroup v1 is incompatible with per-distribution cgroup isolation. To use cgroup v1, set isolateDistroCgroup=false under [wsl2] in .wslconfig, then run wsl --shutdown.</value>
+    <comment>{Locked="Cgroup v1"}{Locked="cgroup v1"}{Locked="isolateDistroCgroup=false"}{Locked="[wsl2]"}{Locked="--shutdown."}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated.</comment>
+  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>오류가 발생했습니다. 나중에 다시 시도하세요.</value>
   </data>
@@ -1221,7 +1236,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>Linux용 Windows 하위 시스템 설정을 통해 개발자는 GUI 기반 응용 프로그램을 사용하여 .wslconfig 파일을 관리할 수 있습니다.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated. "developers" refers to software developers broadly. Use the standard platform term for "developer" in your locale.</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
     <value>자동 메모리 회수</value>
@@ -1301,13 +1316,15 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
     <value>사용자 지정 시스템 배포판</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>배포판 찾아보기</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>사용자 지정 시스템 배포판으로 로드되는 VHD의 경로를 지정합니다. 주로 WSL에서 GUI 앱을 제공하는 데 사용됩니다. [] 여기서 시스템 배포판에 대해 자세히 알아보세요.</value>
-    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="["}{Locked="]"}{Locked="VHD"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed. "VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
@@ -1315,10 +1332,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>사용자 지정 시스템 배포판</value>
+    <comment>"distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "Custom system distro" = "Custom system distribution".</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>WSL에서 주로 GUI 앱 구동에 사용하는 사용자 지정 시스템 배포판으로 로드할 VHD의 경로를 지정합니다.</value>
-    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+    <comment>{Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated. "distro" is short for "distribution" (a Linux distribution). Translate as "distribution" in your locale, not literally. "power" here means "run" or "drive" (to enable functionality), not "turn on" a device.</comment>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>디버그 콘솔 사용</value>
@@ -1353,6 +1371,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>개발자</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>설명서</value>
@@ -1780,9 +1799,10 @@ WSL에서 실행되는 Linux 이진 파일은 Windows에서 GPU를 자동으로 
     <value>설치 방법</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>VS Code 설치한 후 Windows 터미널 원격 WSL 확장을 설치할 수 있습니다.
+    <value>VS Code를 설치한 후 Windows 터미널에서 원격 WSL 확장을 설치할 수 있습니다.
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
+    <comment>{Locked="--install-extension "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Visual Studio Code WSL 프로젝트 열기</value>
@@ -1851,6 +1871,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
     <value>개발자</value>
+    <comment>"Developer" refers to a software developer (a person who creates software), not specifically a "programmer". Use the standard platform term for "Developer" in your locale and avoid translating it as "Programmer".</comment>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>배포판 관리</value>
@@ -1981,6 +2002,18 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
     <value>VM이 종료되기 전에 유휴 상태인 시간(밀리초)입니다.</value>
   </data>
+  <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
+    <value>WSL 계속 실행</value>
+  </data>
+  <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
+    <value>실행 중인 배포와 이를 호스팅하는 WSL 가상 머신이 유휴 상태가 된 후 자동으로 종료되지 않도록 합니다.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>WSL을 계속 실행합니다.</value>
+  </data>
+  <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>실행 중인 배포와 이를 호스팅하는 WSL 가상 머신이 유휴 상태가 된 후 자동으로 종료되지 않도록 합니다.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>초기화 시간 제한</value>
   </data>
@@ -1989,6 +2022,21 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM이 종료되기 전에 유휴 상태인 시간(밀리초)입니다.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
+    <value>배포 유휴 시간 제한</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
+    <value>배포가 종료되기 전에 유휴 상태인 시간(밀리초)입니다.</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>초기화 시간 제한</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>배포 유휴 시간 제한</value>
+  </data>
+  <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>배포가 종료되기 전에 유휴 상태인 시간(밀리초)입니다.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>변경 내용 적용</value>
@@ -2068,9 +2116,21 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>잘못된 IP 주소 '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageFailedToMapPort" xml:space="preserve">
+    <value>포트 '{}', {}를 매핑하지 못했습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionOptionNotSupported" xml:space="preserve">
+    <value>--session 옵션은 이 명령과 함께 사용할 수 없습니다.</value>
+    <comment>{Locked="--session "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToLaunchCommand" xml:space="preserve">
+    <value>{} 명령 실행에 실패했습니다. Errno = {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
     <value>WSLC 세션을 찾을 수 없습니다.</value>
@@ -2085,9 +2145,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
     <value>기본 세션을 찾을 수 없습니다.</value>
-  </data>
-  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
-    <value>기본 세션을 열지 못했습니다.</value>
   </data>
   <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
     <value>기본 세션 종료에 실패했습니다.</value>
@@ -2125,10 +2182,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 '{}'(이)가 실행 중입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcContainerIpAddressNotSupported" xml:space="preserve">
-    <value>ContainerIpAddress는 아직 지원되지 않습니다.</value>
-    <comment>{Locked="ContainerIpAddress"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>포트 매핑은 컨테이너 네트워크 모드에서 지원되지 않습니다. 포트는 대상 컨테이너에서 소유합니다.</value>
   </data>
@@ -2146,6 +2199,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>네트워크 이름은 비워 둘 수 없습니다.</value>
   </data>
+  <data name="MessageWslcDockerEngineErrorPrefix" xml:space="preserve">
+    <value>엔진의 오류 정보:</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>인식할 수 없는 명령: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2154,15 +2210,15 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>필수 인수가 제공 되지 않음: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>인수가 허용되는 횟수보다 더 많이 제공됨: '{}'</value>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>필수 옵션이 제공되지 않았습니다. '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>선택한 명령에 대한 도움말을 표시</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>여러 상호 배타적 인수가 제공됨: '{}'</value>
+    <value>서로 배타적인 옵션이 여러 개 제공되었습니다. '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2194,11 +2250,39 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
     <value>다음 인수를 사용할 수 있음</value>
   </data>
+  <data name="WSLCCLI_NoColorArgDescription" xml:space="preserve">
+    <value>색상 출력을 끕니다.</value>
+  </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>특정 명령에 대한 자세한 내용을 보려면 도움말 인수에 해당 명령을 전달합니다.</value>
+    <value>특정 명령에 대한 자세한 내용을 보려면 해당 명령에 도움말 옵션을 전달합니다.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>자세한 정보가 필요하면 '{} --help'를 실행하세요.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
+    <value>명령:</value>
+  </data>
+  <data name="WSLCCLI_HeadingOptions" xml:space="preserve">
+    <value>옵션:</value>
+  </data>
+  <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
+    <value>전역 옵션:</value>
+  </data>
+  <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
+    <value>별칭:</value>
+  </data>
+  <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
+    <value>인수:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>관련 옵션:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>관련 인수:</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>현재 명령에 대해 인수 이름을 인식할 수 없음: '{}'</value>
+    <value>현재 명령에 대해 옵션 이름을 인식하지 못했습니다. '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2220,31 +2304,35 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 ID</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>인수 값이 누락됨: '{}'</value>
+    <value>누락된 옵션 값: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>현재 명령에 대해 인수 별칭을 인식할 수 없음: '{}'</value>
+    <value>현재 명령에 대해 옵션 별칭을 인식하지 못했습니다. '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>잘못된 인수 특정자: '{}'</value>
+     <value>잘못된 옵션 지정자: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>근접한 플래그 별칭 찾을 수 없음: '{}'</value>
+     <value>인접한 옵션 별칭을 찾을 수 없습니다. '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>근접한 별칭이 플래그가 아님: '{}'</value>
+     <value>인접한 옵션 별칭이 플래그가 아닙니다. '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>잘못된 인수 특정자: '{}'</value>
+     <value>잘못된 옵션 지정자: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>플래그 인수는 근접하는 값을 포함할 수 없음: '{}'</value>
+     <value>옵션에 인접한 값을 포함할 수 없습니다. '{}'</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
+     <value>옵션의 부울 값이 잘못되었습니다. '{}'. true, false, 1, 0, t 또는 f가 필요합니다.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2252,7 +2340,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>인수 이름이 없음: '{}'</value>
+     <value>'{}'에 옵션 이름이 없습니다.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2264,7 +2352,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>값이 있는 별칭 인수는 별칭 체인 '{}'의 마지막이어야 합니다.</value>
+     <value>값이 있는 별칭 옵션은 별칭 체인의 마지막에 있어야 합니다. '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2295,6 +2383,18 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcImageNotFound" xml:space="preserve">
     <value>이미지 '{}'을(를) 찾을 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSecretInvalidSpec" xml:space="preserve">
+    <value>잘못된 --secret 값 '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--secret "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputInvalidSpec" xml:space="preserve">
+    <value>잘못된 --output 값 '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOutputConsoleNotSupported" xml:space="preserve">
+    <value>콘솔에 --output 값 '{}'에 대한 빌드 출력을 쓸 수 없습니다.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
     <value>필수 옵션 누락: '{}'</value>
@@ -2328,6 +2428,18 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>지원되지 않는 네트워크 드라이버: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcInvalidNetworkDriverOption" xml:space="preserve">
+    <value>지원되지 않는 네트워크 드라이버 옵션: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGatewayRequiresSubnet" xml:space="preserve">
+    <value>'--gateway' 옵션은 '--subnet'도 지정해야 합니다.</value>
+    <comment>{Locked="--gateway'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRangeRequiresSubnet" xml:space="preserve">
+    <value>'--ip-range' 옵션은 '--subnet'도 지정해야 합니다.</value>
+    <comment>{Locked="--ip-range'"}{Locked="--subnet'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
     <value>네트워크 '{}'에 활성 엔드포인트가 있습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2340,17 +2452,36 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>지원되지 않는 네트워크 모드: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcAdditionalNetworksRequirePrimary" xml:space="preserve">
-    <value>기본 네트워크 모드가 'host' 또는 'none'일 때 추가 네트워크는 허용되지 않습니다.</value>
-    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="MessageWslcInvalidStopTimeout" xml:space="preserve">
+    <value>잘못된 중지 시간 제한 값: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkModeNoAdditionalNetworks" xml:space="preserve">
+    <value>기본 네트워크 모드 '{}'은(는) 추가 네트워크 연결 또는 연결 끊기를 지원하지 않습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDuplicateNetwork" xml:space="preserve">
     <value>중복 네트워크: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcEndpointSettingsNotSupported" xml:space="preserve">
-    <value>엔드포인트 설정은 아직 지원되지 않습니다(네트워크 '{}').</value>
+  <data name="MessageWslcDriverOptDuplicate" xml:space="preserve">
+    <value>중복된 드라이버 옵션 '{}'입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDriverOptInvalid" xml:space="preserve">
+    <value>잘못된 드라이버 옵션 '{}'입니다. 'key=value'가 필요합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEndpointSettingUnknown" xml:space="preserve">
+    <value>네트워크 '{}'에 대한 알 수 없는 엔드포인트 설정 '{}'입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAddressSingleValue" xml:space="preserve">
+    <value>네트워크 '{}'에 대해 IP 주소를 하나만 지정할 수 있습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcLinkEmpty" xml:space="preserve">
+    <value>네트워크 링크는 비워 둘 수 없습니다.</value>
   </data>
   <data name="MessageWslcAliasEmpty" xml:space="preserve">
     <value>네트워크 별칭은 비워 둘 수 없습니다.</value>
@@ -2359,12 +2490,20 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>네트워크 별칭에는 사용자 정의 네트워크가 필요합니다. --network 를 사용하여 지정합니다.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcEndpointSettingsRequireNetwork" xml:space="preserve">
+    <value>네트워크 모드 '{}'에는 엔드포인트 설정이 지원되지 않습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>여러 개의 네트워크가 요청되는 경우 네트워크 별칭을 지정할 수 없습니다. 단일 --network 인수를 사용합니다.</value>
+    <value>여러 개의 네트워크가 요청되는 경우 네트워크 별칭을 지정할 수 없습니다. 단일 --network 옵션을 사용합니다.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>볼륨 '{}'을(를) 만들지 못함: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
+    <value>너무 많은 볼륨이 탑재되었습니다(제한: {}). 더 많은 볼륨을 탑재하려면 세션을 다시 시작하세요. 이 문제는 이후 릴리스에서 수정될 예정입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcPortInUse" xml:space="preserve">
@@ -2389,6 +2528,18 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
     <value>'{}'에서 WSLC 세션을 찾을 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeEmpty" xml:space="preserve">
+    <value>디렉터리가 비어 있지 않기 때문에 '{}'을(를) 세션 저장소로 사용할 수 없습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageMustBeDirectory" xml:space="preserve">
+    <value>'{}'은(는) 디렉터리가 아니므로 세션 스토리지로 사용할 수 없습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageCustomLocation" xml:space="preserve">
+    <value>session.storagePath에 의해 구성된 '{}'에서 세션 스토리지를 만드는 중입니다. 나중에 이 설정을 변경하거나 제거하는 경우 여기에 저장된 데이터는 더 이상 기본 세션에서 사용되지 않으며 공간을 회수하기 위해 삭제할 수 있습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. {Locked="session.storagePath"}"session.storagePath" is a configuration setting name and should not be translated.</comment>
   </data>
   <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
     <value>이미지 태그 형식이 잘못됨: '{}'. 필요한 형식은 'name:tag'입니다.</value>
@@ -2443,6 +2594,58 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>STDOUT 대신 파일에 씁니다.</value>
     <comment>{Locked="STDOUT"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_ContainerCpDesc" xml:space="preserve">
+    <value>컨테이너와 로컬 파일 시스템 간에 파일을 복사합니다.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCpLongDesc" xml:space="preserve">
+    <value>컨테이너와 로컬 파일 시스템 간에 파일을 복사합니다.
+사용법: wslc container cp [OPTIONS] SOURCE DEST
+  로컬에서 컨테이너로: wslc container cp LOCAL_PATH CONTAINER:PATH
+  컨테이너에서 로컬로: wslc container cp CONTAINER:PATH LOCAL_PATH
+  Stdin에서 컨테이너로: wslc container cp - CONTAINER:PATH</value>
+    <comment>{Locked="wslc"}{Locked="container cp"}{Locked="CONTAINER:PATH"}{Locked="LOCAL_PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceArgDescription" xml:space="preserve">
+    <value>원본: 로컬 경로, CONTAINER:PATH 또는 stdin의 경우 '-'</value>
+    <comment>{Locked="-"}{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpTargetArgDescription" xml:space="preserve">
+    <value>대상: 로컬 경로 또는 CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
+    <value>잘못된 대상 형식입니다. 예상 형식: CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidSourceError" xml:space="preserve">
+    <value>원본 형식이 잘못되었습니다. 예상 형식: CONTAINER:PATH</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceNotFoundError" xml:space="preserve">
+    <value>찾을 수 없는 소스 경로: {0}</value>
+    <comment>{0} is the source path</comment>
+  </data>
+  <data name="WSLCCLI_CpTarNotFoundError" xml:space="preserve">
+    <value>tar.exe 찾을 수 없습니다. 로컬 파일을 복사하려면 Windows tar가 필요합니다.</value>
+    <comment>{Locked="tar.exe"}</comment>
+  </data>
+  <data name="WSLCCLI_CpInvalidDirectionError" xml:space="preserve">
+    <value>복사 방향이 잘못되었습니다. CONTAINER:PATH 원본 또는 대상으로 사용합니다.</value>
+    <comment>{Locked="CONTAINER:PATH"}</comment>
+  </data>
+  <data name="WSLCCLI_CpStdinIsTerminalError" xml:space="preserve">
+    <value>터미널에서 tar 데이터를 읽을 수 없습니다. tar 아카이브를 stdin으로 파이프하세요.
+예: tar -cf - files | wslc container cp - CONTAINER:/path</value>
+    <comment>{Locked="tar -cf -"}{Locked="wslc container cp"}{Locked="CONTAINER:/path"}</comment>
+  </data>
+  <data name="WSLCCLI_CpNoFileExtractedError" xml:space="preserve">
+    <value>컨테이너 아카이브에서 파일이 추출되지 않았습니다.</value>
+    <comment>Shown when the container archive download produced no extractable files.</comment>
+  </data>
+  <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
+    <value>디렉터리를 파일 경로에 복사할 수 없습니다. 대신 디렉터리 대상(후행 구분 기호 포함)을 사용하세요.</value>
+    <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>컨테이너를 검사합니다.</value>
   </data>
@@ -2450,10 +2653,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너에 대한 자세한 정보를 표시합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>컨테이너를 종료합니다.</value>
+    <value>실행 중인 컨테이너를 하나 이상 종료합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>컨테이너를 종료합니다.</value>
+    <value>Kills one or more running containers by sending SIGKILL by default, or the signal specified with --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>컨테이너를 나열합니다.</value>
@@ -2474,9 +2678,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
     <value>중지된 모든 컨테이너를 제거하세요.</value>
   </data>
-  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
-    <value>회수된 총 공간: {:.2f}MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>총 회수된 공간: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>컨테이너를 제거합니다.</value>
@@ -2508,6 +2712,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>컨테이너를 중지합니다.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>보낼 신호(기본값: 컨테이너의 구성된 STOPSIGNAL 또는 구성되지 않은 경우 SIGTERM)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>이미지를 관리합니다.</value>
@@ -2567,9 +2775,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>연결되지 않은 모든 이미지를 제거합니다. --all 이 지정된 경우 컨테이너에서 사용되지 않는 모든 이미지를 제거합니다.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>회수된 총 공간: {:.2f}MB</value>
-    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimedBytes" xml:space="preserve">
+    <value>총 회수된 공간: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
     <value>태그가 지정되지 않음: {}</value>
@@ -2690,6 +2898,16 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>활성 세션에 연결합니다. 세션 ID를 제공하지 않으면 wslc 기본 세션이 사용됩니다.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_SessionRunDesc" xml:space="preserve">
+    <value>세션에서 명령을 실행하세요.</value>
+  </data>
+  <data name="WSLCCLI_SessionRunLongDesc" xml:space="preserve">
+    <value>TTY 없이 활성 세션에서 명령을 실행합니다. 명령과 해당 인수는 세션에 직접 전달됩니다. 세션을 지정하지 않으면 wslc 기본 세션이 사용됩니다.</value>
+    <comment>{Locked="wslc"}{Locked="TTY"}Command line arguments and technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionRunForwardArgsDescription" xml:space="preserve">
+    <value>실행 중인 명령에 전달할 인수</value>
+  </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
     <value>세션을 종료합니다.</value>
   </data>
@@ -2733,6 +2951,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>상태에 관계없이 모두 표시합니다.</value>
   </data>
+  <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
+    <value>아카이브 모드(Docker CLI 호환성을 위해 허용됨)</value>
+    <comment>{Locked="Docker"}</comment>
+  </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>빌드 시간 변수 설정(KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
@@ -2740,8 +2962,16 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
     <value>항상 최신 버전의 이미지를 가져오려고 시도합니다.</value>
   </data>
+  <data name="WSLCCLI_BuildOutputArgDescription" xml:space="preserve">
+    <value>빌드 출력 대상(docker buildx --output spec; 예: type=local,dest=path 또는 type=tar,dest=out.tar)</value>
+    <comment>{Locked="--output "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
     <value>빌드할 대상 빌드 단계 설정</value>
+  </data>
+  <data name="WSLCCLI_SecretArgDescription" xml:space="preserve">
+    <value>빌드에 비밀 노출(id=NAME[,type=env|file][,env=VAR|,src=PATH]; 기본값은 환경 변수 NAME)</value>
+    <comment>{Locked="id=NAME"}{Locked="type=env|file"}{Locked="env=VAR"}{Locked="src=PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>실행할 명령</value>
@@ -2751,7 +2981,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>잘못된 {} 인수 값: '{}'. CPU 수는 양수여야 합니다(예: 0.5, 1, 2).</value>
+    <value>잘못된 {} 옵션 값: '{}'. 양수 값(예: 0.5, 1, 2)의 CPU 수가 필요합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2779,7 +3009,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>제공된 조건에 따라 출력 필터링</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>'-f, --filter' 플래그에 대한 인수 "{}"가 잘못되었습니다: 필터 형식이 잘못되었습니다(name=value 형식이어야 함).</value>
+    <value>'-f, --filter' 옵션에 대한 잘못된 값 "{}": 필터 형식이 잘못되었습니다(name=value 형식 필요).</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>로그 출력 따라가기</value>
@@ -2787,6 +3017,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>출력 형식(json 또는 table) (기본값: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
+    <value>출력 형식(단일 줄 출력을 위한 json)(기본값: 들여쓰기된 JSON)</value>
+    <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>컨테이너의 초기화 프로세스에 전달할 인수</value>
@@ -2798,6 +3032,24 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
     <value>잘못된 {} 값: '{}'. 'all'만 지원됩니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthCmdArgDescription" xml:space="preserve">
+    <value>컨테이너 상태를 확인하기 위해 실행할 명령</value>
+  </data>
+  <data name="WSLCCLI_HealthIntervalArgDescription" xml:space="preserve">
+    <value>상태 검사 실행 간격(예: 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthRetriesArgDescription" xml:space="preserve">
+    <value>컨테이너를 비정상으로 보고하기 위해 필요한 연속 실패 횟수</value>
+  </data>
+  <data name="WSLCCLI_HealthStartPeriodArgDescription" xml:space="preserve">
+    <value>상태 검사 카운트다운이 시작되기 전 컨테이너가 초기화되는 데 걸리는 시간(예: 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HealthTimeoutArgDescription" xml:space="preserve">
+    <value>단일 상태 검사를 실행하는 데 허용되는 최대 시간(예: 30s, 1m30s)</value>
+    <comment>{Locked="30s"}{Locked="1m30s"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>사용 중인 경우에도 이미지 삭제</value>
@@ -2836,9 +3088,20 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_NetworkArgDescription" xml:space="preserve">
     <value>컨테이너를 네트워크에 연결하세요</value>
   </data>
+  <data name="WSLCCLI_NetworkForceArgDescription" xml:space="preserve">
+    <value>네트워크가 없으면 오류 발생 안 함</value>
+  </data>
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>잘못된 {} 값: 네트워크 이름은 비워 두거나 공백일 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>잘못된 {} 값: 네트워크 이름은 한 번만 지정할 수 있습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>유효하지 않은 {} 값: 지원되지 않는 네트워크 옵션 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>호스트 모드 네트워킹은 지원되지 않습니다.</value>
@@ -2846,12 +3109,31 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_NetworkAliasArgDescription" xml:space="preserve">
     <value>컨테이너에 대한 네트워크 범위 별칭 추가</value>
   </data>
+  <data name="WSLCCLI_DriverOptArgDescription" xml:space="preserve">
+    <value>엔드포인트 드라이버 옵션 설정(--driver-opt key=value)</value>
+    <comment>{Locked="--driver-opt "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_IpAddressArgDescription" xml:space="preserve">
+    <value>네트워크에서 컨테이너에 IPv4 주소 할당</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkArgDescription" xml:space="preserve">
+    <value>다른 컨테이너에 링크 추가(--link name:alias)</value>
+    <comment>{Locked="--link "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LinkLocalIpArgDescription" xml:space="preserve">
+    <value>컨테이너에 대한 링크-로컬 IPv4 주소 추가</value>
+    <comment>{Locked="IPv4"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkAliasEmptyError" xml:space="preserve">
     <value>잘못된 {} 값: 네트워크 별칭은 비어 있거나 공백일 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
     <value>이미지를 빌드할 때 캐시를 사용하지 마세요.</value>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckArgDescription" xml:space="preserve">
+    <value>컨테이너에 지정된 상태 검사 비활성화</value>
   </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>태그가 지정되지 않은 부모 삭제 안 함</value>
@@ -2871,6 +3153,13 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>모든 노출된 포트를 임의 호스트 포트에 게시</value>
   </data>
+  <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
+    <value>자세한 정보 표시 출력 숨기기</value>
+  </data>
+  <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
+    <value>기본 태그 사용: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>컨테이너 ID만 출력합니다.</value>
   </data>
@@ -2880,18 +3169,22 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>컨테이너를 중지하라는 신호</value>
   </data>
+  <data name="WSLCCLI_StopTimeoutArgDescription" xml:space="preserve">
+    <value>컨테이너를 강제 종료하기 전에 대기할 시간(초 단위) (-1을 지정하면 대기 시간 없음)</value>
+  </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
     <value>/dev/shm의 크기(예: 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>세션 ID</value>
-  </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>세션 저장소 경로</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>세션 스토리지 디렉터리의 경로</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>보낼 신호</value>
+    <value>컨테이너로 보낼 신호(기본값: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] 형식의 현재 또는 기존 이미지 참조</value>
@@ -2906,10 +3199,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>로그 출력에 타임스탬프 표시</value>
   </data>
   <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
-    <value>타임스탬프 이후 로그 표시(예: unix epoch 초)</value>
+    <value>타임스탬프 이후의 로그 표시(Unix epoch 초 또는 RFC3339, 예: 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
-    <value>타임스탬프 이전 로그 표시(예: unix epoch 초)</value>
+    <value>타임스탬프 이전의 로그 표시 (Unix Epoch 초 또는 RFC3339, 예: 2024-01-15T10:30:00Z)</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>image-name[:tag] 형식의 새 이미지 참조</value>
@@ -2930,6 +3223,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>컨테이너에 볼륨 탑재 바인딩</value>
   </data>
+  <data name="WSLCCLI_VolumeForceArgDescription" xml:space="preserve">
+    <value>볼륨이 없으면 오류 발생 안 함</value>
+  </data>
+  <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
+    <value>컨테이너에 연결된 익명 볼륨 제거</value>
+  </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>컨테이너 내부의 작업 디렉터리</value>
   </data>
@@ -2939,6 +3238,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>제공된 경로에 컨테이너 ID 쓰기</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>제공된 경로에 이미지 ID 쓰기</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>resolv.conf DNS 이름 서버의 IP 주소</value>
@@ -2967,11 +3269,11 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>진행 유형(형식: none|ansi) (기본값: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>진행률 출력 유형(auto, tty, plain, quiet) 설정(기본값: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>이미지 끌어오기 정책(always|missing|never) (default:never)</value>
+    <value>이미지 끌어오기 정책(always|missing|never)(기본값: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -2986,7 +3288,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>잘못된 {} 인수 값: '{}'. 예상 형식은 &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]입니다(-1을 사용하면 무제한).</value>
+    <value>잘못된 {} 옵션 값: '{}'. &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] 형식이 필요합니다(무제한의 경우 -1 사용).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3002,9 +3304,17 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>나열된 세션에 대한 자세한 정보를 표시합니다.</value>
   </data>
-  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>잘못된 형식 유형이 지정되었습니다. 지원되는 형식 유형은 json, table입니다.</value>
-    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  <data name="WSLCCLI_InvalidFormatValueError" xml:space="preserve">
+    <value>잘못된 {} 값: {}은(는) 인식할 수 있는 형식 형식이 아닙니다. 지원되는 형식 형식은 {}입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>잘못된 {} 값: {}은(는) 인식된 끌어오기 정책이 아닙니다. 지원되는 풀 정책은 {}입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>잘못된 {} 값: {}은(는) 인식할 수 있는 진행 유형이 아닙니다. 지원되는 진행 유형은 {}입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>잘못된 {} 값: {}은(는) 인식할 수 있는 검사 유형이 아닙니다. 지원되는 검사 유형은 {}입니다.</value>
@@ -3015,16 +3325,28 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>잘못된 {} 인수 값: {}</value>
+    <value>잘못된 {} 옵션 값: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
+    <value>잘못된 {} 옵션 값: '{}'. Unix epoch 타임스탬프 또는 RFC3339 날짜-시간(예: 2024-01-15T10:30:00Z)이 필요합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>잘못된 {} 값: {}이(가) 유효한 범위({}-{})를 벗어났습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>잘못된 {} 인수 값: '{}'. 메모리 크기가 필요합니다(예: 256M, 1G).</value>
+    <value>잘못된 {} 옵션 값: '{}'. 메모리 크기(예: 256M, 1G)가 필요합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
+    <value>잘못된 {} 옵션 값: '{}'. 지속 시간(예: 30s, 1m30s)이 필요합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
+  </data>
+  <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
+    <value>--no-healthcheck 옵션은 다른 상태 검사 옵션과 함께 사용할 수 없습니다.</value>
+    <comment>{Locked="--no-healthcheck "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
     <value>CID 파일 '{}'이(가) 이미 존재합니다.</value>
@@ -3043,6 +3365,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>로드를 요청했지만 입력이 제공되지 않았습니다.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoaded" xml:space="preserve">
+    <value>불러온 이미지: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadedId" xml:space="preserve">
+    <value>불러온 이미지 ID: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>네트워크를 관리합니다.</value>
@@ -3063,6 +3393,21 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_NetworkLabelArgDescription" xml:space="preserve">
     <value>네트워크 메타데이터 설정</value>
+  </data>
+  <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
+    <value>네트워크에 대한 외부 액세스를 제한합니다</value>
+  </data>
+  <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
+    <value>네트워크 세그먼트를 나타내는 CIDR 형식의 서브넷</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkGatewayArgDescription" xml:space="preserve">
+    <value>서브넷에 대한 IPv4 또는 IPv6 게이트웨이</value>
+    <comment>{Locked="IPv4"}{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkIpRangeArgDescription" xml:space="preserve">
+    <value>하위 범위에서 컨테이너 IP 주소를 CIDR 형식으로 할당</value>
+    <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkRemoveDesc" xml:space="preserve">
     <value>하나 이상의 네트워크를 제거합니다.</value>
@@ -3086,7 +3431,29 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>네트워크 이름</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>네트워크 이름만 출력합니다.</value>
+    <value>네트워크 ID만 표시</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
+    <value>사용하지 않는 네트워크를 모두 제거하세요.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
+    <value>사용하지 않는 네트워크를 모두 제거합니다. 컨테이너에서 참조되지 않는 네트워크는 사용되지 않는 것으로 간주됩니다.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
+    <value>삭제함: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
+    <value>컨테이너를 네트워크에 연결하세요</value>
+  </data>
+  <data name="WSLCCLI_NetworkConnectLongDesc" xml:space="preserve">
+    <value>컨테이너를 기존 네트워크에 연결합니다.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectDesc" xml:space="preserve">
+    <value>네트워크에서 컨테이너의 연결을 끊습니다.</value>
+  </data>
+  <data name="WSLCCLI_NetworkDisconnectLongDesc" xml:space="preserve">
+    <value>기존 네트워크에서 컨테이너의 연결을 끊습니다.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
     <value>볼륨을 관리합니다.</value>
@@ -3151,10 +3518,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>볼륨 이름만 출력합니다.</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>이미지를 터미널에 쓸 수 없습니다. -o 플래그를 사용하거나 stdout을 리디렉션합니다.</value>
+    <value>이미지를 터미널에 쓸 수 없습니다. -o 옵션을 사용하거나 stdout을 리디렉션합니다.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>터미널로 컨테이너를 내보낼 수 없습니다. -o 플래그를 사용하거나 stdout을 리디렉션합니다.</value>
+    <value>터미널로 컨테이너를 내보낼 수 없습니다. -o 옵션을 사용하거나 stdout을 리디렉션합니다.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>필요한 형식: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
@@ -3287,6 +3654,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcSwapInitFailed" xml:space="preserve">
     <value>전환 초기화 실패</value>
   </data>
+  <data name="MessageWslcPublishAllUdpNotSupported" xml:space="preserve">
+    <value>현재 네트워킹 모드에서는 UDP 포트 전달을 지원하지 않으므로, 이미지에서 노출한 UDP 포트가 게시되지 않았습니다.</value>
+  </data>
   <data name="MessageWslcContainerTimestampRecoveryFailed" xml:space="preserve">
     <value>컨테이너 '{}'의 타임스탬프 복원 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3297,6 +3667,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcVolumeUnmountFailed" xml:space="preserve">
     <value>볼륨 '{}' 탑재 실패: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeLostFoundNotEmpty" xml:space="preserve">
+    <value>볼륨 '{}'에 비어 있지 않은 'lost+found' 디렉터리가 있습니다. 그대로 둔 상태이며, 볼륨이 이미지 콘텐츠로 시드되지 않았을 수 있습니다.</value>
+    <comment>{Locked="lost+found"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStopAfterPluginRejectionFailed" xml:space="preserve">
     <value>플러그인 거부 후 컨테이너 '{}' 중지 실패</value>

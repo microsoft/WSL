@@ -16,7 +16,9 @@ Abstract:
 
 #include <wslservice.h>
 #include <wslc.h>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace wsl::windows::wslc::models {
 
@@ -25,6 +27,29 @@ enum class FormatType
 {
     Table,
     Json,
+};
+
+struct ContainerNetwork
+{
+    std::string Name;
+    std::vector<std::string> Aliases;
+};
+
+enum class PullPolicy
+{
+    Missing,
+    Always,
+    Never,
+};
+
+// Progress output style for `wslc build`. Auto resolves to Tty when progress output is an
+// interactive VT console and Plain otherwise.
+enum class ProgressMode
+{
+    Auto,
+    Tty,
+    Plain,
+    Quiet,
 };
 
 struct ContainerOptions
@@ -38,7 +63,14 @@ struct ContainerOptions
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;
+    std::optional<int> StopTimeout{};
     std::optional<int64_t> ShmSize{};
+    std::optional<std::string> HealthCmd{};
+    std::optional<int64_t> HealthInterval{};    // nanoseconds
+    std::optional<int64_t> HealthTimeout{};     // nanoseconds
+    std::optional<int64_t> HealthStartPeriod{}; // nanoseconds
+    std::optional<int> HealthRetries{};
+    bool NoHealthcheck = false;
     bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
@@ -50,7 +82,7 @@ struct ContainerOptions
     std::vector<std::string> DnsServers;
     std::vector<std::string> DnsSearchDomains;
     std::vector<std::string> DnsOptions;
-    std::vector<std::string> Networks;
+    std::vector<ContainerNetwork> Networks;
     std::vector<std::string> NetworkAliases;
     std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
@@ -58,6 +90,7 @@ struct ContainerOptions
     std::optional<int64_t> MemoryBytes{};
     std::optional<int64_t> NanoCpus{};
     std::vector<std::tuple<std::string, int64_t, int64_t>> Ulimits;
+    PullPolicy Pull = PullPolicy::Missing;
 };
 
 struct CreateContainerResult
@@ -67,10 +100,8 @@ struct CreateContainerResult
 
 struct StopContainerOptions
 {
-    static constexpr LONG DefaultTimeout = -1;
-
     WSLCSignal Signal = WSLCSignalNone;
-    LONG Timeout = DefaultTimeout;
+    LONG Timeout = WSLC_STOP_TIMEOUT_DEFAULT;
 };
 
 struct PruneContainersResult

@@ -10,33 +10,34 @@
 
 namespace wsl::core {
 
-enum class VirtioNetworkingFlags
+enum class ConsommeNetworkingFlags
 {
     None = 0x0,
     LocalhostRelay = 0x1,
     DnsTunneling = 0x2,
     Ipv6 = 0x4,
+    LoopbackClientIp = 0x8,
 };
-DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
+DEFINE_ENUM_FLAG_OPERATORS(ConsommeNetworkingFlags);
 
-class VirtioNetworking : public INetworkingEngine
+class ConsommeNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(
+    ConsommeNetworking(
         GnsChannel&& gnsChannel,
-        VirtioNetworkingFlags flags,
+        ConsommeNetworkingFlags flags,
         LPCWSTR dnsOptions,
+        LPCSTR hostLoopback,
         std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-        wil::shared_handle userToken,
-        std::wstring swiotlbConfig);
+        wil::shared_handle userToken);
 
-    ~VirtioNetworking();
+    ~ConsommeNetworking() override;
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
-    VirtioNetworking(const VirtioNetworking&) = delete;
-    VirtioNetworking(VirtioNetworking&&) = delete;
-    VirtioNetworking& operator=(const VirtioNetworking&) = delete;
-    VirtioNetworking& operator=(VirtioNetworking&&) = delete;
+    ConsommeNetworking(const ConsommeNetworking&) = delete;
+    ConsommeNetworking(ConsommeNetworking&&) = delete;
+    ConsommeNetworking& operator=(const ConsommeNetworking&) = delete;
+    ConsommeNetworking& operator=(ConsommeNetworking&&) = delete;
 
     // INetworkingEngine
     void Initialize() override;
@@ -44,12 +45,18 @@ public:
     void FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message) override;
     void StartPortTracker(wil::unique_socket&& socket) override;
 
+    HRESULT MapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol, _Out_ USHORT* AllocatedHostPort) const;
+
+    HRESULT UnmapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol) const;
+
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
 
-    HRESULT HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept;
-    int ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET& addr, _In_ int protocol, _In_ bool isOpen) const;
+    uint16_t HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const;
+    uint16_t ModifyOpenPorts(
+        _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();
+    void SetupHostLoopback();
     void SetupLoopbackDevice();
     void SendDefaultRoute(const std::wstring& gateway, wsl::shared::hns::ModifyRequestType requestType);
     void SendIpv6Address(const networking::EndpointIpAddress& ipAddress, wsl::shared::hns::ModifyRequestType requestType);
@@ -66,14 +73,15 @@ private:
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
-    VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
+    ConsommeNetworkingFlags m_flags = ConsommeNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
-    std::wstring m_swiotlbOption;
+    std::string m_hostLoopback;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
+    std::optional<WslVirtioNetConfig> m_virtioNetConfig;
+    std::vector<IpAddress> m_virtioNetNameservers;
 
     ULONG m_networkMtu = 0;
-    std::wstring m_trackedDeviceOptions;
     networking::EndpointIpAddress m_trackedIpv4Address{};
     networking::EndpointIpAddress m_trackedIpv6Address{};
     std::wstring m_trackedDefaultRoute;

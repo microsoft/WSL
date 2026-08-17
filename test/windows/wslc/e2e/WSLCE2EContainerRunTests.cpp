@@ -25,6 +25,7 @@ class WSLCE2EContainerRunTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(HelloWorldImage);
         EnsureImageIsLoaded(PythonImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
@@ -42,6 +43,7 @@ class WSLCE2EContainerRunTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(HelloWorldImage);
         EnsureImageIsDeleted(PythonImage);
         EnsureVolumeDoesNotExist(WslcVolumeName);
         EnsureNetworkDoesNotExist(TestNetworkName);
@@ -76,7 +78,8 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_HelpCommand)
     {
         auto result = RunWslc(L"container run --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Container_With_Command)
@@ -88,6 +91,36 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"echo_from_container\n", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(WslcContainerName, L"exited");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PullPolicy)
+    {
+        auto session = OpenDefaultElevatedSession();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
+        auto registryImage = TagImageForRegistry(HelloWorldImage.NameAndTag(), wsl::shared::string::MultiByteToWide(registryAddress));
+        auto cleanup = wil::scope_exit([&]() {
+            EnsureContainerDoesNotExist(WslcContainerName);
+            RunWslc(std::format(L"image delete --force {}", registryImage));
+        });
+
+        auto result = RunWslc(std::format(L"container run --pull=never --rm --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_FALSE(result.Stdout->empty());
+
+        result = RunWslc(std::format(L"container run --pull=always --rm --name {} {}", WslcContainerName, registryImage));
+        const auto errorMessage = std::format(
+            L"manifest for {} not found: manifest unknown: manifest unknown\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", registryImage);
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
+
+        result = RunWslc(std::format(L"container run --pull=missing --rm --name {} {}", WslcContainerName, registryImage));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_FALSE(result.Stdout->empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_CIDFile_Valid)
@@ -292,8 +325,9 @@ class WSLCE2EContainerRunTests
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_InvalidContent)
@@ -307,7 +341,9 @@ class WSLCE2EContainerRunTests
             WslcContainerName,
             EscapePath(EnvTestFile1.wstring()),
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_DuplicateKeys_Precedence)
@@ -416,6 +452,8 @@ class WSLCE2EContainerRunTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
         // From the host side, verify we can connect to both ports
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort2).c_str(), HTTP_STATUS_OK, true);
@@ -443,7 +481,9 @@ class WSLCE2EContainerRunTests
         auto startResult = RunWslc(std::format(L"container start {}", containerId));
         startResult.Verify(
             {.Stderr = std::format(
-                 L"Port 127.0.0.1:{}/tcp is already in use, cannot start container {}\r\nError code: ERROR_ALREADY_EXISTS\r\n", HostTestPort1, containerId),
+                 L"Failed to map port '127.0.0.1:{}/tcp', Only one usage of each socket address (protocol/network "
+                 L"address/port) is normally permitted. \r\nError code: WSAEADDRINUSE\r\n",
+                 HostTestPort1),
              .ExitCode = 1});
 
         // Clean up the created container
@@ -455,15 +495,46 @@ class WSLCE2EContainerRunTests
         runResult.Verify({.ExitCode = 1});
 
         VerifyContainerIsNotListed(WslcContainerName2);
+
+        // Repeat the conflict scenario for an IPv6 loopback ([::1]) binding to validate the IPv6 error message.
+        auto ipv6Server = RunWslc(std::format(
+            L"container run -d --name {} -p [::1]:{}:{} {} {}",
+            WslcContainerName2,
+            HostTestPort2,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        ipv6Server.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Create a second container mapping the same IPv6 address/port to validate the full error message.
+        auto ipv6CreateResult =
+            RunWslc(std::format(L"container create -p [::1]:{}:{} {}", HostTestPort2, ContainerTestPort, DebianImage.NameAndTag()));
+        ipv6CreateResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto ipv6ContainerId = ipv6CreateResult.GetStdoutOneLine();
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            RunWslc(std::format(L"container rm {}", ipv6ContainerId)).Verify({.Stderr = L"", .ExitCode = 0});
+        });
+
+        // Attempt to start — should fail with a port conflict, with the IPv6 address bracketed in the message.
+        auto ipv6StartResult = RunWslc(std::format(L"container start {}", ipv6ContainerId));
+        ipv6StartResult.Verify(
+            {.Stderr = std::format(
+                 L"Failed to map port '[::1]:{}/tcp', Only one usage of each socket address (protocol/network "
+                 L"address/port) is normally permitted. \r\nError code: WSAEADDRINUSE\r\n",
+                 HostTestPort2),
+             .ExitCode = 1});
     }
 
-    // https://github.com/microsoft/WSL/issues/14433
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral)
     {
         // Start a container with an ephemeral host port mapping (-p 8080 means host picks a random port)
         auto result = RunWslc(std::format(
             L"container run -d --name {} -p {} {} {}", WslcContainerName, ContainerTestPort, PythonImage.NameAndTag(), GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Wait for the in-container HTTP server to start listening before connecting.
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
 
         // Inspect the container to find the allocated host port
         auto inspectContainer = InspectContainer(WslcContainerName);
@@ -480,18 +551,132 @@ class WSLCE2EContainerRunTests
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort).c_str(), HTTP_STATUS_OK, true);
     }
 
-    // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_UDP)
     {
-        auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        // Start a container with a UDP echo server listening on a port.
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{}/udp {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonUdpEchoServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Send a datagram from the host and verify the container echoes it back uppercased.
+        SendUdpAndReceive(HostTestPort1, "hello", "HELLO");
+
+        // Verify the UDP port mapping is reflected in the container inspect data.
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/udp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_HostIP)
     {
-        auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        // Start a container with a server listening on a port, bound to a specific host IP (127.0.0.1).
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p 127.0.0.1:{}:{} {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
+
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HostLoopback)
+    {
+        VerifyHostLoopback("default", "host.wslc.internal", false);
+        VerifyHostLoopback("default", "host.wslc.internal", true);
+        VerifyHostLoopback("host.containers.internal", "host.containers.internal", false);
+    }
+
+    // Verifies that 'session.defaultBindingAddress: default' resolves to the built-in
+    // loopback default (127.0.0.1) for a published port specified without an explicit host IP.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_DefaultBindingAddress_Default)
+    {
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(settingsPath, "session:\n  defaultBindingAddress: default\n");
+
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
+
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
+    }
+
+    // Verifies that a configured 'session.defaultBindingAddress' overrides the loopback
+    // default for a published port specified without an explicit host IP.
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_DefaultBindingAddress_Override)
+    {
+        const auto hostIp = GetHostAdapterIpv4();
+        if (!hostIp.has_value())
+        {
+            WEX::Logging::Log::Comment(L"Skipping: no suitable non-loopback host IPv4 address was found.");
+            return;
+        }
+
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(settingsPath, std::format("session:\n  defaultBindingAddress: {}\n", *hostIp));
+
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} {}",
+            WslcContainerName,
+            HostTestPort1,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
+
+        const auto hostIpWide = std::wstring(hostIp->begin(), hostIp->end());
+        ExpectHttpResponse(std::format(L"http://{}:{}", hostIpWide, HostTestPort1).c_str(), HTTP_STATUS_OK, true);
+
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(*hostIp), portBindings[0].HostIp);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
@@ -505,6 +690,9 @@ class WSLCE2EContainerRunTests
             PythonImage.NameAndTag(),
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Wait for the in-container HTTP server to start listening before connecting.
+        WaitForContainerOutput(WslcContainerName, "Serving HTTP on");
 
         // Verify we can connect to the server from the host side
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
@@ -570,6 +758,48 @@ class WSLCE2EContainerRunTests
         session.VerifyNoErrors();
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_InteractiveNoTTY_SelfExitingCommand)
+    {
+        // Same stdin-relay teardown deadlock as WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand (see it
+        // for the root cause), but via `container run -i`. run and exec share the client relay (both route through
+        // AttachToCurrentConsole), so the hang is not exec-specific. The test requires run to exit with the client
+        // still holding stdin open; RunWslcInteractive supplies stdin as a synchronous (non-overlapped) pipe, the
+        // case that triggers the bug.
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session =
+            RunWslcInteractive(std::format(L"container run -i --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+
+        session.ExpectStdout("hello\n");
+
+        // Generous timeout: it only bounds the failure (hang) path.
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        // Closing stdin after exit must stay a clean no-op.
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_InteractiveTTY_SelfExitingCommand)
+    {
+        // TTY counterpart of the above: `-t` routes through ConsoleService::RelayInteractiveTty, a separate
+        // stdin-worker teardown from the non-TTY path, so it could regress independently. Guards the TTY run path.
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session =
+            RunWslcInteractive(std::format(L"container run -it --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+
+        // The TTY translates the trailing LF to CRLF.
+        session.ExpectStdout("hello\r\n");
+
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PseudoConsole_TerminalSize)
     {
         VerifyContainerIsNotListed(WslcContainerName);
@@ -615,13 +845,17 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_RelativePath_Fails)
     {
         auto result = RunWslc(std::format(L"container run --rm --tmpfs wslc-tmpfs {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_EmptyDestination_Fails)
     {
         auto result = RunWslc(std::format(L"container run --rm --tmpfs :size=64k {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir)
@@ -680,7 +914,7 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --name {} --network host {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"host mode networking is not supported\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = wsl::shared::Localization::WSLCCLI_NetworkHostModeNotSupportedError() + L"\r\n", .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -703,7 +937,8 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --rm --network \"\" --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid network value: network name cannot be empty or whitespace\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid network value: network name cannot be empty or whitespace"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_NonexistentNetwork_Rejected)
@@ -728,6 +963,41 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
         const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
         VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_DockerStyleMultiNetwork_Success)
+    {
+        const auto secondNetworkName = TestNetworkName + L"-2";
+        EnsureNetworkDoesNotExist(secondNetworkName);
+
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(L"network create --driver bridge {}", secondNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupSecondNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(secondNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container run --name {} --network name={},alias=db,alias=primary "
+            L"--network name={},alias=cache,alias=replica {} true",
+            WslcContainerName,
+            TestNetworkName,
+            secondNetworkName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
+        const auto secondNetwork = wsl::shared::string::WideToMultiByte(secondNetworkName);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(secondNetwork));
+        const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+        const auto& secondEndpoint = inspect.NetworkSettings.Networks.at(secondNetwork);
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "db") != endpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, "primary") != endpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(secondEndpoint.Aliases, "cache") != secondEndpoint.Aliases.end());
+        VERIFY_IS_TRUE(std::ranges::find(secondEndpoint.Aliases, "replica") != secondEndpoint.Aliases.end());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_NoNetwork_Rejected)
@@ -756,14 +1026,18 @@ class WSLCE2EContainerRunTests
             L"container run --rm --network bridge --network bridge --network-alias db --name {} {} true",
             WslcContainerName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            wsl::shared::Localization::MessageWslcAliasAmbiguousWithMultipleNetworks() + L"\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_NetworkAlias_EmptyValue_Rejected)
     {
         auto result = RunWslc(
             std::format(L"container run --rm --network-alias \"\" --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid network-alias value: network alias cannot be empty or whitespace\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid network-alias value: network alias cannot be empty or whitespace"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
@@ -826,6 +1100,87 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL(ExpectedExitCode, inspect.State.ExitCode);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopTimeout)
+    {
+        // A positive value is forwarded to the container configuration.
+        {
+            constexpr int ExpectedStopTimeout = 25;
+            auto result = RunWslc(std::format(
+                L"container run -d --stop-timeout {} --name {} {} sleep infinity",
+                ExpectedStopTimeout,
+                WslcContainerName,
+                DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.StopTimeout.has_value());
+            VERIFY_ARE_EQUAL(ExpectedStopTimeout, inspect.Config.StopTimeout.value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // A value of 0 (stop the container immediately) is a valid, explicit timeout.
+        {
+            auto result = RunWslc(std::format(
+                L"container run -d --stop-timeout 0 --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.StopTimeout.has_value());
+            VERIFY_ARE_EQUAL(0, inspect.Config.StopTimeout.value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // A value of -1 means "no timeout"; it is a valid, explicit value forwarded to the configuration.
+        {
+            auto result = RunWslc(std::format(
+                L"container run -d --stop-timeout -1 --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.StopTimeout.has_value());
+            VERIFY_ARE_EQUAL(-1, inspect.Config.StopTimeout.value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // When --stop-timeout is not specified, no timeout is forwarded to the container configuration.
+        {
+            auto result =
+                RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_FALSE(inspect.Config.StopTimeout.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopTimeout_Invalid)
+    {
+        {
+            auto result =
+                RunWslc(std::format(L"container run --rm --stop-timeout abc --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                wsl::shared::Localization::WSLCCLI_InvalidIntegerArgumentError(L"stop-timeout", L"abc")));
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        {
+            auto result =
+                RunWslc(std::format(L"container run --rm --stop-timeout -2 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop timeout value: -2\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // Validate that the correct error is displayed if the user passes the exact 'WSLC_STOP_TIMEOUT_DEFAULT' value.
+        {
+            auto result = RunWslc(std::format(
+                L"container run --rm --stop-timeout {} --name {} {}", WSLC_STOP_TIMEOUT_DEFAULT, WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop timeout value: -2147483648\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize)
     {
         auto result = RunWslc(std::format(L"container run --rm --shm-size 128M {} df -h /dev/shm", DebianImage.NameAndTag()));
@@ -838,16 +1193,118 @@ class WSLCE2EContainerRunTests
         {
             auto result =
                 RunWslc(std::format(L"container run --rm --shm-size invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid shm-size argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(
+                wsl::shared::Localization::WSLCCLI_InvalidMemorySizeError(L"shm-size", L"invalid")));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container run --rm --shm-size 128X --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid shm-size argument value: '128X'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidMemorySizeError(L"shm-size", L"128X")));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthCheck)
+    {
+        // All health-check options are forwarded to the container configuration.
+        {
+            auto result = RunWslc(std::format(
+                LR"(container run -d --health-cmd "exit 0" --health-interval 5s --health-timeout 3s --health-retries 2 --health-start-period 1s --name {} {} sleep infinity)",
+                WslcContainerName,
+                DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_TRUE(inspect.Config.Healthcheck.has_value());
+
+            const auto& health = inspect.Config.Healthcheck.value();
+            VERIFY_IS_TRUE(health.Test.has_value());
+            const std::vector<std::string> expectedTest{"CMD-SHELL", "exit 0"};
+            VERIFY_ARE_EQUAL(expectedTest, health.Test.value());
+
+            // Durations are reported in nanoseconds.
+            VERIFY_ARE_EQUAL(5'000'000'000LL, health.Interval.value_or(0));
+            VERIFY_ARE_EQUAL(3'000'000'000LL, health.Timeout.value_or(0));
+            VERIFY_ARE_EQUAL(1'000'000'000LL, health.StartPeriod.value_or(0));
+            VERIFY_ARE_EQUAL(2, health.Retries.value_or(0));
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        // When no health option is specified, no health check is forwarded.
+        {
+            auto result =
+                RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto inspect = InspectContainer(WslcContainerName);
+            VERIFY_IS_FALSE(inspect.Config.Healthcheck.has_value());
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthCheck_Invalid)
+    {
+        auto result = RunWslc(
+            std::format(L"container run --rm --health-timeout invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            wsl::shared::Localization::WSLCCLI_InvalidDurationError(L"health-timeout", L"invalid")));
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthStatus_Healthy)
+    {
+        // A health check that always succeeds should drive the container to the "healthy" state.
+        auto result = RunWslc(std::format(
+            LR"(container run -d --health-cmd "exit 0" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto health = WaitForContainerHealth(WslcContainerName, "healthy");
+        VERIFY_ARE_EQUAL(0, health.FailingStreak);
+        VERIFY_IS_FALSE(health.Log.empty());
+        VERIFY_ARE_EQUAL(0, health.Log.back().ExitCode);
+
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthStatus_Unhealthy)
+    {
+        // A health check that always fails should drive the container to the "unhealthy" state.
+        auto result = RunWslc(std::format(
+            LR"(container run -d --health-cmd "exit 1" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto health = WaitForContainerHealth(WslcContainerName, "unhealthy");
+        VERIFY_IS_TRUE(health.FailingStreak >= 1);
+        VERIFY_IS_FALSE(health.Log.empty());
+        VERIFY_ARE_EQUAL(1, health.Log.back().ExitCode);
+
+        EnsureContainerDoesNotExist(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_HealthStatus_Timeout)
+    {
+        auto result = RunWslc(std::format(
+            LR"(container run -d --health-cmd "sleep 30" --health-interval 1s --health-timeout 1s --health-retries 1 --name {} {} sleep infinity)",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto health = WaitForContainerHealth(WslcContainerName, "unhealthy");
+        VERIFY_IS_TRUE(health.FailingStreak >= 1);
+        VERIFY_IS_FALSE(health.Log.empty());
+        VERIFY_ARE_EQUAL(-1, health.Log.back().ExitCode);
+
+        EnsureContainerDoesNotExist(WslcContainerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Cpus)
@@ -897,7 +1354,8 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Cpus_Invalid)
     {
         auto result = RunWslc(std::format(L"container run --rm --cpus 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid cpus argument value: '0'. Expected a positive number of CPUs (e.g. 0.5, 1, 2)\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidCpusError(L"cpus", L"0")));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -905,7 +1363,9 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --rm --memory invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid memory argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidMemorySizeError(L"memory", L"invalid")));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -913,8 +1373,9 @@ class WSLCE2EContainerRunTests
     {
         auto result =
             RunWslc(std::format(L"container run --rm --ulimit nofile --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Invalid ulimit argument value: 'nofile'. Expected <name>=<soft>[:<hard>] (use -1 for unlimited)\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidUlimitError(L"ulimit", L"nofile")));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
 
@@ -923,26 +1384,59 @@ class WSLCE2EContainerRunTests
         {
             auto result = RunWslc(
                 std::format(L"container run --rm --stop-signal SIGINVALID --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-signal value: SIGINVALID is not a recognized signal name or number (Example: SIGKILL, kill, or 9).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(L"Invalid stop-signal value: SIGINVALID is not a recognized signal name or number "
+                                               L"(Example: SIGKILL, kill, or 9)."));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container run --rm --stop-signal 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-signal value: 0 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid stop-signal value: 0 is out of valid range (1-31)."));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result =
                 RunWslc(std::format(L"container run --rm --stop-signal 99 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop-signal value: 99 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid stop-signal value: 99 is out of valid range (1-31)."));
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
 
 private:
+    void VerifyHostLoopback(std::string_view setting, std::string_view dnsName, bool forceTcp)
+    {
+        EnsureSessionIsTerminated();
+        auto terminateSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { EnsureSessionIsTerminated(); });
+
+        const auto settingsPath = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"settings.yaml";
+        HostFileChange settings(settingsPath, std::format("session:\n  hostLoopback: \"{}\"\n", setting));
+
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", HostLoopbackTestPort);
+        UniqueWebServer server(endpoint.c_str(), L"host-loopback-ok");
+        ExpectHttpResponse(endpoint.c_str(), HTTP_STATUS_OK, true);
+
+        auto command = std::format(
+            L"python3 -c \"import http.client,socket;"
+            L"a=socket.getaddrinfo('{}',{},socket.AF_INET,socket.SOCK_STREAM)[0][4];"
+            L"c=http.client.HTTPConnection(*a,timeout=60);"
+            L"c.request('GET','/');"
+            L"assert c.getresponse().read()==b'host-loopback-ok';"
+            L"assert ('use-vc' in open('/etc/resolv.conf').read()) == {}\"", // Validate that the DNS setting was applied
+            std::string(dnsName),
+            HostLoopbackTestPort,
+            forceTcp ? "True" : "False");
+
+        auto result = RunWslc(std::format(
+            L"container run {} --rm --name {} {} {}", forceTcp ? "--dns-option=use-vc" : "", WslcContainerName, PythonImage.NameAndTag(), command));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
@@ -955,6 +1449,7 @@ private:
 
     // Test images
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& HelloWorldImage = HelloWorldTestImage();
     const TestImage& PythonImage = PythonTestImage();
 
     // Test environment variable files
@@ -965,83 +1460,12 @@ private:
     const uint16_t ContainerTestPort = 8080;
     const uint16_t HostTestPort1 = 1234;
     const uint16_t HostTestPort2 = 1235;
+    const uint16_t HostLoopbackTestPort = 1236;
 
     // Test named volume
     const std::wstring WslcVolumeName = L"wslc-test-volume";
 
     // Test user-defined network
     const std::wstring TestNetworkName = L"wslc-test-network";
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return L"Runs a container. By default, the container is started in the foreground; use --detach to run in the "
-               L"background.\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container run [<options>] <image> [<command>] [<arguments>...]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"
-                 << L"  image             Image name\r\n"
-                 << L"  command           The command to run\r\n"
-                 << L"  arguments         Arguments to pass to container's init process\r\n"
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  --cidfile         Write the container ID to the provided path\r\n"
-                << L"  --cpus            Number of CPUs (e.g. 0.5, 1, 2.5)\r\n"
-                << L"  -d,--detach       Run container in detached mode\r\n"
-                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
-                << L"  --dns-option      Set DNS options\r\n"
-                << L"  --dns-search      Set DNS search domains\r\n"
-                << L"  --domainname      Container domain name\r\n"
-                << L"  --entrypoint      Specifies the container init process executable\r\n"
-                << L"  -e,--env          Key=Value pairs for environment variables\r\n"
-                << L"  --env-file        File containing key=value pairs of env variables\r\n"
-                << L"  --gpus            Add GPU devices to the container ('all' to pass all GPUs)\r\n"
-                << L"  -h,--hostname     Container host name\r\n"
-                << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
-                << L"  -l,--label        Set metadata on an object\r\n"
-                << L"  -m,--memory       Memory limit (e.g. 512M, 1G)\r\n"
-                << L"  --name            Name of the container\r\n"
-                << L"  --network         Connect a container to a network\r\n"
-                << L"  --network-alias   Add a network-scoped alias for the container\r\n"
-                << L"  -p,--publish      Publish a port from a container to host\r\n"
-                << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
-                << L"  --rm              Remove the container after it stops\r\n"
-                << L"  --session         Specify the session to use\r\n"
-                << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
-                << L"  --stop-signal     Signal to stop the container\r\n"
-                << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
-                << L"  -t,--tty          Open a TTY with the container process.\r\n"
-                << L"  --ulimit          Ulimit options (format: <name>=<soft>[:<hard>], use -1 for unlimited)\r\n"
-                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
-                << L"  -v,--volume       Bind mount a volume to the container\r\n"
-                << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -?,--help         Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

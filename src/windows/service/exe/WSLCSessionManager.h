@@ -32,6 +32,7 @@ Abstract:
 
 #pragma once
 #include "wslc.h"
+#include "WSLCCompat.h"
 #include "COMImplClass.h"
 #include "wslutil.h"
 #include <atomic>
@@ -107,7 +108,7 @@ private:
     // Iterates over all sessions, cleaning up released sessions.
     // The routine receives a SessionEntry& and can return an optional<T> to stop iteration.
     template <typename T>
-    inline auto ForEachSession(const auto& Routine)
+    inline auto ForEachSession(const auto& Routine, bool DeferSessionCleanup = false)
     {
         std::lock_guard lock(m_wslcSessionsLock);
 
@@ -128,6 +129,13 @@ private:
             wil::com_ptr<IWSLCSession> lockedSession;
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
+                // FindSession is used by plugin callbacks into the API. Defer cleanup in that path so
+                // OnWslcSessionStopping is not nested inside another plugin notification.
+                if (DeferSessionCleanup)
+                {
+                    return false; // Keep in tracking; clean up on a later pass.
+                }
+
                 // Session is gone: notify plugins (if not already), then drop persistent reference if any.
                 NotifySessionStoppingLockHeld(entry);
 
@@ -187,7 +195,7 @@ private:
 } // namespace wsl::windows::service::wslc
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLCSessionManager
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IFastRundown>,
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCSessionManager, IWSLCCompatSessionManager, IFastRundown, ISupportErrorInfo>,
       public wsl::windows::service::wslc::COMImplClass<wsl::windows::service::wslc::WSLCSessionManagerImpl>
 {
 public:
@@ -197,11 +205,19 @@ public:
     WSLCSessionManager(wsl::windows::service::wslc::WSLCSessionManagerImpl* Impl);
 
     IFACEMETHOD(GetVersion)(_Out_ WSLCVersion* Version) override;
-    IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
     IFACEMETHOD(CreateSession)(
         const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
     IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;
+
+    // ISupportErrorInfo: enables IErrorInfo marshaling across COM boundaries.
+    IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
+
+    // IWSLCCompatSessionManager.
+    IFACEMETHOD(GetVersion)(_Out_ WSLCCompatVersion* Version) override;
+    IFACEMETHOD(IsClientVersionSupported)(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported) override;
+    IFACEMETHOD(CreateSession)(
+        const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session) override;
 };

@@ -29,7 +29,7 @@ std::vector<Argument> ImageImportCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ImportFile, true),
         Argument::Create(ArgType::ImageId),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::NoTrunc),
     };
 }
 
@@ -45,8 +45,8 @@ std::wstring ImageImportCommand::LongDescription() const
 
 void ImageImportCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << ImportImage;
 }
 } // namespace wsl::windows::wslc

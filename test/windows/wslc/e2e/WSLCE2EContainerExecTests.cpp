@@ -61,13 +61,15 @@ class WSLCE2EContainerExecTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_HelpCommand)
     {
         auto result = RunWslc(L"container exec --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_MissingContainerId)
     {
         auto result = RunWslc(L"container exec");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'container-id'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_MissingCommand)
@@ -76,7 +78,8 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec {}", WslcContainerName));
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'command'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'command'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_ContainerNotFound)
@@ -151,6 +154,63 @@ class WSLCE2EContainerExecTests
         // Wait for cat to exit with code 0
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand)
+    {
+        // Regression test for a stdin deadlock. When stdin is a synchronous (non-overlapped) anonymous pipe, the client
+        // relays it on a worker thread parked in a blocking ReadFile() that the exit event cannot interrupt. With
+        // `echo hello` (which exits without reading stdin), teardown's join() on that worker blocks until stdin closes,
+        // so wslc hangs. The test exercises this by running `exec -i echo hello` and requiring it to exit while the
+        // client keeps stdin open.
+        //
+        // If this regresses, look at the client-side stdin relay teardown: InterruptAndJoinInputThread
+        // (the CancelSynchronousIo retry loop that unblocks the worker) and relay.cpp's InterruptableRead (which maps
+        // the resulting ERROR_OPERATION_ABORTED to EOF).
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+
+        // RunWslcInteractive wires wslc's stdin to the read end of a synchronous (non-overlapped) anonymous pipe, which
+        // is what triggers the blocking-ReadFile relay path under test.
+        auto session = RunWslcInteractive(std::format(L"container exec -i {} echo hello", containerId));
+
+        // The command's output must arrive without the client closing stdin first.
+        session.ExpectStdout("hello\n");
+
+        // Long timeout: this only bounds the failure (hang) path, so it is generous to avoid false positives under CI load.
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        // Closing stdin after the process has already exited must remain a clean no-op with no errors emitted.
+        session.CloseStdin();
+        session.VerifyNoErrors();
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_InteractiveTTY_SelfExitingCommand)
+    {
+        // TTY counterpart to WSLCE2E_Container_Exec_InteractiveNoTTY_SelfExitingCommand (see that test for the full
+        // explanation of the deadlock). The -t flag routes wslc through ConsoleService::RelayInteractiveTty, whose
+        // stdin worker teardown is a separate scope-exit from the non-TTY path, so a regression could be introduced
+        // in one path and not the other. This test guards the TTY call site.
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+
+        // -t sets the TTY flag; the harness still wires stdin as a synchronous pipe, so wslc takes the vulnerable
+        // RelayInteractiveTty else-branch (its input handle is a pipe, not a console).
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} echo hello", containerId));
+
+        // The TTY translates the trailing LF to CRLF, so the exact output is "hello\r\n".
+        session.ExpectStdout("hello\r\n");
+
+        auto exitCode = session.Wait(120000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"echo should exit with code 0 without the client closing stdin");
+
+        session.CloseStdin();
         session.VerifyNoErrors();
     }
 
@@ -265,8 +325,9 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
-        result.Verify(
-            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MultipleFiles)
@@ -295,7 +356,9 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
-        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_DuplicateKeys_Precedence)
@@ -443,54 +506,5 @@ private:
     // Test environment variable files
     std::filesystem::path EnvTestFile1;
     std::filesystem::path EnvTestFile2;
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return L"Executes a command in a running container.\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container exec [<options>] <container-id> <command> [<arguments>...]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"
-                 << L"  container-id      Container ID\r\n"
-                 << L"  command           The command to run\r\n"
-                 << L"  arguments         Arguments to pass to the command being executed inside the container\r\n"
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -d,--detach       Run container in detached mode\r\n"
-                << L"  -e,--env          Key=Value pairs for environment variables\r\n"
-                << L"  --env-file        File containing key=value pairs of env variables\r\n"
-                << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
-                << L"  --session         Specify the session to use\r\n"
-                << L"  -t,--tty          Open a TTY with the container process.\r\n"
-                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
-                << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -?,--help         Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

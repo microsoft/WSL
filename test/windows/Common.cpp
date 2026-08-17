@@ -17,6 +17,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "LxssDynamicFunction.h"
+#include "WslCoreNetworkEndpointSettings.h"
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
@@ -65,7 +66,7 @@ static std::wstring g_originalDefaultDistro;
 std::wstring g_dumpFolder;
 std::optional<std::wstring> g_dumpToolPath;
 static bool g_enableWerReport = false;
-static std::wstring g_pipelineBuildId;
+std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f
@@ -1459,9 +1460,9 @@ std::wstring LxssWriteWslConfig(const std::wstring& Content)
 }
 
 // writes distro specific settings /etc/wsl.conf
-std::string LxssWriteWslDistroConfig(const std::string& Content)
+std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName)
 {
-    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", LXSS_DISTRO_NAME_TEST);
+    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", DistributionName);
 
     std::ifstream distroConfigRead(path);
     auto previousContent = std::string{std::istreambuf_iterator<char>(distroConfigRead), {}};
@@ -1644,8 +1645,20 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"[wsl2]\n";
     }
 
+    if (Default.virtioFsAggregateShares.has_value())
+    {
+        newConfig += L"\n[experimental]\n";
+        newConfig += boolOptionToString(L"virtioFsAggregateShares", Default.virtioFsAggregateShares, true);
+        newConfig += L"[wsl2]\n";
+    }
+
     // TODO: Remove once SetVersion() truncated archive error is root caused.
     newConfig += L"\n[experimental]\nSetVersionDebug=true\n[wsl2]\n";
+
+    if (Default.isolateDistroCgroup.has_value())
+    {
+        newConfig += boolOptionToString(L"isolateDistroCgroup", Default.isolateDistroCgroup, true);
+    }
 
     return newConfig;
 }
@@ -2517,17 +2530,45 @@ void Trim(std::wstring& string)
     std::erase_if(string, [](auto c) { return !isalnum(c); });
 }
 
-ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) : m_name(Name)
+static std::optional<std::wstring> CaptureEnvValue(const std::wstring& Name)
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(Name.c_str(), Value.c_str()));
+    std::wstring value;
+    HRESULT hr = wil::GetEnvironmentVariableW(Name.c_str(), value);
+    if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
+    {
+        return std::nullopt;
+    }
+    THROW_IF_FAILED(hr);
+    return value;
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name) : m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), nullptr));
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) :
+    m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), Value.c_str()));
 }
 
 ScopedEnvVariable::~ScopedEnvVariable()
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(m_name.c_str(), nullptr));
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), m_originalValue.has_value() ? m_originalValue->c_str() : nullptr));
 }
 
-UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content)
+void ScopedEnvVariable::Set(const std::wstring& Value)
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), Value.c_str()));
+}
+
+void ScopedEnvVariable::Clear()
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
+}
+
+UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content, UINT StatusCode)
 {
     auto cmd = std::format(
         LR"(Powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
@@ -2538,12 +2579,13 @@ $server.Start()
 while ($true)
 {{
     $context = $server.GetContext()
-    $context.Response.StatusCode
+    $context.Response.StatusCode = {}
     $content = [Text.Encoding]::UTF8.GetBytes('{}')
     $context.Response.OutputStream.Write($content , 0, $content.length)
     $context.Response.close()
 }}")",
         Endpoint,
+        StatusCode,
         Content);
 
     m_process = LxsstuStartProcess(cmd.data());
@@ -2957,7 +2999,7 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart, nullptr));
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), fileSize.QuadPart, nullptr, nullptr));
 }
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
@@ -3011,6 +3053,17 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
     {
         sendRequest();
     }
+}
+
+std::optional<std::wstring> GetHostAdapterIpv4()
+{
+    auto endpoint = wsl::core::networking::GetHostEndpointSettings();
+    if (!endpoint || endpoint->PreferredIpAddress.AddressString.empty())
+    {
+        return {};
+    }
+
+    return endpoint->PreferredIpAddress.AddressString;
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)

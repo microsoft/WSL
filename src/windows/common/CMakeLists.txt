@@ -1,4 +1,5 @@
 set(SOURCES
+    APICompat.cpp
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
@@ -38,7 +39,7 @@ set(SOURCES
     VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
-    VirtioNetworking.cpp
+    ConsommeNetworking.cpp
     WSLCProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
@@ -58,6 +59,7 @@ set(SOURCES
 
 set(HEADERS
     ../../../generated/Localization.h
+    APICompat.h
     ../inc/docker_schema.h
     ../inc/wslc_schema.h
     ../inc/lxssbusclient.h
@@ -124,7 +126,7 @@ set(HEADERS
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
-    VirtioNetworking.h
+    ConsommeNetworking.h
     WSLCProcessLauncher.h
     WslClient.h
     WslCoreConfig.h
@@ -148,7 +150,7 @@ set(HEADERS
 # This is factored into a function so that we can have multiple variants with different options.
 function(add_common_library TARGET_NAME)
     add_library(${TARGET_NAME} STATIC ${SOURCES} ${HEADERS})
-    add_dependencies(${TARGET_NAME} wslserviceidl localization wslservicemc wslinstalleridl yaml-cpp)
+    add_dependencies(${TARGET_NAME} wslserviceidl wsldevicehostidl localization wslservicemc wslinstalleridl yaml-cpp)
     target_precompile_headers(${TARGET_NAME} PRIVATE precomp.h)
     set_target_properties(${TARGET_NAME} PROPERTIES FOLDER windows)
     target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})

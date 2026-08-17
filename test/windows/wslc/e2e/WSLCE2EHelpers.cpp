@@ -26,7 +26,10 @@ extern std::wstring g_testDataPath;
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
-using namespace wsl::windows::common;
+
+namespace wslc_schema = wsl::windows::common::wslc_schema;
+using wsl::windows::common::RunningWSLCContainer;
+using wsl::windows::common::WSLCContainerLauncher;
 
 namespace {
     // Lazily compute the session storage base path.
@@ -115,6 +118,12 @@ const TestImage& DebianTestImage()
     return image;
 }
 
+const TestImage& HelloWorldTestImage()
+{
+    static const TestImage image{L"hello-world", L"latest", std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar"};
+    return image;
+}
+
 const TestImage& PythonTestImage()
 {
     static const TestImage image{L"python", L"3.12-alpine", std::filesystem::path{g_testDataPath} / L"python-3_12-alpine.tar"};
@@ -145,7 +154,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"container list --no-trunc --all --session {}", sessionName);
+        command = std::format(L"--session \"{}\" container list --no-trunc --all", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -201,7 +210,7 @@ void VerifyImageIsListed(const TestImage& image)
 {
     auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
     for (const auto& img : images)
     {
         if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
@@ -218,7 +227,7 @@ void VerifyVolumeIsListed(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -234,7 +243,7 @@ void VerifyVolumeIsNotListed(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -248,7 +257,7 @@ void VerifyNetworkIsListed(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
@@ -264,7 +273,7 @@ void VerifyNetworkIsNotListed(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
@@ -286,6 +295,34 @@ wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName
     auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
+}
+
+wslc_schema::Health WaitForContainerHealth(const std::wstring& containerName, const std::string_view& expectedStatus, std::chrono::milliseconds timeout)
+{
+    try
+    {
+        return wsl::shared::retry::RetryWithTimeout<wslc_schema::Health>(
+            [&]() {
+                const auto inspect = InspectContainer(containerName);
+                THROW_HR_IF(E_FAIL, !inspect.State.Health.has_value());
+                THROW_HR_IF(E_FAIL, inspect.State.Health->Status != expectedStatus);
+                return inspect.State.Health.value();
+            },
+            std::chrono::seconds(1),
+            timeout);
+    }
+    catch (...)
+    {
+        const auto inspect = InspectContainer(containerName);
+        const std::string actual = inspect.State.Health.has_value() ? inspect.State.Health->Status : "<none>";
+        VERIFY_FAIL(std::format(
+                        L"Container '{}' did not reach health status '{}' (last status: '{}')",
+                        containerName,
+                        wsl::shared::string::MultiByteToWide(std::string(expectedStatus)),
+                        wsl::shared::string::MultiByteToWide(actual))
+                        .c_str());
+        throw;
+    }
 }
 
 wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
@@ -316,17 +353,6 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
         return;
     }
 
-    if (it->State == WSLCContainerState::WslcContainerStateRunning)
-    {
-        auto result = RunWslc(std::format(L"container kill {}", containerName));
-        // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
-        if (result.ExitCode != 0 &&
-            (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
-        {
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-        }
-    }
-
     auto result = RunWslc(std::format(L"container remove --force {}", containerName));
     // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already removed
     if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
@@ -339,7 +365,7 @@ std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers(
 {
     auto result = RunWslc(L"container list --all --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(result.Stdout.value().c_str());
+    return ParseNdjsonOutputAs<wsl::windows::wslc::models::ContainerInformation>(result);
 }
 
 void EnsureImageContainersAreDeleted(const TestImage& image)
@@ -351,20 +377,21 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
             auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
         }
     }
 }
 
 void EnsureImageIsDeleted(const TestImage& image)
 {
-    auto result = RunWslc(L"image list -q");
+    auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    for (const auto& img : images)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
         {
             EnsureImageContainersAreDeleted(image);
             auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
@@ -374,21 +401,64 @@ void EnsureImageIsDeleted(const TestImage& image)
     }
 }
 
+void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    const auto prefix = wsl::shared::string::WideToMultiByte(repositoryPrefix);
+    for (const auto& image : images)
+    {
+        if (image.Repository && image.Tag && image.Repository->starts_with(prefix))
+        {
+            // No container cleanup here: the images this prunes are only ever built and inspected, never used to
+            // create containers, so image delete --force is sufficient. If a future test containerizes a built
+            // image, remove its container in that test's cleanup rather than broadening this prefix-based safety net.
+            const auto nameAndTag = wsl::shared::string::MultiByteToWide(std::format("{}:{}", *image.Repository, *image.Tag));
+            RunWslc(std::format(L"image delete --force {}", nameAndTag)).Verify({.Stderr = L"", .ExitCode = 0});
+        }
+    }
+}
+
+void EnsureNoUntaggedImages()
+{
+    auto result = RunWslc(L"image list --format json --filter dangling=true");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+
+    for (const auto& image : images)
+    {
+        const auto id = wsl::shared::string::MultiByteToWide(GetHashId(image.Id, true));
+        auto deleteResult = RunWslc(std::format(L"image delete --force {}", id));
+
+        // Tolerate WSLC_E_IMAGE_NOT_FOUND - an untagged image may already be gone if it was a
+        // parent/child of another untagged image deleted earlier in this loop.
+        if (deleteResult.ExitCode != 0 &&
+            (!deleteResult.Stderr.has_value() || deleteResult.Stderr.value().find(L"WSLC_E_IMAGE_NOT_FOUND") == std::wstring::npos))
+        {
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+        }
+    }
+}
+
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    std::wstring listCommand = L"image list -q";
+    std::wstring listCommand = L"image list --format json";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
+        listCommand = std::format(L"--session \"{}\" image list --format json", sessionName);
     }
 
     auto result = RunWslc(listCommand);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    for (const auto& img : images)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
         {
             return;
         }
@@ -398,7 +468,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
     if (!sessionName.empty())
     {
-        loadCommand = std::format(L"image load --input \"{}\" --session \"{}\"", image.Path.wstring(), sessionName);
+        loadCommand = std::format(L"--session \"{}\" image load --input \"{}\"", sessionName, image.Path.wstring());
     }
 
     auto loadResult = RunWslc(loadCommand);
@@ -429,7 +499,7 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         // Check if the line ends with the target session name
         if (line.size() >= targetSession.size() && line.compare(line.size() - targetSession.size(), targetSession.size(), targetSession) == 0)
         {
-            auto result = RunWslc(std::format(L"system session terminate \"{}\"", targetSession));
+            auto result = RunWslc(std::format(L"--session \"{}\" system session terminate", targetSession));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }
@@ -440,7 +510,7 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = ParseNdjsonOutputAs<WSLCVolumeInformation>(result);
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -456,7 +526,7 @@ void EnsureNetworkDoesNotExist(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
@@ -583,36 +653,92 @@ void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std:
     VERIFY_IS_TRUE(file.good());
 }
 
+void WriteTestFileContent(const std::filesystem::path& filePath, const std::string& content)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    THROW_HR_IF_MSG(E_FAIL, !file.is_open(), "Failed to open %ls for writing", filePath.c_str());
+    file << content;
+    THROW_HR_IF_MSG(E_FAIL, !file.good(), "Failed to write to %ls", filePath.c_str());
+}
+
 std::wstring GetPythonHttpServerScript(uint16_t port)
 {
-    return std::format(L"python3 -m http.server {}", port);
+    return std::format(L"python3 -u -m http.server {}", port);
+}
+
+std::wstring GetPythonUdpEchoServerScript(uint16_t port)
+{
+    // Inline Python UDP echo server: echoes each received datagram back uppercased, forever.
+    return std::format(
+        L"python3 -c \"import socket;"
+        L"s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);"
+        L"s.bind(('0.0.0.0',{}));"
+        L"[s.sendto(d.upper(),a) for d,a in iter(lambda:s.recvfrom(1024),0)]\"",
+        port);
+}
+
+std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, const std::string& expectedReply, int family)
+{
+    SOCKADDR_INET addr{};
+    addr.si_family = static_cast<ADDRESS_FAMILY>(family);
+    INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&addr));
+    SS_PORT(&addr) = htons(hostPort);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    do
+    {
+        wil::unique_socket sock{::socket(family, SOCK_DGRAM, IPPROTO_UDP)};
+        THROW_LAST_ERROR_IF(!sock);
+
+        DWORD timeout = 1000;
+        THROW_LAST_ERROR_IF(setsockopt(sock.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+
+        if (sendto(sock.get(), payload.data(), static_cast<int>(payload.size()), 0, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR)
+        {
+            char buf[1024];
+            const int received = recvfrom(sock.get(), buf, sizeof(buf), 0, nullptr, nullptr);
+            if (received != SOCKET_ERROR && received > 0 && std::string(buf, received) == expectedReply)
+            {
+                return std::string(buf, received);
+            }
+        }
+    } while (std::chrono::steady_clock::now() < deadline);
+
+    VERIFY_FAIL(L"Timed out waiting for expected UDP echo reply from container");
+    return {};
 }
 
 namespace {
 
     void WaitForTtySize(const WSLCInteractiveSession& session, SHORT columns, SHORT rows)
     {
-        try
-        {
-            wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() {
-                    const std::string data = session.GetStdoutData();
-                    THROW_HR_IF(E_ABORT, data.find(std::format("{} {}\r\n", rows, columns)) == std::string::npos);
-                },
-                std::chrono::milliseconds(200),
-                std::chrono::seconds(60));
-        }
-        catch (...)
-        {
-            const std::string data = session.GetStdoutData();
-            VERIFY_FAIL(std::format(
-                            L"Timed out waiting for tty resize. Captured pseudoconsole output: \"{}\"",
-                            wsl::shared::string::MultiByteToWide(EscapeString(data)))
-                            .c_str());
-        }
+        WaitForPseudoConsoleOutput(session, std::format("{} {}\r\n", rows, columns));
     }
 
 } // namespace
+
+void WaitForPseudoConsoleOutput(const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout)
+{
+    try
+    {
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const std::string data = session.GetStdoutData();
+                THROW_HR_IF(E_ABORT, data.find(expected) == std::string::npos);
+            },
+            std::chrono::milliseconds(200),
+            timeout);
+    }
+    catch (...)
+    {
+        const std::string data = session.GetStdoutData();
+        VERIFY_FAIL(std::format(
+                        L"Timed out waiting for \"{}\". Captured pseudoconsole output: \"{}\"",
+                        wsl::shared::string::MultiByteToWide(EscapeString(expected)),
+                        wsl::shared::string::MultiByteToWide(EscapeString(data)))
+                        .c_str());
+    }
+}
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows)
 {

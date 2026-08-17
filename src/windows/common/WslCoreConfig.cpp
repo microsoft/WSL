@@ -110,6 +110,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::InstanceIdleTimeout, InstanceIdleTimeout),
         ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &LoadKernelModulesPresence),
         ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &LoadKernelModulesPresence),
+        ConfigKey(ConfigSetting::IsolateDistroCgroup, IsolateDistroCgroup),
 
         // Features that were previously experimental (the old header is maintained for compatibility).
         ConfigKey({ConfigSetting::NetworkingMode, ConfigSetting::Experimental::NetworkingMode}, wsl::core::NetworkingModes, NetworkingMode, &NetworkingModePresence),
@@ -126,7 +127,8 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
-        ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes))};
+        ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
+        ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares)};
 
     wil::unique_file ConfigFile;
     if (ConfigFilePath != nullptr)
@@ -361,7 +363,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         case wsl::core::NetworkingMode::None:
         case wsl::core::NetworkingMode::Nat:
         case wsl::core::NetworkingMode::Mirrored:
-        case wsl::core::NetworkingMode::VirtioProxy:
+        case wsl::core::NetworkingMode::Consomme:
             defaultNetworkingMode = static_cast<wsl::core::NetworkingMode>(setting.value());
             break;
 
@@ -442,10 +444,10 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtioFs, false);
         VALIDATE_CONFIG_OPTION(!EnableVirtio, SwiotlbSizeBytes, 0);
 
-        if (NetworkingMode == NetworkingMode::VirtioProxy)
+        if (NetworkingMode == NetworkingMode::Consomme)
         {
-            NetworkingMode = (defaultNetworkingMode == NetworkingMode::VirtioProxy) ? NetworkingMode::None : NetworkingMode::Nat;
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageVirtioProxyRequiresVirtio(ToString(NetworkingMode)));
+            NetworkingMode = (defaultNetworkingMode == NetworkingMode::Consomme) ? NetworkingMode::None : NetworkingMode::Nat;
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageConsommeRequiresVirtio(ToString(NetworkingMode)));
         }
     }
 
@@ -457,15 +459,15 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 
     // Compute a default swiotlb config only when a virtio device that requires bounce buffers is present.
     // N.B. Must run after policy overrides so networking/fs modes reflect final values.
-    if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::VirtioProxy)))
+    if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
     {
         SwiotlbSizeBytes = wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(MemorySizeBytes);
     }
 
-    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy)
+    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::Consomme)
     {
         VALIDATE_CONFIG_OPTION(
-            (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy),
+            (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::Consomme),
             EnableDnsTunneling,
             false);
     }
@@ -483,7 +485,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     }
 
     // Load NAT configuration from the registry.
-    // N.B. This must be done after all networking mode adjustments (e.g. VirtioProxy -> NAT fallback).
+    // N.B. This must be done after all networking mode adjustments (e.g. Consomme -> NAT fallback).
     if (NetworkingMode == wsl::core::NetworkingMode::Nat)
     {
         try

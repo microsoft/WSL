@@ -311,6 +311,8 @@ namespace Format {
     } // namespace Bg
 
     ConstructedSequence Hyperlink(const std::wstring& text, const std::wstring& ref);
+    ConstructedSequence LinkOpen(const std::wstring& url);
+    extern const Sequence LinkClose;
 } // namespace Format
 
 // Line and screen erasure sequences.

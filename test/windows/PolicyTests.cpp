@@ -261,7 +261,7 @@ class PolicyTest
 
     WSL2_TEST_METHOD(CustomNetworkingMode)
     {
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
         {
             auto revert = SetPolicy(c_allowCustomNetworkingModeUserSetting, 1);
@@ -284,8 +284,8 @@ class PolicyTest
             ValidateWarnings(L"");
 
             // Validate that no warnings are shown if the default networking mode is set to the same value as .wslconfig.
-            auto revertDefault = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::VirtioProxy));
-            config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+            auto revertDefault = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::Consomme));
+            config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
             ValidateWarnings(L"");
         }
     }
@@ -414,10 +414,10 @@ class PolicyTest
         }
 
         {
-            auto revert = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::VirtioProxy));
+            auto revert = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::Consomme));
             WslShutdown();
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'virtioproxy'"), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'consomme'"), 0u);
         }
     }
 
@@ -474,49 +474,109 @@ class PolicyTest
         auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
 
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        const std::wstring combined = stdoutText + stderrText;
-        if (combined.find(L"docker.io") == std::wstring::npos || combined.find(L"blocked by the computer policy") == std::wstring::npos)
+        VERIFY_ARE_EQUAL(L"", stdoutText);
+
+        const auto expected = wsl::shared::Localization::MessageRegistryBlockedByPolicy(L"docker.io") +
+                              L"\r\nError code: WSLC_E_REGISTRY_BLOCKED_BY_POLICY\r\n";
+        VERIFY_ARE_EQUAL(expected, stderrText);
+    }
+
+    // Two variants: BuildKit echoes the caller's Dockerfile spelling in the "failed to solve" prefix.
+    static constexpr auto c_denialPatternExplicitAlpine =
+        "*failed to solve: docker.io/library/alpine:latest: could not resolve image due to policy: "
+        "source \"docker-image://docker.io/library/alpine:latest\" denied by policy: source denied by policy*";
+    static constexpr auto c_denialPatternImplicitAlpine =
+        "*failed to solve: alpine:latest: could not resolve image due to policy: "
+        "source \"docker-image://docker.io/library/alpine:latest\" denied by policy: source denied by policy*";
+
+    // Verifies WSLContainerRegistryAllowlist blocks `wslc image build` when the FROM base image
+    // isn't in the allowlist. Matches the `RegistryAllowlistDenies` pull test.
+    WSLC_TEST_METHOD(RegistryAllowlistBlocksImageBuild)
+    {
+        auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
+
+        auto [exitCode, output] = RunImageBuild(L"FROM docker.io/library/alpine:latest\n", L"wsl-policy-build-blocked");
+
+        VERIFY_ARE_NOT_EQUAL(0, exitCode);
+        VerifyPatternMatch(wsl::shared::string::WideToMultiByte(output), c_denialPatternExplicitAlpine);
+    }
+
+    // Positive path: build must proceed when FROM is on the allowlist.
+    WSLC_TEST_METHOD(RegistryAllowlistAllowsImageBuild)
+    {
+        auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
+
+        auto [exitCode, output] =
+            RunImageBuild(L"FROM mcr.microsoft.com/cbl-mariner/base/core:2.0\n", L"wsl-policy-build-allowed");
+
+        if (exitCode != 0)
         {
-            LogError(
-                "Expected blocked-by-policy for docker.io when allowlist is mcr.microsoft.com, got stdout: '%ls' stderr: '%ls'",
-                stdoutText.c_str(),
-                stderrText.c_str());
+            LogError("Expected build against allowlisted registry to succeed, got exit=%d output: '%ls'", exitCode, output.c_str());
             VERIFY_FAIL();
         }
     }
 
-    // Verifies that `wslc image build` is rejected outright when an allowlist is configured,
-    // since the in-VM docker daemon would fetch FROM base images directly and bypass the
-    // per-pull registry gate.
-    WSLC_TEST_METHOD(RegistryAllowlistRejectsImageBuild)
+    // Case regression: allowlist entries stored uppercase must still match lowercased FROM.
+    WSLC_TEST_METHOD(RegistryAllowlistImageBuildIsCaseInsensitive)
+    {
+        auto revert = SetRegistryAllowlist({L"MCR.MICROSOFT.COM"});
+
+        auto [exitCode, output] = RunImageBuild(L"FROM mcr.microsoft.com/cbl-mariner/base/core:2.0\n", L"wsl-policy-build-case");
+
+        if (exitCode != 0)
+        {
+            LogError("Expected uppercase allowlist entry to match lowercase FROM, got: '%ls'", output.c_str());
+            VERIFY_FAIL();
+        }
+    }
+
+    // Multi-stage regression: `COPY --from=<image>` must also be gated, not just top-level FROM.
+    WSLC_TEST_METHOD(RegistryAllowlistBlocksImageBuildCopyFrom)
+    {
+        auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
+        const auto dockerfile =
+            L"FROM mcr.microsoft.com/cbl-mariner/base/core:2.0\n"
+            L"COPY --from=docker.io/library/alpine:latest /etc/os-release /tmp/os-release\n";
+
+        auto [exitCode, output] = RunImageBuild(dockerfile, L"wsl-policy-build-copyfrom");
+
+        VERIFY_ARE_NOT_EQUAL(0, exitCode);
+        VerifyPatternMatch(wsl::shared::string::WideToMultiByte(output), c_denialPatternExplicitAlpine);
+    }
+
+    WSLC_TEST_METHOD(RegistryAllowlistBlocksImageBuildImplicitDockerIo)
     {
         auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
 
-        // Set up a minimal build context with a one-line Dockerfile in TEMP.
-        const auto contextDir = std::filesystem::temp_directory_path() / L"wsl-policy-build-test";
+        auto [exitCode, output] = RunImageBuild(L"FROM alpine:latest\n", L"wsl-policy-build-implicit");
+
+        VERIFY_ARE_NOT_EQUAL(0, exitCode);
+        VerifyPatternMatch(wsl::shared::string::WideToMultiByte(output), c_denialPatternImplicitAlpine);
+    }
+
+    // Runs `wslc image build` with the supplied Dockerfile content and returns the exit code
+    // plus combined stdout/stderr. Extracted to keep the allowlist matrix above readable.
+    static std::tuple<int, std::wstring> RunImageBuild(std::wstring_view dockerfile, std::wstring_view folder)
+    {
+        // Terminate any existing session so ConfigureBuildKitPolicy re-snapshots the registry.
+        {
+            std::wstring terminateCmd = L"\"" + GetWslcExePath() + L"\" system session terminate";
+            LxsstuLaunchCommandAndCaptureOutputWithResult(terminateCmd.data(), nullptr, nullptr);
+        }
+
+        const auto contextDir = std::filesystem::temp_directory_path() / folder;
         std::error_code ec;
         std::filesystem::remove_all(contextDir, ec);
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit([&] { std::filesystem::remove_all(contextDir, ec); });
-
         {
             std::ofstream df(contextDir / L"Dockerfile");
             VERIFY_IS_TRUE(df.is_open());
-            df << "FROM scratch\n";
+            df << wsl::shared::string::WideToMultiByte(std::wstring{dockerfile});
         }
-
         std::wstring cmd = L"\"" + GetWslcExePath() + L"\" image build \"" + contextDir.wstring() + L"\"";
         auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
-
-        VERIFY_ARE_NOT_EQUAL(0, exitCode);
-        const std::wstring combined = stdoutText + stderrText;
-        if (combined.find(L"Building container images is blocked") == std::wstring::npos ||
-            combined.find(L"computer policy") == std::wstring::npos)
-        {
-            LogError(
-                "Expected image-build to be blocked by policy, got stdout: '%ls' stderr: '%ls'", stdoutText.c_str(), stderrText.c_str());
-            VERIFY_FAIL();
-        }
+        return {exitCode, stdoutText + stderrText};
     }
 
     // Pure-function tests for the registry-allowlist policy evaluator. These don't talk to the
@@ -580,6 +640,34 @@ class PolicyTest
         {
             auto revert = SetRegistryAllowlist({L"mcr.microsoft.com"});
             VERIFY_IS_TRUE(HasRegistryAllowlist(policiesKey.get()));
+        }
+    }
+
+    // The (HKEY) overload is exercised transitively via FromPoliciesRoot.
+    TEST_METHOD(ReadRegistryAllowlistSnapshot_Logic)
+    {
+        // No sub-key -> NotConfigured.
+        {
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::NotConfigured);
+            VERIFY_IS_TRUE(snapshot.Hosts.empty());
+        }
+
+        // Sub-key with only empty entries -> NotConfigured (defensive: stray blank GP list
+        // items must not silently deny every registry).
+        {
+            auto revert = SetRegistryAllowlist({L"", L""});
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::NotConfigured);
+            VERIFY_IS_TRUE(snapshot.Hosts.empty());
+        }
+
+        // Sub-key with hosts -> Configured, hosts populated in order.
+        {
+            auto revert = SetRegistryAllowlist({L"mcr.microsoft.com", L"Docker.IO"});
+            const auto snapshot = ReadRegistryAllowlistSnapshotFromPoliciesRoot();
+            VERIFY_IS_TRUE(snapshot.State == RegistryAllowlistState::Configured);
+            VERIFY_ARE_EQUAL(size_t{2}, snapshot.Hosts.size());
         }
     }
 };

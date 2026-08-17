@@ -36,11 +36,11 @@ using namespace wsl::windows::wslc::execution;
 // function below inside the command. In this way all arguments default to "1" use and not required, and
 // this can only be changed in the command's GetArguments function, so the defaults are always clear and
 // consistent. Visibility can also be overridden and is defaulted to "Help".
-Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<int> countLimit, std::optional<std::wstring> desc)
+Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
 {
     switch (type)
     {
-#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, ArgumentKind, Desc) \
+#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, ArgumentKind, ConvertedType, Desc) \
     case ArgType::EnumName: \
         return Argument{ \
             type, \
@@ -49,7 +49,7 @@ Argument Argument::Create(ArgType type, std::optional<bool> required, std::optio
             desc.has_value() ? std::move(desc.value()) : std::wstring(Desc), \
             ArgumentKind, \
             required.value_or(DefaultRequired), \
-            countLimit.value_or(DefaultCountLimit)};
+            limit.value_or(DefaultLimit)};
 
         WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE

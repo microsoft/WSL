@@ -27,8 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkPruneCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Filter, false, NO_LIMIT),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
     };
 }
 
@@ -44,8 +43,8 @@ std::wstring NetworkPruneCommand::LongDescription() const
 
 void NetworkPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PruneNetworks;
 }
 } // namespace wsl::windows::wslc
