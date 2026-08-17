@@ -2522,6 +2522,7 @@ try
 
         auto* e = it->second.get();
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ImageId, dockerContainer.ImageID.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
         e->GetState(&output[index].State);

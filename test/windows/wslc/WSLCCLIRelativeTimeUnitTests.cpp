@@ -1,0 +1,102 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#include "precomp.h"
+#include "windows/Common.h"
+#include "WSLCCLITestHelpers.h"
+
+#include "ContainerService.h"
+
+using namespace wsl::windows::wslc;
+using namespace wsl::windows::wslc::services;
+using namespace WSLCTestHelpers;
+using namespace WEX::Logging;
+using namespace WEX::Common;
+using namespace WEX::TestExecution;
+
+namespace WSLCCLIRelativeTimeUnitTests {
+
+class WSLCCLIRelativeTimeUnitTests
+{
+    WSLC_TEST_CLASS(WSLCCLIRelativeTimeUnitTests)
+
+    TEST_CLASS_SETUP(TestClassSetup)
+    {
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        return true;
+    }
+
+    static std::wstring FormatElapsed(LONGLONG secondsAgo)
+    {
+        return ContainerService::FormatElapsedSeconds(secondsAgo);
+    }
+
+    TEST_METHOD(RelativeTime_ZeroTimestamp_ReturnsEmpty)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{}, ContainerService::FormatRelativeTime(0));
+    }
+
+    TEST_METHOD(RelativeTime_NegativeElapsed_ClampsToLessThanASecond)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"Less than a second ago"}, ContainerService::FormatElapsedSeconds(-600));
+    }
+
+    TEST_METHOD(RelativeTime_Seconds)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"Less than a second ago"}, FormatElapsed(0));
+        VERIFY_ARE_EQUAL(std::wstring{L"1 second ago"}, FormatElapsed(1));
+        VERIFY_ARE_EQUAL(std::wstring{L"2 seconds ago"}, FormatElapsed(2));
+        VERIFY_ARE_EQUAL(std::wstring{L"59 seconds ago"}, FormatElapsed(59));
+    }
+
+    TEST_METHOD(RelativeTime_Minutes)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"About a minute ago"}, FormatElapsed(60));
+        VERIFY_ARE_EQUAL(std::wstring{L"About a minute ago"}, FormatElapsed(119));
+        VERIFY_ARE_EQUAL(std::wstring{L"2 minutes ago"}, FormatElapsed(120));
+        VERIFY_ARE_EQUAL(std::wstring{L"59 minutes ago"}, FormatElapsed(59 * 60));
+    }
+
+    TEST_METHOD(RelativeTime_Hours)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"About an hour ago"}, FormatElapsed(60 * 60));
+        VERIFY_ARE_EQUAL(std::wstring{L"2 hours ago"}, FormatElapsed(2 * 60 * 60));
+        VERIFY_ARE_EQUAL(std::wstring{L"47 hours ago"}, FormatElapsed(47 * 60 * 60));
+    }
+
+    // The hour count is rounded to the nearest hour rather than truncated.
+    TEST_METHOD(RelativeTime_HoursAreRounded)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"About an hour ago"}, FormatElapsed(89 * 60));
+        VERIFY_ARE_EQUAL(std::wstring{L"2 hours ago"}, FormatElapsed(90 * 60));
+    }
+
+    TEST_METHOD(RelativeTime_Days)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"2 days ago"}, FormatElapsed(48 * 60 * 60));
+        VERIFY_ARE_EQUAL(std::wstring{L"13 days ago"}, FormatElapsed(13 * 24 * 60 * 60));
+    }
+
+    TEST_METHOD(RelativeTime_Weeks)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"2 weeks ago"}, FormatElapsed(14 * 24 * 60 * 60));
+        VERIFY_ARE_EQUAL(std::wstring{L"8 weeks ago"}, FormatElapsed(59 * 24 * 60 * 60));
+    }
+
+    TEST_METHOD(RelativeTime_Months)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"2 months ago"}, FormatElapsed(60 * 24 * 60 * 60));
+        VERIFY_ARE_EQUAL(std::wstring{L"12 months ago"}, FormatElapsed(365 * 24 * 60 * 60));
+    }
+
+    TEST_METHOD(RelativeTime_Years)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"2 years ago"}, FormatElapsed(730 * 24 * 60 * 60LL));
+        VERIFY_ARE_EQUAL(std::wstring{L"3 years ago"}, FormatElapsed(3 * 365 * 24 * 60 * 60LL));
+    }
+};
+
+} // namespace WSLCCLIRelativeTimeUnitTests

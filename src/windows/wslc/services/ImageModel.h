@@ -13,9 +13,6 @@ Abstract:
 --*/
 #pragma once
 
-// 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
-#define WSLC_IMAGE_1MB (1000 * 1000)
-
 namespace wsl::windows::wslc::models {
 struct ImageInformation
 {
@@ -27,6 +24,29 @@ struct ImageInformation
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
 };
+
+// The docker-compatible shape emitted by "image list --format json". Docker reports every value as
+// a string and uses "<none>" rather than null for missing repository, tag, and digest data, so this
+// is kept separate from ImageInformation, which mirrors the service's native types.
+struct ImageOutputInformation
+{
+    std::string Containers;
+    std::string CreatedAt;
+    std::string CreatedSince;
+    std::string Digest;
+    std::string ID;
+    std::string Repository;
+    std::string SharedSize;
+    std::string Size;
+    std::string Tag;
+    std::string UniqueSize;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ImageOutputInformation, Containers, CreatedAt, CreatedSince, Digest, ID, Repository, SharedSize, Size, Tag, UniqueSize);
+};
+
+// Value docker emits for repository, tag, and digest data it does not have.
+inline constexpr std::string_view c_dockerNone = "<none>";
 
 struct PruneImagesResult
 {

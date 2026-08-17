@@ -103,11 +103,11 @@ class WSLCE2EImageImportTests
         auto countUntaggedImages = [&]() {
             auto result = RunWslc(L"image list --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
-            auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+            auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
             size_t count = 0;
             for (const auto& img : images)
             {
-                if (!img.Repository.has_value() || img.Repository.value() == "<none>")
+                if (img.Repository == wsl::windows::wslc::models::c_dockerNone)
                 {
                     count++;
                 }

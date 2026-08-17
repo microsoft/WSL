@@ -22,7 +22,9 @@ Abstract:
 #include "ImageProgressCallback.h"
 #include "TableOutput.h"
 #include "Task.h"
+#include <chrono>
 #include <format>
+#include <unordered_map>
 #include <wslutil.h>
 
 using namespace wsl::shared;
@@ -68,6 +70,101 @@ namespace {
     private:
         Terminal& m_terminal;
     };
+
+    // Values docker reports as unavailable. wslc does not track image digests or layer sharing, so
+    // these use the same placeholders docker emits.
+    constexpr std::string_view c_notAvailable = "N/A";
+    constexpr std::string_view c_none = models::c_dockerNone;
+
+    // Counts the containers created from each image, keyed by image id. Docker includes stopped
+    // containers in this count, and reports 0 for images no container was created from.
+    std::optional<std::unordered_map<std::string, size_t>> TryCountContainersByImage(models::Session& session)
+    try
+    {
+        std::unordered_map<std::string, size_t> counts;
+        for (const auto& container : ContainerService::List(session, true))
+        {
+            counts[container.ImageId]++;
+        }
+
+        return counts;
+    }
+    catch (...)
+    {
+        // Report the count as unavailable rather than failing the listing, which is what docker
+        // does when it has no count for an image.
+        LOG_CAUGHT_EXCEPTION();
+        return std::nullopt;
+    }
+
+    // Formats a byte count the way docker does: SI units with three significant digits
+    // (119856765 -> "120MB").
+    std::string FormatDockerSize(int64_t bytes)
+    {
+        constexpr std::string_view units[] = {"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+
+        auto size = static_cast<double>(bytes);
+        size_t unit = 0;
+        while (size >= 1000.0 && unit < std::size(units) - 1)
+        {
+            size /= 1000.0;
+            unit++;
+        }
+
+        return std::format("{:.3g}{}", size, units[unit]);
+    }
+
+    // Formats a unix timestamp the way docker does, matching Go's time.Time.String()
+    // layout "2006-01-02 15:04:05 -0700 MST" (e.g. "2026-07-12 17:00:00 -0700 PDT").
+    std::string FormatDockerTimestamp(LONGLONG timestamp)
+    {
+        const auto time =
+            std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
+
+        try
+        {
+            const auto* zone = std::chrono::current_zone();
+            return std::format("{:%F %T %z} {}", std::chrono::zoned_time{zone, time}, zone->get_info(time).abbrev);
+        }
+        catch (...)
+        {
+            // The time zone database is unavailable, so report UTC rather than failing the command.
+            LOG_CAUGHT_EXCEPTION();
+            return std::format("{:%F %T} +0000 UTC", time);
+        }
+    }
+
+    // Builds the docker-compatible representation of an image, shared by the table and json output
+    // so the two cannot drift. Docker emits every value as a string, uses "<none>" for missing
+    // repository/tag data, and truncates the id unless --no-trunc is passed, in which case it keeps
+    // the algorithm prefix. Container counts are only looked up for output that reports them.
+    ImageOutputInformation ToImageOutput(
+        const ImageInformation& image, bool truncate, const std::optional<std::unordered_map<std::string, size_t>>& containerCounts = std::nullopt)
+    {
+        ImageOutputInformation entry;
+        if (containerCounts.has_value())
+        {
+            const auto count = containerCounts->find(image.Id);
+            entry.Containers = std::to_string(count == containerCounts->end() ? 0 : count->second);
+        }
+        else
+        {
+            entry.Containers = c_notAvailable;
+        }
+
+        entry.CreatedAt = FormatDockerTimestamp(image.Created);
+        entry.CreatedSince =
+            WideToMultiByte(ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0));
+        entry.Digest = c_none;
+        entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
+        entry.Repository = image.Repository.value_or(std::string{c_none});
+        entry.SharedSize = c_notAvailable;
+        entry.Size = FormatDockerSize(image.Size);
+        entry.Tag = image.Tag.value_or(std::string{c_none});
+        entry.UniqueSize = c_notAvailable;
+
+        return entry;
+    }
 
 } // namespace
 
@@ -174,21 +271,24 @@ void ListImages(CLIExecutionContext& context)
     }
 
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
     case FormatType::Json:
     {
+        WI_ASSERT(context.Data.Contains(Data::Session));
+        const auto containerCounts = TryCountContainersByImage(context.Data.Get<Data::Session>());
+
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(image, c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc, containerCounts), c_jsonCompactIndent));
         }
 
         break;
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
@@ -207,12 +307,13 @@ void ListImages(CLIExecutionContext& context)
 
         for (const auto& image : images)
         {
+            const auto entry = ToImageOutput(image, trunc);
             table.WriteRow({
-                MultiByteToWide(image.Repository.value_or("<untagged>")),
-                MultiByteToWide(image.Tag.value_or("<untagged>")),
-                MultiByteToWide(TruncateId(image.Id, trunc)),
-                ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / WSLC_IMAGE_1MB),
+                MultiByteToWide(entry.Repository),
+                MultiByteToWide(entry.Tag),
+                MultiByteToWide(entry.ID),
+                MultiByteToWide(entry.CreatedSince),
+                MultiByteToWide(entry.Size),
             });
         }
 

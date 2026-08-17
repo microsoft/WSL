@@ -130,6 +130,9 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
+    // Id of the image the container was created from. Not serialized: `container list --format json`
+    // reports the image reference, matching docker.
+    std::string ImageId;
     WSLCContainerState State;
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
