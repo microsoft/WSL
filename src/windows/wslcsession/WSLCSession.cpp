@@ -79,6 +79,15 @@ void ValidateNewSessionStorageDirectory(const std::filesystem::path& StoragePath
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
 }
 
+// Copies a string into a fixed size buffer, truncating rather than failing when the source doesn't
+// fit. Only a genuine copy failure is reported as an error.
+template <size_t Size>
+void CopyTruncated(char (&Destination)[Size], const std::string& Source)
+{
+    const auto result = strncpy_s(Destination, Size, Source.c_str(), _TRUNCATE);
+    THROW_HR_IF(E_UNEXPECTED, result != 0 && result != STRUNCATE);
+}
+
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
 // service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
@@ -2565,8 +2574,8 @@ try
 
         // Commands and status descriptions have no bound imposed by the runtime, so truncate them
         // rather than failing the listing.
-        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Command, std::size(output[index].Command), dockerContainer.Command.c_str(), _TRUNCATE) == EINVAL);
-        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Status, std::size(output[index].Status), dockerContainer.Status.c_str(), _TRUNCATE) == EINVAL);
+        CopyTruncated(output[index].Command, dockerContainer.Command);
+        CopyTruncated(output[index].Status, dockerContainer.Status);
 
         // Labels, networks and mounts are reported the way the docker CLI renders them: a comma
         // separated list. Like the command and status above they are unbounded, so they truncate.
@@ -2598,9 +2607,9 @@ try
         const auto joinedNetworks = wsl::shared::string::Join(networks, ',');
         const auto joinedMounts = wsl::shared::string::Join(mounts, ',');
 
-        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Labels, std::size(output[index].Labels), joinedLabels.c_str(), _TRUNCATE) == EINVAL);
-        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Networks, std::size(output[index].Networks), joinedNetworks.c_str(), _TRUNCATE) == EINVAL);
-        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Mounts, std::size(output[index].Mounts), joinedMounts.c_str(), _TRUNCATE) == EINVAL);
+        CopyTruncated(output[index].Labels, joinedLabels);
+        CopyTruncated(output[index].Networks, joinedNetworks);
+        CopyTruncated(output[index].Mounts, joinedMounts);
         output[index].LocalVolumes = localVolumes;
 
         e->GetState(&output[index].State);

@@ -143,8 +143,6 @@ struct ContainerInformation
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
 };
 
 // The platform a container runs on. Emitted as a nested object to match docker.
