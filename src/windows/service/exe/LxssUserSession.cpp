@@ -17,6 +17,8 @@ Abstract:
 #include "LxssUserSession.h"
 #include "LxssInstance.h"
 #include "LxssSecurity.h"
+#include "notifications.h"
+#include "WslInstall.h"
 #include "WslCoreInstance.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
@@ -2737,6 +2739,20 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             catch (...)
             {
                 result = wil::ResultFromCaughtException();
+
+                if (version == LXSS_WSL_VERSION_2)
+                {
+                    try
+                    {
+                        if (!WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameVmp))
+                        {
+                            wsl::windows::common::notifications::DisplayOptionalComponentsNotification();
+                            EMIT_USER_WARNING(wsl::shared::Localization::MessageVirtualMachinePlatformNotInstalled());
+                        }
+                    }
+                    CATCH_LOG()
+                }
+
                 throw;
             }
         }
