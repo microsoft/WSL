@@ -255,7 +255,7 @@ void Argument::Validate(ArgMap& execArgs) const
             }
             catch (const mount::MountException& ex)
             {
-                throw ArgumentException(ex.Reason());
+                throw ArgumentException(Localization::WSLCCLI_InvalidTmpfsError(value, ex.Reason()));
             }
         });
         break;

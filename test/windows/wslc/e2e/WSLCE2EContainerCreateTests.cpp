@@ -681,7 +681,8 @@ class WSLCE2EContainerCreateTests
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs wslc-tmpfs {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_MountTargetAbsoluteError()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_InvalidTmpfsError(L"wslc-tmpfs", Localization::WSLCCLI_MountTargetAbsoluteError())));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_EmptyDestination_Fails)
@@ -689,7 +690,8 @@ class WSLCE2EContainerCreateTests
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs :size=64k {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_MountTargetRequiredError()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_InvalidTmpfsError(L":size=64k", Localization::WSLCCLI_MountTargetRequiredError())));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Mount_Tmpfs_Success)

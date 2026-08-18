@@ -3017,6 +3017,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Invalid argument "{}" for '--mount' option: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidTmpfsError" xml:space="preserve">
+    <value>Invalid argument "{}" for '--tmpfs' option: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--tmpfs'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_UnsupportedMountError" xml:space="preserve">
     <value>Argument "{}" for '--mount' option uses an unsupported feature: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
