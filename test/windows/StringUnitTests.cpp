@@ -5,6 +5,7 @@
 #include "string.hpp"
 
 using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatDockerSize;
 using wsl::windows::common::string::FormatStorageSize;
 using wsl::windows::common::string::ParseStorageSize;
 using wsl::windows::common::string::StorageSizeUnit;
@@ -225,6 +226,30 @@ class StringUnitTests
         }
 
         VERIFY_ARE_EQUAL(std::wstring{L"119.86 MB"}, FormatBytes(119'856'765));
+    }
+
+    // Docker renders image sizes with units.HumanSizeWithPrecision(size, 3), which is base 1000 with
+    // three significant digits, no space, and "kB" rather than "KB".
+    TEST_METHOD(FormatDockerSize_MatchesDockerPrecision)
+    {
+        const std::vector<std::pair<uint64_t, std::wstring>> TestCases{
+            {0, L"0B"},
+            {999, L"999B"},
+            {1'000, L"1kB"},
+            {1'500, L"1.5kB"},
+            {7'050'000, L"7.05MB"},
+            {119'856'765, L"120MB"},
+            {1'090'000'000, L"1.09GB"},
+            {1'000'000'000'000ULL, L"1TB"},
+        };
+
+        for (const auto& [bytes, expected] : TestCases)
+        {
+            VERIFY_ARE_EQUAL(expected, FormatDockerSize(bytes));
+        }
+
+        // Three significant digits switch to exponent form just below the next unit, matching Go's %g.
+        VERIFY_ARE_EQUAL(std::wstring{L"1e+03MB"}, FormatDockerSize(999'900'000));
     }
 
     TEST_METHOD(StorageSize_BytesToTextRoundTrips)

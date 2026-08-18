@@ -75,23 +75,6 @@ namespace {
     // these use the same placeholders docker emits.
     constexpr std::string_view c_notAvailable = "N/A";
 
-    // Formats a byte count the way docker does: SI units with three significant digits
-    // (119856765 -> "120MB").
-    std::string FormatDockerSize(int64_t bytes)
-    {
-        constexpr std::string_view units[] = {"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
-
-        auto size = static_cast<double>(bytes);
-        size_t unit = 0;
-        while (size >= 1000.0 && unit < std::size(units) - 1)
-        {
-            size /= 1000.0;
-            unit++;
-        }
-
-        return std::format("{:.3g}{}", size, units[unit]);
-    }
-
     // Builds the docker-compatible representation of an image, shared by the table and json output
     // so the two cannot drift. Docker emits every value as a string, uses "<none>" for missing
     // repository/tag data, and truncates the id unless --no-trunc is passed, in which case it keeps
@@ -108,7 +91,7 @@ namespace {
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
         entry.SharedSize = c_notAvailable;
-        entry.Size = FormatDockerSize(image.Size);
+        entry.Size = WideToMultiByte(FormatDockerSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
         entry.Tag = image.Tag.value_or(std::string{c_none});
         entry.UniqueSize = c_notAvailable;
 

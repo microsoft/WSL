@@ -400,6 +400,24 @@ std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
     return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
 }
 
+std::wstring wsl::windows::common::string::FormatDockerSize(uint64_t Bytes)
+{
+    // Mirrors docker's units.HumanSizeWithPrecision(size, 3): base 1000, three significant digits
+    // and no space between the value and the unit. Note the unit names differ from FormatBytes -
+    // docker abbreviates 1000 bytes as "kB", and carries units past PB.
+    constexpr std::wstring_view c_units[] = {L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
+
+    auto value = static_cast<double>(Bytes);
+    size_t unitIndex = 0;
+    while (value >= 1000.0 && unitIndex + 1 < std::size(c_units))
+    {
+        value /= 1000.0;
+        unitIndex++;
+    }
+
+    return std::format(L"{:.3g}{}", value, c_units[unitIndex]);
+}
+
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
 {
     return TruncateIdImpl(id, shortenLength);
