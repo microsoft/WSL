@@ -706,7 +706,7 @@ void WSLCVirtualMachine::DetachDisk(_In_ ULONG Lun)
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_attachedDisks.end());
 
     // Detach it from the guest
-    WSLC_DETACH message;
+    WSLC_DETACH message{};
     message.Lun = Lun;
     const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
 
@@ -732,7 +732,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLCVirtualMachine::For
     int32_t pid{};
     int32_t ptyMaster{};
     {
-        WSLC_FORK message;
+        WSLC_FORK message{};
         message.ForkType = Type;
         message.TtyColumns = static_cast<uint16_t>(TtyColumns);
         message.TtyRows = static_cast<uint16_t>(TtyRows);
@@ -1025,7 +1025,7 @@ void WSLCVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
 {
     std::lock_guard lock(m_lock);
 
-    WSLC_SIGNAL message;
+    WSLC_SIGNAL message{};
     message.Pid = Pid;
     message.Signal = Signal;
     const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
@@ -1087,7 +1087,7 @@ void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
 
     THROW_HR_IF(E_ILLEGAL_STATE_CHANGE, !m_portRelayChannelWrite);
 
-    WSLC_MAP_PORT message;
+    WSLC_MAP_PORT message{};
     message.WindowsPort = WindowsPort;
     message.LinuxPort = LinuxPort;
     message.AddressFamily = Family;
@@ -1230,7 +1230,7 @@ try
     {
         auto [_, __, channel] = Fork(WSLC_FORK::Process);
 
-        WSLC_CONNECT message;
+        WSLC_CONNECT message{};
         message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
 
         auto fd = channel.Transaction(message).Result;
