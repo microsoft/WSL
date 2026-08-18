@@ -772,8 +772,6 @@ interface IWSLCSession : IUnknown
     // it (or the client exiting) lets the VM idle-terminate again.
     HRESULT BeginContainerOperation([out] IUnknown** Operation);
 
-    // Creates a compose session from a minimal compose file. Repeated calls for the same canonical
-    // path return the service-tracked session that was created by the first call.
     HRESULT CreateComposeSession([in] LPCWSTR Path, [out] IWSLCComposeSession** ComposeSession);
 }
 

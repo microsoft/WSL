@@ -175,7 +175,7 @@ bool NetworkModeAllocatesVmPorts(std::string_view mode) noexcept
 
 bool NetworkSupportsAliases(std::string_view mode) noexcept
 {
-    return mode != "bridge" && NetworkModeAllocatesVmPorts(mode);
+    return NetworkModeAllocatesVmPorts(mode);
 }
 
 // Reject `<prefix>:<value>` strings whose prefix isn't `container:`. Docker treats colon-prefixed

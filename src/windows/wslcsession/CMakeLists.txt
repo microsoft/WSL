@@ -9,6 +9,7 @@ set(SOURCES
 
     # Session and container implementation
     ComposeSpec.cpp
+    ServiceContainerLauncher.cpp
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
     WSLCComposeSession.cpp
@@ -41,6 +42,7 @@ set(HEADERS
     IORelay.h
     OptionParser.h
     ServiceProcessLauncher.h
+    ServiceContainerLauncher.h
     WSLCContainer.h
     WSLCComposeSession.h
     WSLCContainerMetadata.h

@@ -20,6 +20,7 @@ Abstract:
 #include "WSLCContainer.h"
 #include "WSLCNetworkMetadata.h"
 #include "ContainerNameGenerator.h"
+#include "ServiceContainerLauncher.h"
 #include "ServiceProcessLauncher.h"
 #include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
@@ -2283,93 +2284,74 @@ try
     std::lock_guard composeLock(m_composeSessionsLock);
     if (const auto existing = m_composeSessions.find(key); existing != m_composeSessions.end())
     {
+        // TODO: Check the state of the compose session before returning.
         return existing->second.CopyTo(ComposeSession);
     }
 
     const auto spec = ComposeSpec::Parse(configPath);
 
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
+    std::string networkName = spec.ProjectName + "_default"; // TODO: Implement this properly.
+
+    // Create a network for the compose session.
+    // TODO: open an existing network instead of deleting.
+
+    auto networkCleanup = DeleteNetworkImpl(networkName.c_str());
+    THROW_HR_IF_MSG(
+        networkCleanup,
+        FAILED(networkCleanup) && networkCleanup != WSLC_E_NETWORK_NOT_FOUND,
+        "Failed to delete network %hs",
+        networkName.c_str());
+
+    WSLCNetworkOptions networkOptions{};
+    networkOptions.Name = networkName.c_str();
+    THROW_IF_FAILED(CreateNetworkImpl(&networkOptions));
+
     auto cleanup = wil::scope_exit([&] {
         for (const auto& container : containers)
         {
             LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
         }
+
+        LOG_IF_FAILED(DeleteNetworkImpl(networkName.c_str()));
     });
 
     auto lease = AcquireLease();
     for (const auto& definition : spec.Containers)
     {
-        const std::string networkMode{"bridge"};
-        std::vector<const char*> command;
-        command.reserve(definition.Command.size());
-        for (const auto& argument : definition.Command)
+        ServiceContainerLauncher launcher(
+            definition.Image, definition.Name, definition.Command, definition.Environment, networkName, WSLCProcessFlagsStdin);
+        if (!definition.WorkingDirectory.empty())
         {
-            command.emplace_back(argument.c_str());
+            launcher.SetWorkingDirectory(std::string{definition.WorkingDirectory});
         }
 
-        std::vector<const char*> environment;
-        environment.reserve(definition.Environment.size());
-        for (const auto& variable : definition.Environment)
+        for (const auto& port : definition.Ports)
         {
-            environment.emplace_back(variable.c_str());
+            launcher.AddPort(port.HostPort, port.ContainerPort, AF_INET);
         }
 
-        std::vector<WSLCVolume> bindVolumes;
-        std::vector<WSLCNamedVolume> namedVolumes;
-        std::vector<::WSLCPortMapping> ports;
-        ports.reserve(definition.Ports.size());
-        for (const auto& definitionPort : definition.Ports)
-        {
-            auto& port = ports.emplace_back(::WSLCPortMapping{
-                .HostPort = definitionPort.HostPort,
-                .ContainerPort = definitionPort.ContainerPort,
-                .Family = AF_INET,
-                .Protocol = IPPROTO_TCP,
-            });
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(port.BindingAddress, "127.0.0.1") != 0);
-        }
+        launcher.AddPrimaryNetworkAlias(definition.Name);
 
         for (const auto& volume : definition.Volumes)
         {
             if (volume.HostPath.has_value())
             {
-                bindVolumes.push_back({
-                    .HostPath = volume.HostPath->c_str(),
-                    .ContainerPath = volume.ContainerPath.c_str(),
-                    .ReadOnly = volume.ReadOnly,
-                });
+                launcher.AddVolume(*volume.HostPath, volume.ContainerPath, volume.ReadOnly);
             }
             else
             {
-                namedVolumes.push_back({
-                    .Name = volume.Name.c_str(),
-                    .ContainerPath = volume.ContainerPath.c_str(),
-                    .ReadOnly = volume.ReadOnly,
-                });
+                launcher.AddNamedVolume(volume.Name, volume.ContainerPath, volume.ReadOnly);
             }
         }
 
-        WSLCContainerOptions options{};
-        options.Image = definition.Image.c_str();
-        options.Name = definition.Name.c_str();
-        options.InitProcessOptions.CommandLine = {command.data(), static_cast<ULONG>(command.size())};
-        options.InitProcessOptions.Environment = {environment.data(), static_cast<ULONG>(environment.size())};
-        options.InitProcessOptions.CurrentDirectory = definition.WorkingDirectory.empty() ? nullptr : definition.WorkingDirectory.c_str();
-        options.InitProcessOptions.Flags = WSLCProcessFlagsStdin;
-        options.Volumes = bindVolumes.data();
-        options.VolumesCount = static_cast<ULONG>(bindVolumes.size());
-        options.NamedVolumes = namedVolumes.data();
-        options.NamedVolumesCount = static_cast<ULONG>(namedVolumes.size());
-        options.Ports = ports.data();
-        options.PortsCount = static_cast<ULONG>(ports.size());
-        options.ContainerNetwork.NetworkMode = networkMode.c_str();
-
         Microsoft::WRL::ComPtr<IWSLCContainer> container;
-        HRESULT result = wil::ResultFromException([&]() { CreateContainerImpl(&options, &container); });
+        HRESULT result = wil::ResultFromException([&]() { container = launcher.Create(*this); });
         if (result == WSLC_E_IMAGE_NOT_FOUND)
         {
+            // TODO: Wire the pull output to caller.
             PullImageLockHeld(definition.Image.c_str(), nullptr, nullptr);
-            CreateContainerImpl(&options, &container);
+            container = launcher.Create(*this);
         }
         else
         {
@@ -2381,11 +2363,10 @@ try
 
     Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
     THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, configPath.wstring(), containers));
-    Microsoft::WRL::ComPtr<IWSLCComposeSession> composeInterface;
-    THROW_IF_FAILED(composeSession.As(&composeInterface));
-    auto [entry, inserted] = m_composeSessions.emplace(std::move(key), std::move(composeInterface));
+    auto [entry, inserted] = m_composeSessions.emplace(std::move(key), std::move(composeSession));
     WI_ASSERT(inserted);
     cleanup.release();
+
     return entry->second.CopyTo(ComposeSession);
 }
 CATCH_RETURN();
@@ -2978,7 +2959,13 @@ HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IWarningCa
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
+    return CreateNetworkImpl(Options);
+}
+CATCH_RETURN();
 
+HRESULT WSLCSession::CreateNetworkImpl(const WSLCNetworkOptions* Options)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
 
@@ -3106,7 +3093,13 @@ HRESULT WSLCSession::DeleteNetwork(LPCSTR Name)
 try
 {
     WSLCExecutionContext context(this);
+    return DeleteNetworkImpl(Name);
+}
+CATCH_RETURN();
 
+HRESULT WSLCSession::DeleteNetworkImpl(LPCSTR Name)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);

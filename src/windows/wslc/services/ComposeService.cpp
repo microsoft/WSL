@@ -86,7 +86,6 @@ int ComposeService::Attach(Terminal& Terminal, models::Session& Session, const s
 {
     [[maybe_unused]] auto operation = Session.BeginContainerOperation();
     auto composeSession = Open(Session, Path);
-    THROW_IF_FAILED(composeSession->Attach());
 
     wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
     THROW_IF_FAILED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));

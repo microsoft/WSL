@@ -87,8 +87,7 @@ CATCH_RETURN();
 
 HRESULT WSLCComposeSession::Attach()
 {
-    // Stream transport remains client-owned. The CLI uses ListContainers() and the existing
-    // IWSLCContainer::Attach handle transport after validating this service-tracked session.
+    // TODO
     return S_OK;
 }
 
