@@ -1234,7 +1234,7 @@ try
             SocketAddress.svm_port = -1;
         }
 
-        LX_INIT_CREATE_SESSION_RESPONSE Response;
+        LX_INIT_CREATE_SESSION_RESPONSE Response{};
         Response.Header.MessageType = LxInitMessageCreateSessionResponse;
         Response.Header.MessageSize = sizeof(Response);
         Response.Port = SocketAddress.svm_port;
@@ -1371,7 +1371,7 @@ Return Value:
     pid_t ChildPid;
     wsl::shared::SocketChannel ControlChannel;
 
-    LX_INIT_PROCESS_EXIT_STATUS ExitStatus;
+    LX_INIT_PROCESS_EXIT_STATUS ExitStatus{};
     unsigned int Index;
     bool InteropEnabled;
     InteropServer InteropServer;

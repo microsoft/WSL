@@ -329,7 +329,7 @@ void CreateProcessVmMode(_In_ const GUID& VmId, _In_ const gsl::span<gsl::byte>&
             if (Result.Status == 0)
             {
                 // Process messages from the binfmt interpreter and wait for the process to exit.
-                LX_INIT_PROCESS_EXIT_STATUS ExitStatus;
+                LX_INIT_PROCESS_EXIT_STATUS ExitStatus{};
                 ExitStatus.Header.MessageType = LxInitMessageExitStatus;
                 ExitStatus.Header.MessageSize = sizeof(ExitStatus);
                 ExitStatus.ExitCode = ProcessInteropMessages(reinterpret_cast<HANDLE>(Sockets[3].get()), &Result);
@@ -553,7 +553,7 @@ void wsl::windows::common::interop::WorkerThread(_In_ wil::unique_handle&& Serve
 
                         // Process messages from the binfmt interpreter and wait for the
                         // process to exit.
-                        LX_INIT_PROCESS_EXIT_STATUS ExitStatus;
+                        LX_INIT_PROCESS_EXIT_STATUS ExitStatus{};
                         ExitStatus.Header.MessageType = LxInitMessageExitStatus;
                         ExitStatus.Header.MessageSize = sizeof(ExitStatus);
                         ExitStatus.ExitCode = ProcessInteropMessages(SignalPipe.first.get(), &Result);
