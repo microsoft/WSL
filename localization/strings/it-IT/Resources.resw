@@ -2210,6 +2210,10 @@ Utilizzo:
     <value>Argomento obbligatorio non specificato: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Opzione necessaria non fornita: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Mostra la guida per il comando selezionato</value>
   </data>
@@ -2250,7 +2254,11 @@ Utilizzo:
     <value>Disabilita l'output a colori.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Per altre informazioni su un comando specifico, passa alla Guida degli argomenti.</value>
+    <value>Per altri dettagli su un comando specifico, passa all'opzione della guida.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Per altre informazioni, esegui '{} --help'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Comandi:</value>
@@ -2267,8 +2275,14 @@ Utilizzo:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Argomenti:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Opzioni correlate:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Argomenti correlati:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Il nome dell'argomento non è stato riconosciuto per il comando corrente: '{}'</value>
+    <value>Il nome dell'opzione non è stato riconosciuto per il comando corrente: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2290,35 +2304,35 @@ Utilizzo:
     <value>ID contenitore</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Valore argomento mancante: '{}'</value>
+    <value>Valore dell'opzione mancante: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Alias di argomento non riconosciuto per il comando corrente: '{}'</value>
+    <value>Alias dell'opzione non riconosciuto per il comando corrente: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Identificatore argomento non valido: '{}'</value>
+     <value>Identificatore dell'opzione non valido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Alias flag contiguo non trovato: '{}'</value>
+     <value>Alias di opzione contiguo non trovato: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>L'alias contiguo non è un flag: '{}'</value>
+     <value>L'alias di opzione contiguo non è un flag: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Identificatore argomento non valido: '{}'</value>
+     <value>Identificatore dell'opzione non valido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>L'argomento flag non può contenere un valore contiguo: '{}'</value>
+     <value>L'opzione non può contenere un valore adiacente: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Valore booleano non valido per l'argomento del flag: '{}'. Previsto vero, falso, 1 o 0.</value>
+     <value>Valore booleano non valido per l'opzione: '{}'. Previsto vero, falso, 1, 0, t o f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2326,7 +2340,7 @@ Utilizzo:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Nome dell'argomento mancante in: '{}'</value>
+     <value>Nome dell'opzione mancante in: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2338,7 +2352,7 @@ Utilizzo:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Gli argomenti alias con un valore devono essere gli ultimi nella catena di alias: '{}'</value>
+     <value>Le opzioni di alias con un valore devono essere le ultime nella catena di alias: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2481,7 +2495,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Impossibile specificare alias di rete quando sono richieste più reti. Utilizza un singolo argomento --network .</value>
+    <value>Impossibile specificare alias di rete quando sono richieste più reti. Usa un'opzione --network singola.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2639,7 +2653,7 @@ Esempio: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Visualizza informazioni dettagliate su un contenitore.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kill one or more running containers.</value>
+    <value>Termina uno o più contenitori in esecuzione.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
     <value>Termina uno o più contenitori in esecuzione inviando SIGKILL per impostazione predefinita o il segnale specificato con --signal.</value>
@@ -2967,7 +2981,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Valore dell'argomento {} non valido: '{}'. È previsto un numero positivo di CPU (ad esempio 0.5, 1, 2)</value>
+    <value>Il valore dell'opzione {} non è valido: '{}'. È previsto un numero positivo di CPU (ad esempio 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2995,7 +3009,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Filtra l'output in base alle condizioni fornite</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Argomento "{}" non valido per '-f, --filter' flag: formato non valido del filtro (previsto nome=valore)</value>
+    <value>Valore "{}" non valido per l'opzione '-f, --filter': formato del filtro non valido (previsto nome=valore)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Segui l'output del log</value>
@@ -3274,7 +3288,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Valore dell'argomento {} non valido: '{}'. Previsto &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (usare -1 per un numero illimitato)</value>
+    <value>Il valore dell'opzione {} non è valido: '{}'. Previsto &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (usare -1 per un numero illimitato)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3311,11 +3325,11 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Valore {} non valido per l'argomento: {}</value>
+    <value>Valore dell'opzione {} non valido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Valore dell'argomento {} non valido: '{}'. È previsto un timestamp periodo Unix o una data-ora RFC3339 (ad esempio 2024-01-15T10:30:00Z)</value>
+    <value>Il valore dell'opzione {} non è valido: '{}'. È previsto un timestamp periodo Unix o una data-ora RFC3339 (ad esempio 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3323,11 +3337,11 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Valore dell'argomento {} non valido: '{}'. È prevista una dimensione di memoria (ad esempio 256M, 1G)</value>
+    <value>Il valore dell'opzione {} non è valido: '{}'. È prevista una dimensione di memoria (ad esempio 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Valore argomento {} non valido: '{}'. È prevista una durata (ad esempio 30s, 1m30s)</value>
+    <value>Valore dell'opzione {} non valido: '{}'. È prevista una durata (ad es. 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3417,7 +3431,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Nome di rete</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Only display network IDs</value>
+    <value>Visualizza solo gli ID di rete</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Rimuovi tutte le reti inutilizzate.</value>
@@ -3504,10 +3518,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Visualizza solo i nomi dei volumi</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Non è possibile scrivere l'immagine nel terminale. Usa il flag -o o reindirizza stdout.</value>
+    <value>Non è possibile scrivere l'immagine nel terminale. Utilizzare l'opzione -o o reindirizzare stdout.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Impossibile esportare il contenitore nel terminale. Usa il flag -o o reindirizza stdout.</value>
+    <value>Impossibile esportare il contenitore nel terminale. Utilizzare l'opzione -o o reindirizzare stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Formato previsto: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>

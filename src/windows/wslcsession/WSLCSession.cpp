@@ -30,6 +30,7 @@ using io::MultiHandleWait;
 using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
+using wsl::windows::common::string::FormatBytes;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -1431,8 +1432,8 @@ try
             {
                 auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
                 auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
-                auto current = wsl::shared::string::FormatBytes(currentBytes);
-                auto total = wsl::shared::string::FormatBytes(totalBytes);
+                auto current = FormatBytes(currentBytes);
+                auto total = FormatBytes(totalBytes);
                 reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)
@@ -3067,8 +3068,6 @@ try
 
     auto lock = AcquireLease();
 
-    std::lock_guard networksLock(m_networksLock);
-
     std::vector<docker_schema::Network> dockerNetworks;
     if (filtered)
     {
@@ -3078,6 +3077,8 @@ try
         }
         CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
     }
+
+    std::lock_guard networksLock(m_networksLock);
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
 

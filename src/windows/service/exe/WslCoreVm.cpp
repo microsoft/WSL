@@ -682,7 +682,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
             {
                 wsl::windows::common::notifications::DisplayOptionalComponentsNotification();
-                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformNotInstalled());
+                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformRequiredForNetworking());
             }
 
             // Fall back to no networking.

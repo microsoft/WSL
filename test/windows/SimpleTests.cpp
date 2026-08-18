@@ -223,33 +223,6 @@ class SimpleTests
             VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(wideString.c_str(), true));
         }
 
-        // Test wsl::shared::string::ParseMemoryString
-        const std::vector<std::pair<LPCSTR, std::optional<uint64_t>>> testCases{
-            {"0", 0},
-            {"1", 1},
-            {" 1", 1},
-            {"1B", 1},
-            {"1K", 1024},
-            {"1KB", 1024},
-            {"2M", 2 * 1024 * 1024},
-            {"100MB", 100 * 1024 * 1024},
-            {"9G", 9 * 1024ULL * 1024ULL * 1024ULL},
-            {"44GB", 44 * 1024ULL * 1024ULL * 1024ULL},
-            {"1TB", 1ULL << 40},
-            {"2T", 2ULL << 40},
-            {"1 B", std::nullopt},
-            {nullptr, std::nullopt},
-            {"", std::nullopt},
-            {"foo", std::nullopt}};
-
-        for (const auto& [input, expected] : testCases)
-        {
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(input), expected);
-
-            const auto wideInput = wsl::shared::string::MultiByteToWide(input);
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(wideInput.c_str()), expected);
-        }
-
         // Test wsl::shared::string GUID helpers
         const GUID guid = {0x1234567a, 0x1234, 0x5678, {0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78}};
         const std::string guidString = "{1234567a-1234-5678-1234-567812345678}";

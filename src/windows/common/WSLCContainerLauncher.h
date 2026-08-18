@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #pragma once
+#include "MountSpecParsing.h"
 #include "WSLCProcessLauncher.h"
 #include "docker_schema.h"
 #include "wslc_schema.h"
@@ -59,6 +60,7 @@ public:
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly);
+    void AddMount(const mount::Spec& Mount);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol = IPPROTO_TCP, const std::optional<std::string>& BindingAddress = {});
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
@@ -109,11 +111,10 @@ private:
     std::string m_image;
     std::string m_name;
     std::vector<WSLCPortMapping> m_ports;
-    std::vector<WSLCVolume> m_volumes;
-    std::vector<WSLCNamedVolume> m_namedVolumes;
-    std::deque<std::wstring> m_hostPaths;
-    std::deque<std::string> m_volumeNames;
-    std::deque<std::string> m_containerPaths;
+    std::vector<WSLCMountSpec> m_mounts;
+    std::deque<std::wstring> m_mountSources;
+    std::deque<std::string> m_mountTargets;
+    std::deque<std::string> m_mountTmpfsOptions;
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
@@ -135,9 +136,6 @@ private:
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
-    std::vector<WSLCTmpfsMount> m_tmpfsMounts;
-    std::deque<std::string> m_tmpfsContainerPaths;
-    std::deque<std::string> m_tmpfsOptions;
     std::int64_t m_memoryBytes = 0;
     std::int64_t m_nanoCpus = 0;
     std::vector<WSLCUlimit> m_ulimits;

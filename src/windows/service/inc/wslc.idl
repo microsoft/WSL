@@ -248,6 +248,37 @@ typedef struct _WSLCTmpfsMount
     [unique] LPCSTR Options;
 } WSLCTmpfsMount;
 
+typedef enum _WSLCMountType
+{
+    WSLCMountTypeBind,
+    WSLCMountTypeVolume,
+    WSLCMountTypeTmpfs,
+} WSLCMountType;
+
+typedef enum _WSLCMountSpecFlags
+{
+    WSLCMountSpecFlagsNone = 0,
+    WSLCMountSpecFlagsTmpfsSize = 1,
+    WSLCMountSpecFlagsTmpfsMode = 2,
+    WSLCMountSpecFlagsCreateSourceIfMissing = 4,
+    WSLCMountSpecFlagsTmpfsOptions = 8,
+} WSLCMountSpecFlags;
+
+cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing | WSLCMountSpecFlagsTmpfsOptions)")
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCMountSpecFlags);")
+
+typedef struct _WSLCMountSpec
+{
+    WSLCMountType Type;
+    [unique, string] LPCWSTR Source;
+    [string] LPCSTR Target;
+    BOOL ReadOnly;
+    WSLCMountSpecFlags Flags;
+    LONGLONG TmpfsSizeBytes;
+    ULONG TmpfsMode;
+    [unique, string] LPCSTR TmpfsOptions;
+} WSLCMountSpec;
+
 typedef struct _WSLCUlimit
 {
     [string] LPCSTR Name;
@@ -331,6 +362,9 @@ typedef struct _WSLCContainerOptions
     LONGLONG HealthTimeoutNs;
     LONGLONG HealthStartPeriodNs;
     LONG HealthRetries;
+
+    [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
+    ULONG MountsCount;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;

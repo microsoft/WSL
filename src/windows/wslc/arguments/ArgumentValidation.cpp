@@ -20,6 +20,7 @@ Abstract:
 #include "Exceptions.h"
 #include "ImageService.h"
 #include "Localization.h"
+#include "MountSpecParsing.h"
 #include <algorithm>
 #include <type_traits>
 #include <utility>
@@ -30,6 +31,8 @@ using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
+
+namespace mount = wsl::windows::common::mount;
 
 namespace argument::details {
     struct RawArgMapAccess
@@ -228,7 +231,52 @@ void Argument::Validate(ArgMap& execArgs) const
         break;
 
     case ArgType::Volume:
-        validation::ValidateVolumeMount(RawArgMapAccess::GetAll<ArgType::Volume>(execArgs));
+        CacheConverted<ArgType::Volume>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerVolumeString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(ex.Reason());
+            }
+        });
+        break;
+
+    case ArgType::TMPFS:
+        CacheConverted<ArgType::TMPFS>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerTmpfsString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_InvalidTmpfsError(value, ex.Reason()));
+            }
+        });
+        break;
+
+    case ArgType::Mount:
+        CacheConverted<ArgType::Mount>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerMountString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountUnsupportedException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_UnsupportedMountError(value, ex.Reason()));
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_InvalidMountError(value, ex.Reason()));
+            }
+        });
         break;
 
     case ArgType::WorkDir:
@@ -301,14 +349,6 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLCSignalFromString(value, argName);
-    }
-}
-
-void ValidateVolumeMount(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = models::VolumeMount::Parse(value);
     }
 }
 
