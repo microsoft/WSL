@@ -1474,7 +1474,6 @@ Return Value:
 
 --*/
 
-try
 {
     std::vector<std::string> Variables;
     auto AddEnvironmentVariable = [&Variables](const char* Name, const char* Value) {
@@ -1500,7 +1499,7 @@ try
     {
         THROW_LAST_ERROR_IF(TEMP_FAILURE_RETRY(dup2(SocketFd, LX_INIT_UTILITY_VM_INIT_SOCKET_FD)) < 0);
 
-        close(SocketFd);
+        THROW_LAST_ERROR_IF(SetCloseOnExec(SocketFd, true));
         SocketFd = LX_INIT_UTILITY_VM_INIT_SOCKET_FD;
     }
     else
@@ -1659,11 +1658,6 @@ try
 
     execle(LX_INIT_PATH, LX_INIT_PATH, nullptr, Environment.data());
     LOG_ERROR("execle({}) failed {}", LX_INIT_PATH, errno);
-    _exit(1);
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
     _exit(1);
 }
 
