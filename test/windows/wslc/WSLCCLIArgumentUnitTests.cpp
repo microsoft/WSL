@@ -33,6 +33,8 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLIArgumentUnitTests {
+namespace mount = wsl::windows::common::mount;
+
 using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
 
 static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
@@ -410,6 +412,22 @@ class WSLCCLIArgumentUnitTests
         // string -> int64_t (nano CPUs)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Cpus>(L"1.5"), validation::GetNanoCpusFromString(L"1.5"));
 
+        // mount strings -> mount::Spec
+        {
+            const auto volume = ValidateAndGetCached<ArgType::Volume>(LR"(C:\hostPath:/containerPath)");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Bind), static_cast<int>(volume.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(volume.BindSource));
+
+            const auto tmpfs = ValidateAndGetCached<ArgType::TMPFS>(L"/tmp:size=64k");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Tmpfs), static_cast<int>(tmpfs.MountType));
+            VERIFY_IS_TRUE(tmpfs.TmpfsOptions.has_value());
+            VERIFY_ARE_EQUAL(std::string("size=64k"), tmpfs.TmpfsOptions.value());
+
+            const auto structured = ValidateAndGetCached<ArgType::Mount>(L"type=volume,source=data-volume,target=/data");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Volume), static_cast<int>(structured.MountType));
+            VERIFY_ARE_EQUAL(std::wstring(L"data-volume"), structured.Source);
+        }
+
         // string -> tuple<name, soft, hard> (ulimit)
         auto ulimit = ValidateAndGetCached<ArgType::Ulimit>(L"nofile=1024:2048");
         VERIFY_ARE_EQUAL(std::get<0>(ulimit), std::string("nofile"));
@@ -544,7 +562,6 @@ class WSLCCLIArgumentUnitTests
 
         const std::vector<Case> cases = {
             {ArgType::Gpus, L"all"},
-            {ArgType::Volume, LR"(C:\hostPath:/containerPath)"},
             {ArgType::WorkDir, L"/app"},
             {ArgType::NetworkAlias, L"myalias"},
         };

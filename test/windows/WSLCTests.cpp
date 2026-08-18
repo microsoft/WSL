@@ -6447,15 +6447,15 @@ class WSLCTests
             ValidateProcessOutput(process, {}, 0);
         }
 
-        // Validate that relative tmpfs paths are rejected by Docker.
+        // Validate that relative tmpfs paths are rejected.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-tmpfs-relative", {"/bin/cat"});
             launcher.AddTmpfs("relative-path", "");
 
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
 
-            ValidateCOMErrorMessage(L"invalid mount path: 'relative-path' mount path must be absolute");
+            ValidateCOMErrorMessage(wsl::shared::Localization::WSLCCLI_MountTargetAbsoluteError());
         }
 
         // Validate that invalid tmpfs options are rejected by Docker.
@@ -8539,9 +8539,16 @@ class WSLCTests
 
                 if (expectedSource.has_value())
                 {
-                    const std::filesystem::path actualSource(it->Source);
-                    VERIFY_IS_TRUE(actualSource.is_absolute());
-                    VERIFY_IS_TRUE(std::filesystem::equivalent(actualSource, expectedSource.value()));
+                    if (expectedType == "bind")
+                    {
+                        const std::filesystem::path actualSource(it->Source);
+                        VERIFY_IS_TRUE(actualSource.is_absolute());
+                        VERIFY_IS_TRUE(std::filesystem::equivalent(actualSource, expectedSource.value()));
+                    }
+                    else
+                    {
+                        VERIFY_ARE_EQUAL(it->Source, expectedSource->string());
+                    }
                 }
                 else
                 {
@@ -8606,7 +8613,7 @@ class WSLCTests
                 details.Mounts,
                 {{"/test-volume", "bind", testFolder, true},
                  {"/test-volume-ro", "bind", testFolderReadOnly, false},
-                 {"/test-guest-volume", "volume", std::nullopt, true},
+                 {"/test-guest-volume", "volume", std::filesystem::path{guestVolumeName}, true},
                  {"/mnt/wslc-tmpfs-inspect", "tmpfs", std::nullopt, true}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));

@@ -29,6 +29,8 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+namespace mount = wsl::windows::common::mount;
+
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using namespace wsl::windows::common::wslutil;
@@ -148,20 +150,9 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
-    // Add volumes if specified
-    for (const auto& volumeSpec : options.Volumes)
+    for (const auto& mountSpec : options.Mounts)
     {
-        auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = volume.Host();
-        auto container = volume.ContainerPath();
-        if (volume.IsNamedVolume())
-        {
-            containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
-        }
-        else
-        {
-            containerLauncher.AddVolume(host, container, volume.IsReadOnly());
-        }
+        containerLauncher.AddMount(mountSpec);
     }
 
     containerLauncher.SetContainerFlags(containerFlags);
@@ -266,12 +257,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
     if (!options.DnsOptions.empty())
     {
         containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
-    }
-
-    for (const auto& tmpfsSpec : options.Tmpfs)
-    {
-        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
-        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
     }
 
     for (const auto& [key, value] : options.Labels)

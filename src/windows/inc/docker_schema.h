@@ -239,6 +239,14 @@ inline void to_json(nlohmann::json& j, const ContainerNetworkRequest& v)
     }
 }
 
+struct MountTmpfsOptions
+{
+    std::int64_t SizeBytes{};
+    std::uint32_t Mode{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MountTmpfsOptions, SizeBytes, Mode);
+};
+
 struct Mount
 {
     std::string Name;
@@ -246,8 +254,9 @@ struct Mount
     std::string Target;
     std::string Type;
     bool ReadOnly{};
+    std::optional<MountTmpfsOptions> TmpfsOptions;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly, TmpfsOptions);
 };
 
 struct DeviceMapping
