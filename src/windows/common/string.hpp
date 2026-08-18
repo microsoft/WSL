@@ -67,9 +67,8 @@ std::string WideToMultiByte(_In_ std::wstring_view Source);
 std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
 std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
 
-// Formats a unix timestamp the way docker does, matching Go's time.Time.String() layout
-// "2006-01-02 15:04:05 -0700 MST" (e.g. "2026-07-12 17:00:00 -0700 PDT"). Falls back to UTC when
-// the time zone database is unavailable.
+// Formats a unix timestamp the way docker does, matching Go's time.Time.String() layout. Falls back
+// to UTC when the time zone database is unavailable.
 std::string FormatDockerTimestamp(LONGLONG timestamp);
 
 // Template implementation for TruncateId to avoid code duplication.

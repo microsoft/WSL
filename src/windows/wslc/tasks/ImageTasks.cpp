@@ -71,14 +71,12 @@ namespace {
         Terminal& m_terminal;
     };
 
-    // Values docker reports as unavailable. wslc does not track image digests or layer sharing, so
-    // these use the same placeholders docker emits.
+    // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
     constexpr std::string_view c_notAvailable = "N/A";
 
-    // Builds the docker-compatible representation of an image, shared by the table and json output
-    // so the two cannot drift. Docker emits every value as a string, uses "<none>" for missing
-    // repository/tag data, and truncates the id unless --no-trunc is passed, in which case it keeps
-    // the algorithm prefix.
+    // Builds the representation of an image, shared by the table and json output so the two cannot
+    // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,
+    // and the id is truncated unless --no-trunc is passed, in which case it keeps the algorithm prefix.
     ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
     {
         ImageOutputInformation entry;

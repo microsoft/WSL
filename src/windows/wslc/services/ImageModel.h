@@ -27,9 +27,9 @@ struct ImageInformation
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
 };
 
-// The docker-compatible shape emitted by "image list --format json". Docker reports every value as
-// a string and uses "<none>" rather than null for missing repository, tag, and digest data, so this
-// is kept separate from ImageInformation, which mirrors the service's native types.
+// The shape emitted by "image list --format json". Every value is reported as a string, and
+// "<none>" is used rather than null for missing repository, tag, and digest data, so this is kept
+// separate from ImageInformation, which mirrors the service's native types.
 struct ImageOutputInformation
 {
     std::string Containers;
@@ -47,7 +47,6 @@ struct ImageOutputInformation
         ImageOutputInformation, Containers, CreatedAt, CreatedSince, Digest, ID, Repository, SharedSize, Size, Tag, UniqueSize);
 };
 
-// Value docker emits for repository, tag, and digest data it does not have.
 inline constexpr std::string_view c_none = "<none>";
 
 struct PruneImagesResult

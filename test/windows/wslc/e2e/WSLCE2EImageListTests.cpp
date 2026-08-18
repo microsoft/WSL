@@ -65,7 +65,7 @@ class WSLCE2EImageListTests
     WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsIdsOnly)
     {
         // Get the expected image ID from JSON output. --no-trunc is required because json output
-        // truncates the id by default, matching docker.
+        // truncates the id by default.
         auto jsonResult = RunWslc(L"image list --format json --no-trunc");
         jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
         const auto images = ParseNdjsonOutputAs<ImageOutputInformation>(jsonResult);
@@ -147,8 +147,6 @@ class WSLCE2EImageListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat_MatchesDockerShape)
     {
-        // Docker reports exactly these fields for "docker images --format json", and every value is
-        // a string. Anything else breaks tools that consume the output interchangeably.
         const std::set<std::string> expectedKeys = {
             "Containers", "CreatedAt", "CreatedSince", "Digest", "ID", "Repository", "SharedSize", "Size", "Tag", "UniqueSize"};
 
@@ -169,7 +167,6 @@ class WSLCE2EImageListTests
 
             VERIFY_ARE_EQUAL(expectedKeys, keys, L"json output must contain exactly docker's image fields");
 
-            // Values docker always populates, even when it has no data for them.
             VERIFY_ARE_NOT_EQUAL(std::string{}, entry["Repository"].get<std::string>());
             VERIFY_ARE_NOT_EQUAL(std::string{}, entry["Tag"].get<std::string>());
             VERIFY_ARE_EQUAL(std::string{c_none}, entry["Digest"].get<std::string>());
@@ -184,8 +181,8 @@ class WSLCE2EImageListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat_ReportsContainerCount)
     {
-        // Docker counts every container created from an image, including containers that were
-        // never started, and reports it against every tag of that image.
+        // Every container created from an image is counted, including containers that were never
+        // started, and the count is reported against every tag of that image.
         constexpr auto containerName = L"wslc-image-list-container-count";
         EnsureContainerDoesNotExist(containerName);
 
@@ -223,8 +220,8 @@ class WSLCE2EImageListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat_TruncatesIdByDefault)
     {
-        // Docker truncates the id to 12 hex characters unless --no-trunc is passed, in which case
-        // it keeps the sha256: prefix.
+        // The id is truncated to 12 hex characters unless --no-trunc is passed, in which case it
+        // keeps the sha256: prefix.
         auto truncResult = RunWslc(L"image list --format json");
         truncResult.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -299,16 +296,16 @@ class WSLCE2EImageListTests
             VERIFY_IS_TRUE(found, std::format(L"Table output has no row matching json values: {}", row).c_str());
         }
 
-        // Docker never labels an untagged image "<untagged>" in either format.
+        // An untagged image is never labeled "<untagged>" in either format.
         for (const auto& line : tableLines)
         {
-            VERIFY_ARE_EQUAL(std::wstring::npos, line.find(L"<untagged>"), L"table must use docker's '<none>' placeholder");
+            VERIFY_ARE_EQUAL(std::wstring::npos, line.find(L"<untagged>"), L"table must use the '<none>' placeholder");
         }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_TableFormat_NoTruncKeepsAlgorithmPrefix)
     {
-        // Docker's --no-trunc table keeps the "sha256:" prefix on the image id.
+        // The --no-trunc table keeps the "sha256:" prefix on the image id.
         const auto result = RunWslc(L"image list --no-trunc");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -442,7 +439,7 @@ class WSLCE2EImageListTests
     WSLC_TEST_METHOD(WSLCE2E_Image_List_NoTrunc_ShowsFullImageId)
     {
         // Pull the full image id from JSON output. --no-trunc is required because json output
-        // truncates the id by default, matching docker.
+        // truncates the id by default.
         auto jsonResult = RunWslc(L"image list --format json --no-trunc");
         jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
         const auto images = ParseNdjsonOutputAs<ImageOutputInformation>(jsonResult);
