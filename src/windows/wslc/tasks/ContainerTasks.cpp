@@ -19,6 +19,7 @@ Abstract:
 #include "ContainerService.h"
 #include "ContainerTasks.h"
 #include "ImageModel.h"
+#include "MountSpecParsing.h"
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
@@ -34,34 +35,11 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
+using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatStorageSize;
+using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
-
-std::string FormatBytes(uint64_t bytes)
-{
-    constexpr uint64_t c_kib = 1024;
-    constexpr uint64_t c_mib = 1024 * c_kib;
-    constexpr uint64_t c_gib = 1024 * c_mib;
-
-    if (bytes >= c_gib)
-    {
-        return std::format("{:.2f} GiB", static_cast<double>(bytes) / static_cast<double>(c_gib));
-    }
-    else if (bytes >= c_mib)
-    {
-        return std::format("{:.2f} MiB", static_cast<double>(bytes) / static_cast<double>(c_mib));
-    }
-    else if (bytes >= c_kib)
-    {
-        return std::format("{:.2f} KiB", static_cast<double>(bytes) / static_cast<double>(c_kib));
-    }
-    else
-    {
-        // Bytes are always whole numbers, so decimal places are intentionally omitted here.
-        // This matches the behaviour of `docker stats`.
-        return std::format("{} B", bytes);
-    }
-}
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
 {
@@ -120,15 +98,18 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     }
 
     const auto& containerName = stats.name.empty() ? stats.id : stats.name;
+    const auto formatBinaryBytes = [](uint64_t bytes) {
+        return WideToMultiByte(FormatStorageSize(bytes, StorageSizeUnit::Binary, 2, true));
+    };
 
     return {
         {"ID", stats.id},
         {"Name", containerName},
         {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
-        {"MemUsage", std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit))},
+        {"MemUsage", std::format("{} / {}", formatBinaryBytes(stats.memory_stats.usage), formatBinaryBytes(stats.memory_stats.limit))},
         {"MemPerc", std::format("{:.2f}%", memPercent)},
-        {"NetIO", std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes))},
-        {"BlockIO", std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes))},
+        {"NetIO", std::format("{} / {}", formatBinaryBytes(netRxBytes), formatBinaryBytes(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", formatBinaryBytes(blkReadBytes), formatBinaryBytes(blkWriteBytes))},
         {"PIDs", stats.pids_stats.current},
     };
 }
@@ -678,11 +659,13 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAllValues<ArgType::Volume>();
-        options.Volumes.reserve(options.Volumes.size() + volumes.size());
-        for (const auto& volume : volumes)
-        {
-            options.Volumes.emplace_back(volume);
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(volumes.begin()), std::make_move_iterator(volumes.end()));
+    }
+
+    if (context.Args.Contains(ArgType::Mount))
+    {
+        auto mounts = context.Args.GetAllValues<ArgType::Mount>();
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(mounts.begin()), std::make_move_iterator(mounts.end()));
     }
 
     options.Remove = context.Args.GetValue<ArgType::Remove>();
@@ -847,12 +830,10 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::TMPFS))
     {
         auto tmpfs = context.Args.GetAllValues<ArgType::TMPFS>();
-        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
-        for (const auto& value : tmpfs)
-        {
-            options.Tmpfs.emplace_back(WideToMultiByte(value));
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(tmpfs.begin()), std::make_move_iterator(tmpfs.end()));
     }
+
+    ValidateUniqueMountDestinations(options);
 
     for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
     {
@@ -1082,7 +1063,6 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     context.Terminal.Output(L"\n");
-    context.Terminal.Output(
-        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

@@ -814,13 +814,14 @@ models::InspectType GetInspectTypeFromString(const std::wstring& input, const st
 
 int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
-    if (!parsed.has_value())
+    const auto bytes =
+        wsl::windows::common::string::ParseStorageSize(std::wstring_view{input}, wsl::windows::common::string::StorageSizeUnit::Binary);
+    if (!bytes.has_value() || bytes.value() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
     }
 
-    return static_cast<int64_t>(parsed.value());
+    return static_cast<int64_t>(bytes.value());
 }
 
 // Parses duration string into nanoseconds.

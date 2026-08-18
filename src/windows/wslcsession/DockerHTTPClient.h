@@ -157,7 +157,7 @@ public:
     // Network management.
     common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
     void RemoveNetwork(const std::string& Name);
-    std::vector<common::docker_schema::Network> ListNetworks();
+    std::vector<common::docker_schema::Network> ListNetworks(const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::Network InspectNetwork(const std::string& Name);
     void ConnectContainerToNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);
     void DisconnectContainerFromNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);

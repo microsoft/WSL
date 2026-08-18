@@ -139,7 +139,9 @@ void GetNetworks(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    context.Data.Add<Data::Networks>(NetworkService::List(session));
+
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
+    context.Data.Add<Data::Networks>(NetworkService::List(session, filters));
 }
 
 void InspectNetworks(CLIExecutionContext& context)

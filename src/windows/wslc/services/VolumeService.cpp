@@ -60,11 +60,19 @@ void VolumeService::Delete(models::Session& session, const std::string& name)
     THROW_IF_FAILED(session.Get()->DeleteVolume(name.c_str()));
 }
 
-std::vector<WSLCVolumeInformation> VolumeService::List(models::Session& session)
+std::vector<WSLCVolumeInformation> VolumeService::List(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
     wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> rawVolumes;
     ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListVolumes(nullptr, 0, &rawVolumes, &count));
+    THROW_IF_FAILED(session.Get()->ListVolumes(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &rawVolumes, &count));
 
     std::vector<WSLCVolumeInformation> volumes;
     volumes.reserve(count);

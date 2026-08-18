@@ -75,11 +75,19 @@ void NetworkService::Delete(models::Session& session, const std::string& name)
     THROW_IF_FAILED(session.Get()->DeleteNetwork(name.c_str()));
 }
 
-std::vector<WSLCNetworkInformation> NetworkService::List(models::Session& session)
+std::vector<WSLCNetworkInformation> NetworkService::List(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
     wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> rawNetworks;
     ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListNetworks(&rawNetworks, &count));
+    THROW_IF_FAILED(session.Get()->ListNetworks(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &rawNetworks, &count));
 
     std::vector<WSLCNetworkInformation> networks;
     networks.reserve(count);

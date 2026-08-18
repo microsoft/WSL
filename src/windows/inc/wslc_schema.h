@@ -30,13 +30,13 @@ struct InspectPortBinding
 
 struct InspectMount
 {
-    // TODO: Support different mount types (plan9/VHD) when VHD volumes are implemented.
     std::string Type;
+    std::string Name;
     std::string Source;
     std::string Destination;
     bool ReadWrite{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, ReadWrite);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Name, Source, Destination, ReadWrite);
 };
 
 struct HealthcheckResult

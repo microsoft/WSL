@@ -30,6 +30,7 @@ using io::MultiHandleWait;
 using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
+using wsl::windows::common::string::FormatBytes;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -1431,8 +1432,8 @@ try
             {
                 auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
                 auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
-                auto current = wsl::shared::string::FormatBytes(currentBytes);
-                auto total = wsl::shared::string::FormatBytes(totalBytes);
+                auto current = FormatBytes(currentBytes);
+                auto total = FormatBytes(totalBytes);
                 reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)
@@ -3008,7 +3009,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkInformation** Networks, ULONG* Count)
 try
 {
     WSLCExecutionContext context(this);
@@ -3019,23 +3020,48 @@ try
     *Networks = nullptr;
     *Count = 0;
 
-    auto lock = AcquireLease();
-    std::lock_guard networksLock(m_networksLock);
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    const bool filtered = !filters.empty();
 
-    if (m_networks.empty())
+    if (filtered)
     {
-        return S_OK;
+        // Scope the filtered query to WSLC-managed networks.
+        filters["label"].push_back(WSLCNetworkManagedLabel);
     }
+
+    auto lock = AcquireLease();
+
+    std::vector<docker_schema::Network> dockerNetworks;
+    if (filtered)
+    {
+        try
+        {
+            dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+        }
+        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+    }
+
+    std::lock_guard networksLock(m_networksLock);
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
 
     ULONG index = 0;
     for (const auto& [name, entry] : m_networks)
     {
+        if (filtered && std::ranges::find_if(dockerNetworks, [&](const auto& n) { return n.Name == name; }) == dockerNetworks.end())
+        {
+            continue;
+        }
+
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
         index++;
+    }
+
+    if (index == 0)
+    {
+        return S_OK;
     }
 
     *Networks = output.release();

@@ -397,218 +397,218 @@ Gebruik:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Copyright (C) Microsoft Corporation. Alle rechten voorbehouden.
+Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Gebruik: wsl.exe [Argument] [Opties...] [Opdrachtregel]
 
-Arguments for running Linux binaries:
+Argumenten voor het uitvoeren van binaire Linux-bestanden:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Als er geen opdrachtregel is opgegeven, wordt de standaardshell gestart met wsl.exe.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        De opgegeven opdracht uitvoeren zonder de standaardshell voor Linux te gebruiken.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        De opgegeven opdracht uitvoeren met het opgegeven shelltype.
 
     --
-        Pass the remaining command line as-is.
+        De resterende opdrachtregel in de huidige staat doorgeven.
 
-Options:
+Opties:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        De opgegeven map instellen als de huidige werkmap.
+        Als ~ wordt gebruikt, wordt het basispad van de Linux-gebruiker gebruikt. Als het pad begint
+        met een /-teken, wordt het geïnterpreteerd als een absoluut Linux-pad.
+        Anders moet de waarde een absoluut Windows-pad zijn.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        De opgegeven distributie uitvoeren.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        De opgegeven distributie-id uitvoeren.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Uitvoeren als de opgegeven gebruiker.
 
     --system
-        Launches a shell for the system distribution.
+        Een shell voor de systeemdistributie starten.
 
-Arguments for managing Windows Subsystem for Linux:
+Argumenten voor het beheren van het Windows-subsysteem voor Linux:
 
     --help
-        Display usage information.
+        Gebruiksgegevens weergeven.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Een WSL2-foutopsporingsshell voor diagnostische doeleinden openen.
 
     --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+        Een Windows-subsysteem voor Linux-distributie installeren.
+        Gebruik 'wsl.exe --list --online' voor een lijst met geldige distributies.
 
-        Options:
+        Opties:
             --enable-wsl1
-                Enable WSL1 support.
+                WSL1-ondersteuning inschakelen.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Een schijf met een vaste grootte maken om de distributie op te slaan.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Een distributie installeren vanaf een lokaal bestand.
 
             --legacy
-                Use the legacy distribution manifest.
+                Het verouderde distributiemanifest gebruiken.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Het installatiepad voor de distributie instellen.
 
-            --name &lt;Name&gt;
-                Set the name of the distribution.
+            --name &lt;Naam&gt;
+                De naam van de distributie instellen.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Door alleen de vereiste optionele onderdelen te installeren, wordt geen distributie geïnstalleerd.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                De distributie niet na de installatie starten.
 
-            --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+            --version &lt;Versie&gt;
+                Specificeert de versie die moet worden gebruikt voor de nieuwe distributie.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Specificeert de grootte van de schijf om de distributie op te slaan.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                De distributie downloaden van internet in plaats van Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Hiermee worden specifieke opties voor de distributie gewijzigd.
 
-        Options:
+        Opties:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                De distributie naar een nieuwe locatie verplaatsen.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                De VHD van de distributie instellen op sparse, zodat schijfruimte automatisch opnieuw kan worden geclaimd.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                De standaardgebruiker van de distributie instellen.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                De grootte van de schijf van de distributie wijzigen in de opgegeven grootte.
 
             --compact
-                Compact the VHDX file of a WSL 2 distribution.
+                Comprimeert het VHDX-bestand van een WSL 2-distributie.
 
-    --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+    --mount &lt;Schijf&gt;
+        Een fysieke of virtuele schijf toevoegen en koppelen in alle WSL 2-distributies.
 
-        Options:
+        Opties:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Hiermee geeft u aan dat &lt;Disk&gt; naar een virtuele harde schijf verwijst.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                De schijf toevoegen aan WSL2, maar niet koppelen.
 
-            --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+            --name &lt;Naam&gt;
+                De schijf koppelen met een aangepaste naam voor het koppelpunt.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Het bestandssysteem dat moet worden gebruikt bij het koppelen van een schijf wordt, indien niet opgegeven, standaard ingesteld op ext4.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Aanvullende koppelingsopties.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                De index van de partitie die moet worden gekoppeld wordt, indien niet opgegeven, standaard ingesteld op de hele schijf.
 
-    --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+    --set-default-version &lt;Versie&gt;
+        Hiermee wijzigt u de standaardinstallatieversie voor nieuwe distributies.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Hiermee beëindigt u onmiddellijk alle actieve distributies en de WSL 2
+        lichtgewicht virtuele machine voor hulpprogramma's.
 
-        Options:
+        Opties:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                De WSL 2-VM beëindigen, zelfs als er een bewerking wordt uitgevoerd. Dit kan gegevensverlies veroorzaken.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        De status van het Windows-subsysteem voor Linux weergeven.
 
-    --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+    --unmount [Schijf]
+        Hiermee wordt een schijf ontkoppeld en ontkoppeld van alle WSL2-distributies.
+        Hiermee worden alle schijven ontkoppeld en losgemaakt als deze zonder argument worden aangeroepen.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Hiermee verwijdert u het Windows-subsysteem voor Linux-pakket van deze computer.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Het Windows-subsysteem voor Linux-pakket bijwerken.
 
-        Options:
+        Opties:
             --pre-release
-                Download a pre-release version if available.
+                Een voorlopige versie downloaden, indien beschikbaar.
 
     --version, -v
-        Display version information.
+        Versiegegevens weergeven.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+        Hiermee exporteert u de distributie naar een TAR-bestand.
+        De bestandsnaam kan - zijn voor stdout.
 
-        Options:
+        Opties:
             --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+                Specificeert de exportindeling. Ondersteunde waarden: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Opties]
+        Hiermee importeert u het opgegeven TAR-bestand als een nieuwe distributie.
+        De bestandsnaam kan - zijn voor stdin.
 
-        Options:
-            --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+        Opties:
+            --version &lt;Versie&gt;
+                Hiermee geeft u de versie op die moet worden gebruikt voor de nieuwe distributie.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Hiermee geef je op dat het opgegeven bestand een VHD- of VHDX-bestand is en geen TAR-bestand.
+                Met deze bewerking wordt een kopie gemaakt van het VHD-bestand op de opgegeven installatielocatie.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Hiermee importeer je het opgegeven VHD-bestand als een nieuwe distributie.
+        Deze virtuele harde schijf moet zijn geformatteerd met het ext4-type bestandssysteem.
 
-    --list, -l [Options]
-        Lists distributions.
+    --list, -l [Opties]
+        Hiermee wordt een lijst met distributies weergegeven.
 
-        Options:
+        Opties:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Alle distributies weergeven, inclusief distributies die
+                momenteel worden geïnstalleerd of verwijderd.
 
             --running
-                List only distributions that are currently running.
+                Alleen distributies weergeven die momenteel worden uitgevoerd.
 
             --quiet, -q
-                Only show distribution names.
+                Alleen distributienamen weergeven.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Gedetailleerde informatie over alle distributies weergeven.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Geeft een lijst weer met beschikbare distributies voor installatie met 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Hiermee stelt u de distributie als standaard in.
 
-    --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+    --set-version &lt;Distro&gt; &lt;Versie&gt;
+        Hiermee wijzigt u de versie van de opgegeven distributie.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Hiermee wordt de opgegeven distributie beëindigd.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        De registratie van de distributie ongedaan maken en het hoofdbestandssysteem verwijderen.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -2204,11 +2204,15 @@ Gebruik:
     <value>Vereist argument niet ingevoerd: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Vereiste optie niet opgegeven: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Toont informatie over de geselecteerde opdracht</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Meerdere elkaar uitsluitende argumenten opgegeven: '{}'</value>
+    <value>Meerdere elkaar uitsluitende opties opgegeven: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2244,7 +2248,11 @@ Gebruik:
     <value>Kleuruitvoer uitschakelen.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Geef het Help-argument door voor meer informatie over een specifieke opdracht.</value>
+    <value>Geef de Help-optie door voor meer informatie over een specifieke opdracht.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Voer '{} --help' uit voor meer informatie.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Opdrachten:</value>
@@ -2261,8 +2269,14 @@ Gebruik:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Argumenten:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Verwante opties:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Gerelateerde argumenten:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Argumentnaam is niet herkend voor de huidige opdracht: '{}'</value>
+    <value>De optienaam is niet herkend voor de huidige opdracht: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2284,35 +2298,35 @@ Gebruik:
     <value>Container-id</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Ontbrekende argumentwaarde: '{}'</value>
+    <value>Ontbrekende optiewaarde: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Argumentalias is niet herkend voor de huidige opdracht: '{}'</value>
+    <value>Optiealias is niet herkend voor de huidige opdracht: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Aanduiding ongeldig argument: '{}'</value>
+     <value>Ongeldige optiespecificatie: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Verbonden vlagalias niet gevonden: '{}'</value>
+     <value>Verbonden optiealias niet gevonden: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Verbonden alias is geen vlag: '{}'</value>
+     <value>Verbonden optiealias is geen vlag: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Aanduiding ongeldig argument: '{}'</value>
+     <value>Ongeldige optiespecificatie: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Vlagargument mag geen verbonden waarde bevatten: '{}'</value>
+     <value>Optie mag geen aangehechte waarde bevatten: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Ongeldige booleaanse waarde voor vlagargument: '{}'. Verwacht true, false, 1 of 0.</value>
+     <value>Ongeldige booleaanse waarde voor optie: '{}'. Verwacht true, false, 1, 0, t of f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2320,7 +2334,7 @@ Gebruik:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Ontbrekende argumentnaam bij: '{}'</value>
+     <value>Ontbrekende optienaam bij: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2332,7 +2346,7 @@ Gebruik:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasargumenten met een waarde moeten als laatste in de aliasreeks staan: '{}'</value>
+     <value>Aliasopties met een waarde moeten als laatste in de aliasreeks staan: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2475,7 +2489,7 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Netwerkaliassen kunnen niet worden opgegeven als er meerdere netwerken worden aangevraagd. Gebruik één --network argument.</value>
+    <value>Netwerkaliassen kunnen niet worden opgegeven als er meerdere netwerken worden aangevraagd. Gebruik één --network optie.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2633,10 +2647,11 @@ Voorbeeld: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Toon gedetailleerde informatie over een container.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Containers beëindigen.</value>
+    <value>Beëindig een of meer actieve containers.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Beëindigt containers.</value>
+    <value>Beëindigt een of meer actieve containers door standaard SIGKILL te verzenden, of het signaal dat is opgegeven met --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Containers weergeven.</value>
@@ -2691,6 +2706,10 @@ Voorbeeld: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Stopt containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Signaal dat moet worden verzonden (standaard: de geconfigureerde STOPSIGNAL van de container of SIGTERM als er geen is geconfigureerd)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Installatiekopieën beheren.</value>
@@ -2956,7 +2975,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een positief aantal CPU's verwacht (bijvoorbeeld 0.5, 1, 2)</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een positief aantal CPU's verwacht (bijvoorbeeld 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2984,7 +3003,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Filter de uitvoer op basis van de opgegeven voorwaarden</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Ongeldig argument {} voor '-f, --filter' vlag: ongeldige indeling van filter (verwachte naam=waarde)</value>
+    <value>Ongeldige waarde {} voor '-f, --filter' optie: ongeldige indeling van filter (verwachte naam=waarde)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Logboekuitvoer volgen</value>
@@ -3070,6 +3089,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Ongeldige {}-waarde: de netwerknaam mag niet leeg zijn of een spatie bevatten</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: de netwerknaam kan slechts één keer worden opgegeven</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Ongeldige {} waarde: niet-ondersteunde netwerkoptie '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Netwerken in hostmodus worden niet ondersteund</value>
   </data>
@@ -3150,7 +3177,8 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Pad naar de sessieopslagmap</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signaal om te verzenden</value>
+    <value>Signaal dat naar de container wordt verzonden (standaard: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Huidige of bestaande afbeeldingsverwijzing in de indeling voor de afbeeldingsnaam [:tag]</value>
@@ -3254,7 +3282,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Verwachte &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (gebruik -1 voor onbeperkt)</value>
+    <value>Ongeldige {} optiewaarde: {}. Verwachte &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (gebruik -1 voor onbeperkt)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3291,11 +3319,11 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Ongeldige {} parameterwaarde: {}</value>
+    <value>Ongeldige waarde voor optie {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een Unix epoche-tijdstempel of een RFC3339 datum/tijd (bijvoorbeeld 2024-01-15T10:30:00Z) verwacht</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een Unix epoche-tijdstempel of een RFC3339 datum/tijd (bijvoorbeeld 2024-01-15T10:30:00Z) verwacht</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3303,11 +3331,11 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Ongeldige {} argumentwaarde: {}. Er wordt een duur verwacht (bijvoorbeeld 30s, 1m30s)</value>
+    <value>Ongeldige {} optiewaarde: {}. Er wordt een duur verwacht (bijvoorbeeld 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3397,7 +3425,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Netwerknaam</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Hiermee worden alleen de netwerknamen weergegeven</value>
+    <value>Toon alleen netwerk-id's</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Verwijder alle ongebruikte netwerken.</value>
@@ -3484,10 +3512,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Voert alleen de volumenamen uit</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Kan de installatiekopieën niet naar de terminal schrijven. Gebruik de -o-vlag of omleidings-stdout.</value>
+    <value>Kan de afbeelding niet naar de terminal schrijven. Gebruik de -o-optie of leid stdout om.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Kan container niet naar de terminal exporteren. Gebruik de -o-vlag of omleidings-stdout.</value>
+    <value>Kan container niet naar de terminal exporteren. Gebruik de -o-optie of leid stdout om.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Verwachte indeling: &lt;hostpad | benoemd volume&gt;:&lt;containerpad&gt;[:modus]</value>

@@ -397,218 +397,218 @@ Käyttö:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. Kaikki oikeudet pidätetään.
+Lisätietoja tämän tuotteen tietosuojasta löytyy osoitteesta https://aka.ms/privacy.
 
-Usage: wsl.exe [Argument] [Options...] [CommandLine]
+Käyttö: wsl.exe [Argumentti] [Asetukset...] [Komentorivi]
 
-Arguments for running Linux binaries:
+Linux-binaaritiedostojen suoritusargumentit:
 
-    If no command line is provided, wsl.exe launches the default shell.
+    Jos komentoriville ei anneta tekstiä, wsl.exe käynnistää oletusliittymän.
 
     --exec, -e &lt;CommandLine&gt;
-        Execute the specified command without using the default Linux shell.
+        Suorita määritetty komento käyttämättä oletusarvoista Linux-liittymää.
 
     --shell-type &lt;standard|login|none&gt;
-        Execute the specified command with the provided shell type.
+        Suorita määritetty komento annetulla liittymätyypillä.
 
     --
-        Pass the remaining command line as-is.
+        Välitä jäljellä oleva komentorivi sellaisenaan.
 
-Options:
+Asetukset:
     --cd &lt;Directory&gt;
-        Sets the specified directory as the current working directory.
-        If ~ is used the Linux user's home path will be used. If the path begins
-        with a / character, it will be interpreted as an absolute Linux path.
-        Otherwise, the value must be an absolute Windows path.
+        Asettaa määritetyn hakemiston nykyiseksi työhakemistoksi.
+        Jos ~ on käytössä, käytetään Linux-käyttäjän kotipolkua. Jos polku alkaa
+        merkillä /, se tulkitaan absoluuttiseksi Linux-poluksi.
+        Muussa tapauksessa arvon on oltava absoluuttinen Windows-polku.
 
     --distribution, -d &lt;DistroName&gt;
-        Run the specified distribution.
+        Suorita määritetty jakelu.
 
     --distribution-id &lt;DistroGuid&gt;
-        Run the specified distribution ID.
+        Suorita määritetty jakelutunnus.
 
     --user, -u &lt;UserName&gt;
-        Run as the specified user.
+        Suorita määritettynä käyttäjänä.
 
     --system
-        Launches a shell for the system distribution.
+        Käynnistää liittymän järjestelmän jakelua varten.
 
-Arguments for managing Windows Subsystem for Linux:
+Argumentit Windows-alijärjestelmän Linuxille hallintaan:
 
     --help
-        Display usage information.
+        Näytä käyttötiedot.
 
     --debug-shell
-        Open a WSL2 debug shell for diagnostics purposes.
+        Avaa WSL2-virheenkorjausliittymä diagnostiikkatarkoitusta varten.
 
-    --install [Distro] [Options...]
-        Install a Windows Subsystem for Linux distribution.
-        For a list of valid distributions, use 'wsl.exe --list --online'.
+    --install [Jakelu] [Asetukset...]
+        Asenna jakelu Windows-alijärjestelmään Linuxille.
+        Jos haluat luettelon kelvollisista jakeluista, käytä argumenttia 'wsl.exe --list --online'.
 
-        Options:
+        Asetukset:
             --enable-wsl1
-                Enable WSL1 support.
+                Ota WSL1-tuki käyttöön.
 
             --fixed-vhd
-                Create a fixed-size disk to store the distribution.
+                Luo kooltaan kiinteä levy jakelun tallentamista varten.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Asenna jakelu paikallisesta tiedostosta.
 
             --legacy
-                Use the legacy distribution manifest.
+                Käytä vanhoja jakelun kokoonpanotietoja.
 
             --location &lt;Location&gt;
-                Set the install path for the distribution.
+                Määritä jakelun asennuspolku.
 
             --name &lt;Name&gt;
-                Set the name of the distribution.
+                Määritä jakelun nimi.
 
             --no-distribution
-                Only install the required optional components, does not install a distribution.
+                Asenna ainoastaan pakolliset valinnaiset komponentit, älä jakelua.
 
             --no-launch, -n
-                Do not launch the distribution after install.
+                Älä käynnistä jakelua asennuksen jälkeen.
 
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Määrittää uutta jakelua varten käytettävän version.
 
             --vhd-size &lt;MemoryString&gt;
-                Specifies the size of the disk to store the distribution.
+                Määrittää jakelun tallennuslevyn koon.
 
             --web-download
-                Download the distribution from the internet instead of the Microsoft Store.
+                Lataa jakelu Internetistä Microsoft Storen sijaan.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Changes distro specific options.
+        Muuttaa tietyn jakelun asetuksia.
 
-        Options:
+        Asetukset:
             --move &lt;Location&gt;
-                Move the distribution to a new location.
+                Siirrä jakelu uuteen sijaintiin.
 
             --set-sparse, -s &lt;true|false&gt;
-                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Määritä jakelun VHD sparse-tiedostoksi, jolloin levytila voidaan vapauttaa automaattisesti.
 
             --set-default-user &lt;Username&gt;
-                Set the default user of the distribution.
+                Määritä jakelun oletuskäyttäjä.
 
             --resize &lt;MemoryString&gt;
-                Resize the disk of the distribution to the specified size.
+                Muuta jakelun levyn koko määritettyyn kokoon.
 
             --compact
-                Compact the VHDX file of a WSL 2 distribution.
+                Tiivistä WSL 2 -jakelun VHDX-tiedosto.
 
     --mount &lt;Disk&gt;
-        Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
+        Liittää ja ottaa käyttöön fyysisen tai virtuaalilevyn kaikissa WSL2-jakeluissa.
 
-        Options:
+        Asetuksia:
             --vhd
-                Specifies that &lt;Disk&gt; refers to a virtual hard disk.
+                Määrittää, että &lt;Disk&gt; viittaa virtuaalikiintolevyyn.
 
             --bare
-                Attach the disk to WSL2, but don't mount it.
+                Liitä levy WSL2:een, mutta älä ota sitä käyttöön.
 
             --name &lt;Name&gt;
-                Mount the disk using a custom name for the mountpoint.
+                Ota levy käyttöön käyttäen mukautettua nimeä käyttöönottopisteelle.
 
             --type &lt;Type&gt;
-                Filesystem to use when mounting a disk, if not specified defaults to ext4.
+                Tiedostojärjestelmä, jota käytetään levyn käyttöönotossa, jos sitä ei ole määritetty, käytetään oletusarvoa ext4.
 
             --options &lt;Options&gt;
-                Additional mount options.
+                Käyttöönoton lisäasetukset.
 
             --partition &lt;Index&gt;
-                Index of the partition to mount, if not specified defaults to the whole disk.
+                Käyttöön otettavan osion indeksi, jos sitä ei ole määritetty, käytetään oletusarvoisesti koko levyä.
 
     --set-default-version &lt;Version&gt;
-        Changes the default install version for new distributions.
+        Muuttaa uusien jakeluiden oletusasennusversiota.
 
     --shutdown
-        Immediately terminates all running distributions and the WSL 2
-        lightweight utility virtual machine.
+        Lopettaa kaikki käynnissä olevat jakelut ja WSL 2:n
+        kevyen käytön näennäiskoneen.
 
-        Options:
+        Asetuksia:
             --force
-                Terminate the WSL 2 virtual machine even if an operation is in progress. Can cause data loss.
+                Lopeta WSL 2 -virtuaalikone, vaikka toiminto olisi käynnissä. Voi aiheuttaa tietojen menetyksen.
 
     --status
-        Show the status of Windows Subsystem for Linux.
+        Näytä Windows-alijärjestelmän Linuxille tila.
 
-    --unmount [Disk]
-        Unmounts and detaches a disk from all WSL2 distributions.
-        Unmounts and detaches all disks if called without argument.
+    --unmount [Levy]
+        Poistaa levyn käytöstä ja irrottaa sen kaikista WSL2-jakeluista.
+        Poistaa mounttauksen ja irrottaa kaikki levyt, jos komento annetaan ilman argumenttia.
 
     --uninstall
-        Uninstalls the Windows Subsystem for Linux package from this machine.
+        Poistaa Windows-alijärjestelmä Linuxille -paketin tästä tietokoneesta.
 
     --update
-        Update the Windows Subsystem for Linux package.
+        Päivitä Windows-alijärjestelmän Linuxille -paketti.
 
-        Options:
+        Asetuksia:
             --pre-release
-                Download a pre-release version if available.
+                Lataa ennakkoversio, jos se on saatavilla.
 
     --version, -v
-        Display version information.
+        Näytä versiotiedot.
 
-Arguments for managing distributions in Windows Subsystem for Linux:
+Windows-alijärjestelmässä Linuxille olevien jakeluiden hallinnan argumentit:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exports the distribution to a tar file.
-        The filename can be - for stdout.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Asetukset]
+        Vie jakelun tar-tiedostoon.
+        Tiedostonimi voi olla - STDOUT-siirrännälle.
 
-        Options:
-            --format &lt;Format&gt;
-                Specifies the export format. Supported values: tar, tar.gz, tar.xz, vhd.
+        Asetuksia:
+            --format &lt;Muotoilu&gt;
+                Määrittää vientimuodon. Tuetut arvot: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Imports the specified tar file as a new distribution.
-        The filename can be - for stdin.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Asetukset]
+        Tuo määritetyn tar-tiedoston uutena jakeluna.
+        Tiedostonimi voi olla - STDIN-siirrännälle.
 
-        Options:
+        Asetuksia:
             --version &lt;Version&gt;
-                Specifies the version to use for the new distribution.
+                Määrittää uudelle jakelulle käytettävän version.
 
             --vhd
-                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
-                This operation makes a copy of the VHD file at the specified install location.
+                Määrittää, että annettu tiedosto on .vhd- tai .vhdx-tiedosto, ei tar-tiedosto.
+                Tämä toiminto tekee kopion VHD-tiedostosta määritettyyn asennussijaintiin.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Imports the specified VHD file as a new distribution.
-        This virtual hard disk must be formatted with the ext4 filesystem type.
+        Tuo määritetyn VHD-tiedoston uutena jakeluna.
+        Tämä virtuaalikiintolevy on alustettava ext4-tiedostojärjestelmän tyypillä.
 
-    --list, -l [Options]
-        Lists distributions.
+    --list, -l [Asetukset]
+        Näyttää luettelon jakeluista.
 
-        Options:
+        Asetukset:
             --all
-                List all distributions, including distributions that are
-                currently being installed or uninstalled.
+                Näytä luettelo kaikista jakeluista, mukaan lukien jakelut, joita
+                parhaillaan asennettuna tai poistettuna.
 
             --running
-                List only distributions that are currently running.
+                Näytä vain parhaillaan käynnissä olevien jakeluiden luettelo.
 
             --quiet, -q
-                Only show distribution names.
+                Näytä vain jakeluiden nimet.
 
             --verbose, -v
-                Show detailed information about all distributions.
+                Näytä yksityiskohtaiset tiedot kaikista jakeluista.
 
             --online, -o
-                Displays a list of available distributions for install with 'wsl.exe --install'.
+                Näyttää luettelon asennettavissa olevista jakeluista argumentilla 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Sets the distribution as the default.
+        Määrittää jakauman oletukseksi.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Changes the version of the specified distribution.
+        Muuttaa määritetyn jakelun versiota.
 
     --terminate, -t &lt;Distro&gt;
-        Terminates the specified distribution.
+        Lopettaa määritetyn jakelun.
 
     --unregister &lt;Distro&gt;
-        Unregisters the distribution and deletes the root filesystem.</value>
+        Poistaa jakelun rekisteröinnin ja päätiedostojärjestelmän.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -1069,7 +1069,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
   </data>
   <data name="MessageCompactVhdNotSupported" xml:space="preserve">
-    <value>Compaction is only supported on .vhdx files.</value>
+    <value>Tiivistämistä tuetaan vain .vhdx-tiedostoissa.</value>
     <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -2204,11 +2204,15 @@ Käyttö:
     <value>Pakollista argumenttia ei ole annettu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Pakollista asetusta ei annettu: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Näyttää valitun komennon ohjeen</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Useita toisensa poissulkevia argumentteja annettiin: {}</value>
+    <value>Annettiin useita toisensa poissulkevia asetuksia: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2244,7 +2248,11 @@ Käyttö:
     <value>Poista väritulostus käytöstä.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Jos haluat lisätietoja tietystä komennosta, siirrä se ohjeargumenttiin.</value>
+    <value>Jos haluat lisätietoja tietystä komennosta, anna sille help-asetus.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Suorita '{} --help', jotta saat lisätietoja.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Komennot:</value>
@@ -2261,8 +2269,14 @@ Käyttö:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Argumentit:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Liittyvät asetukset:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Liittyvät argumentit:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Argumentin nimeä ei tunnistettu nykyiselle komennolle: {}</value>
+    <value>Asetuksen nimeä ei tunnistettu nykyiselle komennolle: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2284,35 +2298,35 @@ Käyttö:
     <value>Säilötunnus</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Argumentin arvo puuttuu: {}</value>
+    <value>Asetuksen arvo puuttuu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Argumentin aliasta ei tunnistettu nykyiselle komennolle: {}</value>
+    <value>Asetusaliasta ei tunnistettu nykyiselle komennolle: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Virheellinen argumentin määrite: {}</value>
+     <value>Virheellinen asetusmäärite: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Liitettyä merkintäaliasta ei löytynyt: {}</value>
+     <value>Liitettyä asetuksen aliasta ei löydy: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Liitetty alias ei ole merkintä: {}</value>
+     <value>Liitetty asetusalias ei ole merkintä: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Virheellinen argumentin määrite: {}</value>
+     <value>Virheellinen asetusmäärite: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Merkintäargumentti ei voi sisältää liitettyä arvoa: {}</value>
+     <value>Vaihtoehto ei voi sisältää liitettyä arvoa: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Virheellinen totuusarvo lippuargumentille: {}. Odotettiin arvoa true, false, 1 tai 0.</value>
+     <value>Virheellinen totuusarvo asetukselle: {}. Odotettu arvo on true, false, 1, 0, t tai f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2320,7 +2334,7 @@ Käyttö:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Argumentin nimi puuttuu kohteesta: {}</value>
+     <value>Asetuksen nimi puuttuu kohdasta: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2332,7 +2346,7 @@ Käyttö:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Alias-argumenttien, joilla on arvo, on oltava viimeisenä alias-ketjussa: {}</value>
+     <value>Arvon sisältävien alias-asetusten on oltava viimeisinä alias-ketjussa: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2475,7 +2489,7 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network argument.</value>
+    <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network option.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2633,10 +2647,11 @@ Esimerkki: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Näytä yksityiskohtaisia tietoja säilöstä.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Lopeta säilöt.</value>
+    <value>Lopeta yksi tai useampi käynnissä oleva säilö.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Lopettaa säilöt.</value>
+    <value>Lopettaa vähintään yhden käynnissä olevan säilön lähettämällä oletusarvoisesti SIGKILL-kohteen tai signaalin, joka on määritetty signaalilla --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Luettele säilöt.</value>
@@ -2691,6 +2706,10 @@ Esimerkki: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Pysäyttää säilöt.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Lähetettävä signaali (oletus: säilön määrittämä STOPSIGNAL tai SIGTERM, jos mitään ei ole määritetty)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Kuvien hallinta.</value>
@@ -2956,7 +2975,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Virheellinen {}-argumentin arvo: {}. Odotettiin positiivista suorittimien määrää (esimerkiksi 0.5, 1 tai 2)</value>
+    <value>Virheellinen {} vaihtoehdon arvo: {}. Odotettiin positiivista suorittimien määrää (esimerkiksi 0.5, 1 tai 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2984,7 +3003,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Suodata tulos annettujen ehtojen perusteella</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Virheellinen argumentti "{}" merkinnälle '-f, --filter': virheellinen suodattimen muoto (odotettu nimi=arvo)</value>
+    <value>Virheellinen arvo {} asetukselle '-f, --filter': suodattimen muoto on virheellinen (odotettu name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Seuraa lokitulostetta</value>
@@ -3070,6 +3089,14 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Virheellinen {}-arvo: verkon nimi ei voi olla tyhjä tai sisältää välilyöntejä</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Virheellinen {}-arvo: verkon nimi voidaan määrittää vain kerran</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Virheellinen {}-arvo: verkkoasetusta "{}" ei tueta</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>Isäntätilan verkkoa ei tueta</value>
   </data>
@@ -3150,7 +3177,8 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Istunnon tallennushakemiston polku</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Lähetettävä signaali</value>
+    <value>Säilöön lähetettävä signaali (oletus: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Nykyinen tai olemassa oleva kuvaviittaus muodossa image-name[:tag]</value>
@@ -3235,7 +3263,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Set type of progress output (auto, tty, plain, quiet) (default: auto)</value>
+    <value>Aseta edistymisen tulostustyyppi (auto, tty, plain, quiet) (oletus: auto)</value>
     <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
@@ -3254,7 +3282,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Virheellinen argumentin {} arvo: {}. Odotettu &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (käytä -1:ä rajoittamattomaan arvoon)</value>
+    <value>Virheellinen {}-asetuksen arvo: {}. Odotettu &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (käytä -1:ä rajoittamattomaan arvoon)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3279,7 +3307,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized progress type. Supported progress types are: {}.</value>
+    <value>Virheellinen {}-arvo: {} ei ole tunnistettu edistymistyyppi. Tuetut edistymistyypit ovat: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
@@ -3291,11 +3319,11 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Virheellinen argumentin {} arvo: {}</value>
+    <value>Virheellinen {}-asetuksen arvo: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Virheellinen {}-argumentin arvo: {}. Odotettiin Unix-kauden aikaleimaa tai RFC3339 päivämäärä-aikaa (esimerkiksi 2024-01-15T10:30:00Z)</value>
+    <value>Virheellinen {} vaihtoehdon arvo: {}. Odotettiin Unix-kauden aikaleimaa tai RFC3339 päivämäärä-aikaa (esimerkiksi 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3303,11 +3331,11 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Virheellinen argumentin {} arvo: {}. Odotettiin muistin kokoa (esim. 256M, 1G)</value>
+    <value>Virheellinen {}-asetuksen arvo: {}. Odotettiin muistin kokoa (esim. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Virheellinen argumentin {} arvo: {}. Odotettiin kestoa (esim. 30s, 1m30s)</value>
+    <value>Virheellinen {}-asetuksen arvo: {}. Odotettiin kestoa (esim. 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3397,7 +3425,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Verkon nimi</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Antaa tuloksena pelkät verkkojen nimet</value>
+    <value>Näytä vain verkkotunnukset</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Poista kaikki käyttämättömät verkot.</value>
@@ -3484,10 +3512,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Tulostaa vain asemien nimet</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Kuvaa ei voi kirjoittaa päätteeseen. Käytä -o-merkintää tai ohjaa stdout uudelleen.</value>
+    <value>Kuvaa ei voi kirjoittaa päätteeseen. Käytä -o-asetusta tai ohjaa stdout uudelleen.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Säiliötä ei voi viedä päätteeseen. Käytä -o-merkintää tai ohjaa stdout uudelleen.</value>
+    <value>Säiliötä ei voi viedä päätteeseen. Käytä -o-asetusta tai ohjaa stdout uudelleen.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Odotettu muoto: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
