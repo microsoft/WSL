@@ -71,6 +71,11 @@ std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
 // to UTC when the time zone database is unavailable.
 std::string FormatDockerTimestamp(LONGLONG timestamp);
 
+// Formats an RFC 3339 timestamp reported by the docker API, e.g. "2026-03-05T10:30:00.123456789Z",
+// the way docker formats network timestamps: UTC, with the fractional seconds preserved exactly as
+// the daemon reported them. The input is returned unchanged when it cannot be parsed.
+std::string FormatDockerTimestamp(std::string_view timestamp);
+
 // Template implementation for TruncateId to avoid code duplication.
 // Algorithm inspired from Moby for consistency in presentation of shortened IDs.
 // Always strips the algorithm prefix (e.g., "sha256:") if present, and optionally shortens to 12 characters.

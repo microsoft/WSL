@@ -5422,10 +5422,8 @@ class WSLCTests
 
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
-        // List should start empty.
-        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(0u, networks.size());
+        // The network must not exist yet. Docker's predefined networks are always listed.
+        VERIFY_IS_FALSE(NetworkIsListed(networkName));
 
         WSLCNetworkOptions options{};
         options.Name = networkName.c_str();
@@ -5437,11 +5435,16 @@ class WSLCTests
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         // Verify it appears in the list with correct fields.
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
-        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
-        VERIFY_IS_TRUE(strlen(networks[0].Id) > 0);
+        auto networks = ListNetworks();
+        const auto created = std::ranges::find_if(networks, [&](const auto& network) { return network.Name == networkName; });
+        VERIFY_ARE_NOT_EQUAL(networks.end(), created);
+        VERIFY_ARE_EQUAL(std::string("bridge"), created->Driver);
+        VERIFY_ARE_EQUAL(std::string("local"), created->Scope);
+        VERIFY_IS_FALSE(created->Id.empty());
+        VERIFY_IS_FALSE(created->Created.empty());
+
+        // The label used to track wslc managed networks is an implementation detail and must not surface.
+        VERIFY_IS_FALSE(created->Labels.contains("com.microsoft.wsl.network.managed"));
 
         // Duplicate name should fail.
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_defaultSession->CreateNetwork(&options, nullptr));
@@ -5449,12 +5452,24 @@ class WSLCTests
         cleanup.release();
         VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
-        // List should be empty again.
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(0u, networks.size());
+        VERIFY_IS_FALSE(NetworkIsListed(networkName));
 
         // Delete non-existent should fail.
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork(networkName.c_str()));
+    }
+
+    std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> ListNetworks(const std::vector<WSLCFilter>& Filters = {})
+    {
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(Filters.empty() ? nullptr : Filters.data(), static_cast<ULONG>(Filters.size()), &output));
+
+        return wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>>(output.get());
+    }
+
+    bool NetworkIsListed(const std::string& Name)
+    {
+        const auto networks = ListNetworks();
+        return std::ranges::any_of(networks, [&](const auto& network) { return network.Name == Name; });
     }
 
     void CreateNamedNetwork(const std::string& Name, const std::vector<WSLCLabel>& Labels = {})
@@ -5493,26 +5508,19 @@ class WSLCTests
             const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
             const ULONG filtersCount = static_cast<ULONG>(filters.size());
 
-            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-            VERIFY_ARE_EQUAL(
-                expected, m_defaultSession->ListNetworks(filtersPtr, filtersCount, networks.addressof(), networks.size_address<ULONG>()));
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(expected, m_defaultSession->ListNetworks(filtersPtr, filtersCount, &output));
         };
 
         auto expectList = [&](const std::vector<std::string>& expected,
                               const std::vector<WSLCFilter>& filters,
                               const std::source_location& source = std::source_location::current()) {
-            const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
-            const ULONG filtersCount = static_cast<ULONG>(filters.size());
-
-            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(filtersPtr, filtersCount, networks.addressof(), networks.size_address<ULONG>()));
-
             std::vector<std::string> names;
-            for (const auto& n : networks)
+            for (const auto& n : ListNetworks(filters))
             {
                 names.emplace_back(n.Name);
-                VERIFY_IS_TRUE(strlen(n.Id) > 0);
-                VERIFY_ARE_EQUAL(std::string("bridge"), std::string(n.Driver));
+                VERIFY_IS_FALSE(n.Id.empty());
+                VERIFY_ARE_EQUAL(std::string("bridge"), n.Driver);
             }
 
             VerifyAreEqualUnordered(expected, names, source);
@@ -5536,8 +5544,23 @@ class WSLCTests
         expectList(all, {{"label", testLabelKV.c_str()}, {"driver", "bridge"}});
         expectList({}, {{"label", testLabelKV.c_str()}, {"driver", "nonexistent"}});
 
-        // Explicit managed-label filter is idempotent with the auto-injected one.
+        // Networks created by wslc carry the managed label, which can still be filtered on explicitly.
         expectList(all, {{"label", testLabelKV.c_str()}, {"label", managedLabel.c_str()}});
+
+        // Predefined networks are not managed by wslc but are still listed.
+        {
+            const auto networks = ListNetworks();
+            std::vector<std::string> names;
+            for (const auto& n : networks)
+            {
+                names.emplace_back(n.Name);
+            }
+
+            for (const auto& predefined : {"bridge", "host", "none"})
+            {
+                VERIFY_ARE_NOT_EQUAL(names.end(), std::ranges::find(names, predefined));
+            }
+        }
 
         // Null filter key/value is rejected.
         expectListFails(E_POINTER, {{nullptr, "anything"}});
@@ -5582,13 +5605,8 @@ class WSLCTests
 
             expectPrune({a, b});
 
-            wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-            VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-            for (const auto& n : networks)
-            {
-                VERIFY_ARE_NOT_EQUAL(a, std::string(n.Name));
-                VERIFY_ARE_NOT_EQUAL(b, std::string(n.Name));
-            }
+            VERIFY_IS_FALSE(NetworkIsListed(a));
+            VERIFY_IS_FALSE(NetworkIsListed(b));
 
             cleanup.release();
         }
@@ -5723,10 +5741,8 @@ class WSLCTests
 
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
 
-        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+        const auto networks = ListNetworks();
+        VERIFY_IS_TRUE(std::ranges::any_of(networks, [&](const auto& network) { return network.Name == networkName; }));
     }
 
     WSLC_TEST_METHOD(NetworkCreateInvalidDriverAndOptionTest)
@@ -5786,11 +5802,10 @@ class WSLCTests
 
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
 
-        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
-        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
+        const auto networks = ListNetworks();
+        const auto created = std::ranges::find_if(networks, [&](const auto& network) { return network.Name == networkName; });
+        VERIFY_ARE_NOT_EQUAL(networks.end(), created);
+        VERIFY_ARE_EQUAL(std::string("bridge"), created->Driver);
     }
 
     WSLC_TEST_METHOD(NetworkCreateReservedNameTest)
@@ -5997,11 +6012,10 @@ class WSLCTests
         VERIFY_IS_NOT_NULL(output.get());
 
         auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
-        VERIFY_IS_TRUE(inspect.Options.has_value());
-        VERIFY_IS_TRUE(inspect.Options->contains("my.abc.key"));
-        VERIFY_IS_TRUE(inspect.Options->contains("com.example.flag"));
-        VERIFY_ARE_EQUAL(std::string("mygod"), inspect.Options->at("my.abc.key"));
-        VERIFY_ARE_EQUAL(std::string("1"), inspect.Options->at("com.example.flag"));
+        VERIFY_IS_TRUE(inspect.Options.contains("my.abc.key"));
+        VERIFY_IS_TRUE(inspect.Options.contains("com.example.flag"));
+        VERIFY_ARE_EQUAL(std::string("mygod"), inspect.Options.at("my.abc.key"));
+        VERIFY_ARE_EQUAL(std::string("1"), inspect.Options.at("com.example.flag"));
     }
 
     WSLC_TEST_METHOD(NetworkSessionRecoveryTest)
@@ -6024,12 +6038,11 @@ class WSLCTests
         // Reset the session (simulates session restart).
         ResetTestSession();
 
-        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
-        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
-        VERIFY_IS_TRUE(strlen(networks[0].Id) > 0);
+        const auto networks = ListNetworks();
+        const auto recovered = std::ranges::find_if(networks, [&](const auto& network) { return network.Name == networkName; });
+        VERIFY_ARE_NOT_EQUAL(networks.end(), recovered);
+        VERIFY_ARE_EQUAL(std::string("bridge"), recovered->Driver);
+        VERIFY_IS_FALSE(recovered->Id.empty());
 
         // Verify arbitrary driver options survive session recovery.
         wil::unique_cotaskmem_ansistring output;
@@ -6037,9 +6050,8 @@ class WSLCTests
         VERIFY_IS_NOT_NULL(output.get());
 
         auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
-        VERIFY_IS_TRUE(inspect.Options.has_value());
-        VERIFY_IS_TRUE(inspect.Options->contains("recovery.test.key"));
-        VERIFY_ARE_EQUAL(std::string("preserved"), inspect.Options->at("recovery.test.key"));
+        VERIFY_IS_TRUE(inspect.Options.contains("recovery.test.key"));
+        VERIFY_ARE_EQUAL(std::string("preserved"), inspect.Options.at("recovery.test.key"));
     }
 
     WSLC_TEST_METHOD(NetworkMultipleCreateListDeleteTest)
@@ -6077,13 +6089,27 @@ class WSLCTests
         optionsC.Internal = TRUE;
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsC, nullptr));
 
-        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(3u, networks.size());
+        auto listedNames = [&]() {
+            std::vector<std::string> names;
+            for (const auto& network : ListNetworks())
+            {
+                names.push_back(network.Name);
+            }
+
+            return names;
+        };
+
+        auto names = listedNames();
+        VERIFY_ARE_NOT_EQUAL(names.end(), std::ranges::find(names, networkNameA));
+        VERIFY_ARE_NOT_EQUAL(names.end(), std::ranges::find(names, networkNameB));
+        VERIFY_ARE_NOT_EQUAL(names.end(), std::ranges::find(names, networkNameC));
 
         VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(nullptr, 0, networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(2u, networks.size());
+
+        names = listedNames();
+        VERIFY_ARE_NOT_EQUAL(names.end(), std::ranges::find(names, networkNameA));
+        VERIFY_ARE_EQUAL(names.end(), std::ranges::find(names, networkNameB));
+        VERIFY_ARE_NOT_EQUAL(names.end(), std::ranges::find(names, networkNameC));
     }
 
     WSLC_TEST_METHOD(NetworkInspectTest)

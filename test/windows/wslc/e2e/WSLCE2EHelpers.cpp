@@ -257,7 +257,7 @@ void VerifyNetworkIsListed(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
+    auto networks = ParseNdjsonOutputAs<NetworkListOutput>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
@@ -273,7 +273,7 @@ void VerifyNetworkIsNotListed(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
+    auto networks = ParseNdjsonOutputAs<NetworkListOutput>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
@@ -526,7 +526,7 @@ void EnsureNetworkDoesNotExist(const std::wstring& networkName)
 {
     auto result = RunWslc(L"network list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto networks = ParseNdjsonOutputAs<WSLCNetworkInformation>(result);
+    auto networks = ParseNdjsonOutputAs<NetworkListOutput>(result);
     for (const auto& net : networks)
     {
         if (net.Name == wsl::shared::string::WideToMultiByte(networkName))

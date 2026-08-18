@@ -16,6 +16,7 @@ Abstract:
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <sstream>
 
 std::vector<std::string> wsl::windows::common::string::InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize)
 {
@@ -441,4 +442,40 @@ std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timesta
         LOG_CAUGHT_EXCEPTION();
         return std::format("{:%F %T} +0000 UTC", time);
     }
+}
+
+std::string wsl::windows::common::string::FormatDockerTimestamp(std::string_view timestamp)
+{
+    if (timestamp.empty())
+    {
+        return {};
+    }
+
+    // The number of fractional digits varies per timestamp, so they are captured verbatim and
+    // re-inserted after formatting instead of being parsed.
+    std::string parsable{timestamp};
+    std::string fraction;
+    const auto separator = parsable.find('.');
+    if (separator != std::string::npos)
+    {
+        auto end = separator + 1;
+        while (end < parsable.size() && (std::isdigit(static_cast<unsigned char>(parsable[end])) != 0))
+        {
+            end++;
+        }
+
+        fraction = parsable.substr(separator, end - separator);
+        parsable.erase(separator, end - separator);
+    }
+
+    std::chrono::sys_seconds parsed{};
+    std::istringstream stream(parsable);
+    stream >> std::chrono::parse("%FT%H:%M:%S%Z", parsed);
+    if (stream.fail())
+    {
+        return std::string{timestamp};
+    }
+
+    // Docker reports network timestamps in UTC rather than converting them to the local time zone.
+    return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }

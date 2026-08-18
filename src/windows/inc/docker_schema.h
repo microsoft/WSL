@@ -17,10 +17,38 @@ Abstract:
 #pragma once
 
 #include "JsonUtils.h"
+#include <chrono>
+#include <sstream>
 
 namespace wsl::windows::common::docker_schema {
 
 using wsl::shared::EmptyObject;
+
+// Reads a value from a docker response, treating both a missing key and an explicit null as absent.
+// Docker reports several empty maps and objects as null, which the default deserializer rejects.
+template <typename T>
+T ValueOrNull(const nlohmann::json& json, const char* key, T defaultValue = T{})
+{
+    const auto entry = json.find(key);
+    if (entry == json.end() || entry->is_null())
+    {
+        return defaultValue;
+    }
+
+    return entry->get<T>();
+}
+
+// Converts a docker UTC ISO 8601 timestamp, e.g. "2026-03-05T10:30:00.123456789Z", to seconds since
+// the unix epoch.
+inline std::uint64_t ParseTimestamp(const std::string& timestamp)
+{
+    std::chrono::sys_seconds utcSeconds;
+    std::istringstream stream(timestamp);
+    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
+    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
+
+    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
+}
 
 struct CreatedContainer
 {
@@ -127,8 +155,37 @@ struct IPAM
 {
     std::string Driver;
     std::optional<std::vector<IPAMConfig>> Config;
+    std::map<std::string, std::string> Options;
+};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAM, Driver, Config);
+inline void to_json(nlohmann::json& j, const IPAM& ipam)
+{
+    j = nlohmann::json{{"Driver", ipam.Driver}, {"Config", ipam.Config}, {"Options", ipam.Options}};
+}
+
+inline void from_json(const nlohmann::json& j, IPAM& ipam)
+{
+    ipam.Driver = ValueOrNull<std::string>(j, "Driver");
+    ipam.Config = ValueOrNull<std::optional<std::vector<IPAMConfig>>>(j, "Config");
+    ipam.Options = ValueOrNull<std::map<std::string, std::string>>(j, "Options");
+}
+
+struct NetworkConfigFrom
+{
+    std::string Network;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkConfigFrom, Network);
+};
+
+struct NetworkContainer
+{
+    std::string Name;
+    std::string EndpointID;
+    std::string MacAddress;
+    std::string IPv4Address;
+    std::string IPv6Address;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkContainer, Name, EndpointID, MacAddress, IPv4Address, IPv6Address);
 };
 
 struct CreateNetworkResponse
@@ -157,15 +214,45 @@ struct Network
 {
     std::string Id;
     std::string Name;
+    std::string Created;
     std::string Driver;
     std::string Scope;
+    bool EnableIPv4{true};
+    bool EnableIPv6{};
     bool Internal{};
+    bool Attachable{};
+    bool Ingress{};
+    bool ConfigOnly{};
+    NetworkConfigFrom ConfigFrom;
     IPAM IPAM;
-    std::optional<std::map<std::string, std::string>> Options;
+    std::map<std::string, std::string> Options;
     std::map<std::string, std::string> Labels;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Options, Labels);
+    std::map<std::string, NetworkContainer> Containers;
+    nlohmann::json Status = nlohmann::json::object();
 };
+
+inline void from_json(const nlohmann::json& j, Network& network)
+{
+    const Network defaults{};
+
+    network.Id = ValueOrNull<std::string>(j, "Id");
+    network.Name = ValueOrNull<std::string>(j, "Name");
+    network.Created = ValueOrNull<std::string>(j, "Created");
+    network.Driver = ValueOrNull<std::string>(j, "Driver");
+    network.Scope = ValueOrNull<std::string>(j, "Scope");
+    network.EnableIPv4 = ValueOrNull<bool>(j, "EnableIPv4", defaults.EnableIPv4);
+    network.EnableIPv6 = ValueOrNull<bool>(j, "EnableIPv6");
+    network.Internal = ValueOrNull<bool>(j, "Internal");
+    network.Attachable = ValueOrNull<bool>(j, "Attachable");
+    network.Ingress = ValueOrNull<bool>(j, "Ingress");
+    network.ConfigOnly = ValueOrNull<bool>(j, "ConfigOnly");
+    network.ConfigFrom = ValueOrNull<NetworkConfigFrom>(j, "ConfigFrom");
+    network.IPAM = ValueOrNull<docker_schema::IPAM>(j, "IPAM");
+    network.Options = ValueOrNull<std::map<std::string, std::string>>(j, "Options");
+    network.Labels = ValueOrNull<std::map<std::string, std::string>>(j, "Labels");
+    network.Containers = ValueOrNull<std::map<std::string, NetworkContainer>>(j, "Containers");
+    network.Status = ValueOrNull<nlohmann::json>(j, "Status", defaults.Status);
+}
 
 struct EndpointIPAMConfig
 {
