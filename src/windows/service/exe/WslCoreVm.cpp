@@ -73,6 +73,21 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
+
+wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path)
+{
+    wil::unique_hfile file{CreateFileW(
+        Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!file);
+
+    return file;
+}
+
+bool IsBackingVolumeMounted(_In_ HANDLE File)
+{
+    DWORD bytesReturned{};
+    return DeviceIoControl(File, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &bytesReturned, nullptr);
+}
 } // namespace
 
 WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig) :
@@ -990,6 +1005,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
 
     // Set a scope exit variable to perform cleanup if attaching the disk fails.
     DiskStateFlags diskFlags{};
+    wil::unique_hfile backingFile;
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         FreeLun(Lun.value());
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::AccessGranted))
@@ -1047,8 +1063,24 @@ ULONG WslCoreVm::AttachDiskLockHeld(
                 // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the LUN of the mounted disk.
                 THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
 
-                return found->second.Lun;
+                // Check if the lun is still valid. It could be stale if the backing volume is reattached.
+                if (IsBackingVolumeMounted(found->second.BackingFile.get()))
+                {
+                    return found->second.Lun;
+                }
+
+                const auto staleLun = found->second.Lun;
+                wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), staleLun);
+                if (WI_IsFlagSet(found->second.Flags, DiskStateFlags::AccessGranted))
+                {
+                    wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), found->first.Path.c_str());
+                }
+
+                m_attachedDisks.erase(found);
+                FreeLun(staleLun);
             }
+
+            backingFile = OpenVhdBackingFile(Disk);
 
             auto grantDiskAccess = [&]() {
                 auto runAsUser = wil::impersonate_token(UserToken);
@@ -1084,7 +1116,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             result, Localization::MessageFailedToAttachDisk(Disk, wsl::windows::common::wslutil::GetSystemErrorString(result)));
     }
 
-    m_attachedDisks.emplace(AttachedDisk{Type, Disk, IsUserDisk}, DiskState{Lun.value(), {}, diskFlags});
+    m_attachedDisks.emplace(AttachedDisk{Type, Disk, IsUserDisk}, DiskState{Lun.value(), {}, diskFlags, std::move(backingFile)});
     cleanup.release();
 
     return Lun.value();
@@ -1744,6 +1776,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
+        auto backingFile = OpenVhdBackingFile(path);
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
         disk.Path = path;
@@ -1765,7 +1798,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
             CATCH_LOG()
         }
 
-        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, diskFlags});
+        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, diskFlags, std::move(backingFile)});
         return lun;
     };
 
