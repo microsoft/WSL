@@ -105,6 +105,18 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
+    if (options.IpAddress.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        containerLauncher.SetPrimaryNetworkIpAddress(std::string(options.IpAddress.value()));
+    }
+
     if (!options.Networks.empty())
     {
         const auto& primary = options.Networks.front();
