@@ -224,11 +224,11 @@ public:
     {
         SKIP_TEST_ARM64();
 
-        constexpr auto MountPoint = "C:\\lxss_fat";
-        constexpr auto VhdPath = "C:\\lxss_fat.vhdx";
-        auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteVolume(MountPoint, VhdPath); });
+        constexpr auto MountPoint = L"C:\\lxss_fat";
+        constexpr auto VhdPath = L"C:\\lxss_fat.vhdx";
+        auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteTestVolume(MountPoint, VhdPath); });
 
-        VERIFY_NO_THROW(CreateVolume("fat32", 100, MountPoint, VhdPath));
+        VERIFY_NO_THROW(CreateTestVolume(L"fat32", 100, MountPoint, VhdPath));
         VERIFY_NO_THROW(
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 3'").c_str(), L"drvfs3"));
     }
@@ -338,11 +338,11 @@ public:
         SKIP_TEST_ARM64();
         WSL_TEST_VERSION_REQUIRED(wsl::windows::common::helpers::WindowsBuildNumbers::Germanium);
 
-        constexpr auto MountPoint = "C:\\lxss_refs";
-        constexpr auto VhdPath = "C:\\lxss_refs.vhdx";
-        auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteVolume(MountPoint, VhdPath); });
+        constexpr auto MountPoint = L"C:\\lxss_refs";
+        constexpr auto VhdPath = L"C:\\lxss_refs.vhdx";
+        auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteTestVolume(MountPoint, VhdPath); });
 
-        VERIFY_NO_THROW(CreateVolume("refs", 50000, MountPoint, VhdPath));
+        VERIFY_NO_THROW(CreateTestVolume(L"refs", 50000, MountPoint, VhdPath));
         VERIFY_NO_THROW(
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 6'").c_str(), L"drvfs6"));
     }
@@ -1010,55 +1010,6 @@ private:
             File.get(), nullptr, nullptr, nullptr, &IoStatus, FSCTL_SET_REPARSE_POINT, ReparseBuffer, ReparseBufferSize, nullptr, 0));
 
         return File;
-    }
-
-    static VOID CreateVolume(LPCSTR FileSystem, ULONG MaxSizeInMb, LPCSTR MountPoint, LPCSTR VhdPath)
-    {
-        THROW_LAST_ERROR_IF(!CreateDirectoryA(MountPoint, NULL));
-
-        const auto CreateScript = std::vformat(
-            "create vdisk file={} maximum={} type=expandable\n"
-            "select vdisk file={}\n"
-            "attach vdisk\n"
-            "create partition primary\n"
-            "select partition 1\n"
-            "online volume\n"
-            "format fs={} quick\n"
-            "assign mount={}\n",
-            std::make_format_args(VhdPath, MaxSizeInMb, VhdPath, FileSystem, MountPoint));
-
-        RunDiskpartScript(CreateScript.c_str());
-    }
-
-    static VOID RunDiskpartScript(LPCSTR Script)
-    {
-        const std::wstring ScriptFileName = wsl::windows::common::filesystem::GetTempFilename();
-
-        std::ofstream ScriptFile(ScriptFileName);
-        THROW_LAST_ERROR_IF(!ScriptFile);
-
-        auto Cleanup = wil::scope_exit([&] { DeleteFileW(ScriptFileName.c_str()); });
-
-        ScriptFile << Script;
-        ScriptFile.close();
-
-        std::wstring CommandLine = L"diskpart.exe /s " + ScriptFileName;
-        THROW_HR_IF(E_FAIL, ((wsl::windows::common::helpers::RunProcess(CommandLine)) != 0));
-    }
-
-    static VOID DeleteVolume(LPCSTR MountPoint, LPCSTR VhdPath)
-    {
-        const auto CleanupScript = std::vformat(
-            "select vdisk file={}\n"
-            "select partition 1\n"
-            "remove all\n"
-            "detach vdisk\n",
-            std::make_format_args(VhdPath));
-
-        RunDiskpartScript(CleanupScript.c_str());
-
-        RemoveDirectoryA(MountPoint);
-        DeleteFileA(VhdPath);
     }
 
     static void ValidateDrvfsMounts(DWORD CreateProcessFlags, DrvFsMode Mode)

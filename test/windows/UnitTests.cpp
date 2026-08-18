@@ -7910,5 +7910,64 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
+    WSL2_TEST_METHOD(CachedVhdIsReattachedAfterBackingVolumeRemount)
+    {
+        const auto testName = std::format(L"cached-vhd-remount-{}-{}", GetCurrentProcessId(), GetTickCount64());
+        const auto testRoot = std::filesystem::temp_directory_path() / testName;
+        const auto outerVhd = testRoot / L"outer.vhdx";
+        const auto mountPath = testRoot / L"mount";
+        const auto installPath = mountPath / L"distro";
+        bool imported = false;
+        bool volumeAttached = false;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (imported)
+            {
+                if (!volumeAttached)
+                {
+                    try
+                    {
+                        AttachTestVolume(mountPath, outerVhd);
+                        volumeAttached = true;
+                    }
+                    CATCH_LOG()
+                }
+
+                LxsstuLaunchWsl(std::format(L"--unregister {}", testName));
+            }
+
+            WslShutdown();
+            try
+            {
+                DeleteTestVolume(mountPath, outerVhd);
+            }
+            CATCH_LOG()
+
+            std::error_code error;
+            std::filesystem::remove_all(testRoot, error);
+        });
+
+        std::filesystem::create_directories(testRoot);
+        CreateTestVolume(L"ntfs", 4096, mountPath, outerVhd);
+        volumeAttached = true;
+
+        WslKeepAlive keepAlive;
+        const auto importResult =
+            LxsstuLaunchWsl(std::format(L"--import {} \"{}\" \"{}\" --version 2", testName, installPath.c_str(), g_testDistroPath));
+        imported = (importResult == 0);
+        VERIFY_ARE_EQUAL(importResult, 0L);
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/true", testName)), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", testName)), 0L);
+
+        DetachTestVolume(mountPath, outerVhd);
+        volumeAttached = false;
+        VERIFY_IS_FALSE(std::filesystem::exists(installPath / LXSS_VM_MODE_VHD_NAME));
+
+        AttachTestVolume(mountPath, outerVhd);
+        volumeAttached = true;
+        VERIFY_IS_TRUE(std::filesystem::exists(installPath / LXSS_VM_MODE_VHD_NAME));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/true", testName)), 0L);
+    }
 }; // namespace UnitTests
 } // namespace UnitTests
