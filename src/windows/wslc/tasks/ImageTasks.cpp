@@ -23,6 +23,7 @@ Abstract:
 #include "TableOutput.h"
 #include "Task.h"
 #include <format>
+#include <unordered_map>
 #include <wslutil.h>
 
 using namespace wsl::shared;
@@ -69,6 +70,31 @@ namespace {
     private:
         Terminal& m_terminal;
     };
+
+    // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
+    constexpr std::string_view c_notAvailable = "N/A";
+
+    // Builds the representation of an image, shared by the table and json output so the two cannot
+    // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,
+    // and the id is truncated unless --no-trunc is passed, in which case it keeps the algorithm prefix.
+    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
+    {
+        ImageOutputInformation entry;
+        entry.Containers = image.Containers < 0 ? std::string{c_notAvailable} : std::to_string(image.Containers);
+
+        entry.CreatedAt = FormatDockerTimestamp(image.Created);
+        entry.CreatedSince =
+            WideToMultiByte(ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0));
+        entry.Digest = c_none;
+        entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
+        entry.Repository = image.Repository.value_or(std::string{c_none});
+        entry.SharedSize = c_notAvailable;
+        entry.Size = WideToMultiByte(FormatDockerSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
+        entry.Tag = image.Tag.value_or(std::string{c_none});
+        entry.UniqueSize = c_notAvailable;
+
+        return entry;
+    }
 
 } // namespace
 
@@ -154,7 +180,12 @@ void GetImages(CLIExecutionContext& context)
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    auto images = ImageService::List(session, filters);
+    // The container count is only reported by json output, and gathering it costs an extra query in
+    // the service, so it is only requested when it will be shown.
+    const bool containerCounts =
+        context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
+
+    auto images = ImageService::List(session, filters, containerCounts);
     context.Data.Add<Data::Images>(std::move(images));
 }
 
@@ -175,6 +206,7 @@ void ListImages(CLIExecutionContext& context)
     }
 
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
@@ -182,14 +214,13 @@ void ListImages(CLIExecutionContext& context)
     {
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(image, c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc), c_jsonCompactIndent));
         }
 
         break;
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
@@ -208,12 +239,13 @@ void ListImages(CLIExecutionContext& context)
 
         for (const auto& image : images)
         {
+            const auto entry = ToImageOutput(image, trunc);
             table.WriteRow({
-                MultiByteToWide(image.Repository.value_or("<untagged>")),
-                MultiByteToWide(image.Tag.value_or("<untagged>")),
-                MultiByteToWide(TruncateId(image.Id, trunc)),
-                ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / WSLC_IMAGE_1MB),
+                MultiByteToWide(entry.Repository),
+                MultiByteToWide(entry.Tag),
+                MultiByteToWide(entry.ID),
+                MultiByteToWide(entry.CreatedSince),
+                MultiByteToWide(entry.Size),
             });
         }
 
