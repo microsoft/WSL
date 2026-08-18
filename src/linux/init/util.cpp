@@ -26,6 +26,7 @@ Abstract:
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include <regex>
 #include <thread>
 #include <chrono>
@@ -877,6 +878,21 @@ try
     while (MountEnum.Next())
     {
         //
+        // When translating Windows paths to Linux, skip internal virtiofs
+        // device mounts. The aggregate virtiofs root and its per-share child
+        // binds live under VIRTIOFS_MOUNT_DIR and carry the same Windows source
+        // as the user-facing /mnt/<drive> bind mounts. If they were considered,
+        // translation could return an internal plumbing path (for example
+        // /run/wsl/virtiofs-mounts/drvfsa/<guid>) instead of the real mount
+        // point such as /mnt/c.
+        //
+
+        if (WinPath && UtilIsPathPrefix(MountEnum.Current().MountPoint, VIRTIOFS_MOUNT_DIR, false) > 0)
+        {
+            continue;
+        }
+
+        //
         // If a mount point was previously found, and this mount point is a
         // prefix of the path (or the previously found mount point, for Windows
         // to Linux translation), it means that the path is not actually on
@@ -911,6 +927,7 @@ try
         //
 
         std::string MountSource;
+        std::string_view MountRoot{MountEnum.Current().Root};
         if (strcmp(MountEnum.Current().FileSystemType, PLAN9_FS_TYPE) == 0)
         {
             MountSource = UtilParsePlan9MountSource(MountEnum.Current().SuperOptions);
@@ -923,13 +940,18 @@ try
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            const auto aggregateRoot = ParseAggregateVirtioFsMountRoot(MountEnum.Current().Source, MountRoot);
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source, MountEnum.Current().Root);
             if (MountSource.empty())
             {
                 continue;
             }
 
             MountEnum.Current().Source = MountSource.data();
+            if (aggregateRoot)
+            {
+                MountRoot = aggregateRoot->SubPath;
+            }
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {
@@ -961,10 +983,10 @@ try
         //
 
         std::string CombinedMountSource;
-        if (strcmp(MountEnum.Current().Root, "/") != 0)
+        if (MountRoot != "/")
         {
             CombinedMountSource += MountEnum.Current().Source;
-            CombinedMountSource += MountEnum.Current().Root;
+            CombinedMountSource += MountRoot;
             UtilCanonicalisePathSeparator(CombinedMountSource, PATH_SEP_NT);
             MountEnum.Current().Source = CombinedMountSource.data();
         }
@@ -1276,7 +1298,7 @@ try
     const auto& response = transaction.Receive<RESULT_MESSAGE<uint8_t>>();
     auto NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(response.Result);
 
-    THROW_ERRNO_IF(EINVAL, NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy);
+    THROW_ERRNO_IF(EINVAL, NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeConsomme);
 
     return NetworkingMode;
 }
@@ -3168,8 +3190,21 @@ try
     }
     else
     {
+        auto matchesPrefix = [Path](const std::string_view& prefix) {
+            if (!wsl::shared::string::StartsWith(Path, prefix, true))
+            {
+                return false;
+            }
+
+            // Validate that the next character is a path separator or the end of the string to prevent matching other distribution paths like:
+            // \\wsl.localhost\<distro-name>-<suffix>
+
+            auto nextChar = Path[prefix.size()];
+            return nextChar == '\0' || nextChar == PATH_SEP || nextChar == PATH_SEP_NT;
+        };
+
         auto PrefixLength = Prefix.length();
-        if (!wsl::shared::string::StartsWith(Path, Prefix, true))
+        if (!matchesPrefix(Prefix))
         {
             //
             // Check the old \\wsl$ prefix if it's not \\wsl.localhost.
@@ -3177,7 +3212,7 @@ try
 
             std::string CompatPrefix{PLAN9_RDR_COMPAT_PREFIX};
             CompatPrefix += DistributionName;
-            if (!wsl::shared::string::StartsWith(Path, CompatPrefix, true))
+            if (!matchesPrefix(CompatPrefix))
             {
                 return {};
             }
@@ -3326,6 +3361,22 @@ std::string UtilReadFileContent(std::string_view path)
     return {std::istreambuf_iterator<char>(file), {}};
 }
 
+HvPciSwiotlbPool UtilReadHvPciSwiotlbPool()
+{
+    HvPciSwiotlbPool pool{};
+    try
+    {
+        pool.Base = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_base"), nullptr, 0);
+        pool.Size = std::stoull(UtilReadFileContent("/sys/bus/vmbus/drivers/hv_pci/swiotlb_size"), nullptr, 0);
+    }
+    catch (...)
+    {
+        pool = {};
+    }
+
+    return pool;
+}
+
 uint16_t UtilWinAfToLinuxAf(uint16_t WinAddressFamily)
 {
     uint16_t LinuxAddressFamily = AF_UNSPEC;
@@ -3343,7 +3394,7 @@ uint16_t UtilWinAfToLinuxAf(uint16_t WinAddressFamily)
     return LinuxAddressFamily;
 }
 
-int WriteToFile(const char* Path, const char* Content, int permissions)
+int WriteToFile(const char* Path, const char* Content, int OpenFlags, int Permissions)
 
 /*++
 
@@ -3357,6 +3408,10 @@ Arguments:
 
     Content - Supplies the content to be written to the file.
 
+    OpenFlags - Supplies the flags passed to open().
+
+    Permissions - Supplies the file mode used when O_CREAT causes the file to be created.
+
 Return Value:
 
     0 on success, -1 on failure.
@@ -3364,7 +3419,7 @@ Return Value:
 --*/
 
 {
-    wil::unique_fd Fd{open(Path, (O_WRONLY | O_CLOEXEC | O_CREAT), permissions)};
+    wil::unique_fd Fd{open(Path, OpenFlags, Permissions)};
     if (!Fd)
     {
         int errnoPrev = errno;
@@ -3386,7 +3441,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer, const std::optional<std::string>& DistroCgroupPath)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3421,30 +3476,34 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
 
-    const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
-        try
-        {
-            wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
-            THROW_LAST_ERROR_IF(!ProcessSocket);
-
-            THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
-            THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
-            execv(Path, (char* const*)(ArgumentArray.data()));
-
-            // If this point is reached, an error needs to be reported back since execv() failed.
-            THROW_LAST_ERROR();
-        }
-        catch (...)
-        {
-            auto error = wil::ResultFromCaughtException();
-            LOG_ERROR("Command execution failed: {}", errno);
-
-            if (write(ControlPipe.write().get(), &error, sizeof(error)) != sizeof(error))
+    const int ChildPid = UtilCreateChildProcess(
+        "CreateChildProcess",
+        [&]() {
+            try
             {
-                LOG_ERROR("Failed to write command execution status: {}", errno);
+                wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
+                THROW_LAST_ERROR_IF(!ProcessSocket);
+
+                THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDIN_FILENO) < 0);
+                THROW_LAST_ERROR_IF(dup2(ProcessSocket.get(), STDOUT_FILENO) < 0);
+                execv(Path, (char* const*)(ArgumentArray.data()));
+
+                // If this point is reached, an error needs to be reported back since execv() failed.
+                THROW_LAST_ERROR();
             }
-        }
-    });
+            catch (...)
+            {
+                auto error = wil::ResultFromCaughtException();
+                LOG_ERROR("Command execution failed: {}", errno);
+
+                if (write(ControlPipe.write().get(), &error, sizeof(error)) != sizeof(error))
+                {
+                    LOG_ERROR("Failed to write command execution status: {}", errno);
+                }
+            }
+        },
+        {},
+        DistroCgroupPath);
 
     THROW_LAST_ERROR_IF(ChildPid < 0);
     ControlPipe.write().reset();
@@ -3457,7 +3516,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     {
         execResult = 0;
     }
-    else if (execResult == sizeof(execResult))
+    else if (ReadResult == sizeof(execResult))
     {
         // Otherwise, return the error code to the service
         execResult = abs(execResult);
@@ -3472,13 +3531,146 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
 
 #define RECLAIM_PATH CGROUP_MOUNTPOINT "/memory.reclaim"
 
-static long long int GetUserCpuTime()
+namespace {
+
+class CpuIdleTracker
+{
+public:
+    struct State
+    {
+        bool IntervalIdle;
+        bool WindowIdle;
+    };
+
+    State AddSample(unsigned long long Busy, unsigned long long Total)
+    {
+        m_windowBusy -= m_busyWindow[m_windowIndex];
+        m_windowTotal -= m_totalWindow[m_windowIndex];
+        m_busyWindow[m_windowIndex] = Busy;
+        m_totalWindow[m_windowIndex] = Total;
+        m_windowBusy += Busy;
+        m_windowTotal += Total;
+        m_windowIndex = (m_windowIndex + 1) % c_windowIntervals;
+        if (m_windowSamples < c_windowIntervals)
+        {
+            m_windowSamples += 1;
+        }
+
+        return {
+            .IntervalIdle = IsIdle(Busy, Total),
+            .WindowIdle = m_windowSamples == c_windowIntervals && IsIdle(m_windowBusy, m_windowTotal),
+        };
+    }
+
+    void Reset()
+    {
+        m_busyWindow.fill(0);
+        m_totalWindow.fill(0);
+        m_windowBusy = 0;
+        m_windowTotal = 0;
+        m_windowIndex = 0;
+        m_windowSamples = 0;
+    }
+
+private:
+    static bool IsIdle(unsigned long long Busy, unsigned long long Total)
+    {
+        return Total == 0 || Busy * 1000 <= Total * c_busyThresholdPerMille;
+    }
+
+    static constexpr size_t c_windowIntervals = 12;                  // 2 minutes
+    static constexpr unsigned long long c_busyThresholdPerMille = 5; // 0.5%
+
+    std::array<unsigned long long, c_windowIntervals> m_busyWindow{};
+    std::array<unsigned long long, c_windowIntervals> m_totalWindow{};
+    unsigned long long m_windowBusy = 0;
+    unsigned long long m_windowTotal = 0;
+    size_t m_windowIndex = 0;
+    size_t m_windowSamples = 0;
+};
+
+} // namespace
+
+static bool ReadCpuBusyIdle(unsigned long long& Busy, unsigned long long& Idle)
 
 /*++
 
 Routine Description:
 
-    This routine parses /proc/stat to query a summary of all user CPU time.
+    This routine parses the aggregate "cpu" line of /proc/stat and splits the cumulative jiffies into
+    busy and idle buckets. Idle time is idle + iowait; everything else (user, nice, system, irq,
+    softirq, steal) counts as busy, so kernel-bound work keeps the VM out of the idle state rather than
+    looking at user time alone.
+
+Arguments:
+
+    Busy - Receives the cumulative busy jiffies across all cores.
+
+    Idle - Receives the cumulative idle jiffies (idle + iowait) across all cores.
+
+Return Value:
+
+    true on success, false on failure.
+
+--*/
+
+{
+    wil::unique_fd fd{TEMP_FAILURE_RETRY(open("/proc/stat", O_RDONLY | O_CLOEXEC))};
+    if (!fd)
+    {
+        LOG_ERROR("open(/proc/stat) failed {}", errno);
+        return false;
+    }
+
+    char buffer[256];
+    const ssize_t result = TEMP_FAILURE_RETRY(read(fd.get(), buffer, sizeof(buffer) - 1));
+    if (result <= 0)
+    {
+        LOG_ERROR("read(/proc/stat) failed {}", errno);
+        return false;
+    }
+
+    buffer[result] = '\0';
+
+    //
+    // Format: "cpu  user nice system idle iowait irq softirq steal ...". The user, nice, system, idle,
+    // and iowait fields are required; irq, softirq, and steal are optional and any fields after steal
+    // are ignored.
+    //
+
+    static const std::regex cpuLine{R"(^cpu[ \t]+(\d+)[ \t]+(\d+)[ \t]+(\d+)[ \t]+(\d+)[ \t]+(\d+)(?:[ \t]+(\d+))?(?:[ \t]+(\d+))?(?:[ \t]+(\d+))?)"};
+    std::cmatch match;
+    if (!std::regex_search(buffer, match, cpuLine))
+    {
+        LOG_ERROR("failed to parse /proc/stat cpu line");
+        return false;
+    }
+
+    unsigned long long fields[8] = {};
+    for (size_t index = 0; index < COUNT_OF(fields); index += 1)
+    {
+        if (match[index + 1].matched)
+        {
+            fields[index] = strtoull(match[index + 1].first, nullptr, 10);
+        }
+    }
+
+    Idle = fields[3] + fields[4];
+    Busy = fields[0] + fields[1] + fields[2] + fields[5] + fields[6] + fields[7];
+
+    return true;
+}
+
+static long long GetReclaimableCacheBytes()
+
+/*++
+
+Routine Description:
+
+    This routine returns the amount of reclaimable file-backed page cache (in bytes) by parsing
+    /proc/meminfo. It counts only memory that cache reclaim can actually return to the host:
+    Active(file) + Inactive(file) + SReclaimable. Anonymous memory is excluded because reclaim of clean
+    cache cannot free it.
 
 Arguments:
 
@@ -3486,75 +3678,107 @@ Arguments:
 
 Return Value:
 
-    The current user CPU counter for all cores.
+    Reclaimable cache in bytes, or -1 on failure.
 
 --*/
 
 {
-    wil::unique_fd Fd{open("/proc/stat", O_RDONLY)};
-    if (!Fd)
+    std::ifstream memInfo("/proc/meminfo");
+    if (!memInfo)
     {
-        LOG_ERROR("open failed {}", errno);
+        LOG_ERROR("failed to open /proc/meminfo");
         return -1;
     }
 
-    char Buffer[32];
-    int Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer, (sizeof(Buffer) - 1)));
-    if (Result <= 0)
+    // /proc/meminfo values are in kB.
+    long long activeFileKb = 0;
+    long long inactiveFileKb = 0;
+    long long reclaimableSlabKb = 0;
+    bool foundActiveFile = false;
+    bool foundInactiveFile = false;
+    bool foundReclaimableSlab = false;
+    std::string line;
+    while (std::getline(memInfo, line))
     {
-        LOG_ERROR("read failed {}", errno);
+        std::istringstream stream(line);
+        std::string name;
+        long long value = 0;
+        if (!(stream >> name >> value))
+        {
+            continue;
+        }
+
+        if (name == "Active(file):")
+        {
+            activeFileKb = value;
+            foundActiveFile = true;
+        }
+        else if (name == "Inactive(file):")
+        {
+            inactiveFileKb = value;
+            foundInactiveFile = true;
+        }
+        else if (name == "SReclaimable:")
+        {
+            reclaimableSlabKb = value;
+            foundReclaimableSlab = true;
+        }
+    }
+
+    if (memInfo.bad())
+    {
+        LOG_ERROR("failed to read /proc/meminfo");
         return -1;
     }
 
-    //
-    // Parse the first line of /proc/stat which is in the format
-    // "cpu  <counter>".
-    //
-
-    Buffer[Result] = '\0';
-    char* Sp1;
-    char* Info = strtok_r(Buffer, " \n", &Sp1);
-    if (Info == nullptr)
+    if (!foundActiveFile || !foundInactiveFile || !foundReclaimableSlab)
     {
-        LOG_ERROR("/proc/stat first line missing cpu label");
+        LOG_ERROR("failed to find reclaimable cache counters in /proc/meminfo");
         return -1;
     }
 
-    Info = strtok_r(nullptr, " \n", &Sp1);
-    if (Info == nullptr)
-    {
-        LOG_ERROR("/proc/stat first line missing cpu counter");
-        return -1;
-    }
-
-    return strtoll(Info, nullptr, 10);
+    return (activeFileKb + inactiveFileKb + reclaimableSlabKb) * 1024;
 }
 
-static ssize_t GetMemoryInUse()
+static bool RequestReclaim(long long Bytes)
 
 /*++
 
 Routine Description:
 
-    This routine returns the amount memory in use in bytes.
+    Best-effort write of a byte count to the cgroup memory.reclaim knob. EAGAIN is an expected outcome
+    (the kernel freed some, but not all, of the requested pages) and is treated as success without
+    logging, so the long-lived reduction thread does not error out every interval. A transient failure
+    never throws.
 
 Arguments:
 
-    None.
+    Bytes - Supplies the number of bytes to request the kernel reclaim.
 
 Return Value:
 
-    Total memory - Free memory. Includes that used by cache and buffers.
+    true if pages were reclaimed (full success or EAGAIN), false otherwise.
 
 --*/
 
-try
 {
-    struct sysinfo Info = {};
-    THROW_LAST_ERROR_IF(sysinfo(&Info) < 0);
-    return (Info.totalram - Info.freeram) * Info.mem_unit;
+    wil::unique_fd fd{TEMP_FAILURE_RETRY(open(RECLAIM_PATH, O_WRONLY | O_CLOEXEC))};
+    if (!fd)
+    {
+        LOG_ERROR("open({}) failed {}", RECLAIM_PATH, errno);
+        return false;
+    }
+
+    const std::string request = std::to_string(Bytes) + " swappiness=0";
+    const ssize_t result = UtilWriteStringView(fd.get(), request);
+    if (result == static_cast<ssize_t>(request.size()) || (result < 0 && errno == EAGAIN))
+    {
+        return true;
+    }
+
+    LOG_ERROR("write({}, {}) failed {}", RECLAIM_PATH, request, errno);
+    return false;
 }
-CATCH_RETURN_ERRNO()
 
 void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
 
@@ -3562,8 +3786,13 @@ void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
 
 Routine Description:
 
-    This routine starts a background thread that performs memory compaction and optional cache/memory
-    reclaim when the VM is idle. This ensures that the maximum number of pages can be discarded to the host.
+    This routine starts a background thread that reclaims cold page cache and compacts free pages while
+    the VM is idle, so the maximum number of pages can be discarded back to the host.
+
+    Reclaim is gated on CPU idle using a rolling window of all non-idle CPU time, not just user time.
+    Gradual mode reclaims cold file-backed page cache above a small floor via the cgroup memory.reclaim
+    knob, falling back to drop_caches when the knob is unavailable. DropCache mode uses drop_caches
+    directly. Freed pages are compacted so free-page reporting can hand back large blocks.
 
 Arguments:
 
@@ -3577,132 +3806,259 @@ Return Value:
 
 try
 {
-    std::thread([Mode = Mode]() mutable {
+    if (Mode == LxMiniInitMemoryReclaimModeDisabled)
+    {
+        return;
+    }
+
+    std::thread([Mode]() {
         try
         {
             //
-            // Set the thread's scheduling policy to idle.
+            // Run at idle scheduling priority so reclaim never competes with real work.
             //
 
-            sched_param Parameter{};
-            Parameter.sched_priority = 0;
-            const int Result = pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter);
-            THROW_ERRNO_IF(Result, Result != 0);
+            sched_param parameter{};
+            parameter.sched_priority = 0;
+            const int result = pthread_setschedparam(pthread_self(), SCHED_IDLE, &parameter);
+            THROW_ERRNO_IF(result, result != 0);
 
             //
-            // Periodically check if the machine is idle by querying procfs for CPU usage.
-            // Memory compaction will occur if both of the following conditions are true:
-            //     1. The CPU time since the last check is greater than the idle threshold.
-            //     2. The current CPU usage is below the idle threshold. This is measured by taking two readings one second apart.
+            // Gradual mode uses cgroup memory.reclaim and falls back to drop_caches when unavailable.
             //
 
-            double MemoryLow = 1024 * 1024 * 1024;
-            double MemoryHigh = 1.1 * 1024.0 * 1024.0 * 1024.0;
-            const int IdleThreshold = get_nprocs(); // Change math to adjust if sysconf(_SC_CLK_TCK) != 100? Is 1%
-            long long int Start, Stop = 0;
-            auto constexpr SleepDuration = std::chrono::seconds(30);
-            size_t ReclaimIndex = 0;
-            long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
-            long long int ReclaimWindow[20] = {}; // 10 minutes
-            long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling = false;
-
-            //
-            // Fall back to drop cache if the required cgroup path is not present.
-            //
-
-            if (Mode == LxMiniInitMemoryReclaimModeGradual && access(RECLAIM_PATH, W_OK) < 0)
+            bool useReclaim = Mode != LxMiniInitMemoryReclaimModeDropCache;
+            if (useReclaim && access(RECLAIM_PATH, W_OK) < 0)
             {
                 LOG_WARNING("access({}, W_OK) failed {}, falling back to drop_caches", RECLAIM_PATH, errno);
-                Mode = LxMiniInitMemoryReclaimModeDropCache;
+                useReclaim = false;
             }
 
-            if (Mode == LxMiniInitMemoryReclaimModeGradual)
+            constexpr auto c_pollInterval = std::chrono::seconds(10);
+
+            // Reclaimable cache below this floor is always retained to protect a minimal working set.
+            constexpr long long c_floorBytes = 128ll * 1024 * 1024;
+
+            // Scale reclaim requests with the VM size while keeping individual operations bounded.
+            constexpr long long c_minReclaimBytes = 256ll * 1024 * 1024;
+            constexpr long long c_maxReclaimBytes = 1024ll * 1024 * 1024;
+
+            struct sysinfo info = {};
+            THROW_LAST_ERROR_IF(sysinfo(&info) < 0);
+
+            long long reclaimStepBytes = (static_cast<long long>(info.totalram) * info.mem_unit) / 32;
+            if (reclaimStepBytes < c_minReclaimBytes)
             {
-                static_assert(COUNT_OF(ReclaimWindow) >= 6);
-                ReclaimWindowLength = 6; // Set to 3 minutes.
+                reclaimStepBytes = c_minReclaimBytes;
             }
-
-            for (auto i = 1; i < ReclaimWindowLength; i++)
+            else if (reclaimStepBytes > c_maxReclaimBytes)
             {
-                ReclaimWindow[i] = LLONG_MIN;
+                reclaimStepBytes = c_maxReclaimBytes;
             }
 
-            std::this_thread::sleep_for(SleepDuration);
+            unsigned long long previousBusy = 0;
+            unsigned long long previousIdle = 0;
+            bool havePreviousSample = false;
+
+            CpuIdleTracker idleTracker;
+
+            bool droppedThisIdlePeriod = false;
+            bool compactedThisIdlePeriod = false;
+
             for (;;)
             {
-                auto const Target = std::chrono::steady_clock::now() + SleepDuration;
-                Start = GetUserCpuTime();
-                THROW_LAST_ERROR_IF(Start == -1);
+                std::this_thread::sleep_for(c_pollInterval);
 
-                if (Mode != LxMiniInitMemoryReclaimModeDisabled)
+                unsigned long long busy = 0;
+                unsigned long long idle = 0;
+                if (!ReadCpuBusyIdle(busy, idle))
                 {
-                    //
-                    // Ensure that utilization is below 0.5% from the last 30 seconds, and last n minutes, of usage.
-                    //
+                    continue;
+                }
 
-                    size_t const LastIndex = (ReclaimIndex + 1) % ReclaimWindowLength;
-                    if ((ReclaimWindow[LastIndex] > Start - ReclaimThreshold * (ReclaimWindowLength + 1)) &&
-                        (ReclaimWindow[ReclaimIndex] > Start - ReclaimThreshold))
-                    {
-                        if (Mode == LxMiniInitMemoryReclaimModeGradual)
-                        {
-                            double MemorySize = GetMemoryInUse();
-                            THROW_LAST_ERROR_IF(MemorySize < 0);
-
-                            if (MemorySize > MemoryHigh)
-                            {
-                                ReclaimIdling = false;
-                            }
-
-                            if (!ReclaimIdling && MemorySize > MemoryLow)
-                            {
-                                double MemoryTargetSize = MemorySize * 0.97;
-                                std::string MemoryToFree = std::to_string(size_t(MemorySize - MemoryTargetSize));
-                                // EAGAIN Means that it attempted, but was unable to evict sufficient pages.
-                                THROW_LAST_ERROR_IF(WriteToFile(RECLAIM_PATH, MemoryToFree.c_str()) < 0 && errno != EAGAIN);
-
-                                if (MemoryTargetSize < MemoryLow)
-                                {
-                                    ReclaimIdling = true;
-                                }
-                            }
-                        }
-                        else if (!ReclaimIdling)
-                        {
-                            ReclaimIdling = true;
-                            THROW_LAST_ERROR_IF(WriteToFile("/proc/sys/vm/drop_caches", "1\n") < 0);
-                        }
-                    }
-                    else
-                    {
-                        ReclaimIdling = false;
-                    }
-
-                    ReclaimIndex = LastIndex;
-                    ReclaimWindow[ReclaimIndex] = Start;
+                if (!havePreviousSample)
+                {
+                    previousBusy = busy;
+                    previousIdle = idle;
+                    havePreviousSample = true;
+                    continue;
                 }
 
                 //
-                // Perform memory compaction if the VM is idle.
-                // This coalesces free pages into larger blocks for more efficient page reporting.
+                // Guard against non-monotonic counters (should not happen, but resample if it does).
                 //
 
-                if ((Start - Stop) > IdleThreshold)
+                if (busy < previousBusy || idle < previousIdle)
                 {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    Stop = GetUserCpuTime();
-                    THROW_LAST_ERROR_IF(Stop == -1);
-                    if ((Stop - Start) < IdleThreshold)
+                    previousBusy = busy;
+                    previousIdle = idle;
+                    idleTracker.Reset();
+                    droppedThisIdlePeriod = false;
+                    compactedThisIdlePeriod = false;
+                    continue;
+                }
+
+                const unsigned long long busyDelta = busy - previousBusy;
+                const unsigned long long totalDelta = busyDelta + (idle - previousIdle);
+                previousBusy = busy;
+                previousIdle = idle;
+
+                const auto idleState = idleTracker.AddSample(busyDelta, totalDelta);
+                if (!idleState.WindowIdle)
+                {
+                    droppedThisIdlePeriod = false;
+                    compactedThisIdlePeriod = false;
+                    continue;
+                }
+
+                //
+                // A short burst blocks this tick but does not discard the preceding idle history.
+                //
+
+                if (!idleState.IntervalIdle)
+                {
+                    continue;
+                }
+
+                //
+                // The VM is idle: reclaim cold cache and compact.
+                //
+
+                bool reclaimed = false;
+                if (useReclaim)
+                {
+                    const long long cache = GetReclaimableCacheBytes();
+                    if (cache > c_floorBytes)
                     {
-                        THROW_LAST_ERROR_IF(WriteToFile("/proc/sys/vm/compact_memory", "1\n") < 0);
+                        long long bytes = cache - c_floorBytes;
+                        if (bytes > reclaimStepBytes)
+                        {
+                            bytes = reclaimStepBytes;
+                        }
+
+                        reclaimed = RequestReclaim(bytes);
+                    }
+                }
+                else if (!droppedThisIdlePeriod)
+                {
+                    //
+                    // drop_caches=3 frees the page cache along with reclaimable slab (dentries and
+                    // inodes), matching the SReclaimable slab counted by GetReclaimableCacheBytes.
+                    //
+
+                    if (WriteToFile("/proc/sys/vm/drop_caches", "3\n") == 0)
+                    {
+                        droppedThisIdlePeriod = true;
+                        reclaimed = true;
                     }
                 }
 
-                std::this_thread::sleep_until(Target);
+                //
+                // Coalesce freed pages into larger blocks for efficient page reporting.
+                //
+
+                bool memoryOperation = reclaimed;
+                if (!compactedThisIdlePeriod || reclaimed)
+                {
+                    if (WriteToFile("/proc/sys/vm/compact_memory", "1\n") == 0)
+                    {
+                        compactedThisIdlePeriod = true;
+                        memoryOperation = true;
+                    }
+                }
+
+                //
+                // Exclude the reclaim/compaction work from the next utilization interval so it does not
+                // restart the grace period itself.
+                //
+
+                if (memoryOperation)
+                {
+                    if (!ReadCpuBusyIdle(previousBusy, previousIdle))
+                    {
+                        havePreviousSample = false;
+                        idleTracker.Reset();
+                        droppedThisIdlePeriod = false;
+                        compactedThisIdlePeriod = false;
+                    }
+                }
             }
         }
         CATCH_LOG()
     }).detach();
 }
 CATCH_LOG()
+
+std::string UtilGetDistroCgroupPath(pid_t DistroInitPid)
+{
+    return std::format("{}/distro-{}", WSL_USER_CGROUP_PATH, DistroInitPid);
+}
+
+int UtilEnableAllCgroupControllers(const std::string& CgroupPath)
+{
+    // Only cpu and memory are required for wsl's resource limit; every other controller cgroup.controllers
+    // reports is enabled on a best-effort basis.
+    constexpr std::string_view RequiredControllers[] = {"cpu", "memory"};
+    std::string RequiredEntries;
+    for (const auto Controller : RequiredControllers)
+    {
+        RequiredEntries += std::format("+{} ", Controller);
+    }
+
+    if (WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), RequiredEntries.c_str()) < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for {}: {}", CgroupPath, errno);
+        return -1;
+    }
+
+    std::string AvailableControllers;
+    try
+    {
+        AvailableControllers = UtilReadFileContent(CgroupPath + "/cgroup.controllers");
+    }
+    CATCH_LOG();
+
+    std::string_view Remaining{AvailableControllers};
+    while (!Remaining.empty())
+    {
+        auto Controller = UtilStringNextToken(Remaining, " \n");
+        if (Controller.empty() ||
+            std::find(std::begin(RequiredControllers), std::end(RequiredControllers), Controller) != std::end(RequiredControllers))
+        {
+            continue;
+        }
+
+        // WriteToFile() already logs a failure; these controllers are best-effort so no extra handling is needed.
+        WriteToFile((CgroupPath + "/cgroup.subtree_control").c_str(), std::format("+{}", Controller).c_str());
+    }
+    return 0;
+}
+
+void UtilTryMoveSelfToDistroCgroup(const std::string& CgroupPath, bool IsSystemd, const std::string& LogSubject)
+try
+{
+    std::string ProcsFile{};
+    if (IsSystemd)
+    {
+        ProcsFile = CgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR + "/cgroup.procs";
+    }
+    else
+    {
+        auto NonSystemdCgroupPath = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR;
+        auto NonSystemdCgroupExists = access(NonSystemdCgroupPath.c_str(), F_OK) == 0;
+        if (NonSystemdCgroupExists)
+        {
+            ProcsFile = CgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR "/cgroup.procs";
+        }
+        else
+        {
+            ProcsFile = CgroupPath + "/cgroup.procs";
+        }
+    }
+
+    if (WriteToFile(ProcsFile.c_str(), "0") < 0)
+    {
+        LOG_WARNING("Failed to move process to cgroup {} for {}: {}", CgroupPath, LogSubject, errno);
+    }
+}
+CATCH_LOG();

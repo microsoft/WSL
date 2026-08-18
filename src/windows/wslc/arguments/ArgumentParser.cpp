@@ -17,10 +17,16 @@ Abstract:
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments) :
-    m_invocation(inv), m_executionArgs(execArgs), m_arguments(std::move(arguments)), m_invocationItr(m_invocation.begin())
+
+ParseArgumentsStateMachine::ParseArgumentsStateMachine(
+    Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
+    m_invocation(inv),
+    m_executionArgs(execArgs),
+    m_arguments(std::move(arguments)),
+    m_invocationItr(m_invocation.begin()),
+    m_optionsOnly(optionsOnly),
+    m_stopOnUnknown(stopOnUnknown)
 {
-    // Create sublists by Kind for easier processing in the state machine.
     for (const auto& arg : m_arguments)
     {
         switch (arg.Kind())
@@ -41,11 +47,17 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& 
     }
 
     m_positionalSearchItr = m_positionalArgs.begin();
+
+    m_overridableDefaults.reserve(overridableDefaults.size());
+    for (const auto& arg : overridableDefaults)
+    {
+        m_overridableDefaults.push_back(arg.Type());
+    }
 }
 
 bool ParseArgumentsStateMachine::Step()
 {
-    if (m_invocationItr == m_invocation.end())
+    if (m_stopped || m_invocationItr == m_invocation.end())
     {
         return false;
     }
@@ -63,13 +75,17 @@ void ParseArgumentsStateMachine::ThrowIfError() const
     // If the next argument was to be a value, but none was provided, convert it to an exception.
     else if (m_state.Type() && m_invocationItr == m_invocation.end())
     {
-        throw ArgumentException(Localization::WSLCCLI_MissingArgumentError(m_state.Arg()));
+        const auto* argument = FindArgument(m_state.Type().value());
+        const auto message = Localization::WSLCCLI_MissingArgumentError(m_state.Arg());
+        throw argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
     }
 }
 
 void ParseArgumentsStateMachine::AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const
 {
-    while (itr != m_positionalArgs.end() && (m_executionArgs.Count(itr->Type()) == itr->Limit()))
+    // Skip positionals that are already full. A single-value positional is full once it
+    // holds one value; an unlimited positional is never full.
+    while (itr != m_positionalArgs.end() && itr->IsSingle() && m_executionArgs.Count(itr->Type()) >= 1)
     {
         ++itr;
     }
@@ -88,35 +104,125 @@ bool ParseArgumentsStateMachine::HasNextPositional() const
     return itr != m_positionalArgs.end();
 }
 
-// Parse arguments as such:
-//  1. If argument starts with a single -, the alias is considered (can be 1-2 characters).
-//      a. If the named argument alias (a or ab) needs a VALUE, it can be provided in these ways:
-//          -a=VALUE or -ab=VALUE
-//          -a VALUE or -ab VALUE
-//      b. If the argument is a flag, additional characters after are treated as if they start
-//          with a -, repeatedly until the end of the argument is reached.  Fails if non-flags hit.
-//  2. If the argument starts with a double --, only the full name is considered.
-//      a. If the named argument (arg) needs a VALUE, it can be provided in these ways:
-//          --arg=VALUE
-//          --arg VALUE
-//  3. If the argument does not start with any -, it is considered the next positional argument.
-//  4. Once a positional argument is encountered, all subsequent arguments are considered positional
-//  5. If the command only has 1 positional argument, all subsequent arguments are considered forwarded.
+ParseArgumentsStateMachine::State ParseArgumentsStateMachine::BackUpAndStop()
+{
+    --m_invocationItr;
+    m_stopped = true;
+    return {};
+}
+
+bool ParseArgumentsStateMachine::ConsumeOverrideIfPresent(ArgType type)
+{
+    auto it = std::find(m_overridableDefaults.begin(), m_overridableDefaults.end(), type);
+    if (it == m_overridableDefaults.end())
+    {
+        return false;
+    }
+
+    m_executionArgs.Remove(type);
+    m_overridableDefaults.erase(it);
+    return true;
+}
+
+void ParseArgumentsStateMachine::ClearArgument(ArgType type)
+{
+    // Drop any preloaded overridable default and remove previously parsed entries so the
+    // argument is left absent. This is the single-value/last-wins primitive shared by
+    // SetFlag (which then stores the flag's explicit value) and AddValue (single-value args).
+    ConsumeOverrideIfPresent(type);
+    m_executionArgs.Remove(type);
+}
+
+void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
+{
+    // Boolean flags store their explicit parsed value (true or false) so a flag whose behavior
+    // is on by default can be turned off with "--flag=false". Clearing first collapses CLI
+    // duplicates to a single entry and gives docker's last-wins behavior for repeated flags
+    // (e.g. "--flag --flag=false" ends up false). Read flags back via ArgMap::GetValue(defaultValue), which
+    // folds the presence check and the stored value into one test, rather than a bare Contains().
+    ClearArgument(type);
+    m_executionArgs.Add(type, value);
+}
+
+std::wstring_view ParseArgumentsStateMachine::StripSurroundingQuotes(std::wstring_view value)
+{
+    if (value.length() >= 2 && value.front() == L'"' && value.back() == L'"')
+    {
+        value = value.substr(1, value.length() - 2);
+    }
+
+    return value;
+}
+
+ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ApplyFlagValue(ArgType type, std::wstring_view value, const std::wstring_view& currArg)
+{
+    const auto unquoted = StripSurroundingQuotes(value);
+    const auto boolVal = string::ParseBool(std::wstring(unquoted).c_str(), /*AllowExtendedForms*/ true);
+    if (!boolVal.has_value())
+    {
+        const auto* argument = FindArgument(type);
+        const auto message = Localization::WSLCCLI_FlagInvalidBooleanError(currArg);
+        return argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
+    }
+
+    SetFlag(type, boolVal.value());
+    return {};
+}
+
+const Argument* ParseArgumentsStateMachine::FindArgument(ArgType type) const
+{
+    for (const auto& arg : m_arguments)
+    {
+        if (arg.Type() == type)
+        {
+            return &arg;
+        }
+    }
+
+    return nullptr;
+}
+
+void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
+{
+    const Argument* arg = FindArgument(type);
+    WI_ASSERT(arg != nullptr);
+
+    // Unlimited value args accumulate; single-value args are last-wins. In both cases the
+    // first CLI value must displace a preloaded overridable default, which ClearArgument
+    // (single) and ConsumeOverrideIfPresent (unlimited) each handle.
+    if (arg != nullptr && arg->IsUnlimited())
+    {
+        ConsumeOverrideIfPresent(type);
+    }
+    else
+    {
+        ClearArgument(type);
+    }
+
+    m_executionArgs.Add(type, std::move(value));
+}
+
+// Parse rules:
+//  1. Token starting with a single '-' is an alias (1-2 chars):
+//     a. Value: '-a=VALUE' / '-ab=VALUE' / '-a VALUE' / '-ab VALUE'
+//     b. Flag:  trailing chars are additional flags; fails if any is non-flag.
+//  2. Token starting with '--' is the full name: '--arg=VALUE' or '--arg VALUE'.
+//  3. Anything else is the next positional.
+//  4. Once a positional is seen, everything after stays positional.
+//  5. If only one positional is defined, everything after it is forwarded.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 {
-    // Get the next argument from the invocation.
     auto currArg = std::wstring_view{*m_invocationItr};
     ++m_invocationItr;
 
-    // If current state has a type, then that means this must be a value for the previous argument.
+    // Pending value from the previous token.
     if (m_state.Type())
     {
-        m_executionArgs.Add(m_state.Type().value(), std::wstring{currArg});
+        AddValue(m_state.Type().value(), std::wstring{currArg});
         return {};
     }
 
-    // If this command has forwarded args present and we have found a positional argument,
-    // the all remaining args are considered positional or forwarded.
+    // Anchored: remaining tokens are positional or forwarded.
     if (!m_forwardArgs.empty() && m_anchorPositional.has_value())
     {
         return ProcessAnchoredPositionals(currArg);
@@ -125,6 +231,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     // Arg does not begin with '-' so it is neither an alias nor a named value, must be positional.
     if (currArg.empty() || currArg[0] != WSLC_CLI_ARG_ID_CHAR)
     {
+        if (m_optionsOnly)
+        {
+            // Options-only mode: stop cleanly at the first positional token without
+            // consuming it so the caller can resume parsing (e.g. subcommand resolution).
+            return BackUpAndStop();
+        }
+
         return ProcessPositionalArgument(currArg);
     }
 
@@ -138,7 +251,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
             return ProcessPositionalArgument(currArg);
         }
 
-        // No positional argument remaining means this is an invalid argument.
+        // No positional argument remaining. In stopOnUnknown mode this token isn't ours;
+        // back up and let the next pass deal with it.
+        if (m_stopOnUnknown)
+        {
+            return BackUpAndStop();
+        }
+
         return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
     }
 
@@ -180,9 +299,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     WI_ASSERT(m_anchorPositional.has_value());
 
     // If we haven't reached the limit for the anchor positional, treat this as another anchor positional.
-    // Anchors with NO_LIMIT will never be full and therefore will always treat subsequent positionals as anchors.
-    if ((m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit()) ||
-        (m_anchorPositional.value().Limit() == NO_LIMIT))
+    // Unlimited anchors are never full and therefore always treat subsequent positionals as anchors.
+    if (m_anchorPositional.value().IsUnlimited() || (m_executionArgs.Count(m_anchorPositional.value().Type()) < 1))
     {
         m_executionArgs.Add(m_anchorPositional.value().Type(), std::wstring{currArg});
         return {};
@@ -254,6 +372,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
     const Argument* firstArg = findArgumentByAlias(currArg, 1, aliasLength);
     if (!firstArg)
     {
+        // Leading alias is unknown. In stopOnUnknown mode nothing has been added
+        // to m_executionArgs for this token yet, so it is safe to back up and stop.
+        if (m_stopOnUnknown)
+        {
+            return BackUpAndStop();
+        }
+
         return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
     }
 
@@ -273,7 +398,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         if (currArg[currentPos] != WSLC_CLI_ARG_SPLIT_CHAR)
         {
             // There are more characters but it's not '=' - this is invalid
-            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
+            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *firstArg);
         }
 
         // Value is adjoined after '='
@@ -281,8 +406,14 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return {};
     }
 
-    // Boolean flag - add it and process any adjoined flags
-    m_executionArgs.Add(firstArg->Type(), true);
+    // Boolean flag - check for adjoined boolean value (e.g., -a=true or -a=false).
+    if (currentPos < currArg.length() && currArg[currentPos] == WSLC_CLI_ARG_SPLIT_CHAR)
+    {
+        return ApplyFlagValue(firstArg->Type(), currArg.substr(currentPos + 1), currArg);
+    }
+
+    // No adjoined value — add the flag as true.
+    SetFlag(firstArg->Type(), true);
 
     // Process remaining adjoined flags
     while (currentPos < currArg.length())
@@ -309,7 +440,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             if (currArg[nextPos] != WSLC_CLI_ARG_SPLIT_CHAR)
             {
                 // There are more characters but it's not '=' - this is invalid
-                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
+                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *nextArg);
             }
 
             // Value is adjoined after '='
@@ -317,7 +448,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return {};
         }
 
-        m_executionArgs.Add(nextArg->Type(), true);
+        // Boolean flag in chain — check for adjoined boolean value.
+        if (nextPos < currArg.length() && currArg[nextPos] == WSLC_CLI_ARG_SPLIT_CHAR)
+        {
+            return ApplyFlagValue(nextArg->Type(), currArg.substr(nextPos + 1), currArg);
+        }
+
+        SetFlag(nextArg->Type(), true);
         currentPos = nextPos;
     }
 
@@ -331,7 +468,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
 
     if (currArg.length() == 2)
     {
-        // Missing argument name after double dash, this is an error.
+        // Bare '--': not a name we recognize. In stopOnUnknown mode hand it off
+        // to the next pass; otherwise it's a malformed token at this level.
+        if (m_stopOnUnknown)
+        {
+            return BackUpAndStop();
+        }
+
         return ArgumentException(Localization::WSLCCLI_MissingArgumentNameError(currArg));
     }
 
@@ -360,13 +503,12 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
             // Found a match, process by kind.
             if (arg.Kind() == Kind::Flag)
             {
-                // TODO: Consider supporting --flag and --flag=true or --flag=false for bool args.
                 if (hasAdjoinedValue)
                 {
-                    return ArgumentException(Localization::WSLCCLI_FlagContainAdjoinedError(currArg));
+                    return ApplyFlagValue(arg.Type(), argValue, currArg);
                 }
 
-                m_executionArgs.Add(arg.Type(), true);
+                SetFlag(arg.Type(), true);
                 return {};
             }
 
@@ -382,18 +524,18 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
         }
     }
 
-    // We found no matching argument for this name, this is an invalid argument name.
+    // Unknown name. In stopOnUnknown mode hand it off to the next pass.
+    if (m_stopOnUnknown)
+    {
+        return BackUpAndStop();
+    }
+
     return ArgumentException(Localization::WSLCCLI_InvalidNameError(currArg));
 }
 
 void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring_view value)
 {
     // If the adjoined value is wrapped in quotes, strip them off.
-    if (value.length() >= 2 && value[0] == '"' && value[value.length() - 1] == '"')
-    {
-        value = value.substr(1, value.length() - 2);
-    }
-
-    m_executionArgs.Add(type, std::wstring{value});
+    AddValue(type, std::wstring{StripSurroundingQuotes(value)});
 }
 } // namespace wsl::windows::wslc

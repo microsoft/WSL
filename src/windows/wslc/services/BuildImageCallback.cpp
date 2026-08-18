@@ -18,6 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using wsl::windows::common::string::MultiByteToWide;
+using namespace wsl::windows::common::vt;
 
 BuildImageCallback::~BuildImageCallback()
 try
@@ -37,36 +38,59 @@ try
     {
         for (const auto& line : m_allLines)
         {
-            WriteTerminal(MultiByteToWide(line));
+            m_terminal.Info(L"{}", line);
         }
     }
 }
 CATCH_LOG()
-
-void BuildImageCallback::WriteTerminal(std::wstring_view content) const
-{
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
-}
 
 bool BuildImageCallback::IsCancelled() const
 {
     return WaitForSingleObject(m_cancelEvent, 0) == WAIT_OBJECT_0;
 }
 
+const wsl::windows::common::vt::Sequence& BuildImageCallback::Color(const wsl::windows::common::vt::Sequence& sequence) const
+{
+    static const wsl::windows::common::vt::Sequence empty{};
+    return m_color ? sequence : empty;
+}
+
+void BuildImageCallback::CaptureForReplay(std::string_view text)
+{
+    m_allLines.emplace_back(text);
+    m_allLinesBytes += m_allLines.back().size();
+    while (m_allLinesBytes > c_maxAllLinesBytes && !m_allLines.empty())
+    {
+        m_allLinesBytes -= m_allLines.front().size();
+        m_allLines.pop_front();
+    }
+}
+
 void BuildImageCallback::CollapseWindow()
 {
     if (m_displayedLines > 0)
     {
-        WriteTerminal(std::format(L"\033[{}A\033[J", m_displayedLines));
+        // Move cursor up to the start of the display area, then erase to end of screen.
+        m_terminal.Info(L"{}{}", Cursor::Up(m_displayedLines), Erase::ScreenForward);
         m_displayedLines = 0;
     }
 
     m_lines.clear();
     m_pendingLine.clear();
+    m_pullLines.clear();
 }
 
-HRESULT BuildImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG /*current*/, ULONGLONG /*total*/)
+void BuildImageCallback::RedrawIfNeeded()
+{
+    auto now = std::chrono::steady_clock::now();
+    if (now - m_lastRedraw >= c_redrawInterval)
+    {
+        Redraw();
+        m_lastRedraw = now;
+    }
+}
+
+HRESULT BuildImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total)
 try
 {
     if (status == nullptr || *status == '\0')
@@ -81,128 +105,158 @@ try
         return S_OK;
     }
 
-    if (m_verbose || !m_isConsole)
-    {
-        wprintf(L"%hs", status);
-        return S_OK;
-    }
+    const std::string_view idView = (id != nullptr) ? id : std::string_view{};
+    const bool isLog = (idView == "log");
+    const bool isPullProgress = (!idView.empty() && total > 0 && !isLog);
 
-    // Match the specific "log" sentinel sent by WSLCSession::BuildImage rather than
-    // accepting any non-empty id, so future or unrelated id usage defaults to permanent.
-    const bool isLog = (id != nullptr && std::string_view{id} == "log");
-
-    if (!isLog)
+    // quiet: suppress live progress but retain everything plain would have printed, so the destructor
+    // can replay the failing step and its logs on build failure. Pull progress is excluded because it
+    // is rewritten in place rather than appended, and so is the only message with no trailing newline.
+    if (m_mode == models::ProgressMode::Quiet)
     {
-        // Permanent line: collapse the scrolling window then print directly.
-        CollapseWindow();
-        WriteTerminal(MultiByteToWide(status));
-        return S_OK;
-    }
-
-    // Log line: add to the scrolling window.
-    for (const char* p = status; *p != '\0'; ++p)
-    {
-        if (*p == '\n')
+        if (!isPullProgress)
         {
-            // Store with the trailing newline so the byte count matches what is replayed.
-            // Cap retained log output to avoid unbounded growth on very long builds.
-            m_allLines.push_back(m_pendingLine + '\n');
-            m_allLinesBytes += m_allLines.back().size();
-            while (m_allLinesBytes > c_maxAllLinesBytes && !m_allLines.empty())
-            {
-                m_allLinesBytes -= m_allLines.front().size();
-                m_allLines.pop_front();
-            }
-
-            m_lines.push_back(std::move(m_pendingLine));
-            m_pendingLine.clear();
-            if (m_lines.size() > c_maxDisplayLines)
-            {
-                m_lines.pop_front();
-            }
+            CaptureForReplay(status);
         }
-        else if (*p == '\r')
+        return S_OK;
+    }
+
+    if (m_verbose || !m_renderInPlace)
+    {
+        // Only major steps are reported here. Unlike docker's plain output, which appends
+        // throttled download lines, pull progress is omitted entirely: without in-place
+        // updates those lines are mostly noise.
+        if (!isPullProgress)
         {
-            // \r\n is a line ending; standalone \r overwrites the current line.
-            if (*(p + 1) != '\n')
+            m_terminal.Info(L"{}", status);
+        }
+        return S_OK;
+    }
+
+    // Pull/download progress: update the per-entry map so Redraw can show each entry
+    // on a single line that updates in place.
+    if (isPullProgress)
+    {
+        m_pullLines[id] = status;
+        RedrawIfNeeded();
+
+        return S_OK;
+    }
+
+    if (isLog)
+    {
+        // Log line: add to the scrolling window.
+        for (const char* p = status; *p != '\0'; ++p)
+        {
+            if (*p == '\n')
             {
-                // Flush a throttled redraw before clearing so \r-based progress
-                // updates are visible even when batched in a single OnProgress call.
-                auto now = std::chrono::steady_clock::now();
-                if (!m_pendingLine.empty() && now - m_lastRedraw >= c_redrawInterval)
+                // Store with the trailing newline so the byte count matches what is replayed.
+                // Cap retained log output to avoid unbounded growth on very long builds.
+                m_allLines.push_back(m_pendingLine + '\n');
+                m_allLinesBytes += m_allLines.back().size();
+                while (m_allLinesBytes > c_maxAllLinesBytes && !m_allLines.empty())
                 {
-                    Redraw();
-                    m_lastRedraw = now;
+                    m_allLinesBytes -= m_allLines.front().size();
+                    m_allLines.pop_front();
                 }
+
+                m_lines.push_back(std::move(m_pendingLine));
                 m_pendingLine.clear();
+                if (m_lines.size() > c_maxDisplayLines)
+                {
+                    m_lines.pop_front();
+                }
+            }
+            else if (*p == '\r')
+            {
+                // \r\n is a line ending; standalone \r overwrites the current line.
+                if (*(p + 1) != '\n')
+                {
+                    // Flush a throttled redraw before clearing so \r-based progress
+                    // updates are visible even when batched in a single OnProgress call.
+                    if (!m_pendingLine.empty())
+                    {
+                        RedrawIfNeeded();
+                    }
+                    m_pendingLine.clear();
+                }
+            }
+            else
+            {
+                m_pendingLine += *p;
             }
         }
-        else
-        {
-            m_pendingLine += *p;
-        }
+
+        // Throttle redraws to avoid blocking the server's IO loop with console writes
+        // during rapid output. Lines accumulate in the deque immediately; the display
+        // catches up at ~20fps.
+        RedrawIfNeeded();
+
+        return S_OK;
     }
 
-    // Throttle redraws to avoid blocking the server's IO loop with console writes
-    // during rapid output. Lines accumulate in the deque immediately; the display
-    // catches up at ~20fps.
-    auto now = std::chrono::steady_clock::now();
-    if (now - m_lastRedraw >= c_redrawInterval)
-    {
-        Redraw();
-        m_lastRedraw = now;
-    }
+    // Else is a build step
+    CollapseWindow();
+    auto wide = MultiByteToWide(status);
+    const auto bodyLength = wide.find_last_not_of(L"\r\n") + 1;
+    const auto newlines = wide.substr(bodyLength);
+    wide.resize(bodyLength);
 
+    // Pass the color sequences as arguments (not baked into the string) so Terminal strips
+    // them when --no-color is set. Color() additionally strips them outside Tty mode. The
+    // trailing newlines are emitted after the reset.
+    m_terminal.Info(L"{}{}{}{}", Color(Format::Fg::BrightGreen), wide, Color(Format::Default), newlines);
     return S_OK;
 }
 CATCH_RETURN();
 
 void BuildImageCallback::Redraw()
 {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    // Use the visible window width (not buffer width), minus one column to avoid the
-    // deferred-wrap edge case when a line is exactly the window width. Clamp to at
-    // least zero so the value never goes negative (which would underflow when passed
-    // to std::wstring::resize).
-    const SHORT consoleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left);
+    const int consoleWidth = m_terminal.GetConsoleWidth(Terminal::Level::Info).value_or(c_fallbackConsoleWidth);
 
-    // Determine how many completed lines to show, leaving room for the pending line.
     const bool showPending = !m_pendingLine.empty();
-    SHORT completedCount = static_cast<SHORT>(m_lines.size());
-    if (showPending && completedCount >= c_maxDisplayLines)
+    const int pullCount = static_cast<int>(m_pullLines.size());
+    int completedCount = static_cast<int>(m_lines.size());
+    const int reservedLines = (showPending ? 1 : 0) + pullCount;
+    if (completedCount + reservedLines > c_maxDisplayLines)
     {
-        completedCount = c_maxDisplayLines - 1;
+        completedCount = std::max(0, c_maxDisplayLines - reservedLines);
     }
-    const SHORT displayCount = completedCount + (showPending ? 1 : 0);
+    const int displayCount = completedCount + reservedLines;
 
-    // Build the entire frame in one buffer to minimize console writes. Hide the cursor
-    // during the redraw so the user doesn't see it bouncing through the cursor movement,
-    // then show it again at the final position. The dim attribute (\033[2m) renders the
-    // scrolling lines de-emphasized regardless of the user's theme.
-    std::wstring buffer = L"\033[?25l\033[2m";
+    // Build the frame body in one buffer to minimize console writes. The cursor moves,
+    // erases, and text lines it holds are non-color VT. This only runs in Tty mode, where a
+    // VT console is attached. The cursor hide/show wrapper and the dim intensity attribute are
+    // passed as Sequence arguments to Terminal (below) so it strips the color ones (Dim/Normal)
+    // when --no-color is set, while leaving the non-color cursor moves intact.
+    //
+    // m_frameBuffer is a member so its backing allocation is reused across frames -
+    // it grows to the high-water mark and is never freed between redraws.
+    m_frameBuffer.clear();
 
     // Move cursor to the start of the display area and erase from there to the end of
     // the screen. \033[J handles the case where the new display is shorter than the
     // previous one (e.g. when \r clears the pending line without a replacement).
     if (m_displayedLines > 0)
     {
-        buffer += std::format(L"\033[{}A\033[J", m_displayedLines);
+        m_frameBuffer += Cursor::Up(m_displayedLines);
+        m_frameBuffer += Erase::ScreenForward;
     }
 
     auto appendLine = [&](const std::string& line) {
         auto wline = MultiByteToWide(line);
-        if (static_cast<SHORT>(wline.size()) > consoleWidth)
+        if (wline.size() > static_cast<size_t>(consoleWidth))
         {
-            wline.resize(consoleWidth);
+            wline.resize(static_cast<size_t>(consoleWidth));
         }
-        buffer += wline;
-        buffer += L"\033[K\n";
+        m_frameBuffer += std::move(wline);
+        m_frameBuffer += Erase::LineForward;
+        m_frameBuffer += L'\n';
     };
 
     // Print completed lines (skip older ones if we need room for the pending line).
     auto it = m_lines.begin();
-    if (completedCount < static_cast<SHORT>(m_lines.size()))
+    if (completedCount < static_cast<int>(m_lines.size()))
     {
         std::advance(it, m_lines.size() - completedCount);
     }
@@ -217,9 +271,16 @@ void BuildImageCallback::Redraw()
         appendLine(m_pendingLine);
     }
 
-    buffer += L"\033[22m\033[?25h";
+    // Render per-entry pull progress (each entry updates in place via the map).
+    for (const auto& [key, line] : m_pullLines)
+    {
+        appendLine(line);
+    }
 
-    WriteTerminal(buffer);
+    // Emit the frame as a single atomic write. Cursor Hide/Show are non-color and always
+    // rendered here (VT is on); Format::Dim/Normal are color sequences that Terminal strips
+    // under --no-color. The buffered body carries the cursor moves, erases, and text lines.
+    m_terminal.Info(L"{}{}{}{}{}", Cursor::Hide, Color(Format::Dim), std::wstring_view{m_frameBuffer}, Color(Format::Normal), Cursor::Show);
     m_displayedLines = displayCount;
 }
 

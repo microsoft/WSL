@@ -28,7 +28,6 @@ std::vector<Argument> ImagePushCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -44,8 +43,8 @@ std::wstring ImagePushCommand::LongDescription() const
 
 void ImagePushCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context               //
+        << ResolveSession //
         << PushImage;
 }
 } // namespace wsl::windows::wslc

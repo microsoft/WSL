@@ -7,15 +7,18 @@
     <projectUrl>https://github.com/microsoft/WSL</projectUrl>
     <description>WSL Containers SDK (Preview - API subject to breaking changes)</description>
     <copyright>© Microsoft Corporation. All rights reserved.</copyright>
-    <tags>WSL</tags>
-    <language>en-us</language>
+    <icon>images\icon.png</icon>
+    <tags>WSL containers Linux Windows SDK</tags>
     <license type="expression">MIT</license>
     <readme>docs\README.MD</readme>
+    <repository type="git" url="https://github.com/microsoft/WSL" />
     <dependencies>
       <group targetFramework="${WSL_NUGET_TARGET_FRAMEWORK}" />
     </dependencies>
   </metadata>
   <files>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\Images\Square44x44Logo.altform-lightunplated_targetsize-256.png" target="images\icon.png"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\NOTICE.txt" target="NOTICE.txt"/>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\WslcSDK\wslcsdk.h" target="include"/>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\${TARGET_PLATFORM}\${CMAKE_BUILD_TYPE}\Microsoft.WSL.Containers.winmd" target="winmd\Microsoft.WSL.Containers.winmd"/>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\Microsoft.WSL.Containers\**" exclude="**\net\**"/>

@@ -64,11 +64,32 @@ namespace wsl::windows::common {
 
 ConsoleState::ConsoleState()
 {
-    // Ensure console state is restored if the constructor throws.
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { RestoreConsoleState(); });
-
     m_InputHandle.reset(
         CreateFileW(L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
+
+    if (!m_InputHandle)
+    {
+        LOG_LAST_ERROR_MSG("CreateFileW(CONIN$) failed");
+    }
+
+    m_OutputHandle.reset(
+        CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
+
+    if (!m_OutputHandle)
+    {
+        LOG_LAST_ERROR_MSG("CreateFileW(CONOUT$) failed");
+    }
+}
+
+void ConsoleState::SetInteractiveMode()
+{
+    if (m_interactiveModeConfigured)
+    {
+        return;
+    }
+
+    // Ensure console state is restored if this method throws.
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { RestoreConsoleState(); });
 
     if (m_InputHandle)
     {
@@ -85,17 +106,14 @@ ConsoleState::ConsoleState()
         ChangeConsoleMode(m_InputHandle.get(), NewMode);
         m_SavedInputMode = mode;
     }
-    else
-    {
-        LOG_LAST_ERROR_MSG("CreateFileW(CONIN$) failed");
-    }
-
-    m_OutputHandle.reset(
-        CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
 
     if (m_OutputHandle)
     {
-        m_SavedOutputCodePage = GetConsoleOutputCP();
+        if (!m_SavedOutputCodePage.has_value())
+        {
+            m_SavedOutputCodePage = GetConsoleOutputCP();
+        }
+
         LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
 
         // Configure for VT output.
@@ -107,12 +125,24 @@ ConsoleState::ConsoleState()
         ChangeConsoleMode(m_OutputHandle.get(), NewMode);
         m_SavedOutputMode = mode;
     }
-    else
+
+    m_interactiveModeConfigured = true;
+    cleanup.release();
+}
+
+void ConsoleState::SetOutputCodePageUtf8()
+{
+    if (!m_OutputHandle)
     {
-        LOG_LAST_ERROR_MSG("CreateFileW(CONOUT$) failed");
+        return;
     }
 
-    cleanup.release();
+    if (!m_SavedOutputCodePage.has_value())
+    {
+        m_SavedOutputCodePage = GetConsoleOutputCP();
+    }
+
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
 }
 
 ConsoleState::~ConsoleState()
@@ -127,11 +157,13 @@ void ConsoleState::RestoreConsoleState()
         if (m_SavedInputCodePage.has_value())
         {
             LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedInputCodePage.value()));
+            m_SavedInputCodePage.reset();
         }
 
         if (m_SavedInputMode.has_value())
         {
             TrySetConsoleMode(m_InputHandle.get(), m_SavedInputMode.value());
+            m_SavedInputMode.reset();
         }
     }
 
@@ -140,11 +172,13 @@ void ConsoleState::RestoreConsoleState()
         if (m_SavedOutputCodePage.has_value())
         {
             LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(m_SavedOutputCodePage.value()));
+            m_SavedOutputCodePage.reset();
         }
 
         if (m_SavedOutputMode.has_value())
         {
             TrySetConsoleMode(m_OutputHandle.get(), m_SavedOutputMode.value());
+            m_SavedOutputMode.reset();
         }
     }
 }

@@ -1,0 +1,11 @@
+title: C++ API reference
+nav:
+  - index.md
+  - data-classes
+  - settings-classes
+  - core-classes
+  - service-class
+  - delegates-and-events
+  - enumerations
+  - not-yet-implemented-and-known-gaps.md
+  - end-to-end-example.md

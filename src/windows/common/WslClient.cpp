@@ -765,6 +765,10 @@ int ListDistributionsHelper(_In_ ListOptions options)
                 state = L"Exporting";
                 break;
 
+            case LxssDistributionStateCompacting:
+                state = L"Compacting";
+                break;
+
             default:
                 break;
             }
@@ -790,7 +794,8 @@ int ListDistributionsHelper(_In_ ListOptions options)
             std::erase_if(distros, [&](const auto& entry) {
                 return (
                     (entry.State == LxssDistributionStateInstalling) || (entry.State == LxssDistributionStateUninstalling) ||
-                    (entry.State == LxssDistributionStateConverting) || (entry.State == LxssDistributionStateExporting));
+                    (entry.State == LxssDistributionStateConverting) || (entry.State == LxssDistributionStateExporting) ||
+                    (entry.State == LxssDistributionStateCompacting));
             });
         }
 
@@ -887,6 +892,7 @@ int Manage(_In_ std::wstring_view commandLine)
     std::optional<std::wstring> move;
     std::optional<std::wstring> defaultUser;
     std::optional<uint64_t> resize;
+    bool compact = false;
     bool allowUnsafe = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME, 0);
@@ -895,6 +901,7 @@ int Manage(_In_ std::wstring_view commandLine)
     parser.AddArgument(AbsolutePath(move), WSL_MANAGE_ARG_MOVE_OPTION_LONG, WSL_MANAGE_ARG_MOVE_OPTION);
     parser.AddArgument(defaultUser, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG);
     parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_RESIZE_OPTION_LONG, WSL_MANAGE_ARG_RESIZE_OPTION);
+    parser.AddArgument(compact, WSL_MANAGE_ARG_COMPACT_OPTION_LONG);
     parser.AddArgument(allowUnsafe, WSL_MANAGE_ARG_ALLOW_UNSAFE);
     parser.Parse();
 
@@ -903,7 +910,7 @@ int Manage(_In_ std::wstring_view commandLine)
     wsl::windows::common::SvcComm service;
     auto distroGuid = service.GetDistributionId(distribution);
 
-    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() != 1)
+    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() + compact != 1)
     {
         THROW_HR(WSL_E_INVALID_USAGE);
     }
@@ -949,6 +956,13 @@ int Manage(_In_ std::wstring_view commandLine)
     else if (resize)
     {
         THROW_IF_FAILED(service.ResizeDistribution(&distroGuid, resize.value()));
+    }
+    else if (compact)
+    {
+        auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageCompactionStart(), true);
+        const auto result = service.CompactDistribution(&distroGuid);
+        progress.End();
+        THROW_IF_FAILED(result);
     }
 
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
@@ -1501,6 +1515,7 @@ int RunDebugShell()
 
     // Create a thread to relay stdin to the pipe.
     wsl::windows::common::ConsoleState console;
+    console.SetInteractiveMode();
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread([&]() {
         wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), []() {}, exitEvent.get());
@@ -1524,7 +1539,14 @@ int WslMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::install::CallMsiPackage();
+        const bool launchedViaAppActivation = winrt::Windows::ApplicationModel::AppInstance::GetActivatedEventArgs() != nullptr;
+        const auto exitCode = wsl::windows::common::install::CallMsiPackage();
+        if (launchedViaAppActivation && exitCode == -1)
+        {
+            g_promptBeforeExit = true;
+        }
+
+        return exitCode;
     }
 
     // Use exit code -1 so invokers of wsl.exe can distinguish between a Linux

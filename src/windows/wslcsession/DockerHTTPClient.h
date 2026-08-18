@@ -20,12 +20,17 @@ Abstract:
 #include <boost/beast/http.hpp>
 #include "relay.hpp"
 #include "docker_schema.h"
+#include "HttpHeaderEndDetector.h"
 
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
     if ((_Ex).HasErrorMessage()) \
     { \
         THROW_HR_WITH_USER_ERROR_MSG( \
-            (_Ex).HResultFromStatusCode(), (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
+            (_Ex).HResultFromStatusCode(), \
+            wsl::windows::service::wslc::FormatDockerEngineError( \
+                (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message), \
+            _Msg, \
+            ##__VA_ARGS__); \
     } \
     else \
     { \
@@ -39,6 +44,8 @@ Abstract:
     }
 
 namespace wsl::windows::service::wslc {
+
+std::string FormatDockerEngineError(const std::string& EngineMessage);
 
 class DockerHTTPException : public std::runtime_error
 {
@@ -126,7 +133,7 @@ public:
         bool all = false, int limit = -1, const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
-    void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds);
+    void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<LONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes = false);
     void SignalContainer(const std::string& Id, std::optional<WSLCSignal> Signal);
     common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
@@ -136,6 +143,8 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
+    std::unique_ptr<HTTPRequestContext> PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength);
+    std::tuple<uint32_t, wil::unique_socket, bool> GetArchive(const std::string& ContainerID, const std::string& Path);
     common::docker_schema::PruneContainerResult PruneContainers(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Volume management.
@@ -148,27 +157,13 @@ public:
     // Network management.
     common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
     void RemoveNetwork(const std::string& Name);
-    std::vector<common::docker_schema::Network> ListNetworks();
+    std::vector<common::docker_schema::Network> ListNetworks(const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::Network InspectNetwork(const std::string& Name);
+    void ConnectContainerToNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);
+    void DisconnectContainerFromNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);
+    common::docker_schema::PruneNetworkResult PruneNetworks(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Image management.
-    struct ListImagesFilters
-    {
-        std::optional<std::string> reference;
-        std::optional<std::string> before;
-        std::optional<std::string> since;
-        std::optional<bool> dangling;
-        std::vector<std::string> labels;
-    };
-
-    struct PruneImagesFilters
-    {
-        std::optional<bool> dangling;
-        std::optional<std::uint64_t> until;
-        std::vector<std::string> presentLabels;
-        std::vector<std::string> absentLabels;
-    };
-
     std::unique_ptr<HTTPRequestContext> PullImage(
         const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth = std::nullopt);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
@@ -176,11 +171,13 @@ public:
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::unique_ptr<HTTPRequestContext> PushImage(const std::string& ImageName, const std::optional<std::string>& tag, const std::string& registryAuth);
     std::string Authenticate(const std::string& serverAddress, const std::string& username, const std::string& password);
-    std::vector<common::docker_schema::Image> ListImages(bool all = false, bool digests = false, const ListImagesFilters& filters = {});
+    std::vector<common::docker_schema::Image> ListImages(
+        bool all = false, bool digests = false, const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::InspectImage InspectImage(const std::string& NameOrId);
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
     std::pair<uint32_t, wil::unique_socket> SaveImage(const std::string& NameOrId);
-    common::docker_schema::PruneImageResult PruneImages(const PruneImagesFilters& filters = {});
+    std::pair<uint32_t, wil::unique_socket> SaveImages(const std::vector<std::string>& NamesOrIds);
+    common::docker_schema::PruneImageResult PruneImages(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Exec.
     common::docker_schema::CreateExecResponse CreateExec(const std::string& Container, const common::docker_schema::CreateExec& Request);
@@ -211,7 +208,7 @@ public:
         std::function<void(const gsl::span<char>&)> OnResponse;
         std::function<void()> OnCompleted;
         boost::beast::http::response_parser<boost::beast::http::buffer_body> Parser;
-        size_t LineFeeds = 0;
+        common::HttpHeaderEndDetector HeaderEnd;
         std::optional<size_t> RemainingContentLength;
         std::optional<common::io::HTTPChunkBasedReadHandle> ResponseParser;
     };
@@ -240,7 +237,7 @@ private:
         static std::string Escape(const std::string& Value);
 
         std::string m_path;
-        std::map<std::string, std::string> m_parameters;
+        std::multimap<std::string, std::string> m_parameters;
     };
 
     wil::unique_socket ConnectSocket();

@@ -86,9 +86,9 @@ WSLCContainerLauncher::WSLCContainerLauncher(
     const std::string& Name,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
-    WSLCContainerNetworkType containerNetworkType,
+    std::string networkMode,
     WSLCProcessFlags Flags) :
-    WSLCProcessLauncher({}, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
+    WSLCProcessLauncher({}, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_networkMode(std::move(networkMode))
 {
 }
 
@@ -129,9 +129,44 @@ void WSLCContainerLauncher::SetDefaultStopSignal(WSLCSignal Signal)
     m_stopSignal = Signal;
 }
 
+void WSLCContainerLauncher::SetStopTimeout(LONG Timeout)
+{
+    m_stopTimeout = Timeout;
+}
+
 void WSLCContainerLauncher::SetShmSize(int64_t ShmSize)
 {
     m_shmSize = ShmSize;
+}
+
+void WSLCContainerLauncher::SetHealthCmd(std::string&& HealthCmd)
+{
+    m_healthCmd = std::move(HealthCmd);
+}
+
+void WSLCContainerLauncher::SetHealthInterval(int64_t Nanoseconds)
+{
+    m_healthInterval = Nanoseconds;
+}
+
+void WSLCContainerLauncher::SetHealthTimeout(int64_t Nanoseconds)
+{
+    m_healthTimeout = Nanoseconds;
+}
+
+void WSLCContainerLauncher::SetHealthStartPeriod(int64_t Nanoseconds)
+{
+    m_healthStartPeriod = Nanoseconds;
+}
+
+void WSLCContainerLauncher::SetHealthRetries(LONG Retries)
+{
+    m_healthRetries = Retries;
+}
+
+void WSLCContainerLauncher::SetNoHealthcheck()
+{
+    WI_SetFlag(m_containerFlags, WSLCContainerFlagsNoHealthCheck);
 }
 
 void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
@@ -142,11 +177,6 @@ void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
 void WSLCContainerLauncher::SetContainerFlags(WSLCContainerFlags Flags)
 {
     m_containerFlags = Flags;
-}
-
-void WSLCContainerLauncher::SetContainerNetworkName(std::string&& Name)
-{
-    m_containerNetworkName = std::move(Name);
 }
 
 void WSLCContainerLauncher::SetHostname(std::string&& Hostname)
@@ -199,29 +229,74 @@ void WSLCContainerLauncher::AddUlimit(const std::string& Name, std::int64_t Soft
 
 void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
-    // Store a copy of the path strings to the launcher to ensure the pointers in WSLCVolume remain valid.
-    const auto& hostPath = m_hostPaths.emplace_back(HostPath);
-    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
-
-    WSLCVolume vol{};
-    vol.HostPath = hostPath.c_str();
-    vol.ContainerPath = containerPath.c_str();
-    vol.ReadOnly = ReadOnly ? TRUE : FALSE;
-
-    m_volumes.push_back(vol);
+    AddMount({
+        .MountType = mount::Type::Bind,
+        .Source = HostPath,
+        .Target = ContainerPath,
+        .ReadOnly = ReadOnly,
+        .BindSource = mount::BindSourcePolicy::CreateIfMissing,
+    });
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly)
 {
-    const auto& name = m_volumeNames.emplace_back(Name);
-    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
+    AddMount({
+        .MountType = mount::Type::Volume,
+        .Source = wsl::shared::string::MultiByteToWide(Name),
+        .Target = ContainerPath,
+        .ReadOnly = ReadOnly,
+    });
+}
 
-    WSLCNamedVolume volume{};
-    volume.Name = name.c_str();
-    volume.ContainerPath = containerPath.c_str();
-    volume.ReadOnly = ReadOnly ? TRUE : FALSE;
+void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mount)
+{
+    WSLCMountSpec mount{};
+    switch (Mount.MountType)
+    {
+    case mount::Type::Bind:
+        mount.Type = WSLCMountTypeBind;
+        break;
 
-    m_namedVolumes.push_back(volume);
+    case mount::Type::Volume:
+        mount.Type = WSLCMountTypeVolume;
+        break;
+
+    case mount::Type::Tmpfs:
+        mount.Type = WSLCMountTypeTmpfs;
+        break;
+    }
+
+    if (!Mount.Source.empty())
+    {
+        mount.Source = m_mountSources.emplace_back(Mount.Source).c_str();
+    }
+
+    mount.Target = m_mountTargets.emplace_back(Mount.Target).c_str();
+    mount.ReadOnly = Mount.ReadOnly ? TRUE : FALSE;
+    if (Mount.MountType == mount::Type::Bind && Mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsCreateSourceIfMissing);
+    }
+
+    if (Mount.TmpfsSizeBytes.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsSize);
+        mount.TmpfsSizeBytes = Mount.TmpfsSizeBytes.value();
+    }
+
+    if (Mount.TmpfsMode.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsMode);
+        mount.TmpfsMode = Mount.TmpfsMode.value();
+    }
+
+    if (Mount.TmpfsOptions.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsOptions);
+        mount.TmpfsOptions = m_mountTmpfsOptions.emplace_back(Mount.TmpfsOptions.value()).c_str();
+    }
+
+    m_mounts.push_back(mount);
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Key, const std::string& Value)
@@ -239,36 +314,47 @@ void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Ke
 
 void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& ContainerPath, const std::string& Options)
 {
-    // Store a copy of the path/options strings to the launcher to ensure the pointers in WSLCTmpfsMount remain valid.
-    const auto& containerPath = m_tmpfsContainerPaths.emplace_back(ContainerPath);
-    const auto& options = m_tmpfsOptions.emplace_back(Options);
-
-    WSLCTmpfsMount tmpfs{};
-    tmpfs.Destination = containerPath.c_str();
-    tmpfs.Options = options.c_str();
-
-    m_tmpfsMounts.push_back(tmpfs);
+    AddMount({
+        .MountType = mount::Type::Tmpfs,
+        .Target = ContainerPath,
+        .TmpfsOptions = Options,
+    });
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name)
 {
-    m_additionalNetworks.push_back(Name);
+    AddAdditionalNetwork(Name, {});
 }
 
-std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(IWSLCSession& Session, WSLCContainerStartFlags Flags)
+void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases)
 {
-    auto [result, container] = CreateNoThrow(Session);
+    m_additionalNetworks.push_back({.Name = Name, .Aliases = Aliases});
+}
+
+void wsl::windows::common::WSLCContainerLauncher::AddPrimaryNetworkAlias(const std::string& Alias)
+{
+    m_primaryNetworkAliases.push_back(Alias);
+}
+
+std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(
+    IWSLCSession& Session, WSLCContainerStartFlags Flags, IWarningCallback* WarningCallback)
+{
+    auto [result, container] = CreateNoThrow(Session, WarningCallback);
     if (FAILED(result))
     {
         return std::make_pair(result, std::optional<RunningWSLCContainer>{});
     }
 
-    result = container.value().Get().Start(Flags, nullptr);
+    WSLCProcessStartOptions startOptions{};
+    startOptions.TtyRows = m_rows;
+    startOptions.TtyColumns = m_columns;
+
+    result = container.value().Get().Start(Flags, &startOptions, WarningCallback);
 
     return std::make_pair(result, std::move(container));
 }
 
-std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::CreateNoThrow(IWSLCSession& Session)
+std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback)
 {
     WSLCContainerOptions options{};
     options.Image = m_image.c_str();
@@ -287,12 +373,32 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
-    options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
     options.Flags = m_containerFlags;
+    if (m_stopTimeout.has_value())
+    {
+        options.StopTimeout = m_stopTimeout.value();
+        WI_SetFlag(options.Flags, WSLCContainerFlagsStopTimeout);
+    }
+
     options.ShmSize = m_shmSize;
+
+    if (m_healthCmd.has_value() || m_healthInterval.has_value() || m_healthTimeout.has_value() ||
+        m_healthStartPeriod.has_value() || m_healthRetries.has_value())
+    {
+        if (m_healthCmd.has_value())
+        {
+            options.HealthCmd = m_healthCmd->c_str();
+        }
+
+        options.HealthIntervalNs = m_healthInterval.value_or(0);
+        options.HealthTimeoutNs = m_healthTimeout.value_or(0);
+        options.HealthStartPeriodNs = m_healthStartPeriod.value_or(0);
+        options.HealthRetries = m_healthRetries.value_or(0);
+        WI_SetFlag(options.Flags, WSLCContainerFlagsHealthCheck);
+    }
 
     if (!entrypointStorage.empty())
     {
@@ -347,33 +453,48 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
         options.InitProcessOptions.CurrentDirectory = m_workingDirectory.c_str();
     }
 
-    options.VolumesCount = static_cast<ULONG>(m_volumes.size());
-    options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
-
-    options.NamedVolumesCount = static_cast<ULONG>(m_namedVolumes.size());
-    options.NamedVolumes = m_namedVolumes.size() > 0 ? m_namedVolumes.data() : nullptr;
+    options.MountsCount = static_cast<ULONG>(m_mounts.size());
+    options.Mounts = m_mounts.size() > 0 ? m_mounts.data() : nullptr;
 
     options.LabelsCount = static_cast<ULONG>(m_labels.size());
     options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;
 
-    options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
-    options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
+    options.ContainerNetwork.NetworkMode = m_networkMode.c_str();
 
-    std::vector<WSLCNetworkAttachment> networkAttachments;
-    if (m_containerNetworkType == WSLCContainerNetworkTypeCustom)
-    {
-        networkAttachments.push_back({m_containerNetworkName.c_str(), nullptr});
-    }
+    // Each additional network becomes an entry in NetworkingConfig.EndpointsConfig.
+    std::vector<WSLCNetworkConnection> connections;
+    connections.reserve(m_additionalNetworks.size());
+    std::vector<std::vector<KeyValuePair>> connectionSettings;
+    connectionSettings.reserve(m_additionalNetworks.size());
     for (const auto& e : m_additionalNetworks)
     {
-        networkAttachments.push_back({e.c_str(), nullptr});
+        auto& settings = connectionSettings.emplace_back();
+        settings.reserve(e.Aliases.size());
+        for (const auto& alias : e.Aliases)
+        {
+            settings.push_back({.Key = "Aliases", .Value = alias.c_str()});
+        }
+
+        connections.push_back({
+            .NetworkName = e.Name.c_str(),
+            .Settings = settings.empty() ? nullptr : settings.data(),
+            .SettingsCount = static_cast<ULONG>(settings.size()),
+        });
     }
 
-    if (!networkAttachments.empty())
+    options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
+    options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
+
+    // Aliases for the primary endpoint.
+    std::vector<KeyValuePair> primarySettings;
+    primarySettings.reserve(m_primaryNetworkAliases.size());
+    for (const auto& alias : m_primaryNetworkAliases)
     {
-        options.ContainerNetwork.Networks = networkAttachments.data();
-        options.ContainerNetwork.NetworksCount = static_cast<ULONG>(networkAttachments.size());
+        primarySettings.push_back({.Key = "Aliases", .Value = alias.c_str()});
     }
+
+    options.ContainerNetwork.Settings = primarySettings.empty() ? nullptr : primarySettings.data();
+    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(primarySettings.size());
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;
@@ -382,7 +503,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
-    auto result = Session.CreateContainer(&options, &container);
+    auto result = Session.CreateContainer(&options, WarningCallback, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLCContainer>>(result, std::optional<RunningWSLCContainer>{});
@@ -391,17 +512,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     return std::make_pair(S_OK, std::move(RunningWSLCContainer{std::move(container), m_flags}));
 }
 
-RunningWSLCContainer WSLCContainerLauncher::Create(IWSLCSession& Session)
+RunningWSLCContainer WSLCContainerLauncher::Create(IWSLCSession& Session, IWarningCallback* WarningCallback)
 {
-    auto [result, container] = CreateNoThrow(Session);
+    auto [result, container] = CreateNoThrow(Session, WarningCallback);
     THROW_IF_FAILED(result);
 
     return std::move(container.value());
 }
 
-RunningWSLCContainer WSLCContainerLauncher::Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags)
+RunningWSLCContainer WSLCContainerLauncher::Launch(IWSLCSession& Session, WSLCContainerStartFlags Flags, IWarningCallback* WarningCallback)
 {
-    auto [result, container] = LaunchNoThrow(Session, Flags);
+    auto [result, container] = LaunchNoThrow(Session, Flags, WarningCallback);
     THROW_IF_FAILED(result);
 
     return std::move(container.value());

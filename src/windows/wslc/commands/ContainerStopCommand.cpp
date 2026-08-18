@@ -27,9 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerStopCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
-        Argument::Create(ArgType::Session),
-        Argument::Create(ArgType::Signal),
+        Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
+        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, Localization::WSLCCLI_ContainerStopSignalArgDescription()),
         Argument::Create(ArgType::Time),
     };
 }
@@ -48,7 +47,7 @@ std::wstring ContainerStopCommand::LongDescription() const
 void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << StopContainers;
 }
 // clang-format on

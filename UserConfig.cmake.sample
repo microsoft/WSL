@@ -2,6 +2,10 @@
 
 message(STATUS "Loading user configuration")
 
+# Uncomment to use locally built wsldevicehost binaries.
+# This folder should contain both wsldevicehost.dll and WslDeviceHost.idl
+# set(WSL_DEVICEHOST_BIN "C:/path/to/devicehost/bin")
+
 # Uncomment to enable development packages (smaller, faster to install)
 # # Note: .vhd files fail to mount via symlink / hardlink, so COPY is needed.
 # set(WSL_DEV_BINARY_PATH "C:/wsldev")
@@ -26,7 +30,11 @@ if(WSL_DEV_BINARY_PATH)
     file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdpnanoTransport.dll" "${WSL_DEV_BINARY_PATH}/rdpnanoTransport.dll" SYMBOLIC)
     file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" "${WSL_DEV_BINARY_PATH}/RdpWinStlHelper.dll" SYMBOLIC)
     file(CREATE_LINK "${MSAL_SOURCE_DIR}/${TARGET_PLATFORM}/msal.wsl.proxy.exe" "${WSL_DEV_BINARY_PATH}/msal.wsl.proxy.exe" SYMBOLIC)
-    file(CREATE_LINK "${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}" "${WSL_DEV_BINARY_PATH}/lib" SYMBOLIC)
+
+    file(MAKE_DIRECTORY "${WSL_DEV_BINARY_PATH}/lib")
+    file(CREATE_LINK "${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}/libd3d12.so" "${WSL_DEV_BINARY_PATH}/lib/libd3d12.so" SYMBOLIC)
+    file(CREATE_LINK "${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}/libd3d12core.so" "${WSL_DEV_BINARY_PATH}/lib/libd3d12core.so" SYMBOLIC)
+    file(CREATE_LINK "${DXCORE_SOURCE_DIR}/lib/libdxcore.so" "${WSL_DEV_BINARY_PATH}/lib/libdxcore.so" SYMBOLIC)
 
     foreach(LANG ${SUPPORTED_LANGS})
         file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/${LANG}" "${WSL_DEV_BINARY_PATH}/${LANG}" SYMBOLIC)
@@ -37,7 +45,7 @@ endif()
 # set(WSL_BUILD_WSL_SETTINGS true)
 
 # # Uncomment to build the C# WSLC sdk
-# set(WSL_BUILD_SDKCS true)
+# set(WSL_INCLUDE_SDK_CSHARP true)
 
 # # Uncomment to configure the WSLC SDK NuGet to only target the current platform
 # set(WSL_NUGET_SINGLE_PLATFORM true)
@@ -56,3 +64,7 @@ endif()
 # #   error - block the commit when formatting issues are found
 # #   fix   - automatically fix formatting and re-stage files
 # set(WSL_PRE_COMMIT_MODE "warn")
+
+# # Uncomment to change how many sources share a unity translation unit (default: 0).
+# # Use 0 to disable unity builds and compile every file separately.
+# set(WSL_UNITY_BATCH_SIZE 4)

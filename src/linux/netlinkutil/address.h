@@ -75,6 +75,7 @@ public:
     int Scope() const noexcept;
     int PreferredLifetime() const noexcept;
     bool IsIpv4() const noexcept;
+    bool IsLinkLocal() const;
     bool IsPrefixRouteAutogenerationDisabled() const noexcept;
 
 private:

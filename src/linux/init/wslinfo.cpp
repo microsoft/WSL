@@ -111,8 +111,8 @@ Return Value:
                 std::cout << "mirrored";
                 break;
 
-            case LxMiniInitNetworkingModeVirtioProxy:
-                std::cout << "virtioproxy";
+            case LxMiniInitNetworkingModeConsomme:
+                std::cout << "consomme";
                 break;
 
             default:

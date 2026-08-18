@@ -10,17 +10,22 @@ WslcInitProcessSettings
 
 WslcCreateSession
 WslcCreateContainer
+WslcOpenContainer
 
 WslcReleaseSession
 WslcReleaseContainer
 WslcReleaseProcess
 
 WslcSetSessionSettingsFeatureFlags
-WslcSetSessionSettingsTerminationCallback
+WslcGetSessionTerminationEvent
+WslcGetSessionTerminationReason
 WslcSetSessionSettingsCpuCount
 WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout
 WslcSetSessionSettingsVhd
+ 
+WslcRegisterSessionCrashDumpCallback
+WslcReleaseCrashDumpSubscription
  
 WslcTerminateSession
 WslcSessionAuthenticate
@@ -48,6 +53,7 @@ WslcSetContainerSettingsPortMappings
 
 WslcCreateContainerProcess
 WslcStartContainer
+WslcSetContainerInitProcessIOCallbacks
 WslcInspectContainer
 WslcGetContainerState
 WslcStopContainer

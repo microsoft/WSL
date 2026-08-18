@@ -203,8 +203,12 @@ void SetHandleInheritable(_In_ HANDLE Handle, _In_ bool Inheritable = true);
 
 bool TryAttachConsole();
 
+std::optional<std::wstring> VersionRegisteredWithDcat();
+
 void RegisterWithDcat(_In_ bool IncludeVersionNumber = true);
 
-void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder);
+void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes, _In_ ULONG cpuCount);
+
+UINT64 ComputeDefaultSwiotlbConfig(_In_ UINT64 memoryBytes);
 
 } // namespace wsl::windows::common::helpers

@@ -22,6 +22,9 @@ struct Process : ProcessT<Process>
     Process() = default;
     Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& settings); // For the init process
     Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings);
+    // Package-internal: creates a Process with a fixed output mode but no ProcessSettings struct.
+    // Used for containers opened via OpenContainer (SetInitProcessOutputMode and InitProcess lazy-fetch paths).
+    explicit Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode outputMode);
 
     void Start();
     uint32_t Pid();
@@ -37,18 +40,15 @@ struct Process : ProcessT<Process>
     winrt::event_token Exited(winrt::Microsoft::WSL::Containers::ProcessExitHandler const& handler);
     void Exited(winrt::event_token const& token) noexcept;
 
+    void Close();
+    static void final_release(std::unique_ptr<Process> self);
+
     WslcProcess ToHandle();
     ProcessOutputMode OutputMode();
     void AttachHandle(WslcProcess handle);
-
-    static void final_release(std::unique_ptr<Process> self)
-    {
-        self->m_process.reset();
-        if (self->m_waitForExitAction)
-        {
-            self->m_waitForExitAction.Cancel();
-        }
-    }
+    // Returns the WslcProcessCallbacks struct pointing to the static callbacks with 'this' as context.
+    // Only meaningful when OutputMode is Event; the callbacks fire into m_outputReceivedEvent etc.
+    WslcProcessCallbacks GetEventCallbacks() const noexcept;
 
 private:
     void EnsureStarted() const;

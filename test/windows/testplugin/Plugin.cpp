@@ -13,6 +13,8 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <atomic>
+#include <thread>
 #include "WslPluginApi.h"
 #include "wslc_schema.h"
 
@@ -28,6 +30,23 @@ std::optional<GUID> g_distroGuid;
 
 const WSLPluginAPIV1* g_api = nullptr;
 PluginTestType g_testType = PluginTestType::Invalid;
+
+// Process deliberately left running across OnWslcVmStopping by the WslcVmStopCommitted test, to
+// prove the announced teardown happens anyway. Never released: it dies with the VM.
+//
+// The exit event is fetched on the callback's own thread and cached here as a plain Win32 handle:
+// the process itself is a COM proxy marshalled to that thread, so the stop-window thread below
+// cannot call methods on it (RPC_E_WRONG_THREAD), but it can wait on the handle.
+std::atomic<WSLCProcessHandle> g_leakedProcess = nullptr;
+std::atomic<HANDLE> g_leakedProcessExitEvent = nullptr;
+
+// Set by the WslcVmStopCommitted test: a call issued from a thread the plugin owns while
+// OnWslcVmStopping is running. Like the callback itself it is served by the VM that is stopping, and
+// must not block on the teardown. It deliberately logs nothing of its own -- its results are written
+// when it is joined -- so g_logfile keeps a single writer and the expected output stays ordered.
+std::thread g_stopWindowCaller;
+HRESULT g_stopWindowCallerResult = E_PENDING;
+std::atomic<bool> g_leakedProcessDied = false;
 
 std::optional<uint32_t> g_previousInitPid;
 
@@ -103,6 +122,21 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
             g_logfile << "Got unexpected output from bash" << std::endl;
             return E_ABORT;
         }
+    }
+    else if (g_testType == PluginTestType::MountFolderAccess)
+    {
+        const auto key = OpenTestRegistryKey(KEY_READ);
+        const auto mountSource = ReadString(key.get(), nullptr, c_mountFolder);
+
+        RETURN_IF_FAILED(
+            g_api->MountFolder(Session->SessionId, mountSource.c_str(), L"/test-plugin-access", false, L"test-plugin-access"));
+
+        std::vector<const char*> arguments = {"/bin/sh", "-c", "{ echo test > /test-plugin-access/plugin-test.txt; } 2>&1", nullptr};
+        wil::unique_socket socket;
+        RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, arguments[0], arguments.data(), &socket));
+
+        const auto output = ReadFromSocket(socket.get());
+        g_logfile.write(output.data(), output.size());
     }
     else if (g_testType == PluginTestType::ApiErrors)
     {
@@ -349,13 +383,36 @@ try
               << ", pid=" << Session->ApplicationPid << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
               << ", sid=" << (Session->UserSid != nullptr ? "set" : "null") << std::endl;
 
+    if (g_testType == PluginTestType::WslcVmNeverStarted)
+    {
+        // A plugin call is never a reason to create a VM. This one has to be rejected rather than
+        // bringing one up, which the absence of any VM notification in the expected output confirms.
+        std::vector<const char*> args = {"/bin/true", nullptr};
+        WSLCProcessHandle process = nullptr;
+        const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+        if (SUCCEEDED(hr))
+        {
+            g_api->WSLCReleaseProcess(process);
+        }
+
+        g_logfile << "WSLC no-vm caller: " << (hr == WSLC_E_VM_NOT_RUNNING ? "rejected" : "unexpected") << std::endl;
+        return S_OK;
+    }
+
     if (g_testType == PluginTestType::WslcSessionRejected)
     {
         g_logfile << "OnWslcSessionCreated: ERROR_ACCESS_DENIED" << std::endl;
         return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
     }
 
-    if (g_testType == PluginTestType::WslcSuccess)
+    return S_OK;
+}
+CATCH_RETURN();
+
+// These checks need a running VM, and a plugin call never creates one, so they run from the VM-started
+// hook rather than from session creation.
+void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
+{
     {
         // Helper: run a command in the root namespace and return (status, stdout, stderr).
         auto runCommand = [&](const char* cmd,
@@ -441,6 +498,8 @@ try
 
         const auto testFolder = L"C:\\";
         constexpr auto testFileName = L"plugin-test.txt";
+        constexpr auto rwMountpoint = "/mnt/wsl-plugin/plugin-rw-test";
+        constexpr auto roMountpoint = "/mnt/wsl-plugin/plugin-ro-test";
 
         // Validate rw mounts.
         {
@@ -453,8 +512,7 @@ try
             }
 
             // Mount read-write and verify the file can be read from Linux.
-            char rwMountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, false, L"plugin-rw-test", rwMountpoint));
+            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, rwMountpoint, false));
 
             g_logfile << "WSLC RW folder mounted at: " << rwMountpoint << std::endl;
 
@@ -466,8 +524,7 @@ try
 
         // Validate ro mounts.
         {
-            char roMountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"plugin-ro-test", roMountpoint));
+            THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, L"C:\\", roMountpoint, TRUE));
 
             g_logfile << "WSLC RO folder mounted at: " << roMountpoint << std::endl;
 
@@ -479,34 +536,40 @@ try
         }
 
         // Validate that trying to mount a folder that doesn't exist fails with the expected error code.
-        {
-            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            g_logfile << "WSLCMountFolder(nonexistent): "
-                      << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", TRUE, L"plugin-ro-test", mountpoint) << std::endl;
-        }
+        g_logfile << "WSLCMountFolder(nonexistent): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\nonexistent", roMountpoint, TRUE)
+                  << std::endl;
 
-        // Validate that trying to escape the /mnt folder fails.
-        {
-            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            g_logfile << "WSLCMountFolder(../escape): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"../escape", mountpoint)
-                      << std::endl;
-        }
-
-        // Validate that empty names are rejected.
-        {
-            char mountpoint[WSLC_MOUNTPOINT_LENGTH] = {};
-            g_logfile << "WSLCMountFolder(): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", TRUE, L"", mountpoint) << std::endl;
-        }
+        // Validate that non-absolute mountpoints are rejected.
+        g_logfile << "WSLCMountFolder(relative): " << g_api->WSLCMountFolder(Session->SessionId, L"C:\\", "relative-mountpoint", TRUE)
+                  << std::endl;
 
         g_logfile << "Test completed" << std::endl;
     }
-
-    return S_OK;
 }
-CATCH_RETURN();
 
 HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
 {
+    // Drain the stop-window thread first, then report what it observed. Logging from here rather than
+    // from that thread keeps the log single-writer and the expected output deterministic. Safe
+    // because this is the last event of the session, so the join cannot run inside a VM notification.
+    if (g_stopWindowCaller.joinable())
+    {
+        g_stopWindowCaller.join();
+
+        g_logfile << "WSLC stop-window caller: " << (SUCCEEDED(g_stopWindowCallerResult) ? "ok" : "failed") << std::endl;
+        g_logfile << "WSLC leaked process died: " << (g_leakedProcessDied.load() ? "yes" : "no") << std::endl;
+    }
+
+    // Close the duplicated exit event if the stop-window thread did not get far enough to claim it.
+    // The leaked process wrapper is deliberately not released: it holds a COM proxy marshalled to the
+    // OnWslcVmStopping callback's thread, and releasing it from this one risks the same
+    // RPC_E_WRONG_THREAD hazard that forced the exit event to be cached as a plain handle. It is one
+    // wrapper for the lifetime of a test process, so leaking it is the safer trade.
+    if (auto* exitEvent = g_leakedProcessExitEvent.exchange(nullptr); exitEvent != nullptr)
+    {
+        const wil::unique_handle owned{exitEvent};
+    }
+
     g_logfile << "WSLC Session stopping, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
               << ", id=" << Session->SessionId << std::endl;
 
@@ -551,6 +614,183 @@ HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId
     return S_OK;
 }
 
+HRESULT OnWslcVmStarted(const WSLCSessionInformation* Session)
+try
+{
+    if (g_testType == PluginTestType::WslcSuccess)
+    {
+        // Run once: the checks are written against the first VM of the session.
+        static std::atomic<bool> done = false;
+        if (!done.exchange(true))
+        {
+            RunWslcSuccessChecks(Session);
+        }
+
+        return S_OK;
+    }
+
+    if (g_testType == PluginTestType::WslcVmStopCommitted)
+    {
+        g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
+        return S_OK;
+    }
+
+    // The VM-never-started test expects no VM hook to fire at all. Logging here is the diagnostic
+    // that makes a regression visible: any line from this hook fails the expected output.
+    if (g_testType == PluginTestType::WslcVmNeverStarted)
+    {
+        g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
+        return S_OK;
+    }
+
+    // Only log/exercise for the dedicated VM-restart test so other WSLC plugin tests (which start
+    // and stop VMs incidentally) are not affected by extra log lines.
+    if (g_testType != PluginTestType::WslcVmRestart)
+    {
+        return S_OK;
+    }
+
+    g_logfile << "WSLC VM started, session=" << Session->SessionId << std::endl;
+
+    // Prove the VM is usable from within the started hook, and that calling back into the session
+    // (WSLCCreateProcess acquires a VM lease + the runtime lock) does not deadlock.
+    std::vector<const char*> args = {"/bin/true", nullptr};
+    WSLCProcessHandle process = nullptr;
+    const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+    g_logfile << "WSLC VM started reentrant WSLCCreateProcess: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+    if (SUCCEEDED(hr))
+    {
+        g_api->WSLCReleaseProcess(process);
+    }
+
+    // Also exercise a reentrant mount + unmount from the started hook; the session is alive here so
+    // both calls succeed, validating that mount management reentrant from OnVmStarted does not deadlock.
+    constexpr auto* mountpoint = "/test-plugin/vm-started-mount";
+    const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", mountpoint, TRUE);
+    if (SUCCEEDED(mountHr))
+    {
+        const auto unmountHr = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
+        g_logfile << "WSLC VM started mount+unmount: " << (SUCCEEDED(unmountHr) ? "ok" : "failed") << std::endl;
+    }
+    else
+    {
+        g_logfile << "WSLC VM started mount+unmount: skipped" << std::endl;
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
+try
+{
+    if (g_testType == PluginTestType::WslcVmNeverStarted)
+    {
+        g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+        return S_OK;
+    }
+
+    if (g_testType == PluginTestType::WslcVmStopCommitted)
+    {
+        // Only the idle teardown is interesting here. The session's final teardown races with the
+        // session-stopping notification, which is delivered independently, so logging it would make
+        // the expected output order-dependent on that race.
+        if (g_stopWindowCaller.joinable())
+        {
+            return S_OK;
+        }
+
+        g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+
+        // Deliberately leave a live process behind when this callback returns. The stop is committed
+        // before it is announced, so the VM goes away regardless and this process dies with it --
+        // which is exactly what the callback was just told would happen.
+        //
+        // Created before the thread below is started so its exit event is published first: that thread
+        // claims the event and must not race ahead of it.
+        std::vector<const char*> args = {"/bin/sleep", "60", nullptr};
+        WSLCProcessHandle leaked = nullptr;
+        const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &leaked, nullptr);
+        g_leakedProcess.store(leaked);
+
+        // Cache the exit event while still on the thread the process proxy is marshalled to.
+        if (SUCCEEDED(hr))
+        {
+            HANDLE exitEvent = nullptr;
+            if (SUCCEEDED(g_api->WSLCProcessGetExitEvent(leaked, &exitEvent)))
+            {
+                g_leakedProcessExitEvent.store(exitEvent);
+            }
+        }
+
+        g_logfile << "WSLC VM stopping leaked process: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
+
+        // A call from a thread this plugin owns is served on the same terms as the callback itself:
+        // by the VM that is stopping, not by a future one and not by a new one. It must not block on
+        // the teardown. Results are logged when this thread is joined, so the output stays deterministic.
+        const auto sessionId = Session->SessionId;
+        g_stopWindowCaller = std::thread([sessionId]() {
+            std::vector<const char*> processArgs = {"/bin/true", nullptr};
+            WSLCProcessHandle process = nullptr;
+            g_stopWindowCallerResult = g_api->WSLCCreateProcess(sessionId, processArgs[0], processArgs.data(), nullptr, &process, nullptr);
+            if (SUCCEEDED(g_stopWindowCallerResult))
+            {
+                g_api->WSLCReleaseProcess(process);
+            }
+
+            // The announced stop takes the VM away and the leaked process with it. Prove that
+            // directly instead of inferring it from the fact that a new VM started -- a process that
+            // outlived the stop is the exact symptom of an announced stop that did not happen.
+            if (auto* exitEvent = g_leakedProcessExitEvent.exchange(nullptr); exitEvent != nullptr)
+            {
+                // GetExitEvent is marshalled as an [out, system_handle(sh_event)] parameter, so this
+                // is a duplicate owned by this process.
+                const wil::unique_handle owned{exitEvent};
+                g_leakedProcessDied = WaitForSingleObject(owned.get(), 30 * 1000) == WAIT_OBJECT_0;
+            }
+        });
+
+        // Give the thread time to issue its call inside the stop window. If it has not, the test still
+        // passes -- it just proves less.
+        std::this_thread::sleep_for(500ms);
+
+        return S_OK;
+    }
+
+    if (g_testType != PluginTestType::WslcVmRestart)
+    {
+        return S_OK;
+    }
+
+    g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
+
+    // Proves OnVmStopping doesn't deadlock a plugin that calls back in: on idle teardown these are
+    // served by the VM that is still stopping and succeed; on permanent teardown they fail cleanly.
+    std::vector<const char*> args = {"/bin/true", nullptr};
+    WSLCProcessHandle process = nullptr;
+    const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+    g_logfile << "WSLC VM stopping reentrant WSLCCreateProcess: " << (SUCCEEDED(processHr) ? "ok" : "failed") << std::endl;
+    if (SUCCEEDED(processHr))
+    {
+        g_api->WSLCReleaseProcess(process);
+    }
+
+    constexpr auto* mountpoint = "/test-plugin/vm-stopping-mount";
+    const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", mountpoint, TRUE);
+    if (SUCCEEDED(mountHr))
+    {
+        const auto unmountHr = g_api->WSLCUnmountFolder(Session->SessionId, mountpoint);
+        g_logfile << "WSLC VM stopping mount+unmount: " << (SUCCEEDED(unmountHr) ? "ok" : "failed") << std::endl;
+    }
+    else
+    {
+        g_logfile << "WSLC VM stopping mount+unmount: skipped" << std::endl;
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPluginAPIV1* Api, WSLPluginHooksV1* Hooks)
 {
     try
@@ -562,7 +802,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcImagePull));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::MountFolderAccess));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;
@@ -578,6 +818,8 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         Hooks->ContainerStopping = &OnWslcContainerStopping;
         Hooks->ImageCreated = &OnWslcImageCreated;
         Hooks->ImageDeleted = &OnWslcImageDeleted;
+        Hooks->WslcVmStarted = &OnWslcVmStarted;
+        Hooks->WslcVmStopping = &OnWslcVmStopping;
 
         if (g_testType == PluginTestType::FailToLoad)
         {

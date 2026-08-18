@@ -16,15 +16,49 @@ steps:
 - task: ComponentGovernanceComponentDetection@0
   displayName: Component Detection
 
+# Append the WSLg NuGet's NOTICE: it covers Linux OSS shipped as binaries, which
+# Component Governance doesn't detect.
+- task: NuGetToolInstaller@1
+  displayName: Install NuGet
+
+- task: NuGetCommand@2
+  displayName: Restore packages (for the WSLg NOTICE)
+  inputs:
+    command: restore
+    restoreSolution: packages.config
+    feedsToUse: config
+    nugetConfigPath: NuGet.Config
+    restoreDirectory: $(Build.SourcesDirectory)/packages
+
+- powershell: |
+    $version = ([xml](Get-Content packages.config)).packages.package |
+        Where-Object { $_.id -eq 'Microsoft.WSLg' } |
+        Select-Object -ExpandProperty version
+    $notice = "$(Build.SourcesDirectory)/packages/Microsoft.WSLg.$version/NOTICE.txt"
+    if (-not (Test-Path $notice)) {
+        Write-Error "WSLg NOTICE not found at $notice"
+        exit 1
+    }
+    Write-Host "##vso[task.setvariable variable=WslgNoticePath]$notice"
+  displayName: Resolve WSLg NOTICE path
+
 - task: notice@0
   displayName: Generate NOTICE file
   inputs:
     outputfile: $(System.DefaultWorkingDirectory)/NOTICE.txt
     outputformat: text
+    additionaldata: $(WslgNoticePath)
 
 - task: PipAuthenticate@1
   inputs:
     artifactFeeds: 'wsl'
+
+- task: AzureKeyVault@2
+  displayName: Fetch GitHub PR token from Key Vault
+  inputs:
+    azureSubscription: 'Azure-Connection'
+    KeyVaultName: 'wsl-ci-key-vault'
+    SecretsFilter: 'GithubPRToken'
 
 - powershell: |
             pip install --user -r tools/devops/requirements.txt

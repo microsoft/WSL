@@ -23,6 +23,9 @@ Abstract:
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.Streams.h>
 
+// Windows' LoadImage macro conflicts with Session::LoadImage
+#undef LoadImage
+
 #include "Container.h"
 #include "ContainerNamedVolume.h"
 #include "ContainerPortMapping.h"

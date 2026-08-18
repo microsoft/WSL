@@ -31,10 +31,9 @@ std::vector<Argument> ContainerExecCommand::GetArguments() const
         Argument::Create(ArgType::Command, true),
         Argument::Create(ArgType::ForwardArgs, std::nullopt, std::nullopt, Localization::WSLCCLI_ContainerExecForwardArgsDescription()),
         Argument::Create(ArgType::Detach),
-        Argument::Create(ArgType::Env, false, NO_LIMIT),
-        Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
+        Argument::Create(ArgType::Env, false, Limit::Unlimited),
+        Argument::Create(ArgType::EnvFile, false, Limit::Unlimited),
         Argument::Create(ArgType::Interactive),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::WorkDir),
@@ -54,7 +53,7 @@ std::wstring ContainerExecCommand::LongDescription() const
 void ContainerExecCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context 
-        << CreateSession
+        << ResolveSession
         << SetContainerOptionsFromArgs
         << ExecContainer;
 }

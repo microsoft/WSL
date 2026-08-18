@@ -26,8 +26,11 @@ extern "C" {
 #define WSLPLUGINAPI_ENTRYPOINTV1 WSLPluginAPIV1_EntryPoint
 #define WSL_E_PLUGIN_REQUIRES_UPDATE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x032A)
 
-// Maximum size for mount points returned by WSLCPluginAPI_MountFolder. This includes the null terminator.
-#define WSLC_MOUNTPOINT_LENGTH 256
+// Returned by the WSLC plugin API calls below when the session has no running VM.
+// N.B. This value is also defined in wslc.idl; the two definitions must stay in sync.
+#ifndef WSLC_E_VM_NOT_RUNNING
+#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0610)
+#endif
 
 #define WSL_PLUGIN_REQUIRE_VERSION(_Major, _Minor, _Revision, Api) \
     if (Api->Version.Major < (_Major) || (Api->Version.Major == (_Major) && Api->Version.Minor < (_Minor)) || \
@@ -144,13 +147,37 @@ typedef HRESULT (*WSLPluginAPI_ImageCreated)(const struct WSLCSessionInformation
 // Called when an image is deleted. 'ImageId' is the deleted image identifier. Errors are ignored.
 typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation* Session, LPCSTR ImageId);
 
+// Called when the VM backing a WSLC session has started. Unlike OnSessionCreated (which fires once
+// per session), this fires every time a VM is created for the session: on the first operation that
+// needs a VM, and again each time the VM is recreated after being idle-terminated. Errors are logged
+// but ignored (they do not abort VM startup or the triggering operation).
+typedef HRESULT (*WSLPluginAPI_OnWslcVmStarted)(const struct WSLCSessionInformation* Session);
+
+// Called when the VM backing a WSLC session is about to stop (idle teardown, explicit termination,
+// or unexpected exit). Fires exactly once per OnWslcVmStarted. Errors are logged but ignored.
+//
+// The VM is still alive for the duration of this call, so a callback may run last-minute work in it
+// (e.g. WSLCCreateProcess) to react to the VM going away. During a permanent session termination
+// such a call fails cleanly, because the session itself is being torn down.
+//
+// The stop is guaranteed: the VM is torn down as soon as this call returns, and nothing the callback
+// does can keep it alive. Any work the callback leaves running in the VM -- a process it did not wait
+// for, for example -- dies with it. Calls made by other threads while this callback is running are
+// served by the same stopping VM, on the same terms; once the teardown starts they fail with
+// WSLC_E_VM_NOT_RUNNING rather than waiting for or creating another VM.
+typedef HRESULT (*WSLPluginAPI_OnWslcVmStopping)(const struct WSLCSessionInformation* Session);
+
 //
 // WSLC plugin API calls.
 //
+// These operate on the VM that is currently backing the session; they never create one. A call made
+// while the session has no running VM fails with WSLC_E_VM_NOT_RUNNING, so a plugin that needs a VM
+// should do its work from OnWslcVmStarted (or before OnWslcVmStopping returns) rather than from a
+// session-level callback.
+//
 
-// Mount a Windows folder into the WSLC session VM. The mount path is returned via 'Mountpoint'.
-// 'Mountpoint' must point to a buffer of at least WSLC_MOUNTPOINT_LENGTH chars, including the null terminator.
-typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPSTR Mountpoint);
+// Mount a Windows folder into the WSLC session VM at the given 'Mountpoint' path. If the 'Mountpoint' doesn't exist, it will be created.
+typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly);
 
 // Unmount a folder previously mounted via WSLCPluginAPI_MountFolder.
 typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCSTR Mountpoint);
@@ -224,6 +251,8 @@ struct WSLPluginHooksV1
     WSLPluginAPI_ContainerStopping ContainerStopping;
     WSLPluginAPI_ImageCreated ImageCreated;
     WSLPluginAPI_ImageDeleted ImageDeleted;
+    WSLPluginAPI_OnWslcVmStarted WslcVmStarted;   // Introduced in 2.9.5
+    WSLPluginAPI_OnWslcVmStopping WslcVmStopping; // Introduced in 2.9.5
 };
 
 struct WSLPluginAPIV1

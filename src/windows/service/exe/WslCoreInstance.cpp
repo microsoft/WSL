@@ -46,8 +46,12 @@ WslCoreInstance::WslCoreInstance(
     m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
 
     // Read a message from the init daemon. This will let us know if anything failed during startup.
+    // The watcher is disarmed as soon as the receive returns so its reported duration reflects
+    // only the wait, not the rest of the constructor.
     gsl::span<gsl::byte> span;
+    SlowOperationWatcher slowOperation{"WaitForCreateInstanceResult"};
     const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
+    slowOperation.Reset();
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -61,8 +65,8 @@ WslCoreInstance::WslCoreInstance(
 
     if (result.Result != 0)
     {
-        // N.B. EUCLEAN (117) can be returned if the disk's journal is corrupted.
-        if ((result.Result == EINVAL || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk)
+        // N.B. EFSBADCRC (74) or EFSCORRUPTED (117) can be returned if the disk's journal is corrupted.
+        if ((result.Result == EINVAL || result.Result == 74 || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk)
         {
             THROW_HR(WSL_E_DISK_CORRUPTED);
         }
@@ -305,6 +309,8 @@ void WslCoreInstance::ReadOOBEResult(wil::unique_socket&& Socket, wsl::windows::
             registration.Write(wsl::windows::service::Property::DefaultUid, static_cast<int>(oobeResult->DefaultUid));
             m_defaultUid = static_cast<int>(oobeResult->DefaultUid);
         }
+
+        m_redirectorConnectionTargets.UpdateUid(m_defaultUid);
     }
 }
 
@@ -377,6 +383,7 @@ void WslCoreInstance::Initialize()
     // If drive mounting is supported, ensure that DrvFs has been initialized.
     if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING))
     {
+        SlowOperationWatcher slowOperation{"WaitForDrvFsInit"};
         drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
 
@@ -398,8 +405,12 @@ void WslCoreInstance::Initialize()
     transaction.Send<LX_INIT_CONFIGURATION_INFORMATION>(gsl::span(config));
 
     // Init replies with information about the distribution.
+    // The watcher is disarmed as soon as the receive returns so its reported duration reflects
+    // only the wait, not the subsequent interop-server launch.
     gsl::span<gsl::byte> span;
+    SlowOperationWatcher slowOperation{"WaitForInitConfigResponse"};
     const auto& response = transaction.Receive<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
+    slowOperation.Reset();
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;

@@ -19,55 +19,46 @@ Abstract:
 #include <wslc_schema.h>
 #include <ContainerModel.h>
 #include <WSLCContainerLauncher.h>
+#include "VTSupport.h"
 
 namespace WSLCE2ETests {
 
-// VT100/ANSI escape sequence constants for TTY testing
+inline std::wstring FormatWslcError(const std::wstring& message, std::wstring_view errorCode = L"E_INVALIDARG")
+{
+    return std::format(L"{}\r\nError code: {}\r\n", message, errorCode);
+}
+
+// VT sequence constants and helpers for TTY testing.
+// Sequences are sourced from wsl::windows::common::vt (VTSupport.h).
 namespace VT {
-// Bracketed paste mode control sequences
-#define VT_B_START "\x1b[?2004h" // Enable bracketed paste mode
-#define VT_B_END "\x1b[?2004l"   // Disable bracketed paste mode
+    using namespace wsl::windows::common::vt;
 
-// Color/formatting sequences
-#define VT_RESET "\x1b[0m"  // Reset all attributes
-#define VT_RED "\x1b[1;31m" // Bold red text
+    inline const auto& B_START = Cursor::BracketedPasteOn;
+    inline const auto& B_END = Cursor::BracketedPasteOff;
+    inline const auto& RESET = Format::Default;
+    inline const auto& ERASE_LINE = Erase::LineForward;
+    inline const Sequence CR{L"\r"};
 
-// Terminal control sequences
-#define VT_ERASE_LINE "\x1b[K" // Erase from cursor to end of line
-#define VT_CR "\r"             // Carriage return
+    // The shell PS1 uses SGR 1;31 (bold + red) in a single sequence.
+    // Sgr({1, 31}) produces L"\x1b[1;31m" to match exactly.
+    inline const ConstructedSequence RED = Sgr({1, 31});
 
-    // Prompt patterns used in WSLC.
-    constexpr auto SESSION_PROMPT = VT_B_START VT_RED "root@ [ " VT_RESET "/" VT_RED " ]# ";
+    // Prompt pattern used in WSLC TTY sessions.
+    inline const std::string SESSION_PROMPT =
+        wsl::shared::string::WideToMultiByte(B_START + RED + L"root@ [ " + RESET + L"/" + RED + L" ]# ");
 
-    // Constexpr representations of the control sequences for use in tests.
-    constexpr auto B_START = VT_B_START;
-    constexpr auto B_END = VT_B_END;
-    constexpr auto RESET = VT_RESET;
-    constexpr auto RED = VT_RED;
-    constexpr auto ERASE_LINE = VT_ERASE_LINE;
-    constexpr auto CR = VT_CR;
-
-// Remove macros to avoid polluting global namespace.
-#undef VT_B_START
-#undef VT_B_END
-#undef VT_RESET
-#undef VT_RED
-#undef VT_ERASE_LINE
-#undef VT_CR
-
-    // Helper function to build container prompt
     inline std::string BuildContainerPrompt(const std::string& prompt, bool withBracketedPaste = true)
     {
         if (withBracketedPaste)
         {
-            return std::format("{}{}", B_START, prompt);
+            return wsl::shared::string::WideToMultiByte(std::format(L"{}", B_START)) + prompt;
         }
-        return std::format("{}", prompt);
+        return prompt;
     }
 
     inline std::string BuildContainerAttachPrompt(const std::string& prompt)
     {
-        return std::format("{}{}{}{}", CR, ERASE_LINE, CR, prompt);
+        return wsl::shared::string::WideToMultiByte(std::format(L"{}{}{}", CR, ERASE_LINE, CR)) + prompt;
     }
 } // namespace VT
 
@@ -84,6 +75,7 @@ struct TestImage
 
 const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
+const TestImage& HelloWorldTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
@@ -111,6 +103,11 @@ struct TestSession
         return m_storagePath;
     }
 
+    IWSLCSession& Session() const
+    {
+        return *m_session;
+    }
+
 private:
     std::wstring m_name;
     std::filesystem::path m_storagePath;
@@ -123,22 +120,50 @@ void VerifyImageIsNotUsed(const TestImage& image);
 void VerifyImageIsListed(const TestImage& image);
 void VerifyVolumeIsListed(const std::wstring& volumeName);
 void VerifyVolumeIsNotListed(const std::wstring& volumeName);
+void VerifyNetworkIsListed(const std::wstring& networkName);
+void VerifyNetworkIsNotListed(const std::wstring& networkName);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
 wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
 wsl::windows::common::wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName);
+wsl::windows::common::wslc_schema::Network InspectNetwork(const std::wstring& networkName);
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
+void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix);
 void EnsureImageContainersAreDeleted(const TestImage& image);
+void EnsureNoUntaggedImages();
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
 void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
+void EnsureNetworkDoesNotExist(const std::wstring& networkName);
 
 void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
+void WriteTestFileContent(const std::filesystem::path& filePath, const std::string& content);
+
+// Sets up a clean test directory and returns a scope_exit to remove it.
+inline auto SetupTestDirectory(const std::filesystem::path& directory)
+{
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
+
+    return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [directory]() {
+        std::error_code removeError;
+        std::filesystem::remove_all(directory, removeError);
+    });
+}
+
 std::wstring GetPythonHttpServerScript(uint16_t port);
+std::wstring GetPythonUdpEchoServerScript(uint16_t port);
+
+std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, const std::string& expectedReply, int family = AF_INET);
+
+void WaitForContainerOutput(const std::wstring& containerName, std::string_view expected, std::chrono::milliseconds timeout = std::chrono::seconds(60));
+
+wsl::windows::common::wslc_schema::Health WaitForContainerHealth(
+    const std::wstring& containerName, const std::string_view& expectedStatus, std::chrono::milliseconds timeout = std::chrono::seconds(120));
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
@@ -188,12 +213,96 @@ inline void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 
-// Starts a local registry container with host networking using the COM API.
-// Returns the running container (holds it alive) and the registry address (e.g. "127.0.0.1:PORT").
+void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
+
+// Waits for a substring to appear in the session's pseudo console output.
+void WaitForPseudoConsoleOutput(
+    const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout = std::chrono::seconds(60));
+
+// Starts a local registry container using the COM API and returns the running container (holds it
+// alive) plus the registry address. Host network for plain http, bridge network for tls enabled.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
-    IWSLCSession& session, const std::string& username = "", const std::string& password = "", USHORT port = 5000);
+    IWSLCSession& session,
+    const std::string& username = "",
+    const std::string& password = "",
+    USHORT port = 5000,
+    const std::wstring& tlsCertDir = L"");
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
+
+// Verifies "--format json" output was emitted as a single compact line and returns the parsed document.
+inline nlohmann::json VerifyCompactJsonOutput(const WSLCExecutionResult& result)
+{
+    VERIFY_IS_TRUE(result.Stdout.has_value());
+
+    const auto lines = result.GetStdoutLines();
+    VERIFY_ARE_EQUAL(1u, lines.size(), L"'--format json' output must be a single line");
+
+    return nlohmann::json::parse(wsl::shared::string::WideToMultiByte(lines[0]));
+}
+
+// Parses list output emitted as one compact JSON object per line.
+inline std::vector<nlohmann::json> ParseNdjsonOutput(const WSLCExecutionResult& result)
+{
+    VERIFY_IS_TRUE(result.Stdout.has_value());
+
+    std::vector<nlohmann::json> entries;
+    for (const auto& line : result.GetStdoutLines())
+    {
+        if (line.empty())
+        {
+            continue;
+        }
+
+        auto entry = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(line));
+        if (!entry.is_object())
+        {
+            VERIFY_FAIL(std::format(L"Line is not a JSON object: '{}'", line).c_str());
+        }
+
+        entries.push_back(std::move(entry));
+    }
+
+    return entries;
+}
+
+// Typed form of ParseNdjsonOutput() that deserializes each line into T.
+template <typename T>
+std::vector<T> ParseNdjsonOutputAs(const WSLCExecutionResult& result)
+{
+    std::vector<T> entries;
+    for (const auto& entry : ParseNdjsonOutput(result))
+    {
+        entries.push_back(entry.get<T>());
+    }
+
+    return entries;
+}
+
+// Verifies that a string is a valid hex ID output.
+// truncated=true expects 12 hex chars, truncated=false expects 64 hex chars.
+inline void VerifyIdOutput(const std::wstring& id, bool truncated)
+{
+    constexpr size_t c_truncatedLength = 12;
+    constexpr size_t c_fullLength = 64;
+
+    const size_t expectedLength = truncated ? c_truncatedLength : c_fullLength;
+
+    VERIFY_ARE_EQUAL(id.size(), expectedLength);
+
+    bool allHex = true;
+    for (size_t i = 0; i < expectedLength; i++)
+    {
+        const auto ch = id[i];
+        if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'f')))
+        {
+            allHex = false;
+            break;
+        }
+    }
+
+    VERIFY_IS_TRUE(allHex, WEX::Common::String().Format(L"ID is not a valid hex string: '%ls'", id.c_str()));
+}
 
 } // namespace WSLCE2ETests

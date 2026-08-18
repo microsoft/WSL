@@ -14,10 +14,21 @@ Abstract:
 
 #pragma once
 
+#include <fcntl.h>
+#include <io.h>
+#include <algorithm>
+#include <memory>
 #include <string>
+#include <thread>
+#include <vector>
 #include <Windows.h>
 #include <WexTestClass.h>
+#include <wil/resource.h>
+#include <wslutil.h>
+#include "windows/Common.h"
 #include "Invocation.h"
+#include "OutputChannel.h"
+#include "Terminal.h"
 #include "TableOutput.h"
 
 namespace WSLCTestHelpers {
@@ -62,20 +73,205 @@ inline void LogComment(const std::wstring& message)
     WEX::Logging::Log::Comment(reinterpret_cast<const char8_t*>(WStringToUTF8(message).c_str()));
 }
 
+// RAII pipe pair for capturing FILE* output in tests.
+// file() is passed to OutputChannel/Terminal; captured() drains the read end after flush.
+struct CapturePipe
+{
+    CapturePipe()
+    {
+        // ReadPipeOverlapped=true so PartialHandleRead's InterruptableRead can be
+        // interrupted by m_exitEvent during teardown if fclose hasn't run yet.
+        auto [r, w] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        wil::unique_handle writeHandle{w.release()};
+        m_file = FileFromHandle(writeHandle, "w");
+
+        const int fd = _fileno(m_file.get());
+        WI_VERIFY(_setmode(fd, _O_U8TEXT) != -1);
+
+        // Disable CRT buffering so each fwprintf is a single write. Prevents
+        // _O_U8TEXT from splitting VT escape sequences across buffer flushes.
+        setvbuf(m_file.get(), nullptr, _IONBF, 0);
+
+        // CapturePipe owns the read pipe; PartialHandleRead borrows it via .get().
+        // m_readPipe is declared before m_reader so destruction order tears the reader
+        // down first (joining its thread) and only then closes the handle it was reading.
+        m_readPipe = std::move(r);
+        m_reader = std::make_unique<PartialHandleRead>(m_readPipe.get());
+    }
+
+    NON_COPYABLE(CapturePipe);
+    NON_MOVABLE(CapturePipe);
+
+    FILE* file() const
+    {
+        return m_file.get();
+    }
+
+    std::wstring captured()
+    {
+        m_file.reset();
+
+        m_reader->ExpectClosed();
+        std::wstring result = wsl::shared::string::MultiByteToWide(m_reader->GetData());
+
+        // _O_U8TEXT prepends a UTF-8 BOM on some streams; strip it if present.
+        if (!result.empty() && result[0] == L'\xFEFF')
+        {
+            result.erase(0, 1);
+        }
+
+        // _O_U8TEXT translates \n to \r\n; strip \r so tests compare plain newlines.
+        result.erase(std::remove(result.begin(), result.end(), L'\r'), result.end());
+        return result;
+    }
+
+private:
+    wil::unique_file m_file;
+    wil::unique_hfile m_readPipe;
+    std::unique_ptr<PartialHandleRead> m_reader;
+};
+
+// RAII pipe preloaded with input for tests. A background thread feeds the content
+// (UTF-8) into the pipe while the test drains the read end, mirroring how real stdin
+// is filled by a separate producer. A synchronous write of the whole content on the
+// reading thread would deadlock once the content exceeds the pipe buffer
+// (OpenAnonymousPipe defaults to 4096 bytes), so the feeder runs concurrently and
+// closes the write end when done, letting file() read the content then hit EOF. The
+// read FILE* is configured like real stdin (_O_U8TEXT) and passed to
+// InputChannel/Terminal.
+struct InputPipe
+{
+    explicit InputPipe(const std::wstring& content)
+    {
+        auto [r, w] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, false);
+
+        wil::unique_handle readHandle{r.release()};
+        m_file = FileFromHandle(readHandle, "r");
+
+        const int fd = _fileno(m_file.get());
+        WI_VERIFY(_setmode(fd, _O_U8TEXT) != -1);
+
+        // Feed the content from a background thread so the reader can drain while the
+        // writer fills. Closing the write end signals EOF. No VERIFY/THROW macros run
+        // here since this executes on a separate thread; a broken pipe (the reader
+        // closed early) simply stops the feed.
+        m_writer = std::thread([writeEnd = std::move(w), utf8 = WStringToUTF8(content)]() mutable {
+            size_t offset = 0;
+            while (offset < utf8.size())
+            {
+                DWORD written = 0;
+                if (!WriteFile(writeEnd.get(), utf8.data() + offset, static_cast<DWORD>(utf8.size() - offset), &written, nullptr))
+                {
+                    break;
+                }
+
+                offset += written;
+            }
+
+            writeEnd.reset();
+        });
+    }
+
+    ~InputPipe()
+    {
+        // Close the read end first so a feeder still blocked on a full pipe unblocks
+        // with a broken pipe, then join it.
+        m_file.reset();
+        if (m_writer.joinable())
+        {
+            m_writer.join();
+        }
+    }
+
+    NON_COPYABLE(InputPipe);
+    NON_MOVABLE(InputPipe);
+
+    FILE* file() const
+    {
+        return m_file.get();
+    }
+
+private:
+    wil::unique_file m_file;
+    std::thread m_writer;
+};
+
+// Terminal wired to a single capture pipe for full output capture.
+// VT is disabled (not a console handle), so error output stays in the same pipe.
+struct CaptureTerminal
+{
+    CapturePipe pipe;
+    wsl::windows::wslc::Terminal terminal;
+
+    explicit CaptureTerminal(bool vtEnabled = false) : terminal(pipe.file(), vtEnabled, pipe.file(), vtEnabled)
+    {
+    }
+
+    std::wstring captured()
+    {
+        return pipe.captured();
+    }
+};
+
 // Helper: capture all lines emitted by a TableOutput into a vector<wstring>.
 template <size_t N>
 struct TableOutputCapture
 {
-    std::vector<std::wstring> lines;
+    CaptureTerminal capture;
     wsl::windows::wslc::TableOutput<N> table;
 
-    // Forwards constructor arguments straight to TableOutput.
-    template <typename... Args>
-    explicit TableOutputCapture(Args&&... args) : table(std::forward<Args>(args)...)
+    // Header + optional config + optional VT flag.
+    explicit TableOutputCapture(
+        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
+        size_t sizingBuffer = 50,
+        size_t columnPadding = wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding,
+        bool vtEnabled = false) :
+        capture(vtEnabled), table(capture.terminal, std::move(header), sizingBuffer, columnPadding)
     {
-        table.SetOutputFunction([this](const std::wstring& line) { lines.push_back(line); });
-        // Pin the console width so shrinking tests are deterministic.
         table.SetConsoleWidthOverride(120);
+    }
+
+    // Header + column configs + optional VT flag.
+    explicit TableOutputCapture(
+        typename wsl::windows::wslc::TableOutput<N>::header_t&& header,
+        typename wsl::windows::wslc::TableOutput<N>::column_config_t&& configs,
+        bool vtEnabled = false) :
+        capture(vtEnabled),
+        table(capture.terminal, std::move(header), std::move(configs), 50, wsl::windows::wslc::TableOutput<N>::DefaultColumnPadding)
+    {
+        table.SetConsoleWidthOverride(120);
+    }
+
+    // Column definitions.
+    explicit TableOutputCapture(typename wsl::windows::wslc::TableOutput<N>::column_def_t&& defs, bool vtEnabled = false) :
+        capture(vtEnabled), table(capture.terminal, std::move(defs))
+    {
+        table.SetConsoleWidthOverride(120);
+    }
+
+    // Returns captured output split into lines.
+    std::vector<std::wstring> lines()
+    {
+        auto raw = capture.captured();
+        std::vector<std::wstring> result;
+        size_t pos = 0;
+        while (pos < raw.size())
+        {
+            auto nl = raw.find(L'\n', pos);
+            if (nl == std::wstring::npos)
+            {
+                result.emplace_back(raw.substr(pos));
+                break;
+            }
+            result.emplace_back(raw.substr(pos, nl - pos));
+            pos = nl + 1;
+        }
+        // Remove trailing empty entry from final newline.
+        if (!result.empty() && result.back().empty())
+        {
+            result.pop_back();
+        }
+        return result;
     }
 };
 } // namespace WSLCTestHelpers

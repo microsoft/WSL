@@ -12,10 +12,11 @@ Abstract:
 --*/
 
 #include "Argument.h"
-#include "ArgumentValidation.h"
+#include "ArgumentConvertedTypes.h"
 #include "InspectTasks.h"
 #include "InspectModel.h"
 #include "ImageService.h"
+#include "NetworkService.h"
 #include "VolumeService.h"
 #include "ContainerService.h"
 
@@ -57,6 +58,11 @@ static bool TryInspectContainer(wsl::windows::wslc::models::Session& session, co
     return TryInspect([&]() { result = services::ContainerService::Inspect(session, containerId); }, WSLC_E_CONTAINER_NOT_FOUND);
 }
 
+static bool TryInspectNetwork(wsl::windows::wslc::models::Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& result)
+{
+    return TryInspect([&]() { result = services::NetworkService::Inspect(session, networkName); }, WSLC_E_NETWORK_NOT_FOUND);
+}
+
 static bool TryInspectVolume(wsl::windows::wslc::models::Session& session, const std::string& volumeId, std::optional<wslc_schema::InspectVolume>& result)
 {
     return TryInspect([&]() { result = services::VolumeService::Inspect(session, volumeId); }, WSLC_E_VOLUME_NOT_FOUND);
@@ -66,13 +72,13 @@ void Inspect(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto objectIds = context.Args.GetAll<ArgType::ObjectId>();
+    auto objectIds = context.Args.GetAllValues<ArgType::ObjectId>();
 
     nlohmann::json array = nlohmann::json::array();
     auto type = InspectType::All;
     if (context.Args.Contains(ArgType::Type))
     {
-        type = validation::GetInspectTypeFromString(context.Args.Get<ArgType::Type>(), L"type");
+        type = context.Args.GetValue<ArgType::Type>();
     }
 
     for (const auto& objectId : objectIds)
@@ -80,6 +86,7 @@ void Inspect(CLIExecutionContext& context)
         auto id = WideToMultiByte(objectId);
         std::optional<wslc_schema::InspectContainer> container;
         std::optional<wslc_schema::InspectImage> image;
+        std::optional<wslc_schema::Network> network;
         std::optional<wslc_schema::InspectVolume> volume;
 
         if (WI_IsFlagSet(type, InspectType::Container) && TryInspectContainer(session, id, container))
@@ -90,18 +97,22 @@ void Inspect(CLIExecutionContext& context)
         {
             array.push_back(std::move(*image));
         }
+        else if (WI_IsFlagSet(type, InspectType::Network) && TryInspectNetwork(session, id, network))
+        {
+            array.push_back(std::move(*network));
+        }
         else if (WI_IsFlagSet(type, InspectType::Volume) && TryInspectVolume(session, id, volume))
         {
             array.push_back(std::move(*volume));
         }
         else
         {
-            PrintMessage(Localization::WSLCCLI_ObjectNotFoundError(objectId), stderr);
+            context.Terminal.Error(L"{}\n", Localization::WSLCCLI_ObjectNotFoundError(objectId));
             context.ExitCode = 1;
         }
     }
 
     // Always print the array, even if it's empty or an error was encountered
-    PrintMessage(MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)));
+    context.Terminal.Output(L"{}\n", MultiByteToWide(array.dump(context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent))));
 }
 } // namespace wsl::windows::wslc::task

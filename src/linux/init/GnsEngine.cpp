@@ -488,7 +488,8 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
                 "LxGnsMessageCreateDeviceRequest [Loopback]: InitializeLoopbackConfiguration deviceName {}, interfaceName {}",
                 wsl::shared::string::GuidToString<char>(createDeviceRequest.lowerEdgeAdapterId.value_or(emptyGuid)).c_str(),
                 gelnic.Name().c_str());
-            manager.InitializeLoopbackConfiguration(gelnic);
+            manager.InitializeLoopbackConfiguration(gelnic, createDeviceRequest.flags);
+
             break;
         }
         default:

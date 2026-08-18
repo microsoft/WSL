@@ -20,7 +20,7 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 ImageInfo::ImageInfo(WslcImageInfo const& info)
 {
     m_name = winrt::to_hstring(info.name);
-    m_sizeBytes = info.sizeBytes;
+    m_size = info.sizeBytes;
     m_createdTimestamp = winrt::clock::from_time_t(static_cast<time_t>(info.createdUnixTime));
 
     winrt::Windows::Storage::Streams::DataWriter writer;
@@ -38,9 +38,9 @@ winrt::Windows::Storage::Streams::IBuffer ImageInfo::Sha256()
     return m_sha256;
 }
 
-uint64_t ImageInfo::SizeBytes()
+uint64_t ImageInfo::Size()
 {
-    return m_sizeBytes;
+    return m_size;
 }
 
 winrt::Windows::Foundation::DateTime ImageInfo::CreatedTimestamp()

@@ -23,7 +23,7 @@ static_assert(NetworkingConfiguration::None == static_cast<int32_t>(wsl::core::N
 static_assert(NetworkingConfiguration::Nat == static_cast<int32_t>(wsl::core::NetworkingMode::Nat));
 static_assert(NetworkingConfiguration::Bridged == static_cast<int32_t>(wsl::core::NetworkingMode::Bridged));
 static_assert(NetworkingConfiguration::Mirrored == static_cast<int32_t>(wsl::core::NetworkingMode::Mirrored));
-static_assert(NetworkingConfiguration::VirtioProxy == static_cast<int32_t>(wsl::core::NetworkingMode::VirtioProxy));
+static_assert(NetworkingConfiguration::Consomme == static_cast<int32_t>(wsl::core::NetworkingMode::Consomme));
 
 static_assert(MemoryReclaimConfiguration::Disabled == static_cast<int32_t>(wsl::core::MemoryReclaimMode::Disabled));
 static_assert(MemoryReclaimConfiguration::Gradual == static_cast<int32_t>(wsl::core::MemoryReclaimMode::Gradual));
@@ -194,6 +194,10 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
     case KernelModulesPath:
         static_assert(std::is_same<decltype(wslConfigSetting.StringValue), decltype(wslConfig->Config.KernelModulesPath.c_str())>::value);
         wslConfigSetting.StringValue = wslConfig->Config.KernelModulesPath.c_str();
+        break;
+    case InstanceIdleTimeout:
+        static_assert(std::is_same<decltype(wslConfigSetting.Int32Value), decltype(wslConfig->Config.InstanceIdleTimeout)>::value);
+        wslConfigSetting.Int32Value = wslConfig->Config.InstanceIdleTimeout;
         break;
     default:
         FAIL_FAST();
@@ -560,6 +564,13 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
             wslConfigSetting.StringValue,
             wslConfig->Config.KernelModulesPath);
     }
+    case InstanceIdleTimeout:
+        return SetWslConfigSetting(
+            wslConfig,
+            ConfigSetting::InstanceIdleTimeout,
+            defaultConfig.InstanceIdleTimeout,
+            wslConfigSetting.Int32Value,
+            wslConfig->Config.InstanceIdleTimeout);
     default:
         FAIL_FAST();
     }

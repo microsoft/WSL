@@ -101,7 +101,15 @@ void DockerContainerProcessControl::OnContainerReleased() noexcept
     // Signal the exit event to prevent callers from being blocked on it.
     if (!m_exitEvent.is_signaled())
     {
-        m_exitedCode = 128 + WSLCSignalSIGKILL;
+        // If the container already produced a real exit code (recorded by SetExitCode but not yet
+        // signaled — e.g. an --rm container whose init-exit signal is deferred to the Destroy
+        // event), preserve it. Only synthesize SIGKILL when the container is released without ever
+        // having produced an exit code (an abrupt teardown of a still-running container).
+        if (!m_exitedCode.has_value())
+        {
+            m_exitedCode = 128 + WSLCSignalSIGKILL;
+        }
+
         m_exitEvent.SetEvent();
     }
 }
@@ -114,15 +122,6 @@ DockerExecProcessControl::DockerExecProcessControl(
     m_eventTrackingReference(EventTracker.RegisterExecStateUpdates(
         Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
-}
-
-DockerExecProcessControl::~DockerExecProcessControl()
-{
-    std::lock_guard lock{m_lock};
-    if (m_container != nullptr)
-    {
-        m_container->OnProcessReleased(this);
-    }
 }
 
 int DockerExecProcessControl::GetPid() const

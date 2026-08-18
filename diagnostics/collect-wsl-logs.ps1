@@ -341,6 +341,50 @@ if ($LogProfile -eq "networking")
     Remove-Item $networkingBashScript
 }
 
+# Collect WSLg logs (https://github.com/microsoft/wslg)
+$wslgFolder = "$folder/wslg"
+New-Item -ItemType Directory -Force -Path $wslgFolder | Out-Null
+
+# Run in a job with a timeout so a wedged WSL service can't hang collection. --system --user root
+# reaches /mnt/wslg even when the default distro is WSL1 or isn't running, and can read root-only logs.
+$wslgJob = Start-Job -ScriptBlock {
+    param($DestFull, $CollectDumps)
+
+    $destWsl = "$(& wsl.exe --system --user root -e wslpath -u "$DestFull" 2>$null)".Trim()
+    if ([string]::IsNullOrWhiteSpace($destWsl)) { return }
+
+    # Destination is passed as $1 so paths containing a single quote are handled safely. In
+    # `sh -c '<script>' sh <arg>`, the token after the script becomes $0 (here "sh") and the
+    # next becomes $1 (the destination path).
+    & wsl.exe --system --user root -e sh -c 'cp /mnt/wslg/pulseaudio.log /mnt/wslg/weston.log /mnt/wslg/wlog.log /mnt/wslg/stderr.log /mnt/wslg/versions.txt "$1/" 2>/dev/null; exit 0' sh "$destWsl"
+
+    if ($CollectDumps)
+    {
+        & wsl.exe --system --user root -e sh -c '[ -d /mnt/wslg/dumps ] && cp -r /mnt/wslg/dumps "$1/dumps"; exit 0' sh "$destWsl"
+    }
+} -ArgumentList (Resolve-Path $wslgFolder).Path, ([bool]$Dump)
+
+if (Wait-Job $wslgJob -Timeout 20)
+{
+    Receive-Job $wslgJob | Out-Null
+}
+else
+{
+    Write-Host -ForegroundColor Yellow "WSLg log collection timed out and was skipped."
+    Stop-Job $wslgJob
+}
+Remove-Job $wslgJob -Force
+
+# Crash dumps are only collected with -Dump, since users may not expect dumps to be published by default.
+if ($Dump)
+{
+    $wslCrashes = "$env:TEMP\wsl-crashes"
+    if (Test-Path $wslCrashes)
+    {
+        Copy-Item $wslCrashes "$wslgFolder/wsl-crashes" -Recurse -ErrorAction Ignore
+    }
+}
+
 if ($Dump)
 {
     $Assembly = [PSObject].Assembly.GetType('System.Management.Automation.WindowsErrorReporting')
