@@ -363,7 +363,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     const auto name = wsl::shared::string::WideToMultiByte(containerName);
     const auto containers = ListAllContainers();
-    auto it = std::ranges::find_if(containers, [&](const auto& c) { return c.Name == name; });
+    auto it = std::ranges::find_if(containers, [&](const auto& c) { return c.Names == name; });
     if (it == containers.end())
     {
         return;
@@ -377,11 +377,12 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     }
 }
 
-std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers()
+std::vector<wsl::windows::wslc::models::ContainerOutputInformation> ListAllContainers()
 {
-    auto result = RunWslc(L"container list --all --format json");
+    // --no-trunc keeps the full ids, which callers use to address containers.
+    auto result = RunWslc(L"container list --all --format json --no-trunc");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    return ParseNdjsonOutputAs<wsl::windows::wslc::models::ContainerInformation>(result);
+    return ParseNdjsonOutputAs<wsl::windows::wslc::models::ContainerOutputInformation>(result);
 }
 
 void EnsureImageContainersAreDeleted(const TestImage& image)
@@ -392,8 +393,8 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         auto nameAndTag = wsl::shared::string::WideToMultiByte(image.NameAndTag());
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
-            auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
+            auto result = RunWslc(std::format(L"container remove --force {}", container.ID));
+            result.Verify({.Stdout = std::format(L"{}\r\n", container.ID), .Stderr = L"", .ExitCode = 0});
         }
     }
 }

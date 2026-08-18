@@ -23,6 +23,14 @@ namespace wsl::windows::wslc::services {
 struct ContainerService
 {
     static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
+
+    // The bare state name, e.g. "running", without the relative time ContainerStateToString appends.
+    // Invariant on purpose: this is what "container list --format json" reports, and it has to match
+    // docker's machine readable output rather than the user's display language.
+    static std::wstring ContainerStateName(WSLCContainerState state);
+
+    // The display form of ContainerStateName, used for the table output.
+    static std::wstring LocalizedContainerStateName(WSLCContainerState state);
     static std::wstring FormatRelativeTime(ULONGLONG timestamp);
     static std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
     static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);

@@ -396,30 +396,50 @@ int ContainerService::Attach(Terminal& terminal, Session& session, const std::st
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt)
+// The invariant state name. This is what "container list --format json" reports, so it must match
+// docker's machine readable output rather than the user's display language.
+std::wstring ContainerService::ContainerStateName(WSLCContainerState state)
 {
-    std::wstring stateString;
     switch (state)
     {
     case WSLCContainerState::WslcContainerStateCreated:
-        stateString = L"created";
-        break;
+        return L"created";
     case WSLCContainerState::WslcContainerStateRunning:
-        stateString = L"running";
-        break;
+        return L"running";
     case WSLCContainerState::WslcContainerStateDeleted:
-        stateString = L"stopped";
-        break;
+        return L"stopped";
     case WSLCContainerState::WslcContainerStateExited:
-        stateString = L"exited";
-        break;
+        return L"exited";
     case WSLCContainerState::WslcContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
+}
 
-    if (stateChangedAt == 0)
+std::wstring ContainerService::LocalizedContainerStateName(WSLCContainerState state)
+{
+    switch (state)
+    {
+    case WSLCContainerState::WslcContainerStateCreated:
+        return Localization::WSLCCLI_ContainerStateCreated();
+    case WSLCContainerState::WslcContainerStateRunning:
+        return Localization::WSLCCLI_ContainerStateRunning();
+    case WSLCContainerState::WslcContainerStateDeleted:
+        return Localization::WSLCCLI_ContainerStateStopped();
+    case WSLCContainerState::WslcContainerStateExited:
+        return Localization::WSLCCLI_ContainerStateExited();
+    case WSLCContainerState::WslcContainerStateInvalid:
+        return Localization::WSLCCLI_ContainerStateInvalid();
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+}
+
+std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt)
+{
+    auto stateString = LocalizedContainerStateName(state);
+    if (stateChangedAt == 0 || state == WSLCContainerState::WslcContainerStateInvalid)
     {
         return stateString;
     }
@@ -658,6 +678,10 @@ std::vector<ContainerInformation> ContainerService::List(
         entry.Image = current.Image;
         entry.Command = current.Command;
         entry.Status = current.Status;
+        entry.Labels = current.Labels;
+        entry.Networks = current.Networks;
+        entry.Mounts = current.Mounts;
+        entry.LocalVolumes = current.LocalVolumes;
         entry.State = current.State;
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;

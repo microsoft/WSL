@@ -2568,6 +2568,41 @@ try
         THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Command, std::size(output[index].Command), dockerContainer.Command.c_str(), _TRUNCATE) == EINVAL);
         THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Status, std::size(output[index].Status), dockerContainer.Status.c_str(), _TRUNCATE) == EINVAL);
 
+        // Labels, networks and mounts are reported the way the docker CLI renders them: a comma
+        // separated list. Like the command and status above they are unbounded, so they truncate.
+        std::vector<std::string> labels;
+        for (const auto& [key, value] : dockerContainer.Labels)
+        {
+            labels.push_back(std::format("{}={}", key, value));
+        }
+
+        std::vector<std::string> networks;
+        for (const auto& [name, _] : dockerContainer.NetworkSettings.Networks)
+        {
+            networks.push_back(name);
+        }
+
+        std::vector<std::string> mounts;
+        ULONG localVolumes = 0;
+        for (const auto& mount : dockerContainer.Mounts)
+        {
+            // Named volumes report a name, bind mounts only report the host path.
+            mounts.push_back(mount.Name.empty() ? mount.Source : mount.Name);
+            if (mount.Type == "volume")
+            {
+                localVolumes++;
+            }
+        }
+
+        const auto joinedLabels = wsl::shared::string::Join(labels, ',');
+        const auto joinedNetworks = wsl::shared::string::Join(networks, ',');
+        const auto joinedMounts = wsl::shared::string::Join(mounts, ',');
+
+        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Labels, std::size(output[index].Labels), joinedLabels.c_str(), _TRUNCATE) == EINVAL);
+        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Networks, std::size(output[index].Networks), joinedNetworks.c_str(), _TRUNCATE) == EINVAL);
+        THROW_HR_IF(E_UNEXPECTED, strncpy_s(output[index].Mounts, std::size(output[index].Mounts), joinedMounts.c_str(), _TRUNCATE) == EINVAL);
+        output[index].LocalVolumes = localVolumes;
+
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
