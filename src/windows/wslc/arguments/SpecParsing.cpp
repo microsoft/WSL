@@ -458,6 +458,80 @@ std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
 }
 
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName)
+{
+    ParsedNetworkArgument result;
+
+    auto parseOptions = [&](std::wstring_view options, bool requireName) {
+        bool parsedName = false;
+        for (const auto part : SplitPreserveEmpty(options, L','))
+        {
+            const auto separator = part.find(L'=');
+            if (separator == std::wstring_view::npos || separator == 0)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{part}));
+            }
+
+            const auto key = part.substr(0, separator);
+            const auto optionValue = part.substr(separator + 1);
+            if (key == L"name")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+                }
+
+                if (parsedName)
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(argName));
+                }
+
+                parsedName = true;
+                result.Name = WideToMultiByte(std::wstring{optionValue});
+            }
+            else if (key == L"alias")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(argName));
+                }
+
+                result.Aliases.emplace_back(WideToMultiByte(std::wstring{optionValue}));
+            }
+            else
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{key}));
+            }
+        }
+
+        if (requireName && !parsedName)
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+    };
+
+    if (value.find(L'=') != std::wstring_view::npos)
+    {
+        parseOptions(value, true);
+    }
+    else
+    {
+        if (IsEmptyOrWhitespace(value))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+
+        result.Name = WideToMultiByte(std::wstring{value});
+    }
+
+    if (result.Name.empty())
+    {
+        throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+    }
+
+    return result;
+}
+
 // Map of signal names to WSLCSignal enum values
 static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
     {L"SIGHUP", WSLCSignalSIGHUP},   {L"SIGINT", WSLCSignalSIGINT},     {L"SIGQUIT", WSLCSignalSIGQUIT},
@@ -740,13 +814,14 @@ models::InspectType GetInspectTypeFromString(const std::wstring& input, const st
 
 int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
-    if (!parsed.has_value())
+    const auto bytes =
+        wsl::windows::common::string::ParseStorageSize(std::wstring_view{input}, wsl::windows::common::string::StorageSizeUnit::Binary);
+    if (!bytes.has_value() || bytes.value() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
     }
 
-    return static_cast<int64_t>(parsed.value());
+    return static_cast<int64_t>(bytes.value());
 }
 
 // Parses duration string into nanoseconds.

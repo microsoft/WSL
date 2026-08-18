@@ -308,6 +308,9 @@
   <data name="MessageConversionStart" xml:space="preserve">
     <value>轉換進行中，這可能需要幾分鐘的時間。</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>正在進行壓縮，這可能需要幾分鐘的時間。</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>發佈已是要求的版本。</value>
   </data>
@@ -400,14 +403,14 @@
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation.著作權所有，並保留一切權利。
-如需此產品的隱私權資訊，請瀏覽 https://aka.ms/privacy。
+    <value>Copyright (c) Microsoft Corporation. 著作權所有，並保留一切權利。
+如需有關此產品的隱私權資訊，請造訪 https://aka.ms/privacy。
 
 使用方式: wsl.exe [Argument] [Options...] [CommandLine]
 
-用於執行 Linux 二進位檔案的引數:
+用於執行 Linux 二進位檔的引數:
 
-    如果未提供命令列，wsl.exe 會啟動預設殼層。
+    如果未提供任何命令列，wsl.exe 會啟動預設殼層。
 
     --exec, -e &lt;CommandLine&gt;
         執行指定的命令，而不使用預設的 Linux 殼層。
@@ -416,113 +419,116 @@
         使用提供的殼層類型執行指定的命令。
 
     --
-        按原樣傳遞剩餘的命令列。
+      依原樣傳遞其餘的命令列。
 
 選項:
     --cd &lt;Directory&gt;
         將指定的目錄設定為目前的工作目錄。
-        如果使用 ~，將會使用 Linux 使用者首頁路徑。如果路徑開頭
-        為 / 字元，它將被解譯為絕對 Linux 路徑。
-        否則，此值必須是絕對 Windows 路徑。
+        如果使用 ~，則會使用 Linux 使用者的常用路徑。如果路徑的開頭為
+        / 字元，它則會被解譯為絕對 Linux 路徑。
+        否則，該值必須是絕對 Windows 路徑。
 
     --distribution, -d &lt;DistroName&gt;
-        執行指定的發行版本。
+        執行指定的發佈。
 
     --distribution-id &lt;DistroGuid&gt;
-        執行指定的發行版本識別碼。
+        執行指定的發佈識別碼。
 
     --user, -u &lt;UserName&gt;
-        作為指定的使用者執行。
+        以指定使用者身分執行。
 
     --system
-        啟動系統發行版本的殼層。
+        啟動系統發佈的殼層。
 
-用於管理 Windows 子系統 Linux 版的引數: 
+用於管理 Windows 子系統 Linux 版的引數:
 
     --help
-        顯示使用資訊。
+        顯示使用方式資訊。
 
     --debug-shell
-        開啟 WSL2 偵錯工具進行診斷。
+        開啟用於診斷用途的 WSL2 偵錯殼層。
 
     --install [Distro] [Options...]
         安裝 Windows 子系統 Linux 版發行版本。
-        對於有效的通訊群組清單，請使用 'wsl.exe --list --online'。
+        如需有效發行版本的清單，請使用 'wsl.exe --list --online'。
 
-        選項:
+       選項:
             --enable-wsl1
                 啟用 WSL1 支援。
 
             --fixed-vhd
-                建立固定大小的磁碟以儲存發行版本。
+                建立大小固定的磁碟，以儲存發佈。
 
             --from-file &lt;Path&gt;
-                從本機檔案安裝發行版本。
+                從本機檔案安裝發佈。
 
             --legacy
-                使用舊版發行版本資訊清單。
+                使用舊版發佈資訊清單。
 
             --location &lt;Location&gt;
-                設定發行版本的安裝路徑。
+                設定發佈的安裝路徑。
 
             --name &lt;Name&gt;
-                設定發行版本的名稱。
+                設定發佈的名稱。
 
             --no-distribution
-                只安裝必要的選擇性元件，不會安裝發行版本。
+                僅安裝必須的選擇性元件，不安裝發行版本。
 
             --no-launch, -n
-                安裝之後請勿啟動發佈。
+                安裝後請勿啟動發佈。
 
             --version &lt;Version&gt;
-                指定要用於新發行版本的版本。
+                指定要用於新發佈的版本。
 
             --vhd-size &lt;MemoryString&gt;
-                指定要儲存發行版本之磁碟的大小。
+                指定磁碟大小，以儲存發佈。
 
             --web-download
-                從網際網路下載發行版本，而非從 Microsoft Store 下載。
+                從網際網路下載發佈，而非從 Microsoft Store 下載。
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        變更發行版本特定選項。
+        變更 distro 指定選項。
 
         選項:
             --move &lt;Location&gt;
-                將發行版本移至新位置。
+                將發佈移動到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
-                將發行版本的 VHD 設為疏鬆配置，以允許自動回收磁碟空間。
+將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。
 
             --set-default-user &lt;Username&gt;
-                設定發行版本的預設使用者。
+                設定發佈的預設使用者。
 
             --resize &lt;MemoryString&gt;
-                將發行版本的磁碟大小調整為指定的大小。
+                將發佈的磁碟大小調整為指定大小。
+
+            --compact
+                壓縮 WSL 2 發行版本的 VHDX 檔案。
 
     --mount &lt;Disk&gt;
-        在所有 WSL 2 發行版本中附加並掛接實體或虛擬磁碟。
+        在所有 WSL 2 發行版本中連結和掛接實體或虛擬磁碟。
 
         選項:
             --vhd
-                指定 &lt;Disk&gt; 參照虛擬硬碟。
+                指定 &lt;Disk&gt; 參考虛擬硬碟。
 
             --bare
-                將磁碟連結到 WSL2，但不掛接。
+                將磁碟連結到 WSL2，但不要掛接。
 
             --name &lt;Name&gt;
-                使用掛載點的自訂名稱掛載磁碟。
+                使用掛接點的自訂名稱掛接磁碟。
 
             --type &lt;Type&gt;
-                掛載磁碟時使用的檔案系統 (若未指定，則預設為 ext4)。
+                掛接磁碟時要使用的檔案系統，如果未指定，則預設為 ext4。
 
             --options &lt;Options&gt;
-                其他掛載選項。
+                其他掛接選項。
 
             --partition &lt;Index&gt;
-                要掛載之磁碟分割的索引 (若未指定，則預設為整個磁碟)。
+                要掛接之磁碟分割的索引，如果未指定，則預設為整個磁碟。 
 
     --set-default-version &lt;Version&gt;
-        變更新發行版本的預設安裝版本。
+        為新的發行版本變更預設安裝版本。
 
     --shutdown
         立即終止所有正在執行的發行版本和 WSL 2
@@ -530,53 +536,53 @@
 
         選項:
             --force
-                終止 WSL 2 虛擬機器，即使有作業正在進行中。可能會導致資料遺失。
+                結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
 
     --status
         顯示 Windows 子系統 Linux 版的狀態。
 
     --unmount [Disk]
-        從所有 WSL2 發行版本卸載並中斷與磁碟的連結。
-        如果在沒有引數的情況下進行調用，會卸載和中斷與所有磁碟的連結。
+        從所有 WSL2 發行版本卸載並中斷連結磁碟。
+        如果呼叫時沒有引數，則卸載並中斷連結所有磁碟。
 
     --uninstall
-        自此電腦解除安裝 Windows 子系統 Linux 版套件。
+        從此電腦取消安裝 Windows 子系統 Linux 版套件。
 
     --update
         更新 Windows 子系統 Linux 版套件。
 
         選項:
             --pre-release
-                若有提供，則下載預先發行版本。
+                下載預先發行版本 (如果有提供)。
 
     --version, -v
         顯示版本資訊。
 
-在 Windows 子系統 Linux 版中管理發行版本的引數: 
+用於在 Windows 子系統 Linux 版中管理發行版本的引數:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        將發行版本匯出至 tar 檔案。
-        檔案名稱可以是 - 代表標準輸出。
+         將發行版本匯出至 tar 檔案。
+        stdout 的檔案名稱可以是 -。
 
         選項:
             --format &lt;Format&gt;
                 指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        將指定的 tar 檔案做為新的發行版本。
-        檔案名稱可以是 - 代表標準輸入。
+        匯入指定的 tar 檔案以做為新發行版本。
+        標準輸出的檔案名稱可以是 -。
 
         選項:
             --version &lt;Version&gt;
                 指定要用於新發行版本的版本。
 
             --vhd
-                指定提供的檔案是 .vhd 或 .vhdx 檔案，而非 tar 檔案。
-                此作業會在指定的安裝位置複製 VHD 檔案。
+                指定提供的檔案是 .vhd 或 .vhdx 檔案，而不是 tar 檔案。
+                此作業會在指定的安裝位置複製 .VHD 檔案。
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        將指定的 VHD 檔案匯入為新的發行版本。
-        此虛擬硬碟必須使用 ext4 檔案系統類型進行格式化。
+        匯入指定的 VHD 檔案以做為新發行版本。
+        此虛擬硬碟必須格式化為 ext4 檔案系統類型。
 
     --list, -l [Options]
         列出發行版本。
@@ -587,7 +593,7 @@
                 目前正在安裝或解除安裝的發行版本。
 
             --running
-                只列出目前正在執行的發行版本。
+                僅列出目前正在執行的發行版本。
 
             --quiet, -q
                 只顯示發行版本名稱。
@@ -596,10 +602,10 @@
                 顯示所有發行版本的詳細資訊。
 
             --online, -o
-                顯示可用發行版本的清單，以使用 'wsl.exe --install' 安裝。
+                顯示可使用 'wsl.exe --install' 安裝的可用發行版本清單。
 
     --set-default, -s &lt;Distro&gt;
-        將發行版本設定為預設。
+        將發行版本設定為預設值。
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
         變更指定發行版本的版本。
@@ -617,7 +623,8 @@
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1066,6 +1073,10 @@ Windows 版本： {}</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>無法完成作業，因為 VHD 目前正在使用中。若要強制 WSL 停止使用： wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>只有 .vhdx 檔案支援壓縮。</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} 不是有效的布林值，&lt;true|false&gt;</value>
@@ -2199,11 +2210,15 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>未提供必要的引數: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>未提供必要的選項: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>顯示所選命令的相關說明</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>已提供多個互斥的引數: '{}'</value>
+    <value>已提供多個互斥選項: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2239,7 +2254,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>停用色彩輸出。</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>如需特定命令的更多詳細資料，請向其傳遞說明引數。</value>
+    <value>如需特定命令的更多詳細資料，請向其傳遞說明選項。</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>執行 '{} --help' 以取得詳細資訊。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>命令:</value>
@@ -2256,8 +2275,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>引數:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>相關選項:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>相關引數:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>無法辨識目前命令的引數名稱: '{}'</value>
+    <value>無法辨識目前命令的選項名稱: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2279,35 +2304,35 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>容器識別碼</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>遺失引數值: '{}'</value>
+    <value>缺少選項值: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>無法辨識目前命令的引數別名: '{}'</value>
+    <value>目前命令中未辨識選項別名：'{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>無效的引數指定元: '{}'</value>
+     <value>無效的選項指定元: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>找不到鄰近旗標別名: '{}'</value>
+     <value>找不到鄰近選項別名: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>鄰近別名不是旗標: '{}'</value>
+     <value>鄰近選項別名不是旗標: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>無效的引數指定元: '{}'</value>
+     <value>無效的選項指定元: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>旗標引數不能包含鄰近值: '{}'</value>
+     <value>選項不能包含鄰近值: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>旗標引數的布林值無效:「{}」。預期為 True、false、1 或 0。</value>
+     <value>選項的布林值無效：'{}'. 預期值為 true, false, 1, 0, t 或 f。</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2315,7 +2340,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>遺失參數名稱於: '{}'</value>
+     <value>遺失選選名稱位置: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2327,7 +2352,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>具有值的別名參數必須位於別名鏈的最後: '{}'</value>
+     <value>具有值的別名選項必須位於別名鏈的最後: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2470,7 +2495,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>要求多個網路時，無法指定網路別名。使用單一 --network 引數。</value>
+    <value>要求多個網路時，無法指定網路別名。使用單一 --network 選項。</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2628,10 +2653,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>顯示容器的詳細資訊。</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>終止容器。</value>
+    <value>終止一個或多個正在執行的容器。</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>終止容器。</value>
+    <value>預設會透過傳送 SIGKILL 信號來終止一個或多個正在運行的容器，或傳送透過 --signal. 參數指定的信號。</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>列出容器。</value>
@@ -2686,6 +2712,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>停止容器。</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>要傳送的信號 (預設: 容器所設定的 STOPSIGNAL，或若未設定則為 SIGTERM)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>管理映像。</value>
@@ -2951,7 +2981,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>無效的 {} 引數值: '{}'。預期 CPU 數量應為正值 (例如 0.5、1、2)</value>
+    <value>無效的 {}選項值: '{}'。預期 CPU 數量應為正值 (例如 0.5、1、2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2979,7 +3009,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>根據提供的條件篩選輸出</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>旗標 '-f, --filter' 的引數 "{}" 無效: 篩選格式錯誤（預期為 name=value）</value>
+    <value>選項 '-f, --filter' 的值 "{}" 無效: 篩選格式錯誤（預期為 name=value）</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>追蹤記錄輸出</value>
@@ -3065,6 +3095,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>{} 值無效： 網路名稱不可為空白或空白字元</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>{} 值無效： 只能指定一次網路名稱</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>無效的 {} 值：不支援的網路選項 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>不支援主機模式網路</value>
   </data>
@@ -3145,7 +3183,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>工作階段儲存目錄的路徑</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>要傳送的訊號</value>
+    <value>要傳送到容器的訊號 (預設：SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>目前或現有的影像參考採用影像名稱[:tag]格式</value>
@@ -3230,8 +3269,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>進度類型 (格式: none|ansi) (預設: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>設定進度輸出的類型（auto、tty、plain、quiet）（預設：auto）</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>映像提取原則 (always|missing|never) (預設: missing)</value>
@@ -3249,7 +3288,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>{} 引數值無效： '{}'。預期 &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (使用 -1 進行無限制的)</value>
+    <value>無效的 {}選項值: '{}'。預期的 &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (若要無限制使用，請輸入 -1)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3273,6 +3312,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>無效的 {} 值：{} 不是可辨識的提取原則。支援的提取原則為: {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>無效的 {} 值: {} 不是可辨識的進度類型。支援的進度類型為: {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>無效的 {} 值： {} 不是可辨識的檢查類型。支援的檢查類型為： {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3282,11 +3325,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>無效的 {} 引數值: {}</value>
+    <value>無效的 {} 選項值: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>無效的 {} 引數值: '{}'。預期為 Unix Epoch 時間戳記或 RFC3339 日期時間 (例如 2024-01-15T10:30:00Z)</value>
+    <value>無效的 {}選項值: '{}'。預期為 Unix Epoch 時間戳記或 RFC3339 日期時間 (例如 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3294,11 +3337,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>{} 引數值無效： '{}'。預期記憶體大小 (，例如 256M、1G)</value>
+    <value>無效的 {}選項值: '{}'。預期的記憶體大小 (例如 256M、1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>無效的 {} 引數值: '{}'。預期持續時間 (例如 30s, 1m30s)</value>
+    <value>無效的 {}選項值: '{}'。預期持續時間 (例如 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3388,7 +3431,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>網路名稱</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>僅輸出網路名稱</value>
+    <value>只顯示網路識別碼</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>移除所有未使用的網路。</value>
@@ -3475,10 +3518,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>僅輸出磁碟區名稱</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>無法將影像寫入終端機。使用 -o 旗標或重新導向 stdout。</value>
+    <value>無法將影像寫入終端機。使用 -o 選項或重新導向 stdout。</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>無法將容器匯出至終端機。使用 -o 旗標或重新導向 stdout。</value>
+    <value>無法將容器匯出至終端機。使用 -o 選項或重新導向 stdout。</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>預期的格式: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>

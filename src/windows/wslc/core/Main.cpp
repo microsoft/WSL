@@ -134,10 +134,19 @@ try
         command->ValidateArguments(context.Args);
         command->Execute(context);
     }
+    catch (const ArgumentException& ae)
+    {
+        command->OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        return 1;
+    }
     catch (const CommandException& ce)
     {
-        // Input failure: show help alongside the error so the user can correct it.
-        command->OutputHelp(context.Terminal, &ce);
+        command->OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        return 1;
+    }
+    catch (const ExecutionException& ee)
+    {
+        context.Terminal.Error(L"{}\n", ee.Message());
         return 1;
     }
     catch (...)

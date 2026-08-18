@@ -29,6 +29,8 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+namespace mount = wsl::windows::common::mount;
+
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using namespace wsl::windows::common::wslutil;
@@ -39,6 +41,12 @@ using namespace std::chrono_literals;
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
+}
+
+static bool SupportsNetworkAliases(std::string_view network)
+{
+    // Aliases are only supported for user-defined networks, not built-in or container-sourced network modes.
+    return network != "bridge" && network != "host" && network != "none" && !network.starts_with("container:");
 }
 
 static void PullImage(Terminal& terminal, Session& session, const std::string& image)
@@ -66,14 +74,20 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
-    std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front();
+    std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front().Name;
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, options.EnvironmentVariables, std::move(networkMode), processFlags);
 
     for (size_t i = 1; i < options.Networks.size(); ++i)
     {
-        containerLauncher.AddAdditionalNetwork(options.Networks[i]);
+        const auto& network = options.Networks[i];
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
+            !network.Aliases.empty() && !SupportsNetworkAliases(network.Name));
+
+        containerLauncher.AddAdditionalNetwork(network.Name, network.Aliases);
     }
 
     if (!options.NetworkAliases.empty())
@@ -82,13 +96,24 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
 
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
 
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcAliasRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        for (const auto& alias : options.NetworkAliases)
+        {
+            containerLauncher.AddPrimaryNetworkAlias(alias);
+        }
+    }
+
+    if (!options.Networks.empty())
+    {
         const auto& primary = options.Networks.front();
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG,
             Localization::MessageWslcAliasRequiresUserDefinedNetwork(),
-            primary == "bridge" || primary == "host" || primary == "none" || primary.starts_with("container:"));
+            !primary.Aliases.empty() && !SupportsNetworkAliases(primary.Name));
 
-        for (const auto& alias : options.NetworkAliases)
+        for (const auto& alias : primary.Aliases)
         {
             containerLauncher.AddPrimaryNetworkAlias(alias);
         }
@@ -125,20 +150,9 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
-    // Add volumes if specified
-    for (const auto& volumeSpec : options.Volumes)
+    for (const auto& mountSpec : options.Mounts)
     {
-        auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = volume.Host();
-        auto container = volume.ContainerPath();
-        if (volume.IsNamedVolume())
-        {
-            containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
-        }
-        else
-        {
-            containerLauncher.AddVolume(host, container, volume.IsReadOnly());
-        }
+        containerLauncher.AddMount(mountSpec);
     }
 
     containerLauncher.SetContainerFlags(containerFlags);
@@ -248,12 +262,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
     if (!options.CapAdd.empty())
     {
         containerLauncher.SetCapAdd(std::vector<std::string>(options.CapAdd));
-    }
-
-    for (const auto& tmpfsSpec : options.Tmpfs)
-    {
-        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
-        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
     }
 
     for (const auto& [key, value] : options.Labels)

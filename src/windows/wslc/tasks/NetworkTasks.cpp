@@ -139,7 +139,9 @@ void GetNetworks(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    context.Data.Add<Data::Networks>(NetworkService::List(session));
+
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
+    context.Data.Add<Data::Networks>(NetworkService::List(session, filters));
 }
 
 void InspectNetworks(CLIExecutionContext& context)
@@ -170,17 +172,18 @@ void ListNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
 
-    if (context.Args.GetValue<ArgType::Quiet>())
+    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    const bool quiet = context.Args.GetValue<ArgType::Quiet>();
+    const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+    if (format == FormatType::Table && quiet)
     {
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(network.Name));
+            context.Terminal.Output(L"{}\n", MultiByteToWide(TruncateId(network.Id, trunc)));
         }
 
         return;
     }
-
-    const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
 
     switch (format)
     {
@@ -188,7 +191,9 @@ void ListNetworks(CLIExecutionContext& context)
     {
         for (const auto& network : networks)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(network, c_jsonCompactIndent));
+            auto json = nlohmann::json(network);
+            json["ID"] = TruncateId(network.Id, trunc);
+            context.Terminal.Output(L"{}\n", ToJsonW(json, c_jsonCompactIndent));
         }
 
         break;
@@ -199,7 +204,7 @@ void ListNetworks(CLIExecutionContext& context)
         for (const auto& network : networks)
         {
             table.WriteRow({
-                MultiByteToWide(TruncateId(network.Id)),
+                MultiByteToWide(TruncateId(network.Id, trunc)),
                 MultiByteToWide(network.Name),
                 MultiByteToWide(network.Driver),
             });

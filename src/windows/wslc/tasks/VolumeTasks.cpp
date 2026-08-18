@@ -27,6 +27,7 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
+using wsl::windows::common::string::FormatBytes;
 
 namespace wsl::windows::wslc::task {
 
@@ -124,7 +125,8 @@ void GetVolumes(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    context.Data.Add<Data::Volumes>(VolumeService::List(session));
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
+    context.Data.Add<Data::Volumes>(VolumeService::List(session, filters));
 }
 
 void InspectVolumes(CLIExecutionContext& context)
@@ -215,6 +217,6 @@ void PruneVolumes(CLIExecutionContext& context)
     }
 
     context.Terminal.Output(L"\n");
-    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_VolumePruneSpaceReclaimed(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_VolumePruneSpaceReclaimed(FormatBytes(result.SpaceReclaimed)));
 }
 } // namespace wsl::windows::wslc::task

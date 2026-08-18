@@ -94,8 +94,9 @@ _(Latest,           "latest",               L"l",             Kind::Flag,       
 _(Link,             "link",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_LinkArgDescription()) \
 _(LinkLocalIp,      "link-local-ip",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_LinkLocalIpArgDescription()) \
 _(Memory,           "memory",               L"m",             Kind::Value,      int64_t,      Localization::WSLCCLI_MemoryArgDescription()) \
-_(Name,             "name",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NameArgDescription()) \
-_(Network,          "network",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkArgDescription()) \
+_(Mount,            "mount",               NO_ALIAS,         Kind::Value,      ParsedMount,  Localization::WSLCCLI_MountArgDescription()) \
+_(Name,             "name",                NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NameArgDescription()) \
+_(Network,          "network",              NO_ALIAS,         Kind::Value,      ParsedNetworkArgument, Localization::WSLCCLI_NetworkArgDescription()) \
 _(NetworkAlias,     "network-alias",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkAliasArgDescription()) \
 _(NetworkName,      "network-name",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_NetworkNameArgDescription()) \
 /*_(NoDNS,            "no-dns",               NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoDNSArgDescription())*/ \
@@ -131,7 +132,7 @@ _(Tail,             "tail",                 L"n",             Kind::Value,      
 _(Tag,              "tag",                  L"t",             Kind::Value,      NoConversion, Localization::WSLCCLI_TagArgDescription()) \
 _(Target,           "target",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,             "time",                 L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
-_(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_TMPFSArgDescription()) \
+_(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      ParsedMount,  Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,              "tty",                  L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,             "type",                 L"t",             Kind::Value,      InspectType,  Localization::WSLCCLI_TypeArgDescription()) \
 _(Ulimit,           "ulimit",               NO_ALIAS,         Kind::Value,      UlimitValue,  Localization::WSLCCLI_UlimitArgDescription()) \
@@ -140,7 +141,7 @@ _(Username,         "username",             L"u",             Kind::Value,      
 _(Verbose,          "verbose",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_VerboseArgDescription()) \
 _(Version,          "version",              L"v",             Kind::Flag,       NoConversion, Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,          "virtualization",       NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_VirtualArgDescription())*/ \
-_(Volume,           "volume",               L"v",             Kind::Value,      NoConversion, Localization::WSLCCLI_VolumeArgDescription()) \
+_(Volume,           "volume",               L"v",             Kind::Value,      ParsedMount,  Localization::WSLCCLI_VolumeArgDescription()) \
 _(VolumeName,       "volume-name",          NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_VolumeNameArgDescription()) \
 _(Volumes,          "volumes",              L"v",             Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveVolumesArgDescription()) \
 _(WorkDir,          "workdir",              L"w",             Kind::Value,      NoConversion, Localization::WSLCCLI_WorkingDirArgDescription()) \

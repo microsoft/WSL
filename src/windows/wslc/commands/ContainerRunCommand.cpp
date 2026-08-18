@@ -53,6 +53,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Label, false, Limit::Unlimited),
         Argument::Create(ArgType::Memory),
+        Argument::Create(ArgType::Mount, false, Limit::Unlimited),
         Argument::Create(ArgType::Name),
         Argument::Create(ArgType::Network, false, Limit::Unlimited),
         Argument::Create(ArgType::NetworkAlias, false, Limit::Unlimited),
