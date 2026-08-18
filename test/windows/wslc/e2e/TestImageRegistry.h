@@ -17,12 +17,13 @@ Abstract:
 #include <set>
 #include <string>
 #include <tuple>
-#include <vector>
 
 namespace WSLCE2ETests {
 
 struct TestImage;
 
+// The cache is only correct as long as every removal is either routed through Delete or followed
+// by Restore, so a test that removes images another way has to put the session back itself.
 class TestImageRegistry
 {
 public:
@@ -39,19 +40,15 @@ public:
     // the registry, such as built or imported ones, are still removed.
     void Delete(const TestImage& image, const std::wstring& sessionName = L"");
 
-    // Observes a wslc command line and drops cached state that the command may have invalidated.
-    // Called for every wslc invocation so that the cache cannot report an image as loaded after
-    // something else removed it.
-    void NoteCommand(const std::wstring& commandLine);
+    // Loads the image back without consulting the cache. Tests that remove images without going
+    // through Delete, such as those exercising image prune, call this to restore the session.
+    void Restore(const TestImage& image, const std::wstring& sessionName = L"");
 
 private:
     TestImageRegistry() = default;
 
     // Loads the image without consulting the cache.
     void Load(const TestImage& image, const std::wstring& sessionName);
-
-    // Drops every cached entry for a session, so the next lookup re-queries the live inventory.
-    void InvalidateSession(const std::wstring& sessionName);
 
     struct ImageKey
     {
@@ -73,20 +70,9 @@ private:
     // Prefixes a command with the session flag when the command targets a named session.
     static std::wstring FormatCommand(const std::wstring& sessionName, const std::wstring& command);
 
-    // Extracts the session a command targets, matching the --session "name" form the helpers emit.
-    static std::wstring ParseSessionName(const std::wstring& commandLine);
-
-    // Lists the images a removal command targets. An empty result means the affected set is
-    // unbounded or not expressible as cache keys, so the whole session has to be dropped.
-    static std::vector<ImageKey> ParseRemovedImages(const std::wstring& commandLine, const std::wstring& sessionName);
-
-    // Only commands that can remove an image matter. Commands that add one can at worst leave the
-    // cache pessimistic, which costs an extra query rather than producing a wrong answer.
-    static bool CommandCanRemoveImages(const std::wstring& commandLine);
-
-    mutable wil::srwlock m_lock;
-    _Guarded_by_(m_lock) std::set<ImageKey> m_loaded;
-    _Guarded_by_(m_lock) std::set<std::wstring> m_seededSessions;
+    // Test methods run one at a time in a single process, so the cache needs no synchronization.
+    std::set<ImageKey> m_loaded;
+    std::set<std::wstring> m_seededSessions;
 };
 
 } // namespace WSLCE2ETests

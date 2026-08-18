@@ -63,7 +63,7 @@ class WSLCE2EImagePruneTests
             RunWslc(L"image prune");
             RunWslc(L"image delete prune-target:v1");
             TestImageRegistry::Instance().Delete(AlpineImage);
-            TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+            TestImageRegistry::Instance().Restore(DebianImage);
         });
 
         RunWslc(std::format(L"image tag {} prune-target:v1", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
@@ -93,7 +93,7 @@ class WSLCE2EImagePruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_AllFlag)
     {
-        auto cleanup = wil::scope_exit([&]() { TestImageRegistry::Instance().EnsureLoaded(DebianImage); });
+        auto cleanup = wil::scope_exit([&]() { TestImageRegistry::Instance().Restore(DebianImage); });
 
         // --all should prune unused images (not just dangling)
         const auto result = RunWslc(L"image prune --all");
@@ -137,7 +137,7 @@ class WSLCE2EImagePruneTests
             RunWslc(L"image prune");
             RunWslc(L"image delete prune-target:v1");
             TestImageRegistry::Instance().Delete(AlpineImage);
-            TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+            TestImageRegistry::Instance().Restore(DebianImage);
         });
 
         RunWslc(std::format(L"image tag {} prune-target:v1", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});

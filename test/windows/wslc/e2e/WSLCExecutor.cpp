@@ -17,7 +17,6 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 
@@ -158,8 +157,6 @@ bool WSLCExecutionResult::StderrContainsSubstring(const std::wstring& substring)
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType, HANDLE stdinHandle)
 {
-    TestImageRegistry::Instance().NoteCommand(commandLine);
-
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
 
@@ -200,8 +197,6 @@ void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expect
 
 WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, std::optional<std::filesystem::path> outputPath, ElevationType elevationType)
 {
-    TestImageRegistry::Instance().NoteCommand(commandLine);
-
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
 
@@ -293,8 +288,6 @@ void WaitForContainerOutput(const std::wstring& containerName, std::string_view 
 
 WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType, std::optional<PseudoConsole> pseudoConsole)
 {
-    TestImageRegistry::Instance().NoteCommand(commandLine);
-
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
 
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
