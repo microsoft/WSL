@@ -6455,7 +6455,7 @@ class WSLCTests
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
 
-            ValidateCOMErrorMessage(Localization::WSLCCLI_MountTargetAbsoluteError());
+            ValidateCOMErrorMessage(wsl::shared::Localization::WSLCCLI_MountTargetAbsoluteError());
         }
 
         // Validate that invalid tmpfs options are rejected by Docker.
