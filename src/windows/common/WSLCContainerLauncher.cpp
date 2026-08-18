@@ -466,7 +466,6 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.UlimitsCount = static_cast<ULONG>(m_ulimits.size());
     options.Ulimits = m_ulimits.size() > 0 ? m_ulimits.data() : nullptr;
 
-    // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
     auto result = Session.CreateContainer(&options, WarningCallback, &container);
     if (FAILED(result))

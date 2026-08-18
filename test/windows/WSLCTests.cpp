@@ -123,17 +123,36 @@ class WSLCTests
     TEST_METHOD(ComposeSessionBasicLifecycle)
     {
         const auto composePath = std::filesystem::current_path() / std::format("compose-{}.yaml", GetCurrentProcessId());
+        const auto volumePath = std::filesystem::current_path() / std::format("compose-volume-{}", GetCurrentProcessId());
         auto cleanup = wil::scope_exit([&] {
             std::error_code error;
             std::filesystem::remove(composePath, error);
+            std::filesystem::remove_all(volumePath, error);
         });
+
+        std::filesystem::create_directory(volumePath);
+        std::ofstream(volumePath / "content.txt") << "compose-volume";
 
         {
             std::ofstream composeFile(composePath);
             composeFile << "services:\n"
                            "  basic:\n"
                            "    name: wslc-compose-basic\n"
-                           "    image: wslc-registry:latest\n";
+                           "    image: alpine:latest\n"
+                           "    environment:\n"
+                           "      COMPOSE_TEST: enabled\n"
+                           "    working_dir: /work\n"
+                           "    command: [\"/bin/sh\", \"-c\", \"while true; do echo $COMPOSE_TEST; sleep 1; done\"]\n"
+                           "    volumes:\n"
+                           "      - ./"
+                        << volumePath.filename().string()
+                        << ":/work:ro\n"
+                           "    ports:\n"
+                           "      - \"0:8080\"\n"
+                           "  secondary:\n"
+                           "    name: wslc-compose-secondary\n"
+                           "    image: alpine:latest\n"
+                           "    command: \"while true; do echo secondary; sleep 1; done\"\n";
         }
 
         wil::com_ptr<IWSLCComposeSession> composeSession;
@@ -142,20 +161,40 @@ class WSLCTests
 
         wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
         VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(1u, containers.size());
+        VERIFY_ARE_EQUAL(2u, containers.size());
         VERIFY_ARE_EQUAL(std::string("wslc-compose-basic"), std::string(containers[0].Name));
         VERIFY_ARE_EQUAL(WslcContainerStateCreated, containers[0].State);
+
+        wil::com_ptr<IWSLCContainer> basicContainer;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-basic", &basicContainer));
+        wil::unique_cotaskmem_ansistring inspectJson;
+        VERIFY_SUCCEEDED(basicContainer->Inspect(&inspectJson));
+        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.get());
+        VERIFY_ARE_EQUAL(std::string("/work"), inspect.Config.WorkingDir);
+        VERIFY_IS_TRUE(inspect.Config.Cmd.has_value());
+        VERIFY_ARE_EQUAL(
+            std::vector<std::string>({"/bin/sh", "-c", "while true; do echo $COMPOSE_TEST; sleep 1; done"}), *inspect.Config.Cmd);
+        VERIFY_IS_TRUE(inspect.Config.Env.has_value());
+        VERIFY_IS_TRUE(std::ranges::find(*inspect.Config.Env, std::string("COMPOSE_TEST=enabled")) != inspect.Config.Env->end());
+        VERIFY_ARE_EQUAL(1u, inspect.Mounts.size());
+        VERIFY_ARE_EQUAL(std::string("/work"), inspect.Mounts[0].Destination);
+        VERIFY_IS_FALSE(inspect.Mounts[0].ReadWrite);
+        VERIFY_IS_TRUE(inspect.Ports.contains("8080/tcp"));
+        VERIFY_ARE_EQUAL(1u, inspect.Ports.at("8080/tcp").size());
+        VERIFY_ARE_EQUAL(std::string("127.0.0.1"), inspect.Ports.at("8080/tcp")[0].HostIp);
 
         VERIFY_SUCCEEDED(composeSession->Start());
         containers.reset();
         VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(WslcContainerStateRunning, containers[0].State);
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, containers[1].State);
 
         VERIFY_SUCCEEDED(composeSession->Attach());
         VERIFY_SUCCEEDED(composeSession->Stop(10));
         containers.reset();
         VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(WslcContainerStateExited, containers[0].State);
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, containers[1].State);
     }
 
     WSLCSessionSettings GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone)

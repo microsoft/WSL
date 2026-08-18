@@ -57,6 +57,7 @@ std::vector<std::unique_ptr<Command>> ComposeCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ComposeCreateCommand>(FullName()));
+    commands.push_back(std::make_unique<ComposeUpCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeStartCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeStopCommand>(FullName()));
@@ -96,6 +97,26 @@ std::wstring ComposeCreateCommand::LongDescription() const
 void ComposeCreateCommand::ExecuteInternal(CLIExecutionContext& Context) const
 {
     ComposeService::Create(ResolveComposeSession(Context), ComposePath(Context));
+}
+
+std::vector<Argument> ComposeUpCommand::GetArguments() const
+{
+    return ComposePathArguments();
+}
+
+std::wstring ComposeUpCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_ComposeUpDesc();
+}
+
+std::wstring ComposeUpCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_ComposeUpLongDesc();
+}
+
+void ComposeUpCommand::ExecuteInternal(CLIExecutionContext& Context) const
+{
+    Context.ExitCode = ComposeService::Up(Context.Terminal, ResolveComposeSession(Context), ComposePath(Context));
 }
 
 std::vector<Argument> ComposeStartCommand::GetArguments() const

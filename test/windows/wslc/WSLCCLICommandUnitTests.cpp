@@ -154,11 +154,12 @@ class WSLCCLICommandUnitTests
         auto cmd = ComposeCommand(L"root");
         auto subcommands = cmd.GetCommands();
 
-        VERIFY_ARE_EQUAL(4u, subcommands.size());
+        VERIFY_ARE_EQUAL(5u, subcommands.size());
         VERIFY_ARE_EQUAL(ComposeCreateCommand::CommandName, subcommands[0]->Name());
-        VERIFY_ARE_EQUAL(ComposeStartCommand::CommandName, subcommands[1]->Name());
-        VERIFY_ARE_EQUAL(ComposeAttachCommand::CommandName, subcommands[2]->Name());
-        VERIFY_ARE_EQUAL(ComposeStopCommand::CommandName, subcommands[3]->Name());
+        VERIFY_ARE_EQUAL(ComposeUpCommand::CommandName, subcommands[1]->Name());
+        VERIFY_ARE_EQUAL(ComposeStartCommand::CommandName, subcommands[2]->Name());
+        VERIFY_ARE_EQUAL(ComposeAttachCommand::CommandName, subcommands[3]->Name());
+        VERIFY_ARE_EQUAL(ComposeStopCommand::CommandName, subcommands[4]->Name());
     }
 
     // Test: Verify VersionCommand has the correct name

@@ -49,6 +49,7 @@ protected:
     }
 
 DECLARE_COMPOSE_COMMAND(ComposeCreateCommand, L"create");
+DECLARE_COMPOSE_COMMAND(ComposeUpCommand, L"up");
 DECLARE_COMPOSE_COMMAND(ComposeStartCommand, L"start");
 DECLARE_COMPOSE_COMMAND(ComposeAttachCommand, L"attach");
 DECLARE_COMPOSE_COMMAND(ComposeStopCommand, L"stop");

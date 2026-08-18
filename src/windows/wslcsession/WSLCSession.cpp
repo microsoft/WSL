@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "ComposeSpec.h"
 #include "WSLCSession.h"
 #include "WSLCComposeSession.h"
 #include "WSLCExecutionContext.h"
@@ -25,7 +26,6 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
-#include <yaml-cpp/yaml.h>
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -225,72 +225,6 @@ std::string GenerateContainerName(int retry)
     }
 
     return name;
-}
-
-struct ComposeContainerDefinition
-{
-    std::string Name;
-    std::string Image;
-};
-
-[[noreturn]] void ThrowInvalidComposeFile(const std::filesystem::path& Path, std::wstring_view Details)
-{
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcComposeFileInvalid(Path.wstring(), Details));
-}
-
-std::vector<ComposeContainerDefinition> ParseComposeFile(const std::filesystem::path& Path)
-{
-    const auto root = YAML::LoadFile(Path.string());
-    const auto services = root["services"];
-    if (!services || !services.IsMap() || services.size() == 0)
-    {
-        ThrowInvalidComposeFile(Path, L"the file must contain a non-empty services map");
-    }
-
-    std::vector<ComposeContainerDefinition> definitions;
-    definitions.reserve(services.size());
-    for (const auto& service : services)
-    {
-        if (!service.first.IsScalar() || !service.second.IsMap())
-        {
-            ThrowInvalidComposeFile(Path, L"each service must be a map");
-        }
-
-        const auto serviceName = service.first.as<std::string>();
-        const auto& settings = service.second;
-        for (const auto& setting : settings)
-        {
-            const auto key = setting.first.as<std::string>();
-            if (key != "name" && key != "container_name" && key != "image")
-            {
-                //ThrowInvalidComposeFile(Path, std::format(L"the '{}' property is not supported", wsl::shared::string::MultiByteToWide(key)));
-            }
-        }
-
-        const auto image = settings["image"];
-        if (!image || !image.IsScalar())
-        {
-            ThrowInvalidComposeFile(
-                Path, std::format(L"the '{}' service must specify an image", wsl::shared::string::MultiByteToWide(serviceName)));
-        }
-
-        const auto nameNode = settings["name"] ? settings["name"] : settings["container_name"];
-        const auto name = nameNode ? nameNode.as<std::string>() : serviceName;
-        if (name.empty())
-        {
-            ThrowInvalidComposeFile(Path, std::format(L"the '{}' service has an empty name", wsl::shared::string::MultiByteToWide(serviceName)));
-        }
-
-        const auto imageName = image.as<std::string>();
-        if (imageName.empty())
-        {
-            ThrowInvalidComposeFile(Path, std::format(L"the '{}' service has an empty image", wsl::shared::string::MultiByteToWide(serviceName)));
-        }
-
-        definitions.push_back({.Name = name, .Image = imageName});
-    }
-
-    return definitions;
 }
 
 } // namespace
@@ -2352,15 +2286,7 @@ try
         return existing->second.CopyTo(ComposeSession);
     }
 
-    std::vector<ComposeContainerDefinition> definitions;
-    try
-    {
-        definitions = ParseComposeFile(configPath);
-    }
-    catch (const YAML::Exception& exception)
-    {
-        ThrowInvalidComposeFile(configPath, wsl::shared::string::MultiByteToWide(exception.what()));
-    }
+    const auto spec = ComposeSpec::Parse(configPath);
 
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
     auto cleanup = wil::scope_exit([&] {
@@ -2371,12 +2297,71 @@ try
     });
 
     auto lease = AcquireLease();
-    for (const auto& definition : definitions)
+    for (const auto& definition : spec.Containers)
     {
         const std::string networkMode{"bridge"};
+        std::vector<const char*> command;
+        command.reserve(definition.Command.size());
+        for (const auto& argument : definition.Command)
+        {
+            command.emplace_back(argument.c_str());
+        }
+
+        std::vector<const char*> environment;
+        environment.reserve(definition.Environment.size());
+        for (const auto& variable : definition.Environment)
+        {
+            environment.emplace_back(variable.c_str());
+        }
+
+        std::vector<WSLCVolume> bindVolumes;
+        std::vector<WSLCNamedVolume> namedVolumes;
+        std::vector<::WSLCPortMapping> ports;
+        ports.reserve(definition.Ports.size());
+        for (const auto& definitionPort : definition.Ports)
+        {
+            auto& port = ports.emplace_back(::WSLCPortMapping{
+                .HostPort = definitionPort.HostPort,
+                .ContainerPort = definitionPort.ContainerPort,
+                .Family = AF_INET,
+                .Protocol = IPPROTO_TCP,
+            });
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(port.BindingAddress, "127.0.0.1") != 0);
+        }
+
+        for (const auto& volume : definition.Volumes)
+        {
+            if (volume.HostPath.has_value())
+            {
+                bindVolumes.push_back({
+                    .HostPath = volume.HostPath->c_str(),
+                    .ContainerPath = volume.ContainerPath.c_str(),
+                    .ReadOnly = volume.ReadOnly,
+                });
+            }
+            else
+            {
+                namedVolumes.push_back({
+                    .Name = volume.Name.c_str(),
+                    .ContainerPath = volume.ContainerPath.c_str(),
+                    .ReadOnly = volume.ReadOnly,
+                });
+            }
+        }
+
         WSLCContainerOptions options{};
         options.Image = definition.Image.c_str();
         options.Name = definition.Name.c_str();
+        options.InitProcessOptions.CommandLine = {command.data(), static_cast<ULONG>(command.size())};
+        options.InitProcessOptions.Environment = {environment.data(), static_cast<ULONG>(environment.size())};
+        options.InitProcessOptions.CurrentDirectory = definition.WorkingDirectory.empty() ? nullptr : definition.WorkingDirectory.c_str();
+        options.InitProcessOptions.Flags = WSLCProcessFlagsStdin;
+        options.Volumes = bindVolumes.data();
+        options.VolumesCount = static_cast<ULONG>(bindVolumes.size());
+        options.NamedVolumes = namedVolumes.data();
+        options.NamedVolumesCount = static_cast<ULONG>(namedVolumes.size());
+        options.Ports = ports.data();
+        options.PortsCount = static_cast<ULONG>(ports.size());
         options.ContainerNetwork.NetworkMode = networkMode.c_str();
 
         Microsoft::WRL::ComPtr<IWSLCContainer> container;

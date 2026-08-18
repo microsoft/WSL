@@ -22,6 +22,7 @@ namespace wsl::windows::wslc::services {
 struct ComposeService
 {
     static void Create(models::Session& Session, const std::wstring& Path);
+    static int Up(Terminal& Terminal, models::Session& Session, const std::wstring& Path);
     static void Start(models::Session& Session, const std::wstring& Path);
     static int Attach(Terminal& Terminal, models::Session& Session, const std::wstring& Path);
     static void Stop(models::Session& Session, const std::wstring& Path, ULONG Timeout);

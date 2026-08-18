@@ -2572,6 +2572,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ComposeCreateLongDesc" xml:space="preserve">
     <value>Create the containers declared by a compose file.</value>
   </data>
+  <data name="WSLCCLI_ComposeUpDesc" xml:space="preserve">
+    <value>Start and attach to a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeUpLongDesc" xml:space="preserve">
+    <value>Start all containers in a compose session, then attach interactively and display their output.</value>
+  </data>
   <data name="WSLCCLI_ComposeStartDesc" xml:space="preserve">
     <value>Start a compose session.</value>
   </data>
@@ -2582,7 +2588,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Attach to a compose session.</value>
   </data>
   <data name="WSLCCLI_ComposeAttachLongDesc" xml:space="preserve">
-    <value>Attach to the container in a single-container compose session.</value>
+    <value>Attach interactively and display output from all containers in a compose session.</value>
   </data>
   <data name="WSLCCLI_ComposeStopDesc" xml:space="preserve">
     <value>Stop a compose session.</value>
@@ -2592,9 +2598,6 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ComposePathArgDescription" xml:space="preserve">
     <value>Path to the compose YAML file</value>
-  </data>
-  <data name="MessageWslcComposeAttachRequiresSingleContainer" xml:space="preserve">
-    <value>This basic compose implementation can only attach to a compose session containing one container.</value>
   </data>
   <data name="MessageWslcComposeFileInvalid" xml:space="preserve">
     <value>The compose file '{0}' is invalid: {1}.</value>
