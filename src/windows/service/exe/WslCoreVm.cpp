@@ -615,7 +615,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 dnsTunnelingSocket.reset();
 
                 m_networkingEngine = std::make_unique<wsl::core::ConsommeNetworking>(
-                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, nullptr, m_guestDeviceManager, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -682,7 +682,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
             {
                 wsl::windows::common::notifications::DisplayOptionalComponentsNotification();
-                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformNotInstalled());
+                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformRequiredForNetworking());
             }
 
             // Fall back to no networking.
@@ -1000,7 +1000,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::Online))
         {
             const auto diskHandle = wsl::windows::common::disk::OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, m_vmConfig.MountDeviceTimeout);
-            wsl::windows::common::disk::SetOnline(diskHandle.get(), false, m_vmConfig.MountDeviceTimeout);
+            wsl::windows::common::disk::SetOnline(diskHandle.get(), true, m_vmConfig.MountDeviceTimeout);
         }
     });
 
@@ -2064,7 +2064,8 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-    wsl::windows::common::hcs::AddPlan9Share(m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags);
+    wsl::windows::common::hcs::AddPlan9Share(
+        m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags, m_userToken.get());
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
@@ -2182,7 +2183,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         sharePath.push_back(L'\\');
     }
 
-    sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
+    sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
 
     std::wstring effectiveOptions(Options);
 
@@ -2489,6 +2490,24 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     }
 }
 
+void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
+{
+    auto lock = m_lock.lock_exclusive();
+
+    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message;
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = LxMiniInitMessageTrimDistribution;
+    message.ScsiLun = Lun;
+
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send(message);
+
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "TrimDistribution", {m_terminatingEvent.get()}};
+
+    const auto& resultMessage = channel.ReceiveMessage<LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE>();
+    THROW_HR_IF(E_FAIL, resultMessage.ResponseCode != 0);
+}
+
 void WslCoreVm::SaveAttachedDisksState()
 try
 {
@@ -2742,8 +2761,9 @@ std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Na
     if (ARGUMENT_PRESENT(Name))
     {
         auto mountName = wsl::shared::string::WideToMultiByte(Name);
-        // Throw if the name contains '/' since it is a linux path separator
-        THROW_HR_IF(WSL_E_VM_MODE_INVALID_MOUNT_NAME, mountName.find('/') != std::string::npos);
+        THROW_HR_IF(
+            WSL_E_VM_MODE_INVALID_MOUNT_NAME,
+            mountName.empty() || mountName == "." || mountName == ".." || mountName.find('/') != std::string::npos);
         return mountName;
     }
 

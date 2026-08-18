@@ -191,6 +191,11 @@ public:
     IFACEMETHOD(ResizeDistribution)(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Compacts the virtual disk of a distribution.
+    /// </summary>
+    IFACEMETHOD(CompactDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Sets the default distribution.
     /// </summary>
     IFACEMETHOD(SetDefaultDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
@@ -466,6 +471,12 @@ public:
     /// </summary>
     HRESULT
     ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
+
+    /// <summary>
+    /// Compacts the disk of a distribution.
+    /// </summary>
+    HRESULT
+    CompactDistribution(_In_ LPCGUID DistroGuid);
 
     /// <summary>
     /// Sets the default distribution.
@@ -757,9 +768,9 @@ private:
     static LXSS_DISTRO_CONFIGURATION s_GetDistributionConfiguration(const wsl::windows::service::DistributionRegistration& Distro, bool skipName = false);
 
     /// <summary>
-    /// Impersonate the user and open the lxss registry key
+    /// Impersonate the specified user and open the lxss registry key.
     /// </summary>
-    static wil::unique_hkey s_OpenLxssUserKey();
+    static wil::unique_hkey s_OpenLxssUserKey(_In_ HANDLE UserToken);
 
     /// <summary>
     /// Ensures the distribution name is valid.
@@ -815,6 +826,11 @@ private:
     _Guarded_by_(m_instanceLock) std::unique_ptr<WslCoreVm> m_utilityVm;
 
     std::atomic<GUID> m_vmId{GUID_NULL};
+
+    /// <summary>
+    /// True when the VM termination callback should not perform session cleanup.
+    /// </summary>
+    std::atomic<bool> m_suppressVmTerminationCallback{false};
 
     /// <summary>
     /// Contains the user sid for the session.

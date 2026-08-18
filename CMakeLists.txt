@@ -126,7 +126,6 @@ find_nuget_package(Microsoft.Identity.MSAL.WSL.Proxy MSAL /build/native/bin)
 find_nuget_package(Microsoft.RemoteDesktop.Client.MSRDC.SessionHost MSRDC /build/native/bin)
 find_nuget_package(Microsoft.Taef TAEF /)
 find_nuget_package(Microsoft.Windows.ImplementationLibrary WIL /)
-find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
 find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
@@ -169,6 +168,16 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
 endif()
 
+if (WSL_DEVICEHOST_BIN)
+    set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICEHOST_BIN}/WslDeviceHost.idl")
+    set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICEHOST_BIN}/wsldevicehost.dll")
+    set(WSL_DEVICE_HOST_VERSION "9.0.0-localbuild")
+else()
+    find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
+    set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/idl/WslDeviceHost.idl")
+    set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll")
+endif()
+
 # Optional target configuration
 
 if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
@@ -179,6 +188,17 @@ if (NOT DEFINED WSL_INCLUDE_SDK_CSHARP)
     set(WSL_INCLUDE_SDK_CSHARP false)
 endif ()
 
+# Number of sources combined into each unity translation unit.
+# Set to 0 to compile every file separately.
+set(WSL_UNITY_BATCH_SIZE_DEFAULT 0)
+
+if (NOT DEFINED WSL_UNITY_BATCH_SIZE)
+    set(WSL_UNITY_BATCH_SIZE ${WSL_UNITY_BATCH_SIZE_DEFAULT})
+endif ()
+
+if (NOT WSL_UNITY_BATCH_SIZE MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "WSL_UNITY_BATCH_SIZE must be a non-negative integer: got '${WSL_UNITY_BATCH_SIZE}'")
+endif ()
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
@@ -241,7 +261,9 @@ file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
 # wsldevicehost.dll is packaged directly from its NuGet package, so only its PDB
 # needs linking into bin for symbol publishing.
-file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
+if (NOT WSL_DEVICEHOST_BIN)
+    file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
+endif()
 
 if (${SKIP_PACKAGE_SIGNING})
     set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)

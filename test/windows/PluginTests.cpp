@@ -89,7 +89,7 @@ class PluginTests
         return true;
     }
 
-    void ConfigurePlugin(PluginTestType testCase) const
+    void ConfigurePlugin(PluginTestType testCase, LPCWSTR mountFolder = L"") const
     {
         StopWslService();
         if (!DeleteFile(logFile.c_str()))
@@ -100,6 +100,7 @@ class PluginTests
         const auto testKey = OpenTestRegistryKey(KEY_SET_VALUE);
         WriteDword(testKey.get(), nullptr, c_testType, static_cast<DWORD>(testCase));
         WriteString(testKey.get(), nullptr, c_logFile, logFile.c_str());
+        WriteString(testKey.get(), nullptr, c_mountFolder, mountFolder);
 
         const auto lxssKey =
             CreateKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_SET_VALUE, nullptr, 0);
@@ -169,6 +170,62 @@ class PluginTests
 
         ConfigurePlugin(PluginTestType::Success);
         StartWsl(0);
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(MountFolderAccess)
+    {
+        const auto testFolder = std::filesystem::current_path() / "deny-write";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        const auto user = wil::get_token_information<TOKEN_USER>();
+        EXPLICIT_ACCESSW access{};
+        access.grfAccessPermissions = FILE_ADD_FILE;
+        access.grfAccessMode = DENY_ACCESS;
+        access.grfInheritance = NO_INHERITANCE;
+        access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        access.Trustee.ptstrName = static_cast<LPWSTR>(user->User.Sid);
+
+        PACL acl = nullptr;
+        wil::unique_hlocal descriptor;
+        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+            testFolder.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
+
+        wsl::windows::common::security::unique_acl newAcl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, acl, &newAcl));
+        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+            const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
+
+        const auto testFile = testFolder / L"plugin-test.txt";
+        wil::unique_hfile deniedFile{CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(!deniedFile);
+        VERIFY_ARE_EQUAL(GetLastError(), ERROR_ACCESS_DENIED);
+
+        auto resetAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            wsl::windows::common::security::unique_acl restoredAcl;
+            access.grfAccessPermissions = 0;
+            access.grfAccessMode = REVOKE_ACCESS;
+
+            THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, acl, &restoredAcl));
+
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, restoredAcl.get(), nullptr));
+        });
+
+        ConfigurePlugin(PluginTestType::MountFolderAccess, testFolder.c_str());
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=25
+                VM created (settings->CustomConfigurationFlags=0)
+                /bin/sh: line 1: /test-plugin-access/plugin-test.txt: Permission denied
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+                VM Stopping)";
+
+        StartWsl(0);
+        VERIFY_IS_FALSE(std::filesystem::exists(testFile));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -606,7 +663,7 @@ class PluginTests
         return sessionManager;
     }
 
-    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone)
+    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone, LPCWSTR StoragePath = nullptr)
     {
         WSLCSessionSettings settings{};
         settings.DisplayName = Name;
@@ -614,6 +671,8 @@ class PluginTests
         settings.MemoryMb = 4096;
         settings.BootTimeoutMs = 30 * 1000;
         settings.NetworkingMode = NetworkingMode;
+        settings.StoragePath = StoragePath;
+        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB, only used when StoragePath is set.
 
         auto manager = OpenWslcSessionManager();
         wil::com_ptr<IWSLCSession> session;
@@ -776,6 +835,150 @@ class PluginTests
             WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
             OnWslcContainerStarted: ERROR_ACCESS_DENIED
             WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    // Validates the VM-lifecycle hooks: OnWslcVmStarted fires each time the VM is (re)created and
+    // OnWslcVmStopping each time it is torn down, decoupled from the once-per-session hooks. Also
+    // proves the started hook can call back into the session (WSLCCreateProcess) without deadlocking.
+    WSL2_TEST_METHOD(WslcVmRestart)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmRestart);
+
+        // Idle termination only tears down storage-backed sessions (tmpfs state is unrecoverable), so
+        // this restart lifecycle test needs a dedicated persistent storage directory.
+        const auto storageDir = std::filesystem::current_path() / "test-storage-wslc-vm-restart";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-restart", WSLCNetworkingModeNone, storageDir.c_str());
+
+            // First operation brings the VM up -> OnWslcVmStarted (which reentrantly runs a process).
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Force idle teardown of the running VM -> OnWslcVmStopping.
+            BOOL wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+
+            // Next operation lazily restarts the VM -> OnWslcVmStarted fires again.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Session teardown tears the second VM down -> OnWslcVmStopping, then OnWslcSessionStopping.
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=22
+            WSLC Session created, name=plugin-wslc-vm-restart, id=*, pid=*, token=set, sid=set
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
+            WSLC VM stopping, session=*
+            WSLC VM stopping reentrant WSLCCreateProcess: ok
+            WSLC VM stopping mount+unmount: ok
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
+            WSLC VM stopping, session=*
+            WSLC VM stopping reentrant WSLCCreateProcess: failed
+            WSLC VM stopping mount+unmount: skipped
+            WSLC Session stopping, name=plugin-wslc-vm-restart, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    // Validates that an announced VM teardown always happens. The plugin leaves a process running when
+    // OnWslcVmStopping returns -- which under the previous design made the runtime abandon the
+    // teardown -- and starts a call from a thread of its own during the notification window. The VM
+    // must stop anyway, the leaked process must die with it, and the windowed call must be served by
+    // the stopping VM rather than blocking on the teardown it cannot influence.
+    WSL2_TEST_METHOD(WslcVmStopCommitted)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmStopCommitted);
+
+        // Idle termination only tears down storage-backed sessions (see WslcVmRestart).
+        const auto storageDir = std::filesystem::current_path() / "test-storage-wslc-vm-stop-committed";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-stop-committed", WSLCNetworkingModeNone, storageDir.c_str());
+
+            // Bring the VM up -> OnWslcVmStarted.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // The teardown is announced and then carried out, even though the plugin's callback left a
+            // process running. The session is genuinely idle afterwards.
+            BOOL wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+
+            // The VM is gone, so this starts a fresh one -> a second OnWslcVmStarted.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+        }
+
+        // "leaked process died: yes" is the assertion that the announced stop actually happened: the
+        // process the callback left running was killed by the teardown rather than keeping the VM
+        // alive. "stop-window caller: ok" shows a plugin call from another thread was served by the
+        // stopping VM instead of deadlocking against the teardown that callback was holding up. Both
+        // are reported when that thread is joined, at session teardown.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=23
+            WSLC Session created, name=plugin-wslc-vm-stop-committed, id=*, pid=*, token=set, sid=set
+            WSLC VM started, session=*
+            WSLC VM stopping, session=*
+            WSLC VM stopping leaked process: ok
+            WSLC VM started, session=*
+            WSLC stop-window caller: ok
+            WSLC leaked process died: yes
+            WSLC Session stopping, name=plugin-wslc-vm-stop-committed, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcVmNeverStarted)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmNeverStarted);
+
+        // A session whose VM is never needed. VM bring-up is lazy, so creating and destroying the
+        // session must not produce either VM notification: OnWslcVmStopping is documented to fire
+        // exactly once per OnWslcVmStarted, and a stop for a VM that never existed would break the
+        // pairing every plugin relies on to track VM lifetime. The plugin also issues a call from
+        // OnWslcSessionCreated, which must be rejected rather than bring a VM up.
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-never-started");
+            VERIFY_IS_NOT_NULL(session.get());
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=24
+            WSLC Session created, name=plugin-wslc-vm-never-started, id=*, pid=*, token=set, sid=set
+            WSLC no-vm caller: rejected
+            WSLC Session stopping, name=plugin-wslc-vm-never-started, id=*)";
 
         ValidateLogFile(ExpectedOutput);
     }

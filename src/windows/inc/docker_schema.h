@@ -239,6 +239,14 @@ inline void to_json(nlohmann::json& j, const ContainerNetworkRequest& v)
     }
 }
 
+struct MountTmpfsOptions
+{
+    std::int64_t SizeBytes{};
+    std::uint32_t Mode{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MountTmpfsOptions, SizeBytes, Mode);
+};
+
 struct Mount
 {
     std::string Name;
@@ -246,8 +254,9 @@ struct Mount
     std::string Target;
     std::string Type;
     bool ReadOnly{};
+    std::optional<MountTmpfsOptions> TmpfsOptions;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly, TmpfsOptions);
 };
 
 struct DeviceMapping
@@ -429,18 +438,21 @@ struct ContainerConfig
     std::optional<std::string> StopSignal;
     std::optional<int> StopTimeout;
     std::optional<HealthConfig> Healthcheck;
+    // Optional because dockerd may emit `"Labels": null` for containers with no merged labels.
+    std::optional<std::map<std::string, std::string>> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout, Healthcheck);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, StopSignal, StopTimeout, Healthcheck, Labels);
 };
 
 struct InspectMount
 {
     std::string Type;
+    std::string Name;
     std::string Source;
     std::string Destination;
     bool RW{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, RW);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Name, Source, Destination, RW);
 };
 
 struct InspectContainer
@@ -452,9 +464,10 @@ struct InspectContainer
     ContainerInspectState State;
     ContainerConfig Config;
     HostConfig HostConfig;
+    std::vector<InspectMount> Mounts;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings);
 };
 
 struct InspectExec
@@ -700,9 +713,11 @@ struct BuildKitVertex
     std::string digest;
     std::string name;
     std::string started;
+    std::string completed;
     std::string error;
+    bool cached{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, completed, error, cached);
 };
 
 struct BuildKitStatus

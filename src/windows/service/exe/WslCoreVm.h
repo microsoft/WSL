@@ -119,6 +119,8 @@ public:
 
     void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
 
+    void TrimDistribution(_In_ ULONG Lun);
+
     _Requires_lock_not_held_(m_lock)
     void SaveAttachedDisksState();
 

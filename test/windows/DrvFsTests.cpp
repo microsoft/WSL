@@ -43,8 +43,6 @@ Abstract:
 
 #define LXSST_DRVFS_METADATA_TEST_MODE (5)
 
-#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
-
 #define LXSST_METADATA_EA_NAME_LENGTH (RTL_NUMBER_OF(LX_FILE_METADATA_UID_EA_NAME) - 1)
 
 #define LX_DRVFS_DISABLE_NONE (0)
@@ -496,10 +494,11 @@ public:
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", nestedMountPoint)), 0);
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount --bind '{}/nested' '{}'", mountPoint, nestedMountPoint)), 0);
 
+                const auto canonicalNestedSourceDir = std::filesystem::canonical(nestedSourceDir).wstring();
                 auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -w '{}'", nestedMountPoint));
-                VERIFY_ARE_EQUAL(std::filesystem::canonical(nestedSourceDir).wstring() + L"\n", out);
+                VERIFY_ARE_EQUAL(canonicalNestedSourceDir + L"\n", out);
 
-                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -u '{}'", nestedSourceDir.wstring()));
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -u '{}'", canonicalNestedSourceDir));
                 VERIFY_ARE_EQUAL(nestedMountPoint + L"\n", out);
 
                 std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/marker'", nestedMountPoint));

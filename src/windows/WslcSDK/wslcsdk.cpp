@@ -908,6 +908,43 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcOpenContainer(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, container);
+    *container = nullptr;
+    RETURN_HR_IF_NULL(E_POINTER, nameOrId);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalSession = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
+
+    auto result = std::make_unique<WslcContainerImpl>();
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->OpenContainer(nameOrId, &result->container))))
+    {
+        wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
+        *container = reinterpret_cast<WslcContainer>(result.release());
+    }
+
+    return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, callbacks);
+    auto internalType = CheckAndGetInternalType(container);
+
+    internalType->ioCallbackOptions.onStdOut = callbacks->onStdOut;
+    internalType->ioCallbackOptions.onStdErr = callbacks->onStdErr;
+    internalType->ioCallbackOptions.onExit = callbacks->onExit;
+    internalType->ioCallbackOptions.callbackContext = context;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
@@ -1536,6 +1573,7 @@ STDAPI WslcSessionAuthenticate(
     _In_z_ PCSTR username,
     _In_z_ PCSTR password,
     _Outptr_result_z_ PSTR* identityToken,
+    _Out_opt_ WslcIdentityTokenType* tokenType,
     _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
@@ -1548,12 +1586,36 @@ try
     RETURN_HR_IF_NULL(E_POINTER, identityToken);
 
     *identityToken = nullptr;
+    if (tokenType != nullptr)
+    {
+        *tokenType = WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN;
+    }
 
-    wil::unique_cotaskmem_ansistring token;
-    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &token));
+    wil::unique_cotaskmem_ansistring rawToken;
+    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &rawToken));
     if (SUCCEEDED(hr))
     {
-        *identityToken = token.release();
+        std::string authHeader;
+        WslcIdentityTokenType type;
+
+        if (rawToken && strlen(rawToken.get()) > 0)
+        {
+            authHeader = BuildRegistryAuthHeader(std::string{rawToken.get()});
+            type = WSLC_IDENTITY_TOKEN_TYPE_TOKEN;
+        }
+        else
+        {
+            authHeader = BuildRegistryAuthHeader(std::string{username}, std::string{password});
+            type = WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS;
+        }
+
+        auto result = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(authHeader.c_str());
+        *identityToken = result.release();
+
+        if (tokenType != nullptr)
+        {
+            *tokenType = type;
+        }
     }
 
     return errorInfoWrapper;

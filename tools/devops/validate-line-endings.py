@@ -2,10 +2,12 @@ import argparse
 import os.path
 import subprocess
 
-EXTENSIONS = ['.c', '.cpp', '.h', '.hpp', '.idl', '.resw']
+EXTENSIONS = ['.c', '.cpp', '.h', '.hpp', '.idl', '.resw', '.cmake']
+FILENAMES = ['cmakelists.txt']
 
 def is_source_file(path: str) -> bool:
-    return any(path.casefold().endswith(e) for e in EXTENSIONS)
+    folded = path.casefold()
+    return os.path.basename(folded) in FILENAMES or any(folded.endswith(e) for e in EXTENSIONS)
 
 def has_crlf_mismatch(content: bytes) -> bool:
     # Strip all CRLF pairs, then any remaining lone '\n' or '\r' is a mismatch.

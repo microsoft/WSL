@@ -20,17 +20,13 @@ Abstract:
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
-
-// Fallback width for the in-place progress display when the console width can't be queried. This
-// value already includes the autowrap guard (visible width minus one) so a wrapped line can't
-// corrupt the cursor-based rendering.
-constexpr int c_fallbackConsoleWidth = 79;
+using wsl::windows::common::string::FormatBytes;
 
 auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        m_reporter.Write(m_level, L"{}", Cursor::Up(line));
+        m_terminal.Write(m_level, L"{}", Cursor::Up(line));
     }
 
     // scope_exit is noexcept and may fire during unwinding; scope_exit_log swallows output
@@ -38,7 +34,7 @@ auto ImageProgressCallback::MoveToLine(int line)
     return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [line = line, this]() {
         if (line > 1)
         {
-            m_reporter.Write(m_level, L"{}", Cursor::Down(line - 1));
+            m_terminal.Write(m_level, L"{}", Cursor::Down(line - 1));
         }
     });
 }
@@ -57,7 +53,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
         {
             if (id == nullptr || *id == '\0')
             {
-                m_reporter.Write(m_level, L"{}\n", status);
+                m_terminal.Write(m_level, L"{}\n", status);
             }
             else
             {
@@ -65,7 +61,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
                 if (inserted || it->second != status)
                 {
                     it->second = status;
-                    m_reporter.Write(m_level, L"{}: {}\n", id, status);
+                    m_terminal.Write(m_level, L"{}: {}\n", id, status);
                 }
             }
 
@@ -74,30 +70,30 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
         // Hide the cursor while rendering so it doesn't bounce through the movements; scope_exit_log
         // restores it on every exit path and can't call std::terminate during unwinding.
-        m_reporter.Write(m_level, L"{}", Cursor::Hide);
-        auto showCursor = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { m_reporter.Write(m_level, L"{}", Cursor::Show); });
+        m_terminal.Write(m_level, L"{}", Cursor::Hide);
+        auto showCursor = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { m_terminal.Write(m_level, L"{}", Cursor::Show); });
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            m_reporter.Write(m_level, L"{}\n", status);
+            m_terminal.Write(m_level, L"{}\n", status);
             m_currentLine++;
             return S_OK;
         }
 
-        const int visibleWidth = m_reporter.GetConsoleWidth(m_level).value_or(c_fallbackConsoleWidth);
+        const int visibleWidth = m_terminal.GetConsoleWidth(m_level).value_or(c_fallbackConsoleWidth);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
+            m_terminal.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            m_reporter.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
+            m_terminal.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
         }
 
         return S_OK;
@@ -137,18 +133,18 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
 
         // Docker's reported total is an estimate of the compressed layer size, so the actual bytes
         // transferred can exceed it. Drop the total in that case to avoid displaying a count over 100%.
-        auto progress = wsl::shared::string::FormatBytes(current);
+        auto progress = FormatBytes(current);
 
         if (current <= total)
         {
-            progress += std::format(L"/{}", wsl::shared::string::FormatBytes(total));
+            progress += std::format(L"/{}", FormatBytes(total));
         }
 
         line = std::format(L"{}: {} [{}] {}", safeId, safeStatus, bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}", safeId, safeStatus, wsl::shared::string::FormatBytes(current));
+        line = std::format(L"{}: {} {}", safeId, safeStatus, FormatBytes(current));
     }
     else
     {

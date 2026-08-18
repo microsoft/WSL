@@ -36,9 +36,11 @@ public:
         m_path = std::filesystem::temp_directory_path() /
                  (L"wslc_ut_secret_" + std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(++s_counter) + L".bin");
         std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+        THROW_HR_IF_MSG(E_FAIL, !file.is_open(), "Failed to create temp file: %ls", m_path.c_str());
         if (!bytes.empty())
         {
             file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            THROW_HR_IF_MSG(E_FAIL, !file.good(), "Failed to write temp file: %ls", m_path.c_str());
         }
     }
 
@@ -105,7 +107,7 @@ class WSLCCLISecretParserUnitTests
         VERIFY_ARE_EQUAL(expectedId, secret.Id);
         VERIFY_IS_TRUE(secret.Value.empty());
         std::error_code ec;
-        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(expectedPath), ec);
+        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(expectedPath, ec), ec);
         VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
     }
 
@@ -182,6 +184,35 @@ class WSLCCLISecretParserUnitTests
         VerifyValidFileSecret(L"id=s,source=" + file.wpath(), L"s", file.wpath());
     }
 
+    TEST_METHOD(Secret_File_QuotedFieldWithCommaInSrcPath)
+    {
+        // Docker parity: buildx parses --secret as a single CSV record, so a whole 'src=' field can be
+        // double-quoted to carry a path containing commas; the comma must stay part of the value rather
+        // than splitting into bogus extra key=value parts. This exercises SplitCsvFields end-to-end
+        // through secret parsing. Note the entire "src=<path>" field is quoted (Go's CSV grammar), not
+        // just the value - a bare quote after 'src=' would be an unquoted-field bare quote (malformed).
+        const auto path =
+            std::filesystem::temp_directory_path() / (L"wslc_ut_secret_" + std::to_wstring(GetCurrentProcessId()) + L"_a,b,c.bin");
+        {
+            std::ofstream file(path, std::ios::binary | std::ios::trunc);
+            VERIFY_IS_TRUE(file.is_open());
+            file << 'x';
+        }
+        auto cleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove(path, ec);
+        });
+
+        const std::wstring spec = L"id=s,\"src=" + path.wstring() + L"\"";
+        auto secret = validation::ParseSecretSpec(spec);
+        VERIFY_ARE_EQUAL(std::wstring(L"s"), secret.Id);
+        VERIFY_IS_TRUE(secret.Value.empty());
+
+        std::error_code ec;
+        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(path, ec), ec);
+        VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
+    }
+
     TEST_METHOD(Secret_File_EmptyFileForwardsPath)
     {
         // An empty file is still a valid file secret: its path is forwarded and mounted (docker delivers
@@ -230,8 +261,39 @@ class WSLCCLISecretParserUnitTests
         VERIFY_IS_TRUE(std::filesystem::path(secret.SourcePath).is_absolute());
 
         std::error_code ec;
-        const auto expectedCanonical = std::filesystem::weakly_canonical(absPath, ec);
+        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(absPath, ec), ec);
         VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
+    }
+
+    // A relative src= naming a file that does not exist must still resolve to an absolute SourcePath.
+    // Parsing deliberately does not require the file to exist, so this case is reachable and the server
+    // still rejects a non-absolute path. std::filesystem::weakly_canonical cannot handle it on its own:
+    // it only produces an absolute path by canonicalizing the longest leading sequence of elements that
+    // exist, so a bare missing filename has nothing to canonicalize and is returned unchanged. The
+    // relative-src test above cannot catch this because its file exists.
+    TEST_METHOD(Secret_File_RelativeSrcMissingFileResolvedToAbsolutePath)
+    {
+        const auto directory = std::filesystem::temp_directory_path();
+        const auto relativeSrc = L"wslc_ut_secret_missing_" + std::to_wstring(GetCurrentProcessId()) + L"_" +
+                                 std::to_wstring(GetTickCount64()) + L".bin";
+        VERIFY_IS_FALSE(std::filesystem::exists(directory / relativeSrc));
+
+        auto originalDir = std::filesystem::current_path();
+        auto restoreDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::current_path(originalDir, ec);
+        });
+        std::filesystem::current_path(directory);
+
+        VERIFY_IS_FALSE(std::filesystem::path(relativeSrc).is_absolute());
+
+        auto secret = validation::ParseSecretSpec(L"id=s,src=" + relativeSrc);
+        VERIFY_ARE_EQUAL(std::wstring(L"s"), secret.Id);
+        VERIFY_IS_TRUE(std::filesystem::path(secret.SourcePath).is_absolute());
+
+        // The leading directory exists, so it canonicalizes; only the missing filename is appended.
+        const auto expected = std::filesystem::canonical(directory) / relativeSrc;
+        VERIFY_ARE_EQUAL(expected.wstring(), secret.SourcePath);
     }
 
     // --- Invalid: spec structure ---

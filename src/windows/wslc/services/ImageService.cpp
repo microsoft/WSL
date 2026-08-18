@@ -14,7 +14,9 @@ Abstract:
 #include "ImageService.h"
 #include "RegistryService.h"
 #include "SessionService.h"
+#include "SpecParsing.h"
 #include "WarningCallback.h"
+#include <filesystem.hpp>
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <relay.hpp>
@@ -121,6 +123,8 @@ void ImageService::Build(
     const std::vector<BuildSecret>& secrets,
     const std::wstring& dockerfilePath,
     const std::wstring& target,
+    const std::optional<BuildOutput>& output,
+    const std::optional<std::wstring>& iidFilePath,
     WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
@@ -191,7 +195,81 @@ void ImageService::Build(
 
     auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
 
+    // Route the docker-style --output exporter. A single-file exporter with a real destination (tar/oci/
+    // docker with dest=) has the destination's parent directory mounted read-write into the VM, so buildx
+    // writes the output file straight to the destination in place. dest=- (stdout) streams the exporter
+    // tarball back out of the VM to OutputHandle. Exporters with no client destination (docker load,
+    // image, registry, cacheonly) run entirely in the VM and the spec is forwarded as-is. Directory
+    // exporters (type=local, or oci/docker with tar=false) are rejected up front by ParseOutputSpec: a
+    // Linux tree cannot be written faithfully to a Windows-backed destination.
+    std::string outputStr;
+    HANDLE outputHandle = nullptr;
+
+    // For a single-file exporter with a real destination the server writes the exporter output into a
+    // read-write virtiofs mount of the destination's parent directory rather than streaming it back:
+    // outputMountPath is that parent directory and outputMountFile the destination file's leaf name.
+    std::wstring outputMountPath;
+    std::wstring outputMountFile;
+
+    if (output.has_value())
+    {
+        const auto& spec = output.value();
+        // Route the exporter the same way `docker buildx build --output` does: some exporters produce a
+        // result the client must materialize (a file or a stdout stream), while others run entirely in
+        // the build VM. Directory exporters are already rejected by ParseOutputSpec. See
+        // OutputStreamsToClient.
+        const bool streamsBack = validation::OutputStreamsToClient(spec);
+
+        if (streamsBack)
+        {
+            if (spec.Dest == L"-")
+            {
+                // dest=- streams the exporter tarball to the client's stdout, matching docker.
+                outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+                // Refuse to dump the binary exporter stream onto an interactive console (matching docker).
+                // Otherwise ToCOMInputHandle would fail the marshal with a cryptic ERROR_NOT_SUPPORTED for
+                // the console handle. A redirected character device such as NUL is not a console, so
+                // IsConsoleHandle (which also checks GetConsoleMode) still lets those through.
+                THROW_HR_WITH_USER_ERROR_IF(
+                    E_INVALIDARG,
+                    Localization::MessageWslcOutputConsoleNotSupported(validation::FormatOutputSpec(spec)),
+                    IsConsoleHandle(outputHandle));
+            }
+            else
+            {
+                // Single-file exporter with a real destination: mount the destination's parent directory
+                // read-write into the VM so buildx writes the exporter output file straight to the
+                // destination in place.
+                auto destPath = std::filesystem::absolute(spec.Dest);
+                auto destDir = destPath.parent_path();
+                std::filesystem::create_directories(destDir);
+
+                outputMountPath = destDir.wstring();
+                outputMountFile = destPath.filename().wstring();
+            }
+
+            // The server picks the VM-side dest, so forward the spec without the client's dest.
+            BuildOutput vmSpec = spec;
+            vmSpec.Dest.clear();
+            outputStr = wsl::windows::common::string::WideToMultiByte(validation::FormatOutputSpec(vmSpec));
+        }
+        else
+        {
+            outputStr = wsl::windows::common::string::WideToMultiByte(validation::FormatOutputSpec(spec));
+        }
+    }
+
     auto contextPathStr = absolutePath.wstring();
+
+    // Resolve the --iidfile destination against the client's working directory; the server mounts its
+    // parent directory read-write into the VM so buildx writes the image ID straight to it.
+    std::wstring iidPathStr;
+    if (iidFilePath.has_value())
+    {
+        iidPathStr = wsl::windows::common::filesystem::GetCanonicalPath(*iidFilePath).wstring();
+    }
+
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
         .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
@@ -201,6 +279,11 @@ void ImageService::Build(
         .Flags = flags,
         .Labels = {labelPointers.data(), static_cast<ULONG>(labelPointers.size())},
         .Secrets = {secretEntries.data(), static_cast<ULONG>(secretEntries.size())},
+        .Output = outputStr.empty() ? nullptr : outputStr.c_str(),
+        .OutputHandle = outputHandle != nullptr ? ToCOMInputHandle(outputHandle) : WSLCHandle{.Type = WSLCHandleTypeUnknown},
+        .OutputMountPath = outputMountPath.empty() ? nullptr : outputMountPath.c_str(),
+        .OutputMountFile = outputMountFile.empty() ? nullptr : outputMountFile.c_str(),
+        .IidFilePath = iidPathStr.empty() ? nullptr : iidPathStr.c_str(),
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
@@ -249,16 +332,16 @@ std::vector<ImageInformation> ImageService::List(
     return result;
 }
 
-void ImageService::Load(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
+void ImageService::Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto source = OpenImageInput(input);
     THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(source.Handle.Get()), source.ContentLength, &warningCallback, callback));
 }
 
-std::string ImageService::Import(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
+std::string ImageService::Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto source = OpenImageInput(input);
     wil::unique_cotaskmem_ansistring imageId;
     THROW_IF_FAILED(session.Get()->ImportImage(
@@ -285,9 +368,9 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 }
 
-void ImageService::Pull(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, &warningCallback));
@@ -316,9 +399,9 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push(Reporter& reporter, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    WarningCallback warningCallback(reporter);
+    WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
     THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, &warningCallback));

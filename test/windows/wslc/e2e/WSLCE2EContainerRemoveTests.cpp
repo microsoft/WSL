@@ -26,6 +26,7 @@ class WSLCE2EContainerRemoveTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+        BuildAnonymousVolumeImage();
         return true;
     }
 
@@ -33,6 +34,8 @@ class WSLCE2EContainerRemoveTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
+        EnsureVolumeDoesNotExist(TestVolumeName);
+        EnsureImageIsDeleted(AnonymousVolumeImage);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -41,6 +44,7 @@ class WSLCE2EContainerRemoveTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
+        EnsureVolumeDoesNotExist(TestVolumeName);
         return true;
     }
 
@@ -157,9 +161,111 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName2);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Volumes_RemovesAnonymousVolume)
+    {
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, AnonymousVolumeImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto anonymousVolume = GetAnonymousVolumeName(WslcContainerName);
+        VerifyVolumeIsListed(anonymousVolume);
+
+        result = RunWslc(std::format(L"container remove --volumes {}", WslcContainerName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsNotListed(WslcContainerName);
+        VerifyVolumeIsNotListed(anonymousVolume);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_WithoutVolumes_KeepsAnonymousVolume)
+    {
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, AnonymousVolumeImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto anonymousVolume = GetAnonymousVolumeName(WslcContainerName);
+        auto cleanup = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(anonymousVolume); });
+        VerifyVolumeIsListed(anonymousVolume);
+
+        result = RunWslc(std::format(L"container remove {}", WslcContainerName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsNotListed(WslcContainerName);
+        VerifyVolumeIsListed(anonymousVolume);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Volumes_KeepsNamedVolume)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container create --name {} -v {}:/data {}", WslcContainerName, TestVolumeName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container remove --volumes {}", WslcContainerName));
+        result.Verify({.Stdout = std::format(L"{}\r\n", WslcContainerName), .Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsNotListed(WslcContainerName);
+        VerifyVolumeIsListed(TestVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Volumes_Force_RunningContainer)
+    {
+        auto result =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, AnonymousVolumeImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        const auto anonymousVolume = GetAnonymousVolumeName(WslcContainerName);
+        VerifyVolumeIsListed(anonymousVolume);
+        VerifyContainerIsListed(containerId, L"running");
+
+        // -fv exercises the combined short form.
+        result = RunWslc(std::format(L"container rm -fv {}", containerId));
+        result.Verify({.Stdout = std::format(L"{}\r\n", containerId), .Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsNotListed(containerId);
+        VerifyVolumeIsNotListed(anonymousVolume);
+    }
+
 private:
+    // The VOLUME directive is the only way to get an anonymous volume: `-v` requires source:target.
+    void BuildAnonymousVolumeImage()
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-container-remove-volume-image";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath, std::format("FROM {}\nVOLUME /data\n", wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag())));
+
+        auto result = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {}", testRoot.wstring(), dockerfilePath.wstring(), AnonymousVolumeImage.NameAndTag()));
+        result.Verify({.ExitCode = 0});
+    }
+
+    static std::wstring GetAnonymousVolumeName(const std::wstring& containerName)
+    {
+        const auto inspect = InspectContainer(containerName);
+        const auto mount = std::ranges::find_if(inspect.Mounts, [](const auto& entry) { return entry.Type == "volume"; });
+
+        VERIFY_IS_TRUE(mount != inspect.Mounts.end(), L"Container inspect did not return the anonymous volume mount");
+        VERIFY_IS_FALSE(mount->Name.empty(), L"Container inspect returned an empty anonymous volume name");
+        VERIFY_IS_TRUE(mount->Source.empty(), L"Anonymous volume source must be empty");
+        VERIFY_ARE_EQUAL(mount->Destination, "/data");
+
+        const auto volumeName = wsl::shared::string::MultiByteToWide(mount->Name);
+        VERIFY_IS_TRUE(
+            InspectVolume(volumeName).Labels.contains("com.docker.volume.anonymous"),
+            L"The volume returned by container inspect is not anonymous");
+        return volumeName;
+    }
+
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
+    const std::wstring TestVolumeName = L"wslc-e2e-container-remove-volume";
     const TestImage& DebianImage = DebianTestImage();
+
+    // Derived from DebianImage, so it must be deleted first in ClassCleanup.
+    const TestImage AnonymousVolumeImage{.Name = L"wslc-e2e-container-remove-anon", .Tag = L"latest"};
 };
 } // namespace WSLCE2ETests
