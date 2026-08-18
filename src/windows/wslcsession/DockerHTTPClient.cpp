@@ -614,7 +614,7 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     auto lock = m_lock.lock_exclusive();
 
     // Send a fork message.
-    WSLC_FORK message{};
+    WSLC_FORK message;
     message.ForkType = WSLC_FORK::Thread;
     const auto& response = m_channel.Transaction(message);
 
