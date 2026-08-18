@@ -178,12 +178,10 @@ class WSLCE2EContainerListTests
         result = RunWslc(L"container list --all --quiet");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Default --quiet truncates to docker's 12 character short id.
         const auto truncatedId = wsl::shared::string::MultiByteToWide(TruncateId(WideToMultiByte(containerId)));
         VERIFY_ARE_EQUAL(12u, truncatedId.size());
         VERIFY_IS_TRUE(result.StdoutContainsLine(truncatedId));
 
-        // --quiet --no-trunc keeps the full id.
         result = RunWslc(L"container list --all --quiet --no-trunc");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
@@ -276,7 +274,6 @@ class WSLCE2EContainerListTests
             {
                 keys.insert(key);
 
-                // Docker reports the platform as a nested object and every other field as a string.
                 if (key == "Platform")
                 {
                     VERIFY_IS_TRUE(value.is_object());
@@ -290,7 +287,6 @@ class WSLCE2EContainerListTests
 
             VERIFY_ARE_EQUAL(expectedKeys, keys, L"json output must contain exactly docker's container fields");
 
-            // Ids are truncated to docker's short form unless --no-trunc is passed.
             VERIFY_ARE_EQUAL(12u, entry["ID"].get<std::string>().size());
             VERIFY_ARE_NOT_EQUAL(std::string{}, entry["Names"].get<std::string>());
             VERIFY_ARE_NOT_EQUAL(std::string{}, entry["State"].get<std::string>());

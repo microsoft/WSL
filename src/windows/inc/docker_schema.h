@@ -699,7 +699,6 @@ struct ContainerInfo
     std::string Image;
     std::string ImageID;
     std::string Command;
-    // Human readable state description built by the daemon, e.g. "Up 5 minutes" or "Exited (0) 2 hours ago".
     std::string Status;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;

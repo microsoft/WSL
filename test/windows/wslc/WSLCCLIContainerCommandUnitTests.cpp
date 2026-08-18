@@ -74,7 +74,6 @@ class WSLCCLIContainerCommandUnitTests
 
     TEST_METHOD(FormatCommand_MultiByteCharacters_CountedAsSingleCodePoints)
     {
-        // U+00E0 encodes as two utf-8 bytes, so a byte based count would shorten these too early.
         const std::string accented = "\xC3\xA0";
         std::string twenty;
         for (int i = 0; i < 20; ++i)

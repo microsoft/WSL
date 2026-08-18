@@ -396,8 +396,7 @@ int ContainerService::Attach(Terminal& terminal, Session& session, const std::st
     return runningProcess.Wait();
 }
 
-// The invariant state name. This is what "container list --format json" reports, so it must match
-// docker's machine readable output rather than the user's display language.
+// The invariant state name. This is what "container list --format json" reports.
 std::wstring ContainerService::ContainerStateName(WSLCContainerState state)
 {
     switch (state)

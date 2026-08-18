@@ -132,11 +132,9 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
-    // Command and runtime supplied status description. Not serialized directly: the json output is
-    // built by ToContainerOutput, which reports the docker shape.
+    // Command and runtime supplied status description.
     std::string Command;
     std::string Status;
-    // Comma separated lists as rendered by the docker CLI.
     std::string Labels;
     std::string Networks;
     std::string Mounts;
@@ -158,9 +156,7 @@ struct ContainerPlatform
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPlatform, architecture, os);
 };
 
-// The shape emitted by "container list --format json". Every value is reported as a string apart
-// from Platform, matching the docker CLI, so this is kept separate from ContainerInformation, which
-// mirrors the service's native types.
+// The shape emitted by "container list --format json".
 struct ContainerOutputInformation
 {
     std::string Command;

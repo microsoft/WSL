@@ -25,8 +25,6 @@ struct ContainerService
     static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
 
     // The bare state name, e.g. "running", without the relative time ContainerStateToString appends.
-    // Invariant on purpose: this is what "container list --format json" reports, and it has to match
-    // docker's machine readable output rather than the user's display language.
     static std::wstring ContainerStateName(WSLCContainerState state);
 
     // The display form of ContainerStateName, used for the table output.
@@ -35,8 +33,6 @@ struct ContainerService
     static std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
     static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
 
-    // Renders a container command the way docker does: optionally shortened to 20 characters with a
-    // trailing ellipsis, then wrapped in double quotes.
     static std::wstring FormatCommand(const std::string& command, bool truncate);
 
     // Renders a container status, preferring the description supplied by the runtime and falling back

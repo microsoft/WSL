@@ -383,15 +383,10 @@ typedef struct _WSLCContainerEntry
 {
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
-    // Command the container runs, as reported by the runtime. Truncated if it exceeds the buffer.
     char Command[WSLC_MAX_CONTAINER_COMMAND_LENGTH + 1];
-    // Human readable state description built by the runtime, e.g. "Up 5 minutes" or "Exited (0) 2 hours ago".
     char Status[WSLC_MAX_CONTAINER_STATUS_LENGTH + 1];
-    // Comma separated "key=value" labels. Truncated if it exceeds the buffer.
     char Labels[WSLC_MAX_CONTAINER_LABELS_LENGTH + 1];
-    // Comma separated network names the container is attached to. Truncated if it exceeds the buffer.
     char Networks[WSLC_MAX_CONTAINER_NETWORKS_LENGTH + 1];
-    // Comma separated mount names or sources. Truncated if it exceeds the buffer.
     char Mounts[WSLC_MAX_CONTAINER_MOUNTS_LENGTH + 1];
     WSLCContainerId Id;
     ULONGLONG StateChangedAt;
