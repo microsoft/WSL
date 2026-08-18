@@ -323,51 +323,51 @@ std::wstring ContainerService::FormatElapsedSeconds(LONGLONG elapsedSeconds)
 
     if (elapsed < 1)
     {
-        return L"Less than a second ago";
+        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
     }
     else if (elapsed == 1)
     {
-        return L"1 second ago";
+        return Localization::WSLCCLI_RelativeTimeOneSecond();
     }
     else if (elapsed < SecondsPerMinute)
     {
-        return std::format(L"{} seconds ago", elapsed);
+        return Localization::WSLCCLI_RelativeTimeSeconds(elapsed);
     }
 
     const auto minutes = elapsed / SecondsPerMinute;
     if (minutes == 1)
     {
-        return L"About a minute ago";
+        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
     }
     else if (minutes < MinutesPerHour)
     {
-        return std::format(L"{} minutes ago", minutes);
+        return Localization::WSLCCLI_RelativeTimeMinutes(minutes);
     }
 
     // Rounded to the nearest hour rather than truncated.
     const auto hours = (elapsed + (SecondsPerHour / 2)) / SecondsPerHour;
     if (hours == 1)
     {
-        return L"About an hour ago";
+        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
     }
     else if (hours < HoursPerDay * 2)
     {
-        return std::format(L"{} hours ago", hours);
+        return Localization::WSLCCLI_RelativeTimeHours(hours);
     }
     else if (hours < HoursPerDay * 7 * 2)
     {
-        return std::format(L"{} days ago", hours / HoursPerDay);
+        return Localization::WSLCCLI_RelativeTimeDays(hours / HoursPerDay);
     }
     else if (hours < HoursPerDay * 30 * 2)
     {
-        return std::format(L"{} weeks ago", hours / HoursPerDay / 7);
+        return Localization::WSLCCLI_RelativeTimeWeeks(hours / HoursPerDay / 7);
     }
     else if (hours < HoursPerDay * 365 * 2)
     {
-        return std::format(L"{} months ago", hours / HoursPerDay / 30);
+        return Localization::WSLCCLI_RelativeTimeMonths(hours / HoursPerDay / 30);
     }
 
-    return std::format(L"{} years ago", elapsed / SecondsPerHour / HoursPerDay / 365);
+    return Localization::WSLCCLI_RelativeTimeYears(elapsed / SecondsPerHour / HoursPerDay / 365);
 }
 
 int ContainerService::Attach(Terminal& terminal, Session& session, const std::string& id)
@@ -618,7 +618,6 @@ std::vector<ContainerInformation> ContainerService::List(
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
-        entry.ImageId = current.ImageId;
         entry.State = current.State;
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;

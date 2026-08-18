@@ -1839,6 +1839,7 @@ try
 
     bool all = false;
     bool digests = false;
+    bool containerCounts = false;
     std::map<std::string, std::vector<std::string>> filters;
 
     if (Options != nullptr)
@@ -1851,6 +1852,7 @@ try
 
         all = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsAll);
         digests = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDigests);
+        containerCounts = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsContainerCounts);
 
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
@@ -1859,12 +1861,45 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
+    // The container count is gathered under the container lock alongside the image list so that no
+    // container can be created or removed in between, which would report counts for a set of images
+    // that no longer matches the listing.
+    std::unique_lock<std::mutex> containersLock;
+    if (containerCounts)
+    {
+        containersLock = std::unique_lock{m_containersLock};
+    }
+
     std::vector<docker_schema::Image> images;
     try
     {
         images = m_runtime.Docker().ListImages(all, digests, filters);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
+
+    // Stopped containers are included, matching docker.
+    std::map<std::string, LONGLONG> containersByImage;
+    if (containerCounts)
+    {
+        try
+        {
+            for (const auto& container : m_runtime.Docker().ListContainers(true))
+            {
+                containersByImage[container.ImageID]++;
+            }
+        }
+        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+    }
+
+    const auto containersForImage = [&](const std::string& id) {
+        if (!containerCounts)
+        {
+            return -1LL;
+        }
+
+        const auto it = containersByImage.find(id);
+        return it == containersByImage.end() ? 0LL : it->second;
+    };
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate(images.begin(), images.end(), size_t{0}, [](auto sum, const auto& e) {
@@ -1906,6 +1941,7 @@ try
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
             output[index].Size = e.Size;
             output[index].Created = e.Created;
+            output[index].Containers = containersForImage(e.Id);
             index++;
         }
         else
@@ -1932,6 +1968,7 @@ try
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
                 output[index].Size = e.Size;
                 output[index].Created = e.Created;
+                output[index].Containers = containersForImage(e.Id);
                 index++;
             }
         }
@@ -2522,7 +2559,6 @@ try
 
         auto* e = it->second.get();
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ImageId, dockerContainer.ImageID.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
         e->GetState(&output[index].State);

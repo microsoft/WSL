@@ -21,6 +21,8 @@ struct ImageInformation
     std::string Id;
     LONGLONG Created{};
     int64_t Size{};
+    // Number of containers created from the image, or -1 when the count wasn't requested.
+    LONGLONG Containers{-1};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
 };
@@ -46,7 +48,7 @@ struct ImageOutputInformation
 };
 
 // Value docker emits for repository, tag, and digest data it does not have.
-inline constexpr std::string_view c_dockerNone = "<none>";
+inline constexpr std::string_view c_none = "<none>";
 
 struct PruneImagesResult
 {

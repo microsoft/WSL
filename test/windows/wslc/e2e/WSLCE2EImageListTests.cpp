@@ -172,7 +172,7 @@ class WSLCE2EImageListTests
             // Values docker always populates, even when it has no data for them.
             VERIFY_ARE_NOT_EQUAL(std::string{}, entry["Repository"].get<std::string>());
             VERIFY_ARE_NOT_EQUAL(std::string{}, entry["Tag"].get<std::string>());
-            VERIFY_ARE_EQUAL(std::string{c_dockerNone}, entry["Digest"].get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{c_none}, entry["Digest"].get<std::string>());
 
             const auto containers = entry["Containers"].get<std::string>();
             VERIFY_IS_FALSE(containers.empty());
@@ -411,7 +411,7 @@ class WSLCE2EImageListTests
         for (const auto& image : images)
         {
             VERIFY_ARE_EQUAL(
-                std::string{wsl::windows::wslc::models::c_dockerNone},
+                std::string{wsl::windows::wslc::models::c_none},
                 image.Repository,
                 L"dangling=true list should not contain tagged images");
         }

@@ -73,28 +73,6 @@ namespace {
     // Values docker reports as unavailable. wslc does not track image digests or layer sharing, so
     // these use the same placeholders docker emits.
     constexpr std::string_view c_notAvailable = "N/A";
-    constexpr std::string_view c_none = models::c_dockerNone;
-
-    // Counts the containers created from each image, keyed by image id. Docker includes stopped
-    // containers in this count, and reports 0 for images no container was created from.
-    std::optional<std::unordered_map<std::string, size_t>> TryCountContainersByImage(models::Session& session)
-    try
-    {
-        std::unordered_map<std::string, size_t> counts;
-        for (const auto& container : ContainerService::List(session, true))
-        {
-            counts[container.ImageId]++;
-        }
-
-        return counts;
-    }
-    catch (...)
-    {
-        // Report the count as unavailable rather than failing the listing, which is what docker
-        // does when it has no count for an image.
-        LOG_CAUGHT_EXCEPTION();
-        return std::nullopt;
-    }
 
     // Formats a byte count the way docker does: SI units with three significant digits
     // (119856765 -> "120MB").
@@ -116,20 +94,11 @@ namespace {
     // Builds the docker-compatible representation of an image, shared by the table and json output
     // so the two cannot drift. Docker emits every value as a string, uses "<none>" for missing
     // repository/tag data, and truncates the id unless --no-trunc is passed, in which case it keeps
-    // the algorithm prefix. Container counts are only looked up for output that reports them.
-    ImageOutputInformation ToImageOutput(
-        const ImageInformation& image, bool truncate, const std::optional<std::unordered_map<std::string, size_t>>& containerCounts = std::nullopt)
+    // the algorithm prefix.
+    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
     {
         ImageOutputInformation entry;
-        if (containerCounts.has_value())
-        {
-            const auto count = containerCounts->find(image.Id);
-            entry.Containers = std::to_string(count == containerCounts->end() ? 0 : count->second);
-        }
-        else
-        {
-            entry.Containers = c_notAvailable;
-        }
+        entry.Containers = image.Containers < 0 ? std::string{c_notAvailable} : std::to_string(image.Containers);
 
         entry.CreatedAt = FormatDockerTimestamp(image.Created);
         entry.CreatedSince =
@@ -229,7 +198,12 @@ void GetImages(CLIExecutionContext& context)
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    auto images = ImageService::List(session, filters);
+    // The container count is only reported by json output, and gathering it costs an extra query in
+    // the service, so it is only requested when it will be shown.
+    const bool containerCounts =
+        context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
+
+    auto images = ImageService::List(session, filters, containerCounts);
     context.Data.Add<Data::Images>(std::move(images));
 }
 
@@ -256,12 +230,9 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        WI_ASSERT(context.Data.Contains(Data::Session));
-        const auto containerCounts = TryCountContainersByImage(context.Data.Get<Data::Session>());
-
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc, containerCounts), c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc), c_jsonCompactIndent));
         }
 
         break;

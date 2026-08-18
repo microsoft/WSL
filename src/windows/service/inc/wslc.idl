@@ -146,6 +146,7 @@ typedef struct _WSLCImageInformation
     LONGLONG Size; // Matches Docker's int64 image size
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
+    LONGLONG Containers; // Number of containers created from the image, or -1 if it wasn't requested
 } WSLCImageInformation;
 
 typedef struct _KeyValuePairInformation
@@ -338,9 +339,6 @@ typedef struct _WSLCContainerEntry
 {
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
-    // Id of the image the container was created from, as resolved when it was created. Unlike
-    // Image, which is the reference the caller passed, this is stable across tag changes.
-    char ImageId[WSLC_MAX_IMAGE_ID_LENGTH + 1];
     WSLCContainerId Id;
     ULONGLONG StateChangedAt;
     ULONGLONG CreatedAt;

@@ -107,7 +107,7 @@ class WSLCE2EImageImportTests
             size_t count = 0;
             for (const auto& img : images)
             {
-                if (img.Repository == wsl::windows::wslc::models::c_dockerNone)
+                if (img.Repository == wsl::windows::wslc::models::c_none)
                 {
                     count++;
                 }
