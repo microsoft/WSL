@@ -368,7 +368,10 @@ void ConsommeNetworking::SetupLoopbackDevice()
     loopbackSettings->PreferredIpAddress.PrefixLength = 28;
     loopbackSettings->Routes.emplace(EndpointRoute::DefaultRoute(AF_INET, wsl::windows::common::string::StringToSockAddrInet(L"169.254.73.249")));
     m_localhostAdapterId = m_guestDeviceManager->AddVirtioNetDevice(
-        c_loopbackDeviceName, BuildVirtioNetConfig(loopbackSettings, false, c_gatewayMacAddress), {}, m_userToken.get());
+        c_loopbackDeviceName,
+        BuildVirtioNetConfig(loopbackSettings, false, c_gatewayMacAddress, m_maxQueuePairs),
+        {},
+        m_userToken.get());
 
     // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.249, so use a /28 subnet
     // that includes both the client and gateway addresses.
