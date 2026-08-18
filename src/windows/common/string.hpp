@@ -35,6 +35,10 @@ std::wstring FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t De
 
 std::wstring FormatBytes(uint64_t Bytes);
 
+// Formats a size the way docker reports image sizes: base 1000, three significant digits and no
+// space (119856765 -> "120MB").
+std::wstring FormatDockerSize(uint64_t Bytes);
+
 std::vector<std::string> InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize);
 
 bool IsPathComponentEqual(const std::wstring_view String1, const std::wstring_view String2);
@@ -62,6 +66,10 @@ std::string WideToMultiByte(_In_ std::wstring_view Source);
 
 std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
 std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
+
+// Formats a unix timestamp the way docker does, matching Go's time.Time.String() layout. Falls back
+// to UTC when the time zone database is unavailable.
+std::string FormatDockerTimestamp(LONGLONG timestamp);
 
 // Template implementation for TruncateId to avoid code duplication.
 // Algorithm inspired from Moby for consistency in presentation of shortened IDs.

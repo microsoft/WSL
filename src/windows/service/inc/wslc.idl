@@ -30,6 +30,7 @@ cpp_quote("#endif")
 #define WSLC_MAX_VOLUME_NAME_LENGTH 255
 #define WSLC_MAX_VOLUME_DRIVER_LENGTH 255
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
+#define WSLC_MAX_IMAGE_ID_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 #define WSLC_EPHEMERAL_PORT 0
@@ -40,6 +41,7 @@ cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
 cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
+cpp_quote("#define WSLC_MAX_IMAGE_ID_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
@@ -139,11 +141,12 @@ interface IWSLCPluginNotifier : IUnknown
 typedef struct _WSLCImageInformation
 {
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
-    char Hash[256];
+    char Hash[WSLC_MAX_IMAGE_ID_LENGTH + 1];
     char Digest[256];
     LONGLONG Size; // Matches Docker's int64 image size
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
+    LONGLONG Containers; // Number of containers created from the image, or -1 if it wasn't requested
 } WSLCImageInformation;
 
 typedef struct _KeyValuePairInformation
