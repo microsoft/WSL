@@ -2319,6 +2319,13 @@ try
     auto lease = AcquireLease();
     for (const auto& definition : spec.Containers)
     {
+        THROW_HR_IF_MSG(
+            networkCleanup,
+            FAILED(networkCleanup) && networkCleanup != WSLC_E_NETWORK_NOT_FOUND,
+            "Failed to delete network %hs",
+            networkName.c_str());
+
+
         ServiceContainerLauncher launcher(
             definition.Image, definition.Name, definition.Command, definition.Environment, networkName, WSLCProcessFlagsStdin);
         if (!definition.WorkingDirectory.empty())
