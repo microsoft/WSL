@@ -152,7 +152,7 @@ class WSLCTests
                            "  secondary:\n"
                            "    name: wslc-compose-secondary\n"
                            "    image: alpine:latest\n"
-                           "    command: \"while true; do echo secondary; sleep 1; done\"\n";
+                           "    command: [\"/bin/sh\", \"-c\", \"while true; do echo secondary; sleep 1; done\"]\n";
         }
 
         wil::com_ptr<IWSLCComposeSession> composeSession;
