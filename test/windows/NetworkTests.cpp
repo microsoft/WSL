@@ -367,6 +367,43 @@ class NetworkTests
         VERIFY_ARE_EQUAL(v6State.DefaultRoute->Device, L"eth0");
     }
 
+    // Adds a dummy interface with a default route over it, then updates the default route on eth0 to have the same metric.
+    // The test verifies that both default routes exist after the update.
+    WSL2_TEST_METHOD(UpdateDefaultRouteKeepsOtherInterfaceRoute)
+    {
+        constexpr auto c_dummyInterface = L"wsldummy0";
+        constexpr auto c_sharedMetric = 100;
+        const std::wstring metricArg = L" metric " + std::to_wstring(c_sharedMetric);
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::wstring(L"ip link add ") + c_dummyInterface + L" type dummy"), (DWORD)0);
+
+        auto removeDummyInterface = wil::scope_exit([&] { LxsstuLaunchWsl(std::wstring(L"ip link del ") + c_dummyInterface); });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::wstring(L"ip link set ") + c_dummyInterface + L" up"), (DWORD)0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::wstring(L"ip route add default dev ") + c_dummyInterface + metricArg), (DWORD)0);
+
+        const auto defaultRouteExistsOnDevice = [&](const std::wstring& device) {
+            return LxsstuLaunchWsl(
+                       L"ip -4 route show default | grep -w \"dev " + device + L"\" | grep -qw \"metric " +
+                       std::to_wstring(c_sharedMetric) + L"\"") == (DWORD)0;
+        };
+
+        VERIFY_IS_TRUE(defaultRouteExistsOnDevice(c_dummyInterface));
+
+        wsl::shared::hns::Route route;
+        route.NextHop = L"0.0.0.0";
+        route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+        route.Family = AF_INET;
+        route.Metric = c_sharedMetric;
+        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+
+        VERIFY_IS_TRUE(defaultRouteExistsOnDevice(c_dummyInterface));
+        VERIFY_IS_TRUE(defaultRouteExistsOnDevice(L"eth0"));
+
+        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        VERIFY_IS_FALSE(defaultRouteExistsOnDevice(L"eth0"));
+    }
+
     WSL2_TEST_METHOD(AddDefaultRouteWithOfflinkGateway)
     {
         TestCase({{L"eth0", {{L"100.96.5.160", 32}}, L"100.96.5.161"}});
