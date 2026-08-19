@@ -2375,6 +2375,7 @@ void ProcessLaunchInitMessage(
     }
     catch (...)
     {
+        LOG_CAUGHT_EXCEPTION();
         ReportStatus(wil::ResultFromCaughtException());
         _exit(1);
     }
