@@ -6686,13 +6686,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
-    static LxssDistributionState GetDistroState()
+    static LxssDistributionState GetDistroState(LPCWSTR DistroName = LXSS_DISTRO_NAME_TEST_L)
     {
         wsl::windows::common::SvcComm service;
 
         for (const auto& e : service.EnumerateDistributions())
         {
-            if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
+            if (wsl::shared::string::IsEqual(e.DistroName, DistroName))
             {
                 return e.State;
             }
@@ -7959,6 +7959,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/true", testName)), 0L);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", testName)), 0L);
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), GetDistroState(testName.c_str()) == LxssDistributionStateRunning);
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
 
         DetachTestVolume(mountPath, outerVhd);
         volumeAttached = false;
