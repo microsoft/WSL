@@ -30,6 +30,7 @@ using io::MultiHandleWait;
 using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
+using wsl::windows::common::string::FormatBytes;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -971,15 +972,6 @@ try
         "Invalid flags: 0x%x",
         Options->Flags);
 
-    // Image builds shell out to `docker build` inside the VM, which fetches FROM
-    // base images directly through the in-VM docker daemon and bypasses the
-    // per-pull registry policy gate. When an allowlist is configured, refuse the
-    // build outright since we cannot reliably attribute its registry traffic.
-    if (wsl::windows::policies::HasRegistryAllowlist(wsl::windows::policies::OpenPoliciesKey().get()))
-    {
-        THROW_HR_WITH_USER_ERROR(WSLC_E_REGISTRY_BLOCKED_BY_POLICY, Localization::MessageImageBuildBlockedByPolicy());
-    }
-
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
     std::optional<UserCOMCallback> comCall;
@@ -991,6 +983,8 @@ try
     auto runtime = m_runtime.Acquire();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
+
+    const auto policyState = runtime.Vm().GetBuildKitPolicyState();
 
     // Track every Windows folder we mount into the VM during this build so a single scope_exit
     // unmounts them all on success or on any throw partway through the loop below.
@@ -1018,12 +1012,20 @@ try
     // one parent directory per file secret are mounted.
     mountedPaths.reserve(static_cast<size_t>(3) + Options->Secrets.Count);
 
-    auto mountPath = mountInVm(Options->ContextPath, TRUE);
-
-    std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
     // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
     // values never touch disk; kept off telemetry (only buildArgs is logged).
     std::vector<std::string> buildEnv;
+
+    if (policyState == WSLCVirtualMachine::BuildKitPolicyState::Configured)
+    {
+        buildEnv.emplace_back(std::string{"EXPERIMENTAL_BUILDKIT_SOURCE_POLICY="} + WSLCVirtualMachine::c_buildKitPolicyPath);
+    }
+
+    auto mountPath = mountInVm(Options->ContextPath, TRUE);
+
+    // Progress is requested as JSON so it can be parsed into the formatted progress messages sent to the
+    // client. The raw JSON is a docker implementation detail and is never forwarded.
+    std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
@@ -1247,6 +1249,7 @@ try
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
+    std::set<std::string> reportedCached;
     std::set<std::string> reportedErrors;
     std::map<std::string, std::string> digestToStageName;
     bool needsNewline = false; // true when the last log chunk didn't end with \n
@@ -1279,6 +1282,23 @@ try
         }
 
         return {};
+    };
+
+    // Returns the leading step token from a BuildKit vertex name, e.g. "[2/3]" from "[2/3] RUN make".
+    // Falls back to the full name when there is no bracketed prefix.
+    auto getStepToken = [](const std::string& name) -> std::string {
+        if (name.empty() || name[0] != '[')
+        {
+            return name;
+        }
+
+        auto close = name.find(']');
+        if (close == std::string::npos)
+        {
+            return name;
+        }
+
+        return name.substr(0, close + 1);
     };
 
     auto logPrefix = [](const std::string& name) -> std::string {
@@ -1346,6 +1366,16 @@ try
                 reportProgress(vertex.name + "\n");
             }
 
+            if (vertex.cached && reportedCached.insert(vertex.digest).second)
+            {
+                auto stepToken = getStepToken(vertex.name);
+                if (!stepToken.empty())
+                {
+                    flushLine();
+                    reportProgress(stepToken + " CACHED\n");
+                }
+            }
+
             if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
             {
                 flushLine();
@@ -1402,8 +1432,8 @@ try
             {
                 auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
                 auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
-                auto current = wsl::shared::string::FormatBytes(currentBytes);
-                auto total = wsl::shared::string::FormatBytes(totalBytes);
+                auto current = FormatBytes(currentBytes);
+                auto total = FormatBytes(totalBytes);
                 reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)
@@ -1414,8 +1444,7 @@ try
         }
     };
 
-    // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure).
+    // Docker writes progress to stderr and the final image ID to stdout on success (empty on failure).
     //
     // For dest=- the exporter tarball is written to stdout, so it is relayed to the client handle as the
     // build runs. RelayHandle is an overlapped handle, so a slow client only marks the relay pending and
@@ -1811,6 +1840,7 @@ try
 
     bool all = false;
     bool digests = false;
+    bool containerCounts = false;
     std::map<std::string, std::vector<std::string>> filters;
 
     if (Options != nullptr)
@@ -1823,6 +1853,7 @@ try
 
         all = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsAll);
         digests = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDigests);
+        containerCounts = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsContainerCounts);
 
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
@@ -1831,12 +1862,45 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
+    // The container count is gathered under the container lock alongside the image list so that no
+    // container can be created or removed in between, which would report counts for a set of images
+    // that no longer matches the listing.
+    std::unique_lock<std::mutex> containersLock;
+    if (containerCounts)
+    {
+        containersLock = std::unique_lock{m_containersLock};
+    }
+
     std::vector<docker_schema::Image> images;
     try
     {
         images = m_runtime.Docker().ListImages(all, digests, filters);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
+
+    // Stopped containers are included, matching docker.
+    std::map<std::string, LONGLONG> containersByImage;
+    if (containerCounts)
+    {
+        try
+        {
+            for (const auto& container : m_runtime.Docker().ListContainers(true))
+            {
+                containersByImage[container.ImageID]++;
+            }
+        }
+        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+    }
+
+    const auto containersForImage = [&](const std::string& id) {
+        if (!containerCounts)
+        {
+            return -1LL;
+        }
+
+        const auto it = containersByImage.find(id);
+        return it == containersByImage.end() ? 0LL : it->second;
+    };
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate(images.begin(), images.end(), size_t{0}, [](auto sum, const auto& e) {
@@ -1878,6 +1942,7 @@ try
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
             output[index].Size = e.Size;
             output[index].Created = e.Created;
+            output[index].Containers = containersForImage(e.Id);
             index++;
         }
         else
@@ -1904,6 +1969,7 @@ try
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
                 output[index].Size = e.Size;
                 output[index].Created = e.Created;
+                output[index].Containers = containersForImage(e.Id);
                 index++;
             }
         }
@@ -2980,7 +3046,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkInformation** Networks, ULONG* Count)
 try
 {
     WSLCExecutionContext context(this);
@@ -2991,23 +3057,48 @@ try
     *Networks = nullptr;
     *Count = 0;
 
-    auto lock = AcquireLease();
-    std::lock_guard networksLock(m_networksLock);
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    const bool filtered = !filters.empty();
 
-    if (m_networks.empty())
+    if (filtered)
     {
-        return S_OK;
+        // Scope the filtered query to WSLC-managed networks.
+        filters["label"].push_back(WSLCNetworkManagedLabel);
     }
+
+    auto lock = AcquireLease();
+
+    std::vector<docker_schema::Network> dockerNetworks;
+    if (filtered)
+    {
+        try
+        {
+            dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+        }
+        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+    }
+
+    std::lock_guard networksLock(m_networksLock);
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
 
     ULONG index = 0;
     for (const auto& [name, entry] : m_networks)
     {
+        if (filtered && std::ranges::find_if(dockerNetworks, [&](const auto& n) { return n.Name == name; }) == dockerNetworks.end())
+        {
+            continue;
+        }
+
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
         index++;
+    }
+
+    if (index == 0)
+    {
+        return S_OK;
     }
 
     *Networks = output.release();

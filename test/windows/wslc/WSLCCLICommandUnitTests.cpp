@@ -250,7 +250,7 @@ class WSLCCLICommandUnitTests
     {
         // Build a lookup table from ArgType -> enum name string using the same X-macro.
         static constexpr const wchar_t* c_argTypeNames[] = {
-#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, Desc) L## #EnumName,
+#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, ConvertedType, Desc) L## #EnumName,
             WSLC_ARGUMENTS(WSLC_ARG_ENUM)
 #undef WSLC_ARG_ENUM
         };

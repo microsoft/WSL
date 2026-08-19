@@ -897,6 +897,40 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transac
 }
 
 void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_WRITE_FILE& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    if (Message.PathIndex >= Buffer.size() || Message.ContentIndex > Buffer.size() ||
+        Message.ContentLength > Buffer.size() - Message.ContentIndex)
+    {
+        Transaction.SendResultMessage<int32_t>(EINVAL);
+        return;
+    }
+
+    const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
+    const auto content = Buffer.subspan(Message.ContentIndex, Message.ContentLength);
+
+    int result = 0;
+    if (UtilMkdirPath(path, 0755, true) < 0)
+    {
+        result = errno;
+    }
+    else
+    {
+        wil::unique_fd fd{open(path, Message.OpenFlags, Message.Permissions)};
+        if (!fd)
+        {
+            result = errno;
+        }
+        else if (UtilWriteBuffer(fd.get(), content) != static_cast<ssize_t>(content.size()))
+        {
+            result = errno;
+        }
+    }
+
+    Transaction.SendResultMessage<int32_t>(result);
+}
+
+void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sync();
@@ -1045,7 +1079,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

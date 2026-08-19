@@ -14,6 +14,7 @@ Abstract:
 
 #include "HcsVirtualMachine.h"
 #include <format>
+#include <fstream>
 #include <string>
 #include <string_view>
 #include "hcs_schema.h"

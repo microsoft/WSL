@@ -26,6 +26,7 @@ set(SOURCES
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
+    MountSpecParsing.cpp
     NatNetworking.cpp
     notifications.cpp
     Redirector.cpp
@@ -111,6 +112,7 @@ set(HEADERS
     LxssPort.h
     LxssSecurity.h
     LxssServerPort.h
+    MountSpecParsing.h
     NatNetworking.h
     notifications.h
     precomp.h

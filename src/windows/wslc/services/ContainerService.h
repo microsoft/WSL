@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 #include "SessionModel.h"
 #include "ContainerModel.h"
-#include "Reporter.h"
+#include "Terminal.h"
 #include <docker_schema.h>
 #include <wslc.h>
 #include <wslc_schema.h>
@@ -24,18 +24,19 @@ struct ContainerService
 {
     static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
     static std::wstring FormatRelativeTime(ULONGLONG timestamp);
+    static std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
     static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
-    static int Attach(Reporter& reporter, models::Session& session, const std::string& id);
-    static int Run(Reporter& reporter, models::Session& session, const std::string& image, models::ContainerOptions options);
-    static models::CreateContainerResult Create(Reporter& reporter, models::Session& session, const std::string& image, models::ContainerOptions options);
-    static int Start(Reporter& reporter, models::Session& session, const std::string& id, bool attach = false);
+    static int Attach(Terminal& terminal, models::Session& session, const std::string& id);
+    static int Run(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);
+    static models::CreateContainerResult Create(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);
+    static int Start(Terminal& terminal, models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force, bool deleteVolumes = false);
     static std::vector<models::ContainerInformation> List(
         models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {});
 
-    static int Exec(Reporter& reporter, models::Session& session, const std::string& id, models::ContainerOptions options);
+    static int Exec(Terminal& terminal, models::Session& session, const std::string& id, models::ContainerOptions options);
     static void Export(models::Session& session, const std::string& id, const std::wstring& outputPath);
     static void Export(models::Session& session, const std::string& id, HANDLE outputHandle);
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);

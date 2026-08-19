@@ -107,7 +107,7 @@ class WSLCCLISecretParserUnitTests
         VERIFY_ARE_EQUAL(expectedId, secret.Id);
         VERIFY_IS_TRUE(secret.Value.empty());
         std::error_code ec;
-        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(expectedPath), ec);
+        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(expectedPath, ec), ec);
         VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
     }
 
@@ -209,7 +209,7 @@ class WSLCCLISecretParserUnitTests
         VERIFY_IS_TRUE(secret.Value.empty());
 
         std::error_code ec;
-        const auto expectedCanonical = std::filesystem::weakly_canonical(path, ec);
+        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(path, ec), ec);
         VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
     }
 
@@ -261,8 +261,39 @@ class WSLCCLISecretParserUnitTests
         VERIFY_IS_TRUE(std::filesystem::path(secret.SourcePath).is_absolute());
 
         std::error_code ec;
-        const auto expectedCanonical = std::filesystem::weakly_canonical(absPath, ec);
+        const auto expectedCanonical = std::filesystem::weakly_canonical(std::filesystem::absolute(absPath, ec), ec);
         VERIFY_ARE_EQUAL(expectedCanonical.wstring(), secret.SourcePath);
+    }
+
+    // A relative src= naming a file that does not exist must still resolve to an absolute SourcePath.
+    // Parsing deliberately does not require the file to exist, so this case is reachable and the server
+    // still rejects a non-absolute path. std::filesystem::weakly_canonical cannot handle it on its own:
+    // it only produces an absolute path by canonicalizing the longest leading sequence of elements that
+    // exist, so a bare missing filename has nothing to canonicalize and is returned unchanged. The
+    // relative-src test above cannot catch this because its file exists.
+    TEST_METHOD(Secret_File_RelativeSrcMissingFileResolvedToAbsolutePath)
+    {
+        const auto directory = std::filesystem::temp_directory_path();
+        const auto relativeSrc = L"wslc_ut_secret_missing_" + std::to_wstring(GetCurrentProcessId()) + L"_" +
+                                 std::to_wstring(GetTickCount64()) + L".bin";
+        VERIFY_IS_FALSE(std::filesystem::exists(directory / relativeSrc));
+
+        auto originalDir = std::filesystem::current_path();
+        auto restoreDir = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::current_path(originalDir, ec);
+        });
+        std::filesystem::current_path(directory);
+
+        VERIFY_IS_FALSE(std::filesystem::path(relativeSrc).is_absolute());
+
+        auto secret = validation::ParseSecretSpec(L"id=s,src=" + relativeSrc);
+        VERIFY_ARE_EQUAL(std::wstring(L"s"), secret.Id);
+        VERIFY_IS_TRUE(std::filesystem::path(secret.SourcePath).is_absolute());
+
+        // The leading directory exists, so it canonicalizes; only the missing filename is appended.
+        const auto expected = std::filesystem::canonical(directory) / relativeSrc;
+        VERIFY_ARE_EQUAL(expected.wstring(), secret.SourcePath);
     }
 
     // --- Invalid: spec structure ---

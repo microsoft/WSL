@@ -167,10 +167,10 @@ services::BuildSecret ParseSecretSpec(const std::wstring& spec)
         // Normalize to an absolute path (the service requires one to mount the file's directory) but do
         // not verify the file exists or is a regular file here: that would be a TOCTOU race with the
         // build, and the file may only be reachable from the service's context. Let the service/BuildKit
-        // reject an unmountable or unreadable file instead. weakly_canonical resolves a relative path
+        // reject an unmountable or unreadable file instead. GetCanonicalPath resolves a relative path
         // against the current directory, collapses '..', and resolves symlinks for the portion of the
         // path that exists; it succeeds for a missing file but still reports genuine errors.
-        auto absPath = std::filesystem::weakly_canonical(srcPath, ec);
+        auto absPath = wsl::windows::common::filesystem::GetCanonicalPath(srcPath, ec);
         if (ec.value() != 0)
         {
             throw ArgumentException(
@@ -458,6 +458,80 @@ std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
 }
 
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName)
+{
+    ParsedNetworkArgument result;
+
+    auto parseOptions = [&](std::wstring_view options, bool requireName) {
+        bool parsedName = false;
+        for (const auto part : SplitPreserveEmpty(options, L','))
+        {
+            const auto separator = part.find(L'=');
+            if (separator == std::wstring_view::npos || separator == 0)
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{part}));
+            }
+
+            const auto key = part.substr(0, separator);
+            const auto optionValue = part.substr(separator + 1);
+            if (key == L"name")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+                }
+
+                if (parsedName)
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkDuplicateNameError(argName));
+                }
+
+                parsedName = true;
+                result.Name = WideToMultiByte(std::wstring{optionValue});
+            }
+            else if (key == L"alias")
+            {
+                if (IsEmptyOrWhitespace(optionValue))
+                {
+                    throw ArgumentException(Localization::WSLCCLI_NetworkAliasEmptyError(argName));
+                }
+
+                result.Aliases.emplace_back(WideToMultiByte(std::wstring{optionValue}));
+            }
+            else
+            {
+                throw ArgumentException(Localization::WSLCCLI_NetworkUnsupportedOptionError(argName, std::wstring{key}));
+            }
+        }
+
+        if (requireName && !parsedName)
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+    };
+
+    if (value.find(L'=') != std::wstring_view::npos)
+    {
+        parseOptions(value, true);
+    }
+    else
+    {
+        if (IsEmptyOrWhitespace(value))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+        }
+
+        result.Name = WideToMultiByte(std::wstring{value});
+    }
+
+    if (result.Name.empty())
+    {
+        throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(argName));
+    }
+
+    return result;
+}
+
 // Map of signal names to WSLCSignal enum values
 static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
     {L"SIGHUP", WSLCSignalSIGHUP},   {L"SIGINT", WSLCSignalSIGINT},     {L"SIGQUIT", WSLCSignalSIGQUIT},
@@ -612,35 +686,105 @@ ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& 
 
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (IsEqual(input, L"json"))
+    // Single source of truth for the accepted format values. It drives both parsing and the error
+    // message's supported-values list, so adding a type here updates both automatically.
+    static constexpr std::pair<std::wstring_view, models::FormatType> c_formatTypes[] = {
+        {L"json", models::FormatType::Json},
+        {L"table", models::FormatType::Table},
+    };
+
+    for (const auto& [name, type] : c_formatTypes)
     {
-        return models::FormatType::Json;
+        if (IsEqual(input, name))
+        {
+            return type;
+        }
     }
-    else if (IsEqual(input, L"table"))
+
+    std::wstring supportedValues;
+    for (const auto& formatType : c_formatTypes)
     {
-        return models::FormatType::Table;
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += formatType.first;
     }
-    else
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
+}
+
+int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (!IsEqual(input, L"json"))
     {
-        constexpr std::wstring_view supportedValues = L"json, table";
+        constexpr std::wstring_view supportedValues = L"json";
         throw ArgumentException(Localization::WSLCCLI_InvalidFormatValueError(argName, input, supportedValues));
     }
+
+    return wsl::shared::c_jsonCompactIndent;
 }
 
-models::FormatType GetOutputFormat(const argument::ArgMap& args)
+models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (!args.Contains(argument::ArgType::Format))
+    static constexpr std::pair<std::wstring_view, models::PullPolicy> c_pullPolicies[] = {
+        {L"always", models::PullPolicy::Always},
+        {L"missing", models::PullPolicy::Missing},
+        {L"never", models::PullPolicy::Never},
+    };
+
+    for (const auto& [name, policy] : c_pullPolicies)
     {
-        return models::FormatType::Table;
+        if (IsEqual(input, name))
+        {
+            return policy;
+        }
     }
 
-    return GetFormatTypeFromString(args.Get<argument::ArgType::Format>());
+    std::wstring supportedValues;
+    for (const auto& pullPolicy : c_pullPolicies)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += pullPolicy.first;
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
 }
 
-int GetInspectJsonIndent(const argument::ArgMap& args)
+models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    // Validation guarantees the only accepted value is "json", so its presence alone selects compact.
-    return args.Contains(argument::ArgType::InspectFormat) ? wsl::shared::c_jsonCompactIndent : wsl::shared::c_jsonPrettyPrintIndent;
+    static constexpr std::pair<std::wstring_view, models::ProgressMode> c_progressModes[] = {
+        {L"auto", models::ProgressMode::Auto},
+        {L"tty", models::ProgressMode::Tty},
+        {L"plain", models::ProgressMode::Plain},
+        {L"quiet", models::ProgressMode::Quiet},
+    };
+
+    for (const auto& [name, mode] : c_progressModes)
+    {
+        if (IsEqual(input, name))
+        {
+            return mode;
+        }
+    }
+
+    std::wstring supportedValues;
+    for (const auto& progressMode : c_progressModes)
+    {
+        if (!supportedValues.empty())
+        {
+            supportedValues += L", ";
+        }
+
+        supportedValues += progressMode.first;
+    }
+
+    throw ArgumentException(Localization::WSLCCLI_InvalidProgressTypeError(argName, input, supportedValues));
 }
 
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
@@ -670,13 +814,14 @@ models::InspectType GetInspectTypeFromString(const std::wstring& input, const st
 
 int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
-    if (!parsed.has_value())
+    const auto bytes =
+        wsl::windows::common::string::ParseStorageSize(std::wstring_view{input}, wsl::windows::common::string::StorageSizeUnit::Binary);
+    if (!bytes.has_value() || bytes.value() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
     }
 
-    return static_cast<int64_t>(parsed.value());
+    return static_cast<int64_t>(bytes.value());
 }
 
 // Parses duration string into nanoseconds.
