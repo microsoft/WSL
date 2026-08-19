@@ -1410,6 +1410,85 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ip_Success)
+    {
+        const std::wstring subnet = L"172.74.0.0/16";
+        const std::wstring ipAddress = L"172.74.0.42";
+
+        auto result = RunWslc(std::format(L"network create --driver bridge --subnet {} {}", subnet, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container create --name {} --network {} --ip {} {} true", WslcContainerName, TestNetworkName, ipAddress, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
+        const auto expectedIp = wsl::shared::string::WideToMultiByte(ipAddress);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+        VERIFY_IS_TRUE(endpoint.IPAMConfig.has_value());
+        VERIFY_ARE_EQUAL(expectedIp, endpoint.IPAMConfig->IPv4Address);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ip_NoNetwork_Rejected)
+    {
+        const std::wstring ipAddress = L"172.74.0.42";
+
+        auto result =
+            RunWslc(std::format(L"container create --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+             .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ip_BridgeMode_Rejected)
+    {
+        const std::wstring ipAddress = L"172.74.0.42";
+
+        auto result = RunWslc(std::format(
+            L"container create --network bridge --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+             .ExitCode = 1});
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ip_MultipleNetworks_Rejected)
+    {
+        const std::wstring ipAddress = L"172.74.0.42";
+
+        auto result = RunWslc(std::format(
+            L"container create --network bridge --network bridge --ip {} --name {} {} true",
+            ipAddress,
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            wsl::shared::Localization::MessageWslcIpAmbiguousWithMultipleNetworks() + L"\r\nError code: E_INVALIDARG"));
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Ip_InvalidValue_Rejected)
+    {
+        const std::wstring badIp = L"not-an-ip";
+
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container create --network {} --ip {} --name {} {} true", TestNetworkName, badIp, WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VerifyPatternMatch(
+            wsl::shared::string::WideToMultiByte(result.Stderr.value()),
+            std::format("*Invalid IP address '{}'*", wsl::shared::string::WideToMultiByte(badIp)));
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Cpus)
     {
         auto result = RunWslc(std::format(L"container create --name {} --cpus 0.5 {} true", WslcContainerName, DebianImage.NameAndTag()));

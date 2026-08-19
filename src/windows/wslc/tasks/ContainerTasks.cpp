@@ -822,6 +822,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::IpAddress))
+    {
+        options.IpAddress = WideToMultiByte(context.Args.GetValue<ArgType::IpAddress>());
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.GetValue<ArgType::User>());
