@@ -35,6 +35,10 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
+using wsl::test::CreateSession;
+using wsl::test::GetDefaultWSLCSessionSettings;
+using wsl::test::LoadTestImages;
+using wsl::test::OpenSessionManager;
 using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
@@ -59,38 +63,9 @@ class WSLCTests
         m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLCNetworkingModeConsomme);
         m_defaultSession = CreateSession(m_defaultSessionSettings);
 
-        wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
-        VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
-
-        auto hasImage = [&](const std::string& imageName) {
-            return std::ranges::any_of(
-                images.get(), images.get() + images.size(), [&](const auto& e) { return e.Image == imageName; });
-        };
-
-        if (!hasImage("debian:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "debian:latest");
-        }
-
-        if (!hasImage("python:3.12-alpine"))
-        {
-            LoadTestImage(*m_defaultSession, "python:3.12-alpine");
-        }
-
-        if (!hasImage("hello-world:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "hello-world:latest");
-        }
-
-        if (!hasImage("alpine:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "alpine:latest");
-        }
-
-        if (!hasImage("wslc-registry:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "wslc-registry:latest");
-        }
+        LoadTestImages(
+            *m_defaultSession,
+            {"debian:latest", "python:3.12-alpine", "hello-world:latest", "alpine:latest", "wslc-registry:latest"});
 
         PruneResult result;
         VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
@@ -120,95 +95,9 @@ class WSLCTests
         return true;
     }
 
-    TEST_METHOD(ComposeSessionBasicLifecycle)
-    {
-        const auto composePath = std::filesystem::current_path() / std::format("compose-{}.yaml", GetCurrentProcessId());
-        const auto volumePath = std::filesystem::current_path() / std::format("compose-volume-{}", GetCurrentProcessId());
-        auto cleanup = wil::scope_exit([&] {
-            std::error_code error;
-            std::filesystem::remove(composePath, error);
-            std::filesystem::remove_all(volumePath, error);
-        });
-
-        std::filesystem::create_directory(volumePath);
-        std::ofstream(volumePath / "content.txt") << "compose-volume";
-
-        {
-            std::ofstream composeFile(composePath);
-            composeFile << "services:\n"
-                           "  basic:\n"
-                           "    name: wslc-compose-basic\n"
-                           "    image: alpine:latest\n"
-                           "    environment:\n"
-                           "      COMPOSE_TEST: enabled\n"
-                           "    working_dir: /work\n"
-                           "    command: [\"/bin/sh\", \"-c\", \"while true; do echo $COMPOSE_TEST; sleep 1; done\"]\n"
-                           "    volumes:\n"
-                           "      - ./"
-                        << volumePath.filename().string()
-                        << ":/work:ro\n"
-                           "    ports:\n"
-                           "      - \"0:8080\"\n"
-                           "  secondary:\n"
-                           "    name: wslc-compose-secondary\n"
-                           "    image: alpine:latest\n"
-                           "    command: [\"/bin/sh\", \"-c\", \"while true; do echo secondary; sleep 1; done\"]\n";
-        }
-
-        wil::com_ptr<IWSLCComposeSession> composeSession;
-        VERIFY_SUCCEEDED(m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
-        VERIFY_IS_NOT_NULL(composeSession.get());
-
-        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-        VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(2u, containers.size());
-        VERIFY_ARE_EQUAL(std::string("wslc-compose-basic"), std::string(containers[0].Name));
-        VERIFY_ARE_EQUAL(WslcContainerStateCreated, containers[0].State);
-
-        wil::com_ptr<IWSLCContainer> basicContainer;
-        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-basic", &basicContainer));
-        wil::unique_cotaskmem_ansistring inspectJson;
-        VERIFY_SUCCEEDED(basicContainer->Inspect(&inspectJson));
-        const auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectJson.get());
-        VERIFY_ARE_EQUAL(std::string("/work"), inspect.Config.WorkingDir);
-        VERIFY_IS_TRUE(inspect.Config.Cmd.has_value());
-        VERIFY_ARE_EQUAL(
-            std::vector<std::string>({"/bin/sh", "-c", "while true; do echo $COMPOSE_TEST; sleep 1; done"}), *inspect.Config.Cmd);
-        VERIFY_IS_TRUE(inspect.Config.Env.has_value());
-        VERIFY_IS_TRUE(std::ranges::find(*inspect.Config.Env, std::string("COMPOSE_TEST=enabled")) != inspect.Config.Env->end());
-        VERIFY_ARE_EQUAL(1u, inspect.Mounts.size());
-        VERIFY_ARE_EQUAL(std::string("/work"), inspect.Mounts[0].Destination);
-        VERIFY_IS_FALSE(inspect.Mounts[0].ReadWrite);
-        VERIFY_IS_TRUE(inspect.Ports.contains("8080/tcp"));
-        VERIFY_ARE_EQUAL(1u, inspect.Ports.at("8080/tcp").size());
-        VERIFY_ARE_EQUAL(std::string("127.0.0.1"), inspect.Ports.at("8080/tcp")[0].HostIp);
-
-        VERIFY_SUCCEEDED(composeSession->Start());
-        containers.reset();
-        VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(WslcContainerStateRunning, containers[0].State);
-        VERIFY_ARE_EQUAL(WslcContainerStateRunning, containers[1].State);
-
-        VERIFY_SUCCEEDED(composeSession->Attach());
-        VERIFY_SUCCEEDED(composeSession->Stop(10));
-        containers.reset();
-        VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(WslcContainerStateExited, containers[0].State);
-        VERIFY_ARE_EQUAL(WslcContainerStateExited, containers[1].State);
-    }
-
     WSLCSessionSettings GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone)
     {
-        WSLCSessionSettings settings{};
-        settings.DisplayName = Name;
-        settings.CpuCount = 4;
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
-        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB.
-        settings.NetworkingMode = networkingMode;
-
-        return settings;
+        return GetDefaultWSLCSessionSettings(Name, enableStorage ? m_storagePath.c_str() : nullptr, networkingMode);
     }
 
     auto ResetTestSession()
@@ -216,15 +105,6 @@ class WSLCTests
         m_defaultSession.reset();
 
         return wil::scope_exit([this]() { m_defaultSession = CreateSession(m_defaultSessionSettings); });
-    }
-
-    static wil::com_ptr<IWSLCSessionManager> OpenSessionManager()
-    {
-        wil::com_ptr<IWSLCSessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
-
-        return sessionManager;
     }
 
     // Returns true for the names the wslc CLI reserves for its default sessions.
@@ -257,22 +137,6 @@ class WSLCTests
         }
 
         return names;
-    }
-
-    wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags Flags = WSLCSessionFlagsNone)
-    {
-        const auto sessionManager = OpenSessionManager();
-
-        wil::com_ptr<IWSLCSession> session;
-
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, &session));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-
-        WSLCSessionState state{};
-        VERIFY_SUCCEEDED(session->GetState(&state));
-        VERIFY_ARE_EQUAL(state, WSLCSessionStateRunning);
-
-        return session;
     }
 
     RunningWSLCContainer OpenContainer(IWSLCSession* session, const std::string& name)

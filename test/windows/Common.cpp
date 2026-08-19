@@ -3002,6 +3002,69 @@ void LoadTestImage(IWSLCSession& session, std::string_view imageName)
     THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), fileSize.QuadPart, nullptr, nullptr));
 }
 
+namespace wsl::test {
+
+void LoadTestImages(IWSLCSession& session, std::initializer_list<std::string_view> imageNames)
+{
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
+    THROW_IF_FAILED(session.ListImages(nullptr, &images, images.size_address<ULONG>()));
+
+    std::set<std::string, std::less<>> loadedImages;
+    for (const auto& image : images)
+    {
+        loadedImages.emplace(image.Image);
+    }
+
+    for (const auto imageName : imageNames)
+    {
+        if (!loadedImages.contains(imageName))
+        {
+            ::LoadTestImage(session, imageName);
+            loadedImages.emplace(imageName);
+        }
+    }
+}
+
+WSLCSessionSettings GetDefaultWSLCSessionSettings(LPCWSTR name, LPCWSTR storagePath, WSLCNetworkingMode networkingMode)
+{
+    WSLCSessionSettings settings{};
+    settings.DisplayName = name;
+    settings.CpuCount = 4;
+    settings.MemoryMb = 2048;
+    settings.BootTimeoutMs = 30 * 1000;
+    settings.StoragePath = storagePath;
+    settings.MaximumStorageSizeMb = 1024 * 20;
+    settings.NetworkingMode = networkingMode;
+
+    return settings;
+}
+
+wil::com_ptr<IWSLCSessionManager> OpenSessionManager()
+{
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    return sessionManager;
+}
+
+wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags flags)
+{
+    const auto sessionManager = OpenSessionManager();
+
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(sessionManager->CreateSession(&sessionSettings, flags, nullptr, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    WSLCSessionState state{};
+    THROW_IF_FAILED(session->GetState(&state));
+    THROW_HR_IF(E_UNEXPECTED, state != WSLCSessionStateRunning);
+
+    return session;
+}
+
+} // namespace wsl::test
+
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
 {
     const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;

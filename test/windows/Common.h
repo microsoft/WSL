@@ -656,6 +656,16 @@ std::filesystem::path GetTestImagePath(std::string_view imageName);
 
 void LoadTestImage(IWSLCSession& session, std::string_view imageName);
 
+namespace wsl::test {
+
+void LoadTestImages(IWSLCSession& session, std::initializer_list<std::string_view> imageNames);
+
+WSLCSessionSettings GetDefaultWSLCSessionSettings(LPCWSTR name, LPCWSTR storagePath = nullptr, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone);
+wil::com_ptr<IWSLCSessionManager> OpenSessionManager();
+wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags flags = WSLCSessionFlagsNone);
+
+} // namespace wsl::test
+
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 
 std::optional<std::wstring> GetHostAdapterIpv4();

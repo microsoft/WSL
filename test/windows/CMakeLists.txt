@@ -11,6 +11,7 @@ set(SOURCES
     PluginTests.cpp
     PolicyTests.cpp
     InstallerTests.cpp
+    WSLCComposeTests.cpp
     WSLCTests.cpp
     WslcSdkTests.cpp
     WslcSdkWinRtTests.cpp
