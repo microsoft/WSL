@@ -33,6 +33,7 @@ if (DEFINED WSL_UNITY_BATCH_SIZE AND WSL_UNITY_BATCH_SIZE GREATER 0)
 endif ()
 
 target_include_directories(wsltests PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/windows/service/exe
     ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
     ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 target_link_directories(wsltests PRIVATE ${BIN})
