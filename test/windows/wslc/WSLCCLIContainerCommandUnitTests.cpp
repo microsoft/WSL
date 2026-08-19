@@ -68,8 +68,10 @@ class WSLCCLIContainerCommandUnitTests
 
     TEST_METHOD(FormatCommand_EmbeddedQuotesAndBackslashes_AreEscaped)
     {
-        VERIFY_ARE_EQUAL(std::wstring{LR"("say \"hi\"")"}, Truncated(R"(say "hi")"));
-        VERIFY_ARE_EQUAL(std::wstring{LR"("c:\\temp")"}, Truncated(R"(c:\temp)"));
+        // Raw string literals are avoided here: the compiler mangles them when the verify macro
+        // stringizes its arguments.
+        VERIFY_ARE_EQUAL(std::wstring{L"\"say \\\"hi\\\"\""}, Truncated("say \"hi\""));
+        VERIFY_ARE_EQUAL(std::wstring{L"\"c:\\\\temp\""}, Truncated("c:\\temp"));
     }
 
     TEST_METHOD(FormatCommand_MultiByteCharacters_CountedAsSingleCodePoints)
