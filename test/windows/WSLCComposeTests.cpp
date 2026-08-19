@@ -176,7 +176,7 @@ class WSLCComposeTests
 
         wil::com_ptr<IWSLCComposeSession> composeSession;
         VERIFY_SUCCEEDED(m_defaultSession->CreateComposeSession(composePath.c_str(), &composeSession));
-        auto stopCompose = wil::scope_exit([&] { LOG_IF_FAILED(composeSession->Stop(10)); });
+        auto stopCompose = wil::scope_exit([&] { LOG_IF_FAILED(composeSession->Stop(0)); });
 
         VERIFY_SUCCEEDED(composeSession->Start());
 

@@ -81,7 +81,6 @@ int ComposeService::Attach(Terminal& Terminal, models::Session& Session, const s
 
     io.Run({});
 
-   
     return 0;
 }
 
