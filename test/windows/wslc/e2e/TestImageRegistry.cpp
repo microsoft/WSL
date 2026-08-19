@@ -50,14 +50,14 @@ void TestImageRegistry::EnsureSeeded(const std::wstring& sessionName)
     auto result = RunWslc(FormatCommand(sessionName, L"image list --format json"));
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
 
     for (const auto& image : images)
     {
-        if (image.Repository && image.Tag)
+        if (image.Repository != wsl::windows::wslc::models::c_none && image.Tag != wsl::windows::wslc::models::c_none)
         {
             m_loaded.insert(ImageKey{
-                sessionName, wsl::shared::string::MultiByteToWide(*image.Repository), wsl::shared::string::MultiByteToWide(*image.Tag)});
+                sessionName, wsl::shared::string::MultiByteToWide(image.Repository), wsl::shared::string::MultiByteToWide(image.Tag)});
         }
     }
 
@@ -96,7 +96,7 @@ void TestImageRegistry::Delete(const TestImage& image, const std::wstring& sessi
     auto result = RunWslc(FormatCommand(sessionName, L"image list --format json"));
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
     const auto name = wsl::shared::string::WideToMultiByte(image.Name);
     const auto tag = wsl::shared::string::WideToMultiByte(image.Tag);
     const bool present =

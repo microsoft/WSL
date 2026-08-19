@@ -59,7 +59,7 @@ class WSLCE2EImagePruneTests
         // 2. Delete the original debian:latest tag so prune-target:v1 is the only reference
         // 3. Tag alpine as prune-target:v1, overwriting it — debian image is now dangling
         TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
-        auto cleanup = wil::scope_exit([&]() {
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             RunWslc(L"image prune");
             RunWslc(L"image delete prune-target:v1");
             TestImageRegistry::Instance().Delete(AlpineImage);
@@ -93,7 +93,7 @@ class WSLCE2EImagePruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_AllFlag)
     {
-        auto cleanup = wil::scope_exit([&]() { TestImageRegistry::Instance().Restore(DebianImage); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Restore(DebianImage); });
 
         // --all should prune unused images (not just dangling)
         const auto result = RunWslc(L"image prune --all");
@@ -133,7 +133,7 @@ class WSLCE2EImagePruneTests
     {
         // Create a dangling debian image (same trick as WSLCE2E_Image_Prune_DanglingImage).
         TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
-        auto cleanup = wil::scope_exit([&]() {
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             RunWslc(L"image prune");
             RunWslc(L"image delete prune-target:v1");
             TestImageRegistry::Instance().Delete(AlpineImage);

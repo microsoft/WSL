@@ -139,7 +139,7 @@ class WSLCE2EImageSaveTests
         // see the same on-disk tar as DebianImage.Path. Without this, reloading from a
         // multi-image archive can produce a slightly different on-disk representation that
         // breaks byte-exact size checks in WSLCE2E_Image_Save_Success.
-        auto restoreDebian = wil::scope_exit([&]() { TestImageRegistry::Instance().Delete(DebianImage); });
+        auto restoreDebian = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Delete(DebianImage); });
 
         // Save both images into a single archive.
         const auto saveResult = RunWslc(std::format(
