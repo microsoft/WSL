@@ -1396,38 +1396,23 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             std::optional<HRESULT> hr{};
             switch (trackedRoute.SyncStatus)
             {
+            // For routes, an Add and an Update resolve to the same guest netlink operation
+            // (RTM_NEWROUTE | NLM_F_CREATE, with EEXIST ignored), so a single Add is sufficient to plumb
+            // a new route or re-assert an existing one.
             case PendingAdd:
+            case PendingUpdate:
                 hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
-                if (FAILED(hr.value()))
-                {
-                    // try to update it instead if it already exists
-                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Update);
-                }
                 break;
 
             case Synced:
                 if (refreshAllRoutes)
                 {
-                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Update);
-                    if (FAILED(hr.value()))
-                    {
-                        // try to add it
-                        hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
-                    }
+                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
                     if (FAILED(hr.value()))
                     {
                         trackedRoute.SyncStatus = PendingUpdate;
                         trackedRoute.SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
                     }
-                }
-                break;
-
-            case PendingUpdate:
-                hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Update);
-                if (FAILED(hr.value()))
-                {
-                    // try to add it
-                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
                 }
                 break;
 
