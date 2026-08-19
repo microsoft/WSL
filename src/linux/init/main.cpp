@@ -2170,7 +2170,9 @@ Return Value:
 
 try
 {
-    wil::unique_fd InitFd{open(Target, (O_CREAT | O_WRONLY | O_TRUNC), 0755)};
+    THROW_LAST_ERROR_IF(unlink(Target) < 0 && errno != ENOENT);
+
+    wil::unique_fd InitFd{open(Target, (O_CREAT | O_EXCL | O_WRONLY), 0755)};
     THROW_LAST_ERROR_IF(!InitFd);
 
     THROW_LAST_ERROR_IF(mount(LX_INIT_PATH, Target, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);
