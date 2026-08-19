@@ -7,7 +7,7 @@ parameters:
 - name: pushToStore
   displayName: 'Push the release to the Microsoft Store'
   type: boolean
-  default: false
+  default: true
 
 - name: testVersion
   displayName: 'Test the release pipeline'

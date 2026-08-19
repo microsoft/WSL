@@ -120,5 +120,15 @@ class WSLCE2ESessionEnterTests
             .ExitCode = 1,
         });
     }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ExecutionErrorDoesNotShowHelp)
+    {
+        const auto result = RunWslc(L"--session unsupported system session enter ignored");
+        result.Verify({
+            .Stdout = L"",
+            .Stderr = wsl::shared::Localization::MessageWslcSessionOptionNotSupported() + L"\r\n",
+            .ExitCode = 1,
+        });
+    }
 };
 } // namespace WSLCE2ETests

@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "ExecutionContextData.h"
 #include "Terminal.h"
 #include <optional>
@@ -50,9 +50,8 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     HANDLE CreateCancelEvent();
 
-    // Single chokepoint that turns parsed GlobalArgs into process-wide effects
-    // (debug logging, VT color, ...). Idempotent.
-    void ApplyGlobalOptions();
+    // Applies and freezes environment-only global options before command-line parsing reports errors.
+    void ApplyGlobalEnvironmentOptions();
 };
 
 } // namespace wsl::windows::wslc::execution

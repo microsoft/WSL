@@ -14,14 +14,16 @@ Abstract:
 #pragma once
 #include "Argument.h"
 #include "Exceptions.h"
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
 #include "Terminal.h"
 
+#include <initializer_list>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,6 +32,13 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
+
+enum class HelpOutput
+{
+    Full,
+    Command,
+    Argument,
+};
 
 // The executable name shown in usage/help output, set from argv[0] at startup.
 extern std::wstring s_ExecutableName;
@@ -101,7 +110,11 @@ struct Command
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
-    void OutputHelp(Terminal& terminal, const CommandException* exception = nullptr) const;
+    void OutputHelp(
+        Terminal& terminal,
+        HelpOutput output = HelpOutput::Full,
+        const CommandException* exception = nullptr,
+        std::span<const Argument> relevantArguments = {}) const;
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
 
@@ -127,9 +140,9 @@ struct Command
         ParseArguments(inv, target, GetAllArguments());
     }
 
-    void ValidateArguments(const ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
+    void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
 
-    void ValidateArguments(const ArgMap& source) const
+    void ValidateArguments(ArgMap& source) const
     {
         ValidateArguments(source, GetAllArguments(), true);
     }
@@ -137,8 +150,17 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
-    virtual void ValidateArgumentsInternal(const ArgMap& source) const;
+    // Command-specific validation hook, run after the shared per-argument Argument::Validate pass.
+    // Override to enforce cross-argument rules that per-argument validation cannot express, such as
+    // mutually-exclusive arguments or required argument combinations.
+    //
+    // Contract: this hook enforces relationships between already-validated arguments. It receives a
+    // GetValue/GetAllValues make the selected argument immutable after returning it. Converted
+    // arguments are validated on demand if needed.
+    virtual void ValidateArgumentsInternal(ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
+
+    std::vector<Argument> GetArgumentsForHelp(std::initializer_list<ArgType> types) const;
 
 private:
     std::wstring_view m_name;

@@ -150,7 +150,7 @@ struct ContainerListCommand final : public Command
 
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
-    void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
+    void ValidateArgumentsInternal(ArgMap& execArgs) const override;
 };
 
 // Logs Command

@@ -16,6 +16,7 @@ Abstract:
 #include "SessionService.h"
 #include "SpecParsing.h"
 #include "WarningCallback.h"
+#include <filesystem.hpp>
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <relay.hpp>
@@ -266,7 +267,7 @@ void ImageService::Build(
     std::wstring iidPathStr;
     if (iidFilePath.has_value())
     {
-        iidPathStr = std::filesystem::weakly_canonical(std::filesystem::absolute(*iidFilePath)).wstring();
+        iidPathStr = wsl::windows::common::filesystem::GetCanonicalPath(*iidFilePath).wstring();
     }
 
     WSLCBuildImageOptions options{
@@ -289,7 +290,7 @@ void ImageService::Build(
 }
 
 std::vector<ImageInformation> ImageService::List(
-    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
+    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -299,7 +300,7 @@ std::vector<ImageInformation> ImageService::List(
     }
 
     WSLCListImagesOptions options{};
-    options.Flags = WSLCListImagesFlagsNone;
+    options.Flags = containerCounts ? WSLCListImagesFlagsContainerCounts : WSLCListImagesFlagsNone;
     options.Filters = filterEntries.empty() ? nullptr : filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
@@ -325,6 +326,7 @@ std::vector<ImageInformation> ImageService::List(
         info.Id = image.Hash;
         info.Created = image.Created;
         info.Size = image.Size;
+        info.Containers = image.Containers;
         result.push_back(info);
     }
 

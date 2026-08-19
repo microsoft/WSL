@@ -191,6 +191,11 @@ public:
     IFACEMETHOD(ResizeDistribution)(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Compacts the virtual disk of a distribution.
+    /// </summary>
+    IFACEMETHOD(CompactDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Sets the default distribution.
     /// </summary>
     IFACEMETHOD(SetDefaultDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
@@ -466,6 +471,12 @@ public:
     /// </summary>
     HRESULT
     ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
+
+    /// <summary>
+    /// Compacts the disk of a distribution.
+    /// </summary>
+    HRESULT
+    CompactDistribution(_In_ LPCGUID DistroGuid);
 
     /// <summary>
     /// Sets the default distribution.
@@ -815,6 +826,11 @@ private:
     _Guarded_by_(m_instanceLock) std::unique_ptr<WslCoreVm> m_utilityVm;
 
     std::atomic<GUID> m_vmId{GUID_NULL};
+
+    /// <summary>
+    /// True when the VM termination callback should not perform session cleanup.
+    /// </summary>
+    std::atomic<bool> m_suppressVmTerminationCallback{false};
 
     /// <summary>
     /// Contains the user sid for the session.

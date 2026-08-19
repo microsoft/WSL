@@ -23,6 +23,7 @@ Abstract:
 #include "ExecutionContext.h"
 #include "MsiQuery.h"
 #include <Dbghelp.h>
+#include "WslInstall.h"
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
@@ -1446,10 +1447,20 @@ bool wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled()
 {
     // Note for Windows 11 22H2 and above builds: If hyper-v is installed but VMP platform isn't, HNS and vmcompute are
     // available but calls to HNS will fail if vfpext isn't installed.
-    return wsl::windows::common::helpers::IsServicePresent(L"HNS") &&
-           wsl::windows::common::helpers::IsServicePresent(L"vmcompute") &&
-           (helpers::GetWindowsVersion().BuildNumber < helpers::WindowsBuildNumbers::Nickel ||
-            wsl::windows::common::helpers::IsServicePresent(L"vfpext"));
+    if (!wsl::windows::common::helpers::IsServicePresent(L"HNS") || !wsl::windows::common::helpers::IsServicePresent(L"vmcompute") ||
+        (helpers::GetWindowsVersion().BuildNumber >= helpers::WindowsBuildNumbers::Nickel &&
+         !wsl::windows::common::helpers::IsServicePresent(L"vfpext")))
+    {
+        return false;
+    }
+
+    try
+    {
+        return WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameVmp);
+    }
+    CATCH_LOG()
+
+    return true;
 }
 
 wil::unique_handle wsl::windows::common::wslutil::OpenCallingProcess(_In_ DWORD access)
