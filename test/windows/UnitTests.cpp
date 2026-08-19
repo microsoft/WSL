@@ -3068,8 +3068,8 @@ EOF
         //      break subsequent runs.
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             LxsstuLaunchWsl(
-                L"umount /usr/bin/perf 2>/dev/null; rm -f /usr/bin/perf; ln -snf /usr/src/linux-headers-$(uname -r) "
-                L"/lib/modules/$(uname -r)/build",
+                L"umount /usr/bin/distro-perf 2>/dev/null; rm -f /usr/bin/perf /usr/bin/distro-perf; ln -snf"
+                L" /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build",
                 nullptr,
                 nullptr,
                 nullptr,
@@ -3077,12 +3077,19 @@ EOF
         });
 
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf > /usr/bin/perf", nullptr, nullptr, nullptr, nullptr),
+            LxsstuLaunchWsl(
+                L"rm /lib/modules/$(uname -r)/build && ln -s /tmp /lib/modules/$(uname -r)/build && printf old-perf >"
+                L" /usr/bin/distro-perf && ln -s distro-perf /usr/bin/perf",
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr),
             0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"test \"$(readlink /lib/modules/$(uname -r)/build)\" = \"/usr/src/linux-headers-$(uname -r)\"", nullptr, nullptr, nullptr, nullptr),
             0u);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test \"$(readlink /usr/bin/perf)\" = \"distro-perf\"", nullptr, nullptr, nullptr, nullptr), 0u);
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(
                 L"test \"$(stat -Lc %d:%i /usr/bin/perf)\" = \"$(stat -Lc %d:%i /usr/lib/linux-tools/$(uname -r)/bin/perf)\"", nullptr, nullptr, nullptr, nullptr),

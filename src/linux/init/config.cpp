@@ -1196,12 +1196,13 @@ Return Value:
         //
 
         struct stat existing{};
-        if ((lstat(PERF_BINARY_PATH, &existing) == 0) && S_ISREG(existing.st_mode))
+        if ((stat(PERF_BINARY_PATH, &existing) == 0) && S_ISREG(existing.st_mode))
         {
             const std::string perfBinary = target + "/bin/perf";
-            if (UtilMountFile(perfBinary.c_str(), PERF_BINARY_PATH) < 0)
+            const auto perfMountPoint = std::filesystem::canonical(PERF_BINARY_PATH);
+            if (UtilMountFile(perfBinary.c_str(), perfMountPoint.c_str()) < 0)
             {
-                LOG_ERROR("UtilMountFile({}, {}) failed {}", perfBinary, PERF_BINARY_PATH, errno);
+                LOG_ERROR("UtilMountFile({}, {}) failed {}", perfBinary, perfMountPoint.string(), errno);
             }
         }
     });
