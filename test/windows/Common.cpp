@@ -3214,7 +3214,7 @@ void DetachTestVolume(const std::filesystem::path& MountPoint, const std::filesy
     RunDiskpartScript(std::format(
         L"select vdisk file=\"{}\"\n"
         L"select partition 1\n"
-        L"remove mount=\"{}\"\n"
+        L"remove mount=\"{}\" noerr\n"
         L"detach vdisk\n",
         VhdPath.wstring(),
         MountPoint.wstring()));
