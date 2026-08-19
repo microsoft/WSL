@@ -24,8 +24,8 @@ namespace wsl::windows::common::docker_schema {
 
 using wsl::shared::EmptyObject;
 
-// Reads a value from a docker response, treating both a missing key and an explicit null as absent.
-// Docker reports several empty maps and objects as null, which the default deserializer rejects.
+// Reads a value, treating both a missing key and an explicit null as absent. The daemon reports some
+// empty maps and objects as null, which the default deserializer rejects.
 template <typename T>
 T ValueOrNull(const nlohmann::json& json, const char* key, T defaultValue = T{})
 {
@@ -38,8 +38,7 @@ T ValueOrNull(const nlohmann::json& json, const char* key, T defaultValue = T{})
     return entry->get<T>();
 }
 
-// Converts a docker UTC ISO 8601 timestamp, e.g. "2026-03-05T10:30:00.123456789Z", to seconds since
-// the unix epoch.
+// Converts a UTC ISO 8601 timestamp, e.g. "2026-03-05T10:30:00.123456789Z", to seconds since the unix epoch.
 inline std::uint64_t ParseTimestamp(const std::string& timestamp)
 {
     std::chrono::sys_seconds utcSeconds;

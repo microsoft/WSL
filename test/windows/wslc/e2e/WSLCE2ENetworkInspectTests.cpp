@@ -78,7 +78,7 @@ class WSLCE2ENetworkInspectTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Inspect_PredefinedNetwork)
     {
-        // Docker's predefined networks are not created by wslc but must still be inspectable.
+        // The predefined networks are not created by wslc but must still be inspectable.
         auto result = RunWslc(L"network inspect bridge");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 

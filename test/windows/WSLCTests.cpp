@@ -5422,7 +5422,7 @@ class WSLCTests
 
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
-        // The network must not exist yet. Docker's predefined networks are always listed.
+        // The network must not exist yet. The predefined networks are always listed.
         VERIFY_IS_FALSE(NetworkIsListed(networkName));
 
         WSLCNetworkOptions options{};

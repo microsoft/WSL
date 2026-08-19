@@ -56,8 +56,7 @@ struct PruneNetworksResult
     std::vector<std::string> PrunedNetworks;
 };
 
-// The shape emitted by "network list --format json". Every value is reported as a string, so this is
-// kept separate from the schema type, which mirrors the service's native types.
+// The shape emitted by "network list --format json"; every value is reported as a string.
 struct NetworkOutputInformation
 {
     std::string CreatedAt;

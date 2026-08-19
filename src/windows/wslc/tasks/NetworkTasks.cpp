@@ -32,8 +32,7 @@ namespace wsl::windows::wslc::task {
 
 namespace {
 
-    // Builds the representation of a network, shared by the table and json output so the two cannot
-    // drift. Every value is emitted as a string and the id is truncated unless --no-trunc is passed.
+    // Shared by the table and json output so the two cannot drift. The id is truncated unless --no-trunc is passed.
     NetworkOutputInformation ToNetworkOutput(const wslc_schema::NetworkListEntry& network, bool truncate)
     {
         NetworkOutputInformation entry;
@@ -203,7 +202,7 @@ void ListNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
 
-    // Docker reports networks in name order regardless of how the daemon returns them.
+    // Networks are reported in name order regardless of how the daemon returns them.
     std::ranges::sort(networks, {}, &wslc_schema::NetworkListEntry::Name);
 
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
@@ -232,16 +231,15 @@ void ListNetworks(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        // Docker's table writer gives every column a minimum total width of ten characters,
-        // including the padding that follows it.
-        constexpr size_t c_dockerMinimumColumnWidth = 7;
+        // Every column has a minimum total width of ten characters, including the padding that follows it.
+        constexpr size_t c_minimumColumnWidth = 7;
         auto table = wsl::windows::wslc::TableOutput<4>(
             context.Terminal,
             {L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"},
-            {ColumnWidthConfig{.MinWidth = c_dockerMinimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_dockerMinimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_dockerMinimumColumnWidth},
-             ColumnWidthConfig{.MinWidth = c_dockerMinimumColumnWidth}});
+            {ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
+             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
+             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
+             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth}});
         for (const auto& network : networks)
         {
             const auto entry = ToNetworkOutput(network, trunc);

@@ -223,8 +223,7 @@ struct IPAMConfig
     std::string IPRange;
 };
 
-// Docker omits the gateway and ip range when they were never configured, so they are only emitted
-// when set rather than as empty strings.
+// The gateway and ip range are omitted when unset rather than emitted as empty strings.
 inline void to_json(nlohmann::json& j, const IPAMConfig& config)
 {
     j = nlohmann::json::object();
@@ -295,7 +294,7 @@ struct Network
 };
 
 // The network properties carried from the session to the CLI for "network list". Values keep their
-// native types; the CLI turns them into docker's all-string list output.
+// native types; the CLI renders the string output.
 struct NetworkListEntry
 {
     std::string Id;

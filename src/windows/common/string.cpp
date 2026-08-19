@@ -451,8 +451,7 @@ std::string wsl::windows::common::string::FormatDockerTimestamp(std::string_view
         return {};
     }
 
-    // The number of fractional digits varies per timestamp, so they are captured verbatim and
-    // re-inserted after formatting instead of being parsed.
+    // Fractional digits vary in length, so they are captured verbatim and re-inserted after formatting.
     std::string parsable{timestamp};
     std::string fraction;
     const auto separator = parsable.find('.');
@@ -476,6 +475,6 @@ std::string wsl::windows::common::string::FormatDockerTimestamp(std::string_view
         return std::string{timestamp};
     }
 
-    // Docker reports network timestamps in UTC rather than converting them to the local time zone.
+    // Network timestamps are reported in UTC rather than the local time zone.
     return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }

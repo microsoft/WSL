@@ -172,7 +172,7 @@ class WSLCE2ENetworkListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_List_IncludesPredefinedNetworks)
     {
-        // Docker's predefined networks are not created by wslc but are still reported by list.
+        // The predefined networks are not created by wslc but are still reported by list.
         auto result = RunWslc(L"network list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
