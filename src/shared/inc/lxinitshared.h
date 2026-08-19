@@ -413,6 +413,10 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCGetGuestCapabilitiesResult,
     LxMessageWSLCListDir,
     LxMessageWSLCListDirResult,
+    LxMessageWSLCMountVirtioFs,
+    LxMessageWSLCWriteFile,
+    LxMiniInitMessageTrimDistribution,
+    LxMiniInitMessageTrimDistributionResponse,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -527,6 +531,10 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCGetGuestCapabilitiesResult)
         X(LxMessageWSLCListDir)
         X(LxMessageWSLCListDirResult)
+        X(LxMessageWSLCMountVirtioFs)
+        X(LxMessageWSLCWriteFile)
+        X(LxMiniInitMessageTrimDistribution)
+        X(LxMiniInitMessageTrimDistributionResponse)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1160,10 +1168,11 @@ typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE
     MESSAGE_HEADER Header;
     int Result;
     unsigned int TagOffset;
+    unsigned int ChildNameOffset;
     unsigned int SourceOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(SourceOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(ChildNameOffset), STRING_FIELD(SourceOffset));
 } LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, *PLX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE;
 
 typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE
@@ -1509,6 +1518,26 @@ typedef struct _LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE
     PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun), FIELD(NewSize));
 } LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE, *PLX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE;
 
+typedef struct _LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE
+{
+    static inline auto Type = LxMiniInitMessageTrimDistributionResponse;
+
+    MESSAGE_HEADER Header;
+    uint32_t ResponseCode;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(ResponseCode));
+} LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE, *PLX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE;
+
+typedef struct _LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE
+{
+    static inline auto Type = LxMiniInitMessageTrimDistribution;
+
+    MESSAGE_HEADER Header;
+    unsigned int ScsiLun;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+} LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE, *PLX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE;
+
 struct CREATE_PROCESS_MESSAGE
 {
     static inline auto Type = LxInitCreateProcess;
@@ -1654,6 +1683,25 @@ struct WSLC_MOUNT
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
+};
+
+struct WSLC_MOUNT_VIRTIOFS
+{
+    static inline auto Type = LxMessageWSLCMountVirtioFs;
+    using TResponse = WSLC_MOUNT_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_MOUNT_VIRTIOFS);
+
+    MESSAGE_HEADER Header{};
+    unsigned int SourceIndex{};
+    unsigned int DestinationIndex{};
+    unsigned int TypeIndex{};
+    unsigned int OptionsIndex{};
+    unsigned int Flags{};
+    unsigned int ChildNameIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex), STRING_FIELD(ChildNameIndex));
 };
 
 struct WSLC_EXEC
@@ -1902,6 +1950,24 @@ struct WSLC_GET_GUEST_CAPABILITIES
     MESSAGE_HEADER Header{};
 
     PRETTY_PRINT(FIELD(Header));
+};
+
+struct WSLC_WRITE_FILE
+{
+    static inline auto Type = LxMessageWSLCWriteFile;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(WSLC_WRITE_FILE);
+    MESSAGE_HEADER Header;
+    unsigned int PathIndex;
+    unsigned int ContentIndex;
+    unsigned int ContentLength;
+    int OpenFlags;
+    int Permissions;
+    char Buffer[];
+
+    // Buffer content excluded from PRETTY_PRINT so callers can pass sensitive payloads.
+    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

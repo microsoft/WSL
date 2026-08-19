@@ -2949,6 +2949,59 @@ try
 }
 CATCH_RETURN_ERRNO();
 
+int ProcessTrimDistributionMessage(gsl::span<gsl::byte> Buffer)
+try
+{
+    auto* Message = gslhelpers::try_get_struct<LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE>(Buffer);
+
+    if (!Message)
+    {
+        LOG_ERROR("Unexpected message size {}", Buffer.size());
+        return -1;
+    }
+
+    wil::unique_fd SocketFd{UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true)};
+    if (!SocketFd)
+    {
+        return -1;
+    }
+
+    const int ChildPid = UtilCreateChildProcess(
+        "TrimDistribution", [Message, Channel = wsl::shared::SocketChannel{std::move(SocketFd), "TrimDistribution"}]() mutable {
+            int ResponseCode = -1;
+            auto ReportStatus = wil::scope_exit([&]() {
+                LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE ResponseMessage{};
+                ResponseMessage.ResponseCode = ResponseCode;
+                ResponseMessage.Header.MessageType = LxMiniInitMessageTrimDistributionResponse;
+                ResponseMessage.Header.MessageSize = sizeof(ResponseMessage);
+
+                Channel.SendMessage(ResponseMessage);
+            });
+
+            const auto DevicePath = GetLunDevicePath(Message->ScsiLun);
+
+            //
+            // Run a full offline filesystem check and discard the free blocks so the host can reclaim
+            // them when the VHD is compacted. This mirrors the offline e2fsck used by
+            // ResizeDistribution: it runs on the detached device without mounting it, and '-E discard'
+            // issues the same block-discard requests that 'fstrim' would on a mounted filesystem.
+            //
+            // This is best-effort: a failure here must not prevent compaction, so the child logs the
+            // error but still reports success.
+            //
+            const auto CommandLine = std::format("/usr/sbin/e2fsck -f -y -E discard '{}'", DevicePath);
+            if (UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0)
+            {
+                LOG_WARNING("Failed to trim {}", DevicePath.c_str());
+            }
+
+            ResponseCode = 0;
+        });
+
+    return (ChildPid < 0) ? -1 : 0;
+}
+CATCH_RETURN_ERRNO();
+
 int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
 
 /*++
@@ -3321,6 +3374,13 @@ try
         return 0;
     }
 
+    case LxMiniInitMessageTrimDistribution:
+    {
+
+        ProcessTrimDistributionMessage(Buffer);
+        return 0;
+    }
+
     default:
         LOG_ERROR("Unexpected message type {}", Type);
         return -1;
@@ -3336,7 +3396,12 @@ wil::unique_fd RegisterSeccompHook()
 
 Routine Description:
 
-    Register a seccomp notification for bind() & ioctl(*, TUNSETIFF, *) calls.
+    Register a seccomp notification for bind() & listen() calls (both the native and 32-bit
+    compat ABIs), plus ioctl(*, SIOCSIFFLAGS, *) calls on the native 64-bit ABI only.
+
+    listen() is intercepted in addition to bind() because it can perform an implicit
+    autobind (assigning an ephemeral port) on a socket that was never explicitly bind()'d;
+    that autobind would otherwise be invisible to the port tracker.
 
 Arguments:
 
@@ -3360,11 +3425,13 @@ Return Value:
         // If syscall_arch & __AUDIT_ARCH_64BIT then continue else goto :32bit
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arch),
         // For now, notify on all non-native arch
-        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 7),
+        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 8),
         // If syscall_nr == __NR_bind then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 3, 0),
-        // if (syscall_nr == __NR_bind) then continue else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 4, 0),
+        // if (syscall_nr == __NR_listen) then goto user_notify: else continue
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_listen, 3, 0),
+        // if (syscall_nr == __NR_ioctl) then continue else goto allow:
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_ioctl, 0, 3),
         // if (syscall arg1 == SIOCSIFFLAGS) goto user_notify else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(1)),
@@ -3377,15 +3444,17 @@ Return Value:
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 
     // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND to make bind system call.
+    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls.
 #ifdef __x86_64__
         // 32bit:
         // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 3),
-        // if syscall arg0 == SYS_BIND then goto user_notify: else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 4),
+        // if syscall arg0 == SYS_BIND then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(0)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_BIND, 0, 1),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_BIND, 1, 0),
+        // if syscall arg0 == SYS_LISTEN then continue else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_LISTEN, 0, 1),
         // user_notify:
         //     return SECCOMP_RET_USER_NOTIF;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
@@ -3394,9 +3463,11 @@ Return Value:
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 #else
         // 32bit:
-        // If syscall_nr == __NR_bind then goto user_notify: else goto allow:
+        // If syscall_nr == __NR_bind then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_bind, 0, 1),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_bind, 1, 0),
+        // if (syscall_nr == __NR_listen) then goto user_notify: else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_listen, 0, 1),
         // user_notify:
         //     return SECCOMP_RET_USER_NOTIF;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),

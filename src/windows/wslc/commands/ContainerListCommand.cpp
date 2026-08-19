@@ -29,7 +29,7 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::All),
-        Argument::Create(ArgType::Filter, false, NO_LIMIT),
+        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Last),
         Argument::Create(ArgType::Latest),
@@ -58,11 +58,13 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
 }
 // clang-format on
 
-void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+void ContainerListCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
-    if (execArgs.Contains(ArgType::Last) && execArgs.Contains(ArgType::Latest))
+    if (execArgs.Contains(ArgType::Last) && execArgs.GetValue<ArgType::Latest>())
     {
-        throw CommandException(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"));
+        throw ArgumentException(
+            Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest"),
+            GetArgumentsForHelp({ArgType::Last, ArgType::Latest}));
     }
 }
 } // namespace wsl::windows::wslc

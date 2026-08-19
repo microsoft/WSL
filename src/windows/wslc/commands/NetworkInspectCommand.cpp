@@ -27,7 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::NetworkName, true, NO_LIMIT),
+        Argument::Create(ArgType::NetworkName, true, Limit::Unlimited),
+        Argument::Create(ArgType::InspectFormat),
     };
 }
 

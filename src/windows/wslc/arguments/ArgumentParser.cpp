@@ -75,13 +75,17 @@ void ParseArgumentsStateMachine::ThrowIfError() const
     // If the next argument was to be a value, but none was provided, convert it to an exception.
     else if (m_state.Type() && m_invocationItr == m_invocation.end())
     {
-        throw ArgumentException(Localization::WSLCCLI_MissingArgumentError(m_state.Arg()));
+        const auto* argument = FindArgument(m_state.Type().value());
+        const auto message = Localization::WSLCCLI_MissingArgumentError(m_state.Arg());
+        throw argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
     }
 }
 
 void ParseArgumentsStateMachine::AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const
 {
-    while (itr != m_positionalArgs.end() && (m_executionArgs.Count(itr->Type()) == itr->Limit()))
+    // Skip positionals that are already full. A single-value positional is full once it
+    // holds one value; an unlimited positional is never full.
+    while (itr != m_positionalArgs.end() && itr->IsSingle() && m_executionArgs.Count(itr->Type()) >= 1)
     {
         ++itr;
     }
@@ -120,20 +124,81 @@ bool ParseArgumentsStateMachine::ConsumeOverrideIfPresent(ArgType type)
     return true;
 }
 
-void ParseArgumentsStateMachine::AddFlag(ArgType type)
+void ParseArgumentsStateMachine::ClearArgument(ArgType type)
 {
-    if (!ConsumeOverrideIfPresent(type) && m_executionArgs.Contains(type))
+    // Drop any preloaded overridable default and remove previously parsed entries so the
+    // argument is left absent. This is the single-value/last-wins primitive shared by
+    // SetFlag (which then stores the flag's explicit value) and AddValue (single-value args).
+    ConsumeOverrideIfPresent(type);
+    m_executionArgs.Remove(type);
+}
+
+void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
+{
+    // Boolean flags store their explicit parsed value (true or false) so a flag whose behavior
+    // is on by default can be turned off with "--flag=false". Clearing first collapses CLI
+    // duplicates to a single entry and gives docker's last-wins behavior for repeated flags
+    // (e.g. "--flag --flag=false" ends up false). Read flags back via ArgMap::GetValue(defaultValue), which
+    // folds the presence check and the stored value into one test, rather than a bare Contains().
+    ClearArgument(type);
+    m_executionArgs.Add(type, value);
+}
+
+std::wstring_view ParseArgumentsStateMachine::StripSurroundingQuotes(std::wstring_view value)
+{
+    if (value.length() >= 2 && value.front() == L'"' && value.back() == L'"')
     {
-        // Repeating the same flag on the CLI is a no-op, matching docker.
-        return;
+        value = value.substr(1, value.length() - 2);
     }
 
-    m_executionArgs.Add(type, true);
+    return value;
+}
+
+ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ApplyFlagValue(ArgType type, std::wstring_view value, const std::wstring_view& currArg)
+{
+    const auto unquoted = StripSurroundingQuotes(value);
+    const auto boolVal = string::ParseBool(std::wstring(unquoted).c_str(), /*AllowExtendedForms*/ true);
+    if (!boolVal.has_value())
+    {
+        const auto* argument = FindArgument(type);
+        const auto message = Localization::WSLCCLI_FlagInvalidBooleanError(currArg);
+        return argument != nullptr ? ArgumentException(message, *argument) : ArgumentException(message);
+    }
+
+    SetFlag(type, boolVal.value());
+    return {};
+}
+
+const Argument* ParseArgumentsStateMachine::FindArgument(ArgType type) const
+{
+    for (const auto& arg : m_arguments)
+    {
+        if (arg.Type() == type)
+        {
+            return &arg;
+        }
+    }
+
+    return nullptr;
 }
 
 void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
 {
-    ConsumeOverrideIfPresent(type);
+    const Argument* arg = FindArgument(type);
+    WI_ASSERT(arg != nullptr);
+
+    // Unlimited value args accumulate; single-value args are last-wins. In both cases the
+    // first CLI value must displace a preloaded overridable default, which ClearArgument
+    // (single) and ConsumeOverrideIfPresent (unlimited) each handle.
+    if (arg != nullptr && arg->IsUnlimited())
+    {
+        ConsumeOverrideIfPresent(type);
+    }
+    else
+    {
+        ClearArgument(type);
+    }
+
     m_executionArgs.Add(type, std::move(value));
 }
 
@@ -234,9 +299,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     WI_ASSERT(m_anchorPositional.has_value());
 
     // If we haven't reached the limit for the anchor positional, treat this as another anchor positional.
-    // Anchors with NO_LIMIT will never be full and therefore will always treat subsequent positionals as anchors.
-    if ((m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit()) ||
-        (m_anchorPositional.value().Limit() == NO_LIMIT))
+    // Unlimited anchors are never full and therefore always treat subsequent positionals as anchors.
+    if (m_anchorPositional.value().IsUnlimited() || (m_executionArgs.Count(m_anchorPositional.value().Type()) < 1))
     {
         m_executionArgs.Add(m_anchorPositional.value().Type(), std::wstring{currArg});
         return {};
@@ -334,7 +398,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         if (currArg[currentPos] != WSLC_CLI_ARG_SPLIT_CHAR)
         {
             // There are more characters but it's not '=' - this is invalid
-            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
+            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *firstArg);
         }
 
         // Value is adjoined after '='
@@ -345,22 +409,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
     // Boolean flag - check for adjoined boolean value (e.g., -a=true or -a=false).
     if (currentPos < currArg.length() && currArg[currentPos] == WSLC_CLI_ARG_SPLIT_CHAR)
     {
-        auto boolVal = string::ParseBool(std::wstring(currArg.substr(currentPos + 1)).c_str());
-        if (!boolVal.has_value())
-        {
-            return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
-        }
-
-        if (boolVal.value())
-        {
-            AddFlag(firstArg->Type());
-        }
-
-        return {};
+        return ApplyFlagValue(firstArg->Type(), currArg.substr(currentPos + 1), currArg);
     }
 
     // No adjoined value — add the flag as true.
-    AddFlag(firstArg->Type());
+    SetFlag(firstArg->Type(), true);
 
     // Process remaining adjoined flags
     while (currentPos < currArg.length())
@@ -387,7 +440,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             if (currArg[nextPos] != WSLC_CLI_ARG_SPLIT_CHAR)
             {
                 // There are more characters but it's not '=' - this is invalid
-                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
+                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *nextArg);
             }
 
             // Value is adjoined after '='
@@ -398,21 +451,10 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         // Boolean flag in chain — check for adjoined boolean value.
         if (nextPos < currArg.length() && currArg[nextPos] == WSLC_CLI_ARG_SPLIT_CHAR)
         {
-            auto boolVal = string::ParseBool(std::wstring(currArg.substr(nextPos + 1)).c_str());
-            if (!boolVal.has_value())
-            {
-                return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
-            }
-
-            if (boolVal.value())
-            {
-                AddFlag(nextArg->Type());
-            }
-
-            return {};
+            return ApplyFlagValue(nextArg->Type(), currArg.substr(nextPos + 1), currArg);
         }
 
-        AddFlag(nextArg->Type());
+        SetFlag(nextArg->Type(), true);
         currentPos = nextPos;
     }
 
@@ -463,21 +505,10 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
             {
                 if (hasAdjoinedValue)
                 {
-                    auto boolVal = string::ParseBool(std::wstring(argValue).c_str());
-                    if (!boolVal.has_value())
-                    {
-                        return ArgumentException(Localization::WSLCCLI_FlagInvalidBooleanError(currArg));
-                    }
-
-                    if (boolVal.value())
-                    {
-                        AddFlag(arg.Type());
-                    }
-
-                    return {};
+                    return ApplyFlagValue(arg.Type(), argValue, currArg);
                 }
 
-                AddFlag(arg.Type());
+                SetFlag(arg.Type(), true);
                 return {};
             }
 
@@ -505,11 +536,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
 void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring_view value)
 {
     // If the adjoined value is wrapped in quotes, strip them off.
-    if (value.length() >= 2 && value[0] == '"' && value[value.length() - 1] == '"')
-    {
-        value = value.substr(1, value.length() - 2);
-    }
-
-    AddValue(type, std::wstring{value});
+    AddValue(type, std::wstring{StripSurroundingQuotes(value)});
 }
 } // namespace wsl::windows::wslc

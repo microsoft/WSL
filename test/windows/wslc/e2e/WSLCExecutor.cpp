@@ -21,7 +21,9 @@ Abstract:
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
-using namespace wsl::windows::common;
+
+namespace wslutil = wsl::windows::common::wslutil;
+using wsl::windows::common::SubProcess;
 
 namespace {
     wil::unique_handle GetNonElevatedPrimaryToken()

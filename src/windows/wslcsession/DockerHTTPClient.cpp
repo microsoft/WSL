@@ -56,6 +56,16 @@ bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_typ
 
 } // namespace
 
+std::string wsl::windows::service::wslc::FormatDockerEngineError(const std::string& EngineMessage)
+{
+    if (EngineMessage.empty() || wsl::shared::Localization::IsCurrentLanguageEnglish())
+    {
+        return EngineMessage;
+    }
+
+    return wsl::shared::string::WideToMultiByte(wsl::shared::Localization::MessageWslcDockerEngineErrorPrefix()) + " " + EngineMessage;
+}
+
 DockerHTTPClient::URL::URL(std::string&& Path) : m_path(std::move(Path))
 {
 }
@@ -125,8 +135,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
     auto url = URL::Create("/images/create");
 
     // Normalize the repo server & path
-    auto [server, path] = wslutil::NormalizeRepo(Repo);
-    url.SetParameter("fromImage", std::format("{}/{}", server, path));
+    url.SetParameter("fromImage", wslutil::RepositoryReference::Parse(Repo).GetCanonical());
 
     if (tagOrDigest.has_value())
     {
@@ -484,9 +493,16 @@ void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& Network
     Transaction(verb::post, URL::Create("/networks/{}/disconnect", NetworkName), Request);
 }
 
-std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
+std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks(const std::map<std::string, std::vector<std::string>>& filters)
 {
-    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
+    auto url = URL::Create("/networks");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, url);
 }
 
 docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)

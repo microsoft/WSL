@@ -99,6 +99,50 @@ class WSLCE2EInspectTests
         result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", DebianImage.NameAndTag()), .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_FormatJson_IsSingleLine)
+    {
+        // The whole array is emitted on one compact line.
+        auto result = RunWslc(std::format(L"inspect --format json {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_IS_TRUE(document.is_array());
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), document[0]["RepoTags"][0].get<std::string>());
+
+        // The compact rendering must not contain the pretty-printer's indentation.
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"\n  "));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_DefaultFormat_IsIndented)
+    {
+        // Without --format the array stays indented over several lines.
+        auto result = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_GREATER_THAN(result.GetStdoutLines().size(), 1u);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_InvalidFormatOption)
+    {
+        auto result = RunWslc(std::format(L"inspect --format invalid {}", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json."));
+
+        // json is the only rendering the inspect family has; `table` belongs to the list commands.
+        auto tableResult = RunWslc(std::format(L"inspect --format table {}", DebianImage.NameAndTag()));
+        tableResult.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(tableResult.StderrContainsSubstring(
+            L"Invalid format value: table is not a recognized format type. Supported format types are: json."));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_FormatJson_ObjectNotFound)
+    {
+        // An empty array is already compact, so both formats agree on "[]".
+        auto result = RunWslc(std::format(L"inspect --format json {}", InvalidImage.NameAndTag()));
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_Success)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
@@ -111,6 +155,53 @@ class WSLCE2EInspectTests
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         VERIFY_ARE_EQUAL(WslcContainerName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+
+        // Config.Labels must be present in the emitted JSON even when empty.
+        auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
+        VERIFY_IS_TRUE(json.is_array() && !json.empty());
+        VERIFY_IS_TRUE(json[0].contains("Config") && json[0]["Config"].contains("Labels"));
+        VERIFY_IS_TRUE(json[0]["Config"].contains("Image"));
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), json[0]["Config"]["Image"].get<std::string>());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_InheritsImageLabels)
+    {
+        auto imageCleanup = wil::scope_exit([&]() { EnsureImageIsDeleted(LabelInheritImage); });
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-inspect-inherit-labels";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFileContent(
+            dockerfilePath,
+            "FROM debian:latest\n"
+            "LABEL com.microsoft.wsl.test.inherit-me=from-image\n"
+            "CMD [\"echo\", \"ok\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), LabelInheritImage.NameAndTag()));
+        buildResult.Verify({.Stdout = L"", .ExitCode = 0});
+
+        EnsureContainerDoesNotExist(WslcContainerName);
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, LabelInheritImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto result = RunWslc(std::format(L"inspect {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+
+        const auto& configLabels = inspectData[0].Config.Labels;
+        auto inheritedIt = configLabels.find("com.microsoft.wsl.test.inherit-me");
+        VERIFY_IS_TRUE(inheritedIt != configLabels.end());
+        VERIFY_ARE_EQUAL(std::string("from-image"), inheritedIt->second);
+
+        VERIFY_IS_TRUE(configLabels.find("com.microsoft.wsl.container.metadata") == configLabels.end());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Volume_Success)
@@ -318,5 +409,6 @@ private:
     const TestImage& InvalidImage = InvalidTestImage();
     const std::wstring WslcVolumeName = L"wslc-inspect-test-volume";
     const std::wstring WslcNetworkName = L"wslc-inspect-test-network";
+    const TestImage LabelInheritImage{L"wslc-e2e-inspect-inherit-labels", L"latest", L""};
 };
 } // namespace WSLCE2ETests

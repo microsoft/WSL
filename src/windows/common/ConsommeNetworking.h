@@ -27,9 +27,9 @@ public:
         GnsChannel&& gnsChannel,
         ConsommeNetworkingFlags flags,
         LPCWSTR dnsOptions,
+        LPCSTR hostLoopback,
         std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-        wil::shared_handle userToken,
-        std::wstring swiotlbConfig);
+        wil::shared_handle userToken);
 
     ~ConsommeNetworking() override;
 
@@ -56,6 +56,7 @@ private:
     uint16_t ModifyOpenPorts(
         _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();
+    void SetupHostLoopback();
     void SetupLoopbackDevice();
     void SendDefaultRoute(const std::wstring& gateway, wsl::shared::hns::ModifyRequestType requestType);
     void SendIpv6Address(const networking::EndpointIpAddress& ipAddress, wsl::shared::hns::ModifyRequestType requestType);
@@ -74,12 +75,13 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     ConsommeNetworkingFlags m_flags = ConsommeNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
-    std::wstring m_swiotlbOption;
+    std::string m_hostLoopback;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
+    std::optional<WslVirtioNetConfig> m_virtioNetConfig;
+    std::vector<IpAddress> m_virtioNetNameservers;
 
     ULONG m_networkMtu = 0;
-    std::wstring m_trackedDeviceOptions;
     networking::EndpointIpAddress m_trackedIpv4Address{};
     networking::EndpointIpAddress m_trackedIpv6Address{};
     std::wstring m_trackedDefaultRoute;

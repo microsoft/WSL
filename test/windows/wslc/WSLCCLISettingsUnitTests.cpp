@@ -122,6 +122,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -150,6 +151,22 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(4096u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(20000u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    TEST_METHOD(LoadSettings_StorageSizeFormats_YieldExpectedValues)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  memorySize: \" 1.5GiB\"\n"
+            "  maxStorageSize: 20.5GB\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(1536u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(20992u, s.Get<Setting::SessionStorageSizeMb>());
     }
 
     // An empty settings file is valid YAML (null document) but not a mapping;
@@ -235,6 +252,39 @@ class WSLCCLISettingsUnitTests
             s.GetWarnings().front().Message);
     }
 
+    TEST_METHOD(Validation_MemoryMb_Limits_AreEnforced)
+    {
+        struct TestCase
+        {
+            std::string Value;
+            uint32_t Expected;
+            bool IsValid;
+        };
+
+        const std::vector<TestCase> TestCases{
+            {"0.5MiB", 0, false},
+            {"4294967295MiB", std::numeric_limits<uint32_t>::max(), true},
+            {"4294967296MiB", 0, false},
+        };
+
+        for (const auto& TestCase : TestCases)
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  memorySize: {}\n", TestCase.Value));
+
+            UserSettingsTest s{dir};
+
+            VERIFY_ARE_EQUAL(TestCase.Expected, s.Get<Setting::SessionMemoryMb>());
+            VERIFY_ARE_EQUAL(TestCase.IsValid ? 0u : 1u, s.GetWarnings().size());
+            if (!TestCase.IsValid)
+            {
+                VERIFY_ARE_EQUAL(
+                    Loc::WSLCUserSettings_Warning_InvalidValue(L"session.memorySize", s.SettingsFilePath().wstring(), 2),
+                    s.GetWarnings().front().Message);
+            }
+        }
+    }
+
     // maxStorageSize: 0 must be rejected; the default is used.
     TEST_METHOD(Validation_StorageSizeMb_Zero_UsesDefaultAndWarns)
     {
@@ -294,6 +344,7 @@ class WSLCCLISettingsUnitTests
             "  networkingMode: default\n"
             "  hostFileShareMode: default\n"
             "  dnsTunneling: default\n"
+            "  hostLoopback: default\n"
             "experimental:\n"
             "  portRelay: default\n"
             "credentialStore: default\n");
@@ -308,6 +359,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeConsomme), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
         VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
+        VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
         VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::VirtioNet), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
@@ -546,6 +598,32 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::WslRelay), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
+    }
+
+    // -----------------------------------------------------------------------
+    // session.hostLoopback
+    // -----------------------------------------------------------------------
+
+    TEST_METHOD(Validation_HostLoopback_CustomName)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  hostLoopback: host.containers.internal\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("host.containers.internal"), s.Get<Setting::SessionHostLoopback>());
+    }
+
+    TEST_METHOD(Validation_HostLoopback_NoneDisablesEntry)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  hostLoopback: none\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
     }
 
     // -----------------------------------------------------------------------

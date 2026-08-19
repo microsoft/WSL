@@ -26,7 +26,11 @@ Abstract:
     if ((_Ex).HasErrorMessage()) \
     { \
         THROW_HR_WITH_USER_ERROR_MSG( \
-            (_Ex).HResultFromStatusCode(), (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
+            (_Ex).HResultFromStatusCode(), \
+            wsl::windows::service::wslc::FormatDockerEngineError( \
+                (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message), \
+            _Msg, \
+            ##__VA_ARGS__); \
     } \
     else \
     { \
@@ -40,6 +44,8 @@ Abstract:
     }
 
 namespace wsl::windows::service::wslc {
+
+std::string FormatDockerEngineError(const std::string& EngineMessage);
 
 class DockerHTTPException : public std::runtime_error
 {
@@ -151,7 +157,7 @@ public:
     // Network management.
     common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
     void RemoveNetwork(const std::string& Name);
-    std::vector<common::docker_schema::Network> ListNetworks();
+    std::vector<common::docker_schema::Network> ListNetworks(const std::map<std::string, std::vector<std::string>>& filters = {});
     common::docker_schema::Network InspectNetwork(const std::string& Name);
     void ConnectContainerToNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);
     void DisconnectContainerFromNetwork(const std::string& NetworkName, const common::docker_schema::ContainerNetworkRequest& Request);
