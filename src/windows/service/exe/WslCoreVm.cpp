@@ -2133,7 +2133,7 @@ WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
 void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 {
     // Construct the mini_init message.
-    LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE message;
+    LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageWaitForPmemDevice;
     message.Header.MessageSize = sizeof(message);
     message.PmemId = PmemId;
@@ -2469,7 +2469,7 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
 {
     auto lock = m_lock.lock_exclusive();
 
-    LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message;
+    LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageResizeDistribution;
     message.ScsiLun = Lun;
@@ -2494,7 +2494,7 @@ void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
 {
     auto lock = m_lock.lock_exclusive();
 
-    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message;
+    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageTrimDistribution;
     message.ScsiLun = Lun;
@@ -2566,7 +2566,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     }
 
     // Tell the guest to flush its IO caches and stop using the disk.
-    LX_MINI_INIT_DETACH_MESSAGE message;
+    LX_MINI_INIT_DETACH_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageDetach;
     message.Header.MessageSize = sizeof(message);
     message.ScsiLun = State.Lun;

@@ -105,6 +105,18 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
+    if (options.IpAddress.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        containerLauncher.SetPrimaryNetworkIpAddress(std::string(options.IpAddress.value()));
+    }
+
     if (!options.Networks.empty())
     {
         const auto& primary = options.Networks.front();
@@ -294,49 +306,65 @@ std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
         return L"";
     }
 
+    return FormatElapsedSeconds(static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp));
+}
+
+std::wstring ContainerService::FormatElapsedSeconds(LONGLONG elapsedSeconds)
+{
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
-    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
-    constexpr LONGLONG SecondsPerWeek = SecondsPerDay * 7;
-    constexpr LONGLONG SecondsPerMonth = SecondsPerDay * 30;
-    constexpr LONGLONG SecondsPerYear = SecondsPerDay * 365;
+    constexpr LONGLONG HoursPerDay = 24;
+    constexpr LONGLONG MinutesPerHour = 60;
 
-    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
-    if (elapsed < 0)
-    {
-        elapsed = 0;
-    }
+    const auto elapsed = std::max<LONGLONG>(elapsedSeconds, 0);
 
-    auto pluralize = [](LONGLONG count, const wchar_t* singular, const wchar_t* plural) {
-        return std::format(L"{} {} ago", count, (count == 1 ? singular : plural));
-    };
-
-    if (elapsed < SecondsPerMinute)
+    if (elapsed < 1)
     {
-        return pluralize(elapsed, L"second", L"seconds");
+        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
     }
-    else if (elapsed < SecondsPerHour)
+    else if (elapsed == 1)
     {
-        return pluralize(elapsed / SecondsPerMinute, L"minute", L"minutes");
+        return Localization::WSLCCLI_RelativeTimeOneSecond();
     }
-    else if (elapsed < SecondsPerDay)
+    else if (elapsed < SecondsPerMinute)
     {
-        return pluralize(elapsed / SecondsPerHour, L"hour", L"hours");
-    }
-    else if (elapsed < SecondsPerWeek)
-    {
-        return pluralize(elapsed / SecondsPerDay, L"day", L"days");
-    }
-    else if (elapsed < SecondsPerMonth)
-    {
-        return pluralize(elapsed / SecondsPerWeek, L"week", L"weeks");
-    }
-    else if (elapsed < SecondsPerYear)
-    {
-        return pluralize(elapsed / SecondsPerMonth, L"month", L"months");
+        return Localization::WSLCCLI_RelativeTimeSeconds(elapsed);
     }
 
-    return pluralize(elapsed / SecondsPerYear, L"year", L"years");
+    const auto minutes = elapsed / SecondsPerMinute;
+    if (minutes == 1)
+    {
+        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
+    }
+    else if (minutes < MinutesPerHour)
+    {
+        return Localization::WSLCCLI_RelativeTimeMinutes(minutes);
+    }
+
+    // Rounded to the nearest hour rather than truncated.
+    const auto hours = (elapsed + (SecondsPerHour / 2)) / SecondsPerHour;
+    if (hours == 1)
+    {
+        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
+    }
+    else if (hours < HoursPerDay * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeHours(hours);
+    }
+    else if (hours < HoursPerDay * 7 * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeDays(hours / HoursPerDay);
+    }
+    else if (hours < HoursPerDay * 30 * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeWeeks(hours / HoursPerDay / 7);
+    }
+    else if (hours < HoursPerDay * 365 * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeMonths(hours / HoursPerDay / 30);
+    }
+
+    return Localization::WSLCCLI_RelativeTimeYears(elapsed / SecondsPerHour / HoursPerDay / 365);
 }
 
 int ContainerService::Attach(Terminal& terminal, Session& session, const std::string& id)

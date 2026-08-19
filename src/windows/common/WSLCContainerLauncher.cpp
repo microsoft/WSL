@@ -336,6 +336,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddPrimaryNetworkAlias(const s
     m_primaryNetworkAliases.push_back(Alias);
 }
 
+void wsl::windows::common::WSLCContainerLauncher::SetPrimaryNetworkIpAddress(std::string&& Address)
+{
+    m_primaryNetworkIpAddress = std::move(Address);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(
     IWSLCSession& Session, WSLCContainerStartFlags Flags, IWarningCallback* WarningCallback)
 {
@@ -485,12 +490,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
 
-    // Aliases for the primary endpoint.
+    // Settings for the primary endpoint.
     std::vector<KeyValuePair> primarySettings;
-    primarySettings.reserve(m_primaryNetworkAliases.size());
+    primarySettings.reserve(m_primaryNetworkAliases.size() + (m_primaryNetworkIpAddress.has_value() ? 1 : 0));
     for (const auto& alias : m_primaryNetworkAliases)
     {
         primarySettings.push_back({.Key = "Aliases", .Value = alias.c_str()});
+    }
+
+    if (m_primaryNetworkIpAddress.has_value())
+    {
+        primarySettings.push_back({.Key = "IPAddress", .Value = m_primaryNetworkIpAddress->c_str()});
     }
 
     options.ContainerNetwork.Settings = primarySettings.empty() ? nullptr : primarySettings.data();
