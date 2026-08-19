@@ -67,6 +67,7 @@ public:
     void AddAdditionalNetwork(const std::string& Name);
     void AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases);
     void AddPrimaryNetworkAlias(const std::string& Alias);
+    void SetPrimaryNetworkIpAddress(std::string&& Address);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
     RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
@@ -133,6 +134,7 @@ private:
     std::vector<std::string> m_dnsOptions;
     std::vector<NetworkConnection> m_additionalNetworks;
     std::vector<std::string> m_primaryNetworkAliases;
+    std::optional<std::string> m_primaryNetworkIpAddress;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;

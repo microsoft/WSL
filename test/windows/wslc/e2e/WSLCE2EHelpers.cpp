@@ -210,7 +210,7 @@ void VerifyImageIsListed(const TestImage& image)
 {
     auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
     for (const auto& img : images)
     {
         if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
@@ -387,7 +387,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
     for (const auto& img : images)
     {
         if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
@@ -406,16 +406,16 @@ void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
     auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
     const auto prefix = wsl::shared::string::WideToMultiByte(repositoryPrefix);
     for (const auto& image : images)
     {
-        if (image.Repository && image.Tag && image.Repository->starts_with(prefix))
+        if (image.Repository.starts_with(prefix))
         {
             // No container cleanup here: the images this prunes are only ever built and inspected, never used to
             // create containers, so image delete --force is sufficient. If a future test containerizes a built
             // image, remove its container in that test's cleanup rather than broadening this prefix-based safety net.
-            const auto nameAndTag = wsl::shared::string::MultiByteToWide(std::format("{}:{}", *image.Repository, *image.Tag));
+            const auto nameAndTag = wsl::shared::string::MultiByteToWide(std::format("{}:{}", image.Repository, image.Tag));
             RunWslc(std::format(L"image delete --force {}", nameAndTag)).Verify({.Stderr = L"", .ExitCode = 0});
         }
     }
@@ -423,14 +423,14 @@ void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
 
 void EnsureNoUntaggedImages()
 {
-    auto result = RunWslc(L"image list --format json --filter dangling=true");
+    auto result = RunWslc(L"image list --format json --no-trunc --filter dangling=true");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    const auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
 
     for (const auto& image : images)
     {
-        const auto id = wsl::shared::string::MultiByteToWide(GetHashId(image.Id, true));
+        const auto id = wsl::shared::string::MultiByteToWide(GetHashId(image.ID, true));
         auto deleteResult = RunWslc(std::format(L"image delete --force {}", id));
 
         // Tolerate WSLC_E_IMAGE_NOT_FOUND - an untagged image may already be gone if it was a
@@ -454,7 +454,7 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
     auto result = RunWslc(listCommand);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
-    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
     for (const auto& img : images)
     {
         if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&

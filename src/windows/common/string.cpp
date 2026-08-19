@@ -400,6 +400,21 @@ std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
     return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
 }
 
+std::wstring wsl::windows::common::string::FormatDockerSize(uint64_t Bytes)
+{
+    constexpr std::wstring_view c_units[] = {L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
+
+    auto value = static_cast<double>(Bytes);
+    size_t unitIndex = 0;
+    while (value >= 1000.0 && unitIndex + 1 < std::size(c_units))
+    {
+        value /= 1000.0;
+        unitIndex++;
+    }
+
+    return std::format(L"{:.3g}{}", value, c_units[unitIndex]);
+}
+
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
 {
     return TruncateIdImpl(id, shortenLength);
@@ -408,4 +423,22 @@ std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id,
 std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, bool shortenLength)
 {
     return TruncateIdImpl(id, shortenLength);
+}
+
+std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timestamp)
+{
+    const auto time =
+        std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
+
+    try
+    {
+        const auto* zone = std::chrono::current_zone();
+        return std::format("{:%F %T %z} {}", std::chrono::zoned_time{zone, time}, zone->get_info(time).abbrev);
+    }
+    catch (...)
+    {
+        // The time zone database is unavailable, so report UTC rather than failing the caller.
+        LOG_CAUGHT_EXCEPTION();
+        return std::format("{:%F %T} +0000 UTC", time);
+    }
 }

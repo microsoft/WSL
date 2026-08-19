@@ -1041,6 +1041,88 @@ class WSLCE2EContainerRunTests
             result.StderrContainsSubstring(L"Invalid network-alias value: network alias cannot be empty or whitespace"));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ip_Success)
+    {
+        const std::wstring subnet = L"172.73.0.0/16";
+        const std::wstring ipAddress = L"172.73.0.42";
+
+        auto result = RunWslc(std::format(L"network create --driver bridge --subnet {} {}", subnet, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container run -d --name {} --network {} --ip {} {} sleep infinity",
+            WslcContainerName,
+            TestNetworkName,
+            ipAddress,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        // Registered after the network so it runs first; the network cannot be deleted while the container holds an endpoint.
+        auto cleanupContainer = wil::scope_exit([&] { EnsureContainerDoesNotExist(WslcContainerName); });
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        const auto networkName = wsl::shared::string::WideToMultiByte(TestNetworkName);
+        const auto expectedIp = wsl::shared::string::WideToMultiByte(ipAddress);
+        VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+        const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+        VERIFY_ARE_EQUAL(expectedIp, endpoint.IPAddress);
+        VERIFY_IS_TRUE(endpoint.IPAMConfig.has_value());
+        VERIFY_ARE_EQUAL(expectedIp, endpoint.IPAMConfig->IPv4Address);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ip_NoNetwork_Rejected)
+    {
+        const std::wstring ipAddress = L"172.73.0.42";
+
+        auto result =
+            RunWslc(std::format(L"container run --rm --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+             .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ip_BridgeMode_Rejected)
+    {
+        const std::wstring ipAddress = L"172.73.0.42";
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --network bridge --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+             .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ip_MultipleNetworks_Rejected)
+    {
+        const std::wstring ipAddress = L"172.73.0.42";
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --network bridge --network bridge --ip {} --name {} {} true",
+            ipAddress,
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            wsl::shared::Localization::MessageWslcIpAmbiguousWithMultipleNetworks() + L"\r\nError code: E_INVALIDARG"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Ip_InvalidValue_Rejected)
+    {
+        const std::wstring badIp = L"not-an-ip";
+
+        auto result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto cleanupNetwork = wil::scope_exit([&] { EnsureNetworkDoesNotExist(TestNetworkName); });
+
+        result = RunWslc(std::format(
+            L"container run --rm --network {} --ip {} --name {} {} true", TestNetworkName, badIp, WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VerifyPatternMatch(
+            wsl::shared::string::WideToMultiByte(result.Stderr.value()),
+            std::format("*Invalid IP address '{}'*", wsl::shared::string::WideToMultiByte(badIp)));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume

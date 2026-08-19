@@ -8355,6 +8355,44 @@ class WSLCTests
             VERIFY_ARE_EQUAL(driverOptValue, opt->second);
         }
 
+        // Launcher-driven pinned IP alongside an alias — both settings survive the same KVP batch.
+        {
+            const std::string networkName = "alias-net-ip";
+            const std::string ipAddress = "172.67.0.42";
+            const std::string alias = "db";
+            createNetwork(networkName, "172.67.0.0/16");
+            auto netCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            WSLCContainerLauncher launcher("debian:latest", "alias-ctr-ip", {"sleep", "99999"}, {}, networkName);
+            launcher.AddPrimaryNetworkAlias(alias);
+            launcher.SetPrimaryNetworkIpAddress(std::string(ipAddress));
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.NetworkSettings.Networks.contains(networkName));
+            const auto& endpoint = inspect.NetworkSettings.Networks.at(networkName);
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAddress);
+            VERIFY_IS_TRUE(endpoint.IPAMConfig.has_value());
+            VERIFY_ARE_EQUAL(ipAddress, endpoint.IPAMConfig->IPv4Address);
+            VERIFY_IS_TRUE(std::ranges::find(endpoint.Aliases, alias) != endpoint.Aliases.end());
+        }
+
+        // Pinned IP outside a user-defined network — rejected for callers that bypass the CLI checks.
+        {
+            auto expectEndpointSettingsError = [&](const std::string& containerName, const std::string& networkMode) {
+                WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, networkMode);
+                launcher.SetPrimaryNetworkIpAddress("172.67.0.42");
+
+                auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
+                VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+                ValidateCOMErrorMessage(std::format(
+                    L"Endpoint settings are not supported for network mode '{}'.", std::wstring(networkMode.begin(), networkMode.end())));
+            };
+
+            expectEndpointSettingsError("alias-ctr-ip-host", "host");
+            expectEndpointSettingsError("alias-ctr-ip-none", "none");
+        }
+
         // Primary endpoint Links: launch a target container with an alias, then a source with --link at create time.
         {
             const std::string networkName = "alias-net-link";

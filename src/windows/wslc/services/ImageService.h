@@ -62,8 +62,12 @@ public:
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);
 
+    // Container counts are only gathered when requested: it costs an extra query, and the service
+    // computes it alongside the image list so the two are consistent.
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(
-        wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
+        wsl::windows::wslc::models::Session& session,
+        const std::vector<std::pair<std::string, std::string>>& filters = {},
+        bool containerCounts = false);
     static void Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback = nullptr);
     static std::string Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
