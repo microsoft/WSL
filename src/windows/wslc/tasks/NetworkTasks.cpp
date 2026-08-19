@@ -36,7 +36,7 @@ namespace {
     NetworkOutputInformation ToNetworkOutput(const wslc_schema::NetworkListEntry& network, bool truncate)
     {
         NetworkOutputInformation entry;
-        entry.CreatedAt = FormatDockerTimestamp(network.Created);
+        entry.CreatedAt = Rfc3339ToUtcDisplayTime(network.Created);
         entry.Driver = network.Driver;
         entry.ID = TruncateId(network.Id, truncate);
         entry.IPv4 = network.EnableIPv4 ? "true" : "false";

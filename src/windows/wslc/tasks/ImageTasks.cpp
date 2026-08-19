@@ -82,7 +82,7 @@ namespace {
         ImageOutputInformation entry;
         entry.Containers = image.Containers < 0 ? std::string{c_notAvailable} : std::to_string(image.Containers);
 
-        entry.CreatedAt = FormatDockerTimestamp(image.Created);
+        entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
         entry.CreatedSince =
             WideToMultiByte(ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0));
         entry.Digest = c_none;

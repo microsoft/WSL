@@ -17,8 +17,6 @@ Abstract:
 #pragma once
 
 #include "JsonUtils.h"
-#include <chrono>
-#include <sstream>
 
 namespace wsl::windows::common::docker_schema {
 
@@ -36,17 +34,6 @@ T ValueOrNull(const nlohmann::json& json, const char* key, T defaultValue = T{})
     }
 
     return entry->get<T>();
-}
-
-// Converts a UTC ISO 8601 timestamp, e.g. "2026-03-05T10:30:00.123456789Z", to seconds since the unix epoch.
-inline std::uint64_t ParseTimestamp(const std::string& timestamp)
-{
-    std::chrono::sys_seconds utcSeconds;
-    std::istringstream stream(timestamp);
-    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
-    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
-
-    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
 }
 
 struct CreatedContainer

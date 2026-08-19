@@ -426,7 +426,17 @@ std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, b
     return TruncateIdImpl(id, shortenLength);
 }
 
-std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timestamp)
+std::uint64_t wsl::windows::common::string::Rfc3339ToEpoch(const std::string& timestamp)
+{
+    std::chrono::sys_seconds utcSeconds;
+    std::istringstream stream(timestamp);
+    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
+    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
+
+    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
+}
+
+std::string wsl::windows::common::string::EpochToLocalDisplayTime(LONGLONG timestamp)
 {
     const auto time =
         std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
@@ -444,7 +454,7 @@ std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timesta
     }
 }
 
-std::string wsl::windows::common::string::FormatDockerTimestamp(std::string_view timestamp)
+std::string wsl::windows::common::string::Rfc3339ToUtcDisplayTime(std::string_view timestamp)
 {
     if (timestamp.empty())
     {
