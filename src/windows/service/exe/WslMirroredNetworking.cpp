@@ -1396,9 +1396,10 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             std::optional<HRESULT> hr{};
             switch (trackedRoute.SyncStatus)
             {
-            // For routes, an Add and an Update resolve to the same guest netlink operation
-            // (RTM_NEWROUTE | NLM_F_CREATE, with EEXIST ignored), so a single Add is sufficient to plumb
-            // a new route or re-assert an existing one.
+            // Use Add rather than Update to (re-)assert routes. An Update replaces by
+            // (destination prefix, tos, metric) key alone and would silently overwrite a same-key route
+            // belonging to a *different* interface (e.g. another interface's default at the same metric).
+            // A create plumbs a new route or leaves an existing one in place (EEXIST is ignored).
             case PendingAdd:
             case PendingUpdate:
                 hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
