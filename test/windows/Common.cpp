@@ -3167,47 +3167,44 @@ static void RunDiskpartScript(std::wstring_view Script)
 
 void AttachTestVolume(const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath)
 {
-    RunDiskpartScript(
-        std::format(
-            L"select vdisk file=\"{}\"\n"
-            L"attach vdisk\n"
-            L"select partition 1\n"
-            L"assign mount=\"{}\"\n",
-            VhdPath.wstring(),
-            MountPoint.wstring()));
+    RunDiskpartScript(std::format(
+        L"select vdisk file=\"{}\"\n"
+        L"attach vdisk\n"
+        L"select partition 1\n"
+        L"assign mount=\"{}\"\n",
+        VhdPath.wstring(),
+        MountPoint.wstring()));
 }
 
 void CreateTestVolume(_In_ PCWSTR FileSystem, _In_ ULONG MaxSizeInMb, const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath)
 {
     THROW_LAST_ERROR_IF(!CreateDirectoryW(MountPoint.c_str(), nullptr));
 
-    RunDiskpartScript(
-        std::format(
-            L"create vdisk file=\"{}\" maximum={} type=expandable\n"
-            L"select vdisk file=\"{}\"\n"
-            L"attach vdisk\n"
-            L"create partition primary\n"
-            L"select partition 1\n"
-            L"online volume\n"
-            L"format fs={} quick\n"
-            L"assign mount=\"{}\"\n",
-            VhdPath.wstring(),
-            MaxSizeInMb,
-            VhdPath.wstring(),
-            FileSystem,
-            MountPoint.wstring()));
+    RunDiskpartScript(std::format(
+        L"create vdisk file=\"{}\" maximum={} type=expandable\n"
+        L"select vdisk file=\"{}\"\n"
+        L"attach vdisk\n"
+        L"create partition primary\n"
+        L"select partition 1\n"
+        L"online volume\n"
+        L"format fs={} quick\n"
+        L"assign mount=\"{}\"\n",
+        VhdPath.wstring(),
+        MaxSizeInMb,
+        VhdPath.wstring(),
+        FileSystem,
+        MountPoint.wstring()));
 }
 
 void DeleteTestVolume(const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath)
 {
-    RunDiskpartScript(
-        std::format(
-            L"select vdisk file=\"{}\"\n"
-            L"attach vdisk noerr\n"
-            L"select partition 1\n"
-            L"remove all noerr\n"
-            L"detach vdisk noerr\n",
-            VhdPath.wstring()));
+    RunDiskpartScript(std::format(
+        L"select vdisk file=\"{}\"\n"
+        L"attach vdisk noerr\n"
+        L"select partition 1\n"
+        L"remove all noerr\n"
+        L"detach vdisk noerr\n",
+        VhdPath.wstring()));
 
     RemoveDirectoryW(MountPoint.c_str());
     DeleteFileW(VhdPath.c_str());
@@ -3215,12 +3212,11 @@ void DeleteTestVolume(const std::filesystem::path& MountPoint, const std::filesy
 
 void DetachTestVolume(const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath)
 {
-    RunDiskpartScript(
-        std::format(
-            L"select vdisk file=\"{}\"\n"
-            L"select partition 1\n"
-            L"remove mount=\"{}\"\n"
-            L"detach vdisk\n",
-            VhdPath.wstring(),
-            MountPoint.wstring()));
+    RunDiskpartScript(std::format(
+        L"select vdisk file=\"{}\"\n"
+        L"select partition 1\n"
+        L"remove mount=\"{}\"\n"
+        L"detach vdisk\n",
+        VhdPath.wstring(),
+        MountPoint.wstring()));
 }
