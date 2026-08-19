@@ -1503,7 +1503,7 @@ class UnitTests
                     L"-d DummyBrokenDistro",
                     L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
                     L"specified. ",
-                    L"Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND");
+                    L"Wsl/Service/CreateInstance/MountDisk/ERROR_PATH_NOT_FOUND");
 
                 // Purposefully set an incorrect value type to validate registry error handling.
                 wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"Version", L"Broken");
