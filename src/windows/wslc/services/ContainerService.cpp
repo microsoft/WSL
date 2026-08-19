@@ -459,6 +459,11 @@ std::wstring ContainerService::FormatCommand(const std::string& command, bool tr
         size_t cutoff = 0;
         for (; index < wide.size(); ++codePoints)
         {
+            if (codePoints > c_maxDisplayWidth)
+            {
+                break;
+            }
+
             if (codePoints == c_maxDisplayWidth - 1)
             {
                 cutoff = index;
@@ -474,6 +479,8 @@ std::wstring ContainerService::FormatCommand(const std::string& command, bool tr
         }
     }
 
+    // Quoting happens after truncation, so the result can exceed c_maxDisplayWidth. This matches docker, which truncates
+    // the command first and quotes the truncated value.
     std::wstring quoted{L'"'};
     for (const auto character : wide)
     {
