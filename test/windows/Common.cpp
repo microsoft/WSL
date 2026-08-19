@@ -3154,14 +3154,13 @@ static void RunDiskpartScript(std::wstring_view Script)
 {
     const auto scriptFileName = wsl::windows::common::filesystem::GetTempFilename();
     std::wofstream scriptFile(scriptFileName);
-    THROW_LAST_ERROR_IF(!scriptFile);
+    THROW_HR_IF(E_FAIL, !scriptFile.is_open());
 
     auto cleanup = wil::scope_exit([&] { DeleteFileW(scriptFileName.c_str()); });
     scriptFile << Script;
     scriptFile.close();
 
-    std::wstring commandLine = L"diskpart.exe /s ";
-    commandLine += scriptFileName.c_str();
+    auto commandLine = std::format(L"diskpart.exe /s \"{}\"", scriptFileName);
     THROW_HR_IF(E_FAIL, wsl::windows::common::helpers::RunProcess(commandLine) != 0);
 }
 
