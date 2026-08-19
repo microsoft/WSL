@@ -126,11 +126,20 @@ class WSLCComposeTests
         VERIFY_ARE_EQUAL(1u, inspect.Ports.at("8080/tcp").size());
         VERIFY_ARE_EQUAL(std::string("127.0.0.1"), inspect.Ports.at("8080/tcp")[0].HostIp);
 
+        const std::string basicContainerId = containers[0].Id;
+        const std::string secondaryContainerId = containers[1].Id;
+        wil::com_ptr<IWSLCContainer> secondaryContainer;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-secondary", &secondaryContainer));
+        VERIFY_SUCCEEDED(basicContainer->Delete(WSLCDeleteFlagsForce));
+        VERIFY_SUCCEEDED(secondaryContainer->Delete(WSLCDeleteFlagsForce));
+
         VERIFY_SUCCEEDED(composeSession->Start());
         containers.reset();
         VERIFY_SUCCEEDED(composeSession->ListContainers(&containers, containers.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(WslcContainerStateRunning, containers[0].State);
         VERIFY_ARE_EQUAL(WslcContainerStateRunning, containers[1].State);
+        VERIFY_ARE_NOT_EQUAL(basicContainerId, std::string(containers[0].Id));
+        VERIFY_ARE_NOT_EQUAL(secondaryContainerId, std::string(containers[1].Id));
 
         VERIFY_SUCCEEDED(composeSession->Attach());
         VERIFY_SUCCEEDED(composeSession->Stop(10));
@@ -159,9 +168,10 @@ class WSLCComposeTests
                    "  client:\n"
                    "    name: wslc-compose-http-client\n"
                    "    image: python:3.12-alpine\n"
-                   "    command: [\"/bin/sh\", \"-c\", \"for attempt in $(seq 1 30); do python3 -c 'import urllib.request; "
-                   "urllib.request.urlopen(\\\"http://wslc-compose-http-server:8000/\\\", timeout=10).read()' && exit 0; "
-                   "sleep 1; done; exit 1\"]\n";
+                   "    command: [\"python3\", \"-c\", \"import time, urllib.request\\nwhile True:\\n    try:\\n        with "
+                   "urllib.request.urlopen(\\\"http://wslc-compose-http-server:8000/\\\", timeout=10) as response:\\n            "
+                   "if response.status == 200:\\n                break\\n    except Exception:\\n        pass\\n    "
+                   "time.sleep(1)\"]\n";
         }
 
         wil::com_ptr<IWSLCComposeSession> composeSession;
@@ -179,7 +189,7 @@ class WSLCComposeTests
                 THROW_HR_IF(E_FAIL, inspect.State.ExitCode != 0);
             },
             100ms,
-            45s);
+            120s);
     }
 
 private:

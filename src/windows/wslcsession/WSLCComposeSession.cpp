@@ -14,15 +14,20 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCComposeSession.h"
+#include "WSLCSession.h"
 
 namespace wsl::windows::service::wslc {
 
-HRESULT WSLCComposeSession::RuntimeClassInitialize(std::wstring ConfigPath, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Containers)
+HRESULT WSLCComposeSession::RuntimeClassInitialize(
+    WSLCSession* Session, std::wstring ConfigPath, ComposeSpec Spec, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Containers)
 {
+    RETURN_HR_IF_NULL(E_INVALIDARG, Session);
     RETURN_HR_IF(E_INVALIDARG, ConfigPath.empty());
     RETURN_HR_IF(E_INVALIDARG, Containers.empty());
 
+    m_session = Session;
     m_configPath = std::move(ConfigPath);
+    m_spec = std::move(Spec);
     m_containers = std::move(Containers);
     return S_OK;
 }
@@ -75,6 +80,14 @@ HRESULT WSLCComposeSession::Start()
 try
 {
     std::lock_guard lock(m_lock);
+
+    for (const auto& container : m_containers)
+    {
+        const HRESULT result = container->Delete(WSLCDeleteFlagsForce);
+        THROW_IF_FAILED_EXCEPT(result, RPC_E_DISCONNECTED);
+    }
+
+    m_containers = m_session->CreateComposeContainers(m_spec);
     for (const auto& container : m_containers)
     {
         const HRESULT result = container->Start(WSLCContainerStartFlagsNone, nullptr, nullptr);

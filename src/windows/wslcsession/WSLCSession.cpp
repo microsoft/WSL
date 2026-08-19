@@ -2289,9 +2289,21 @@ try
     }
 
     const auto spec = ComposeSpec::Parse(configPath);
+    auto containers = CreateComposeContainers(spec);
 
+    Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
+    THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, this, configPath.wstring(), spec, std::move(containers)));
+    auto [entry, inserted] = m_composeSessions.emplace(std::move(key), std::move(composeSession));
+    WI_ASSERT(inserted);
+
+    return entry->second.CopyTo(ComposeSession);
+}
+CATCH_RETURN();
+
+std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& Spec)
+{
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
-    std::string networkName = spec.ProjectName + "_default"; // TODO: Implement this properly.
+    std::string networkName = Spec.ProjectName + "_default"; // TODO: Implement this properly.
 
     // Create a network for the compose session.
     // TODO: open an existing network instead of deleting.
@@ -2317,15 +2329,8 @@ try
     });
 
     auto lease = AcquireLease();
-    for (const auto& definition : spec.Containers)
+    for (const auto& definition : Spec.Containers)
     {
-        THROW_HR_IF_MSG(
-            networkCleanup,
-            FAILED(networkCleanup) && networkCleanup != WSLC_E_NETWORK_NOT_FOUND,
-            "Failed to delete network %hs",
-            networkName.c_str());
-
-
         ServiceContainerLauncher launcher(
             definition.Image, definition.Name, definition.Command, definition.Environment, networkName, WSLCProcessFlagsStdin);
         if (!definition.WorkingDirectory.empty())
@@ -2368,15 +2373,10 @@ try
         containers.emplace_back(std::move(container));
     }
 
-    Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
-    THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, configPath.wstring(), containers));
-    auto [entry, inserted] = m_composeSessions.emplace(std::move(key), std::move(composeSession));
-    WI_ASSERT(inserted);
     cleanup.release();
 
-    return entry->second.CopyTo(ComposeSession);
+    return containers;
 }
-CATCH_RETURN();
 
 void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
 {
