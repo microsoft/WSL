@@ -1501,7 +1501,6 @@ Return Value:
 
         THROW_LAST_ERROR_IF(SetCloseOnExec(SocketFd, true));
         SocketFd = LX_INIT_UTILITY_VM_INIT_SOCKET_FD;
-
     }
     else
     {
