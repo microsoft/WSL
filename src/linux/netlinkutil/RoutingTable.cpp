@@ -96,7 +96,7 @@ void RoutingTable::ModifyRouteImpl(const Route& route, Operation action)
         // (destination prefix, tos, metric) alone - ignoring the next hop / output interface -
         // so replacing a route can silently overwrite a *different* interface's route that happens
         // to share the same key (e.g. two interfaces with a default route at the same metric),
-        // deleting it. An Update is send by the WSL service to mean "ensure this route exists",
+        // deleting it. An Update is sent by the WSL service to mean "ensure this route exists",
         // so a create is sufficient.
         // Note: The EEXIST error is already treated as non-fatal.
         // flags = NLM_F_CREATE;
