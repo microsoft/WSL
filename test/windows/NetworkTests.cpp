@@ -3974,6 +3974,11 @@ class GnsCallbackResultTests
     {
         VERIFY_SUCCEEDED(wsl::core::networking::GetGnsCallbackResult(LxGnsMessageConnectTestRequest, S_OK, -1));
     }
+
+    TEST_METHOD(GnsCallbackConnectTestTransportFailureFails)
+    {
+        VERIFY_ARE_EQUAL(E_ABORT, wsl::core::networking::GetGnsCallbackResult(LxGnsMessageConnectTestRequest, E_ABORT, -1));
+    }
 };
 
 class MirroredTests
