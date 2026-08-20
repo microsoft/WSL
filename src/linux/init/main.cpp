@@ -1512,7 +1512,6 @@ Return Value:
         THROW_LAST_ERROR_IF(SetCloseOnExec(SocketFd, false));
     }
 
-    
     //
     // Move the cross-distro shared mount to a temporary location. This mount
     // will be moved by the distro init.
