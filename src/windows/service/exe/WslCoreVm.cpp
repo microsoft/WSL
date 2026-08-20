@@ -75,17 +75,20 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 }
 } // namespace
 
-WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig) :
-    m_vmConfig(std::move(VmConfig)), m_traceClient(m_vmConfig.EnableTelemetry)
+WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs) :
+    m_vmConfig(std::move(VmConfig)), m_initializeDrvFs(std::move(InitializeDrvFs)), m_traceClient(m_vmConfig.EnableTelemetry)
 {
     // Create a job object that will terminate child processes (wslhost.exe, wslrelay.exe)
     // when the VM is destroyed.
     m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
-std::unique_ptr<WslCoreVm> WslCoreVm::Create(_In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId)
+std::unique_ptr<WslCoreVm> WslCoreVm::Create(
+    _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs)
 {
-    auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig)}};
+    THROW_HR_IF(E_INVALIDARG, !InitializeDrvFs);
+
+    auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig), std::move(InitializeDrvFs)}};
     try
     {
         const auto startTimeMs = GetTickCount64();
@@ -236,7 +239,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
 #else
 
-            m_vmConfig.KernelModulesPath = m_rootFsPath / L"modules.vhd";
+            m_vmConfig.KernelModulesPath = m_rootFsPath / L"artifacts.vhd";
 
 #endif
         }
@@ -1281,7 +1284,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         localConfig,
         DefaultUid,
         ClientLifetimeId,
-        std::bind(s_InitializeDrvFs, this, std::placeholders::_1),
+        m_initializeDrvFs,
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
@@ -2133,7 +2136,7 @@ WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
 void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 {
     // Construct the mini_init message.
-    LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE message;
+    LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageWaitForPmemDevice;
     message.Header.MessageSize = sizeof(message);
     message.PmemId = PmemId;
@@ -2469,7 +2472,7 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
 {
     auto lock = m_lock.lock_exclusive();
 
-    LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message;
+    LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageResizeDistribution;
     message.ScsiLun = Lun;
@@ -2494,7 +2497,7 @@ void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
 {
     auto lock = m_lock.lock_exclusive();
 
-    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message;
+    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageTrimDistribution;
     message.ScsiLun = Lun;
@@ -2566,7 +2569,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     }
 
     // Tell the guest to flush its IO caches and stop using the disk.
-    LX_MINI_INIT_DETACH_MESSAGE message;
+    LX_MINI_INIT_DETACH_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageDetach;
     message.Header.MessageSize = sizeof(message);
     message.ScsiLun = State.Lun;
@@ -2776,20 +2779,6 @@ std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Na
     }
 
     return target;
-}
-
-LX_INIT_DRVFS_MOUNT WslCoreVm::s_InitializeDrvFs(_Inout_ WslCoreVm* VmContext, _In_ HANDLE UserToken)
-{
-    try
-    {
-        return VmContext->InitializeDrvFs(UserToken) ? LxInitDrvfsMountElevated : LxInitDrvfsMountNonElevated;
-    }
-    catch (...)
-    {
-        LOG_CAUGHT_EXCEPTION();
-
-        return LxInitDrvfsMountNone;
-    }
 }
 
 void CALLBACK WslCoreVm::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)

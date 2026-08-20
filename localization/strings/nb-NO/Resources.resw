@@ -2501,11 +2501,11 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBindSourcePathNotFound" xml:space="preserve">
-    <value>Bind source path does not exist: '{}'</value>
+    <value>Banen til bindingskilden finnes ikke: «{}»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBindSourcePathError" xml:space="preserve">
-    <value>Failed to access bind source path '{}': {}</value>
+    <value>Kan ikke få tilgang til banen til bindingskilden «{}»: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
@@ -3030,11 +3030,11 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DuplicateMountDestinationError" xml:space="preserve">
-    <value>Duplicate mount point: {}</value>
+    <value>Duplisert monteringspunkt: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountMalformedCsvError" xml:space="preserve">
-    <value>The CSV input is malformed.</value>
+    <value>CSV-inndataene er feil utformet.</value>
     <comment>{Locked="CSV"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
@@ -3054,14 +3054,14 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
-    <value>The mount type is required.</value>
+    <value>Monteringstypen kreves.</value>
   </data>
   <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
-    <value>Options matching '{}' cannot be used with mount type '{}'.</value>
+    <value>Alternativer som samsvarer med {} kan ikke brukes med monteringstypen {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
-    <value>Option '{}' requires the 'readonly' option.</value>
+    <value>Alternativet «{}» krever alternativet «readonly».</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
@@ -3069,43 +3069,43 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{Locked="bind-recursive=readonly"}{Locked="bind-propagation=rprivate"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
-    <value>Mount type '{}' is not supported.</value>
+    <value>Monteringstype «{}» støttes ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
-    <value>Option '{}' is not supported.</value>
+    <value>Alternativet «{}» støttes ikke.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
-    <value>The mount target is required.</value>
+    <value>Monteringsmålet er obligatorisk.</value>
   </data>
   <data name="WSLCCLI_MountTargetAbsoluteError" xml:space="preserve">
-    <value>The mount target path must be absolute.</value>
+    <value>Banen til monteringsmålet må være absolutt.</value>
   </data>
   <data name="WSLCCLI_MountTmpfsOptionsTypeError" xml:space="preserve">
-    <value>The tmpfs options are supported only for tmpfs mounts.</value>
+    <value>tmpfs-alternativene støttes bare for tmpfs-monteringer.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTmpfsSizeNegativeError" xml:space="preserve">
-    <value>The tmpfs size cannot be negative.</value>
+    <value>tmpfs-størrelsen kan ikke være negativ.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountSourceRequiredError" xml:space="preserve">
-    <value>The mount source is required.</value>
+    <value>Monteringskilden kreves.</value>
   </data>
   <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
-    <value>The bind source path must be absolute.</value>
+    <value>Banen til bindingskilden må være absolutt.</value>
     <comment>{Locked="bind"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
-    <value>The volume source must be a valid named volume.</value>
+    <value>Volumkilden må være et gyldig navngitt volum.</value>
   </data>
   <data name="WSLCCLI_MountTmpfsSourceUnsupportedError" xml:space="preserve">
-    <value>The source option is not supported for tmpfs mounts.</value>
+    <value>Kildealternativet støttes ikke for tmpfs-monteringer.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedGenericError" xml:space="preserve">
-    <value>The mount type is not supported.</value>
+    <value>Monteringstypen støttes ikke.</value>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Følg loggutdata</value>
@@ -3176,7 +3176,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountArgDescription" xml:space="preserve">
-    <value>Attach a filesystem mount to the container</value>
+    <value>Koble en filsystemmontering til beholderen</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Beholderens vertsnavn</value>
@@ -3697,6 +3697,50 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
+    <value>Less than a second ago</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
+    <value>1 second ago</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
+    <value>{} seconds ago</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
+    <value>About a minute ago</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
+    <value>{} minutes ago</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
+    <value>About an hour ago</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
+    <value>{} hours ago</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
+    <value>{} days ago</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
+    <value>{} weeks ago</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
+    <value>{} months ago</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
+    <value>{} years ago</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Advarsel: Ugyldig verdi for innstilling {} i {}:{}.</value>

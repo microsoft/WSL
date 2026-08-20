@@ -2549,6 +2549,21 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
 
     Result = -1;
     auto ReportStatus = wil::scope_exit([&Channel, &Result, MessageType = Message->Header.MessageType]() {
+        wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
+
+        if (MessageType != LxMiniInitMessageExport && Result == 0)
+        {
+            PostProcessImportedDistribution(message, DISTRO_PATH);
+        }
+
+        sync();
+
+        if (umount(DISTRO_PATH) < 0)
+        {
+            LOG_ERROR("umount({}) failed, {}", DISTRO_PATH, errno);
+            Result = -1;
+        }
+
         if (MessageType == LxMiniInitMessageExport)
         {
             if (UtilWriteBuffer(Channel.Socket(), &Result, sizeof(Result)) < 0)
@@ -2558,13 +2573,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
         }
         else
         {
-            wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
             message->Result = Result;
-            if (Result == 0)
-            {
-                PostProcessImportedDistribution(message, DISTRO_PATH);
-            }
-
             Channel.SendMessage<LX_MINI_INIT_IMPORT_RESULT>(message.Span());
         }
     });
@@ -2812,7 +2821,7 @@ Return Value:
 --*/
 try
 {
-    LX_MINI_INIT_MOUNT_RESULT_MESSAGE Message;
+    LX_MINI_INIT_MOUNT_RESULT_MESSAGE Message{};
     Message.Header.MessageSize = sizeof(Message);
     Message.Header.MessageType = LxMiniInitMessageMountStatus;
     Message.Result = Result;
@@ -3214,7 +3223,10 @@ try
         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
         //      directory must be writable for tools like depmod to work.
         //
-
+        // N.B. The artifacts VHD nests the modules under <release>/modules.
+        //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
+        //      layout when the nested modules directory is not present.
+        //
         if (EarlyConfig->KernelModulesDeviceId != UINT_MAX)
         {
             THROW_LAST_ERROR_IF(
@@ -3223,9 +3235,33 @@ try
 
             utsname UnameBuffer{};
             THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+            const std::string Release{UnameBuffer.release};
 
-            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, UnameBuffer.release);
-            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), KERNEL_MODULES_VHD_PATH, (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
+            const std::string ArtifactsBase = std::format("{}/{}", KERNEL_MODULES_VHD_PATH, Release);
+            const std::string NestedModules = ArtifactsBase + "/modules";
+
+            std::error_code Error{};
+            const bool NestedLayout = std::filesystem::is_directory(NestedModules, Error);
+            const std::string ModulesLower = NestedLayout ? NestedModules : std::string{KERNEL_MODULES_VHD_PATH};
+            const bool LegacyLayout = !NestedLayout && std::filesystem::is_regular_file(ModulesLower + "/modules.dep", Error);
+
+            //
+            // A valid artifacts VHD nests the tree under <release>/modules; a legacy module-only VHD
+            // places it at the root.
+            //
+            if (LegacyLayout)
+            {
+                LOG_WARNING(
+                    "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
+                    "removed in a future version");
+            }
+            else if (!NestedLayout)
+            {
+                LOG_WARNING("kernel modules VHD does not contain modules for {}", Release);
+            }
+
+            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, Release);
+            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), ModulesLower.c_str(), (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
 
             const std::string KernelModulesList = wsl::shared::string::FromSpan(Buffer, EarlyConfig->KernelModulesListOffset);
             for (const auto& Module : wsl::shared::string::Split(KernelModulesList, ','))

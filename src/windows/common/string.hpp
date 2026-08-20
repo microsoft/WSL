@@ -73,9 +73,17 @@ std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
 // (cli/command/formatter/displayutils.go), including its handling of widths of one and below.
 std::wstring Ellipsis(_In_ std::wstring_view Value, _In_ size_t MaxDisplayWidth);
 
-// Formats a unix timestamp the way docker does, matching Go's time.Time.String() layout. Falls back
-// to UTC when the time zone database is unavailable.
-std::string FormatDockerTimestamp(LONGLONG timestamp);
+// Converts an RFC 3339 timestamp to seconds since the unix epoch. Only the 'Z' zone designator is
+// accepted; numeric offsets are not.
+std::uint64_t Rfc3339ToEpoch(const std::string& timestamp);
+
+// Renders seconds since the unix epoch in the local time zone, using the layout
+// "2006-01-02 15:04:05 -0700 MST". Falls back to UTC when the time zone database is unavailable.
+std::string EpochToLocalDisplayTime(LONGLONG timestamp);
+
+// Renders an RFC 3339 timestamp in the same layout, but as UTC and with its fractional seconds
+// preserved. The input is returned unchanged when it cannot be parsed.
+std::string Rfc3339ToUtcDisplayTime(std::string_view timestamp);
 
 // Template implementation for TruncateId to avoid code duplication.
 // Algorithm inspired from Moby for consistency in presentation of shortened IDs.

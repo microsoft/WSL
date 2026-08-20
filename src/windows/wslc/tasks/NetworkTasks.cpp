@@ -30,6 +30,36 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+namespace {
+
+    // Shared by the table and json output so the two cannot drift. The id is truncated unless --no-trunc is passed.
+    NetworkOutputInformation ToNetworkOutput(const wslc_schema::NetworkListEntry& network, bool truncate)
+    {
+        NetworkOutputInformation entry;
+        entry.CreatedAt = Rfc3339ToUtcDisplayTime(network.Created);
+        entry.Driver = network.Driver;
+        entry.ID = TruncateId(network.Id, truncate);
+        entry.IPv4 = network.EnableIPv4 ? "true" : "false";
+        entry.IPv6 = network.EnableIPv6 ? "true" : "false";
+        entry.Internal = network.Internal ? "true" : "false";
+        entry.Name = network.Name;
+        entry.Scope = network.Scope;
+
+        for (const auto& [key, value] : network.Labels)
+        {
+            if (!entry.Labels.empty())
+            {
+                entry.Labels += ",";
+            }
+
+            entry.Labels += value.empty() ? key : std::format("{}={}", key, value);
+        }
+
+        return entry;
+    }
+
+} // namespace
+
 static bool TryInspectNetwork(Terminal& terminal, Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& inspectData)
 {
     try
@@ -172,6 +202,9 @@ void ListNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Networks));
     auto& networks = context.Data.Get<Data::Networks>();
 
+    // Networks are reported in name order regardless of how the daemon returns them.
+    std::ranges::sort(networks, {}, &wslc_schema::NetworkListEntry::Name);
+
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
     const bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
@@ -191,22 +224,30 @@ void ListNetworks(CLIExecutionContext& context)
     {
         for (const auto& network : networks)
         {
-            auto json = nlohmann::json(network);
-            json["ID"] = TruncateId(network.Id, trunc);
-            context.Terminal.Output(L"{}\n", ToJsonW(json, c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToNetworkOutput(network, trunc), c_jsonCompactIndent));
         }
 
         break;
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<3>(context.Terminal, {L"NETWORK ID", L"NAME", L"DRIVER"});
+        // Every column has a minimum total width of ten characters, including the padding that follows it.
+        constexpr size_t c_minimumColumnWidth = 7;
+        auto table = wsl::windows::wslc::TableOutput<4>(
+            context.Terminal,
+            {L"NETWORK ID", L"NAME", L"DRIVER", L"SCOPE"},
+            {ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
+             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
+             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth},
+             ColumnWidthConfig{.MinWidth = c_minimumColumnWidth}});
         for (const auto& network : networks)
         {
+            const auto entry = ToNetworkOutput(network, trunc);
             table.WriteRow({
-                MultiByteToWide(TruncateId(network.Id, trunc)),
-                MultiByteToWide(network.Name),
-                MultiByteToWide(network.Driver),
+                MultiByteToWide(entry.ID),
+                MultiByteToWide(entry.Name),
+                MultiByteToWide(entry.Driver),
+                MultiByteToWide(entry.Scope),
             });
         }
 
@@ -228,10 +269,18 @@ void PruneNetworks(CLIExecutionContext& context)
 
     auto result = NetworkService::Prune(session, filters);
 
+    if (result.PrunedNetworks.empty())
+    {
+        return;
+    }
+
+    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeletedHeader());
     for (const auto& networkName : result.PrunedNetworks)
     {
-        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_NetworkPruneDeleted(MultiByteToWide(networkName)));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(networkName));
     }
+
+    context.Terminal.Output(L"\n");
 }
 
 void ConnectNetwork(CLIExecutionContext& context)

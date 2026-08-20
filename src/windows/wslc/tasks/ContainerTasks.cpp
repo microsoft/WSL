@@ -121,7 +121,7 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
 {
     ContainerOutputInformation entry;
     entry.Command = WideToMultiByte(ContainerService::FormatCommand(container.Command, truncate));
-    entry.CreatedAt = FormatDockerTimestamp(static_cast<LONGLONG>(container.CreatedAt));
+    entry.CreatedAt = EpochToLocalDisplayTime(static_cast<LONGLONG>(container.CreatedAt));
     // The runtime reports health as a suffix on the status description, which is the only place it is
     // exposed by the listing API.
     entry.HealthStatus = ContainerService::FormatHealthStatus(container.Status);
@@ -855,6 +855,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         {
             options.NetworkAliases.emplace_back(WideToMultiByte(value));
         }
+    }
+
+    if (context.Args.Contains(ArgType::IpAddress))
+    {
+        options.IpAddress = WideToMultiByte(context.Args.GetValue<ArgType::IpAddress>());
     }
 
     if (context.Args.Contains(ArgType::User))

@@ -87,6 +87,8 @@ struct ContainerOptions
     std::vector<std::string> DnsOptions;
     std::vector<ContainerNetwork> Networks;
     std::vector<std::string> NetworkAliases;
+    std::optional<std::string> IpAddress{};
+    std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
     std::optional<std::wstring> CidFile{};
     std::optional<int64_t> MemoryBytes{};

@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -26,14 +27,13 @@ class WSLCE2EImageBuildTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
-        EnsureImageIsLoaded(DebianTestImage());
+        TestImageRegistry::Instance().EnsureLoaded(DebianTestImage());
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
-        EnsureImageIsDeleted(DebianTestImage());
         return true;
     }
 
@@ -173,7 +173,7 @@ class WSLCE2EImageBuildTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Pull_Success)
     {
         // A local registry acts as the private image source that --pull re-resolves the base image from.
-        EnsureImageIsLoaded(AlpineTestImage());
+        TestImageRegistry::Instance().EnsureLoaded(AlpineTestImage());
 
         auto session = OpenDefaultElevatedSession();
         auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", c_registryPort);

@@ -544,7 +544,7 @@ Return Value:
                 MESSAGE_HEADER Header;
                 LX_INIT_PROCESS_EXIT_STATUS ExitStatus;
                 LX_INIT_CREATE_PROCESS_RESPONSE Response;
-            } Reply;
+            } Reply{};
 
             Bytes = TEMP_FAILURE_RETRY(read(PollDescriptors[0].fd, &Reply, sizeof(Reply)));
             if (Bytes < 0)
@@ -1054,7 +1054,7 @@ Return Value:
         return;
     }
 
-    LX_INIT_WINDOW_SIZE_CHANGED ResizeMessage;
+    LX_INIT_WINDOW_SIZE_CHANGED ResizeMessage{};
     ResizeMessage.Header.MessageType = LxInitMessageWindowSizeChanged;
     ResizeMessage.Header.MessageSize = sizeof(ResizeMessage);
     ResizeMessage.Columns = WindowSize.ws_col;

@@ -206,9 +206,8 @@ class WSLCE2ENetworkCreateTests
         VerifyNetworkIsListed(TestNetworkName);
         auto inspect = InspectNetwork(TestNetworkName);
         VERIFY_ARE_EQUAL("bridge", inspect.Driver);
-        VERIFY_IS_TRUE(inspect.Options.has_value());
-        VERIFY_ARE_EQUAL("true", (*inspect.Options)["com.docker.network.bridge.enable_icc"]);
-        VERIFY_ARE_EQUAL("1450", (*inspect.Options)["com.docker.network.driver.mtu"]);
+        VERIFY_ARE_EQUAL("true", inspect.Options["com.docker.network.bridge.enable_icc"]);
+        VERIFY_ARE_EQUAL("1450", inspect.Options["com.docker.network.driver.mtu"]);
     }
 
 private:
