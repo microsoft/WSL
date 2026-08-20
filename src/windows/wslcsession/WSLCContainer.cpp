@@ -1339,7 +1339,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         WI_ASSERT(!transition || transition->Kind == TransitionKind::Stop);
 
         // There can be an active stop transition post observing the exited state for cases where additional work needs to be done
-        // after the contaier stopped: e.g. auto remove, restart, etc. Therefore, if there is an active stop transition, we still
+        // after the container stopped: e.g. auto remove, restart, etc. Therefore, if there is an active stop transition, we still
         // need to attach to it below. This check simply skips creating a new transition once the state is already exited.
         if (!transition && m_state != WslcContainerStateRunning)
         {
