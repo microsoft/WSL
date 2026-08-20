@@ -925,12 +925,10 @@ int Manage(_In_ std::wstring_view commandLine)
     else if (defaultUser)
     {
         auto wslExe = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
-
-        auto commandLine = std::format(
-            L"\"{}\" {} -u root /usr/bin/id -u -- '{}'",
-            wslExe,
-            wsl::shared::string::GuidToString<wchar_t>(distroGuid),
-            defaultUser.value());
+        const auto distroGuidString = wsl::shared::string::GuidToString<wchar_t>(distroGuid);
+        const std::array<std::wstring_view, 9> arguments{
+            wslExe, distroGuidString, WSL_USER_ARG, L"root", WSL_EXEC_ARG, L"/usr/bin/id", L"-u", L"--", defaultUser.value()};
+        const auto commandLine = wil::ArgvToCommandLine(arguments);
 
         wsl::windows::common::SubProcess process{wslExe.c_str(), commandLine.c_str()};
 
