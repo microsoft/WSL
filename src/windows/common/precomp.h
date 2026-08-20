@@ -97,6 +97,7 @@ Abstract:
 #include <format>
 #include <cwctype>
 #include <variant>
+#include <bit>
 
 // Socket APIs
 #include <mswsock.h>

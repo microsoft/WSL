@@ -169,6 +169,10 @@ class UnitTests
             VERIFY_ARE_EQUAL(out, L"This operation is only supported by WSL2.\r\nError code: Wsl/Service/WSL_E_WSL2_NEEDED\r\n");
             VERIFY_ARE_EQUAL(err, L"");
         }
+
+        VerifyInvalidUsage(
+            std::format(L"--export {} {} --format tar.gz --format tar.xz", LXSS_DISTRO_NAME_TEST_L, tarPath));
+        VerifyInvalidUsage(std::format(L"--export {} {} --format tar.xz --vhd", LXSS_DISTRO_NAME_TEST_L, tarPath));
     }
 
     WSL2_TEST_METHOD(SystemdSafeMode)

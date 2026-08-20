@@ -256,9 +256,8 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     parser.AddArgument(parseFormat, WSL_EXPORT_ARG_FORMAT_OPTION);
     parser.Parse();
 
-    THROW_HR_IF(
-        WSL_E_INVALID_USAGE,
-        filePath.empty() || (WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_GZIP) && WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD)));
+    constexpr ULONG c_exportFormatFlags = LXSS_EXPORT_DISTRO_FLAGS_VHD | LXSS_EXPORT_DISTRO_FLAGS_GZIP | LXSS_EXPORT_DISTRO_FLAGS_XZIP;
+    THROW_HR_IF(WSL_E_INVALID_USAGE, filePath.empty() || std::popcount(flags & c_exportFormatFlags) > 1);
 
     // Determine if the target is stdout, or an on-disk file.
     wil::unique_hfile file;
