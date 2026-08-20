@@ -16,6 +16,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "Argument.h"
 
 namespace WSLCE2ETests {
@@ -56,7 +57,7 @@ class WSLCE2EPushPullTests
     WSLC_TEST_METHOD(WSLCE2E_Image_PushPull)
     {
         const auto& testImage = AlpineTestImage();
-        EnsureImageIsLoaded(testImage);
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         // Start a local registry without auth.
         auto session = OpenDefaultElevatedSession();
@@ -96,7 +97,7 @@ class WSLCE2EPushPullTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Pull_QuietOption)
     {
         const auto& testImage = AlpineTestImage();
-        EnsureImageIsLoaded(testImage);
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         auto session = OpenDefaultElevatedSession();
 

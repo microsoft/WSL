@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <wslc_schema.h>
 
 namespace WSLCE2ETests {
@@ -27,7 +28,7 @@ class WSLCE2EContainerInspectTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
@@ -35,7 +36,6 @@ class WSLCE2EContainerInspectTests
     {
         EnsureContainerDoesNotExist(TestContainerName1);
         EnsureContainerDoesNotExist(TestContainerName2);
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
