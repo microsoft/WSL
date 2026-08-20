@@ -67,7 +67,7 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
     m_volumes.insert({vol.Name, WSLCGuestVolumeImpl::Open(vol, m_dockerClient)});
 }
 
-void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t)
+void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::int64_t)
 {
     auto lock = m_lock.lock_exclusive();
 

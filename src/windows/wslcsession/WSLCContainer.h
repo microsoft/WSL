@@ -86,7 +86,7 @@ public:
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         WSLCContainerState InitialState,
-        std::uint64_t CreatedAt,
+        std::int64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags);
 
@@ -101,8 +101,8 @@ public:
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
     void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
-    void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
-    void GetCreatedAt(_Out_ ULONGLONG* CreatedAt);
+    void GetStateChangedAt(_Out_ LONGLONG* StateChangedAt);
+    void GetCreatedAt(_Out_ LONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
     void GetInitProcess(_Out_ IWSLCProcess** process) const;
     void Exec(_In_ const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process);
@@ -123,7 +123,7 @@ public:
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::int64_t> stateChangedAt = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -154,14 +154,14 @@ private:
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime);
 
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect OnStopped(std::optional<std::uint64_t> stopTimestamp);
+    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect OnStopped(std::optional<std::int64_t> stopTimestamp);
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -192,7 +192,7 @@ private:
 
     struct StopNotification
     {
-        std::atomic<std::uint64_t> EventTime{0};
+        std::atomic<std::int64_t> EventTime{0};
         wil::unique_event Event{wil::EventOptions::None};
     } m_stopNotification;
 
@@ -207,8 +207,8 @@ private:
     // fetched from the (stable) runtime at each use rather than cached, since a cached reference
     // would dangle across a restart. They are only valid while a VM lease is held.
     WSLCSessionRuntime& m_runtime;
-    std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
-    std::uint64_t m_createdAt{};
+    std::int64_t m_stateChangedAt{static_cast<std::int64_t>(std::time(nullptr))};
+    std::int64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
     IWSLCPluginNotifier* m_pluginNotifier;

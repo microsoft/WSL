@@ -94,6 +94,14 @@ std::string EpochToLocalDisplayTime(LONGLONG timestamp);
 // preserved. An empty input returns an empty string; anything else that cannot be parsed throws.
 std::string Rfc3339ToUtcDisplayTime(std::string_view timestamp);
 
+// Renders an elapsed number of seconds as a coarse, localized description such as "About a minute"
+// or "3 weeks". Negative values are treated as zero.
+std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
+
+// Renders how long ago a timestamp given in seconds since the unix epoch occurred. A timestamp of
+// zero means "unset" and returns an empty string.
+std::wstring FormatRelativeTime(LONGLONG timestamp);
+
 // Template implementation for TruncateId to avoid code duplication.
 // Algorithm inspired from Moby for consistency in presentation of shortened IDs.
 // Always strips the algorithm prefix (e.g., "sha256:") if present, and optionally shortens to 12 characters.

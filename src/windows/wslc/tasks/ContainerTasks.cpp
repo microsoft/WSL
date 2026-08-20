@@ -576,7 +576,7 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
-                ContainerService::FormatRelativeTime(container.CreatedAt),
+                FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
                 ContainerService::FormatPorts(container.State, container.Ports),
             });

@@ -711,3 +711,74 @@ std::string wsl::windows::common::string::Rfc3339ToUtcDisplayTime(std::string_vi
     // Network timestamps are reported in UTC rather than the local time zone.
     return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }
+
+std::wstring wsl::windows::common::string::FormatElapsedSeconds(LONGLONG elapsedSeconds)
+{
+    using namespace std::chrono_literals;
+    using wsl::shared::Localization;
+
+    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
+    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
+    constexpr LONGLONG HoursPerDay = 24;
+    constexpr LONGLONG MinutesPerHour = 60;
+
+    const auto elapsed = std::max<LONGLONG>(elapsedSeconds, 0);
+
+    if (elapsed < 1)
+    {
+        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
+    }
+    else if (elapsed == 1)
+    {
+        return Localization::WSLCCLI_RelativeTimeOneSecond();
+    }
+    else if (elapsed < SecondsPerMinute)
+    {
+        return Localization::WSLCCLI_RelativeTimeSeconds(elapsed);
+    }
+
+    const auto minutes = elapsed / SecondsPerMinute;
+    if (minutes == 1)
+    {
+        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
+    }
+    else if (minutes < MinutesPerHour)
+    {
+        return Localization::WSLCCLI_RelativeTimeMinutes(minutes);
+    }
+
+    // Rounded to the nearest hour rather than truncated.
+    const auto hours = (elapsed + (SecondsPerHour / 2)) / SecondsPerHour;
+    if (hours == 1)
+    {
+        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
+    }
+    else if (hours < HoursPerDay * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeHours(hours);
+    }
+    else if (hours < HoursPerDay * 7 * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeDays(hours / HoursPerDay);
+    }
+    else if (hours < HoursPerDay * 30 * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeWeeks(hours / HoursPerDay / 7);
+    }
+    else if (hours < HoursPerDay * 365 * 2)
+    {
+        return Localization::WSLCCLI_RelativeTimeMonths(hours / HoursPerDay / 30);
+    }
+
+    return Localization::WSLCCLI_RelativeTimeYears(elapsed / SecondsPerHour / HoursPerDay / 365);
+}
+
+std::wstring wsl::windows::common::string::FormatRelativeTime(LONGLONG timestamp)
+{
+    if (timestamp == 0)
+    {
+        return {};
+    }
+
+    return FormatElapsedSeconds(static_cast<LONGLONG>(std::time(nullptr)) - timestamp);
+}
