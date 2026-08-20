@@ -7920,6 +7920,22 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         bool imported = false;
         bool volumeAttached = false;
 
+        auto attachVolume = [&]() {
+            RunDiskpartScript(
+                std::format(
+                    L"select vdisk file=\"{}\"\n"
+                    L"attach vdisk\n",
+                    outerVhd.wstring()));
+        };
+
+        auto detachVolume = [&]() {
+            RunDiskpartScript(
+                std::format(
+                    L"select vdisk file=\"{}\"\n"
+                    L"detach vdisk\n",
+                    outerVhd.wstring()));
+        };
+
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             if (imported)
             {
@@ -7927,7 +7943,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 {
                     try
                     {
-                        AttachTestVolume(mountPath, outerVhd);
+                        attachVolume();
                         volumeAttached = true;
                     }
                     CATCH_LOG()
@@ -7939,7 +7955,14 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             WslShutdown();
             try
             {
-                DeleteTestVolume(mountPath, outerVhd);
+                RunDiskpartScript(
+                    std::format(
+                        L"select vdisk file=\"{}\"\n"
+                        L"attach vdisk noerr\n"
+                        L"select partition 1\n"
+                        L"remove all noerr\n"
+                        L"detach vdisk noerr\n",
+                        outerVhd.wstring()));
             }
             CATCH_LOG()
 
@@ -7948,7 +7971,20 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         });
 
         std::filesystem::create_directories(testRoot);
-        CreateTestVolume(L"ntfs", 4096, mountPath, outerVhd);
+        std::filesystem::create_directories(mountPath);
+        RunDiskpartScript(
+            std::format(
+                L"create vdisk file=\"{}\" maximum=4096 type=expandable\n"
+                L"select vdisk file=\"{}\"\n"
+                L"attach vdisk\n"
+                L"create partition primary\n"
+                L"select partition 1\n"
+                L"online volume\n"
+                L"format fs=ntfs quick\n"
+                L"assign mount=\"{}\"\n",
+                outerVhd.wstring(),
+                outerVhd.wstring(),
+                mountPath.wstring()));
         volumeAttached = true;
 
         WslKeepAlive keepAlive;
@@ -7959,11 +7995,11 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/true", testName)), 0L);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", testName)), 0L);
-        DetachTestVolume(mountPath, outerVhd);
+        detachVolume();
         volumeAttached = false;
         VERIFY_IS_FALSE(std::filesystem::exists(installPath / LXSS_VM_MODE_VHD_NAME));
 
-        AttachTestVolume(mountPath, outerVhd);
+        attachVolume();
         volumeAttached = true;
         VERIFY_IS_TRUE(std::filesystem::exists(installPath / LXSS_VM_MODE_VHD_NAME));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/true", testName)), 0L);

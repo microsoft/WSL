@@ -724,10 +724,4 @@ void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const 
 
 void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring);
 
-void AttachTestVolume(const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath);
-
-void CreateTestVolume(_In_ PCWSTR FileSystem, _In_ ULONG MaxSizeInMb, const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath);
-
-void DeleteTestVolume(const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath);
-
-void DetachTestVolume(const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath);
+void RunDiskpartScript(std::wstring_view Script);
