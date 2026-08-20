@@ -17,10 +17,13 @@ Abstract:
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
+#include "registry.hpp"
+#include "wslpolicies.h"
 #include "wslutil.h"
 #include "wslc/e2e/WSLCE2EHelpers.h"
 
 #include "winrt/Session.h"
+#include "winrt/SessionSettings.h"
 #include "winrt/Helpers.h"
 #include "winrt/ProcessCrashInformation.h"
 
@@ -319,6 +322,29 @@ class WslcSdkWinRtTests
         {
             VERIFY_THROWS_HR(WSLCSDK::Session(WSLCSDK::SessionSettings{nullptr}), E_POINTER);
         }
+    }
+
+    WSLC_TEST_METHOD(SessionSettingsNestedVirtualization)
+    {
+        const auto storagePath = m_storagePath / "wslc-winrt-nested-virtualization-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+        });
+
+        auto settings = WSLCSDK::SessionSettings(L"wslc-winrt-nested-virtualization", storagePath.wstring());
+        VERIFY_IS_FALSE(settings.EnableNestedVirtualization());
+
+        settings.EnableNestedVirtualization(true);
+        VERIFY_IS_TRUE(settings.EnableNestedVirtualization());
+        settings.VhdRequirements(WSLCSDK::VhdOptions(L"", 1024ull * 1024 * 1024, WSLCSDK::VhdType::Dynamic));
+
+        auto revertPolicy = RegistryKeyChange(
+            HKEY_LOCAL_MACHINE, wsl::windows::policies::c_registryKey, wsl::windows::policies::c_allowWSLContainerNestedVirtualization, DWORD{0});
+
+        auto session = WSLCSDK::Session(settings);
+        VERIFY_THROWS_HR(session.Start(), HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY));
+        VERIFY_THROWS_HR(settings.EnableNestedVirtualization(false), E_ILLEGAL_STATE_CHANGE);
     }
 
     WSLC_TEST_METHOD(TerminationHandler)

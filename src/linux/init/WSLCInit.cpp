@@ -30,6 +30,12 @@ Abstract:
 #include <sys/signalfd.h>
 #include <arpa/inet.h>
 
+#ifdef __x86_64__
+#include <cpuid.h>
+#endif
+
+#include <array>
+#include <cstring>
 #include <pty.h>
 #include <mutex>
 #include "mountutilcpp.h"
@@ -70,6 +76,7 @@ struct WSLCState
 static WSLCState g_state;
 
 constexpr auto c_kernelModulesVhdMountPoint = "/kernel_modules_vhd";
+constexpr auto c_kvmDevicePath = "/dev/kvm";
 
 void WriteWslcCdiSpec()
 try
@@ -671,6 +678,54 @@ void HandleMessageImpl(
     Transaction.Send(Response);
 }
 
+void LoadKvmModule()
+{
+#ifdef __x86_64__
+
+    // On x86_64 the vendor specific KVM module is loadable and isn't loaded by default. Containers
+    // can't load it themselves, so it needs to be present before the container is launched.
+    unsigned int eax{};
+    unsigned int ebx{};
+    unsigned int ecx{};
+    unsigned int edx{};
+    THROW_ERRNO_IF(ENOTSUP, __get_cpuid(0, &eax, &ebx, &ecx, &edx) == 0);
+
+    std::array<char, 13> vendor{};
+    memcpy(vendor.data(), &ebx, sizeof(ebx));
+    memcpy(vendor.data() + sizeof(ebx), &edx, sizeof(edx));
+    memcpy(vendor.data() + sizeof(ebx) + sizeof(edx), &ecx, sizeof(ecx));
+
+    const char* module = nullptr;
+    if (strcmp(vendor.data(), "GenuineIntel") == 0)
+    {
+        module = "kvm_intel";
+    }
+    else if (strcmp(vendor.data(), "AuthenticAMD") == 0)
+    {
+        module = "kvm_amd";
+    }
+
+    if (module == nullptr)
+    {
+        LOG_ERROR("Unsupported processor vendor for KVM: '{}'", vendor.data());
+        THROW_ERRNO(ENOTSUP);
+    }
+
+    const char* argv[] = {"/sbin/modprobe", module, nullptr};
+    THROW_ERRNO_IF(EIO, UtilCreateProcessAndWait("/sbin/modprobe", argv) < 0);
+
+#endif
+
+    // On aarch64 KVM is built into the kernel rather than shipped as a loadable module, so there is
+    // nothing to load. Validate the device on all architectures so an unsupported guest fails here
+    // instead of surfacing as a missing device once the container starts.
+    if (!std::filesystem::exists(c_kvmDevicePath))
+    {
+        LOG_ERROR("{} is not present, nested virtualization is not available in this guest", c_kvmDevicePath);
+        THROW_ERRNO(ENOTSUP);
+    }
+}
+
 template <typename TMessage>
 void HandleMountMessage(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const TMessage& Message, const gsl::span<gsl::byte>& Buffer)
@@ -855,6 +910,11 @@ void HandleMessageImpl(
         const std::string modulesSource = std::format("{}/{}/modules", c_kernelModulesVhdMountPoint, unameBuffer.release);
         THROW_LAST_ERROR_IF(
             UtilMount(modulesSource.c_str(), g_state.ModulesMountPoint->c_str(), nullptr, (MS_BIND | MS_REC), nullptr, c_defaultRetryTimeout) < 0);
+
+        if (Message.LoadKvm)
+        {
+            LoadKvmModule();
+        }
 
         response.Result = 0;
     }

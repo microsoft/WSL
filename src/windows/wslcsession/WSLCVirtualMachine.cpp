@@ -363,9 +363,8 @@ void WSLCVirtualMachine::Initialize()
     // Mount VHDs
     const auto rootDevice = GetVhdDevicePath(0);
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs);
-
     const auto modulesDevice = GetVhdDevicePath(1);
-    MountModules(m_initChannel, modulesDevice.c_str());
+    MountModules(m_initChannel, modulesDevice.c_str(), FeatureEnabled(WslcFeatureFlagsNestedVirtualization));
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
     // to the service before virtiofs shares or Consomme networking devices are created.
@@ -985,16 +984,22 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
     THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
-void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Source)
+void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Source, bool LoadKvm)
 {
     wsl::shared::MessageWriter<WSLC_MOUNT_MODULES> message;
     message.WriteString(message->SourceIndex, Source);
+    message->LoadKvm = LoadKvm;
 
     const auto& response = Channel.Transaction<WSLC_MOUNT_MODULES>(message.Span());
 
-    WSL_LOG("WSLCMountModules", TraceLoggingValue(Source, "Source"), TraceLoggingValue(response.Result, "Result"));
+    WSL_LOG(
+        "WSLCMountModules",
+        TraceLoggingValue(Source, "Source"),
+        TraceLoggingValue(LoadKvm, "LoadKvm"),
+        TraceLoggingValue(response.Result, "Result"));
 
-    THROW_HR_IF(E_FAIL, response.Result != 0);
+    // N.B. The guest reports failures as a positive errno value, so it can't be thrown directly as an HRESULT.
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to mount kernel modules, init returned: %d", response.Result);
 }
 
 void WSLCVirtualMachine::MountVirtioFsChild(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR ChildName, LPCSTR Target, LPCSTR Options, ULONG Flags)
