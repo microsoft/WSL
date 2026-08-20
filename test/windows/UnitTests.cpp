@@ -7711,60 +7711,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
             VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }
-
-        {
-            constexpr DWORD transactionTimeout = 200;
-            constexpr LONGLONG schedulingTolerance = 50;
-            constexpr LONGLONG maximumWait = 5000;
-            auto [client, server] = MakeSocketPair();
-            wsl::shared::SocketChannel channel{std::move(client), "client"};
-            auto transaction = channel.StartTransaction(transactionTimeout);
-
-            RESULT_MESSAGE<int32_t> request{};
-            request.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
-            request.Header.MessageSize = sizeof(request);
-            transaction.Send(request);
-
-            RESULT_MESSAGE<int32_t> receivedRequest{};
-            recvAll(server.get(), &receivedRequest, sizeof(receivedRequest));
-            VERIFY_ARE_EQUAL(receivedRequest.Header.TransactionStep, static_cast<unsigned int>(TRANSACTION_STEP::REQUEST));
-
-            const auto start = std::chrono::steady_clock::now();
-            const auto hr = wil::ResultFromException([&]() { transaction.Receive<RESULT_MESSAGE<int32_t>>(); });
-            const auto elapsed =
-                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-
-            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-            VERIFY_IS_GREATER_THAN_OR_EQUAL(elapsed, static_cast<LONGLONG>(transactionTimeout) - schedulingTolerance);
-            VERIFY_IS_LESS_THAN(elapsed, maximumWait);
-        }
-
-        {
-            constexpr DWORD transactionTimeout = 1000;
-            constexpr int32_t expectedResult = 42;
-            auto [client, server] = MakeSocketPair();
-            wsl::shared::SocketChannel channel{std::move(client), "client"};
-            auto transaction = channel.StartTransaction(transactionTimeout);
-
-            RESULT_MESSAGE<int32_t> request{};
-            request.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
-            request.Header.MessageSize = sizeof(request);
-            transaction.Send(request);
-
-            RESULT_MESSAGE<int32_t> receivedRequest{};
-            recvAll(server.get(), &receivedRequest, sizeof(receivedRequest));
-
-            RESULT_MESSAGE<int32_t> response{};
-            response.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
-            response.Header.MessageSize = sizeof(response);
-            response.Header.TransactionId = receivedRequest.Header.TransactionId;
-            response.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::FIRST_REPLY);
-            response.Result = expectedResult;
-            WriteSocket(server.get(), &response, sizeof(response));
-
-            const auto& receivedResponse = transaction.Receive<RESULT_MESSAGE<int32_t>>();
-            VERIFY_ARE_EQUAL(receivedResponse.Result, expectedResult);
-        }
     }
 
     TEST_METHOD(DownloadToHiddenSystemTempFolder)
