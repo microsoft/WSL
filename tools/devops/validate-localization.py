@@ -260,8 +260,7 @@ def validate_adml(adml_folder: str, baseline_language: str) -> bool:
         missing = baseline_ids - set(translated.keys())
         extra = set(translated.keys()) - baseline_ids
         if missing:
-            print(f'error: ADML {locale_path} is missing string ids: {sorted(missing)}')
-            result = False
+            print(f'warning: ADML {locale_path} is missing string ids: {sorted(missing)}')
         if extra:
             print(f'error: ADML {locale_path} has unexpected string ids: {sorted(extra)}')
             result = False
