@@ -180,10 +180,8 @@ void WslCoreInstance::CreateLxProcess(
     {
         EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
 
-        const wil::unique_handle oobeCompleteEvent{
-            wsl::windows::common::wslutil::DuplicateHandle(m_oobeCompleteEvent.get(), SYNCHRONIZE)};
-        const wil::unique_handle destroyingEvent{
-            wsl::windows::common::wslutil::DuplicateHandle(m_destroyingEvent.get(), SYNCHRONIZE)};
+        const auto oobeCompleteEvent = m_oobeCompleteEvent;
+        const auto destroyingEvent = m_destroyingEvent;
         const HANDLE waitHandles[] = {oobeCompleteEvent.get(), destroyingEvent.get()};
         lock.unlock();
         const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, INFINITE);

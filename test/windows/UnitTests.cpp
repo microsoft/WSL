@@ -4783,17 +4783,9 @@ VERSION_ID="Invalid|Format"
 
         wsl::windows::common::SubProcess terminationProcessBuilder(
             nullptr, LxssGenerateWslCommandLine(L"--terminate " LXSS_DISTRO_NAME_TEST_L).c_str());
-        const auto terminationProcess = terminationProcessBuilder.Start();
-        const DWORD terminationResult = WaitForSingleObject(terminationProcess.get(), terminationTimeout);
-
-        if (terminationResult == WAIT_TIMEOUT)
-        {
-            VERIFY_ARE_EQUAL(WaitForSingleObject(terminationProcess.get(), cleanupTimeout), WAIT_OBJECT_0);
-        }
+        VERIFY_ARE_EQUAL(terminationProcessBuilder.Run(terminationTimeout), 0u);
 
         VERIFY_ARE_EQUAL(waitingResult, WAIT_TIMEOUT);
-        VERIFY_ARE_EQUAL(terminationResult, WAIT_OBJECT_0);
-        VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess::GetExitCode(terminationProcess.get(), 0), 0u);
         VERIFY_ARE_EQUAL(WaitForSingleObject(waitingProcess.get(), cleanupTimeout), WAIT_OBJECT_0);
         VERIFY_ARE_EQUAL(WaitForSingleObject(oobeProcess.get(), cleanupTimeout), WAIT_OBJECT_0);
     }
