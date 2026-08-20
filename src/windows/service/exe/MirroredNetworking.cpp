@@ -695,7 +695,8 @@ try
                             TraceLoggingValue(retryCount, "retryCount"));
 
                         ++retryCount;
-                        return hr;
+                        return networking::GetGnsCallbackResult(
+                            messageType, hr, returnedValueFromGns ? *returnedValueFromGns : 0);
                     },
                     std::chrono::milliseconds(100),
                     std::chrono::seconds(3));
