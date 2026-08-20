@@ -16,6 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "hcs.hpp"
 #include <ComputeCore.h>
+#include "helpers.hpp"
 
 #pragma hdrstop
 
@@ -132,6 +133,17 @@ const std::vector<std::string>& wsl::windows::common::hcs::GetProcessorFeatures(
     });
 
     return g_processorFeatures;
+}
+
+bool wsl::windows::common::hcs::IsNestedVirtualizationSupported()
+{
+    if (!wsl::windows::common::helpers::IsWindows11OrAbove())
+    {
+        return false;
+    }
+
+    const auto& processorFeatures = GetProcessorFeatures();
+    return std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt") != processorFeatures.end();
 }
 
 wsl::shared::hns::HNSEndpoint wsl::windows::common::hcs::GetEndpointProperties(HCN_ENDPOINT Endpoint)

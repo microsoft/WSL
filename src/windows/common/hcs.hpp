@@ -59,6 +59,8 @@ wsl::shared::hns::HNSEndpoint GetEndpointProperties(HCN_ENDPOINT endpoint);
 
 const std::vector<std::string>& GetProcessorFeatures();
 
+bool IsNestedVirtualizationSupported();
+
 GUID GetRuntimeId(_In_ HCS_SYSTEM ComputeSystem);
 
 std::pair<uint32_t, uint32_t> GetSchemaVersion();
