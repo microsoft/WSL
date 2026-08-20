@@ -3962,13 +3962,12 @@ class GnsCallbackResultTests
 
     TEST_METHOD(GnsCallbackSuccessfulTransportAndLinuxFailureFails)
     {
-        VERIFY_FAILED(wsl::core::networking::GetGnsCallbackResult(LxGnsMessageDeviceSettingRequest, S_OK, -1));
+        VERIFY_ARE_EQUAL(E_FAIL, wsl::core::networking::GetGnsCallbackResult(LxGnsMessageDeviceSettingRequest, S_OK, -1));
     }
 
     TEST_METHOD(GnsCallbackTransportFailureFails)
     {
-        VERIFY_ARE_EQUAL(
-            E_ABORT, wsl::core::networking::GetGnsCallbackResult(LxGnsMessageDeviceSettingRequest, E_ABORT, 0));
+        VERIFY_ARE_EQUAL(E_ABORT, wsl::core::networking::GetGnsCallbackResult(LxGnsMessageDeviceSettingRequest, E_ABORT, 0));
     }
 
     TEST_METHOD(GnsCallbackConnectTestBusinessResultSucceeds)

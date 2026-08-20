@@ -143,7 +143,7 @@ inline HRESULT GetGnsCallbackResult(LX_MESSAGE_TYPE messageType, HRESULT transpo
         return transportResult;
     }
 
-    return E_UNEXPECTED;
+    return E_FAIL;
 }
 
 inline constexpr GUID c_wslFirewallVmCreatorId = {0x40E0AC32, 0x46A5, 0x438A, {0xA0, 0xB2, 0x2B, 0x47, 0x9E, 0x8F, 0x2E, 0x90}};
