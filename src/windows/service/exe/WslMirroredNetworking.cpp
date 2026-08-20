@@ -1396,10 +1396,17 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             std::optional<HRESULT> hr{};
             switch (trackedRoute.SyncStatus)
             {
-            // Use Add rather than Update to (re-)assert routes. An Update replaces by
+            // Use ModifyRequestType::Add rather than ModifyRequestType::Update for PendingUpdate.
+            // An Update in GNS uses NLM_F_REPLACE and replaces by
             // (destination prefix, tos, metric) key alone and would silently overwrite a same-key route
             // belonging to a *different* interface (e.g. another interface's default at the same metric).
-            // A create plumbs a new route or leaves an existing one in place (EEXIST is ignored).
+            // An ModifyRequestType::Add plumbs a new route or leaves an existing one in place (EEXIST is ignored),
+            // which is the desited behavior for PendingUpdate.
+            //
+            // The route synchronization logic never attempts an in-place update of a route. Whenever
+            // a route change occurs on the host (ProcessRouteChange), we mark for removal the routes that are known
+            // to have been synced in Linux but are no longer part of the latest set of host routes, we do not
+            // do a diff of the route properties to determine if an in-place update is needed.
             case PendingAdd:
             case PendingUpdate:
                 hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
