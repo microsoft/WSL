@@ -62,6 +62,22 @@ namespace VT {
     }
 } // namespace VT
 
+// The shape emitted by "network list --format json"; every value is reported as a string.
+struct NetworkListOutput
+{
+    std::string CreatedAt;
+    std::string Driver;
+    std::string ID;
+    std::string IPv4;
+    std::string IPv6;
+    std::string Internal;
+    std::string Labels;
+    std::string Name;
+    std::string Scope;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListOutput, CreatedAt, Driver, ID, IPv4, IPv6, Internal, Labels, Name, Scope);
+};
+
 struct TestImage
 {
     std::wstring Name;

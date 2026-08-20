@@ -16,6 +16,7 @@ Abstract:
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <sstream>
 
 std::vector<std::string> wsl::windows::common::string::InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize)
 {
@@ -425,7 +426,17 @@ std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, b
     return TruncateIdImpl(id, shortenLength);
 }
 
-std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timestamp)
+std::uint64_t wsl::windows::common::string::Rfc3339ToEpoch(const std::string& timestamp)
+{
+    std::chrono::sys_seconds utcSeconds;
+    std::istringstream stream(timestamp);
+    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
+    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
+
+    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
+}
+
+std::string wsl::windows::common::string::EpochToLocalDisplayTime(LONGLONG timestamp)
 {
     const auto time =
         std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
@@ -441,4 +452,39 @@ std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timesta
         LOG_CAUGHT_EXCEPTION();
         return std::format("{:%F %T} +0000 UTC", time);
     }
+}
+
+std::string wsl::windows::common::string::Rfc3339ToUtcDisplayTime(std::string_view timestamp)
+{
+    if (timestamp.empty())
+    {
+        return {};
+    }
+
+    // Fractional digits vary in length, so they are captured verbatim and re-inserted after formatting.
+    std::string parsable{timestamp};
+    std::string fraction;
+    const auto separator = parsable.find('.');
+    if (separator != std::string::npos)
+    {
+        auto end = separator + 1;
+        while (end < parsable.size() && (std::isdigit(static_cast<unsigned char>(parsable[end])) != 0))
+        {
+            end++;
+        }
+
+        fraction = parsable.substr(separator, end - separator);
+        parsable.erase(separator, end - separator);
+    }
+
+    std::chrono::sys_seconds parsed{};
+    std::istringstream stream(parsable);
+    stream >> std::chrono::parse("%FT%H:%M:%S%Z", parsed);
+    if (stream.fail())
+    {
+        return std::string{timestamp};
+    }
+
+    // Network timestamps are reported in UTC rather than the local time zone.
+    return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }

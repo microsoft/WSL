@@ -488,17 +488,6 @@ WSLCContainerState DockerStateToWSLCState(ContainerState state)
     }
 }
 
-std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
-{
-    // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
-    std::chrono::sys_seconds utcSeconds;
-    std::istringstream stream(timestamp);
-    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
-    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
-
-    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
-}
-
 std::string CleanContainerName(const std::string& name)
 {
     // Docker container names have a leading '/', strip it.
@@ -2432,7 +2421,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(mergedLabels),
         std::move(OnDeleted),
         WslcContainerStateCreated,
-        ParseDockerTimestamp(inspectData.Created),
+        wsl::windows::common::string::Rfc3339ToEpoch(inspectData.Created),
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
@@ -2544,7 +2533,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
             if (!timestamp.empty())
             {
-                container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
+                container->m_stateChangedAt = wsl::windows::common::string::Rfc3339ToEpoch(timestamp);
             }
         }
     }
