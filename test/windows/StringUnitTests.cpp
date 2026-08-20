@@ -252,7 +252,6 @@ class StringUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"1e+03MB"}, FormatHumanReadableSize(999'900'000));
     }
 
-    // The prune commands report reclaimed space with four significant digits.
     TEST_METHOD(FormatHumanReadableSize_SupportsReclaimedSpacePrecision)
     {
         const std::vector<std::pair<uint64_t, std::wstring>> TestCases{

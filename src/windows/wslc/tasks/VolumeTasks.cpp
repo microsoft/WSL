@@ -31,7 +31,6 @@ using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
 
-// The prune commands report reclaimed space with four significant digits.
 constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
 static bool TryInspectVolume(Terminal& terminal, Session& session, const std::string& volumeName, std::optional<wslc_schema::InspectVolume>& inspectData)

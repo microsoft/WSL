@@ -204,8 +204,6 @@ struct InspectImage
         InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config, RootFS);
 };
 
-// The volume properties reported by "volume inspect". The driver options are named "Options" when
-// reading a volume and "DriverOpts" when creating one; this is the read shape.
 struct InspectVolume
 {
     std::string Name;
