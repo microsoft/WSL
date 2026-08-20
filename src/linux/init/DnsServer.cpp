@@ -4,6 +4,7 @@
 #include <sys/epoll.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include "RuntimeErrorWithSourceLocation.h"
 #include "DnsServer.h"
 #include "Syscall.h"
 #include "util.h"
