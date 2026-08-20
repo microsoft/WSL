@@ -204,17 +204,44 @@ struct InspectImage
         InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config, RootFS);
 };
 
+// The volume properties reported by "volume inspect". The driver options are named "Options" when
+// reading a volume and "DriverOpts" when creating one; this is the read shape.
 struct InspectVolume
 {
     std::string Name;
     std::string Driver;
     std::string CreatedAt;
-    std::map<std::string, std::string> DriverOpts;
-    std::map<std::string, std::string> Labels;
+    std::string Mountpoint;
+    std::string Scope;
+    std::optional<std::map<std::string, std::string>> Options;
+    std::optional<std::map<std::string, std::string>> Labels;
     std::optional<std::map<std::string, std::string>> Status;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVolume, Name, Driver, CreatedAt, DriverOpts, Labels, Status);
 };
+
+// Labels and options are reported as null rather than as empty objects, and the driver-specific
+// status is omitted entirely when the driver reports nothing.
+inline void to_json(nlohmann::json& j, const InspectVolume& volume)
+{
+    const auto mapOrNull = [](const std::optional<std::map<std::string, std::string>>& value) {
+        return value.has_value() && !value->empty() ? nlohmann::json(*value) : nlohmann::json(nullptr);
+    };
+
+    j = nlohmann::json::object();
+    j["CreatedAt"] = volume.CreatedAt;
+    j["Driver"] = volume.Driver;
+    j["Labels"] = mapOrNull(volume.Labels);
+    j["Mountpoint"] = volume.Mountpoint;
+    j["Name"] = volume.Name;
+    j["Options"] = mapOrNull(volume.Options);
+    j["Scope"] = volume.Scope;
+
+    if (volume.Status.has_value() && !volume.Status->empty())
+    {
+        j["Status"] = *volume.Status;
+    }
+}
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(InspectVolume, Name, Driver, CreatedAt, Mountpoint, Scope, Options, Labels, Status);
 
 struct IPAMConfig
 {
