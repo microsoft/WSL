@@ -16,5 +16,6 @@ Example:
 ```c
 HRESULT hr = WslcSetSessionSettingsFeatureFlags(
     &sessionSettings,
-    WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU);
+    WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU |
+        WSLC_SESSION_FEATURE_FLAG_NESTED_VIRTUALIZATION);
 ```

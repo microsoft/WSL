@@ -34,6 +34,7 @@ Do not put credentials or other sensitive information in the session's name.
   - disabled by default (empty string); only enable when needed, since services listening only on the Windows loopback interface may not expect connections from container workloads
   - containers must also have networking enabled, for example `ContainerSettings::NetworkingMode(ContainerNetworkingMode::Bridged)`
   - requires WSL 3.0.5 or later; session creation fails with `WSLC_E_RUNTIME_UPDATE_NEEDED` on older runtimes
+- `EnableNestedVirtualization()` / setter
 
 ```cpp
 SessionSettings settings{ L"demo", L"C:\\WSLC\\demo" };
@@ -44,6 +45,7 @@ settings.MemorySizeInMB(winrt::box_value<uint32_t>(4096).as<winrt::Windows::Foun
 settings.Timeout(winrt::box_value(winrt::Windows::Foundation::TimeSpan{ std::chrono::minutes(5) })
     .as<winrt::Windows::Foundation::IReference<winrt::Windows::Foundation::TimeSpan>>());
 settings.EnableGpu(true);
+settings.EnableNestedVirtualization(true);
 
 auto name = settings.Name();
 auto path = settings.StoragePath();
@@ -51,4 +53,5 @@ auto cpu = settings.CpuCount();
 auto memory = settings.MemorySizeInMB();
 auto timeout = settings.Timeout();
 auto enableGpu = settings.EnableGpu();
+auto enableNestedVirtualization = settings.EnableNestedVirtualization();
 ```
