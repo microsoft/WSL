@@ -161,6 +161,7 @@ private:
         std::map<ULONG, Mount> Mounts;
         DiskStateFlags Flags;
         wil::unique_hfile BackingFile;
+
     };
 
     struct VirtioFsShare
