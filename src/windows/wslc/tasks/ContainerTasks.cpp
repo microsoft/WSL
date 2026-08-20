@@ -122,13 +122,14 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
     ContainerOutputInformation entry;
     entry.Command = WideToMultiByte(ContainerService::FormatCommand(container.Command, truncate));
     entry.CreatedAt = FormatDockerTimestamp(static_cast<LONGLONG>(container.CreatedAt));
-    // wslc does not surface health checks in the listing, which docker reports as "none".
-    entry.HealthStatus = "none";
+    // The runtime reports health as a suffix on the status description, which is the only place it is
+    // exposed by the listing API.
+    entry.HealthStatus = ContainerService::FormatHealthStatus(container.Status);
     entry.ID = truncate ? TruncateId(container.Id) : container.Id;
     entry.Image = container.Image;
     entry.Labels = container.Labels;
     entry.LocalVolumes = std::to_string(container.LocalVolumes);
-    entry.Mounts = container.Mounts;
+    entry.Mounts = WideToMultiByte(ContainerService::FormatMounts(container.Mounts, truncate));
     entry.Names = container.Name;
     entry.Networks = container.Networks;
     entry.Platform.architecture = wsl::shared::Arm64 ? "arm64" : "amd64";

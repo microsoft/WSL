@@ -79,13 +79,15 @@ void ValidateNewSessionStorageDirectory(const std::filesystem::path& StoragePath
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
 }
 
-// Copies a string into a fixed size buffer, truncating rather than failing when the source doesn't
-// fit. Only a genuine copy failure is reported as an error.
-template <size_t Size>
-void CopyTruncated(char (&Destination)[Size], const std::string& Source)
+// Frees the caller-owned strings on a container entry. Safe to call on a partially populated entry
+// because unset fields are null.
+void FreeContainerEntryStrings(WSLCContainerEntry& Entry)
 {
-    const auto result = strncpy_s(Destination, Size, Source.c_str(), _TRUNCATE);
-    THROW_HR_IF(E_UNEXPECTED, result != 0 && result != STRUNCATE);
+    CoTaskMemFree(Entry.Command);
+    CoTaskMemFree(Entry.Status);
+    CoTaskMemFree(Entry.Labels);
+    CoTaskMemFree(Entry.Networks);
+    CoTaskMemFree(Entry.Mounts);
 }
 
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
@@ -2556,6 +2558,13 @@ try
     // if some IDs returned by Docker aren't in m_containers (e.g. created externally), but in the
     // common case the two should match.
     auto output = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(dockerContainers.size());
+    auto freeStrings = wil::scope_exit([&] {
+        for (size_t i = 0; i < dockerContainers.size(); ++i)
+        {
+            FreeContainerEntryStrings(output[i]);
+        }
+    });
+
     std::vector<WSLCContainerPortMapping> allPorts;
 
     size_t index = 0;
@@ -2572,13 +2581,13 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
 
-        // Commands and status descriptions have no bound imposed by the runtime, so truncate them
-        // rather than failing the listing.
-        CopyTruncated(output[index].Command, dockerContainer.Command);
-        CopyTruncated(output[index].Status, dockerContainer.Status);
+        // Commands and status descriptions have no bound imposed by the runtime, so they are
+        // allocated rather than copied into a fixed buffer.
+        output[index].Command = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(dockerContainer.Command.c_str()).release();
+        output[index].Status = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(dockerContainer.Status.c_str()).release();
 
         // Labels, networks and mounts are reported the way the docker CLI renders them: a comma
-        // separated list. Like the command and status above they are unbounded, so they truncate.
+        // separated list. Like the command and status above they are unbounded.
         std::vector<std::string> labels;
         for (const auto& [key, value] : dockerContainer.Labels)
         {
@@ -2607,9 +2616,9 @@ try
         const auto joinedNetworks = wsl::shared::string::Join(networks, ',');
         const auto joinedMounts = wsl::shared::string::Join(mounts, ',');
 
-        CopyTruncated(output[index].Labels, joinedLabels);
-        CopyTruncated(output[index].Networks, joinedNetworks);
-        CopyTruncated(output[index].Mounts, joinedMounts);
+        output[index].Labels = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedLabels.c_str()).release();
+        output[index].Networks = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedNetworks.c_str()).release();
+        output[index].Mounts = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedMounts.c_str()).release();
         output[index].LocalVolumes = localVolumes;
 
         e->GetState(&output[index].State);
@@ -2632,13 +2641,21 @@ try
         index++;
     }
 
+    // Finish every allocation before transferring ownership so nothing can throw once the caller
+    // owns the results.
+    wil::unique_cotaskmem_ptr<WSLCContainerPortMapping[]> portsOutput;
+    if (!allPorts.empty())
+    {
+        portsOutput = wil::make_unique_cotaskmem<WSLCContainerPortMapping[]>(allPorts.size());
+        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLCContainerPortMapping));
+    }
+
+    freeStrings.release();
     *Count = static_cast<ULONG>(index);
     *Containers = output.release();
 
-    if (!allPorts.empty())
+    if (portsOutput)
     {
-        auto portsOutput = wil::make_unique_cotaskmem<WSLCContainerPortMapping[]>(allPorts.size());
-        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLCContainerPortMapping));
         *PortsCount = static_cast<ULONG>(allPorts.size());
         *Ports = portsOutput.release();
     }

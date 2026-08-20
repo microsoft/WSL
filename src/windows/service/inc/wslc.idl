@@ -31,11 +31,6 @@ cpp_quote("#endif")
 #define WSLC_MAX_VOLUME_DRIVER_LENGTH 255
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
 #define WSLC_MAX_IMAGE_ID_LENGTH 255
-#define WSLC_MAX_CONTAINER_COMMAND_LENGTH 4095
-#define WSLC_MAX_CONTAINER_STATUS_LENGTH 127
-#define WSLC_MAX_CONTAINER_LABELS_LENGTH 4095
-#define WSLC_MAX_CONTAINER_NETWORKS_LENGTH 1023
-#define WSLC_MAX_CONTAINER_MOUNTS_LENGTH 4095
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 #define WSLC_EPHEMERAL_PORT 0
@@ -47,11 +42,6 @@ cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
 cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_ID_LENGTH 255")
-cpp_quote("#define WSLC_MAX_CONTAINER_COMMAND_LENGTH 4095")
-cpp_quote("#define WSLC_MAX_CONTAINER_STATUS_LENGTH 127")
-cpp_quote("#define WSLC_MAX_CONTAINER_LABELS_LENGTH 4095")
-cpp_quote("#define WSLC_MAX_CONTAINER_NETWORKS_LENGTH 1023")
-cpp_quote("#define WSLC_MAX_CONTAINER_MOUNTS_LENGTH 4095")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
@@ -383,11 +373,13 @@ typedef struct _WSLCContainerEntry
 {
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
-    char Command[WSLC_MAX_CONTAINER_COMMAND_LENGTH + 1];
-    char Status[WSLC_MAX_CONTAINER_STATUS_LENGTH + 1];
-    char Labels[WSLC_MAX_CONTAINER_LABELS_LENGTH + 1];
-    char Networks[WSLC_MAX_CONTAINER_NETWORKS_LENGTH + 1];
-    char Mounts[WSLC_MAX_CONTAINER_MOUNTS_LENGTH + 1];
+    // The runtime imposes no bound on these values, so they are allocated by the callee and freed
+    // by the caller. Any of them may be null when the container reports no value.
+    [string] LPSTR Command;
+    [string] LPSTR Status;
+    [string] LPSTR Labels;
+    [string] LPSTR Networks;
+    [string] LPSTR Mounts;
     WSLCContainerId Id;
     ULONGLONG StateChangedAt;
     ULONGLONG CreatedAt;

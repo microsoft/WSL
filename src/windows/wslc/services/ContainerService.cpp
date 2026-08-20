@@ -446,6 +446,63 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
+// Reports whether a code point is printable using the same rule as Go's unicode.IsPrint, which docker relies on when
+// quoting: letters, marks, numbers, punctuation, symbols and the ASCII space.
+static bool IsPrintable(UChar32 codePoint)
+{
+    constexpr auto printableMask = U_GC_L_MASK | U_GC_M_MASK | U_GC_N_MASK | U_GC_P_MASK | U_GC_S_MASK;
+    return codePoint == U' ' || (U_GET_GC_MASK(codePoint) & printableMask) != 0;
+}
+
+// Appends a code point that has no printable representation, mirroring the escapes Go's strconv.Quote emits.
+static void AppendEscape(std::wstring& quoted, UChar32 codePoint)
+{
+    switch (codePoint)
+    {
+    case L'\a':
+        quoted += L"\\a";
+        return;
+    case L'\b':
+        quoted += L"\\b";
+        return;
+    case L'\f':
+        quoted += L"\\f";
+        return;
+    case L'\n':
+        quoted += L"\\n";
+        return;
+    case L'\r':
+        quoted += L"\\r";
+        return;
+    case L'\t':
+        quoted += L"\\t";
+        return;
+    case L'\v':
+        quoted += L"\\v";
+        return;
+    default:
+        break;
+    }
+
+    if (codePoint < L' ' || codePoint == 0x7F)
+    {
+        quoted += std::format(L"\\x{:02x}", static_cast<unsigned int>(codePoint));
+    }
+    else if (U_IS_SURROGATE(codePoint))
+    {
+        // An unpaired surrogate is not a valid code point, and Go substitutes the replacement character.
+        quoted += L"\\ufffd";
+    }
+    else if (codePoint < 0x10000)
+    {
+        quoted += std::format(L"\\u{:04x}", static_cast<unsigned int>(codePoint));
+    }
+    else
+    {
+        quoted += std::format(L"\\U{:08x}", static_cast<unsigned int>(codePoint));
+    }
+}
+
 std::wstring ContainerService::FormatCommand(const std::string& command, bool truncate)
 {
     constexpr size_t c_maxDisplayWidth = 20;
@@ -453,47 +510,55 @@ std::wstring ContainerService::FormatCommand(const std::string& command, bool tr
     auto wide = wsl::shared::string::MultiByteToWide(command);
     if (truncate)
     {
-        // Count code points rather than code units so a surrogate pair is never split.
-        size_t codePoints = 0;
-        size_t index = 0;
-        size_t cutoff = 0;
-        for (; index < wide.size(); ++codePoints)
-        {
-            if (codePoints > c_maxDisplayWidth)
-            {
-                break;
-            }
-
-            if (codePoints == c_maxDisplayWidth - 1)
-            {
-                cutoff = index;
-            }
-
-            index += (IS_HIGH_SURROGATE(wide[index]) && (index + 1 < wide.size()) && IS_LOW_SURROGATE(wide[index + 1])) ? 2 : 1;
-        }
-
-        if (codePoints > c_maxDisplayWidth)
-        {
-            wide.resize(cutoff);
-            wide += L'\u2026';
-        }
+        wide = wsl::windows::common::string::Ellipsis(wide, c_maxDisplayWidth);
     }
 
     // Quoting happens after truncation, so the result can exceed c_maxDisplayWidth. This matches docker, which truncates
     // the command first and quotes the truncated value.
+    const auto length = static_cast<int32_t>(wide.size());
     std::wstring quoted{L'"'};
-    for (const auto character : wide)
+    for (int32_t index = 0; index < length;)
     {
-        if (character == L'"' || character == L'\\')
+        const auto start = index;
+        UChar32 codePoint{};
+        U16_NEXT(wide.data(), index, length, codePoint);
+
+        if (codePoint == L'"' || codePoint == L'\\')
         {
             quoted += L'\\';
+            quoted += static_cast<wchar_t>(codePoint);
         }
-
-        quoted += character;
+        else if (IsPrintable(codePoint))
+        {
+            quoted.append(wide, start, static_cast<size_t>(index - start));
+        }
+        else
+        {
+            AppendEscape(quoted, codePoint);
+        }
     }
 
     quoted += L'"';
     return quoted;
+}
+
+std::wstring ContainerService::FormatMounts(const std::string& mounts, bool truncate)
+{
+    constexpr size_t c_maxDisplayWidth = 15;
+
+    auto wide = wsl::shared::string::MultiByteToWide(mounts);
+    if (!truncate || wide.empty())
+    {
+        return wide;
+    }
+
+    std::vector<std::wstring> shortened;
+    for (const auto& mount : wsl::shared::string::SplitPreserveEmpty(std::wstring_view{wide}, L','))
+    {
+        shortened.emplace_back(wsl::windows::common::string::Ellipsis(mount, c_maxDisplayWidth));
+    }
+
+    return wsl::shared::string::Join(shortened, L',');
 }
 
 std::wstring ContainerService::FormatStatus(const std::string& status, WSLCContainerState state, ULONGLONG stateChangedAt)
@@ -504,6 +569,29 @@ std::wstring ContainerService::FormatStatus(const std::string& status, WSLCConta
     }
 
     return ContainerStateToString(state, stateChangedAt);
+}
+
+std::string ContainerService::FormatHealthStatus(const std::string& status)
+{
+    const auto open = status.find('(');
+    if (open == std::string::npos || status.back() != ')')
+    {
+        return {};
+    }
+
+    constexpr std::string_view c_healthPrefix = "health: ";
+    auto health = std::string_view{status}.substr(open + 1, status.size() - open - 2);
+    if (health.starts_with(c_healthPrefix))
+    {
+        health.remove_prefix(c_healthPrefix.size());
+    }
+
+    if (health == "healthy" || health == "unhealthy" || health == "starting")
+    {
+        return std::string{health};
+    }
+
+    return {};
 }
 
 std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
@@ -677,16 +765,28 @@ std::vector<ContainerInformation> ContainerService::List(
 
     std::vector<ContainerInformation> result;
 
+    // The listing allocates these fields, so take ownership of each one as it is read.
+    const auto freeStrings = wil::scope_exit([&] {
+        for (auto& current : containers)
+        {
+            CoTaskMemFree(current.Command);
+            CoTaskMemFree(current.Status);
+            CoTaskMemFree(current.Labels);
+            CoTaskMemFree(current.Networks);
+            CoTaskMemFree(current.Mounts);
+        }
+    });
+
     for (const auto& current : containers)
     {
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
-        entry.Command = current.Command;
-        entry.Status = current.Status;
-        entry.Labels = current.Labels;
-        entry.Networks = current.Networks;
-        entry.Mounts = current.Mounts;
+        entry.Command = current.Command == nullptr ? "" : current.Command;
+        entry.Status = current.Status == nullptr ? "" : current.Status;
+        entry.Labels = current.Labels == nullptr ? "" : current.Labels;
+        entry.Networks = current.Networks == nullptr ? "" : current.Networks;
+        entry.Mounts = current.Mounts == nullptr ? "" : current.Mounts;
         entry.LocalVolumes = current.LocalVolumes;
         entry.State = current.State;
         entry.Id = current.Id;

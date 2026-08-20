@@ -35,9 +35,17 @@ struct ContainerService
 
     static std::wstring FormatCommand(const std::string& command, bool truncate);
 
+    // Renders the comma separated mount list. Docker shortens each name independently, so a long path
+    // never crowds out the mounts that follow it.
+    static std::wstring FormatMounts(const std::string& mounts, bool truncate);
+
     // Renders a container status, preferring the description supplied by the runtime and falling back
     // to a locally built one when it is unavailable.
     static std::wstring FormatStatus(const std::string& status, WSLCContainerState state, ULONGLONG stateChangedAt);
+
+    // Extracts the health status from a runtime supplied status description, which carries it as a
+    // parenthesized suffix. Containers without a health check report an empty string.
+    static std::string FormatHealthStatus(const std::string& status);
     static int Attach(Terminal& terminal, models::Session& session, const std::string& id);
     static int Run(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);
     static models::CreateContainerResult Create(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);

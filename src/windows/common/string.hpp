@@ -67,6 +67,12 @@ std::string WideToMultiByte(_In_ std::wstring_view Source);
 std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
 std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
 
+// Shortens a value so it occupies at most MaxDisplayWidth terminal columns, appending an ellipsis when
+// characters are dropped. East Asian wide and fullwidth code points occupy two columns, so fewer of them
+// fit than narrow ones, and a code point is never split. This matches docker's formatter.Ellipsis
+// (cli/command/formatter/displayutils.go), including its handling of widths of one and below.
+std::wstring Ellipsis(_In_ std::wstring_view Value, _In_ size_t MaxDisplayWidth);
+
 // Formats a unix timestamp the way docker does, matching Go's time.Time.String() layout. Falls back
 // to UTC when the time zone database is unavailable.
 std::string FormatDockerTimestamp(LONGLONG timestamp);
