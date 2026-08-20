@@ -16,6 +16,8 @@ Abstract:
 
 #include "helpers.hpp"
 #include "stringshared.h"
+#include <chrono>
+#include <optional>
 
 // Forward declare types to avoid pulling in excessive number of headers.
 using IP_ADDRESS_PREFIX = struct _IP_ADDRESS_PREFIX;
@@ -67,16 +69,29 @@ std::string WideToMultiByte(_In_ std::wstring_view Source);
 std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
 std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
 
-// Converts an RFC 3339 timestamp to seconds since the unix epoch. Only the 'Z' zone designator is
-// accepted; numeric offsets are not.
-std::uint64_t Rfc3339ToEpoch(const std::string& timestamp);
+// Expands a partial timestamp into a full RFC 3339 one. Hour-only, minute-only and date-only values
+// are padded out to a complete time, and a value with no zone designator is resolved against the
+// offset currently in effect locally. Input that is not recognized is returned for the parser to
+// reject.
+std::string ExpandToRfc3339(const std::string& timestamp);
+
+// Converts an RFC 3339 timestamp to seconds since the unix epoch. Accepts a 'Z' designator or a
+// numeric +HH:MM offset, with optional fractional seconds. Timestamps that predate the epoch convert
+// to a negative value. Throws E_INVALIDARG if the timestamp is malformed, names an invalid date, or
+// has trailing characters.
+std::int64_t Rfc3339ToEpoch(const std::string& timestamp);
+
+// Parses a Go duration such as "1h30m", "-1.5h" or "300ms": an optional sign followed by one or more
+// decimal values that each carry a unit of ns, us, ms, s, m or h. Returns nothing if the value does
+// not match that grammar or overflows.
+std::optional<std::chrono::nanoseconds> TryParseDuration(const std::string& duration);
 
 // Renders seconds since the unix epoch in the local time zone, using the layout
 // "2006-01-02 15:04:05 -0700 MST". Falls back to UTC when the time zone database is unavailable.
 std::string EpochToLocalDisplayTime(LONGLONG timestamp);
 
 // Renders an RFC 3339 timestamp in the same layout, but as UTC and with its fractional seconds
-// preserved. The input is returned unchanged when it cannot be parsed.
+// preserved. An empty input returns an empty string; anything else that cannot be parsed throws.
 std::string Rfc3339ToUtcDisplayTime(std::string_view timestamp);
 
 // Template implementation for TruncateId to avoid code duplication.

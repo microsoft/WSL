@@ -2421,7 +2421,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(mergedLabels),
         std::move(OnDeleted),
         WslcContainerStateCreated,
-        wsl::windows::common::string::Rfc3339ToEpoch(inspectData.Created),
+        static_cast<std::uint64_t>(wsl::windows::common::string::Rfc3339ToEpoch(inspectData.Created)),
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
@@ -2531,9 +2531,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         {
             const auto& timestamp = (state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
 
-            if (!timestamp.empty())
+            if (!timestamp.empty() && timestamp != c_unsetTimestamp)
             {
-                container->m_stateChangedAt = wsl::windows::common::string::Rfc3339ToEpoch(timestamp);
+                container->m_stateChangedAt = static_cast<std::uint64_t>(wsl::windows::common::string::Rfc3339ToEpoch(timestamp));
             }
         }
     }
@@ -2575,7 +2575,7 @@ std::string WSLCContainerImpl::InspectLockHeld() const
     return wsl::shared::ToJson(wslcInspect);
 }
 
-void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const
+void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -3081,7 +3081,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 try
 {
     WSLCExecutionContext context(&m_session);
