@@ -1518,7 +1518,6 @@ Return Value:
     //
 
     bool readOnly = false;
-
     try
     {
         AddTemporaryMount(LX_WSL2_CROSS_DISTRO_ENV, CROSS_DISTRO_SHARE_PATH, (MS_MOVE | MS_REC));
