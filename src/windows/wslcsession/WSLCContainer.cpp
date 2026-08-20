@@ -1373,6 +1373,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
             bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
 
             lock.reset();
+            lifecycleLock.reset();
 
             try
             {
@@ -1406,7 +1407,9 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
                 lock = m_lock.lock_exclusive();
                 transition = m_transition;
 
-                if (!transition)
+                // Only start a transition if the container is still running. OnEvent may have observed the stop
+                // while the locks were released, in which case there is no further event to wait for.
+                if (!transition && m_state == WslcContainerStateRunning)
                 {
                     transition = StartTransition(TransitionKind::Stop, ContainerEvent::Stop);
                 }
