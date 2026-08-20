@@ -607,7 +607,7 @@ LONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& a
         return intValue;
     }
 
-    if (const auto duration = wsl::windows::common::string::TryParseDuration(narrowValue); duration.has_value())
+    if (const auto duration = wsl::windows::common::timestamp::TryParseDuration(narrowValue); duration.has_value())
     {
         const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch());
 
@@ -616,7 +616,7 @@ LONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& a
 
     try
     {
-        return wsl::windows::common::string::Rfc3339ToEpoch(wsl::windows::common::string::ExpandToRfc3339(narrowValue));
+        return wsl::windows::common::timestamp::Rfc3339ToEpoch(wsl::windows::common::timestamp::ExpandToRfc3339(narrowValue));
     }
     // Name the offending argument rather than surfacing the raw parse failure.
     catch (...)
@@ -768,7 +768,7 @@ int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& a
 int64_t GetDurationNanosFromString(const std::wstring& input, const std::wstring& argName)
 {
     const std::string narrow = WideToMultiByte(input);
-    const auto parsed = wsl::windows::common::string::TryParseDuration(narrow);
+    const auto parsed = wsl::windows::common::timestamp::TryParseDuration(narrow);
 
     if (!parsed.has_value() || parsed.value() < std::chrono::nanoseconds::zero())
     {

@@ -4,10 +4,10 @@
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
-#include "string.hpp"
+#include "timestamp.hpp"
 
 using namespace wsl::shared;
-using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
 using namespace WEX::Common;

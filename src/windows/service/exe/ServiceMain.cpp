@@ -23,6 +23,7 @@ Abstract:
 
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::policies;
 

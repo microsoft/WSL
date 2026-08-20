@@ -368,7 +368,7 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
         return stateString;
     }
 
-    return std::format(L"{} {}", stateString, wsl::windows::common::string::FormatRelativeTime(stateChangedAt));
+    return std::format(L"{} {}", stateString, wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt));
 }
 
 std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)

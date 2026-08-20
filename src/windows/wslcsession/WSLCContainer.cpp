@@ -2421,7 +2421,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(mergedLabels),
         std::move(OnDeleted),
         WslcContainerStateCreated,
-        wsl::windows::common::string::Rfc3339ToEpoch(inspectData.Created),
+        wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created),
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
@@ -2533,7 +2533,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
             if (!timestamp.empty() && timestamp != c_unsetTimestamp)
             {
-                container->m_stateChangedAt = wsl::windows::common::string::Rfc3339ToEpoch(timestamp);
+                container->m_stateChangedAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(timestamp);
             }
         }
     }
