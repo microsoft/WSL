@@ -2496,6 +2496,14 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Det går inte att ange nätverksalias när flera nätverk begärs. Använd ett enda --network alternativ.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>En IP-adress kräver ett användardefinierat nätverk. Använd --network för att ange ett.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Det går inte att ange en IP-adress när flera nätverk begärs. Använd ett enda --network alternativ.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Det gick inte att skapa volymen {}: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

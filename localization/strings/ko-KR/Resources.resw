@@ -2502,6 +2502,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>여러 개의 네트워크가 요청되는 경우 네트워크 별칭을 지정할 수 없습니다. 단일 --network 옵션을 사용합니다.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>IP 주소에는 사용자 정의 네트워크가 필요합니다. --network 를 사용하여 지정합니다.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>여러 네트워크가 요청될 때 IP 주소를 지정할 수 없습니다. 단일 --network 옵션을 사용합니다.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>볼륨 '{}'을(를) 만들지 못함: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
