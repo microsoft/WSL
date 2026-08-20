@@ -768,9 +768,9 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ValidateTimestamp_ValidPreEpoch)
     {
         // No lower bound is applied, so pre-1970 values convert to a negative epoch.
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1960-01-15T10:30:00Z"), -315610200LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1960-01-15T10:30:00Z"), -314371800LL);
         VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0001-01-01T00:00:00Z"), -62135596800LL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"-315610200"), -315610200LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"-314371800"), -314371800LL);
     }
 
     TEST_METHOD(ValidateTimestamp_ValidZoneLessLocalTime)
