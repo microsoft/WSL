@@ -7959,8 +7959,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/true", testName)), 0L);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--terminate {}", testName)), 0L);
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { DetachTestVolume(mountPath, outerVhd); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+        DetachTestVolume(mountPath, outerVhd);
         volumeAttached = false;
         VERIFY_IS_FALSE(std::filesystem::exists(installPath / LXSS_VM_MODE_VHD_NAME));
 

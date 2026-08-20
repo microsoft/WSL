@@ -8,6 +8,7 @@ stages:
 - template: build-stage.yml@self
   parameters:
     isRelease: false
+    cloudTestName: 'UnitTests::UnitTests::CachedVhdIsReattachedAfterBackingVolumeRemount'
     pool: 'wsl-build'
     vsoOrg: shine-oss
     vsoProject: wsl
@@ -16,4 +17,5 @@ stages:
   parameters:
     includePackageStage: false
     rs_prerelease_only: true
+    versions: [wsl2]
     pool: server

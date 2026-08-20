@@ -3161,7 +3161,19 @@ static void RunDiskpartScript(std::wstring_view Script)
     scriptFile.close();
 
     auto commandLine = std::format(L"diskpart.exe /s \"{}\"", scriptFileName);
-    THROW_HR_IF(E_FAIL, wsl::windows::common::helpers::RunProcess(commandLine) != 0);
+    wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+    const auto output = process.RunAndCaptureOutput();
+    if (output.ExitCode != 0)
+    {
+        LogError(
+            "diskpart failed with exit code %lu. Script:\n%.*ls\nStdout:\n%ls\nStderr:\n%ls",
+            output.ExitCode,
+            static_cast<int>(Script.size()),
+            Script.data(),
+            output.Stdout.c_str(),
+            output.Stderr.c_str());
+        THROW_HR(E_FAIL);
+    }
 }
 
 void AttachTestVolume(const std::filesystem::path& MountPoint, const std::filesystem::path& VhdPath)
