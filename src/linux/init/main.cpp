@@ -1630,7 +1630,7 @@ try
     //
     // If kernel headers were mounted, move them to a temporary location and pass the desired
     // target path to the distro init via an environment variable. Distro init will move the
-    // mount to /usr/src/linux-headers-<uname -r>/include and create the
+    // mount to /usr/src/linux-headers-<uname -r> and create the
     // /lib/modules/<release>/build symlink.
     //
 

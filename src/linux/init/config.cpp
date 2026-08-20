@@ -189,7 +189,10 @@ try
     }
 
     const std::string targetPath{target};
-    unsetenv(PathEnvironmentName);
+    if (unsetenv(PathEnvironmentName) < 0)
+    {
+        LOG_ERROR("unsetenv({}) failed {}", PathEnvironmentName, errno);
+    }
 
     if (tempMount.MoveMount(targetPath.c_str()))
     {
