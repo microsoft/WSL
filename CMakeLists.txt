@@ -518,7 +518,7 @@ endif()
 if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smaller
     add_compile_definitions(WSL_SYSTEM_DISTRO_PATH="${WSL_DEV_BINARY_PATH}/system.vhd"
                             WSL_KERNEL_PATH="${WSL_DEV_BINARY_PATH}/kernel"
-                            WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/modules.vhd"
+                            WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/artifacts.vhd"
                             WSL_DEV_INSTALL_PATH="${WSL_DEV_BINARY_PATH}"
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
 endif()

@@ -18,6 +18,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <JsonUtils.h>
 #include <wslutil.h>
 
@@ -382,25 +383,6 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
     }
 }
 
-void EnsureImageIsDeleted(const TestImage& image)
-{
-    auto result = RunWslc(L"image list --format json");
-    result.Verify({.Stderr = L"", .ExitCode = 0});
-
-    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
-    for (const auto& img : images)
-    {
-        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
-            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
-        {
-            EnsureImageContainersAreDeleted(image);
-            auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
-            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
-            break;
-        }
-    }
-}
-
 void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix)
 {
     auto result = RunWslc(L"image list --format json");
@@ -441,38 +423,6 @@ void EnsureNoUntaggedImages()
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
         }
     }
-}
-
-void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
-{
-    std::wstring listCommand = L"image list --format json";
-    if (!sessionName.empty())
-    {
-        listCommand = std::format(L"--session \"{}\" image list --format json", sessionName);
-    }
-
-    auto result = RunWslc(listCommand);
-    result.Verify({.Stderr = L"", .ExitCode = 0});
-
-    auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
-    for (const auto& img : images)
-    {
-        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
-            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
-        {
-            return;
-        }
-    }
-
-    // Image not found, load it
-    std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
-    if (!sessionName.empty())
-    {
-        loadCommand = std::format(L"--session \"{}\" image load --input \"{}\"", sessionName, image.Path.wstring());
-    }
-
-    auto loadResult = RunWslc(loadCommand);
-    loadResult.Verify({.Stderr = L"", .ExitCode = 0});
 }
 
 void EnsureSessionIsTerminated(const std::wstring& sessionName)
