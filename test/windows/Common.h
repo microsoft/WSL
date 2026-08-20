@@ -723,5 +723,3 @@ void WriteSocket(SOCKET Socket, const void* data, size_t size);
 void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current());
 
 void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring);
-
-void RunDiskpartScript(std::wstring_view Script);

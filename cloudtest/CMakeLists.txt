@@ -47,12 +47,6 @@ function(add_test_group image version suffix filter)
     set(DIR ${OUT}/${image}-${suffix})
     file(MAKE_DIRECTORY ${DIR})
 
-    if(CLOUDTEST_TEST_NAME AND "${suffix}" STREQUAL "wsl2")
-        set(test_args "/name:${CLOUDTEST_TEST_NAME}")
-    else()
-        set(test_args "/select:&quot;${filter}&quot;")
-    endif()
-
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestMap.xml.in ${DIR}/TestMap.xml)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup.xml.in ${DIR}/TestGroup.xml)
 endfunction()

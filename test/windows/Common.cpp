@@ -3149,29 +3149,3 @@ void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
         VERIFY_FAIL();
     }
 }
-
-void RunDiskpartScript(std::wstring_view Script)
-{
-    const auto scriptFileName = wsl::windows::common::filesystem::GetTempFilename();
-    std::wofstream scriptFile(scriptFileName);
-    THROW_HR_IF(E_FAIL, !scriptFile.is_open());
-
-    auto cleanup = wil::scope_exit([&] { DeleteFileW(scriptFileName.c_str()); });
-    scriptFile << Script;
-    scriptFile.close();
-
-    auto commandLine = std::format(L"diskpart.exe /s \"{}\"", scriptFileName);
-    wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
-    const auto output = process.RunAndCaptureOutput();
-    if (output.ExitCode != 0)
-    {
-        LogError(
-            "diskpart failed with exit code %lu. Script:\n%.*ls\nStdout:\n%ls\nStderr:\n%ls",
-            output.ExitCode,
-            static_cast<int>(Script.size()),
-            Script.data(),
-            output.Stdout.c_str(),
-            output.Stderr.c_str());
-        THROW_HR(E_FAIL);
-    }
-}

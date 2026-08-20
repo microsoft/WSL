@@ -19,10 +19,6 @@ parameters:
     type: string
     default: ''
 
-  - name: cloudTestName
-    type: string
-    default: ''
-
   - name: nugetPackages
     type: object
     default:
@@ -82,7 +78,6 @@ stages:
           isNightly: ${{ parameters.isNightly }}
           packageVersion: ${{ parameters.packageVersion }}
           traceLoggingConfig: ${{ parameters.traceLoggingConfig }}
-          cloudTestName: ${{ parameters.cloudTestName }}
           targets: ${{ parameters.targets }}
           pool: ${{ parameters.pool }}
           vsoOrg: ${{ parameters.vsoOrg }}
@@ -143,7 +138,6 @@ stages:
           isNightly: ${{ parameters.isNightly }}
           packageVersion: ${{ parameters.packageVersion }}
           traceLoggingConfig: ${{ parameters.traceLoggingConfig }}
-          cloudTestName: ${{ parameters.cloudTestName }}
           targets: ${{ parameters.targets }}
           pool: ${{ parameters.pool }}
           vsoOrg: ${{ parameters.vsoOrg }}

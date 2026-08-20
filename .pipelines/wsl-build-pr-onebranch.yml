@@ -46,10 +46,8 @@ extends:
     - template: build-stage.yml@self
       parameters:
         isRelease: false
-        cloudTestName: 'UnitTests::UnitTests::CachedVhdIsReattachedAfterBackingVolumeRemount'
 
     - template: test-stage.yml@self
       parameters:
         includePackageStage: false
         rs_prerelease_only: true
-        versions: [wsl2]
