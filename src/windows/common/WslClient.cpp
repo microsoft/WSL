@@ -223,8 +223,9 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     std::filesystem::path filePath;
     LPCWSTR name{};
+    int tarFormatSet = 0;
 
-    auto parseFormat = [&flags](LPCWSTR Value) {
+    auto parseFormat = [&flags, &tarFormatSet](LPCWSTR Value) {
         if (Value == nullptr)
         {
             return -1;
@@ -242,7 +243,11 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
         {
             WI_SetFlag(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD);
         }
-        else if (!wsl::shared::string::IsEqual(L"tar", Value))
+        else if (wsl::shared::string::IsEqual(L"tar", Value))
+        {
+            tarFormatSet = 1;
+        }
+        else
         {
             THROW_HR(E_INVALIDARG);
         }
@@ -257,7 +262,7 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     parser.Parse();
 
     constexpr ULONG c_exportFormatFlags = LXSS_EXPORT_DISTRO_FLAGS_VHD | LXSS_EXPORT_DISTRO_FLAGS_GZIP | LXSS_EXPORT_DISTRO_FLAGS_XZIP;
-    THROW_HR_IF(WSL_E_INVALID_USAGE, filePath.empty() || std::popcount(flags & c_exportFormatFlags) > 1);
+    THROW_HR_IF(WSL_E_INVALID_USAGE, filePath.empty() || std::popcount(flags & c_exportFormatFlags) + tarFormatSet > 1);
 
     // Determine if the target is stdout, or an on-disk file.
     wil::unique_hfile file;

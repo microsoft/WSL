@@ -4382,6 +4382,8 @@ localhostForwarding=true
         auto injectionCommandLine = LxssGenerateWslCommandLine(injectionCommand.c_str());
         const auto [injectionOutput, injectionError, injectionExitCode] =
             LxsstuLaunchCommandAndCaptureOutputWithResult(injectionCommandLine.data());
+        (void)injectionOutput;
+        (void)injectionError;
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/test ! -e {}", injectionMarker)), 0L);
         VERIFY_ARE_EQUAL(injectionExitCode, 1);
