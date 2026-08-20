@@ -2923,8 +2923,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Ensure the kernel modules folder is mounted correctly.
         std::wstring command = std::format(
             L"mount | grep -iF 'none on /usr/lib/modules/{} type overlay "
-            L"(rw,nosuid,nodev,noatime,lowerdir=/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
+            L"(rw,nosuid,nodev,noatime,lowerdir=/modules/{}/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
             L"work,uuid=on)'",
+            kernelVersion,
             kernelVersion,
             kernelVersion,
             kernelVersion);
@@ -2953,7 +2954,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 #ifdef WSL_DEV_INSTALL_PATH
 
         std::wstring kernelPath = WSL_DEV_INSTALL_PATH L"/kernel";
-        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/modules.vhd";
+        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/artifacts.vhd";
 
 #else
 
@@ -2963,7 +2964,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         std::filesystem::path wslInstallPath(installPath.value());
 
         std::wstring kernelPath = wslInstallPath / "tools" / "kernel";
-        std::wstring kernelModulesPath = wslInstallPath / "tools" / "modules.vhd";
+        std::wstring kernelModulesPath = wslInstallPath / "tools" / "artifacts.vhd";
 
 #endif
 
@@ -6809,13 +6810,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
@@ -6862,13 +6863,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 

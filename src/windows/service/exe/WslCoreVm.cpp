@@ -236,7 +236,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
 #else
 
-            m_vmConfig.KernelModulesPath = m_rootFsPath / L"modules.vhd";
+            m_vmConfig.KernelModulesPath = m_rootFsPath / L"artifacts.vhd";
 
 #endif
         }
