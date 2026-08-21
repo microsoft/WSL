@@ -641,7 +641,14 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    //
+    // 'discard' is required so that blocks freed inside the guest are unmapped in the backing VHDX.
+    // Without it the dynamically expanding VHDX only ever grows: every image load extracts the incoming
+    // tar into /var/lib/docker/tmp before deduplicating it, and although that data is deleted right
+    // afterwards, ext4 satisfies the next extraction from a different region, so the VHD grows by
+    // roughly the tar size on each load even when nothing new is stored. See
+    // WSLCTests::LoadImageRepeatedDoesNotGrowStorageVhd.
+    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "discard", 0);
     m_runtime.SetStorageMounted(true);
 
     // Configure swap on a separate ephemeral VHD.

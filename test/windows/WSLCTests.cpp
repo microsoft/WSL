@@ -1419,19 +1419,80 @@ class WSLCTests
 
     // Loading the same image tar repeatedly must not permanently grow the session storage VHD.
     //
-    // Docker's /images/load handler extracts the entire tar into a temporary directory under its data
+    // Docker's /images/load handler extracts the incoming tar into a temporary directory under its data
     // root (/var/lib/docker, which is the storage VHD) before inspecting any digest, so every call
     // writes roughly one tar's worth of data to the VHD even when the layers already exist and are
     // deduplicated. That temporary directory is deleted afterwards, but the VHD is a non-sparse
     // dynamically expanding VHDX mounted without 'discard', so the freed blocks are never returned to
-    // the host. The result is a VHD that grows by about the tar size on every load.
+    // the host, and ext4 tends to satisfy the next extraction from a different region rather than
+    // reusing the just-freed one. The result is a VHD that grows by about the tar size on every load.
+    //
+    // The size of the tar matters: a small tar is re-extracted into blocks the VHDX has already
+    // allocated, so the growth plateaus immediately and the bug does not reproduce. This test therefore
+    // builds a large image with incompressible layers (which is what a real from-source application
+    // image looks like once 'save' has written its uncompressed layers out) rather than reusing one of
+    // the small prebuilt test tars.
     WSLC_TEST_METHOD(LoadImageRepeatedDoesNotGrowStorageVhd)
     {
         SKIP_TEST_SERVER();
 
         constexpr auto c_sessionName = L"wslc-load-image-vhd-growth";
-        constexpr auto c_imageName = "debian:latest";
-        constexpr auto c_extraLoads = 4;
+        constexpr auto c_imageName = "wslc-test-load-growth:latest";
+        constexpr auto c_layerCount = 4;
+        constexpr auto c_layerSizeMb = 256;
+        constexpr auto c_extraLoads = 3;
+
+        // Build the image in the shared session (it already has debian:latest), then export it. Each
+        // layer is /dev/urandom so it cannot be compressed away, making the exported tar's size
+        // representative of the data the engine has to move on every load.
+        //
+        // Pass /p:LoadGrowthTar=<path> to run the loop against an existing tar (for example one produced
+        // by 'wslc build' + 'wslc save' for a real application image) instead of building one here.
+        WEX::Common::String existingTar;
+        WEX::TestExecution::RuntimeParameters::TryGetValue(L"LoadGrowthTar", existingTar);
+        const bool useExistingTar = !existingTar.IsEmpty();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-load-growth";
+        const auto imageTar = useExistingTar ? std::filesystem::path{static_cast<LPCWSTR>(existingTar)}
+                                             : std::filesystem::current_path() / "wslc-load-growth.tar";
+
+        auto buildCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (useExistingTar)
+            {
+                return;
+            }
+
+            LOG_IF_FAILED(DeleteImageNoThrow(c_imageName, WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+            std::filesystem::remove(imageTar, ec);
+        });
+
+        if (!useExistingTar)
+        {
+            std::filesystem::create_directories(contextDir);
+
+            {
+                std::ofstream dockerfile(contextDir / "Dockerfile");
+                dockerfile << "FROM debian:latest\n";
+                for (auto i = 0; i < c_layerCount; i++)
+                {
+                    dockerfile << std::format(
+                        "RUN dd if=/dev/urandom bs=1M count={} of=/blob{}.bin status=none\n", c_layerSizeMb, i);
+                }
+            }
+
+            VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, c_imageName));
+
+            wil::unique_handle tarFile{CreateFileW(
+                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == tarFile.get());
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(ToCOMInputHandle(tarFile.get()), c_imageName, nullptr, nullptr));
+        }
+
+        const auto tarSize = static_cast<uint64_t>(std::filesystem::file_size(imageTar));
+        VERIFY_IS_TRUE(tarSize > 0);
 
         // A dedicated storage directory is required: the shared class storage is preloaded with the test
         // images and is written to by every other test in this class, so its size says nothing here.
@@ -1449,9 +1510,6 @@ class WSLCTests
         auto session = CreateSession(settings);
 
         const auto vhdPath = storageDir / wsl::windows::wslc::DefaultStorageVhdName;
-        const auto imageTar = GetTestImagePath(c_imageName);
-        const auto tarSize = static_cast<uint64_t>(std::filesystem::file_size(imageTar));
-        VERIFY_IS_TRUE(tarSize > 0);
 
         // Size on disk, which is what grows as the dynamically expanding VHDX allocates blocks.
         auto vhdSizeOnDisk = [&]() {
@@ -1498,7 +1556,10 @@ class WSLCTests
         // The first load legitimately grows the VHD: this is where the layers are actually registered.
         // Everything measured after it is overhead from re-loading content docker already has.
         loadImage();
-        ExpectImagePresent(*session, c_imageName);
+        if (!useExistingTar)
+        {
+            ExpectImagePresent(*session, c_imageName);
+        }
 
         const auto baselineVhdSize = vhdSizeOnDisk();
         const auto baselineGuestUsed = guestUsedBytes();
@@ -1529,6 +1590,20 @@ class WSLCTests
         const auto finalVhdSize = vhdSizeOnDisk();
         const auto finalGuestUsed = guestUsedBytes();
 
+        // The host-side VHD must not grow by roughly one tar per load. The budget allows a single tar of
+        // slack in total (with a floor so that small tars don't make this flaky), which is well under the
+        // c_extraLoads * tarSize that linear growth would produce.
+        constexpr uint64_t c_minimumGrowthBudget = 64ull * 1024 * 1024;
+        const auto growthBudget = std::max<uint64_t>(tarSize, c_minimumGrowthBudget);
+
+        LogInfo(
+            "Storage VHD grew by %llu bytes over %d reloads of a %llu byte tar (budget=%llu). Guest usage grew by %lld bytes.",
+            static_cast<unsigned long long>(finalVhdSize - baselineVhdSize),
+            c_extraLoads,
+            static_cast<unsigned long long>(tarSize),
+            static_cast<unsigned long long>(growthBudget),
+            static_cast<long long>(finalGuestUsed - baselineGuestUsed));
+
         // Reloading the same tar must not leave docker's extraction directory behind.
         VERIFY_ARE_EQUAL(0ull, guestTempEntryCount());
 
@@ -1537,21 +1612,9 @@ class WSLCTests
         // the guest rather than merely being unreclaimable on the host.
         VERIFY_IS_TRUE(finalGuestUsed < baselineGuestUsed + tarSize);
 
-        // The host-side VHD must not grow by roughly one tar per load. The budget allows a single tar of
-        // slack in total (with a floor so that small tars don't make this flaky), which is well under the
-        // c_extraLoads * tarSize that linear growth would produce.
-        constexpr uint64_t c_minimumGrowthBudget = 64ull * 1024 * 1024;
-        const auto growthBudget = std::max<uint64_t>(tarSize, c_minimumGrowthBudget);
         if (finalVhdSize >= baselineVhdSize + growthBudget)
         {
-            LogError(
-                "Storage VHD grew by %llu bytes over %d reloads of a %llu byte tar (budget=%llu). Guest usage grew by %lld "
-                "bytes, so the space is being written and then not reclaimed.",
-                static_cast<unsigned long long>(finalVhdSize - baselineVhdSize),
-                c_extraLoads,
-                static_cast<unsigned long long>(tarSize),
-                static_cast<unsigned long long>(growthBudget),
-                static_cast<long long>(finalGuestUsed - baselineGuestUsed));
+            LogError("The storage VHD is growing with each load: the space is being written and then not reclaimed.");
 
             VERIFY_FAIL();
         }
