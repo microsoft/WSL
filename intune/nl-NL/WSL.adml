@@ -55,7 +55,7 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-container toestaan</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Dit beleid bepaalt of de WSL-container op dit apparaat kan worden gebruikt. Wanneer deze is ingeschakeld of niet is geconfigureerd, kunnen gebruikers en Windows-toepassingen Linux-containers uitvoeren via WSL. Wanneer deze is uitgeschakeld, wordt de WSL-container voor alle gebruikers geblokkeerd en kunnen Windows-apps geen Linux-containers uitvoeren. Waarschuwing: als je dit instelt op 'Disabled', kunnen Windows-apps die afhankelijk zijn van Linux-containers, worden onderbroken.</string>
 
-        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Allow privileged WSL containers</string>
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Geprivilegieerde WSL-containers toestaan</string>
         <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL containers can run in privileged mode on this machine. When enabled or not configured, users and Windows applications can start privileged containers. When set to 'Disabled', requests to start a privileged container are refused for all users and Windows apps. Privileged containers run with elevated Linux capabilities and reduced isolation from the container host.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Acceptatielijst voor WSL-containerregisters</string>
