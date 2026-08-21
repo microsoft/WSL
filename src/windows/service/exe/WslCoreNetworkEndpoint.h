@@ -51,12 +51,13 @@ struct NetworkEndpoint
     windows::common::hcs::unique_hcn_endpoint Endpoint{};
     std::optional<IpStateTracking> StateTracking;
 
-    void DeleteEndpoint() const noexcept
+    void DeleteEndpoint() noexcept
     {
         if (Endpoint)
         {
             wil::unique_cotaskmem_string error;
             LOG_IF_FAILED_MSG(::HcnDeleteEndpoint(EndpointId, &error), "error message: %ls", error.get());
+            Endpoint.reset();
         }
     }
 

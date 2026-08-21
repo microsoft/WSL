@@ -4380,13 +4380,10 @@ localhostForwarding=true
             WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG, injectionUsername};
         const auto injectionCommand = wil::ArgvToCommandLine(injectionArguments, wil::ArgvToCommandLineFlags::FirstArgumentIsNotPath);
         auto injectionCommandLine = LxssGenerateWslCommandLine(injectionCommand.c_str());
-        const auto [injectionOutput, injectionError, injectionExitCode] =
-            LxsstuLaunchCommandAndCaptureOutputWithResult(injectionCommandLine.data());
-        (void)injectionOutput;
-        (void)injectionError;
+        const auto injectionExitCode = LxsstuRunCommand(injectionCommandLine.data());
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/test ! -e {}", injectionMarker)), 0L);
-        VERIFY_ARE_EQUAL(injectionExitCode, 1);
+        VERIFY_ARE_EQUAL(injectionExitCode, 1L);
     }
 
     TEST_METHOD(PostDistroRegistrationSettingsOOBE)
