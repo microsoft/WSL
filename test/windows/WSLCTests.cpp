@@ -1478,8 +1478,7 @@ class WSLCTests
                 dockerfile << "FROM debian:latest\n";
                 for (auto i = 0; i < c_layerCount; i++)
                 {
-                    dockerfile << std::format(
-                        "RUN dd if=/dev/urandom bs=1M count={} of=/blob{}.bin status=none\n", c_layerSizeMb, i);
+                    dockerfile << std::format("RUN dd if=/dev/urandom bs=1M count={} of=/blob{}.bin status=none\n", c_layerSizeMb, i);
                 }
             }
 

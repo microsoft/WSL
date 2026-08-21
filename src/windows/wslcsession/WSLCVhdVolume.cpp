@@ -172,6 +172,8 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     VirtualMachine.Ext4Format(device, opts.Uid, opts.Gid);
 
     auto virtualMachinePath = std::format("/mnt/wslc-volumes/{}", name);
+
+    // These should match the mount options used in Open
     VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "discard", 0);
 
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
@@ -275,7 +277,8 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
         auto [attachedLun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
         auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(attachedLun); });
 
-        VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
+        // These should match the mount options used in Create
+        VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "discard", 0);
         auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
 
         RemoveLostFoundDirectory(VirtualMachine, Volume.Name, virtualMachinePath);
