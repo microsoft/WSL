@@ -2496,6 +2496,14 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Der kan ikke angives netværksaliasser, når der anmodes om flere netværk. Brug en enkelt --network indstilling.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>En IP-adresse kræver et brugerdefineret netværk. Brug --network til at angive en.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Der kan ikke angives en IP-adresse, når der anmodes om flere netværk. Brug en enkelt --network indstilling.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Enheden '{}' kunne ikke oprettes: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3538,9 +3546,8 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Fjerner alle ubenyttede netværk. Et netværk anses for at være ubrugt, når ingen objektbeholder refererer til det.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Slettet: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Slettede netværk:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Opret forbindelse mellem en objektbeholder og et netværk</value>
@@ -3595,9 +3602,8 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Fjern alle ubrugte diskenheder, ikke kun anonyme diskenheder.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Slettet: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Volumes:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Samlet frigjort plads: {}</value>
@@ -3699,47 +3705,47 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>PIDS</value>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
-    <value>Less than a second ago</value>
+    <value>For mindre end et sekund siden</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
-    <value>1 second ago</value>
+    <value>For 1 sekund siden</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
-    <value>{} seconds ago</value>
+    <value>For {} sekunder siden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
-    <value>About a minute ago</value>
+    <value>For ca. et minut siden</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
-    <value>{} minutes ago</value>
+    <value>For {} minutter siden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
-    <value>About an hour ago</value>
+    <value>For ca. en time siden</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
-    <value>{} hours ago</value>
+    <value>For {} timer siden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
-    <value>{} days ago</value>
+    <value>For {} dage siden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
-    <value>{} weeks ago</value>
+    <value>For {} uger siden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
-    <value>{} months ago</value>
+    <value>For {} måneder siden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
-    <value>{} years ago</value>
+    <value>For {} ⌡år siden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">

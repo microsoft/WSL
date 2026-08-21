@@ -2496,6 +2496,14 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>Hálózati aliasok nem adhatók meg, ha több hálózatra van szükség. Használjon egyetlen --network opciót.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Az IP-címhez felhasználó által meghatározott hálózat szükséges. A --network használatával adhat meg egyet.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Egy IP-cím nem adható meg, ha több hálózatra van szükség. Használjon egyetlen --network opciót.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nem sikerült létrehozni a(z) „{}” kötetet: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3538,9 +3546,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Eltávolítja az összes nem használt hálózatot. Egy hálózat akkor tekinthető nem használtnak, ha egyetlen tároló sem hivatkozik rá.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Törölve: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Törölt hálózatok:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Tároló csatlakoztatása hálózathoz</value>
@@ -3595,9 +3602,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Távolítsa el az összes nem használt kötetet, ne csak a névteleneket.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Törölve: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Volumes:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Teljes felszabadított terület: {}</value>
@@ -3699,47 +3705,47 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>PIDS</value>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
-    <value>Less than a second ago</value>
+    <value>Kevesebb mint egy másodperce</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
-    <value>1 second ago</value>
+    <value>1 másodperce</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
-    <value>{} seconds ago</value>
+    <value>{} másodperce</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
-    <value>About a minute ago</value>
+    <value>Körülbelül egy perce</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
-    <value>{} minutes ago</value>
+    <value>{} perce</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
-    <value>About an hour ago</value>
+    <value>Körülbelül egy órája</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
-    <value>{} hours ago</value>
+    <value>{} órája</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
-    <value>{} days ago</value>
+    <value>{} napja</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
-    <value>{} weeks ago</value>
+    <value>{} hete</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
-    <value>{} months ago</value>
+    <value>{} hónapja</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
-    <value>{} years ago</value>
+    <value>{} éve</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">

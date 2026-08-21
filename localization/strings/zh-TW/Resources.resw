@@ -2502,6 +2502,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>要求多個網路時，無法指定網路別名。使用單一 --network 選項。</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>IP 位址需要使用者定義的網路。使用 --network 指定一個。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>要求多個網路時，不能指定 IP 位址。使用單一 --network 選項。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>無法建立磁碟區 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3544,9 +3552,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>移除所有未使用的網路。當網路未被任何容器參考時，會被視為未使用。</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>已刪除: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>已刪除的網路:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>將容器連線到網路</value>
@@ -3601,9 +3608,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>移除所有未使用的磁碟區，而不僅是匿名磁碟區。</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>已刪除: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Volumes:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>已回收空間總計: {}</value>

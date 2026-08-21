@@ -55,7 +55,7 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-tároló engedélyezése</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Ez a házirend szabályozza, hogy ezen a gépen használható-e WSL-tároló. Ha engedélyezve van vagy nincs beállítva, a felhasználók és a Windows-alkalmazások WSL-en keresztül futtathatnak Linux-tárolókat. Ha le van tiltva, a WSL-tároló minden felhasználó számára blokkolva van, és a Windows-alkalmazások nem futtathatnak Linux-tárolókat. Figyelmeztetés: Ha ezt „Disabled” értékre állítja, az megszakíthatja azokat a Windows-alkalmazásokat, amelyek Linux-tárolóktól függenek.</string>
 
-        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Allow privileged WSL containers</string>
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Engedélyezze a kiemelt WSL-tárolókat</string>
         <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL containers can run in privileged mode on this machine. When enabled or not configured, users and Windows applications can start privileged containers. When set to 'Disabled', requests to start a privileged container are refused for all users and Windows apps. Privileged containers run with elevated Linux capabilities and reduced isolation from the container host.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL-tárolóregisztrációs adatbázisok engedélyezési listája</string>
