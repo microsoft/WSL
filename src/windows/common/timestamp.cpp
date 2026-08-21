@@ -108,14 +108,22 @@ std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& 
         normalized += "+00:00";
     }
 
-    // Reject a separator with no fractional digits, which std::chrono::parse otherwise accepts.
+    // Strip any fractional seconds. The value is truncated to whole seconds regardless, and parsing at
+    // second precision keeps timestamps outside the nanosecond range from silently wrapping.
     const auto separator = normalized.find('.');
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        separator != std::string::npos &&
-            (separator + 1 >= normalized.size() || std::isdigit(static_cast<unsigned char>(normalized[separator + 1])) == 0),
-        "Failed to parse timestamp '%hs'",
-        timestamp.c_str());
+    if (separator != std::string::npos)
+    {
+        auto end = separator + 1;
+        while (end < normalized.size() && std::isdigit(static_cast<unsigned char>(normalized[end])) != 0)
+        {
+            ++end;
+        }
+
+        // A separator with no fractional digits is invalid, but std::chrono::parse otherwise accepts it.
+        THROW_HR_IF_MSG(E_INVALIDARG, end == separator + 1, "Failed to parse timestamp '%hs'", timestamp.c_str());
+
+        normalized.erase(separator, end - separator);
+    }
 
     // Validate the day up front since std::chrono::parse silently wraps invalid dates (e.g. Feb 31 -> Mar 2).
     if (normalized.size() >= 10 && normalized[4] == '-' && normalized[7] == '-')
@@ -135,8 +143,7 @@ std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& 
         }
     }
 
-    // Parse at nanosecond precision so that fractional seconds are consumed rather than left behind.
-    std::chrono::sys_time<std::chrono::nanoseconds> parsed{};
+    std::chrono::sys_seconds parsed{};
     std::istringstream stream(normalized);
     stream >> std::chrono::parse("%FT%T%Ez", parsed);
     THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
@@ -146,7 +153,7 @@ std::int64_t wsl::windows::common::timestamp::Rfc3339ToEpoch(const std::string& 
         "Unexpected trailing characters in timestamp '%hs'",
         timestamp.c_str());
 
-    return std::chrono::duration_cast<std::chrono::seconds>(parsed.time_since_epoch()).count();
+    return parsed.time_since_epoch().count();
 }
 
 std::optional<std::chrono::nanoseconds> wsl::windows::common::timestamp::TryParseDuration(const std::string& duration)

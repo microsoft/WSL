@@ -773,6 +773,14 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"-314371800"), -314371800LL);
     }
 
+    TEST_METHOD(ValidateTimestamp_OutsideNanosecondRange)
+    {
+        // Values beyond the range of a nanosecond representation still convert exactly.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1600-01-01T00:00:00Z"), -11676096000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2300-01-01T00:00:00Z"), 10413792000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999-12-31T23:59:59Z"), 253402300799LL);
+    }
+
     TEST_METHOD(ValidateTimestamp_ValidZoneLessLocalTime)
     {
         // A value with no zone designator is resolved against the local UTC offset.
