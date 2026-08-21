@@ -609,9 +609,10 @@ LONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& a
 
     if (const auto duration = wsl::windows::common::timestamp::TryParseDuration(narrowValue); duration.has_value())
     {
-        const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch());
+        // Apply the duration at full precision and truncate once, so that a sub-second value keeps its sign.
+        const auto target = std::chrono::system_clock::now() - duration.value();
 
-        return (now - std::chrono::duration_cast<std::chrono::seconds>(duration.value())).count();
+        return std::chrono::floor<std::chrono::seconds>(target.time_since_epoch()).count();
     }
 
     try

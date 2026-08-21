@@ -828,6 +828,21 @@ class WSLCCLIArgumentUnitTests
         verifyDuration(L"-1h", -3600LL);
     }
 
+    TEST_METHOD(ValidateTimestamp_SubSecondGoDuration)
+    {
+        // A sub-second duration is applied before the value is truncated, so a negative one still
+        // resolves at or after the current second rather than being rounded away.
+        const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        const auto future = validation::GetTimestampFromString(L"-500ms");
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(future, now);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(future, now + 30);
+
+        const auto past = validation::GetTimestampFromString(L"500ms");
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(past, now - 1);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(past, now + 30);
+    }
+
     TEST_METHOD(ValidateTimestamp_InvalidRfc3339_Rejected)
     {
         // Invalid month

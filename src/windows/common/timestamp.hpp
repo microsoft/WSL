@@ -22,8 +22,8 @@ namespace wsl::windows::common::timestamp {
 
 // Expands a partial timestamp into a full RFC 3339 one. Hour-only, minute-only and date-only values
 // are padded out to a complete time, and a value with no zone designator is resolved against the
-// offset currently in effect locally. Input that is not recognized is returned for the parser to
-// reject.
+// offset currently in effect locally. The input is not validated, so an unrecognized value is
+// expanded as-is and left for the parser to reject.
 std::string ExpandToRfc3339(const std::string& timestamp);
 
 // Converts an RFC 3339 timestamp to seconds since the unix epoch. Accepts a 'Z' designator or a
