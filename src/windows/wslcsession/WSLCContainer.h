@@ -165,10 +165,11 @@ private:
         }
 
         const TransitionKind Kind;
-        ContainerEvent ExpectedEvent;
         wil::unique_event Completed{wil::EventOptions::ManualReset};
         std::exception_ptr Exception;
+
         // Access under WSLCContainerImpl::m_lock.
+        ContainerEvent ExpectedEvent;
         unique_com_disconnect Wrapper;
     };
 
