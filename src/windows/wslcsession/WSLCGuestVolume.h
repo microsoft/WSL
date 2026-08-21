@@ -41,6 +41,7 @@ public:
     WSLCGuestVolumeImpl(
         std::string&& Name,
         std::string&& CreatedAt,
+        std::string&& Mountpoint,
         std::map<std::string, std::string>&& DriverOpts,
         std::map<std::string, std::string>&& Labels,
         DockerHTTPClient& DockerClient);
@@ -76,6 +77,7 @@ public:
 private:
     std::string m_name;
     std::string m_createdAt;
+    std::string m_mountpoint;
     std::map<std::string, std::string> m_driverOpts;
     std::map<std::string, std::string> m_labels;
     DockerHTTPClient& m_dockerClient;

@@ -35,9 +35,9 @@ std::wstring FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t De
 
 std::wstring FormatBytes(uint64_t Bytes);
 
-// Formats a size the way docker reports image sizes: base 1000, three significant digits and no
-// space (119856765 -> "120MB").
-std::wstring FormatDockerSize(uint64_t Bytes);
+// Formats a size as base 1000 with no space and the given number of significant digits
+// (119856765 -> "120MB" at precision 3, "119.9MB" at 4).
+std::wstring FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision = 3);
 
 std::vector<std::string> InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize);
 
