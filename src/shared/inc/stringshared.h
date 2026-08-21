@@ -1253,7 +1253,7 @@ struct std::formatter<char*, wchar_t>
     template <typename TCtx>
     auto format(const char* str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1269,7 +1269,7 @@ struct std::formatter<const char*, wchar_t>
     template <typename TCtx>
     auto format(const char* str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1285,7 +1285,7 @@ struct std::formatter<char[N], wchar_t>
     template <typename TCtx>
     auto format(const char str[N], TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1301,7 +1301,7 @@ struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
     template <typename TCtx>
     auto format(const std::basic_string<char, Traits, Allocator>& str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
