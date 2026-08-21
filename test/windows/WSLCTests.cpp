@@ -5108,7 +5108,10 @@ class WSLCTests
         auto vhdInspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
         VERIFY_ARE_EQUAL(vhdInspect.Name, vhdVolumeName);
         VERIFY_ARE_EQUAL(vhdInspect.Driver, std::string("vhd"));
-        VERIFY_IS_TRUE(vhdInspect.DriverOpts.contains("SizeBytes"));
+        VERIFY_ARE_EQUAL(vhdInspect.Scope, std::string("local"));
+        VERIFY_IS_FALSE(vhdInspect.Mountpoint.empty());
+        VERIFY_IS_TRUE(vhdInspect.Options.has_value());
+        VERIFY_IS_TRUE(vhdInspect.Options->contains("SizeBytes"));
 
         // Verify InspectVolume returns correct details for the guest volume (no driver opts).
         output.reset();
@@ -5118,7 +5121,9 @@ class WSLCTests
         auto guestInspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
         VERIFY_ARE_EQUAL(guestInspect.Name, guestVolumeName);
         VERIFY_ARE_EQUAL(guestInspect.Driver, std::string("guest"));
-        VERIFY_IS_TRUE(guestInspect.DriverOpts.empty());
+        VERIFY_ARE_EQUAL(guestInspect.Scope, std::string("local"));
+        VERIFY_IS_FALSE(guestInspect.Mountpoint.empty());
+        VERIFY_IS_FALSE(guestInspect.Options.has_value());
 
         // Verify InspectVolume fails for a non-existent volume.
         output.reset();

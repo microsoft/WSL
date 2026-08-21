@@ -89,7 +89,7 @@ namespace {
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
         entry.SharedSize = c_notAvailable;
-        entry.Size = WideToMultiByte(FormatDockerSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
+        entry.Size = WideToMultiByte(FormatHumanReadableSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
         entry.Tag = image.Tag.value_or(std::string{c_none});
         entry.UniqueSize = c_notAvailable;
 

@@ -69,6 +69,31 @@ class WSLCE2EVolumeInspectTests
         VERIFY_ARE_EQUAL("guest", inspect.Driver);
     }
 
+    // Every volume reports the same field set: Labels and Options are null rather than empty
+    // objects, Scope is always "local", and Status is only present when the driver reports one.
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_ReportsFullFieldSet)
+    {
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"volume inspect --format json {}", TestVolumeName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto document = VerifyCompactJsonOutput(result);
+        VERIFY_ARE_EQUAL(1u, document.size());
+        const auto& volume = document[0];
+
+        VERIFY_ARE_EQUAL(7u, volume.size());
+        VERIFY_IS_TRUE(volume["CreatedAt"].is_string());
+        VERIFY_ARE_EQUAL("guest", volume["Driver"].get<std::string>());
+        VERIFY_IS_TRUE(volume["Labels"].is_null());
+        VERIFY_IS_FALSE(volume["Mountpoint"].get<std::string>().empty());
+        VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), volume["Name"].get<std::string>());
+        VERIFY_IS_TRUE(volume["Options"].is_null());
+        VERIFY_ARE_EQUAL("local", volume["Scope"].get<std::string>());
+        VERIFY_IS_FALSE(volume.contains("Status"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_FormatJson_IsSingleLine)
     {
         auto result = RunWslc(std::format(L"volume create {}", TestVolumeName1));
