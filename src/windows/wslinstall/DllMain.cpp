@@ -102,8 +102,7 @@ winrt::Windows::Management::Deployment::DeploymentResult WaitForDeploymentOperat
         throw winrt::hresult_canceled();
     }
 
-    auto result = operation.GetResults();
-    return result;
+    return operation.GetResults();
 }
 
 void ThrowIfOperationError(
