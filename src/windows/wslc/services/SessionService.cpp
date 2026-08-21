@@ -143,6 +143,14 @@ int SessionService::Enter(Terminal& terminal, const std::wstring& storagePath, c
     return ConsoleService::AttachToCurrentConsole(terminal, console, launcher.Launch(*session.get()));
 }
 
+WSLCVersion SessionService::ManagerVersion()
+{
+    WSLCVersion version{};
+    THROW_IF_FAILED(CreateSessionManager()->GetVersion(&version));
+
+    return version;
+}
+
 std::vector<SessionInformation> SessionService::List()
 {
     std::vector<SessionInformation> result;
