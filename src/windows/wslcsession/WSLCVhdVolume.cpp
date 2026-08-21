@@ -118,6 +118,7 @@ WSLCVhdVolumeImpl::WSLCVhdVolumeImpl(
     ULONG Lun,
     std::string&& VirtualMachinePath,
     std::string&& CreatedAt,
+    std::string&& Mountpoint,
     std::map<std::string, std::string>&& DriverOpts,
     std::map<std::string, std::string>&& Labels,
     WSLCVirtualMachine& VirtualMachine,
@@ -128,6 +129,7 @@ WSLCVhdVolumeImpl::WSLCVhdVolumeImpl(
     m_hostPath(std::move(HostPath)),
     m_virtualMachinePath(std::move(VirtualMachinePath)),
     m_createdAt(std::move(CreatedAt)),
+    m_mountpoint(std::move(Mountpoint)),
     m_driverOpts(std::move(DriverOpts)),
     m_labels(std::move(Labels)),
     m_sizeBytes(SizeBytes),
@@ -217,6 +219,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
             lun,
             std::move(virtualMachinePath),
             std::move(createdVolume.CreatedAt),
+            std::move(createdVolume.Mountpoint),
             std::move(DriverOpts),
             std::move(Labels),
             VirtualMachine,
@@ -303,6 +306,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
         lun,
         std::move(virtualMachinePath),
         std::string{Volume.CreatedAt},
+        std::string{Volume.Mountpoint},
         std::move(driverOpts),
         std::move(userLabels),
         VirtualMachine,
@@ -334,7 +338,9 @@ std::string WSLCVhdVolumeImpl::Inspect() const
     inspect.Name = m_name;
     inspect.Driver = WSLCVhdVolumeDriver;
     inspect.CreatedAt = m_createdAt;
-    inspect.DriverOpts = m_driverOpts;
+    inspect.Mountpoint = m_mountpoint;
+    inspect.Scope = WSLCVolumeScope;
+    inspect.Options = m_driverOpts;
     inspect.Labels = m_labels;
     inspect.Status = std::map<std::string, std::string>{
         {"HostPath", m_hostPath.string()},

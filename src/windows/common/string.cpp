@@ -401,7 +401,7 @@ std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
     return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
 }
 
-std::wstring wsl::windows::common::string::FormatDockerSize(uint64_t Bytes)
+std::wstring wsl::windows::common::string::FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision)
 {
     constexpr std::wstring_view c_units[] = {L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
 
@@ -413,7 +413,7 @@ std::wstring wsl::windows::common::string::FormatDockerSize(uint64_t Bytes)
         unitIndex++;
     }
 
-    return std::format(L"{:.3g}{}", value, c_units[unitIndex]);
+    return std::format(L"{:.{}g}{}", value, Precision, c_units[unitIndex]);
 }
 
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
