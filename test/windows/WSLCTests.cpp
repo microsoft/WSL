@@ -18,6 +18,7 @@ Abstract:
 #include "wslccompat.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
+#include "WSLCContainerEntry.h"
 #include "WslCoreFilesystem.h"
 #include "hcs.hpp"
 #include "ContainerNameGenerator.h"
@@ -208,7 +209,7 @@ class WSLCTests
 
     struct ListContainersResult
     {
-        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> Containers;
+        wsl::windows::common::wslc::unique_container_entry_array Containers;
         wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> Ports;
     };
 
@@ -7161,7 +7162,7 @@ class WSLCTests
             options.Filters = filters.data();
             options.FiltersCount = static_cast<ULONG>(filters.size());
 
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wsl::windows::common::wslc::unique_container_entry_array containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
                 &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -7246,7 +7247,7 @@ class WSLCTests
             options.Flags = WSLCListContainersFlagsAll;
             options.Limit = 1;
 
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wsl::windows::common::wslc::unique_container_entry_array containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
                 &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -7317,7 +7318,7 @@ class WSLCTests
             WSLCListContainersOptions options{};
             options.Flags = WSLCListContainersFlagsAll;
 
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wsl::windows::common::wslc::unique_container_entry_array containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             HRESULT hrList = m_defaultSession->ListContainers(
                 &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>());
@@ -8988,7 +8989,7 @@ class WSLCTests
 
             // Verify that ListContainers returns the port data for a running container.
             {
-                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+                wsl::windows::common::wslc::unique_container_entry_array containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
                 VERIFY_SUCCEEDED(session.ListContainers(
                     nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -9033,7 +9034,7 @@ class WSLCTests
 
                 auto createdContainer = createdLauncher.Create(session);
 
-                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+                wsl::windows::common::wslc::unique_container_entry_array containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
                 VERIFY_SUCCEEDED(session.ListContainers(
                     nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -9060,7 +9061,7 @@ class WSLCTests
             // Verify that a stopped container returns no ports.
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
             {
-                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+                wsl::windows::common::wslc::unique_container_entry_array containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
                 VERIFY_SUCCEEDED(session.ListContainers(
                     nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -11740,7 +11741,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
 
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wsl::windows::common::wslc::unique_container_entry_array containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
                 nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -11775,7 +11776,7 @@ class WSLCTests
         wil::com_ptr<IWSLCContainer> notFound;
         VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
 
-        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+        wsl::windows::common::wslc::unique_container_entry_array containers;
         wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
         VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
             nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -11906,7 +11907,7 @@ class WSLCTests
         // Validate that various operations can be done while the export is in progress.
 
         {
-            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wsl::windows::common::wslc::unique_container_entry_array containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
                 nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));

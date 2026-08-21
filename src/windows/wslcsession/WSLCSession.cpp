@@ -24,6 +24,7 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
+#include "WSLCContainerEntry.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -83,11 +84,7 @@ void ValidateNewSessionStorageDirectory(const std::filesystem::path& StoragePath
 // because unset fields are null.
 void FreeContainerEntryStrings(WSLCContainerEntry& Entry)
 {
-    CoTaskMemFree(Entry.Command);
-    CoTaskMemFree(Entry.Status);
-    CoTaskMemFree(Entry.Labels);
-    CoTaskMemFree(Entry.Networks);
-    CoTaskMemFree(Entry.Mounts);
+    wsl::windows::common::wslc::ContainerEntryDeleter{}(Entry);
 }
 
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image

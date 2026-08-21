@@ -137,7 +137,7 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
     entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
     entry.RunningFor = WideToMultiByte(ContainerService::FormatRelativeTime(container.CreatedAt));
     // Container sizes are only computed when docker is passed --size, which wslc does not support.
-    entry.Size = WideToMultiByte(FormatDockerSize(0));
+    entry.Size = WideToMultiByte(FormatHumanReadableSize(0));
     entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
     entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt));
 

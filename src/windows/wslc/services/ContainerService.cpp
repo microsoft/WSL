@@ -21,6 +21,7 @@ Abstract:
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <WSLCProcessLauncher.h>
+#include <WSLCContainerEntry.h>
 #include <ConsoleState.h>
 #include <CommandLine.h>
 #include <WSLCUserSettings.h>
@@ -770,24 +771,12 @@ std::vector<ContainerInformation> ContainerService::List(
     options.Filters = filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
-    wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+    wsl::windows::common::wslc::unique_container_entry_array containers;
     wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
     THROW_IF_FAILED(
         session.Get()->ListContainers(&options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
     std::vector<ContainerInformation> result;
-
-    // The listing allocates these fields, so take ownership of each one as it is read.
-    const auto freeStrings = wil::scope_exit([&] {
-        for (auto& current : containers)
-        {
-            CoTaskMemFree(current.Command);
-            CoTaskMemFree(current.Status);
-            CoTaskMemFree(current.Labels);
-            CoTaskMemFree(current.Networks);
-            CoTaskMemFree(current.Mounts);
-        }
-    });
 
     for (const auto& current : containers)
     {
