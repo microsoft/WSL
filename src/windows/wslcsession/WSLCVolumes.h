@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCVolumeMetadata.h"
 #include "DockerHTTPClient.h"
 #include "DockerEventTracker.h"
+#include <wslc_schema.h>
 
 namespace wsl::windows::service::wslc {
 
@@ -40,7 +41,7 @@ public:
 
     void DeleteVolume(_In_ LPCSTR Name);
 
-    std::vector<WSLCVolumeInformation> ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const;
+    std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const;
 
     struct PruneVolumesResult
     {

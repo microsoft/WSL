@@ -33,6 +33,41 @@ namespace wsl::windows::wslc::task {
 
 constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
+namespace {
+
+    // Reported for the fields that only carry a value when volume usage data or swarm cluster
+    // information is available, neither of which applies here.
+    constexpr std::string_view c_notAvailable = "N/A";
+
+    // Shared by the table and json output so the two cannot drift.
+    VolumeOutputInformation ToVolumeOutput(const wslc_schema::VolumeListEntry& volume)
+    {
+        VolumeOutputInformation entry;
+        entry.Availability = c_notAvailable;
+        entry.Driver = volume.Driver;
+        entry.Group = c_notAvailable;
+        entry.Links = c_notAvailable;
+        entry.Mountpoint = volume.Mountpoint;
+        entry.Name = volume.Name;
+        entry.Scope = volume.Scope;
+        entry.Size = c_notAvailable;
+        entry.Status = c_notAvailable;
+
+        for (const auto& [key, value] : volume.Labels)
+        {
+            if (!entry.Labels.empty())
+            {
+                entry.Labels += ",";
+            }
+
+            entry.Labels += std::format("{}={}", key, value);
+        }
+
+        return entry;
+    }
+
+} // namespace
+
 static bool TryInspectVolume(Terminal& terminal, Session& session, const std::string& volumeName, std::optional<wslc_schema::InspectVolume>& inspectData)
 {
     try
@@ -177,7 +212,7 @@ void ListVolumes(CLIExecutionContext& context)
     {
         for (const auto& volume : volumes)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(volume, c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToVolumeOutput(volume), c_jsonCompactIndent));
         }
 
         break;
