@@ -39,7 +39,7 @@ namespace {
     // information is available, neither of which applies here.
     constexpr std::string_view c_notAvailable = "N/A";
 
-    // Shared by the table and json output so the two cannot drift.
+    // Converts session volume entries into the all-string shape used for "volume list --format json".
     VolumeOutputInformation ToVolumeOutput(const wslc_schema::VolumeListEntry& volume)
     {
         VolumeOutputInformation entry;
