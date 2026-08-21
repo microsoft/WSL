@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "ImageModel.h"
 
 namespace WSLCE2ETests {
@@ -26,16 +27,15 @@ class WSLCE2EImageImportTests
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(ImportedImage);
+        TestImageRegistry::Instance().Delete(ImportedImage);
         EnsureNoUntaggedImages();
         return true;
     }
 
     TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsDeleted(ImportedImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().Delete(ImportedImage);
         EnsureNoUntaggedImages();
         SavedArchivePath = wsl::windows::common::filesystem::GetTempFilename();
         return true;
@@ -103,11 +103,11 @@ class WSLCE2EImageImportTests
         auto countUntaggedImages = [&]() {
             auto result = RunWslc(L"image list --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
-            auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageInformation>(result);
+            auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
             size_t count = 0;
             for (const auto& img : images)
             {
-                if (!img.Repository.has_value() || img.Repository.value() == "<none>")
+                if (img.Repository == wsl::windows::wslc::models::c_none)
                 {
                     count++;
                 }

@@ -14,12 +14,12 @@ if(WSL_DEV_BINARY_PATH)
     file(MAKE_DIRECTORY ${WSL_DEV_BINARY_PATH})
     file(CREATE_LINK "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/kernel" "${WSL_DEV_BINARY_PATH}/kernel" SYMBOLIC)
     file(COPY_FILE "${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd" "${WSL_DEV_BINARY_PATH}/system.vhd" ONLY_IF_DIFFERENT)
-    file(COPY_FILE "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/modules.vhd" "${WSL_DEV_BINARY_PATH}/modules.vhd" ONLY_IF_DIFFERENT)
+    file(COPY_FILE "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/artifacts.vhd" "${WSL_DEV_BINARY_PATH}/artifacts.vhd" ONLY_IF_DIFFERENT)
 
     # read-only VHDs need to be world readable to mount successfully.
     execute_process(
         COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/system.vhd" "/grant:r" "Everyone:(R)" /Q
-        COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/modules.vhd" "/grant:r" "Everyone:(R)" /Q
+        COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/artifacts.vhd" "/grant:r" "Everyone:(R)" /Q
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         COMMAND_ERROR_IS_FATAL ANY)
 
@@ -65,6 +65,6 @@ endif()
 # #   fix   - automatically fix formatting and re-stage files
 # set(WSL_PRE_COMMIT_MODE "warn")
 
-# # Uncomment to change how many test sources share a unity translation unit (default: 2).
-# # Use 0 to disable unity builds and compile every test file separately.
-# set(WSL_TEST_UNITY_BATCH_SIZE 4)
+# # Uncomment to change how many sources share a unity translation unit (default: 0).
+# # Use 0 to disable unity builds and compile every file separately.
+# set(WSL_UNITY_BATCH_SIZE 4)

@@ -73,19 +73,37 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
 }
+
+wil::unique_hfile OpenVhdBackingFile(_In_ PCWSTR Path)
+{
+    wil::unique_hfile file{CreateFileW(
+        Path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!file);
+
+    return file;
+}
+
+bool IsBackingVolumeMounted(_In_ HANDLE File)
+{
+    DWORD bytesReturned{};
+    return DeviceIoControl(File, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &bytesReturned, nullptr);
+}
 } // namespace
 
-WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig) :
-    m_vmConfig(std::move(VmConfig)), m_traceClient(m_vmConfig.EnableTelemetry)
+WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs) :
+    m_vmConfig(std::move(VmConfig)), m_initializeDrvFs(std::move(InitializeDrvFs)), m_traceClient(m_vmConfig.EnableTelemetry)
 {
     // Create a job object that will terminate child processes (wslhost.exe, wslrelay.exe)
     // when the VM is destroyed.
     m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
 
-std::unique_ptr<WslCoreVm> WslCoreVm::Create(_In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId)
+std::unique_ptr<WslCoreVm> WslCoreVm::Create(
+    _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs)
 {
-    auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig)}};
+    THROW_HR_IF(E_INVALIDARG, !InitializeDrvFs);
+
+    auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig), std::move(InitializeDrvFs)}};
     try
     {
         const auto startTimeMs = GetTickCount64();
@@ -236,7 +254,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
 #else
 
-            m_vmConfig.KernelModulesPath = m_rootFsPath / L"modules.vhd";
+            m_vmConfig.KernelModulesPath = m_rootFsPath / L"artifacts.vhd";
 
 #endif
         }
@@ -682,7 +700,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled())
             {
                 wsl::windows::common::notifications::DisplayOptionalComponentsNotification();
-                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformNotInstalled());
+                EMIT_USER_WARNING(Localization::MessageVirtualMachinePlatformRequiredForNetworking());
             }
 
             // Fall back to no networking.
@@ -990,6 +1008,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
 
     // Set a scope exit variable to perform cleanup if attaching the disk fails.
     DiskStateFlags diskFlags{};
+    wil::unique_hfile backingFile;
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         FreeLun(Lun.value());
         if (WI_IsFlagSet(diskFlags, DiskStateFlags::AccessGranted))
@@ -1047,8 +1066,24 @@ ULONG WslCoreVm::AttachDiskLockHeld(
                 // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the LUN of the mounted disk.
                 THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
 
-                return found->second.Lun;
+                // Check if the lun is still valid. It could be stale if the backing volume is reattached.
+                if (IsBackingVolumeMounted(found->second.BackingFile.get()))
+                {
+                    return found->second.Lun;
+                }
+
+                const auto staleLun = found->second.Lun;
+                wsl::windows::common::hcs::RemoveScsiDisk(m_system.get(), staleLun);
+                if (WI_IsFlagSet(found->second.Flags, DiskStateFlags::AccessGranted))
+                {
+                    wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), found->first.Path.c_str());
+                }
+
+                m_attachedDisks.erase(found);
+                FreeLun(staleLun);
             }
+
+            backingFile = OpenVhdBackingFile(Disk);
 
             auto grantDiskAccess = [&]() {
                 auto runAsUser = wil::impersonate_token(UserToken);
@@ -1084,7 +1119,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             result, Localization::MessageFailedToAttachDisk(Disk, wsl::windows::common::wslutil::GetSystemErrorString(result)));
     }
 
-    m_attachedDisks.emplace(AttachedDisk{Type, Disk, IsUserDisk}, DiskState{Lun.value(), {}, diskFlags});
+    m_attachedDisks.emplace(AttachedDisk{Type, Disk, IsUserDisk}, DiskState{Lun.value(), {}, diskFlags, std::move(backingFile)});
     cleanup.release();
 
     return Lun.value();
@@ -1281,7 +1316,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         localConfig,
         DefaultUid,
         ClientLifetimeId,
-        std::bind(s_InitializeDrvFs, this, std::placeholders::_1),
+        m_initializeDrvFs,
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
@@ -1744,6 +1779,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // inherited ACLs; otherwise StartComputeSystem will surface E_ACCESSDENIED.
     auto attachDisk = [&](PCWSTR path, bool grantVmAccess) {
         auto lun = ReserveLun();
+        auto backingFile = OpenVhdBackingFile(path);
         hcs::Attachment disk{};
         disk.Type = hcs::AttachmentType::VirtualDisk;
         disk.Path = path;
@@ -1765,7 +1801,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
             CATCH_LOG()
         }
 
-        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, diskFlags});
+        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, diskFlags, std::move(backingFile)});
         return lun;
     };
 
@@ -2064,7 +2100,8 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-    wsl::windows::common::hcs::AddPlan9Share(m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags);
+    wsl::windows::common::hcs::AddPlan9Share(
+        m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags, m_userToken.get());
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
@@ -2132,7 +2169,7 @@ WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
 void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 {
     // Construct the mini_init message.
-    LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE message;
+    LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageWaitForPmemDevice;
     message.Header.MessageSize = sizeof(message);
     message.PmemId = PmemId;
@@ -2182,7 +2219,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
         sharePath.push_back(L'\\');
     }
 
-    sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
+    sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath).wstring();
 
     std::wstring effectiveOptions(Options);
 
@@ -2468,7 +2505,7 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
 {
     auto lock = m_lock.lock_exclusive();
 
-    LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message;
+    LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageResizeDistribution;
     message.ScsiLun = Lun;
@@ -2487,6 +2524,24 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     {
         THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageFailedToResizeDisk());
     }
+}
+
+void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
+{
+    auto lock = m_lock.lock_exclusive();
+
+    LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message{};
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = LxMiniInitMessageTrimDistribution;
+    message.ScsiLun = Lun;
+
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send(message);
+
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "TrimDistribution", {m_terminatingEvent.get()}};
+
+    const auto& resultMessage = channel.ReceiveMessage<LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE>();
+    THROW_HR_IF(E_FAIL, resultMessage.ResponseCode != 0);
 }
 
 void WslCoreVm::SaveAttachedDisksState()
@@ -2547,7 +2602,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     }
 
     // Tell the guest to flush its IO caches and stop using the disk.
-    LX_MINI_INIT_DETACH_MESSAGE message;
+    LX_MINI_INIT_DETACH_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageDetach;
     message.Header.MessageSize = sizeof(message);
     message.ScsiLun = State.Lun;
@@ -2757,20 +2812,6 @@ std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Na
     }
 
     return target;
-}
-
-LX_INIT_DRVFS_MOUNT WslCoreVm::s_InitializeDrvFs(_Inout_ WslCoreVm* VmContext, _In_ HANDLE UserToken)
-{
-    try
-    {
-        return VmContext->InitializeDrvFs(UserToken) ? LxInitDrvfsMountElevated : LxInitDrvfsMountNonElevated;
-    }
-    catch (...)
-    {
-        LOG_CAUGHT_EXCEPTION();
-
-        return LxInitDrvfsMountNone;
-    }
 }
 
 void CALLBACK WslCoreVm::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)

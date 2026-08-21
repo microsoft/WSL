@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <wslc_schema.h>
 #include <JsonUtils.h>
 
@@ -27,7 +28,7 @@ class WSLCE2EInspectTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
@@ -37,7 +38,6 @@ class WSLCE2EInspectTests
         EnsureContainerDoesNotExist(DebianImage.Name);
         EnsureNetworkDoesNotExist(WslcNetworkName);
         EnsureNetworkDoesNotExist(DebianImage.Name);
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -160,11 +160,14 @@ class WSLCE2EInspectTests
         auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
         VERIFY_IS_TRUE(json.is_array() && !json.empty());
         VERIFY_IS_TRUE(json[0].contains("Config") && json[0]["Config"].contains("Labels"));
+        VERIFY_IS_TRUE(json[0]["Config"].contains("Image"));
+        VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), json[0]["Config"]["Image"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_InheritsImageLabels)
     {
-        auto imageCleanup = wil::scope_exit([&]() { EnsureImageIsDeleted(LabelInheritImage); });
+        auto imageCleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Delete(LabelInheritImage); });
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-inspect-inherit-labels";
         auto cleanup = SetupTestDirectory(testRoot);
 

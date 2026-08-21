@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,7 +26,7 @@ class WSLCE2EContainerStopTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
@@ -33,7 +34,6 @@ class WSLCE2EContainerStopTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -218,7 +218,8 @@ class WSLCE2EContainerStopTests
             // Invalid integer
             result = RunWslc(std::format(L"container stop {} -t abc", containerId));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid time argument value: abc"));
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidIntegerArgumentError(L"time", L"abc")));
 
             // Should still be running after failed stop
             VerifyContainerIsListed(containerId, L"running");
@@ -228,7 +229,8 @@ class WSLCE2EContainerStopTests
             // Another invalid integer shape
             result = RunWslc(std::format(L"container stop {} -t 1.5", containerId));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid time argument value: 1.5"));
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidIntegerArgumentError(L"time", L"1.5")));
 
             // Should still be running after failed stop
             VerifyContainerIsListed(containerId, L"running");
@@ -238,7 +240,8 @@ class WSLCE2EContainerStopTests
             // Invalid integer prefixed
             result = RunWslc(std::format(L"container stop {} -t 9abc", containerId));
             result.Verify({.Stdout = L"", .ExitCode = 1});
-            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Invalid time argument value: 9abc"));
+            VERIFY_IS_TRUE(
+                result.StderrContainsSubstring(wsl::shared::Localization::WSLCCLI_InvalidIntegerArgumentError(L"time", L"9abc")));
 
             // Should still be running after failed stop
             VerifyContainerIsListed(containerId, L"running");

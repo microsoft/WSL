@@ -33,6 +33,8 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLIArgumentUnitTests {
+namespace mount = wsl::windows::common::mount;
+
 using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
 
 static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
@@ -53,6 +55,17 @@ class WSLCCLIArgumentUnitTests
     {
         // Add any necessary cleanup for argument tests
         return true;
+    }
+
+    TEST_METHOD(ArgumentException_OptionalArgumentHelp)
+    {
+        const ArgumentException withoutArgument{L"error"};
+        VERIFY_IS_TRUE(withoutArgument.Arguments().empty());
+
+        const auto argument = Argument::Create(ArgType::Verbose);
+        const ArgumentException withArgument{L"error", argument};
+        VERIFY_ARE_EQUAL(1u, withArgument.Arguments().size());
+        VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
@@ -161,6 +174,23 @@ class WSLCCLIArgumentUnitTests
         pullPolicy = validation::GetPullPolicyFromString(L"never");
         VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Never);
         VERIFY_THROWS(validation::GetPullPolicyFromString(L"invalid"), ArgumentException);
+
+        // Verify build progress mode
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"auto"), ProgressMode::Auto);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"tty"), ProgressMode::Tty);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"plain"), ProgressMode::Plain);
+        VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"quiet"), ProgressMode::Quiet);
+        VERIFY_THROWS(validation::GetProgressModeFromString(L"TTY"), ArgumentException); // Case-sensitive: only lowercase accepted
+        VERIFY_THROWS(validation::GetProgressModeFromString(L"fancy"), ArgumentException);
+
+        // Verify Docker-style memory size conversion.
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(1'610'612'736), validation::GetMemorySizeFromString(L"1.5G"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(314'572), validation::GetMemorySizeFromString(L"0.3MiB"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(32), validation::GetMemorySizeFromString(L"32.3"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(9'007'199'254'740'993), validation::GetMemorySizeFromString(L"9007199254740993"));
+        VERIFY_ARE_EQUAL(std::numeric_limits<int64_t>::max(), validation::GetMemorySizeFromString(L"9223372036854775807"));
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"-1.5G"), ArgumentException);
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"9223372036854775808"), ArgumentException);
 
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
@@ -372,7 +402,7 @@ class WSLCCLIArgumentUnitTests
 
         // string -> int64_t (memory sizes). The cached value matches the converter's result.
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Memory>(L"512M"), validation::GetMemorySizeFromString(L"512M"));
-        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::ShmSize>(L"64M"), validation::GetMemorySizeFromString(L"64M"));
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::ShmSize>(L"1.5G"), static_cast<int64_t>(1'610'612'736));
 
         // string -> int64_t (durations, in nanoseconds)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthInterval>(L"30s"), validation::GetDurationNanosFromString(L"30s"));
@@ -381,6 +411,22 @@ class WSLCCLIArgumentUnitTests
 
         // string -> int64_t (nano CPUs)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Cpus>(L"1.5"), validation::GetNanoCpusFromString(L"1.5"));
+
+        // mount strings -> mount::Spec
+        {
+            const auto volume = ValidateAndGetCached<ArgType::Volume>(LR"(C:\hostPath:/containerPath)");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Bind), static_cast<int>(volume.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(volume.BindSource));
+
+            const auto tmpfs = ValidateAndGetCached<ArgType::TMPFS>(L"/tmp:size=64k");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Tmpfs), static_cast<int>(tmpfs.MountType));
+            VERIFY_IS_TRUE(tmpfs.TmpfsOptions.has_value());
+            VERIFY_ARE_EQUAL(std::string("size=64k"), tmpfs.TmpfsOptions.value());
+
+            const auto structured = ValidateAndGetCached<ArgType::Mount>(L"type=volume,source=data-volume,target=/data");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Volume), static_cast<int>(structured.MountType));
+            VERIFY_ARE_EQUAL(std::wstring(L"data-volume"), structured.Source);
+        }
 
         // string -> tuple<name, soft, hard> (ulimit)
         auto ulimit = ValidateAndGetCached<ArgType::Ulimit>(L"nofile=1024:2048");
@@ -430,6 +476,14 @@ class WSLCCLIArgumentUnitTests
             VERIFY_ARE_EQUAL(secret.Id, std::wstring(L"convtest"));
             const std::string expected = "conv-value";
             VERIFY_IS_TRUE(std::vector<BYTE>(expected.begin(), expected.end()) == secret.Value);
+        }
+
+        // string -> ParsedNetworkArgument (docker-style network name and aliases)
+        {
+            auto network = ValidateAndGetCached<ArgType::Network>(L"name=custom,alias=web");
+            VERIFY_ARE_EQUAL(network.Name, std::string("custom"));
+            VERIFY_ARE_EQUAL(network.Aliases.size(), static_cast<size_t>(1));
+            VERIFY_ARE_EQUAL(network.Aliases[0], std::string("web"));
         }
     }
 
@@ -508,9 +562,7 @@ class WSLCCLIArgumentUnitTests
 
         const std::vector<Case> cases = {
             {ArgType::Gpus, L"all"},
-            {ArgType::Volume, LR"(C:\hostPath:/containerPath)"},
             {ArgType::WorkDir, L"/app"},
-            {ArgType::Network, L"bridge"},
             {ArgType::NetworkAlias, L"myalias"},
         };
 
@@ -581,12 +633,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(2));
     }
 
-    // Test: A validate-only argument (checked during validation but not converted into a cached
-    // value) is validated on demand when read, so a value added after the up-front pass is checked
-    // exactly as a command-line value. These arguments have no converted cache, so the earlier
-    // converted-path tests do not cover them; the read path still runs their range/format checks.
-    // Network rejects "host" mode and unsupported values.
-    TEST_METHOD(ArgumentValidate_OnDemandValidateOnlyArgIsChecked)
+    // Test: Arguments are validated on demand when read, so a value added after the up-front pass is
+    // checked exactly as a command-line value.
+    TEST_METHOD(ArgumentValidate_OnDemandArgIsChecked)
     {
         ArgMap labels;
         labels.Add(ArgType::BuildLabel, std::wstring(L"foo"));
@@ -600,18 +649,20 @@ class WSLCCLIArgumentUnitTests
         invalidLabel.Add(ArgType::BuildLabel, std::wstring(L"=value"));
         VERIFY_THROWS(invalidLabel.GetAllValues<ArgType::BuildLabel>(), wil::ResultException);
 
-        // Valid value, no prior validation pass: the read validates on demand and returns the raw value.
+        // Valid value, no prior validation pass: the read validates and converts on demand.
         ArgMap valid;
-        valid.Add(ArgType::Network, std::wstring(L"bridge"));
+        valid.Add(ArgType::Network, std::wstring(L"name=custom,alias=web"));
         auto networks = valid.GetAllValues<ArgType::Network>();
         VERIFY_ARE_EQUAL(networks.size(), static_cast<size_t>(1));
-        VERIFY_ARE_EQUAL(networks[0], std::wstring(L"bridge"));
+        VERIFY_ARE_EQUAL(networks[0].Name, std::string("custom"));
+        VERIFY_ARE_EQUAL(networks[0].Aliases.size(), static_cast<size_t>(1));
+        VERIFY_ARE_EQUAL(networks[0].Aliases[0], std::string("web"));
 
         // Invalid value, no prior validation pass: the read validates on demand and throws, matching
         // the failure the up-front pass raises for the same value.
         ArgMap invalid;
         invalid.Add(ArgType::Network, std::wstring(L"host"));
-        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ArgumentException);
+        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ExecutionException);
 
         // Valid up-front, then an unsupported value added before the first read: the map-action
         // callback clears the validated record, so the read re-validates on demand and throws.
@@ -619,7 +670,7 @@ class WSLCCLIArgumentUnitTests
         added.Add(ArgType::Network, std::wstring(L"bridge"));
         Argument::Create(ArgType::Network).Validate(added);
         added.Add(ArgType::Network, std::wstring(L"host"));
-        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ArgumentException);
+        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ExecutionException);
     }
 
     TEST_METHOD(ArgumentValidate_ReadMakesArgumentImmutable)

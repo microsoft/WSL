@@ -16,6 +16,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "Argument.h"
 #include <wslutil.h>
 
@@ -48,8 +49,8 @@ class WSLCE2ERegistryTests
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_LoginLogout_PushPull_AuthFlow)
     {
-        const auto& debianImage = DebianTestImage();
-        EnsureImageIsLoaded(debianImage);
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         auto session = OpenDefaultElevatedSession();
 
@@ -57,7 +58,7 @@ class WSLCE2ERegistryTests
             auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15001);
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
-            auto registryImageName = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
+            auto registryImageName = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 RunWslc(std::format(L"image delete --force {}", registryImageName));
@@ -78,7 +79,7 @@ class WSLCE2ERegistryTests
                 L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
             result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
 
-            registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
+            registryImageName = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
             result = RunWslc(std::format(L"push {}", registryImageName));
             result.Verify({.ExitCode = 0});
 
@@ -93,7 +94,7 @@ class WSLCE2ERegistryTests
             result = RunWslc(std::format(L"pull {}", registryImageName));
             VerifyAuthFailure(result);
 
-            registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
+            registryImageName = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
             result = RunWslc(std::format(L"push {}", registryImageName));
             VerifyAuthFailure(result);
 

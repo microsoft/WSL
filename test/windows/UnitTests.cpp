@@ -1436,6 +1436,29 @@ class UnitTests
         VERIFY_ARE_EQUAL(output, ExpectedOutput);
     }
 
+    static std::wstring ExpectedUsageMessage()
+    {
+        std::wstring expectedUsageMessage;
+        for (auto e : wsl::shared::Localization::MessageWslUsage())
+        {
+            if (e == L'\n')
+            {
+                expectedUsageMessage += L'\r';
+            }
+
+            expectedUsageMessage += e;
+        }
+
+        return expectedUsageMessage + L"\r\n";
+    }
+
+    static void VerifyInvalidUsage(const std::wstring& Cmd)
+    {
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(Cmd.c_str(), -1);
+        VERIFY_ARE_EQUAL(ExpectedUsageMessage(), output);
+        VERIFY_ARE_EQUAL(error, L"");
+    }
+
     TEST_METHOD(ErrorMessages)
     {
         if (LxsstuVmMode()) // wsl --mount and bridged networking only exist in WSL2.
@@ -1480,7 +1503,7 @@ class UnitTests
                     L"-d DummyBrokenDistro",
                     L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
                     L"specified. ",
-                    L"Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND");
+                    L"Wsl/Service/CreateInstance/MountDisk/ERROR_PATH_NOT_FOUND");
 
                 // Purposefully set an incorrect value type to validate registry error handling.
                 wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"Version", L"Broken");
@@ -1515,6 +1538,10 @@ class UnitTests
                 L"--manage test_distro --resize 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
+
+            // wsl.exe --manage --compact requires WSL2.
+            ValidateErrorMessage(
+                L"--manage test_distro --compact", L"This operation is only supported by WSL2.", L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
 
         ValidateErrorMessage(
@@ -1629,20 +1656,7 @@ class UnitTests
 
         VerifyOutput(L"--install --no-distribution", L"The operation completed successfully. \r\n");
 
-        {
-            std::wstring expectedUsageMessage;
-            for (auto e : wsl::shared::Localization::MessageWslUsage())
-            {
-                if (e == L'\n')
-                {
-                    expectedUsageMessage += L'\r';
-                }
-
-                expectedUsageMessage += e;
-            }
-
-            VerifyOutput(L"--manage --move .", expectedUsageMessage + L"\r\n", -1);
-        }
+        VerifyInvalidUsage(L"--manage --move .");
     }
 
     TEST_METHOD(CommandLineParsing)
@@ -1666,6 +1680,11 @@ class UnitTests
         VerifyOutput(L"--exec echo -n \\\"a\\\"", L"\"a\"");
         VerifyOutput(L"--exec echo -n \"a\"\"b\"", L"a\"b");
         VerifyOutput(L"--exec echo -n \\\"", L"\"");
+    }
+
+    TEST_METHOD(ManageInvalidUsage)
+    {
+        VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
     }
 
     // This test validates that the help messages for wsl.exe and wsl.config are correctly displayed.
@@ -1773,6 +1792,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -2622,7 +2644,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     WSL2_TEST_METHOD(CorruptedVhd)
     {
         // Create a 100MB vhd without a filesystem.
-        auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
+        auto distroPath = wsl::windows::common::filesystem::GetCanonicalPath(wil::GetCurrentDirectoryW<std::wstring>());
         auto vhdPath = distroPath / L"CorruptedTest.vhdx";
 
         VIRTUAL_STORAGE_TYPE storageType{};
@@ -2901,8 +2923,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Ensure the kernel modules folder is mounted correctly.
         std::wstring command = std::format(
             L"mount | grep -iF 'none on /usr/lib/modules/{} type overlay "
-            L"(rw,nosuid,nodev,noatime,lowerdir=/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
+            L"(rw,nosuid,nodev,noatime,lowerdir=/modules/{}/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
             L"work,uuid=on)'",
+            kernelVersion,
             kernelVersion,
             kernelVersion,
             kernelVersion);
@@ -2931,7 +2954,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 #ifdef WSL_DEV_INSTALL_PATH
 
         std::wstring kernelPath = WSL_DEV_INSTALL_PATH L"/kernel";
-        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/modules.vhd";
+        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/artifacts.vhd";
 
 #else
 
@@ -2941,7 +2964,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         std::filesystem::path wslInstallPath(installPath.value());
 
         std::wstring kernelPath = wslInstallPath / "tools" / "kernel";
-        std::wstring kernelModulesPath = wslInstallPath / "tools" / "modules.vhd";
+        std::wstring kernelModulesPath = wslInstallPath / "tools" / "artifacts.vhd";
 
 #endif
 
@@ -3083,7 +3106,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", testFolder)));
         }
 
-        auto absolutePath = std::filesystem::weakly_canonical(".").wstring();
+        auto absolutePath = wsl::windows::common::filesystem::GetCanonicalPath(".").wstring();
 
         // Move the distro to a different folder (absolute path)
         {
@@ -3205,9 +3228,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
     WSL2_TEST_METHOD(MoveVhdWithAdminOwner)
     {
-        // Regression test for #40716: if the VHD's owner is BUILTIN\Administrators
-        // (as happens after a cross-volume MoveFileEx from an elevated context),
-        // the move must still succeed because setVhdOwner runs as SYSTEM.
+        // Regression test for #40716: a same-volume move must succeed when the VHD
+        // is already owned by BUILTIN\Administrators.
         constexpr auto name = L"move-admin-owner-test-distro";
         constexpr auto firstFolder = L"move-admin-owner-first";
         constexpr auto secondFolder = L"move-admin-owner-second";
@@ -3255,9 +3277,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto newVhdPath = std::format(L"{}\\ext4.vhdx", secondFolder);
         VERIFY_IS_TRUE(std::filesystem::exists(newVhdPath));
 
-        // Verify the VHD owner was preserved. The code reads the owner before
-        // MoveFileEx and restores it afterward. Since we set the owner to
-        // Administrators before this move, it should still be Administrators.
+        // A same-volume move preserves the VHD owner.
         {
             PSID ownerSid = nullptr;
             wil::unique_hlocal descriptor;
@@ -3373,6 +3393,84 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         const auto moveTarget = std::filesystem::absolute(L"manage-locked-move-target").wstring();
         verifyRejected(std::format(L"--manage {} --move \"{}\"", name, moveTarget));
+    }
+
+    WSL2_TEST_METHOD(Compact)
+    {
+        constexpr auto name = L"compact-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        WslShutdown();
+
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        auto getVhdSizeOnDisk = [](const std::filesystem::path& path) {
+            DWORD highPart{};
+            SetLastError(NO_ERROR);
+            const auto lowPart = GetCompressedFileSizeW(path.c_str(), &highPart);
+            THROW_LAST_ERROR_IF(lowPart == INVALID_FILE_SIZE && GetLastError() != NO_ERROR);
+
+            ULARGE_INTEGER size{};
+            size.LowPart = lowPart;
+            size.HighPart = highPart;
+            return size.QuadPart;
+        };
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
+        const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+            L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
+            L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
+            name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeAfterWrite = getVhdSizeOnDisk(vhdPath);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeBeforeWrite + minimumCompactionDelta);
+
+        // Delete the file but do NOT trim from inside the guest: reclaiming the freed blocks now
+        // depends on the trim that '--compact' performs on the host before compacting the VHD.
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync'", name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeBeforeCompact = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        const auto sizeAfterCompact = getVhdSizeOnDisk(vhdPath);
+        LogInfo(
+            "Compact test VHD size on disk: before write=%llu, after write=%llu, before compact=%llu, after compact=%llu",
+            static_cast<unsigned long long>(sizeBeforeWrite),
+            static_cast<unsigned long long>(sizeAfterWrite),
+            static_cast<unsigned long long>(sizeBeforeCompact),
+            static_cast<unsigned long long>(sizeAfterCompact));
+
+        VERIFY_IS_TRUE(sizeBeforeCompact >= sizeAfterCompact);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeAfterCompact + minimumCompactionDelta);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+        VERIFY_ARE_EQUAL(err, L"");
     }
 
     WSL2_TEST_METHOD(FileOffsets)
@@ -6712,13 +6810,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
@@ -6765,13 +6863,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 

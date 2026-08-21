@@ -17,8 +17,10 @@ Abstract:
 #include "ContainerModel.h"
 #include "InspectModel.h"
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
@@ -72,6 +74,15 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
 // Parses a --filter spec ("key=value"); the separator is required.
 std::pair<std::string, std::string> ParseFilter(const std::wstring& value);
 
+struct ParsedNetworkArgument
+{
+    std::string Name;
+    std::vector<std::string> Aliases;
+};
+
+// Parses a --network spec ("network" or "name=network,alias=alias").
+ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName = {});
+
 // Parses a signal by name ("SIGKILL"/"KILL", case-insensitive) or number ("9") into a WSLCSignal.
 WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 
@@ -87,10 +98,13 @@ int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring
 // Parses an image pull policy ("always"/"missing"/"never").
 models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName = {});
 
+// Parses a build progress type ("auto"/"tty"/"plain"/"quiet") into a ProgressMode.
+models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName = {});
+
 // Parses an inspect target ("image"/"container"/"network"/"volume") into an InspectType.
 models::InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
-// Parses a memory size (e.g. "512m", "1g") into a byte count.
+// Parses a Docker-style memory size (e.g. "512m", "1.5g") into a byte count.
 int64_t GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName = {});
 
 // Parses a Go-style duration (e.g. "1.5h", "500ms") into nanoseconds.

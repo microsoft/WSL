@@ -14,11 +14,16 @@ Abstract:
 
 #pragma once
 
+#include "MountSpecParsing.h"
 #include <wslservice.h>
 #include <wslc.h>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace wsl::windows::wslc::models {
+
+namespace mount = wsl::windows::common::mount;
 
 // Valid formats for container list output.
 enum class FormatType
@@ -27,11 +32,27 @@ enum class FormatType
     Json,
 };
 
+struct ContainerNetwork
+{
+    std::string Name;
+    std::vector<std::string> Aliases;
+};
+
 enum class PullPolicy
 {
     Missing,
     Always,
     Never,
+};
+
+// Progress output style for `wslc build`. Auto resolves to Tty when progress output is an
+// interactive VT console and Plain otherwise.
+enum class ProgressMode
+{
+    Auto,
+    Tty,
+    Plain,
+    Quiet,
 };
 
 struct ContainerOptions
@@ -55,7 +76,7 @@ struct ContainerOptions
     bool NoHealthcheck = false;
     bool Gpu = false;
     std::vector<std::string> Ports;
-    std::vector<std::wstring> Volumes;
+    std::vector<mount::Spec> Mounts;
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
@@ -64,8 +85,9 @@ struct ContainerOptions
     std::vector<std::string> DnsServers;
     std::vector<std::string> DnsSearchDomains;
     std::vector<std::string> DnsOptions;
-    std::vector<std::string> Networks;
+    std::vector<ContainerNetwork> Networks;
     std::vector<std::string> NetworkAliases;
+    std::optional<std::string> IpAddress{};
     std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
     std::optional<std::wstring> CidFile{};
@@ -287,34 +309,9 @@ private:
     std::string m_containerPath;
     bool m_isReadOnlyMode = false;
     bool m_isNamedVolume = false;
-
-    static bool IsReadOnlyMode(const std::wstring& mode)
-    {
-        return mode == L"ro";
-    }
-
-    static bool IsValidMode(const std::wstring& mode)
-    {
-        return IsReadOnlyMode(mode) || mode == L"rw";
-    }
 };
 
-struct TmpfsMount
-{
-    std::string ContainerPath() const
-    {
-        return m_containerPath;
-    }
-    std::string Options() const
-    {
-        return m_options;
-    }
-    static TmpfsMount Parse(const std::string& value);
-
-private:
-    std::string m_containerPath;
-    std::string m_options;
-};
+void ValidateUniqueMountDestinations(const ContainerOptions& options);
 
 class CidFile
 {

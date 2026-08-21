@@ -78,12 +78,14 @@ void RegistryLoginCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
     if (execArgs.Contains(ArgType::Password) && execArgs.GetValue<ArgType::PasswordStdin>())
     {
-        throw CommandException(Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive());
+        throw ArgumentException(
+            Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive(), GetArgumentsForHelp({ArgType::Password, ArgType::PasswordStdin}));
     }
 
     if (execArgs.GetValue<ArgType::PasswordStdin>() && !execArgs.Contains(ArgType::Username))
     {
-        throw CommandException(Localization::WSLCCLI_LoginPasswordStdinRequiresUsername());
+        throw ArgumentException(
+            Localization::WSLCCLI_LoginPasswordStdinRequiresUsername(), GetArgumentsForHelp({ArgType::PasswordStdin, ArgType::Username}));
     }
 }
 
