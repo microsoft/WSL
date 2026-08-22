@@ -55,7 +55,7 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Salli WSL-säilö</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Tämä käytäntö määrittää, voiko WSL-säilöä käyttää tässä laitteessa. Kun se on käytössä tai sitä ei ole määritetty, käyttäjät ja Windows-sovellukset voivat suorittaa Linux-säilöjä WSL:n kautta. Kun se on poissa käytöstä, WSL-säilö on estetty kaikilta käyttäjiltä, eivätkä Windows-sovellukset voi suorittaa Linux-säilöjä. Varoitus: Jos asetat käytännön tilaan Disabled, se voi rikkoa Windows-sovelluksia, jotka ovat riippuvaisia Linux-säilöistä.</string>
 
-        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Allow privileged WSL containers</string>
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Salli etuoikeutetut WSL-säilöt</string>
         <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->This policy controls whether WSL containers can run in privileged mode on this machine. When enabled or not configured, users and Windows applications can start privileged containers. When set to 'Disabled', requests to start a privileged container are refused for all users and Windows apps. Privileged containers run with elevated Linux capabilities and reduced isolation from the container host.</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL-säilörekisterien sallittujen luettelo</string>
