@@ -1,0 +1,79 @@
+parameters:
+  - name: displayName
+    type: string
+
+  - name: folderPath
+    type: string
+
+  - name: pattern
+    type: string
+
+  # authenticode: signtool, for binaries, installers, cabs and scripts.
+  # nuget: nuget package signing, for .nupkg files.
+  - name: signingType
+    type: string
+    default: authenticode
+    values:
+      - authenticode
+      - nuget
+
+steps:
+  - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+    displayName: '${{ parameters.displayName }}'
+    inputs:
+      ConnectedServiceName: AzureConnection-AME
+      signConfigType: inlineSignParams
+      SessionTimeout: 60
+      MaxConcurrency: 50
+      MaxRetryAttempts: 5
+      ServiceEndpointUrl: $(EsrpServiceEndpointUrl)
+      AuthAKVName: $(EsrpAuthAKVName)
+      AuthSignCertName: $(EsrpAuthSignCertName)
+      AppRegistrationClientId: $(EsrpAppRegistrationClientId)
+      AppRegistrationTenantId: $(EsrpAppRegistrationTenantId)
+      EsrpClientId: $(EsrpClientId)
+      UseMSIAuthentication: true
+      FolderPath: '${{ parameters.folderPath }}'
+      Pattern: '${{ parameters.pattern }}'
+      ${{ if eq(parameters.signingType, 'authenticode') }}:
+        inlineOperation: |
+          [
+              {
+                  "KeyCode": "CP-230012",
+                  "OperationCode": "SigntoolSign",
+                  "Parameters": {
+                      "OpusName": "Microsoft",
+                      "OpusInfo": "http://www.microsoft.com",
+                      "FileDigest": "/fd \"SHA256\"",
+                      "PageHash": "/NPH",
+                      "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                  },
+                  "ToolName": "sign",
+                  "ToolVersion": "1.0"
+              },
+              {
+                  "KeyCode": "CP-230012",
+                  "OperationCode": "SigntoolVerify",
+                  "Parameters": {},
+                  "ToolName": "sign",
+                  "ToolVersion": "1.0"
+              }
+          ]
+      ${{ elseif eq(parameters.signingType, 'nuget') }}:
+        inlineOperation: |
+          [
+              {
+                  "KeyCode": "CP-401405",
+                  "OperationCode": "NuGetSign",
+                  "Parameters": {},
+                  "ToolName": "sign",
+                  "ToolVersion": "1.0"
+              },
+              {
+                  "KeyCode": "CP-401405",
+                  "OperationCode": "NuGetVerify",
+                  "Parameters": {},
+                  "ToolName": "sign",
+                  "ToolVersion": "1.0"
+              }
+          ]
