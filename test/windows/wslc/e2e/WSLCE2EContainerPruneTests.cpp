@@ -53,7 +53,7 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_NoStoppedContainers)
     {
         // Establish a clean baseline first so this does not depend on what other tests left behind.
-        RunWslc(L"container prune");
+        RunWslc(L"container prune").Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto result = RunWslc(L"container prune");
 

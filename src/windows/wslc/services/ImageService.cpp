@@ -371,9 +371,9 @@ std::vector<wsl::windows::wslc::models::DeletedImageEntry> ImageService::Delete(
 
     std::vector<wsl::windows::wslc::models::DeletedImageEntry> result;
     result.reserve(deletedImages.size());
-    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    for (const auto& entry : deletedImages)
     {
-        result.push_back({ptr->Image, ptr->Type == WSLCDeletedImageTypeDeleted});
+        result.push_back({entry.Image, entry.Type == WSLCDeletedImageTypeDeleted});
     }
 
     return result;
@@ -484,15 +484,15 @@ wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(
 
     wsl::windows::wslc::models::PruneImagesResult result;
     result.SpaceReclaimed = spaceReclaimed;
-    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    for (const auto& entry : deletedImages)
     {
-        if (ptr->Type == WSLCDeletedImageTypeDeleted)
+        if (entry.Type == WSLCDeletedImageTypeDeleted)
         {
-            result.DeletedImages.push_back(ptr->Image);
+            result.DeletedImages.push_back(entry.Image);
         }
         else
         {
-            result.UntaggedImages.push_back(ptr->Image);
+            result.UntaggedImages.push_back(entry.Image);
         }
     }
 

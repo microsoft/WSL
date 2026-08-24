@@ -499,17 +499,6 @@ std::string CleanContainerName(const std::string& name)
     return name;
 }
 
-std::string QualifyContainerName(const std::string& name)
-{
-    // Docker reports inspect names with a leading '/'.
-    if (name.empty() || name[0] == '/')
-    {
-        return name;
-    }
-
-    return "/" + name;
-}
-
 std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
 {
     if (names.empty())
@@ -1765,7 +1754,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     WslcInspectContainer wslcInspect{};
 
     wslcInspect.Id = dockerInspect.Id;
-    wslcInspect.Name = QualifyContainerName(dockerInspect.Name);
+    wslcInspect.Name = dockerInspect.Name;
     wslcInspect.Created = dockerInspect.Created;
     wslcInspect.Image = dockerInspect.Image;
 
