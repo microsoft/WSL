@@ -36,8 +36,7 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
-using wsl::windows::common::string::FormatBytes;
-using wsl::windows::common::string::FormatStorageSize;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
@@ -99,18 +98,22 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     }
 
     const auto& containerName = stats.name.empty() ? stats.id : stats.name;
-    const auto formatBinaryBytes = [](uint64_t bytes) {
-        return WideToMultiByte(FormatStorageSize(bytes, StorageSizeUnit::Binary, 2, true));
+    // Docker reports memory in binary units and network and block IO in decimal units.
+    constexpr uint32_t c_memoryPrecision = 4;
+    constexpr uint32_t c_ioPrecision = 3;
+    const auto formatMemory = [](uint64_t bytes) {
+        return WideToMultiByte(FormatHumanReadableSize(bytes, c_memoryPrecision, StorageSizeUnit::Binary));
     };
+    const auto formatIo = [](uint64_t bytes) { return WideToMultiByte(FormatHumanReadableSize(bytes, c_ioPrecision)); };
 
     return {
         {"ID", stats.id},
         {"Name", containerName},
         {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
-        {"MemUsage", std::format("{} / {}", formatBinaryBytes(stats.memory_stats.usage), formatBinaryBytes(stats.memory_stats.limit))},
+        {"MemUsage", std::format("{} / {}", formatMemory(stats.memory_stats.usage), formatMemory(stats.memory_stats.limit))},
         {"MemPerc", std::format("{:.2f}%", memPercent)},
-        {"NetIO", std::format("{} / {}", formatBinaryBytes(netRxBytes), formatBinaryBytes(netTxBytes))},
-        {"BlockIO", std::format("{} / {}", formatBinaryBytes(blkReadBytes), formatBinaryBytes(blkWriteBytes))},
+        {"NetIO", std::format("{} / {}", formatIo(netRxBytes), formatIo(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", formatIo(blkReadBytes), formatIo(blkWriteBytes))},
         {"PIDs", stats.pids_stats.current},
     };
 }
@@ -118,6 +121,8 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 } // namespace
 
 namespace wsl::windows::wslc::task {
+
+constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
 static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
 {
@@ -1069,6 +1074,7 @@ void PruneContainers(CLIExecutionContext& context)
     }
 
     context.Terminal.Output(L"\n");
-    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(
+        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task
