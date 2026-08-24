@@ -1193,23 +1193,12 @@ with open('/proc/mounts', encoding='utf-8') as mounts_file:
     assert any(fields[1:3] == ['/data', 'virtiofs'] for fields in mounts)
 
 fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o777)
-try:
-    libc = ctypes.CDLL(None, use_errno=True)
-    libc.mmap.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_size_t,
-        ctypes.c_int,
-        ctypes.c_int,
-        ctypes.c_int,
-        ctypes.c_long,
-    ]
-    libc.mmap.restype = ctypes.c_void_p
-    address = libc.mmap(None, 32 * 1024, mmap.PROT_READ | mmap.PROT_WRITE, mmap.MAP_SHARED, fd, 0)
-    if address == ctypes.c_void_p(-1).value:
-        error = ctypes.get_errno()
-        raise OSError(error, os.strerror(error))
-finally:
-    os.close(fd)
+libc = ctypes.CDLL(None, use_errno=True)
+libc.mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_long]
+libc.mmap.restype = ctypes.c_void_p
+address = libc.mmap(None, 32 * 1024, mmap.PROT_READ | mmap.PROT_WRITE, mmap.MAP_SHARED, fd, 0)
+assert address != ctypes.c_void_p(-1).value, os.strerror(ctypes.get_errno())
+os.close(fd)
 )PY";
 
         auto result = RunWslc(std::format(
