@@ -69,6 +69,10 @@ public:
     {
         return m_labels;
     }
+    const std::string& Mountpoint() const noexcept override
+    {
+        return m_mountpoint;
+    }
 
     void Delete() override;
     std::string Inspect() const override;
