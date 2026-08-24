@@ -78,6 +78,14 @@ class StringUnitTests
 {
     WSL_TEST_CLASS(StringUnitTests)
 
+    TEST_METHOD(FormatUtf8StringAsWideString)
+    {
+        const std::string input{"安装依赖"};
+        const auto expected = wsl::shared::string::MultiByteToWide(input);
+
+        VERIFY_ARE_EQUAL(expected, std::format(L"{}", input));
+    }
+
     TEST_METHOD(ParseMemorySize_LegacyForms)
     {
         const std::vector<std::pair<LPCSTR, std::optional<uint64_t>>> TestCases{

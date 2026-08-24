@@ -522,7 +522,7 @@ docker_schema::PruneNetworkResult DockerHTTPClient::PruneNetworks(const std::map
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneNetworkResult>(verb::post, url);
 }
 
-wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
     url.SetParameter("follow", WI_IsFlagSet(Flags, WSLCLogsFlagsFollow));

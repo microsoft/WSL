@@ -31,6 +31,7 @@ Abstract:
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
@@ -121,7 +122,7 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
 {
     ContainerOutputInformation entry;
     entry.Command = WideToMultiByte(ContainerService::FormatCommand(container.Command, truncate));
-    entry.CreatedAt = EpochToLocalDisplayTime(static_cast<LONGLONG>(container.CreatedAt));
+    entry.CreatedAt = EpochToLocalDisplayTime(container.CreatedAt);
     // The runtime reports health as a suffix on the status description, which is the only place it is
     // exposed by the listing API.
     entry.HealthStatus = ContainerService::FormatHealthStatus(container.Status);
@@ -135,7 +136,7 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
     entry.Platform.architecture = wsl::shared::Arm64 ? "arm64" : "amd64";
     entry.Platform.os = "linux";
     entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
-    entry.RunningFor = WideToMultiByte(ContainerService::FormatRelativeTime(container.CreatedAt));
+    entry.RunningFor = WideToMultiByte(FormatRelativeTime(container.CreatedAt));
     // Container sizes are only computed when docker is passed --size, which wslc does not support.
     entry.Size = WideToMultiByte(FormatHumanReadableSize(0));
     entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
@@ -1075,13 +1076,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
     // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
     // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
-    ULONGLONG since = 0;
+    LONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
         since = context.Args.GetValue<ArgType::Since>();
     }
 
-    ULONGLONG until = 0;
+    LONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
         until = context.Args.GetValue<ArgType::Until>();

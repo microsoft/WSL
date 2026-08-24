@@ -141,7 +141,7 @@ public:
     common::docker_schema::InspectExec InspectExec(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
-    wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
+    wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, LONGLONG Since, LONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
     std::unique_ptr<HTTPRequestContext> PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength);
     std::tuple<uint32_t, wil::unique_socket, bool> GetArchive(const std::string& ContainerID, const std::string& Path);

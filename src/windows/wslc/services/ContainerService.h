@@ -22,15 +22,14 @@ Abstract:
 namespace wsl::windows::wslc::services {
 struct ContainerService
 {
-    static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
+    static std::wstring ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt = 0);
 
     // The bare state name, e.g. "running", without the relative time ContainerStateToString appends.
     static std::wstring ContainerStateName(WSLCContainerState state);
 
     // The display form of ContainerStateName, used for the table output.
     static std::wstring LocalizedContainerStateName(WSLCContainerState state);
-    static std::wstring FormatRelativeTime(ULONGLONG timestamp);
-    static std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
+
     static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
 
     static std::wstring FormatCommand(const std::string& command, bool truncate);
@@ -41,7 +40,7 @@ struct ContainerService
 
     // Renders a container status, preferring the description supplied by the runtime and falling back
     // to a locally built one when it is unavailable.
-    static std::wstring FormatStatus(const std::string& status, WSLCContainerState state, ULONGLONG stateChangedAt);
+    static std::wstring FormatStatus(const std::string& status, WSLCContainerState state, LONGLONG stateChangedAt);
 
     // Extracts the health status from a runtime supplied status description, which carries it as a
     // parenthesized suffix. Containers without a health check report an empty string.
@@ -62,7 +61,7 @@ struct ContainerService
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
     static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
-    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail = 0);
+    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);
     static models::PruneContainersResult Prune(models::Session& session);
 };

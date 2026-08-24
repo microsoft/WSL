@@ -142,8 +142,8 @@ struct ContainerInformation
     std::string Mounts;
     ULONG LocalVolumes{};
     WSLCContainerState State;
-    ULONGLONG StateChangedAt{};
-    ULONGLONG CreatedAt{};
+    LONGLONG StateChangedAt{};
+    LONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
 };
 

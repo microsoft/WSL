@@ -80,13 +80,6 @@ void ValidateNewSessionStorageDirectory(const std::filesystem::path& StoragePath
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcSessionStorageMustBeEmpty(StoragePath.c_str()), !empty);
 }
 
-// Frees the caller-owned strings on a container entry. Safe to call on a partially populated entry
-// because unset fields are null.
-void FreeContainerEntryStrings(WSLCContainerEntry& Entry)
-{
-    wsl::windows::common::wslc::ContainerEntryDeleter{}(Entry);
-}
-
 // Group policy: WSLContainerRegistryAllowlist restricts which container-image
 // registries can be pulled from or pushed to. The check is enforced here at the
 // service boundary so it covers ALL callers (wslc.exe CLI, the WslcSDK C API, and
@@ -649,7 +642,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "discard", 0);
     m_runtime.SetStorageMounted(true);
 
     // Configure swap on a separate ephemeral VHD.
@@ -2558,7 +2551,7 @@ try
     auto freeStrings = wil::scope_exit([&] {
         for (size_t i = 0; i < dockerContainers.size(); ++i)
         {
-            FreeContainerEntryStrings(output[i]);
+            wsl::windows::common::wslc::FreeContainerEntryStrings(output[i]);
         }
     });
 
