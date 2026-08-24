@@ -34,9 +34,6 @@ parameters:
   - name: artifactSuffix
     type: string
 
-  - name: esrp
-    type: object
-
   # x64-only features
   - name: includeTestArtifacts
     type: boolean
@@ -134,46 +131,11 @@ jobs:
             displayName: "Build ${{ target.target }} (${{ parameters.platform }})"
 
           - ${{ if eq(parameters.isRelease, true) }}:
-              - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
-                displayName: "Sign ${{ target.target }} (${{ parameters.platform }})"
-                inputs:
-                  ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
-                  signConfigType: ${{ parameters.esrp.signConfigType }}
-                  SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
-                  MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
-                  MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
-                  ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
-                  AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
-                  AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
-                  AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
-                  AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
-                  FolderPath: "bin\\${{ parameters.platform }}\\Release"
-                  Pattern: "${{ target.pattern }}"
-                  UseMSIAuthentication: true
-                  EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
-                  inlineOperation: |
-                    [
-                          {
-                              "KeyCode": "CP-230012",
-                              "OperationCode": "SigntoolSign",
-                              "Parameters" : {
-                                    "OpusName" : "Microsoft",
-                                    "OpusInfo" : "http://www.microsoft.com",
-                                    "FileDigest" : "/fd \"SHA256\"",
-                                    "PageHash" : "/NPH",
-                                    "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-                                },
-                                "ToolName" : "sign",
-                                "ToolVersion" : "1.0"
-                            },
-                            {
-                                "KeyCode" : "CP-230012",
-                                "OperationCode" : "SigntoolVerify",
-                                "Parameters" : {},
-                                "ToolName" : "sign",
-                                "ToolVersion" : "1.0"
-                            }
-                      ]
+              - template: sign-step.yml
+                parameters:
+                  displayName: 'Sign ${{ target.target }} (${{ parameters.platform }})'
+                  folderPath: 'bin\${{ parameters.platform }}\Release'
+                  pattern: '${{ target.pattern }}'
 
               - task: PowerShell@2
                 displayName: "Copy signed ${{ target.target }} to staging (${{ parameters.platform }})"
@@ -247,46 +209,11 @@ jobs:
               }
 
       - ${{ if eq(parameters.isRelease, true) }}:
-          - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
-            displayName: "Sign CAB (${{ parameters.platform }})"
-            inputs:
-              ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
-              signConfigType: ${{ parameters.esrp.signConfigType }}
-              SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
-              MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
-              MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
-              ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
-              AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
-              AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
-              AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
-              AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
-              FolderPath: "$(ob_outputDirectory)\\bundle"
-              Pattern: "*.cab"
-              UseMSIAuthentication: true
-              EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
-              inlineOperation: |
-                [
-                      {
-                          "KeyCode": "CP-230012",
-                          "OperationCode": "SigntoolSign",
-                          "Parameters" : {
-                                "OpusName" : "Microsoft",
-                                "OpusInfo" : "http://www.microsoft.com",
-                                "FileDigest" : "/fd \"SHA256\"",
-                                "PageHash" : "/NPH",
-                                "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-                            },
-                            "ToolName" : "sign",
-                            "ToolVersion" : "1.0"
-                        },
-                        {
-                            "KeyCode" : "CP-230012",
-                            "OperationCode" : "SigntoolVerify",
-                            "Parameters" : {},
-                            "ToolName" : "sign",
-                            "ToolVersion" : "1.0"
-                        }
-                  ]
+          - template: sign-step.yml
+            parameters:
+              displayName: 'Sign CAB (${{ parameters.platform }})'
+              folderPath: '$(ob_outputDirectory)\bundle'
+              pattern: '*.cab'
 
       - powershell: |
           $binFolder = ".\bin\${{ parameters.platform }}\Release"

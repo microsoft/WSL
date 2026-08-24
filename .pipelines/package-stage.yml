@@ -12,21 +12,6 @@ parameters:
     type: string
     default: ''
 
-  - name: esrp
-    type: object
-    default:
-      ConnectedServiceName: "AzureConnection-AME"
-      signConfigType: "inlineSignParams"
-      SessionTimeout: 60
-      MaxConcurrency: 50
-      MaxRetryAttempts: 5
-      ServiceEndpointUrl: $(EsrpServiceEndpointUrl)
-      AuthAKVName: $(EsrpAuthAKVName)
-      AuthSignCertName: $(EsrpAuthSignCertName)
-      AppRegistrationClientId: $(EsrpAppRegistrationClientId)
-      AppRegistrationTenantId: $(EsrpAppRegistrationTenantId)
-      EsrpClientId: $(EsrpClientId)
-
 stages:
   - stage: package
     dependsOn: [build_x64, build_arm64]
@@ -110,46 +95,11 @@ stages:
             displayName: Copy bundle to output
 
           - ${{ if eq(parameters.isRelease, true) }}:
-            - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
-              displayName: "Sign the bundle"
-              inputs:
-                ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
-                signConfigType: ${{ parameters.esrp.signConfigType }}
-                SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
-                MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
-                MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
-                ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
-                AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
-                AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
-                AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
-                AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
-                FolderPath: "$(ob_outputDirectory)\\bundle"
-                Pattern: "*.msixbundle"
-                UseMSIAuthentication: true
-                EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
-                inlineOperation: |
-                  [
-                        {
-                            "KeyCode": "CP-230012",
-                            "OperationCode": "SigntoolSign",
-                            "Parameters" : {
-                                  "OpusName" : "Microsoft",
-                                  "OpusInfo" : "http://www.microsoft.com",
-                                  "FileDigest" : "/fd \"SHA256\"",
-                                  "PageHash" : "/NPH",
-                                  "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-                              },
-                              "ToolName" : "sign",
-                              "ToolVersion" : "1.0"
-                          },
-                          {
-                              "KeyCode" : "CP-230012",
-                              "OperationCode" : "SigntoolVerify",
-                              "Parameters" : {},
-                              "ToolName" : "sign",
-                              "ToolVersion" : "1.0"
-                          }
-                    ]
+            - template: sign-step.yml
+              parameters:
+                displayName: Sign the bundle
+                folderPath: '$(ob_outputDirectory)\bundle'
+                pattern: '*.msixbundle'
 
           - ${{ if not(eq(parameters.isRelease, true)) }}:
             - powershell: |
@@ -203,40 +153,12 @@ stages:
                 displayName: Build ${{ package }}
 
           - ${{ if eq(parameters.isRelease, true) }}:
-              - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
-                displayName: "Sign nuget packages"
-                inputs:
-                  ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
-                  signConfigType: ${{ parameters.esrp.signConfigType }}
-                  SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
-                  MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
-                  MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
-                  ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
-                  AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
-                  AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
-                  AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
-                  AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
-                  FolderPath: '$(ob_outputDirectory)\nuget'
-                  Pattern: "*.nupkg"
-                  UseMSIAuthentication: true
-                  EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
-                  inlineOperation: |
-                    [
-                        {
-                            "KeyCode": "CP-401405",
-                            "OperationCode": "NuGetSign",
-                            "Parameters" : {},
-                              "ToolName" : "sign",
-                              "ToolVersion" : "1.0"
-                          },
-                          {
-                              "KeyCode" : "CP-401405",
-                              "OperationCode" : "NuGetVerify",
-                              "Parameters" : {},
-                              "ToolName" : "sign",
-                              "ToolVersion" : "1.0"
-                          }
-                    ]
+              - template: sign-step.yml
+                parameters:
+                  displayName: Sign nuget packages
+                  folderPath: '$(ob_outputDirectory)\nuget'
+                  pattern: '*.nupkg'
+                  signingType: nuget
 
           - ${{ if ne(parameters.pool, '') }}:
             - task: PublishPipelineArtifact@1

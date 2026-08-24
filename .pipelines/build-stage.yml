@@ -49,21 +49,6 @@ parameters:
   - name: vsoProject
     type: string
 
-  - name: esrp
-    type: object
-    default:
-      ConnectedServiceName: "AzureConnection-AME"
-      signConfigType: "inlineSignParams"
-      SessionTimeout: 60
-      MaxConcurrency: 50
-      MaxRetryAttempts: 5
-      ServiceEndpointUrl: $(EsrpServiceEndpointUrl)
-      AuthAKVName: $(EsrpAuthAKVName)
-      AuthSignCertName: $(EsrpAuthSignCertName)
-      AppRegistrationClientId: $(EsrpAppRegistrationClientId)
-      AppRegistrationTenantId: $(EsrpAppRegistrationTenantId)
-      EsrpClientId: $(EsrpClientId)
-
 stages:
   # ── x64 build stage ──────────────────────────────────────────────────
   # Runs in parallel with build_arm64. Tests depend on this stage.
@@ -82,7 +67,6 @@ stages:
           pool: ${{ parameters.pool }}
           vsoOrg: ${{ parameters.vsoOrg }}
           vsoProject: ${{ parameters.vsoProject }}
-          esrp: ${{ parameters.esrp }}
           includeTestArtifacts: true
 
   # ── arm64 build stage (runs in parallel with build_x64) ──────────────
@@ -142,7 +126,6 @@ stages:
           pool: ${{ parameters.pool }}
           vsoOrg: ${{ parameters.vsoOrg }}
           vsoProject: ${{ parameters.vsoProject }}
-          esrp: ${{ parameters.esrp }}
           includeCodeQL: true
 
   # ── package stage (release and nightly only) ─────────────────────────
@@ -152,5 +135,4 @@ stages:
       parameters:
         isRelease: ${{ parameters.isRelease }}
         pool: ${{ parameters.pool }}
-        esrp: ${{ parameters.esrp }}
         nugetPackages: ${{ parameters.nugetPackages }}
