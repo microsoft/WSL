@@ -1175,6 +1175,50 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"WSLC Mount Bind Test", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_Bind_VirtioFs_MapShared_Success)
+    {
+        const auto hostDirectory = EnvTestFile1.parent_path();
+        const auto fileName = EnvTestFile1.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile1.c_str()));
+
+        constexpr auto mapSharedScript =
+            LR"PY(
+import ctypes
+import mmap
+import os
+import sys
+
+with open('/proc/mounts', encoding='utf-8') as mounts_file:
+    mounts = (line.split() for line in mounts_file)
+    assert any(fields[1:3] == ['/data', 'virtiofs'] for fields in mounts)
+
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o777)
+try:
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.mmap.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_long,
+    ]
+    libc.mmap.restype = ctypes.c_void_p
+    address = libc.mmap(None, 32 * 1024, mmap.PROT_READ | mmap.PROT_WRITE, mmap.MAP_SHARED, fd, 0)
+    if address == ctypes.c_void_p(-1).value:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+finally:
+    os.close(fd)
+)PY";
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --volume \"{}:/data\" {} python3 -c \"{}\" /data/{}", hostDirectory.wstring(), PythonImage.NameAndTag(), mapSharedScript, fileName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(std::filesystem::exists(EnvTestFile1));
+        VERIFY_ARE_EQUAL(0ull, std::filesystem::file_size(EnvTestFile1));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_Volume_Success)
     {
         auto result = RunWslc(std::format(
