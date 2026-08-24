@@ -63,8 +63,8 @@ _(File,             "file",                 L"f",             Kind::Value,      
 _(Filter,           "filter",               L"f",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_FilterArgDescription()) \
 _(Follow,           "follow",               L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_FollowArgDescription()) \
 _(Timestamps,       "timestamps",           L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TimestampsArgDescription()) \
-_(Since,            "since",                NO_ALIAS,         Kind::Value,      ULONGLONG,    Localization::WSLCCLI_SinceArgDescription()) \
-_(Until,            "until",                NO_ALIAS,         Kind::Value,      ULONGLONG,    Localization::WSLCCLI_UntilArgDescription()) \
+_(Since,            "since",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_SinceArgDescription()) \
+_(Until,            "until",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_UntilArgDescription()) \
 _(Format,           "format",               NO_ALIAS,         Kind::Value,      FormatType,   Localization::WSLCCLI_FormatArgDescription()) \
 _(ForwardArgs,      "arguments",            NO_ALIAS,         Kind::Forward,    NoConversion, Localization::WSLCCLI_ForwardArgsDescription()) \
 _(Gateway,          "gateway",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkGatewayArgDescription()) \

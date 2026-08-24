@@ -43,6 +43,7 @@ public:
         ULONG Lun,
         std::string&& VirtualMachinePath,
         std::string&& CreatedAt,
+        std::string&& Mountpoint,
         std::map<std::string, std::string>&& DriverOpts,
         std::map<std::string, std::string>&& Labels,
         WSLCVirtualMachine& VirtualMachine,
@@ -99,6 +100,7 @@ private:
     std::filesystem::path m_hostPath;
     std::string m_virtualMachinePath;
     std::string m_createdAt;
+    std::string m_mountpoint;
     std::map<std::string, std::string> m_driverOpts;
     std::map<std::string, std::string> m_labels;
     ULONGLONG m_sizeBytes{};

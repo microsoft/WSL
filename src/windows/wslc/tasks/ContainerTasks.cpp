@@ -31,6 +31,7 @@ Abstract:
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
@@ -576,7 +577,7 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
-                ContainerService::FormatRelativeTime(container.CreatedAt),
+                FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
                 ContainerService::FormatPorts(container.State, container.Ports),
             });
@@ -1040,13 +1041,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
     // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
     // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
-    ULONGLONG since = 0;
+    LONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
         since = context.Args.GetValue<ArgType::Since>();
     }
 
-    ULONGLONG until = 0;
+    LONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
         until = context.Args.GetValue<ArgType::Until>();

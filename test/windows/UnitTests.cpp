@@ -169,6 +169,9 @@ class UnitTests
             VERIFY_ARE_EQUAL(out, L"This operation is only supported by WSL2.\r\nError code: Wsl/Service/WSL_E_WSL2_NEEDED\r\n");
             VERIFY_ARE_EQUAL(err, L"");
         }
+
+        VerifyInvalidUsage(std::format(L"--export {} {} --format tar.gz --format tar.xz", LXSS_DISTRO_NAME_TEST_L, tarPath));
+        VerifyInvalidUsage(std::format(L"--export {} {} --format tar.xz --vhd", LXSS_DISTRO_NAME_TEST_L, tarPath));
     }
 
     WSL2_TEST_METHOD(SystemdSafeMode)
@@ -1503,7 +1506,7 @@ class UnitTests
                     L"-d DummyBrokenDistro",
                     L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
                     L"specified. ",
-                    L"Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND");
+                    L"Wsl/Service/CreateInstance/MountDisk/ERROR_PATH_NOT_FOUND");
 
                 // Purposefully set an incorrect value type to validate registry error handling.
                 wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"Version", L"Broken");
@@ -2923,8 +2926,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Ensure the kernel modules folder is mounted correctly.
         std::wstring command = std::format(
             L"mount | grep -iF 'none on /usr/lib/modules/{} type overlay "
-            L"(rw,nosuid,nodev,noatime,lowerdir=/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
+            L"(rw,nosuid,nodev,noatime,lowerdir=/modules/{}/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
             L"work,uuid=on)'",
+            kernelVersion,
             kernelVersion,
             kernelVersion,
             kernelVersion);
@@ -2953,7 +2957,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 #ifdef WSL_DEV_INSTALL_PATH
 
         std::wstring kernelPath = WSL_DEV_INSTALL_PATH L"/kernel";
-        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/modules.vhd";
+        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/artifacts.vhd";
 
 #else
 
@@ -2963,7 +2967,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         std::filesystem::path wslInstallPath(installPath.value());
 
         std::wstring kernelPath = wslInstallPath / "tools" / "kernel";
-        std::wstring kernelModulesPath = wslInstallPath / "tools" / "modules.vhd";
+        std::wstring kernelModulesPath = wslInstallPath / "tools" / "artifacts.vhd";
 
 #endif
 
@@ -4365,6 +4369,22 @@ localhostForwarding=true
 
         VERIFY_ARE_EQUAL(
             out, L"There is no distribution with the supplied name.\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_FOUND\r\n");
+
+        constexpr auto injectionMarker = L"/tmp/wsl-manage-default-user-injection";
+        LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/rm -f {}", injectionMarker));
+        auto cleanupInjectionMarker = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [injectionMarker]() {
+            LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/rm -f {}", injectionMarker));
+        });
+
+        const auto injectionUsername = std::format(L"' || touch {} || '", injectionMarker);
+        const std::array<std::wstring_view, 4> injectionArguments{
+            WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG, injectionUsername};
+        const auto injectionCommand = wil::ArgvToCommandLine(injectionArguments, wil::ArgvToCommandLineFlags::FirstArgumentIsNotPath);
+        auto injectionCommandLine = LxssGenerateWslCommandLine(injectionCommand.c_str());
+        const auto injectionExitCode = LxsstuRunCommand(injectionCommandLine.data());
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/test ! -e {}", injectionMarker)), 0L);
+        VERIFY_ARE_EQUAL(injectionExitCode, 1L);
     }
 
     TEST_METHOD(PostDistroRegistrationSettingsOOBE)
@@ -6809,13 +6829,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
@@ -6862,13 +6882,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        const auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
         const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
-        const auto modulesPath = std::format(L"{}\\tools\\modules.vhd", installPath);
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
         const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
         const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
