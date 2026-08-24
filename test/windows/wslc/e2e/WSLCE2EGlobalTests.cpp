@@ -234,12 +234,14 @@ class WSLCE2EGlobalTests
         const auto& client = root.at("Client");
         VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, client.at("Version").get<std::string>());
         VERIFY_ARE_EQUAL(std::string{KERNEL_VERSION}, client.at("KernelVersion").get<std::string>());
-        VERIFY_ARE_EQUAL(std::string{WSLG_VERSION}, client.at("WslgVersion").get<std::string>());
-        VERIFY_ARE_EQUAL(std::string{MSRDC_VERSION}, client.at("MsrdcVersion").get<std::string>());
         VERIFY_ARE_EQUAL(std::string{DIRECT3D_VERSION}, client.at("Direct3DVersion").get<std::string>());
         VERIFY_ARE_EQUAL(std::string{DXCORE_VERSION}, client.at("DxCoreVersion").get<std::string>());
         VERIFY_IS_FALSE(client.at("WindowsVersion").get<std::string>().empty());
         VERIFY_IS_FALSE(client.at("SettingsFile").get<std::string>().empty());
+
+        // WSLg and MSRDC aren't relevant to wslc.
+        VERIFY_IS_FALSE(client.contains("WslgVersion"));
+        VERIFY_IS_FALSE(client.contains("MsrdcVersion"));
 
         const auto& server = root.at("Server");
         VERIFY_ARE_EQUAL(

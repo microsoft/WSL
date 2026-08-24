@@ -2896,6 +2896,14 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
     <value>Client:</value>
   </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>WSL version: {}
+Kernel version: {}
+Direct3D version: {}
+DXCore version: {}
+Windows version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
     <value>Server:</value>
   </data>

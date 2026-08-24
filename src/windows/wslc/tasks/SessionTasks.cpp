@@ -120,8 +120,6 @@ void ShowSystemInfo(CLIExecutionContext& context)
         auto& client = root["Client"];
         client["Version"] = std::string{WSL_PACKAGE_VERSION};
         client["KernelVersion"] = std::string{KERNEL_VERSION};
-        client["WslgVersion"] = std::string{WSLG_VERSION};
-        client["MsrdcVersion"] = std::string{MSRDC_VERSION};
         client["Direct3DVersion"] = std::string{DIRECT3D_VERSION};
         client["DxCoreVersion"] = std::string{DXCORE_VERSION};
         client["WindowsVersion"] = windowsVersion;
@@ -151,9 +149,7 @@ void ShowSystemInfo(CLIExecutionContext& context)
     {
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_SystemInfoClientHeader());
         context.Terminal.Output(
-            L"{}\n",
-            Localization::MessagePackageVersions(
-                WSL_PACKAGE_VERSION, KERNEL_VERSION, WSLG_VERSION, MSRDC_VERSION, DIRECT3D_VERSION, DXCORE_VERSION, windowsVersion));
+            L"{}\n", Localization::WSLCCLI_SystemInfoVersions(WSL_PACKAGE_VERSION, KERNEL_VERSION, DIRECT3D_VERSION, DXCORE_VERSION, windowsVersion));
 
         if constexpr (!wsl::shared::OfficialBuild)
         {
