@@ -2551,7 +2551,7 @@ try
     auto freeStrings = wil::scope_exit([&] {
         for (size_t i = 0; i < dockerContainers.size(); ++i)
         {
-            wsl::windows::common::wslc::FreeContainerEntryStrings(output[i]);
+            wsl::windows::common::wslc::FreeContainerEntryStrings(&output[i]);
         }
     });
 
