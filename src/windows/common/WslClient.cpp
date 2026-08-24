@@ -223,8 +223,9 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     std::filesystem::path filePath;
     LPCWSTR name{};
+    int tarFormatSet = 0;
 
-    auto parseFormat = [&flags](LPCWSTR Value) {
+    auto parseFormat = [&flags, &tarFormatSet](LPCWSTR Value) {
         if (Value == nullptr)
         {
             return -1;
@@ -242,7 +243,11 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
         {
             WI_SetFlag(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD);
         }
-        else if (!wsl::shared::string::IsEqual(L"tar", Value))
+        else if (wsl::shared::string::IsEqual(L"tar", Value))
+        {
+            tarFormatSet = 1;
+        }
+        else
         {
             THROW_HR(E_INVALIDARG);
         }
@@ -256,9 +261,8 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     parser.AddArgument(parseFormat, WSL_EXPORT_ARG_FORMAT_OPTION);
     parser.Parse();
 
-    THROW_HR_IF(
-        WSL_E_INVALID_USAGE,
-        filePath.empty() || (WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_GZIP) && WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD)));
+    constexpr ULONG c_exportFormatFlags = LXSS_EXPORT_DISTRO_FLAGS_VHD | LXSS_EXPORT_DISTRO_FLAGS_GZIP | LXSS_EXPORT_DISTRO_FLAGS_XZIP;
+    THROW_HR_IF(WSL_E_INVALID_USAGE, filePath.empty() || std::popcount(flags & c_exportFormatFlags) + tarFormatSet > 1);
 
     // Determine if the target is stdout, or an on-disk file.
     wil::unique_hfile file;
@@ -926,12 +930,10 @@ int Manage(_In_ std::wstring_view commandLine)
     else if (defaultUser)
     {
         auto wslExe = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
-
-        auto commandLine = std::format(
-            L"\"{}\" {} -u root /usr/bin/id -u -- '{}'",
-            wslExe,
-            wsl::shared::string::GuidToString<wchar_t>(distroGuid),
-            defaultUser.value());
+        const auto distroGuidString = wsl::shared::string::GuidToString<wchar_t>(distroGuid);
+        const std::array<std::wstring_view, 9> arguments{
+            wslExe, distroGuidString, WSL_USER_ARG, L"root", WSL_EXEC_ARG, L"/usr/bin/id", L"-u", L"--", defaultUser.value()};
+        const auto commandLine = wil::ArgvToCommandLine(arguments);
 
         wsl::windows::common::SubProcess process{wslExe.c_str(), commandLine.c_str()};
 
