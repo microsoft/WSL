@@ -350,7 +350,8 @@ std::string ImageService::Import(Terminal& terminal, wsl::windows::wslc::models:
     return imageId.get() ? std::string(imageId.get()) : std::string();
 }
 
-void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
+std::vector<wsl::windows::wslc::models::DeletedImageEntry> ImageService::Delete(
+    wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
     WSLCDeleteImageOptions options{};
     options.Image = image.c_str();
@@ -367,6 +368,15 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+
+    std::vector<wsl::windows::wslc::models::DeletedImageEntry> result;
+    result.reserve(deletedImages.size());
+    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    {
+        result.push_back({ptr->Image, ptr->Type == WSLCDeletedImageTypeDeleted});
+    }
+
+    return result;
 }
 
 void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)

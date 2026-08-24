@@ -69,7 +69,9 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsNotUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", DebianImage.NameAndTag())));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Deleted: sha256:"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MultipleUnusedImages_Success)
@@ -80,7 +82,9 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsNotUsed(AlpineImage);
 
         auto result = RunWslc(std::format(L"image delete {} {}", DebianImage.Name, AlpineImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", DebianImage.NameAndTag())));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", AlpineImage.NameAndTag())));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UsedImage_Failure)
@@ -119,7 +123,8 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete --force {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", DebianImage.NameAndTag())));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)

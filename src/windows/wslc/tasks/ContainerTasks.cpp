@@ -35,11 +35,13 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
-using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::common::string::FormatStorageSize;
 using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
+
+constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
 {
@@ -1062,12 +1064,18 @@ void PruneContainers(CLIExecutionContext& context)
 
     auto result = ContainerService::Prune(session);
 
-    for (const auto& containerId : result.PrunedContainers)
+    if (!result.PrunedContainers.empty())
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneDeletedHeader());
+        for (const auto& containerId : result.PrunedContainers)
+        {
+            context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    context.Terminal.Output(L"\n");
-    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(
+        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task

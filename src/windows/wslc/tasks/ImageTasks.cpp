@@ -310,7 +310,14 @@ void DeleteImage(CLIExecutionContext& context)
     bool noPrune = context.Args.GetValue<ArgType::NoPrune>();
     for (const auto& id : imageIds)
     {
-        services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+        const auto deleted = services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+        for (const auto& entry : deleted)
+        {
+            context.Terminal.Output(
+                L"{}\n",
+                entry.Deleted ? Localization::WSLCCLI_ImageDeleteDeleted(entry.Image)
+                              : Localization::WSLCCLI_ImageDeleteUntagged(entry.Image));
+        }
     }
 }
 
