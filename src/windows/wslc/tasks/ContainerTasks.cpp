@@ -41,6 +41,20 @@ using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
 
+// Docker reports memory in binary units and network and block IO in decimal units.
+constexpr uint32_t c_statsMemoryPrecision = 4;
+constexpr uint32_t c_statsIoPrecision = 3;
+
+std::string FormatStatsMemory(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsMemoryPrecision, StorageSizeUnit::Binary));
+}
+
+std::string FormatStatsIo(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
+}
+
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
 {
     // Calculate CPU %
@@ -98,22 +112,15 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     }
 
     const auto& containerName = stats.name.empty() ? stats.id : stats.name;
-    // Docker reports memory in binary units and network and block IO in decimal units.
-    constexpr uint32_t c_memoryPrecision = 4;
-    constexpr uint32_t c_ioPrecision = 3;
-    const auto formatMemory = [](uint64_t bytes) {
-        return WideToMultiByte(FormatHumanReadableSize(bytes, c_memoryPrecision, StorageSizeUnit::Binary));
-    };
-    const auto formatIo = [](uint64_t bytes) { return WideToMultiByte(FormatHumanReadableSize(bytes, c_ioPrecision)); };
 
     return {
         {"ID", stats.id},
         {"Name", containerName},
         {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
-        {"MemUsage", std::format("{} / {}", formatMemory(stats.memory_stats.usage), formatMemory(stats.memory_stats.limit))},
+        {"MemUsage", std::format("{} / {}", FormatStatsMemory(stats.memory_stats.usage), FormatStatsMemory(stats.memory_stats.limit))},
         {"MemPerc", std::format("{:.2f}%", memPercent)},
-        {"NetIO", std::format("{} / {}", formatIo(netRxBytes), formatIo(netTxBytes))},
-        {"BlockIO", std::format("{} / {}", formatIo(blkReadBytes), formatIo(blkWriteBytes))},
+        {"NetIO", std::format("{} / {}", FormatStatsIo(netRxBytes), FormatStatsIo(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatStatsIo(blkReadBytes), FormatStatsIo(blkWriteBytes))},
         {"PIDs", stats.pids_stats.current},
     };
 }
