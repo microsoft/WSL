@@ -1189,7 +1189,8 @@ import sys
 
 with open('/proc/mounts', encoding='utf-8') as mounts_file:
     mounts = (line.split() for line in mounts_file)
-    assert any(fields[1:3] == ['/data', 'virtiofs'] for fields in mounts)
+    if not any(fields[1:3] == ['/data', 'virtiofs'] for fields in mounts):
+        raise RuntimeError('/data is not mounted as virtiofs')
 
 fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o777)
 try:
@@ -1197,7 +1198,8 @@ try:
     with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.PROT_WRITE) as mapping:
         mapping[0:1] = b'W'
         mapping.flush()
-        assert os.pread(fd, 1, 0) == b'W'
+        if os.pread(fd, 1, 0) != b'W':
+            raise RuntimeError('MAP_SHARED write was not visible through the file')
 finally:
     os.close(fd)
 )PY";
