@@ -1413,6 +1413,10 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
                     transition.reset();
                 }
             }
+            else
+            {
+                transition.reset();
+            }
         }
     }
 

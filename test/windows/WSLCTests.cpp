@@ -7418,6 +7418,70 @@ class WSLCTests
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
     }
 
+    WSLC_TEST_METHOD(ConcurrentContainerStopAndIgnoredSignal)
+    {
+        // The init process blocks in its SIGTERM handler and only logs SIGUSR1, so the Stop stays pending
+        // across the Kill instead of being completed by it.
+        WSLCContainerLauncher launcher(
+            "debian:latest",
+            "test-concurrent-stop-ignored-signal",
+            {"/bin/sh",
+             "-c",
+             "trap 'echo stopping; while true; do sleep 1; done' TERM; trap 'echo signaled' USR1; echo ready; while true; do "
+             "sleep 1; done"},
+            {},
+            "host");
+
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+        auto outputHandle = initProcess.GetStdHandle(1);
+        PartialHandleRead output{outputHandle.get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult{};
+        HRESULT killResult{};
+        std::thread stopThread;
+        std::thread killThread;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGKILL));
+
+            if (stopThread.joinable())
+            {
+                stopThread.join();
+            }
+
+            if (killThread.joinable())
+            {
+                killThread.join();
+            }
+        });
+
+        stopThread = std::thread([&]() { stopResult = container.Get().Stop(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE); });
+
+        output.ExpectConsume("stopping\n");
+
+        // A signal that doesn't stop the container must not wait on the Stop it raced.
+        killThread = std::thread([&]() { killResult = container.Get().Kill(WSLCSignalSIGUSR1); });
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(killThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        killThread.join();
+        VERIFY_SUCCEEDED(killResult);
+
+        // The signal reached the container, and the Stop is still pending.
+        output.ExpectConsume("signaled\n");
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 100), WAIT_TIMEOUT);
+
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
+        stopThread.join();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(stopResult);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
     WSLC_TEST_METHOD(ConcurrentContainerStopTimeoutOverride)
     {
         auto container = LaunchContainerWithBlockingStopHandler("test-concurrent-stop-timeout");
