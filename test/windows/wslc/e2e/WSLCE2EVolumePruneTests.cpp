@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,7 +26,7 @@ class WSLCE2EVolumePruneTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         CleanUpAllTestState();
         return true;
     }
@@ -39,7 +40,6 @@ class WSLCE2EVolumePruneTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         CleanUpAllTestState();
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -56,7 +56,9 @@ class WSLCE2EVolumePruneTests
         const auto result = RunWslc(L"volume prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
+        // The deleted-volume block, and the blank line that follows it, are only written when
+        // something was actually removed.
+        result.Verify({.Stdout = L"Total reclaimed space: 0B\r\n"});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_NoAllFlag_PreservesNamedVolumes)
@@ -70,9 +72,8 @@ class WSLCE2EVolumePruneTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto output = result.GetStdoutLines();
-        VERIFY_ARE_EQUAL(2u, output.size());
-        VERIFY_ARE_EQUAL(output[0], L"");
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[1].find(L"Total reclaimed space:"));
+        VERIFY_ARE_EQUAL(1u, output.size());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[0].find(L"Total reclaimed space:"));
 
         VerifyVolumeIsListed(TestVolumeName);
     }
@@ -88,10 +89,11 @@ class WSLCE2EVolumePruneTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto output = result.GetStdoutLines();
-        VERIFY_ARE_EQUAL(3u, output.size());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[0].find(std::format(L"Deleted: {}", TestVolumeName)));
-        VERIFY_ARE_EQUAL(output[1], L"");
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[2].find(L"Total reclaimed space:"));
+        VERIFY_ARE_EQUAL(4u, output.size());
+        VERIFY_ARE_EQUAL(output[0], L"Deleted Volumes:");
+        VERIFY_ARE_EQUAL(output[1], TestVolumeName);
+        VERIFY_ARE_EQUAL(output[2], L"");
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[3].find(L"Total reclaimed space:"));
 
         VerifyVolumeIsNotListed(TestVolumeName);
     }
@@ -111,8 +113,9 @@ class WSLCE2EVolumePruneTests
         const auto result = RunWslc(L"volume prune --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)));
-        VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName2)));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(L"Deleted Volumes:"));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestVolumeName));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestVolumeName2));
 
         VerifyVolumeIsNotListed(TestVolumeName);
         VerifyVolumeIsNotListed(TestVolumeName2);
@@ -136,9 +139,7 @@ class WSLCE2EVolumePruneTests
         const auto result = RunWslc(L"volume prune --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_FALSE(
-            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
-            L"Volume in use by a running container must not be pruned");
+        VERIFY_IS_FALSE(result.StdoutContainsLine(TestVolumeName), L"Volume in use by a running container must not be pruned");
 
         VerifyVolumeIsListed(TestVolumeName);
     }
@@ -154,15 +155,14 @@ class WSLCE2EVolumePruneTests
         const auto filteredPrune = RunWslc(L"volume prune --all --filter label=wslc.test.never=present");
         filteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_FALSE(
-            filteredPrune.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
-            L"Filtered prune should not have deleted the non-matching volume");
+            filteredPrune.StdoutContainsLine(TestVolumeName), L"Filtered prune should not have deleted the non-matching volume");
         VerifyVolumeIsListed(TestVolumeName);
 
         // Subsequent unfiltered prune --all should still remove it, proving
         // the filter was the reason it survived.
         const auto unfilteredPrune = RunWslc(L"volume prune --all");
         unfilteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(unfilteredPrune.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)));
+        VERIFY_IS_TRUE(unfilteredPrune.StdoutContainsLine(TestVolumeName));
         VerifyVolumeIsNotListed(TestVolumeName);
     }
 
@@ -181,10 +181,8 @@ class WSLCE2EVolumePruneTests
         const auto result = RunWslc(L"volume prune --all --filter label=wslc.test.prune=keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)));
-        VERIFY_IS_FALSE(
-            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName2)),
-            L"Volume without the matching label must not be deleted");
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestVolumeName));
+        VERIFY_IS_FALSE(result.StdoutContainsLine(TestVolumeName2), L"Volume without the matching label must not be deleted");
 
         VerifyVolumeIsNotListed(TestVolumeName);
         VerifyVolumeIsListed(TestVolumeName2);
@@ -205,10 +203,9 @@ class WSLCE2EVolumePruneTests
         const auto result = RunWslc(L"volume prune --all --filter label!=wslc.test.keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName2)));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestVolumeName2));
         VERIFY_IS_FALSE(
-            result.StdoutContainsLine(std::format(L"Deleted: {}", TestVolumeName)),
-            L"Labeled volume must be preserved when prune negates that label");
+            result.StdoutContainsLine(TestVolumeName), L"Labeled volume must be preserved when prune negates that label");
 
         VerifyVolumeIsListed(TestVolumeName);
         VerifyVolumeIsNotListed(TestVolumeName2);

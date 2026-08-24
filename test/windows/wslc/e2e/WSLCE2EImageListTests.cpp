@@ -16,6 +16,7 @@ Abstract:
 #include "ImageModel.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -28,15 +29,13 @@ class WSLCE2EImageListTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 

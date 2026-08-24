@@ -175,7 +175,12 @@ class InstallerTests
 
     static void CallMsiExec(const std::wstring& Args)
     {
-        VERIFY_ARE_EQUAL(0L, RunMsiExec(Args));
+        auto exitCode = RunMsiExec(Args);
+        if (exitCode != ERROR_SUCCESS && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED)
+        {
+            LogError("msiexec failed with exit code %lu", exitCode);
+            VERIFY_FAIL();
+        }
     }
 
     std::wstring GetMsiProductCode() const

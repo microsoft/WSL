@@ -150,7 +150,7 @@ class WSLCCLIExecutionUnitTests
             }
             else if (dataType == Data::Networks)
             {
-                std::vector<WSLCNetworkInformation> networks;
+                std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> networks;
                 dataMap.Add<Data::Networks>(std::move(networks));
                 handled = true;
             }

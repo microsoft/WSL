@@ -27,9 +27,11 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
-using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
+
+constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
 static bool TryInspectVolume(Terminal& terminal, Session& session, const std::string& volumeName, std::optional<wslc_schema::InspectVolume>& inspectData)
 {
@@ -211,12 +213,18 @@ void PruneVolumes(CLIExecutionContext& context)
 
     auto result = VolumeService::Prune(context.Terminal, session, all, filters);
 
-    for (const auto& volumeName : result.PrunedVolumes)
+    if (!result.PrunedVolumes.empty())
     {
-        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_VolumePruneDeleted(MultiByteToWide(volumeName)));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_VolumePruneDeletedHeader());
+        for (const auto& volumeName : result.PrunedVolumes)
+        {
+            context.Terminal.Output(L"{}\n", MultiByteToWide(volumeName));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    context.Terminal.Output(L"\n");
-    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_VolumePruneSpaceReclaimed(FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(
+        L"{}\n", Localization::WSLCCLI_VolumePruneSpaceReclaimed(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task

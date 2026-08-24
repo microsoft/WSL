@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "ImageModel.h"
 
 namespace WSLCE2ETests {
@@ -26,16 +27,15 @@ class WSLCE2EImageImportTests
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(ImportedImage);
+        TestImageRegistry::Instance().Delete(ImportedImage);
         EnsureNoUntaggedImages();
         return true;
     }
 
     TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsDeleted(ImportedImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().Delete(ImportedImage);
         EnsureNoUntaggedImages();
         SavedArchivePath = wsl::windows::common::filesystem::GetTempFilename();
         return true;

@@ -49,10 +49,16 @@ namespace {
 WSLCGuestVolumeImpl::WSLCGuestVolumeImpl(
     std::string&& Name,
     std::string&& CreatedAt,
+    std::string&& Mountpoint,
     std::map<std::string, std::string>&& DriverOpts,
     std::map<std::string, std::string>&& Labels,
     DockerHTTPClient& DockerClient) :
-    m_name(std::move(Name)), m_createdAt(std::move(CreatedAt)), m_driverOpts(std::move(DriverOpts)), m_labels(std::move(Labels)), m_dockerClient(DockerClient)
+    m_name(std::move(Name)),
+    m_createdAt(std::move(CreatedAt)),
+    m_mountpoint(std::move(Mountpoint)),
+    m_driverOpts(std::move(DriverOpts)),
+    m_labels(std::move(Labels)),
+    m_dockerClient(DockerClient)
 {
 }
 
@@ -80,7 +86,12 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
         auto createdVolume = DockerClient.CreateVolume(request);
 
         return std::make_unique<WSLCGuestVolumeImpl>(
-            std::move(createdVolume.Name), std::move(createdVolume.CreatedAt), std::move(DriverOpts), std::move(Labels), DockerClient);
+            std::move(createdVolume.Name),
+            std::move(createdVolume.CreatedAt),
+            std::move(createdVolume.Mountpoint),
+            std::move(DriverOpts),
+            std::move(Labels),
+            DockerClient);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create volume '%hs'", Name != nullptr ? Name : "");
 }
@@ -98,7 +109,7 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Open(const wsl::window
     std::map<std::string, std::string> labels = Volume.Labels.value_or(std::map<std::string, std::string>{});
 
     return std::make_unique<WSLCGuestVolumeImpl>(
-        std::string{Volume.Name}, std::string{Volume.CreatedAt}, std::move(driverOpts), std::move(labels), DockerClient);
+        std::string{Volume.Name}, std::string{Volume.CreatedAt}, std::string{Volume.Mountpoint}, std::move(driverOpts), std::move(labels), DockerClient);
 }
 
 void WSLCGuestVolumeImpl::Delete()
@@ -122,7 +133,9 @@ std::string WSLCGuestVolumeImpl::Inspect() const
     inspect.Name = m_name;
     inspect.Driver = WSLCGuestVolumeDriver;
     inspect.CreatedAt = m_createdAt;
-    inspect.DriverOpts = m_driverOpts;
+    inspect.Mountpoint = m_mountpoint;
+    inspect.Scope = WSLCVolumeScope;
+    inspect.Options = m_driverOpts;
     inspect.Labels = m_labels;
 
     return wsl::shared::ToJson(inspect);

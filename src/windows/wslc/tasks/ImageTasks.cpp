@@ -29,6 +29,7 @@ Abstract:
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
@@ -82,14 +83,13 @@ namespace {
         ImageOutputInformation entry;
         entry.Containers = image.Containers < 0 ? std::string{c_notAvailable} : std::to_string(image.Containers);
 
-        entry.CreatedAt = FormatDockerTimestamp(image.Created);
-        entry.CreatedSince =
-            WideToMultiByte(ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0));
+        entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
+        entry.CreatedSince = WideToMultiByte(FormatRelativeTime(image.Created));
         entry.Digest = c_none;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
         entry.SharedSize = c_notAvailable;
-        entry.Size = WideToMultiByte(FormatDockerSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
+        entry.Size = WideToMultiByte(FormatHumanReadableSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
         entry.Tag = image.Tag.value_or(std::string{c_none});
         entry.UniqueSize = c_notAvailable;
 

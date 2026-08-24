@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 
@@ -26,17 +27,15 @@ class WSLCE2EImageTagTests
 
     TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsDeleted(DebianTaggedImage);
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().Delete(DebianTaggedImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianTaggedImage);
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
+        TestImageRegistry::Instance().Delete(DebianTaggedImage);
         return true;
     }
 
@@ -152,7 +151,7 @@ class WSLCE2EImageTagTests
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
         VerifyImageIsListed(DebianTaggedImage);
     }
 
@@ -161,7 +160,7 @@ class WSLCE2EImageTagTests
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
-        EnsureImageIsDeleted(DebianTaggedImage);
+        TestImageRegistry::Instance().Delete(DebianTaggedImage);
         VerifyImageIsListed(DebianImage);
     }
 

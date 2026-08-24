@@ -374,8 +374,8 @@ typedef struct _WSLCContainerEntry
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
     WSLCContainerId Id;
-    ULONGLONG StateChangedAt;
-    ULONGLONG CreatedAt;
+    LONGLONG StateChangedAt;
+    LONGLONG CreatedAt;
     WSLCContainerState State;
 } WSLCContainerEntry;
 
@@ -565,7 +565,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
     HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] const WSLCProcessStartOptions* StartOptions, [out] IWSLCProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] LONGLONG Since, [in] LONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
@@ -647,13 +647,6 @@ typedef struct _WSLCNetworkOptions
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
-
-typedef struct _WSLCNetworkInformation
-{
-    char Name[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
-    char Id[WSLC_CONTAINER_ID_LENGTH + 1];
-    char Driver[64];
-} WSLCNetworkInformation;
 
 typedef struct _WSLCPruneContainersResults
 {
@@ -775,7 +768,8 @@ interface IWSLCSession : IUnknown
     // Network management.
     HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options, [in, unique] IWarningCallback* WarningCallback);
     HRESULT DeleteNetwork([in] LPCSTR Name);
-    HRESULT ListNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
+    // Returns a JSON array of wslc_schema::NetworkListEntry objects describing the session's networks.
+    HRESULT ListNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] LPSTR* Output);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
     HRESULT PruneNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *NetworksCount)] WSLCNetworkName** Networks, [out] ULONG* NetworksCount);
 

@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "WSLCSessionDefaults.h"
 #include "Argument.h"
 
@@ -485,7 +486,7 @@ class WSLCE2EGlobalTests
         auto session = TestSession::Create(sessionName);
 
         // Load the Debian image into the test session to avoid hitting Docker Hub rate limits.
-        EnsureImageIsLoaded(DebianTestImage(), session.Name());
+        TestImageRegistry::Instance().EnsureLoaded(DebianTestImage(), session.Name());
 
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"--session INVALID_SESSION_NAME container list");
@@ -505,17 +506,20 @@ class WSLCE2EGlobalTests
         result = RunWslc(std::format(L"--session \"{}\" container list", session.Name()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Add a container to the new session.
+        // Add a container to the new session. The listing checks below match on substrings, so the
+        // name carries the session's unique suffix: "test-cont" on its own is a prefix of the
+        // "wslc-test-container" names other tests leave in the default session.
+        const auto containerName = std::format(L"wslc-session-cont-{}", guidStr.substr(0, 8));
         result = RunWslc(std::format(
-            L"--session \"{}\" container create --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
+            L"--session \"{}\" container create --name {} {}", session.Name(), containerName, DebianTestImage().NameAndTag()));
         result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
         result.Verify({.ExitCode = 0});
 
         // Verify container exists in the custom session
-        VerifyContainerIsListed(L"test-cont", L"created", session.Name());
+        VerifyContainerIsListed(containerName, L"created", session.Name());
 
         // Verify container does not exist in the default CLI session.
-        VerifyContainerIsNotListed(L"test-cont");
+        VerifyContainerIsNotListed(containerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_Shell)
