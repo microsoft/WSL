@@ -22,6 +22,10 @@ namespace wsl::windows::common::docker_schema {
 
 using wsl::shared::EmptyObject;
 
+// The daemon formats timestamps that were never set as the zero value of Go's time.Time rather than
+// omitting them, so this value means "unset" instead of an actual point in time.
+inline constexpr std::string_view c_unsetTimestamp = "0001-01-01T00:00:00Z";
+
 // Reads a value, treating both a missing key and an explicit null as absent. The daemon reports some
 // empty maps and objects as null, which the default deserializer rejects.
 template <typename T>

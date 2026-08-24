@@ -6985,8 +6985,8 @@ class WSLCTests
             expectContainerList({{"test-container-1", "debian:latest", WslcContainerStateRunning}});
 
             // Capture StateChangedAt and CreatedAt while the container is running.
-            ULONGLONG runningStateChangedAt{};
-            ULONGLONG runningCreatedAt{};
+            LONGLONG runningStateChangedAt{};
+            LONGLONG runningCreatedAt{};
             {
                 auto [containers, ports] = ListContainers(m_defaultSession.get());
                 VERIFY_ARE_EQUAL(containers.size(), 1);
@@ -7017,7 +7017,7 @@ class WSLCTests
                 auto [containers, ports] = ListContainers(m_defaultSession.get());
                 VERIFY_ARE_EQUAL(containers.size(), 1);
 
-                auto now = static_cast<ULONGLONG>(time(nullptr));
+                auto now = static_cast<LONGLONG>(time(nullptr));
                 VERIFY_IS_TRUE(containers[0].StateChangedAt <= now);
                 VERIFY_IS_TRUE(containers[0].StateChangedAt >= runningStateChangedAt);
 
@@ -10671,8 +10671,8 @@ class WSLCTests
         auto restore = ResetTestSession(); // Required to access the storage folder.
 
         std::string containerName = "test-container";
-        ULONGLONG originalStateChangedAt{};
-        ULONGLONG originalCreatedAt{};
+        LONGLONG originalStateChangedAt{};
+        LONGLONG originalCreatedAt{};
 
         // Phase 1: Create session and container, then stop the container
         {

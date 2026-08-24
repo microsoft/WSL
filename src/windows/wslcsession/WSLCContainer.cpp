@@ -843,7 +843,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
     WSLCContainerState InitialState,
-    std::uint64_t CreatedAt,
+    std::int64_t CreatedAt,
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags) :
     m_wslcSession(wslcSession),
@@ -976,13 +976,13 @@ std::vector<WSLCPortMapping> WSLCContainerImpl::GetPorts() const
     return result;
 }
 
-void WSLCContainerImpl::GetStateChangedAt(ULONGLONG* Result)
+void WSLCContainerImpl::GetStateChangedAt(LONGLONG* Result)
 {
     auto lock = m_lock.lock_shared();
     *Result = m_stateChangedAt;
 }
 
-void WSLCContainerImpl::GetCreatedAt(ULONGLONG* Result)
+void WSLCContainerImpl::GetCreatedAt(LONGLONG* Result)
 {
     auto lock = m_lock.lock_shared();
     *Result = m_createdAt;
@@ -1188,7 +1188,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
     cleanup.release();
 }
 
-void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime)
+void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime)
 {
     // We must release m_lock and m_stopLock before the wrapper's destructor calls
     // Disconnect(), so in-flight COM callers can drain from COMImplClass::m_callers.
@@ -1304,7 +1304,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 
     // Wait for the stop event to get the Docker timestamp.
-    std::optional<std::uint64_t> stopTimestamp;
+    std::optional<std::int64_t> stopTimestamp;
     if (m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s))
     {
         stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
@@ -1322,7 +1322,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 }
 
-__requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::OnStopped(std::optional<std::uint64_t> stopTimestamp)
+__requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::OnStopped(std::optional<std::int64_t> stopTimestamp)
 {
     unique_com_disconnect comWrapper;
 
@@ -2421,7 +2421,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(mergedLabels),
         std::move(OnDeleted),
         WslcContainerStateCreated,
-        wsl::windows::common::string::Rfc3339ToEpoch(inspectData.Created),
+        wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created),
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
@@ -2509,7 +2509,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::move(labels),
         std::move(OnDeleted),
         DockerStateToWSLCState(dockerContainer.State),
-        static_cast<std::uint64_t>(dockerContainer.Created),
+        dockerContainer.Created,
         metadata.InitProcessFlags,
         metadata.Flags);
 
@@ -2525,15 +2525,15 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         {
             // A created-but-never-started container has no StartedAt/FinishedAt; its state last
             // changed when it was created.
-            container->m_stateChangedAt = static_cast<std::uint64_t>(dockerContainer.Created);
+            container->m_stateChangedAt = dockerContainer.Created;
         }
         else
         {
             const auto& timestamp = (state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
 
-            if (!timestamp.empty())
+            if (!timestamp.empty() && timestamp != c_unsetTimestamp)
             {
-                container->m_stateChangedAt = wsl::windows::common::string::Rfc3339ToEpoch(timestamp);
+                container->m_stateChangedAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(timestamp);
             }
         }
     }
@@ -2575,7 +2575,7 @@ std::string WSLCContainerImpl::InspectLockHeld() const
     return wsl::shared::ToJson(wslcInspect);
 }
 
-void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const
+void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -2816,7 +2816,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
-__requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept
+__requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerState State, std::optional<std::int64_t> stateChangedAt) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
@@ -2828,7 +2828,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
-    m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
+    m_stateChangedAt = stateChangedAt.value_or(static_cast<std::int64_t>(std::time(nullptr)));
 
     // Keep the VM alive while this container is Running and release the hold once it leaves that
     // state, even when no client holds the wrapper (e.g. a detached `run -d` container). Dropping
@@ -3081,7 +3081,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 try
 {
     WSLCExecutionContext context(&m_session);

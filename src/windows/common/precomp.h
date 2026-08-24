@@ -147,6 +147,7 @@ Abstract:
 #include "conncheckshared.h"
 #include "helpers.hpp"
 #include "string.hpp"
+#include "timestamp.hpp"
 #include "filesystem.hpp"
 #include "Localization.h"
 #include "wslutil.h"

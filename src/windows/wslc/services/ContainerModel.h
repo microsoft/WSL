@@ -135,8 +135,8 @@ struct ContainerInformation
     std::string Name;
     std::string Image;
     WSLCContainerState State;
-    ULONGLONG StateChangedAt{};
-    ULONGLONG CreatedAt{};
+    LONGLONG StateChangedAt{};
+    LONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
