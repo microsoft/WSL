@@ -77,6 +77,10 @@ public:
     {
         return m_labels;
     }
+    const std::string& Mountpoint() const noexcept override
+    {
+        return m_mountpoint;
+    }
 
     std::pair<HRESULT, std::string> Status() const override
     {
