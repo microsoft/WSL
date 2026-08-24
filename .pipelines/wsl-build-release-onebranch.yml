@@ -39,7 +39,7 @@ resources:
       ref: refs/tags/v1
 
 extends:
-  template: v2/Microsoft.Official.yml@templates
+  template: v2/Microsoft.NonOfficial.yml@templates
   parameters:
     platform:
       name: "windows_undocked"
@@ -80,19 +80,3 @@ extends:
         vsoProject: Microsoft.WSL
 
     - template: dcat-stage.yml@self
-
-    - template: test-stage.yml@self
-      parameters:
-        rs_prerelease_only: false
-
-    - template: flight-stage.yml@self
-      parameters:
-        publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
-        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
-        bypassTests: ${{ parameters.bypassTests }}
-        pushToStore: ${{ parameters.pushToStore }}
-
-    - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
-        - template: nuget-stage.yml@self
-          parameters:
-            isNightly: false
