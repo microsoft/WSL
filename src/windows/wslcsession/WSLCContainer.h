@@ -216,7 +216,7 @@ private:
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
     // Lifecycle requests hold this shared until their transitions are published; event delivery holds it exclusively.
-    // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks the state instead.
+    // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks m_stateGeneration instead.
     wil::srwlock m_lifecycleLock;
     mutable wil::srwlock m_lock;
     std::string m_name;
@@ -239,6 +239,9 @@ private:
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
+
+    // Bumped on every state change so a thread that released m_lock can detect a state cycle, not just a difference.
+    std::uint64_t m_stateGeneration{};
     WSLCSession& m_wslcSession;
     IWSLCPluginNotifier* m_pluginNotifier;
     std::vector<ContainerPortMapping> m_mappedPorts;

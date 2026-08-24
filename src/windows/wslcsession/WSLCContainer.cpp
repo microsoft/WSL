@@ -1371,6 +1371,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
             // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
             // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
             bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
+            const auto generation = m_stateGeneration;
 
             lock.reset();
             lifecycleLock.reset();
@@ -1407,11 +1408,20 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
                 lock = m_lock.lock_exclusive();
                 transition = m_transition;
 
-                // Only start a transition if the container is still running. OnEvent may have observed the stop
-                // while the locks were released, in which case there is no further event to wait for.
-                if (!transition && m_state == WslcContainerStateRunning)
+                // The container can exit and start again while the locks are released, so an unchanged generation is
+                // the only proof that the stop event this call is waiting for is still to come.
+                if (m_stateGeneration == generation)
                 {
-                    transition = StartTransition(TransitionKind::Stop, ContainerEvent::Stop);
+                    if (!transition)
+                    {
+                        transition = StartTransition(TransitionKind::Stop, ContainerEvent::Stop);
+                    }
+                }
+                // The run already ended: keep waiting on the work it triggered (e.g. auto-remove), never on a start
+                // that raced in behind it.
+                else if (transition && transition->Kind == TransitionKind::Start)
+                {
+                    transition.reset();
                 }
             }
         }
@@ -2960,6 +2970,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
+    m_stateGeneration++;
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
 
     // Keep the VM alive while this container is Running and release the hold once it leaves that
