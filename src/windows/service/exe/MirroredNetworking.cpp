@@ -695,11 +695,9 @@ try
                     TraceLoggingValue(retryCount, "retryCount"));
 
                 ++retryCount;
-                THROW_IF_FAILED(hr);
                 return networking::GetGnsCallbackResult(messageType, hr, linuxResultCode);
             };
 
-            // RetryWithTimeout throws if transport fails after the timeout has elapsed.
             return wsl::shared::retry::RetryWithTimeout<HRESULT>(sendMessage, std::chrono::milliseconds(100), std::chrono::seconds(3));
         }
         CATCH_RETURN()
