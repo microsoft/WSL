@@ -1024,6 +1024,28 @@ void StopContainers(CLIExecutionContext& context)
     }
 }
 
+void RestartContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containersToRestart = context.Args.GetAllValues<ArgType::ContainerId>();
+    StopContainerOptions options;
+
+    // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
+    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
+
+    if (context.Args.Contains(ArgType::Time))
+    {
+        options.Timeout = context.Args.GetValue<ArgType::Time>();
+    }
+
+    for (const auto& id : containersToRestart)
+    {
+        ContainerService::Restart(context.Terminal, session, WideToMultiByte(id), options);
+        context.Terminal.Output(L"{}\n", id);
+    }
+}
+
 void ViewContainerLogs(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
