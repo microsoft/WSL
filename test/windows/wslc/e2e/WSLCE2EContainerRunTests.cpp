@@ -1175,6 +1175,40 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"WSLC Mount Bind Test", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_Bind_VirtioFs_MapShared_Success)
+    {
+        const auto hostDirectory = EnvTestFile1.parent_path();
+        const auto fileName = EnvTestFile1.filename().wstring();
+        VERIFY_IS_TRUE(DeleteFileW(EnvTestFile1.c_str()));
+
+        constexpr auto mapSharedScript =
+            LR"PY(
+import mmap
+import os
+import sys
+
+with open('/proc/mounts', encoding='utf-8') as mounts_file:
+    mounts = (line.split() for line in mounts_file)
+    if not any(fields[1:3] == ['/data', 'virtiofs'] for fields in mounts):
+        raise RuntimeError('/data is not mounted as virtiofs')
+
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o777)
+os.ftruncate(fd, 32 * 1024)
+with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.PROT_WRITE) as mapping:
+    mapping[0:1] = b'W'
+    mapping.flush()
+    if os.pread(fd, 1, 0) != b'W':
+        raise RuntimeError('MAP_SHARED write was not visible through the file')
+)PY";
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --volume \"{}:/data\" {} python3 -c \"{}\" /data/{}", hostDirectory.wstring(), PythonImage.NameAndTag(), mapSharedScript, fileName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(std::filesystem::exists(EnvTestFile1));
+        VERIFY_ARE_EQUAL(32ull * 1024, std::filesystem::file_size(EnvTestFile1));
+        VERIFY_ARE_EQUAL(L'W', ReadFileContent(EnvTestFile1.wstring())[0]);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_Volume_Success)
     {
         auto result = RunWslc(std::format(
