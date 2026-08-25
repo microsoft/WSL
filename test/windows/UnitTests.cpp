@@ -2343,8 +2343,15 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Verify experimental.swiotlb parsing and validation.
         //
         // With wsl2.virtio enabled (the default), a valid swiotlb value is accepted silently.
+
         validateWarnings(L"[experimental]\nswiotlb=64M", L"");
-        validateWarnings(L"[experimental]\nswiotlb=4096K", L"");
+
+        constexpr auto expectedWarning =
+            wsl::shared::Arm64 ? L"wsl: The running kernel is missing a patch that significantly improves virtio device "
+                                 L"performance. Update to a more recent WSL kernel to enable this optimization.\r\n"
+                               : L"";
+
+        validateWarnings(L"[experimental]\nswiotlb=4096K", expectedWarning);
 
         // Malformed values are rejected by the parser; only the parser warning is reported.
         validateWarnings(
@@ -2441,7 +2448,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             return wsl::shared::retry::RetryWithTimeout<std::string>(
                 [&]() {
                     auto content = readDmesgLog(offset);
-                    THROW_HR_IF(E_FAIL, content.find(expectedLine) == std::string::npos);
+                    THROW_HR_IF_MSG(E_FAIL, content.find(expectedLine) == std::string::npos, "%hs", content.c_str());
 
                     return content;
                 },
@@ -2451,10 +2458,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         // 'Linux version' is printed during early boot. 'brd: module loaded' is printed after transitioning to the virtio console.
         {
-            auto dmesg = expectInDmesg(true, "brd: module loaded");
+            // N.B. brd is only loaded on X64.
+            auto dmesg = expectInDmesg(true, wsl::shared::Arm64 ? "Linux version" : "brd: module loaded");
             VERIFY_ARE_NOT_EQUAL(dmesg.find("Linux version"), std::string::npos);
         }
 
+        // N.B. Early boot logging is always enabled on ARM64.
+        if constexpr (!wsl::shared::Arm64)
         {
             auto dmesg = expectInDmesg(false, "brd: module loaded");
             VERIFY_ARE_EQUAL(dmesg.find("Linux version"), std::string::npos);
@@ -5580,8 +5590,12 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
                 "FriendlyName": "DebianFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5646,6 +5660,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "Amd64Url": {{
                     "Url": "",
                     "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "",
+                    "Sha256": ""
                 }}
             }},
             {{
@@ -5653,8 +5671,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "FriendlyName": "DebianFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ],
@@ -5666,6 +5688,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "Amd64Url": {{
                     "Url": "",
                     "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "",
+                    "Sha256": ""
                 }}
             }},
             {{
@@ -5673,8 +5699,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "FriendlyName": "UbuntuFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{2}",
+                    "Sha256": "{3}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{2}",
+                    "Sha256": "{3}"
                 }}
             }}
         ]
@@ -5730,6 +5760,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 "Amd64Url": {{
                     "Url": "",
                     "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "",
+                    "Sha256": ""
                 }}
             }}
         ]
@@ -5741,7 +5775,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
           "PackageFamilyName": "Dummy",
           "Amd64": true,
           "Arm64": true,
-          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
+          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl",
+          "Arm64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
 }})",
                 tarPath);
 
@@ -5773,8 +5808,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5786,7 +5825,8 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
           "PackageFamilyName": "Dummy",
           "Amd64": true,
           "Arm64": true,
-          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
+          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl",
+          "Arm64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
 }})",
                 tarPath,
                 tarHash);
@@ -5817,8 +5857,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }},
             {{
@@ -5826,7 +5870,11 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "FriendlyName": "DebianFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
+                    "Url": "{2}",
+                    "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "{2}",
                     "Sha256": ""
                 }}
             }}
@@ -5846,8 +5894,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyNameOverridden",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5880,8 +5932,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "test-default-manifest-name",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5908,7 +5964,11 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
+                    "Url": "{0}",
+                    "Sha256": "0x12"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
                     "Sha256": "0x12"
                 }}
             }}
@@ -5939,7 +5999,11 @@ Error code: Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
+                    "Url": "{0}",
+                    "Sha256": "wrongformat"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
                     "Sha256": "wrongformat"
                 }}
             }}
@@ -5969,7 +6033,8 @@ Error code: Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG\r\n",
           "PackageFamilyName": "Dummy",
           "Amd64": true,
           "Arm64": true,
-          "Amd64PackageUrl": "" }]
+          "Amd64PackageUrl": "",
+          "Arm64PackageUrl": "" }]
 })";
 
             auto restore = SetManifest(manifest);
@@ -6002,9 +6067,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
     "ModernDistributions": {{
         "debian": [
             {{
-                "Name": "{}",
+                "Name": "{0}",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
+                    "Url": "file://nonexistent",
+                    "Sha256": ""
+                }},
+                "Arm64Url": {{
                     "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
@@ -6013,6 +6082,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "dummy",
                 "FriendlyName": "dummy",
                 "Amd64Url": {{
+                    "Url": "file://nonexistent",
+                    "Sha256": ""
+                }},
+                "Arm64Url": {{
                     "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
@@ -6059,6 +6132,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Amd64Url": {
                     "Url": "",
                     "Sha256": ""
+                },
+                "Arm64Url": {
+                    "Url": "",
+                    "Sha256": ""
                 }
             }
         ]
@@ -6102,8 +6179,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 "FriendlyName": "FriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}/distro.tar?foo=bar&key=value",
-                    "Sha256": "{}"
+                    "Url": "{0}/distro.tar?foo=bar&key=value",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}/distro.tar?foo=bar&key=value",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -6228,8 +6309,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 \"FriendlyName\": \"FriendlyName\",
                 \"Default\": true,
                 \"Amd64Url\": {{
-                    \"Url\": \"{}/distro.tar\",
-                    \"Sha256\": \"{}\"
+                    \"Url\": \"{0}/distro.tar\",
+                    \"Sha256\": \"{1}\"
+                }},
+                \"Arm64Url\": {{
+                    \"Url\": \"{0}/distro.tar\",
+                    \"Sha256\": \"{1}\"
                 }}
             }}
         ]
@@ -6783,9 +6868,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(false, json);
 
             VERIFY_ARE_EQUAL(version, L"2.4.12");
-            VERIFY_ARE_EQUAL(asset.id, 2);
-            VERIFY_ARE_EQUAL(asset.url, L"http://x64-url");
-            VERIFY_ARE_EQUAL(asset.name, L"wsl.2.4.12.0.x64.msi");
+            VERIFY_ARE_EQUAL(asset.id, wsl::shared::Arm64 ? 1 : 2);
+            VERIFY_ARE_EQUAL(asset.url, wsl::shared::Arm64 ? L"http://arm-url" : L"http://x64-url");
+            VERIFY_ARE_EQUAL(asset.name, wsl::shared::Arm64 ? L"wsl.2.4.12.0.arm64.msi" : L"wsl.2.4.12.0.x64.msi");
         }
 
         // Test wsl --update --pre-release
@@ -6817,9 +6902,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(true, json);
 
             VERIFY_ARE_EQUAL(version, L"2.5.1");
-            VERIFY_ARE_EQUAL(asset.id, 2);
-            VERIFY_ARE_EQUAL(asset.url, L"http://x64-url");
-            VERIFY_ARE_EQUAL(asset.name, L"wsl.2.5.1.0.x64.msi");
+            VERIFY_ARE_EQUAL(asset.id, wsl::shared::Arm64 ? 1 : 2);
+            VERIFY_ARE_EQUAL(asset.url, wsl::shared::Arm64 ? L"http://arm-url" : L"http://x64-url");
+            VERIFY_ARE_EQUAL(asset.name, wsl::shared::Arm64 ? L"wsl.2.5.1.0.arm64.msi" : L"wsl.2.5.1.x64.msi");
         }
     }
 
