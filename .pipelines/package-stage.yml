@@ -49,8 +49,30 @@ stages:
           ob_sdl_codeSignValidation_enabled: false
           buildStagePackageVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_PACKAGE_VERSION'] ]
           buildStageNugetVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_NUGET_PACKAGE_VERSION'] ]
+          storeBrokerPath: $(Build.SourcesDirectory)\storebroker # location of StoreBroker information in the repo
+          storeBrokerPayloadPath: $(Build.ArtifactStagingDirectory)\StoreBrokerPayload # location of package created for flight
 
         steps:
+          - ${{ if eq(parameters.isRelease, true) }}:
+            # The publish pipeline reads this run's artifacts long after it finishes, so make sure they
+            # don't expire first. This has to happen here rather than in the publish pipeline because the
+            # lease is taken against this run. There is no task or az CLI command for retention leases;
+            # this is the documented approach.
+            # Source: https://learn.microsoft.com/azure/devops/pipelines/build/run-retention?view=azure-devops&tabs=powershell
+            - task: PowerShell@2
+              condition: and(succeeded(), not(canceled()))
+              displayName: Retain this build
+              inputs:
+                failOnStderr: true
+                targetType: 'inline'
+                script: |
+                  $contentType = "application/json";
+                  $headers = @{ Authorization = 'Bearer $(System.AccessToken)' };
+                  $rawRequest = @{ daysValid = 365 * 2; definitionId = $(System.DefinitionId); ownerId = 'User:$(Build.RequestedForId)'; protectPipeline = $false; runId = $(Build.BuildId) };
+                  $request = ConvertTo-Json @($rawRequest);
+                  $uri = "$(System.CollectionUri)$(System.TeamProject)/_apis/build/retention/leases?api-version=6.0-preview.1";
+                  Invoke-RestMethod -uri $uri -method POST -Headers $headers -ContentType $contentType -Body $request;
+
           - task: PowerShell@2
             displayName: "Set package version from build stage"
             name: version
@@ -194,6 +216,45 @@ stages:
 
             displayName: Create appxupload
             condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+
+          - ${{ if eq(parameters.isRelease, true) }}:
+            # The StoreBroker payload is built here and consumed by the Store flight stage of the publish
+            # pipeline.
+            - task: CopyFiles@2
+              displayName: Copy AppxUpload for StoreBroker
+              inputs:
+                sourceFolder: $(ob_outputDirectory)\appxupload
+                contents: '**'
+                targetFolder: $(storeBrokerPath)\appxpackage
+
+            # Bundles the store page information and the WSL appxupload into a submission package that the
+            # publish pipeline can submit to the store.
+            - task: MS-RDX-MRO.windows-store-publish.package-task.store-package@3
+              displayName: 'Creating StoreBroker Payload'
+              inputs:
+                serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
+                sbConfigPath: $(storeBrokerPath)\sbconfig.json
+                sourceFolder: $(storeBrokerPath)\appxpackage\
+                contents: Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_x64_ARM64.appxupload
+                pdpPath: $(storeBrokerPath)\PDPs\
+                pdpInclude: PDP.xml
+                pdpMediaPath: $(storeBrokerPath)\Media\
+                outSBPackagePath: $(storeBrokerPayloadPath)
+                outSBName: WindowsSubsystemForLinux
+
+            - task: CopyFiles@2
+              displayName: Copy StoreBrokerPayload to drop
+              inputs:
+                sourceFolder: $(storeBrokerPayloadPath)
+                contents: '**'
+                targetFolder: $(ob_outputDirectory)\StoreBrokerPayload
+
+            - task: CopyFiles@2
+              displayName: Copy StoreBroker log to drop
+              inputs:
+                sourceFolder: $(System.DefaultWorkingDirectory)
+                contents: SBLog.txt
+                targetFolder: $(ob_outputDirectory)\StoreBrokerPayload
 
           - script: md.exe $(ob_outputDirectory)\nuget
             displayName: "Create the nuget directory"

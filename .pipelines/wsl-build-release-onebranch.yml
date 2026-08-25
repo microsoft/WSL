@@ -1,14 +1,4 @@
 parameters:
-- name: bypassTests
-  displayName: 'Publish release even if tests fail'
-  type: boolean
-  default: false
-
-- name: pushToStore
-  displayName: 'Push the release to the Microsoft Store'
-  type: boolean
-  default: true
-
 - name: testVersion
   displayName: 'Test the release pipeline'
   type: string
@@ -84,13 +74,6 @@ extends:
     - template: test-stage.yml@self
       parameters:
         rs_prerelease_only: false
-
-    - template: flight-stage.yml@self
-      parameters:
-        publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
-        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
-        bypassTests: ${{ parameters.bypassTests }}
-        pushToStore: ${{ parameters.pushToStore }}
 
     - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self

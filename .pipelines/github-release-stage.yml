@@ -1,0 +1,54 @@
+# Creates the GitHub release. create-release.py creates it as a draft, so someone still has to review the
+# notes and publish it by hand.
+
+stages:
+  - stage: github_release
+    displayName: GitHub release
+    trigger: manual
+    dependsOn: []
+    jobs:
+      - job: github_release
+        displayName: Create GitHub release
+
+        variables:
+          dropPath: $(Pipeline.Workspace)\package
+
+        templateContext:
+          type: releaseJob
+          inputs:
+            - input: pipelineArtifact
+              pipeline: releaseBuild
+              artifactName: drop_wsl_package
+              targetPath: $(Pipeline.Workspace)\package
+              itemPattern: |
+                bundle/*.msi
+                bundle/*.msixbundle
+                nuget/*.nupkg
+
+        steps:
+          # TODO: Publish the script as an artifact so that this release pipeline doesn't check out anything
+          - checkout: none
+
+          - task: PipAuthenticate@1
+            displayName: 'Pip Authenticate'
+            inputs:
+              artifactFeeds: 'wsl'
+
+          - task: AzureKeyVault@2
+            displayName: Fetch GitHub release token from Key Vault
+            inputs:
+              azureSubscription: 'Azure-Connection'
+              KeyVaultName: 'wsl-ci-key-vault'
+              SecretsFilter: 'GithubReleaseToken'
+
+          - powershell: |
+              pip install --user -r tools/devops/requirements.txt
+              python tools/devops/create-release.py '$(packageVersion)' `
+                  "$(dropPath)\bundle\Microsoft.WSL_$(fileVersion)_x64_ARM64.msixbundle" `
+                  "$(dropPath)\bundle\wsl.$(fileVersion).arm64.msi" `
+                  "$(dropPath)\bundle\wsl.$(fileVersion).x64.msi" `
+                  "$(dropPath)\nuget\Microsoft.WSL.Containers.$(packageVersion).nupkg" `
+                  --no-fetch --github-token "$env:token" --publish --auto-release-notes
+            displayName: Create GitHub release
+            env:
+              token: $(GithubReleaseToken)

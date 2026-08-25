@@ -1,0 +1,53 @@
+parameters:
+  - name: name
+    type: string
+
+  - name: displayName
+    type: string
+
+  - name: audience
+    type: string
+    values:
+      - Internal
+      - Insider
+      - Public
+
+  - name: dependsOn
+    type: object
+    default: []
+
+  - name: platforms
+    type: object
+    default: [x64, arm64]
+
+jobs:
+  - job: ${{ parameters.name }}
+    displayName: ${{ parameters.displayName }}
+    dependsOn: ${{ parameters.dependsOn }}
+
+    variables:
+      dcatSubmissionPath: $(Pipeline.Workspace)\dcat
+
+    templateContext:
+      type: releaseJob
+      inputs:
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_dcat
+          targetPath: $(Pipeline.Workspace)\dcat
+
+    steps:
+      - checkout: none
+
+      - ${{ each platform in parameters.platforms }}:
+          - task: dcat-publishing@1
+            displayName: Add ${{ parameters.audience }} audience (${{ platform }})
+            inputs:
+              serviceConnectionId: $(dcatServiceConnection)
+              tenantId: $(dcatTenantId)
+              clientId: $(dcatClientId)
+              environment: $(dcatEnvironment)
+              action: add
+              publisher: $(dcatPublisher)
+              metadataFile: $(dcatSubmissionPath)\add-audience-${{ parameters.audience }}-${{ platform }}.json
+              pollingEnabled: false

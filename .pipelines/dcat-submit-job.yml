@@ -1,0 +1,81 @@
+parameters:
+  - name: name
+    type: string
+
+  - name: displayName
+    type: string
+
+  - name: distributionIntent
+    type: string
+    values:
+      - MSFlight
+      - External
+
+  - name: dependsOn
+    type: object
+    default: []
+
+  - name: platforms
+    type: object
+    default: [x64, arm64]
+
+jobs:
+  - job: ${{ parameters.name }}
+    displayName: ${{ parameters.displayName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    timeoutInMinutes: 30
+
+    variables:
+      dcatSubmissionPath: $(Pipeline.Workspace)\dcat
+      dcatContentPath: $(Pipeline.Workspace)\dcat-content
+
+    templateContext:
+      type: releaseJob
+      inputs:
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_dcat
+          targetPath: $(Pipeline.Workspace)\dcat
+
+        # The build artifacts are large, so only pull the CABs that are actually submitted.
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_build
+          targetPath: $(Pipeline.Workspace)\drop_x64
+          itemPattern: bundle/*.cab
+
+        - input: pipelineArtifact
+          pipeline: releaseBuild
+          artifactName: drop_wsl_build_arm64
+          targetPath: $(Pipeline.Workspace)\drop_arm64
+          itemPattern: bundle/*.cab
+
+    steps:
+      - checkout: none
+
+      # TODO: Rewrite without script. Try to hide the JSON property paths
+      - pwsh: |
+          New-Item -ItemType Directory -Path '$(dcatContentPath)' -Force | Out-Null
+          Copy-Item '$(Pipeline.Workspace)\drop_x64\bundle\wsl.$(fileVersion).x64.cab' '$(dcatContentPath)'
+          Copy-Item '$(Pipeline.Workspace)\drop_arm64\bundle\wsl.$(fileVersion).arm64.cab' '$(dcatContentPath)'
+
+          # The submission metadata embeds the absolute CAB path from the agent that generated it, which
+          # means nothing on this agent. Rewrite it to point at the content we just staged.
+          & '$(Pipeline.Workspace)\s\wsl-release-scripts\scripts\Dcat\Update-DcatSubmission.ps1' `
+              -SubmissionFolderPath '$(dcatSubmissionPath)' `
+              -ContentFolderPath '$(dcatContentPath)'
+        displayName: Stage content and rewrite submission paths
+
+      - ${{ each platform in parameters.platforms }}:
+          - task: dcat-publishing@1
+            displayName: Submit ${{ parameters.distributionIntent }} content (${{ platform }})
+            inputs:
+              serviceConnectionId: $(dcatServiceConnection)
+              tenantId: $(dcatTenantId)
+              clientId: $(dcatClientId)
+              environment: $(dcatEnvironment)
+              action: submit
+              publisher: $(dcatPublisher)
+              contentPath: $(dcatContentPath)
+              metadataFile: $(dcatSubmissionPath)\submit-${{ parameters.distributionIntent }}-${{ platform }}.json
+              pollingEnabled: true

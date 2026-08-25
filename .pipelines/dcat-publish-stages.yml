@@ -1,0 +1,89 @@
+parameters:
+  - name: platforms
+    type: object
+    default: [x64, arm64]
+
+stages:
+  # Internal ring. Runs automatically.
+  - stage: dcat_internal
+    displayName: DCAT - internal ring
+    dependsOn: []
+    jobs:
+      - template: dcat-submit-job.yml
+        parameters:
+          name: submit_msflight
+          displayName: Submit MSFlight content
+          distributionIntent: MSFlight
+          platforms: ${{ parameters.platforms }}
+
+      - template: dcat-audience-job.yml
+        parameters:
+          name: add_internal_audience
+          displayName: Add internal audience
+          audience: Internal
+          dependsOn: [submit_msflight]
+          platforms: ${{ parameters.platforms }}
+
+  # Preview ring.
+  - template: publish-gate-stage.yml
+    parameters:
+      name: gate_preview
+      displayName: Gate - preview ring
+
+  - stage: dcat_preview
+    displayName: DCAT - preview ring
+    dependsOn: [gate_preview, dcat_internal]
+    jobs:
+      # TEMPORARY: this stage is only reachable once gate_preview has been triggered manually. Until that
+      # has been seen to work, fail before anything is published. Delete this job and the dependsOn below
+      # once the first run confirms it.
+      - job: probe
+        displayName: "TEMPORARY: structural probe"
+        steps:
+          - checkout: none
+          - pwsh: |
+              Write-Host "Reached $(System.StageName) without its gate having been triggered."
+              exit 1
+
+      - template: dcat-submit-job.yml
+        parameters:
+          name: submit_external
+          displayName: Submit External content
+          distributionIntent: External
+          platforms: ${{ parameters.platforms }}
+          dependsOn: [probe] # TEMPORARY
+
+      - template: dcat-audience-job.yml
+        parameters:
+          name: add_insider_audience
+          displayName: Add insider audience
+          audience: Insider
+          dependsOn: [submit_external]
+          platforms: ${{ parameters.platforms }}
+
+  - template: publish-gate-stage.yml
+    parameters:
+      name: gate_broad
+      displayName: Gate - broad ring
+
+  # Public release.
+  - stage: dcat_broad
+    displayName: DCAT - broad ring
+    dependsOn: [gate_broad, dcat_preview]
+    jobs:
+      # TEMPORARY: see the probe job in dcat_preview.
+      - job: probe
+        displayName: "TEMPORARY: structural probe"
+        steps:
+          - checkout: none
+          - pwsh: |
+              Write-Host "Reached $(System.StageName) without its gate having been triggered."
+              exit 1
+
+      - template: dcat-audience-job.yml
+        parameters:
+          name: add_public_audience
+          displayName: Add public audience
+          audience: Public
+          platforms: ${{ parameters.platforms }}
+          dependsOn: [probe] # TEMPORARY

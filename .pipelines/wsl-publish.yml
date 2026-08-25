@@ -1,0 +1,86 @@
+# Publishes the artifacts produced by the wsl-github-release pipeline. This pipeline builds nothing; it
+# only reads artifacts from a completed release build and pushes them where they need to go.
+
+parameters:
+  - name: dcatEnvironment
+    displayName: 'DCAT environment'
+    type: string
+    default: PPE
+    values:
+      - PPE
+      - PROD
+
+  - name: versionOverride
+    displayName: 'Version to publish (defaults to the release build tag)'
+    type: string
+    default: ''
+
+trigger: none
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: releaseBuild
+      source: '\OneBranch\wsl-github-release'
+      trigger: true
+
+  repositories:
+    - repository: 1ESPipelineTemplates
+      type: git
+      name: 1ESPipelineTemplates/1ESPipelineTemplates
+      ref: refs/tags/release
+    - repository: releaseScripts
+      type: git
+      name: Microsoft.WSL/wsl-release-scripts
+      ref: refs/tags/v1
+
+variables:
+  - name: dcatEnvironment
+    value: ${{ parameters.dcatEnvironment }}
+  - name: dcatTenantId
+    value: 33e01921-4d64-4f8c-a055-5bdaffd5e33d
+  - name: dcatPublisher
+    value: WSL
+
+  - ${{ if eq(parameters.dcatEnvironment, 'PPE') }}:
+      - name: dcatServiceConnection
+        value: wsl-dcat-publish-ppe
+      - name: dcatClientId
+        value: 793bdf5b-a802-4c14-9857-2c3047139431
+  - ${{ else }}:
+      - name: dcatServiceConnection
+        value: wsl-dcat-publish-prod
+      - name: dcatClientId
+        value: 9752ce08-bcf4-432b-ab86-d60856f646c0
+
+  # The release build is triggered by a tag, so its source branch carries the version being published.
+  - ${{ if ne(parameters.versionOverride, '') }}:
+      - name: packageVersion
+        value: ${{ parameters.versionOverride }}
+  - ${{ else }}:
+      - name: packageVersion
+        value: $[ replace(variables['resources.pipeline.releaseBuild.sourceBranch'], 'refs/tags/', '') ]
+
+  # Artifact file names use the four part version.
+  - name: fileVersion
+    value: $(packageVersion).0
+
+extends:
+  template: v1/1ES.Unofficial.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    pool:
+      name: Azure-Pipelines-1ESPT-ExDShared
+      image: windows-2022
+      os: windows
+
+    settings:
+      networkIsolationPolicy: Permissive
+
+    stages:
+      - template: dcat-publish-stages.yml@self
+
+      - template: store-flight-stage.yml@self
+
+      - template: github-release-stage.yml@self
+
+      - template: nuget-publish-stage.yml@self

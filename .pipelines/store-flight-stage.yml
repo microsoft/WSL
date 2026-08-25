@@ -1,0 +1,53 @@
+# Flights the release to the WSL SelfHost flight group in Partner Center.
+#
+# This is transitional: Store distribution goes away once DCAT takes over, so this is a verbatim port of
+# what the release build used to do inline rather than an attempt to improve it.
+
+stages:
+  - stage: store_flight
+    displayName: Microsoft Store - SelfHost flight
+    trigger: manual
+    dependsOn: []
+    jobs:
+      - job: flight
+        displayName: Flight StoreBroker package
+        timeoutInMinutes: 60
+
+        variables:
+          AppId: 9P9TQF7MRM4R
+          FlightId: $(StoreBrokerFlightId)
+          StoreBrokerPayloadPath: $(Pipeline.Workspace)\store\StoreBrokerPayload
+
+        templateContext:
+          type: releaseJob
+          inputs:
+            - input: pipelineArtifact
+              pipeline: releaseBuild
+              artifactName: drop_wsl_package
+              targetPath: $(Pipeline.Workspace)\store
+              itemPattern: StoreBrokerPayload/*
+
+        steps:
+          - checkout: none
+
+          - task: MS-RDX-MRO.windows-store-publish.flight-task.store-flight@3
+            displayName: 'Flight StoreBroker Package to Partner Center - WSL SelfHost Flight Group'
+            inputs:
+              serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
+              appId: $(AppId)
+              flightId: $(FlightId)
+              inputMethod: JsonAndZip
+              jsonPath: $(StoreBrokerPayloadPath)\WindowsSubsystemForLinux.json
+              zipPath: $(StoreBrokerPayloadPath)\WindowsSubsystemForLinux.zip
+              force: true
+              skipPolling: true # skips polling Partner Centre/store API for the state of the package; skipping will mean that errors in the process will only show up in Partner Center
+              targetPublishMode: Immediate # on completion of this task, the package will be published to the WSL SelfHost flight once certified (no manual clicking of any buttons in Partner Center)
+              preserveSubmissionId: false
+              deletePackages: true
+              numberOfPackagesToKeep: 0
+
+          - pwsh: |
+              $log = Join-Path '$(System.DefaultWorkingDirectory)' 'SBLog.txt'
+              if (Test-Path $log) { Get-Content $log } else { Write-Host "No StoreBroker log found." }
+            displayName: Output StoreBroker logs
+            condition: succeededOrFailed()

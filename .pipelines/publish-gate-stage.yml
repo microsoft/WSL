@@ -1,0 +1,28 @@
+# A stage can either be manually triggered or declare dependsOn, never both.
+#
+# Nothing says the manual trigger and the work have to live in the same stage though, so the trigger lives
+# here in an empty gate stage and the stage doing the work depends on this one. That keeps ADO-enforced
+# ordering between the publishing rings.
+#
+# The gate runs on an agentless (server) job so it costs no agent and completes instantly.
+
+parameters:
+  - name: name
+    type: string
+
+  - name: displayName
+    type: string
+
+stages:
+  - stage: ${{ parameters.name }}
+    displayName: ${{ parameters.displayName }}
+    trigger: manual
+    jobs:
+      - job: gate
+        displayName: Gate
+        pool: server
+        steps:
+          - task: Delay@1
+            displayName: No-op
+            inputs:
+              delayForMinutes: '0'

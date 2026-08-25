@@ -1,0 +1,40 @@
+# Publishes the release NuGet packages to nuget.org.
+parameters:
+  - name: packages
+    type: object
+    default:
+      - Microsoft.WSL.PluginApi
+      - Microsoft.WSL.Containers
+
+stages:
+  - stage: nuget
+    displayName: NuGet
+    trigger: manual
+    dependsOn: []
+    jobs:
+      - job: nuget
+        displayName: Push packages to NuGet.org
+
+        variables:
+          nugetPath: $(Pipeline.Workspace)\package\nuget
+
+        templateContext:
+          type: releaseJob
+          inputs:
+            - input: pipelineArtifact
+              pipeline: releaseBuild
+              artifactName: drop_wsl_package
+              targetPath: $(Pipeline.Workspace)\package
+              itemPattern: nuget/*.nupkg
+
+        steps:
+          - checkout: none
+
+          - ${{ each package in parameters.packages }}:
+              - task: NuGetCommand@2
+                displayName: Push ${{ package }}.$(packageVersion).nupkg
+                inputs:
+                  command: push
+                  packagesToPush: $(nugetPath)\${{ package }}.$(packageVersion).nupkg
+                  nuGetFeedType: external
+                  publishFeedCredentials: wsl-nuget-publish
