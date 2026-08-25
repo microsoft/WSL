@@ -9934,7 +9934,7 @@ class WSLCTests
 
             VerifyPatternMatch(
                 wsl::shared::string::WideToMultiByte(comError->Message.get()),
-                "Failed to create volume '*test-volume\\subfolder': Access is denied. ");
+                "Failed to create volume '*test-volume\\subfolder': Access is denied.");
         }
 
         // Validate that files mounts are correctly recovered when a container is loaded from storage

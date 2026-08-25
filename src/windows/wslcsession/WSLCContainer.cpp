@@ -695,7 +695,7 @@ PreparedBindMount PrepareBindMount(const std::wstring& source, const std::string
         hostPath = wsl::windows::common::filesystem::GetCanonicalPath(hostPath, ec);
         if (ec)
         {
-            THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(source, ec.message()));
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ec.value()), Localization::MessageWslcFailedToMountVolume(source, ec.message()));
         }
 
         if (std::filesystem::is_regular_file(hostPath))
