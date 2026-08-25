@@ -13,9 +13,12 @@ file(GLOB_RECURSE WSLC_TEST_HEADERS CONFIGURE_DEPENDS
 target_sources(wsltests PRIVATE ${WSLC_TEST_SOURCES} ${WSLC_TEST_HEADERS})
 
 # Ensure the file uses the precompiled header from the parent target.
+# The per-source flag only applies when the file is compiled on its own, so keep
+# it out of the unity sources.
 set_source_files_properties(${WSLC_TEST_SOURCES}
     PROPERTIES
     COMPILE_FLAGS "/Yuprecomp.h"
+    SKIP_UNITY_BUILD_INCLUSION ON
 )
 
 # Add include directories needed for WSLC tests.

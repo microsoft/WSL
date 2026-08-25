@@ -15,4 +15,7 @@ target_link_libraries(libwsl
                       common
                       configfile
                       legacy_stdio_definitions
-                      VirtDisk.lib)
+                      VirtDisk.lib
+                      delayimp.lib)
+
+set_target_properties(libwsl PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")

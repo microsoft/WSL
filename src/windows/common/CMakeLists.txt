@@ -157,7 +157,15 @@ target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 
+# common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
+# the config file parser, so anything linking common needs those libraries too.
+# PUBLIC propagates them instead of making each consumer restate them.
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile)
+
 # WSLCUserSettings.cpp uses yaml-cpp headers.
+# The per-source include path and definition below only apply when the file is
+# compiled on its own, so keep it out of the unity sources.
 set_source_files_properties(WSLCUserSettings.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${yaml-cpp_SOURCE_DIR}/include"
-    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE")
+    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE"
+    SKIP_UNITY_BUILD_INCLUSION ON)
