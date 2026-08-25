@@ -335,4 +335,17 @@ struct NetworkListEntry
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels);
 };
 
+// The volume properties carried from the session to the CLI for "volume list". Values keep their
+// native types; the CLI renders the string output.
+struct VolumeListEntry
+{
+    std::string Name;
+    std::string Driver;
+    std::string Mountpoint;
+    std::string Scope;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeListEntry, Name, Driver, Mountpoint, Scope, Labels);
+};
+
 } // namespace wsl::windows::common::wslc_schema
