@@ -125,7 +125,8 @@ public:
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::optional<std::int64_t> stateChangedAt = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void CommitState(
+        WSLCContainerState State, std::optional<std::int64_t> stateChangedAt = std::nullopt, std::optional<int> ExitCode = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -181,6 +182,7 @@ private:
 
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept;
+    void RecordEvent(std::string&& Action, std::optional<std::uint64_t> TimeSeconds = std::nullopt, std::optional<int> ExitCode = std::nullopt) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 

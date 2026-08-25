@@ -6859,6 +6859,12 @@ class WSLCTests
 
     WSLC_TEST_METHOD(EventStream)
     {
+        constexpr auto c_containerName = "wslc-test-events";
+        constexpr auto c_imageName = "debian:latest";
+        constexpr auto c_labelKey = "event-label";
+        constexpr auto c_labelValue = "event-value";
+        const auto expectedExitCode = std::to_string(128 + WSLCSignalSIGKILL);
+
         auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
 
         // Drains a bounded event stream to completion (GetNext returns WSLC_E_EVENT_STREAM_FINISHED
@@ -6890,6 +6896,19 @@ class WSLCTests
 
                 VERIFY_ARE_EQUAL(action, event.Action);
                 VERIFY_ARE_EQUAL(actorId, event.Actor.ID);
+                VERIFY_ARE_EQUAL(c_containerName, event.Actor.Attributes.at("name"));
+                VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
+                VERIFY_ARE_EQUAL(c_labelValue, event.Actor.Attributes.at(c_labelKey));
+                VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+
+                if (action == "stop")
+                {
+                    VERIFY_ARE_EQUAL(expectedExitCode, event.Actor.Attributes.at("exitCode"));
+                }
+                else
+                {
+                    VERIFY_IS_FALSE(event.Actor.Attributes.contains("exitCode"));
+                }
 
                 // Events are reported in non-decreasing time order.
                 if (i > 0)
@@ -6903,7 +6922,8 @@ class WSLCTests
         const ULONGLONG since = now();
         std::string id;
         {
-            WSLCContainerLauncher launcher("debian:latest", "wslc-test-events", {"sleep", "99999"});
+            WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
+            launcher.AddLabel(c_labelKey, c_labelValue);
             auto container = launcher.Launch(*m_defaultSession);
             id = container.Id();
 
