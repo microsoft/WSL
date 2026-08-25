@@ -73,6 +73,22 @@ struct NetworkListOutput
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListOutput, CreatedAt, Driver, ID, IPv4, IPv6, Internal, Labels, Name, Scope);
 };
 
+struct VolumeListOutput
+{
+    std::string Availability;
+    std::string Driver;
+    std::string Group;
+    std::string Labels;
+    std::string Links;
+    std::string Mountpoint;
+    std::string Name;
+    std::string Scope;
+    std::string Size;
+    std::string Status;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeListOutput, Availability, Driver, Group, Labels, Links, Mountpoint, Name, Scope, Size, Status);
+};
+
 struct TestImage
 {
     std::wstring Name;

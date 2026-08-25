@@ -170,6 +170,9 @@ class UnitTests
                 out, FormatErrorMessage(L"This operation is only supported by WSL2.", L"Wsl/Service/WSL_E_WSL2_NEEDED"));
             VERIFY_ARE_EQUAL(err, L"");
         }
+
+        VerifyInvalidUsage(std::format(L"--export {} {} --format tar.gz --format tar.xz", LXSS_DISTRO_NAME_TEST_L, tarPath));
+        VerifyInvalidUsage(std::format(L"--export {} {} --format tar.xz --vhd", LXSS_DISTRO_NAME_TEST_L, tarPath));
     }
 
     WSL2_TEST_METHOD(SystemdSafeMode)
@@ -4372,6 +4375,22 @@ localhostForwarding=true
 
         VERIFY_ARE_EQUAL(
             out, FormatErrorMessage(L"There is no distribution with the supplied name.", L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND"));
+
+        constexpr auto injectionMarker = L"/tmp/wsl-manage-default-user-injection";
+        LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/rm -f {}", injectionMarker));
+        auto cleanupInjectionMarker = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [injectionMarker]() {
+            LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/rm -f {}", injectionMarker));
+        });
+
+        const auto injectionUsername = std::format(L"' || touch {} || '", injectionMarker);
+        const std::array<std::wstring_view, 4> injectionArguments{
+            WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG, injectionUsername};
+        const auto injectionCommand = wil::ArgvToCommandLine(injectionArguments, wil::ArgvToCommandLineFlags::FirstArgumentIsNotPath);
+        auto injectionCommandLine = LxssGenerateWslCommandLine(injectionCommand.c_str());
+        const auto injectionExitCode = LxsstuRunCommand(injectionCommandLine.data());
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/test ! -e {}", injectionMarker)), 0L);
+        VERIFY_ARE_EQUAL(injectionExitCode, 1L);
     }
 
     TEST_METHOD(PostDistroRegistrationSettingsOOBE)

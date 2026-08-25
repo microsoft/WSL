@@ -255,8 +255,9 @@ private:
         VERIFY_ARE_EQUAL(mount->Destination, "/data");
 
         const auto volumeName = wsl::shared::string::MultiByteToWide(mount->Name);
+        const auto volumeLabels = InspectVolume(volumeName).Labels;
         VERIFY_IS_TRUE(
-            InspectVolume(volumeName).Labels.contains("com.docker.volume.anonymous"),
+            volumeLabels.has_value() && volumeLabels->contains("com.docker.volume.anonymous"),
             L"The volume returned by container inspect is not anonymous");
         return volumeName;
     }
