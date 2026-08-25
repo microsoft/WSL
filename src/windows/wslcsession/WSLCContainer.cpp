@@ -1274,8 +1274,6 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
 void WSLCContainerImpl::RecordEvent(std::string&& Action, std::optional<std::uint64_t> TimeSeconds, std::optional<int> ExitCode) noexcept
 {
     auto attributes = StripInternalLabels(m_labels);
-    attributes.erase("exitCode");
-
     attributes["name"] = m_name;
     attributes["image"] = m_image;
 
