@@ -1028,15 +1028,17 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     std::vector<std::unique_ptr<OverlappedIOHandle>> handles;
 
-    // This is required for docker to know when stdin is closed.
-    auto onInputComplete = [handle = ioHandle.get()]() { LOG_LAST_ERROR_IF(shutdown(handle, SD_SEND) == SOCKET_ERROR); };
+    // Keep the socket alive until both relays are destroyed since they complete independently.
+    auto sharedIoHandle = std::make_shared<wil::unique_socket>(std::move(ioHandle));
 
-    // N.B. Ownership of the io handle is given to the DockerIORelayHandle relay, so it can be closed when docker closes the connection.
-    handles.emplace_back(
-        std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
+    // This is required for docker to know when stdin is closed.
+    auto onInputComplete = [sharedIoHandle]() { LOG_LAST_ERROR_IF(shutdown(sharedIoHandle->get(), SD_SEND) == SOCKET_ERROR); };
+
+    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
+        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, sharedIoHandle->get()));
 
     handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+        HandleWrapper{sharedIoHandle->get(), [sharedIoHandle]() {}}, std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_runtime.Relay()->AddHandles(std::move(handles));
 
@@ -2772,16 +2774,19 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     std::vector<std::unique_ptr<OverlappedIOHandle>> ioHandles;
     std::map<ULONG, TypedHandle> fds;
 
+    // Keep the socket alive until both relays are destroyed since they complete independently.
+    auto sharedStream = std::make_shared<wil::unique_handle>(std::move(stream));
+
     // This is required for docker to know when stdin is closed.
-    auto closeStdin = [socket = stream.get(), this]() {
-        LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(socket), SD_SEND) == SOCKET_ERROR);
+    auto closeStdin = [sharedStream]() {
+        LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(sharedStream->get()), SD_SEND) == SOCKET_ERROR);
     };
 
     if (WI_IsFlagSet(flags, WSLCProcessFlagsStdin))
     {
         auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
-        ioHandles.emplace_back(
-            std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, stream.get()));
+        ioHandles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
+            HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, sharedStream->get()));
 
         fds.emplace(WSLCFDStdin, TypedHandle{wil::unique_handle{stdinWrite.release()}, WSLCHandleTypePipe});
     }
@@ -2798,7 +2803,7 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
     ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
+        HandleWrapper{sharedStream->get(), [sharedStream]() {}}, std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
     m_runtime.Relay()->AddHandles(std::move(ioHandles));
 

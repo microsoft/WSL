@@ -11970,12 +11970,12 @@ class WSLCTests
             auto attachedPrompt = attachedReader.ReadBytes(13);
             VerifyPatternMatch(attachedPrompt, "*root@*");
 
-            // Close the tty.
+            // Stop pending reads before closing the handles borrowed by the readers.
+            originalReader.Stop();
+            attachedReader.Stop();
+
             originalTty.reset();
             attachedTty.Reset();
-
-            originalReader.ExpectClosed();
-            attachedReader.ExpectClosed();
         }
 
         // Validate that containers can be started in detached mode and attached to later.

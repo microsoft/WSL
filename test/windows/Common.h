@@ -400,6 +400,7 @@ public:
     void Expect(const std::string& Expected);
     void ExpectConsume(const std::string& Expected);
     void ExpectClosed(DWORD Timeout = 60 * 1000);
+    void Stop();
 
     std::string ReadBytes(size_t Length);
     std::string ConsumeBytes(size_t Length);

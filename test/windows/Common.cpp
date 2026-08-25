@@ -2808,6 +2808,11 @@ PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
 
 PartialHandleRead::~PartialHandleRead()
 {
+    Stop();
+}
+
+void PartialHandleRead::Stop()
+{
     m_exitEvent.SetEvent();
     if (m_thread.joinable())
     {
