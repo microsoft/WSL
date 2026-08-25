@@ -18,6 +18,7 @@ Abstract:
 #include "wslpolicies.h"
 #include "hns_schema.h"
 #include "WslCoreNetworkEndpointSettings.h"
+#include "WslCoreNetworkingSupport.h"
 
 #include <mstcpip.h>
 #include <winhttp.h>
@@ -3947,6 +3948,36 @@ class NetworkTests
                                            ? expectedErrorCode
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureSocketConnect);
         RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+    }
+};
+
+class GnsCallbackResultTests
+{
+    WSL_TEST_CLASS(GnsCallbackResultTests)
+
+    TEST_METHOD(GnsCallbackSuccessfulTransportAndLinuxResultSucceeds)
+    {
+        VERIFY_SUCCEEDED(wsl::core::networking::GetGnsCallbackResult(LxGnsMessageDeviceSettingRequest, S_OK, 0));
+    }
+
+    TEST_METHOD(GnsCallbackSuccessfulTransportAndLinuxFailureFails)
+    {
+        VERIFY_ARE_EQUAL(E_FAIL, wsl::core::networking::GetGnsCallbackResult(LxGnsMessageDeviceSettingRequest, S_OK, -1));
+    }
+
+    TEST_METHOD(GnsCallbackTransportFailureFails)
+    {
+        VERIFY_ARE_EQUAL(E_ABORT, wsl::core::networking::GetGnsCallbackResult(LxGnsMessageDeviceSettingRequest, E_ABORT, 0));
+    }
+
+    TEST_METHOD(GnsCallbackConnectTestBusinessResultSucceeds)
+    {
+        VERIFY_SUCCEEDED(wsl::core::networking::GetGnsCallbackResult(LxGnsMessageConnectTestRequest, S_OK, -1));
+    }
+
+    TEST_METHOD(GnsCallbackConnectTestTransportFailureFails)
+    {
+        VERIFY_ARE_EQUAL(E_ABORT, wsl::core::networking::GetGnsCallbackResult(LxGnsMessageConnectTestRequest, E_ABORT, -1));
     }
 };
 

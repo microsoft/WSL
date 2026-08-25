@@ -34,9 +34,10 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
-using wsl::windows::common::string::FormatBytes;
 
 namespace wsl::windows::wslc::task {
+
+constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
 namespace {
 
@@ -438,6 +439,7 @@ void PruneImages(CLIExecutionContext& context)
     }
 
     context.Terminal.Output(L"\n");
-    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(
+        L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task
