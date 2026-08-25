@@ -2496,6 +2496,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network option.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>An IP address requires a user-defined network. Use --network to specify one.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>An IP address cannot be specified when multiple networks are requested. Use a single --network option.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Failed to create volume '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3538,9 +3546,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Removes all unused networks. A network is considered unused when it is not referenced by any container.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Networks:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Connect a container to a network.</value>
@@ -3595,9 +3602,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Remove all unused volumes, not just anonymous ones.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Volumes:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Total reclaimed space: {}</value>

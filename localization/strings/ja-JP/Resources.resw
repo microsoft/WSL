@@ -2502,6 +2502,14 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>複数のネットワークが要求されている場合は、ネットワーク エイリアスを指定できません。単一の --network オプションを使用します。</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>IP アドレスにはユーザー定義のネットワークが必要です。--network を使用して 1 つ指定します。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>複数のネットワークが要求されている場合は、IP アドレスを指定できません。単一の --network オプションを使用します。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>ボリューム '{}' を作成できませんでした: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3544,9 +3552,8 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>未使用のネットワークをすべて削除します。どのコンテナーからも参照されていない場合、ネットワークは未使用と見なされます。</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>削除済み: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>削除済みネットワーク:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>コンテナーをネットワークに接続する</value>
@@ -3601,9 +3608,8 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>匿名のボリュームだけでなく、未使用のボリュームをすべて削除します。</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>削除済み: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>削除されたボリューム:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>解放された領域の合計: {}</value>

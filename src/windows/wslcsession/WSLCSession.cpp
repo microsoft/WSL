@@ -30,7 +30,7 @@ using io::MultiHandleWait;
 using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
-using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -42,6 +42,7 @@ constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
+constexpr uint32_t c_progressPrecision = 4;
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
 // session's IdleTimeoutSec setting is 0/unset). This avoids thrashing the VM (repeated
@@ -1432,8 +1433,8 @@ try
             {
                 auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
                 auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
-                auto current = FormatBytes(currentBytes);
-                auto total = FormatBytes(totalBytes);
+                auto current = FormatHumanReadableSize(currentBytes, c_progressPrecision);
+                auto total = FormatHumanReadableSize(totalBytes, c_progressPrecision);
                 reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)
@@ -2776,16 +2777,14 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeInformation** Volumes, ULONG* Count)
+HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Volumes);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
-    *Volumes = nullptr;
-    *Count = 0;
+    *Output = nullptr;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
@@ -2794,16 +2793,9 @@ try
 
     auto volumeList = m_runtime.Volumes().ListVolumes(std::move(filters));
 
-    if (volumeList.empty())
-    {
-        return S_OK;
-    }
+    std::string json = wsl::shared::ToJson(volumeList);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
-    auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(volumeList.size());
-    memcpy(output.get(), volumeList.data(), volumeList.size() * sizeof(WSLCVolumeInformation));
-
-    *Count = static_cast<ULONG>(volumeList.size());
-    *Volumes = output.release();
     return S_OK;
 }
 CATCH_RETURN();

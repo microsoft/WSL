@@ -4,11 +4,10 @@
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
-#include "ContainerService.h"
+#include "timestamp.hpp"
 
 using namespace wsl::shared;
-using namespace wsl::windows::wslc;
-using namespace wsl::windows::wslc::services;
+using namespace wsl::windows::common::timestamp;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -32,17 +31,17 @@ class WSLCCLIRelativeTimeUnitTests
 
     static std::wstring FormatElapsed(LONGLONG secondsAgo)
     {
-        return ContainerService::FormatElapsedSeconds(secondsAgo);
+        return FormatElapsedSeconds(secondsAgo);
     }
 
     TEST_METHOD(RelativeTime_ZeroTimestamp_ReturnsEmpty)
     {
-        VERIFY_ARE_EQUAL(std::wstring{}, ContainerService::FormatRelativeTime(0));
+        VERIFY_ARE_EQUAL(std::wstring{}, FormatRelativeTime(0));
     }
 
     TEST_METHOD(RelativeTime_NegativeElapsed_ClampsToLessThanASecond)
     {
-        VERIFY_ARE_EQUAL(Localization::WSLCCLI_RelativeTimeLessThanASecond(), ContainerService::FormatElapsedSeconds(-600));
+        VERIFY_ARE_EQUAL(Localization::WSLCCLI_RelativeTimeLessThanASecond(), FormatElapsedSeconds(-600));
     }
 
     TEST_METHOD(RelativeTime_Seconds)

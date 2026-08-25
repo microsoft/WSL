@@ -67,7 +67,7 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
     m_volumes.insert({vol.Name, WSLCGuestVolumeImpl::Open(vol, m_dockerClient)});
 }
 
-void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t)
+void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::int64_t)
 {
     auto lock = m_lock.lock_exclusive();
 
@@ -141,7 +141,7 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
     m_expectedEvents.emplace_back(Name, VolumeEvent::Destroy);
 }
 
-std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const
+std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> WSLCVolumes::ListVolumes(std::map<std::string, std::vector<std::string>>&& Filters) const
 {
     // Pull the driver filter out and forward everything else to docker for filtering.
     // Driver filter is special-cased because our driver concept doesn't map 1:1 to docker's.
@@ -169,7 +169,7 @@ std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(std::map<std::string
 
     auto lock = m_lock.lock_shared();
 
-    std::vector<WSLCVolumeInformation> result;
+    std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> result;
     result.reserve(dockerVolumeNames.size());
 
     for (const auto& [name, vol] : m_volumes)
@@ -186,7 +186,14 @@ std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(std::map<std::string
             continue;
         }
 
-        result.push_back(vol->GetVolumeInformation());
+        wsl::windows::common::wslc_schema::VolumeListEntry entry;
+        entry.Name = vol->Name();
+        entry.Driver = vol->Driver();
+        entry.Mountpoint = vol->Mountpoint();
+        entry.Scope = WSLCVolumeScope;
+        entry.Labels = vol->Labels();
+
+        result.push_back(std::move(entry));
     }
 
     return result;

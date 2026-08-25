@@ -375,45 +375,26 @@ std::optional<uint64_t> wsl::windows::common::string::ParseStorageSize(std::wstr
     return static_cast<uint64_t>(bytes);
 }
 
-std::wstring wsl::windows::common::string::FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace)
+std::wstring wsl::windows::common::string::FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision, StorageSizeUnit Unit)
 {
-    constexpr size_t c_unitCount = 6;
-    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{L"B", L"KB", L"MB", L"GB", L"TB", L"PB"};
-    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB"};
+    constexpr size_t c_unitCount = 9;
+    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{
+        L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
+    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{
+        L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB", L"EiB", L"ZiB", L"YiB"};
 
     const double base = Unit == StorageSizeUnit::Decimal ? 1000.0 : 1024.0;
     const auto& units = Unit == StorageSizeUnit::Decimal ? c_decimalUnits : c_binaryUnits;
 
-    double value = static_cast<double>(Bytes);
+    auto value = static_cast<double>(Bytes);
     size_t unitIndex = 0;
     while (value >= base && unitIndex + 1 < c_unitCount)
     {
         value /= base;
-        ++unitIndex;
-    }
-
-    const auto formattedValue = unitIndex == 0 ? std::to_wstring(Bytes) : std::format(L"{:.{}f}", value, DecimalPlaces);
-    return std::format(L"{}{}{}", formattedValue, IncludeSpace ? L" " : L"", units[unitIndex]);
-}
-
-std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
-{
-    return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
-}
-
-std::wstring wsl::windows::common::string::FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision)
-{
-    constexpr std::wstring_view c_units[] = {L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
-
-    auto value = static_cast<double>(Bytes);
-    size_t unitIndex = 0;
-    while (value >= 1000.0 && unitIndex + 1 < std::size(c_units))
-    {
-        value /= 1000.0;
         unitIndex++;
     }
 
-    return std::format(L"{:.{}g}{}", value, Precision, c_units[unitIndex]);
+    return std::format(L"{:.{}g}{}", value, Precision, units[unitIndex]);
 }
 
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
@@ -424,67 +405,4 @@ std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id,
 std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, bool shortenLength)
 {
     return TruncateIdImpl(id, shortenLength);
-}
-
-std::uint64_t wsl::windows::common::string::Rfc3339ToEpoch(const std::string& timestamp)
-{
-    std::chrono::sys_seconds utcSeconds;
-    std::istringstream stream(timestamp);
-    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
-    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
-
-    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
-}
-
-std::string wsl::windows::common::string::EpochToLocalDisplayTime(LONGLONG timestamp)
-{
-    const auto time =
-        std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
-
-    try
-    {
-        const auto* zone = std::chrono::current_zone();
-        return std::format("{:%F %T %z} {}", std::chrono::zoned_time{zone, time}, zone->get_info(time).abbrev);
-    }
-    catch (...)
-    {
-        // The time zone database is unavailable, so report UTC rather than failing the caller.
-        LOG_CAUGHT_EXCEPTION();
-        return std::format("{:%F %T} +0000 UTC", time);
-    }
-}
-
-std::string wsl::windows::common::string::Rfc3339ToUtcDisplayTime(std::string_view timestamp)
-{
-    if (timestamp.empty())
-    {
-        return {};
-    }
-
-    // Fractional digits vary in length, so they are captured verbatim and re-inserted after formatting.
-    std::string parsable{timestamp};
-    std::string fraction;
-    const auto separator = parsable.find('.');
-    if (separator != std::string::npos)
-    {
-        auto end = separator + 1;
-        while (end < parsable.size() && (std::isdigit(static_cast<unsigned char>(parsable[end])) != 0))
-        {
-            end++;
-        }
-
-        fraction = parsable.substr(separator, end - separator);
-        parsable.erase(separator, end - separator);
-    }
-
-    std::chrono::sys_seconds parsed{};
-    std::istringstream stream(parsable);
-    stream >> std::chrono::parse("%FT%H:%M:%S%Z", parsed);
-    if (stream.fail())
-    {
-        return std::string{timestamp};
-    }
-
-    // Network timestamps are reported in UTC rather than the local time zone.
-    return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }

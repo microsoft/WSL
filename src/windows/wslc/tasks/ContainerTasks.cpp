@@ -31,17 +31,29 @@ Abstract:
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 using wsl::windows::common::string::FormatHumanReadableSize;
-using wsl::windows::common::string::FormatStorageSize;
 using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
+// Docker reports memory in binary units and network and block IO in decimal units.
+constexpr uint32_t c_statsMemoryPrecision = 4;
+constexpr uint32_t c_statsIoPrecision = 3;
+
+std::string FormatStatsMemory(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsMemoryPrecision, StorageSizeUnit::Binary));
+}
+
+std::string FormatStatsIo(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
+}
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
 {
@@ -100,18 +112,15 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     }
 
     const auto& containerName = stats.name.empty() ? stats.id : stats.name;
-    const auto formatBinaryBytes = [](uint64_t bytes) {
-        return WideToMultiByte(FormatStorageSize(bytes, StorageSizeUnit::Binary, 2, true));
-    };
 
     return {
         {"ID", stats.id},
         {"Name", containerName},
         {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
-        {"MemUsage", std::format("{} / {}", formatBinaryBytes(stats.memory_stats.usage), formatBinaryBytes(stats.memory_stats.limit))},
+        {"MemUsage", std::format("{} / {}", FormatStatsMemory(stats.memory_stats.usage), FormatStatsMemory(stats.memory_stats.limit))},
         {"MemPerc", std::format("{:.2f}%", memPercent)},
-        {"NetIO", std::format("{} / {}", formatBinaryBytes(netRxBytes), formatBinaryBytes(netTxBytes))},
-        {"BlockIO", std::format("{} / {}", formatBinaryBytes(blkReadBytes), formatBinaryBytes(blkWriteBytes))},
+        {"NetIO", std::format("{} / {}", FormatStatsIo(netRxBytes), FormatStatsIo(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatStatsIo(blkReadBytes), FormatStatsIo(blkWriteBytes))},
         {"PIDs", stats.pids_stats.current},
     };
 }
@@ -119,6 +128,8 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 } // namespace
 
 namespace wsl::windows::wslc::task {
+
+constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
 static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
 {
@@ -578,7 +589,7 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
-                ContainerService::FormatRelativeTime(container.CreatedAt),
+                FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
                 ContainerService::FormatPorts(container.State, container.Ports),
             });
@@ -1042,13 +1053,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
     // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
     // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
-    ULONGLONG since = 0;
+    LONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
         since = context.Args.GetValue<ArgType::Since>();
     }
 
-    ULONGLONG until = 0;
+    LONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
         until = context.Args.GetValue<ArgType::Until>();
