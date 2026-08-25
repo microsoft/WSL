@@ -84,11 +84,16 @@ namespace {
         FieldDefinition{L"destination", Field::Target, Family::General, false, Support::Supported},
         FieldDefinition{L"readonly", Field::ReadOnly, Family::General, true, Support::Supported},
         FieldDefinition{L"ro", Field::ReadOnly, Family::General, true, Support::Supported},
+        // The WSLC mount transport and Docker request model have no end-to-end consistency setting.
         FieldDefinition{L"consistency", Field::Consistency, Family::General, false, Support::Unsupported},
+        // The WSLC mount transport and Docker request model do not carry Docker bind options.
+        // "enabled" requires no non-default bind behavior and is accepted below.
         FieldDefinition{L"bind-propagation", Field::BindPropagation, Family::Bind, false, Support::Unsupported},
         FieldDefinition{L"bind-nonrecursive", Field::BindNonRecursive, Family::Bind, true, Support::Unsupported},
         FieldDefinition{L"bind-recursive", Field::BindRecursive, Family::Bind, false, Support::ValueDependent},
+        // The mount pipeline relies on Docker's default volume copy-up behavior and does not carry VolumeOptions.
         FieldDefinition{L"volume-nocopy", Field::VolumeNoCopy, Family::Volume, true, Support::Unsupported},
+        // Inline mounts reference volumes by name; the volume creation API owns labels, drivers, and driver options.
         FieldDefinition{L"volume-label", Field::VolumeLabel, Family::Volume, false, Support::Unsupported},
         FieldDefinition{L"volume-driver", Field::VolumeDriver, Family::Volume, false, Support::Unsupported},
         FieldDefinition{L"volume-opt", Field::VolumeOption, Family::Volume, false, Support::Unsupported},
