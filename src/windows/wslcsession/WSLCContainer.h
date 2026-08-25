@@ -97,6 +97,7 @@ public:
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
+    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
@@ -231,6 +232,9 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
+    // Set between Restart()'s stop and start phases so OnStopped() skips the auto-delete of an --rm container.
+    _Guarded_by_(m_lock) bool m_manualRestart {};
+
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
     // fetched from the (stable) runtime at each use rather than cached, since a cached reference
@@ -270,6 +274,7 @@ public:
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
+    IFACEMETHOD(Restart)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;

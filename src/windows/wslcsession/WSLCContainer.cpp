@@ -1426,6 +1426,31 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 }
 
+void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
+{
+    bool wasRunning{};
+
+    {
+        auto lock = m_lock.lock_exclusive();
+        wasRunning = m_state == WslcContainerStateRunning;
+
+        // N.B. Stop() and Start() each take m_lock, so it cannot be held across both phases.
+        m_manualRestart = wasRunning;
+    }
+
+    auto restartCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() {
+        auto lock = m_lock.lock_exclusive();
+        m_manualRestart = false;
+    });
+
+    if (wasRunning)
+    {
+        Stop(Signal, TimeoutSeconds, false);
+    }
+
+    Start(WSLCContainerStartFlagsNone, nullptr);
+}
+
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::optional<std::int64_t> stopTimestamp)
 {
     auto transition = m_transition;
@@ -1469,7 +1494,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 
     // Stop with Rm must initiate Delete.
-    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
+    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm) && !m_manualRestart)
     {
         try
         {
@@ -2966,6 +2991,11 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
     m_stateGeneration++;
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::int64_t>(std::time(nullptr)));
 
+    if (State == WslcContainerStateRunning)
+    {
+        m_manualRestart = false;
+    }
+
     // Keep the VM alive while this container is Running and release the hold once it leaves that
     // state, even when no client holds the wrapper (e.g. a detached `run -d` container). Dropping
     // the hold on the transition out of Running is what lets an otherwise-idle VM be torn down; a
@@ -3101,6 +3131,18 @@ try
     // Hold a VM lease for the same reason as Stop(): --rm can self-delete and drop activity.
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, IWarningCallback* WarningCallback)
+try
+{
+    WSLCExecutionContext context(&m_session, WarningCallback);
+
+    // Hold a VM lease across both phases: the container is not Running in between, so nothing else
+    // keeps the VM alive.
+    auto vmLease = m_session.Runtime().AcquireVmLease();
+    return CallImpl(&WSLCContainerImpl::Restart, Signal, TimeoutSeconds);
 }
 CATCH_RETURN();
 
