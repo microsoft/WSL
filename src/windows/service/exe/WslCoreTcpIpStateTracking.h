@@ -12,6 +12,7 @@ enum class TrackedIpStateSyncStatus
     PendingRemoval,
     Synced
 };
+
 constexpr auto ToString(networking::TrackedIpStateSyncStatus status) noexcept
 {
     switch (status)
