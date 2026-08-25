@@ -24,10 +24,6 @@ Abstract:
 namespace wsl::windows::common {
 struct Error;
 
-namespace io {
-    struct HandleWrapper;
-}
-
 struct ErrorStrings
 {
     std::wstring Message;
@@ -100,21 +96,18 @@ struct COMOutputHandle : public WSLCHandle
     {
         if (!Empty())
         {
-            if (Type == WSLCHandleTypeSocket)
-            {
-                LOG_LAST_ERROR_IF(closesocket(reinterpret_cast<SOCKET>(Handle.Socket)) == SOCKET_ERROR);
-            }
-            else
-            {
-                LOG_IF_WIN32_BOOL_FALSE(CloseHandle(Handle.File));
-            }
-
+            LOG_IF_WIN32_BOOL_FALSE(CloseHandle(Handle.File));
             Handle.File = nullptr;
-            Type = WSLCHandleTypeUnknown;
         }
     }
 
-    [[nodiscard]] io::HandleWrapper Release();
+    [[nodiscard]] wil::unique_handle Release() noexcept
+    {
+        wil::unique_handle handle(Handle.File);
+        Handle.File = nullptr;
+
+        return handle;
+    }
 
     HANDLE Get() const noexcept
     {

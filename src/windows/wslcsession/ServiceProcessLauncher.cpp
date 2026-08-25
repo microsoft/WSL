@@ -25,9 +25,9 @@ ServiceRunningProcess::ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLCPr
     process.CopyTo(m_process.GetAddressOf());
 }
 
-wsl::windows::common::io::HandleWrapper ServiceRunningProcess::GetStdHandle(int Index)
+wil::unique_handle ServiceRunningProcess::GetStdHandle(int Index)
 {
-    return Get().GetStdHandle(Index);
+    return std::move(Get().GetStdHandle(Index));
 }
 
 wil::unique_event ServiceRunningProcess::GetExitEvent()

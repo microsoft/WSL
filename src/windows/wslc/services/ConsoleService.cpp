@@ -18,7 +18,6 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using wsl::windows::common::ClientRunningWSLCProcess;
-using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::common::io::MultiHandleWait;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::ReadConsoleHandle;
@@ -131,7 +130,7 @@ bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Con
     return !detached;
 }
 
-void ConsoleService::RelayNonTtyProcess(HandleWrapper&& Stdin, HandleWrapper&& Stdout, HandleWrapper&& Stderr)
+void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
 {
     // Process output is UTF-8.
     wsl::windows::common::ConsoleState console;
@@ -144,7 +143,7 @@ void ConsoleService::RelayNonTtyProcess(HandleWrapper&& Stdin, HandleWrapper&& S
 
     auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InterruptAndJoinInputThread(inputThread, exitEvent); });
 
-    if (Stdin.IsValid())
+    if (Stdin.is_valid())
     {
         auto input = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -163,11 +162,11 @@ void ConsoleService::RelayNonTtyProcess(HandleWrapper&& Stdin, HandleWrapper&& S
             inputThread = std::thread{[&]() {
                 try
                 {
-                    windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.Get(), exitEvent.get());
+                    windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
                 }
                 CATCH_LOG();
 
-                Stdin.Reset();
+                Stdin.reset();
             }};
         }
     }
@@ -183,8 +182,7 @@ int ConsoleService::AttachToCurrentConsole(
 {
     if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsTty))
     {
-        auto tty = process.GetStdHandle(WSLCFDTty);
-        if (!RelayInteractiveTty(console, process, tty.Get(), triggerRefresh))
+        if (!RelayInteractiveTty(console, process, process.GetStdHandle(WSLCFDTty).get(), triggerRefresh))
         {
             terminal.Info(L"[detached]\n");
             return 0;
@@ -192,7 +190,7 @@ int ConsoleService::AttachToCurrentConsole(
     }
     else
     {
-        HandleWrapper stdinHandle;
+        wil::unique_handle stdinHandle;
         if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsStdin))
         {
             stdinHandle = process.GetStdHandle(WSLCFDStdin);

@@ -48,6 +48,26 @@ if ($Fast)
     $SetupScript = $null
 }
 
+$Verifier = $false
+$VerifierTargets = @(
+    "wsl.exe",
+    "wslc.exe",
+    "wslhost.exe",
+    "wslrelay.exe",
+    "wslservice.exe",
+    "wslg.exe",
+    "wslcsession.exe",
+    "dllhost.exe",
+    "te.exe",
+    "TE.ProcessHost.exe"
+)
+
+if ($TeArgs -and ($TeArgs -icontains '/verifier'))
+{
+    $TeArgs = @($TeArgs | Where-Object { $_ -ine '/verifier' })
+    $Verifier = $true
+}
+
 # Handle /attachdebugger: verify WinDbgX is available, then add /waitfordebugger so we can find and attach to the test host.
 $AttachDebugger = $false
 if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
@@ -73,23 +93,70 @@ if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
 $teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath", "/p:TestDataPath=$TestDataPath",
     "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
 
-if ($AttachDebugger)
+$verifierTargetsEnabled = @()
+$testExitCode = 0
+try
 {
-    $teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
-
-    # /inproc is always added above, so attach directly to TE.exe.
-    Write-Host "Launching WinDbgX attached to TE.exe (PID: $($teProcess.Id))..."
-    Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
-
-    $teProcess | Wait-Process
-    exit $teProcess.ExitCode
-}
-else
-{
-    te.exe $teArgList
-    if ($LASTEXITCODE -ne 0)
+    if ($Verifier)
     {
-        exit $LASTEXITCODE
+        foreach ($target in $VerifierTargets)
+        {
+            & appverif.exe -verify $target
+            if ($LASTEXITCODE -ne 0)
+            {
+                throw "Failed to enable Application Verifier for $target (exit code: $LASTEXITCODE)."
+            }
+
+            $verifierTargetsEnabled += $target
+
+            # Required otherwise calls like std::chrono::current_zone() are reported as leaks
+            & appverif.exe -enable Leak -for $target -with "Leak.ExcludeUCRT=true" 
+            if ($LASTEXITCODE -ne 0)
+            {
+                throw "Failed to exclude UCRT allocations from leak detection for $target (exit code: $LASTEXITCODE)."
+            }
+
+            & appverif.exe -enable Handles -for $target -with "Handles.Traces=65536"
+            if ($LASTEXITCODE -ne 0)
+            {
+                throw "Failed to configure handle tracing for $target (exit code: $LASTEXITCODE)."
+            }
+        }
+    }
+
+    if ($AttachDebugger)
+    {
+        $teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
+
+        # /inproc is always added above, so attach directly to TE.exe.
+        Write-Host "Launching WinDbgX attached to TE.exe (PID: $($teProcess.Id))..."
+        Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
+
+        $teProcess | Wait-Process
+        $testExitCode = $teProcess.ExitCode
+    }
+    else
+    {
+        te.exe $teArgList
+        $testExitCode = $LASTEXITCODE
+    }
+}
+finally
+{
+    $cleanupFailures = @()
+    foreach ($target in $verifierTargetsEnabled)
+    {
+        & appverif.exe -delete settings -for $target
+        if ($LASTEXITCODE -ne 0)
+        {
+            $cleanupFailures += $target
+        }
+    }
+
+    if ($cleanupFailures.Count -ne 0)
+    {
+        Write-Error "Failed to disable Application Verifier for: $($cleanupFailures -join ', ')."
     }
 }
 
+exit $testExitCode

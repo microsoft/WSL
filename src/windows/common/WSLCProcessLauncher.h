@@ -15,7 +15,6 @@ Abstract:
 --*/
 
 #pragma once
-#include "HandleIO.h"
 #include "wslc.h"
 #include <variant>
 #include <vector>
@@ -38,7 +37,7 @@ public:
 
     ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<io::OverlappedIOHandle>>&& ExtraHandles = {});
     int Wait(DWORD TimeoutMs = INFINITE);
-    virtual io::HandleWrapper GetStdHandle(int Index) = 0;
+    virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
     int GetExitCode();
     WSLCProcessState State();
@@ -58,7 +57,7 @@ public:
     DEFAULT_MOVABLE(ClientRunningWSLCProcess);
 
     ClientRunningWSLCProcess(wil::com_ptr<IWSLCProcess>&& process, WSLCProcessFlags Flags);
-    io::HandleWrapper GetStdHandle(int Index) override;
+    wil::unique_handle GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
     IWSLCProcess& Get();
 
