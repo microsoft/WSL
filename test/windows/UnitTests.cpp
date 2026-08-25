@@ -6904,7 +6904,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             VERIFY_ARE_EQUAL(version, L"2.5.1");
             VERIFY_ARE_EQUAL(asset.id, wsl::shared::Arm64 ? 1 : 2);
             VERIFY_ARE_EQUAL(asset.url, wsl::shared::Arm64 ? L"http://arm-url" : L"http://x64-url");
-            VERIFY_ARE_EQUAL(asset.name, wsl::shared::Arm64 ? L"wsl.2.5.1.0.arm64.msi" : L"wsl.2.5.1.x64.msi");
+            VERIFY_ARE_EQUAL(asset.name, wsl::shared::Arm64 ? L"wsl.2.5.1.0.arm64.msi" : L"wsl.2.5.1.0.x64.msi");
         }
     }
 
