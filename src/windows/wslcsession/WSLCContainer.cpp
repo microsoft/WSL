@@ -1003,11 +1003,13 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id.c_str()), m_state != WslcContainerStateRunning);
 
-    wil::unique_socket ioHandle;
+    wil::shared_socket ioHandle;
 
     try
     {
-        ioHandle = m_runtime.Docker().AttachContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
+        ioHandle = wil::shared_socket{
+            m_runtime.Docker().AttachContainer(
+                m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys))};
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
@@ -1029,16 +1031,14 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     std::vector<std::unique_ptr<OverlappedIOHandle>> handles;
 
     // Keep the socket alive until both relays are destroyed since they complete independently.
-    auto sharedIoHandle = std::make_shared<wil::unique_socket>(std::move(ioHandle));
-
     // This is required for docker to know when stdin is closed.
-    auto onInputComplete = [sharedIoHandle]() { LOG_LAST_ERROR_IF(shutdown(sharedIoHandle->get(), SD_SEND) == SOCKET_ERROR); };
+    auto onInputComplete = [ioHandle]() { LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR); };
 
     handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, sharedIoHandle->get()));
+        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, HandleWrapper{ioHandle}));
 
     handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        HandleWrapper{sharedIoHandle->get(), [sharedIoHandle]() {}}, std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+        HandleWrapper{ioHandle}, std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_runtime.Relay()->AddHandles(std::move(handles));
 
@@ -1093,8 +1093,8 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
             }
             else
             {
-                wil::unique_handle stream{reinterpret_cast<HANDLE>(m_runtime.Docker().AttachContainer(m_id, detachKeys).release())};
-                io = CreateRelayedProcessIO(std::move(stream), m_initProcessFlags);
+                io = CreateRelayedProcessIO(
+                    wil::shared_socket{m_runtime.Docker().AttachContainer(m_id, detachKeys)}, m_initProcessFlags);
             }
         }
     }
@@ -1814,19 +1814,18 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
 
         // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
 
-        wil::unique_handle stream{
-            (HANDLE)m_runtime.Docker()
-                .StartExec(result.Id, common::docker_schema::StartExec{.Tty = request.Tty, .ConsoleSize = request.ConsoleSize})
-                .release()};
+        auto stream = m_runtime.Docker().StartExec(
+            result.Id, common::docker_schema::StartExec{.Tty = request.Tty, .ConsoleSize = request.ConsoleSize});
 
         std::unique_ptr<WSLCProcessIO> io;
         if (request.Tty)
         {
-            io = std::make_unique<TTYProcessIO>(TypedHandle{std::move(stream), WSLCHandleTypeSocket});
+            io = std::make_unique<TTYProcessIO>(
+                TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(stream.release())}, WSLCHandleTypeSocket});
         }
         else
         {
-            io = CreateRelayedProcessIO(std::move(stream), Options->Flags);
+            io = CreateRelayedProcessIO(wil::shared_socket{std::move(stream)}, Options->Flags);
         }
 
         auto control = std::make_shared<DockerExecProcessControl>(*this, result.Id, m_runtime.Docker(), m_runtime.Events());
@@ -2768,25 +2767,20 @@ void WSLCContainerImpl::Stats(LPSTR* Output) const
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to get stats for container '%hs'", m_id.c_str());
 }
 
-std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil::unique_handle&& stream, WSLCProcessFlags flags)
+std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil::shared_socket stream, WSLCProcessFlags flags)
 {
     // Create one pipe for each STD handle.
     std::vector<std::unique_ptr<OverlappedIOHandle>> ioHandles;
     std::map<ULONG, TypedHandle> fds;
 
-    // Keep the socket alive until both relays are destroyed since they complete independently.
-    auto sharedStream = std::make_shared<wil::unique_handle>(std::move(stream));
-
     // This is required for docker to know when stdin is closed.
-    auto closeStdin = [sharedStream]() {
-        LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(sharedStream->get()), SD_SEND) == SOCKET_ERROR);
-    };
+    auto closeStdin = [stream]() { LOG_LAST_ERROR_IF(shutdown(stream.get(), SD_SEND) == SOCKET_ERROR); };
 
     if (WI_IsFlagSet(flags, WSLCProcessFlagsStdin))
     {
         auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
         ioHandles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-            HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, sharedStream->get()));
+            HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, HandleWrapper{stream}));
 
         fds.emplace(WSLCFDStdin, TypedHandle{wil::unique_handle{stdinWrite.release()}, WSLCHandleTypePipe});
     }
@@ -2803,7 +2797,7 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
     ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        HandleWrapper{sharedStream->get(), [sharedStream]() {}}, std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
+        HandleWrapper{stream}, std::move(stdoutWrite), std::move(stderrWrite), common::io::DockerIORelayHandle::Format::Raw));
 
     m_runtime.Relay()->AddHandles(std::move(ioHandles));
 

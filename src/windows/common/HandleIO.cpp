@@ -150,6 +150,16 @@ HandleWrapper::HandleWrapper(wil::unique_socket&& handle, std::function<void()>&
 {
 }
 
+HandleWrapper::HandleWrapper(wil::shared_handle handle, std::function<void()>&& OnClose) :
+    Handle(handle.get()), OwnedHandle(std::move(handle)), OnClose(std::move(OnClose))
+{
+}
+
+HandleWrapper::HandleWrapper(wil::shared_socket handle, std::function<void()>&& OnClose) :
+    Handle(reinterpret_cast<HANDLE>(handle.get())), OwnedHandle(std::move(handle)), OnClose(std::move(OnClose))
+{
+}
+
 HandleWrapper::HandleWrapper(wil::unique_event&& handle, std::function<void()>&& OnClose) :
     Handle(handle.get()), OwnedHandle(wil::unique_handle{handle.release()}), OnClose(std::move(OnClose))
 {
