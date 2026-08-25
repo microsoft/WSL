@@ -717,7 +717,7 @@ interface IWSLCSession : IUnknown
     // returned stream object; events are then pulled one at a time via IWSLCEventStream::GetNext.
     // SinceTime / UntilTime bound the window by event time, in seconds since the Unix epoch. 0 means
     // unbounded on that end.
-    // Filters are key/value pair. Values sharing a key are OR'd, distinct keys are AND'd.
+    // Filters are key/value pairs. Values sharing a key are OR'd, distinct keys are AND'd.
     HRESULT GetEvents(
         [in] ULONGLONG SinceTime,
         [in] ULONGLONG UntilTime,
