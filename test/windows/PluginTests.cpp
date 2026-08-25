@@ -726,7 +726,7 @@ class PluginTests
             WSLCMountFolder(relative): {}
             Test completed
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
-            WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-container, image=debian:latest, state=*
             WSLC Container stopping, session=*, id=*
             WSLC Image deleted, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-test, id=*)",
