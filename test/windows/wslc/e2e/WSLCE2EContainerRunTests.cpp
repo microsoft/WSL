@@ -1193,15 +1193,12 @@ with open('/proc/mounts', encoding='utf-8') as mounts_file:
         raise RuntimeError('/data is not mounted as virtiofs')
 
 fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o777)
-try:
-    os.ftruncate(fd, 32 * 1024)
-    with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.PROT_WRITE) as mapping:
-        mapping[0:1] = b'W'
-        mapping.flush()
-        if os.pread(fd, 1, 0) != b'W':
-            raise RuntimeError('MAP_SHARED write was not visible through the file')
-finally:
-    os.close(fd)
+os.ftruncate(fd, 32 * 1024)
+with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.PROT_WRITE) as mapping:
+    mapping[0:1] = b'W'
+    mapping.flush()
+    if os.pread(fd, 1, 0) != b'W':
+        raise RuntimeError('MAP_SHARED write was not visible through the file')
 )PY";
 
         auto result = RunWslc(std::format(
@@ -1209,13 +1206,7 @@ finally:
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(std::filesystem::exists(EnvTestFile1));
         VERIFY_ARE_EQUAL(32ull * 1024, std::filesystem::file_size(EnvTestFile1));
-
-        std::ifstream mappedFile(EnvTestFile1, std::ios::binary);
-        VERIFY_IS_TRUE(mappedFile.is_open());
-        char mappedValue{};
-        mappedFile.get(mappedValue);
-        VERIFY_IS_TRUE(mappedFile.good());
-        VERIFY_ARE_EQUAL('W', mappedValue);
+        VERIFY_ARE_EQUAL(L'W', ReadFileContent(EnvTestFile1.wstring())[0]);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_Volume_Success)
