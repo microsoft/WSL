@@ -23,11 +23,6 @@ Abstract:
 
 namespace WSLCE2ETests {
 
-inline std::wstring FormatWslcError(const std::wstring& message, std::wstring_view errorCode = L"E_INVALIDARG")
-{
-    return std::format(L"{}\r\nError code: {}\r\n", message, errorCode);
-}
-
 // VT sequence constants and helpers for TTY testing.
 // Sequences are sourced from wsl::windows::common::vt (VTSupport.h).
 namespace VT {
