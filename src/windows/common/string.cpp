@@ -16,6 +16,7 @@ Abstract:
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <sstream>
 
 std::vector<std::string> wsl::windows::common::string::InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize)
 {
@@ -400,7 +401,7 @@ std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
     return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
 }
 
-std::wstring wsl::windows::common::string::FormatDockerSize(uint64_t Bytes)
+std::wstring wsl::windows::common::string::FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision)
 {
     constexpr std::wstring_view c_units[] = {L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
 
@@ -412,7 +413,7 @@ std::wstring wsl::windows::common::string::FormatDockerSize(uint64_t Bytes)
         unitIndex++;
     }
 
-    return std::format(L"{:.3g}{}", value, c_units[unitIndex]);
+    return std::format(L"{:.{}g}{}", value, Precision, c_units[unitIndex]);
 }
 
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
@@ -423,22 +424,4 @@ std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id,
 std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, bool shortenLength)
 {
     return TruncateIdImpl(id, shortenLength);
-}
-
-std::string wsl::windows::common::string::FormatDockerTimestamp(LONGLONG timestamp)
-{
-    const auto time =
-        std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
-
-    try
-    {
-        const auto* zone = std::chrono::current_zone();
-        return std::format("{:%F %T %z} {}", std::chrono::zoned_time{zone, time}, zone->get_info(time).abbrev);
-    }
-    catch (...)
-    {
-        // The time zone database is unavailable, so report UTC rather than failing the caller.
-        LOG_CAUGHT_EXCEPTION();
-        return std::format("{:%F %T} +0000 UTC", time);
-    }
 }

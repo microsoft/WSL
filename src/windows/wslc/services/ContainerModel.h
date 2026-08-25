@@ -87,6 +87,8 @@ struct ContainerOptions
     std::vector<std::string> DnsOptions;
     std::vector<ContainerNetwork> Networks;
     std::vector<std::string> NetworkAliases;
+    std::optional<std::string> IpAddress{};
+    std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
     std::optional<std::wstring> CidFile{};
     std::optional<int64_t> MemoryBytes{};
@@ -133,8 +135,8 @@ struct ContainerInformation
     std::string Name;
     std::string Image;
     WSLCContainerState State;
-    ULONGLONG StateChangedAt{};
-    ULONGLONG CreatedAt{};
+    LONGLONG StateChangedAt{};
+    LONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);

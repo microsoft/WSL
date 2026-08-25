@@ -75,18 +75,42 @@ void TrustPackageCertificate(LPCWSTR Path)
 }
 #endif
 
-void ThrowIfOperationError(
-    const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Management::Deployment::DeploymentResult, winrt::Windows::Management::Deployment::DeploymentProgress>& result,
+winrt::Windows::Management::Deployment::DeploymentResult WaitForDeploymentOperation(
+    const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Management::Deployment::DeploymentResult, winrt::Windows::Management::Deployment::DeploymentProgress>& operation,
     const std::source_location& source = std::source_location::current())
 {
-    const auto status = result.get();
+    // IAsyncOperation::get() installs a completion delegate whose implementation resides in this DLL. The operation can retain
+    // that delegate after get() returns, allowing its final Release() to call into the DLL after MSI unloads it.
+    // To avoid this, poll until the operation is completed.
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Close(); });
 
-    if (result.Status() == winrt::Windows::Foundation::AsyncStatus::Error)
+    auto status = operation.Status();
+    while (status == winrt::Windows::Foundation::AsyncStatus::Started)
     {
-        THROW_HR_MSG(result.ErrorCode(), "Source: %hs() - %hs:%lu", source.function_name(), source.file_name(), source.line());
+        Sleep(10);
+        status = operation.Status();
     }
 
-    THROW_IF_FAILED_MSG(status.ExtendedErrorCode(), "%ls", status.ErrorText().c_str());
+    if (status == winrt::Windows::Foundation::AsyncStatus::Error)
+    {
+        const auto error = operation.ErrorCode();
+        THROW_HR_MSG(error, "Source: %hs() - %hs:%lu", source.function_name(), source.file_name(), source.line());
+    }
+
+    if (status == winrt::Windows::Foundation::AsyncStatus::Canceled)
+    {
+        throw winrt::hresult_canceled();
+    }
+
+    return operation.GetResults();
+}
+
+void ThrowIfOperationError(
+    const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Management::Deployment::DeploymentResult, winrt::Windows::Management::Deployment::DeploymentProgress>& operation,
+    const std::source_location& source = std::source_location::current())
+{
+    const auto result = WaitForDeploymentOperation(operation, source);
+    THROW_IF_FAILED_MSG(result.ExtendedErrorCode(), "%ls", result.ErrorText().c_str());
 }
 
 std::wstring GetMsiProperty(MSIHANDLE install, LPCWSTR name)
@@ -530,7 +554,8 @@ try
     WSL_INSTALL_LOG("DeprovisionMsix");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
-    const auto result = packageManager.DeprovisionPackageForAllUsersAsync(wsl::windows::common::wslutil::c_msixPackageFamilyName).get();
+    const auto result = WaitForDeploymentOperation(
+        packageManager.DeprovisionPackageForAllUsersAsync(wsl::windows::common::wslutil::c_msixPackageFamilyName));
     LOG_IF_FAILED_MSG(result.ExtendedErrorCode(), "%ls", result.ErrorText().c_str());
 
     return NOERROR;

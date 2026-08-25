@@ -641,7 +641,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "discard", 0);
     m_runtime.SetStorageMounted(true);
 
     // Configure swap on a separate ephemeral VHD.
@@ -2776,16 +2776,14 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeInformation** Volumes, ULONG* Count)
+HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Volumes);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
-    *Volumes = nullptr;
-    *Count = 0;
+    *Output = nullptr;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
@@ -2794,16 +2792,9 @@ try
 
     auto volumeList = m_runtime.Volumes().ListVolumes(std::move(filters));
 
-    if (volumeList.empty())
-    {
-        return S_OK;
-    }
+    std::string json = wsl::shared::ToJson(volumeList);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
-    auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(volumeList.size());
-    memcpy(output.get(), volumeList.data(), volumeList.size() * sizeof(WSLCVolumeInformation));
-
-    *Count = static_cast<ULONG>(volumeList.size());
-    *Volumes = output.release();
     return S_OK;
 }
 CATCH_RETURN();
@@ -2983,10 +2974,7 @@ try
     entry.Scope = full.Scope;
     entry.Internal = full.Internal;
     entry.Labels = full.Labels;
-    if (full.Options)
-    {
-        entry.Options = *full.Options;
-    }
+    entry.Options = full.Options;
     entry.IPAM.Driver = full.IPAM.Driver;
     if (full.IPAM.Config)
     {
@@ -3046,63 +3034,49 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Networks);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
-    *Networks = nullptr;
-    *Count = 0;
+    *Output = nullptr;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
-    const bool filtered = !filters.empty();
-
-    if (filtered)
-    {
-        // Scope the filtered query to WSLC-managed networks.
-        filters["label"].push_back(WSLCNetworkManagedLabel);
-    }
 
     auto lock = AcquireLease();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::vector<docker_schema::Network> dockerNetworks;
-    if (filtered)
+    try
     {
-        try
-        {
-            dockerNetworks = m_runtime.Docker().ListNetworks(filters);
-        }
-        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+        dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+
+    std::vector<wslc_schema::NetworkListEntry> networks;
+    networks.reserve(dockerNetworks.size());
+    for (const auto& network : dockerNetworks)
+    {
+        wslc_schema::NetworkListEntry entry;
+        entry.Id = network.Id;
+        entry.Name = network.Name;
+        entry.Driver = network.Driver;
+        entry.Scope = network.Scope;
+        entry.Created = network.Created;
+        entry.EnableIPv4 = network.EnableIPv4;
+        entry.EnableIPv6 = network.EnableIPv6;
+        entry.Internal = network.Internal;
+        entry.Labels = network.Labels;
+        entry.Labels.erase(WSLCNetworkManagedLabel);
+
+        networks.push_back(std::move(entry));
     }
 
-    std::lock_guard networksLock(m_networksLock);
-
-    auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
-
-    ULONG index = 0;
-    for (const auto& [name, entry] : m_networks)
-    {
-        if (filtered && std::ranges::find_if(dockerNetworks, [&](const auto& n) { return n.Name == name; }) == dockerNetworks.end())
-        {
-            continue;
-        }
-
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
-        index++;
-    }
-
-    if (index == 0)
-    {
-        return S_OK;
-    }
-
-    *Networks = output.release();
-    *Count = index;
+    std::string json = wsl::shared::ToJson(networks);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
     return S_OK;
 }
@@ -3122,30 +3096,44 @@ try
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     auto lock = AcquireLease();
-    std::lock_guard networksLock(m_networksLock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    auto it = m_networks.find(name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
-
-    const auto& entry = it->second;
-
-    wslc_schema::Network result;
-    result.Id = entry.Id;
-    result.Name = name;
-    result.Driver = entry.Driver;
-    result.Scope = entry.Scope;
-    result.Internal = entry.Internal;
-    result.Labels = entry.Labels;
-    if (!entry.Options.empty())
+    docker_schema::Network network;
+    try
     {
-        result.Options = entry.Options;
+        network = m_runtime.Docker().InspectNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", name.c_str());
     }
 
-    result.IPAM.Driver = entry.IPAM.Driver;
-    if (entry.IPAM.Config)
+    wslc_schema::Network result;
+    result.Id = network.Id;
+    result.Name = network.Name;
+    result.Created = network.Created;
+    result.Driver = network.Driver;
+    result.Scope = network.Scope;
+    result.EnableIPv4 = network.EnableIPv4;
+    result.EnableIPv6 = network.EnableIPv6;
+    result.Internal = network.Internal;
+    result.Attachable = network.Attachable;
+    result.Ingress = network.Ingress;
+    result.ConfigOnly = network.ConfigOnly;
+    result.ConfigFrom.Network = network.ConfigFrom.Network;
+    result.Options = network.Options;
+    result.Labels = network.Labels;
+    result.Labels.erase(WSLCNetworkManagedLabel);
+    result.Status = network.Status;
+
+    result.IPAM.Driver = network.IPAM.Driver;
+    result.IPAM.Options = network.IPAM.Options;
+    if (network.IPAM.Config)
     {
         auto& configs = result.IPAM.Config.emplace();
-        for (const auto& cfg : *entry.IPAM.Config)
+        for (const auto& cfg : *network.IPAM.Config)
         {
             wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
@@ -3153,6 +3141,17 @@ try
             inspectCfg.IPRange = cfg.IPRange;
             configs.push_back(std::move(inspectCfg));
         }
+    }
+
+    for (const auto& [id, container] : network.Containers)
+    {
+        wslc_schema::NetworkContainer inspectContainer;
+        inspectContainer.Name = container.Name;
+        inspectContainer.EndpointID = container.EndpointID;
+        inspectContainer.MacAddress = container.MacAddress;
+        inspectContainer.IPv4Address = container.IPv4Address;
+        inspectContainer.IPv6Address = container.IPv6Address;
+        result.Containers.emplace(id, std::move(inspectContainer));
     }
 
     std::string json = wsl::shared::ToJson(result);
@@ -3931,10 +3930,7 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Scope = network.Scope;
             entry.Internal = network.Internal;
             entry.Labels = network.Labels;
-            if (network.Options)
-            {
-                entry.Options = *network.Options;
-            }
+            entry.Options = network.Options;
             entry.IPAM.Driver = network.IPAM.Driver;
             if (network.IPAM.Config)
             {

@@ -2496,16 +2496,24 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network option.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>IP adresa vyžaduje síť definovanou uživatelem. Zadejte --network .</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>An IP address cannot be specified when multiple networks are requested. Use a single --network option.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nepodařilo se vytvořit svazek '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBindSourcePathNotFound" xml:space="preserve">
-    <value>Bind source path does not exist: '{}'</value>
+    <value>Zdrojová cesta připojení bind neexistuje: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBindSourcePathError" xml:space="preserve">
-    <value>Failed to access bind source path '{}': {}</value>
+    <value>Přístup ke zdrojové cestě připojení bind {} se nepovedl: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
@@ -3030,19 +3038,19 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DuplicateMountDestinationError" xml:space="preserve">
-    <value>Duplicate mount point: {}</value>
+    <value>Duplicitní přípojný bod: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountMalformedCsvError" xml:space="preserve">
-    <value>The CSV input is malformed.</value>
+    <value>Vstup CSV má chybný formát.</value>
     <comment>{Locked="CSV"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
-    <value>The field '{}' must be a key=value pair.</value>
+    <value>Pole {} musí být dvojice key=value.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountUnexpectedKeyError" xml:space="preserve">
-    <value>The key '{}' is unexpected in '{}'.</value>
+    <value>Klíč {} se v {} neočekává.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidValueError" xml:space="preserve">
@@ -3050,62 +3058,62 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidBindRecursiveValueError" xml:space="preserve">
-    <value>The value for '{}' is invalid: '{}'. Valid values are "enabled", "disabled", "writable", and "readonly".</value>
+    <value>Hodnota pro {} není platná: {}. Platné hodnoty jsou „enabled“, „disabled“, „writable“ a „readonly“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
-    <value>The mount type is required.</value>
+    <value>Je nutné zadat typ připojení.</value>
   </data>
   <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
-    <value>Options matching '{}' cannot be used with mount type '{}'.</value>
+    <value>Možnosti odpovídající {} nejde použít s typem připojení {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
-    <value>Option '{}' requires the 'readonly' option.</value>
+    <value>Možnost {} vyžaduje možnost readonly.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
-    <value>Option 'bind-recursive=readonly' requires the 'bind-propagation=rprivate' option.</value>
+    <value>Možnost „bind-recursive=readonly“ vyžaduje možnost „bind-propagation=rprivate“.</value>
     <comment>{Locked="bind-recursive=readonly"}{Locked="bind-propagation=rprivate"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
-    <value>Mount type '{}' is not supported.</value>
+    <value>Typ připojení {} není podporovaný.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
-    <value>Option '{}' is not supported.</value>
+    <value>Možnost {} není podporovaná.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
-    <value>The mount target is required.</value>
+    <value>Je nutné zadat cíl připojení.</value>
   </data>
   <data name="WSLCCLI_MountTargetAbsoluteError" xml:space="preserve">
-    <value>The mount target path must be absolute.</value>
+    <value>Cesta k cíli připojení musí být absolutní.</value>
   </data>
   <data name="WSLCCLI_MountTmpfsOptionsTypeError" xml:space="preserve">
     <value>Možnosti tmpfs jsou podporovány pouze pro připojení tmpfs.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTmpfsSizeNegativeError" xml:space="preserve">
-    <value>The tmpfs size cannot be negative.</value>
+    <value>Velikost tmpfs nemůže být záporná.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountSourceRequiredError" xml:space="preserve">
-    <value>The mount source is required.</value>
+    <value>Je nutné zadat zdroj připojení.</value>
   </data>
   <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
-    <value>The bind source path must be absolute.</value>
+    <value>Zdrojová cesta připojení bind musí být absolutní.</value>
     <comment>{Locked="bind"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
-    <value>The volume source must be a valid named volume.</value>
+    <value>Zdroj svazku musí být platný pojmenovaný svazek.</value>
   </data>
   <data name="WSLCCLI_MountTmpfsSourceUnsupportedError" xml:space="preserve">
     <value>Možnost zdroje se pro připojení tmpfs nepodporuje.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedGenericError" xml:space="preserve">
-    <value>The mount type is not supported.</value>
+    <value>Tento typ připojení není podporovaný.</value>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Sledovat výstup protokolu</value>
@@ -3176,7 +3184,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountArgDescription" xml:space="preserve">
-    <value>Attach a filesystem mount to the container</value>
+    <value>Připojit systém souborů ke kontejneru</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Název hostitele kontejneru</value>
@@ -3538,9 +3546,8 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Odstraní všechny nepoužívané sítě. Síť se považuje za nepoužívanou, pokud na ni neodkazuje žádný kontejner.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Odstraněno: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Odstraněné sítě:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Připojte kontejner k síti</value>
@@ -3595,9 +3602,8 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Odeberte všechny nepoužívané svazky, nejen ty anonymní.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Odstraněno: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Odstraněné svazky:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Celkové uvolněné místo: {}</value>
@@ -3697,6 +3703,50 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PID</value>
+  </data>
+  <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
+    <value>Před méně než sekundou</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
+    <value>Před 1 sekundou</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
+    <value>Před {} sekundami</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
+    <value>Asi před minutou</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
+    <value>Před {} minutami</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
+    <value>Asi před hodinou</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
+    <value>Před {} hodinami</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
+    <value>Před {} dny</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
+    <value>Před {} týdny</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
+    <value>Před {} měsíci</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
+    <value>Před {} lety</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Upozornění: Neplatná hodnota pro nastavení {} v: {}:{}.</value>

@@ -66,6 +66,26 @@ class WSLCE2ENetworkInspectTests
 
         VERIFY_ARE_EQUAL(WideToMultiByte(TestNetworkName1), inspect.Name);
         VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_ARE_EQUAL("local", inspect.Scope);
+        VERIFY_IS_FALSE(inspect.Created.empty());
+        VERIFY_IS_TRUE(inspect.EnableIPv4);
+        VERIFY_IS_FALSE(inspect.ConfigOnly);
+        VERIFY_IS_TRUE(inspect.Containers.empty());
+
+        // The label used to track wslc managed networks is an implementation detail and must not surface.
+        VERIFY_IS_FALSE(inspect.Labels.contains("com.microsoft.wsl.network.managed"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Inspect_PredefinedNetwork)
+    {
+        // The predefined networks are not created by wslc but must still be inspectable.
+        auto result = RunWslc(L"network inspect bridge");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+        VERIFY_ARE_EQUAL("bridge", inspectData[0].Name);
+        VERIFY_ARE_EQUAL("bridge", inspectData[0].Driver);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Inspect_FormatJson_IsSingleLine)

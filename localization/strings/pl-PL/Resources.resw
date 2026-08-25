@@ -965,7 +965,7 @@ Powrót do sieci NAT.</value>
     <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
-    <value>Virtual Machine Platform is not enabled. WSL 2 may not work correctly. To enable it, run: wsl.exe --install --no-distribution</value>
+    <value>Platforma maszyn wirtualnych nie jest włączona. Usługa WSL 2 może nie działać poprawnie. Aby ją włączyć, uruchom: wsl.exe --install --no-distribution</value>
     <comment>{Locked="WSL 2"}{Locked="wsl.exe"}{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
@@ -2496,16 +2496,24 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network option.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>An IP address requires a user-defined network. Use --network to specify one.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>An IP address cannot be specified when multiple networks are requested. Use a single --network option.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nie można utworzyć woluminu „{}”: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBindSourcePathNotFound" xml:space="preserve">
-    <value>Bind source path does not exist: '{}'</value>
+    <value>Ścieżka źródłowa bind nie istnieje: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBindSourcePathError" xml:space="preserve">
-    <value>Failed to access bind source path '{}': {}</value>
+    <value>Nie można uzyskać dostępu do ścieżki źródłowej bind „{}”: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
@@ -3030,82 +3038,82 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DuplicateMountDestinationError" xml:space="preserve">
-    <value>Duplicate mount point: {}</value>
+    <value>Duplikat punktu instalacji: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountMalformedCsvError" xml:space="preserve">
-    <value>The CSV input is malformed.</value>
+    <value>Dane wejściowe CSV są źle sformułowane.</value>
     <comment>{Locked="CSV"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
-    <value>The field '{}' must be a key=value pair.</value>
+    <value>Pole „{}” musi być parą klucz=wartość.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountUnexpectedKeyError" xml:space="preserve">
-    <value>The key '{}' is unexpected in '{}'.</value>
+    <value>Klucz „{}” jest nieoczekiwany w „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidValueError" xml:space="preserve">
-    <value>The value for '{}' is invalid: '{}'.</value>
+    <value>Wartość dla „{}” jest nieprawidłowa: „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidBindRecursiveValueError" xml:space="preserve">
-    <value>The value for '{}' is invalid: '{}'. Valid values are "enabled", "disabled", "writable", and "readonly".</value>
+    <value>Wartość dla „{}” jest nieprawidłowa: „{}”. Prawidłowe wartości to „enabled”, „disabled”, „writable” i „readonly”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
-    <value>The mount type is required.</value>
+    <value>Typ instalacji jest wymagany.</value>
   </data>
   <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
-    <value>Options matching '{}' cannot be used with mount type '{}'.</value>
+    <value>Opcje pasujące do „{}” nie mogą być używane z typem instalacji „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
-    <value>Option '{}' requires the 'readonly' option.</value>
+    <value>Opcja „{}” wymaga opcji „readonly”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
-    <value>Option 'bind-recursive=readonly' requires the 'bind-propagation=rprivate' option.</value>
+    <value>Opcja „bind-recursive=readonly” wymaga opcji „bind-propagation=rprivate”.</value>
     <comment>{Locked="bind-recursive=readonly"}{Locked="bind-propagation=rprivate"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
-    <value>Mount type '{}' is not supported.</value>
+    <value>Typ instalacji „{}” nie jest obsługiwany.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
-    <value>Option '{}' is not supported.</value>
+    <value>Opcja „{}” nie jest obsługiwana.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
-    <value>The mount target is required.</value>
+    <value>Docelowy punkt instalacji jest wymagany.</value>
   </data>
   <data name="WSLCCLI_MountTargetAbsoluteError" xml:space="preserve">
-    <value>The mount target path must be absolute.</value>
+    <value>Ścieżka docelowa instalacji musi być bezwzględna.</value>
   </data>
   <data name="WSLCCLI_MountTmpfsOptionsTypeError" xml:space="preserve">
-    <value>The tmpfs options are supported only for tmpfs mounts.</value>
+    <value>Opcje tmpfs są obsługiwane tylko dla instalacji tmpfs.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTmpfsSizeNegativeError" xml:space="preserve">
-    <value>The tmpfs size cannot be negative.</value>
+    <value>Rozmiar tmpfs nie może być ujemny.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountSourceRequiredError" xml:space="preserve">
-    <value>The mount source is required.</value>
+    <value>Źródło instalacji jest wymagane.</value>
   </data>
   <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
-    <value>The bind source path must be absolute.</value>
+    <value>Ścieżka źródła bind musi być bezwzględna.</value>
     <comment>{Locked="bind"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
-    <value>The volume source must be a valid named volume.</value>
+    <value>Źródłem woluminu musi być prawidłowy nazwany wolumin.</value>
   </data>
   <data name="WSLCCLI_MountTmpfsSourceUnsupportedError" xml:space="preserve">
-    <value>The source option is not supported for tmpfs mounts.</value>
+    <value>Opcja źródła nie jest obsługiwana dla instalacji tmpfs.</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedGenericError" xml:space="preserve">
-    <value>The mount type is not supported.</value>
+    <value>Typ instalacji nie jest obsługiwany.</value>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Śledź dane wyjściowe dziennika</value>
@@ -3176,7 +3184,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountArgDescription" xml:space="preserve">
-    <value>Attach a filesystem mount to the container</value>
+    <value>Dołączanie punktu instalacji systemu plików do kontenera</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nazwa hosta kontenera</value>
@@ -3538,9 +3546,8 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Usuwa wszystkie nieużywane sieci. Sieć jest uznawana za nieużywaną, gdy nie odwołuje się do niej żaden kontener.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Usunięto: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Usunięte sieci:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Połącz kontener z siecią</value>
@@ -3595,9 +3602,8 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Usuń wszystkie nieużywane woluminy, nie tylko anonimowe.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Usunięto: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Usunięte woluminy:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Łączna ilość odzyskanego miejsca: {}</value>
@@ -3697,6 +3703,50 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
+    <value>Mniej niż sekundę temu</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
+    <value>1 sekundę temu</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
+    <value>{} s temu</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
+    <value>Około minutę temu</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
+    <value>{} min temu</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
+    <value>Około godzinę temu</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
+    <value>{} godz. temu</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
+    <value>{} dni temu</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
+    <value>{} tyg. temu</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
+    <value>{} mies. temu</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
+    <value>{} lat(a) temu</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Ostrzeżenie: Nieprawidłowa wartość ustawienia „{}” w {}:{}.</value>

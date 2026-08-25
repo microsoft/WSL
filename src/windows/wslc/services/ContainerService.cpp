@@ -105,6 +105,18 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
+    if (options.IpAddress.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        containerLauncher.SetPrimaryNetworkIpAddress(std::string(options.IpAddress.value()));
+    }
+
     if (!options.Networks.empty())
     {
         const auto& primary = options.Networks.front();
@@ -287,74 +299,6 @@ static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping&
     };
 }
 
-std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
-{
-    if (timestamp == 0)
-    {
-        return L"";
-    }
-
-    return FormatElapsedSeconds(static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp));
-}
-
-std::wstring ContainerService::FormatElapsedSeconds(LONGLONG elapsedSeconds)
-{
-    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
-    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
-    constexpr LONGLONG HoursPerDay = 24;
-    constexpr LONGLONG MinutesPerHour = 60;
-
-    const auto elapsed = std::max<LONGLONG>(elapsedSeconds, 0);
-
-    if (elapsed < 1)
-    {
-        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
-    }
-    else if (elapsed == 1)
-    {
-        return Localization::WSLCCLI_RelativeTimeOneSecond();
-    }
-    else if (elapsed < SecondsPerMinute)
-    {
-        return Localization::WSLCCLI_RelativeTimeSeconds(elapsed);
-    }
-
-    const auto minutes = elapsed / SecondsPerMinute;
-    if (minutes == 1)
-    {
-        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
-    }
-    else if (minutes < MinutesPerHour)
-    {
-        return Localization::WSLCCLI_RelativeTimeMinutes(minutes);
-    }
-
-    // Rounded to the nearest hour rather than truncated.
-    const auto hours = (elapsed + (SecondsPerHour / 2)) / SecondsPerHour;
-    if (hours == 1)
-    {
-        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
-    }
-    else if (hours < HoursPerDay * 2)
-    {
-        return Localization::WSLCCLI_RelativeTimeHours(hours);
-    }
-    else if (hours < HoursPerDay * 7 * 2)
-    {
-        return Localization::WSLCCLI_RelativeTimeDays(hours / HoursPerDay);
-    }
-    else if (hours < HoursPerDay * 30 * 2)
-    {
-        return Localization::WSLCCLI_RelativeTimeWeeks(hours / HoursPerDay / 7);
-    }
-    else if (hours < HoursPerDay * 365 * 2)
-    {
-        return Localization::WSLCCLI_RelativeTimeMonths(hours / HoursPerDay / 30);
-    }
-
-    return Localization::WSLCCLI_RelativeTimeYears(elapsed / SecondsPerHour / HoursPerDay / 365);
-}
-
 int ContainerService::Attach(Terminal& terminal, Session& session, const std::string& id)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
@@ -396,7 +340,7 @@ int ContainerService::Attach(Terminal& terminal, Session& session, const std::st
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt)
+std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt)
 {
     std::wstring stateString;
     switch (state)
@@ -424,7 +368,7 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
         return stateString;
     }
 
-    return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
+    return std::format(L"{} {}", stateString, wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt));
 }
 
 std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
@@ -706,7 +650,7 @@ void ContainerService::CopyFromContainer(Session& session, const std::string& id
     THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;

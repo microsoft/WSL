@@ -967,7 +967,7 @@ Windows 版本： {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVirtualMachinePlatformRequiredForNetworking" xml:space="preserve">
-    <value>Failed to start virtual networking - please install the optional component Virtual Machine Platform by running: wsl.exe --install --no-distribution</value>
+    <value>無法啟動虛擬網路 - 請執行下列命令以安裝選用元件「虛擬機器平台」: wsl.exe --install --no-distribution</value>
     <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
@@ -2502,6 +2502,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>要求多個網路時，無法指定網路別名。使用單一 --network 選項。</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>IP 位址需要使用者定義的網路。使用 --network 指定一個。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>要求多個網路時，不能指定 IP 位址。使用單一 --network 選項。</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>無法建立磁碟區 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3024,23 +3032,23 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>選項 '-f, --filter' 的值 "{}" 無效: 篩選格式錯誤（預期為 name=value）</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
-    <value>Invalid argument "{}" for '--mount' option: {}</value>
+    <value>'--mount' 選項的引數 "{}" 無效: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTmpfsError" xml:space="preserve">
-    <value>Invalid argument "{}" for '--tmpfs' option: {}</value>
+    <value>'--tmpfs' 選項的引數 "{}" 無效: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--tmpfs'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedMountError" xml:space="preserve">
-    <value>Argument "{}" for '--mount' option uses an unsupported feature: {}</value>
+    <value>'--mount' 選項的引數 "{}" 使用不支援的功能: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DuplicateMountDestinationError" xml:space="preserve">
-    <value>Duplicate mount point: {}</value>
+    <value>重複的掛接點: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountMalformedCsvError" xml:space="preserve">
-    <value>The CSV input is malformed.</value>
+    <value>CSV 輸入格式錯誤。</value>
     <comment>{Locked="CSV"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
@@ -3048,70 +3056,70 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountUnexpectedKeyError" xml:space="preserve">
-    <value>The key '{}' is unexpected in '{}'.</value>
+    <value>'{}' 中有未預期的索引鍵 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidValueError" xml:space="preserve">
-    <value>The value for '{}' is invalid: '{}'.</value>
+    <value>'{}' 的值無效: '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountInvalidBindRecursiveValueError" xml:space="preserve">
-    <value>'{}' 的值無效： '{}'。有效值為 “enabled”、“disabled”、“writable” 和 “readonly”。</value>
+    <value>'{}' 的值無效: '{}'。有效值為 "enabled"、"disabled"、"writable" 和 "readonly"。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
-    <value>The mount type is required.</value>
+    <value>需要掛接類型。</value>
   </data>
   <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
     <value>與 '{}' 相符的選項不能與裝載類型 '{}' 一起使用。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
-    <value>Option '{}' requires the 'readonly' option.</value>
+    <value>選項 '{}' 需要 'readonly' 選項。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
-    <value>Option 'bind-recursive=readonly' requires the 'bind-propagation=rprivate' option.</value>
+    <value>選項 'bind-recursive=readonly' 需要 'bind-propagation=rprivate' 選項。</value>
     <comment>{Locked="bind-recursive=readonly"}{Locked="bind-propagation=rprivate"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
-    <value>Mount type '{}' is not supported.</value>
+    <value>不支援掛接類型 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
-    <value>Option '{}' is not supported.</value>
+    <value>不支援選項 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
-    <value>The mount target is required.</value>
+    <value>需要掛接目標。</value>
   </data>
   <data name="WSLCCLI_MountTargetAbsoluteError" xml:space="preserve">
-    <value>The mount target path must be absolute.</value>
+    <value>掛接目標路徑必須是絕對路徑。</value>
   </data>
   <data name="WSLCCLI_MountTmpfsOptionsTypeError" xml:space="preserve">
-    <value>tmpfs 選項僅支援 tmpfs 掛載。</value>
+    <value>tmpfs 掛接僅支援 tmpfs 選項。</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTmpfsSizeNegativeError" xml:space="preserve">
-    <value>The tmpfs size cannot be negative.</value>
+    <value>tmpfs 大小不可為負值。</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountSourceRequiredError" xml:space="preserve">
-    <value>The mount source is required.</value>
+    <value>需要掛接來源。</value>
   </data>
   <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
-    <value>The bind source path must be absolute.</value>
+    <value>bind 來源路徑必須是絕對路徑。</value>
     <comment>{Locked="bind"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
     <value>磁碟區來源必須是有效的具名磁碟區。</value>
   </data>
   <data name="WSLCCLI_MountTmpfsSourceUnsupportedError" xml:space="preserve">
-    <value>The source option is not supported for tmpfs mounts.</value>
+    <value>tmpfs 掛接不支援來源選項。</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountTypeUnsupportedGenericError" xml:space="preserve">
-    <value>The mount type is not supported.</value>
+    <value>不支援此掛接類型。</value>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>追蹤記錄輸出</value>
@@ -3182,7 +3190,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_MountArgDescription" xml:space="preserve">
-    <value>Attach a filesystem mount to the container</value>
+    <value>將檔案系統掛接連結到容器</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>容器主機名稱</value>
@@ -3544,9 +3552,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>移除所有未使用的網路。當網路未被任何容器參考時，會被視為未使用。</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>已刪除: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>已刪除的網路:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>將容器連線到網路</value>
@@ -3601,9 +3608,8 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>移除所有未使用的磁碟區，而不僅是匿名磁碟區。</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>已刪除: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>已刪除磁碟區:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>已回收空間總計: {}</value>
@@ -3703,6 +3709,50 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
+    <value>不到一秒前</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
+    <value>1 秒前</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
+    <value>{} 秒前</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
+    <value>大約一分鐘前</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
+    <value>{} 分鐘前</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
+    <value>大約一小時前</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
+    <value>{} 小時前</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
+    <value>{} 天前</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
+    <value>{} 週前</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
+    <value>{} 個月前</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
+    <value>{} 年前</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>警告： 在 {}：{} 中設定 '{}' 的值無效。</value>

@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL-tároló engedélyezése</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Ez a házirend szabályozza, hogy ezen a gépen használható-e WSL-tároló. Ha engedélyezve van vagy nincs beállítva, a felhasználók és a Windows-alkalmazások WSL-en keresztül futtathatnak Linux-tárolókat. Ha le van tiltva, a WSL-tároló minden felhasználó számára blokkolva van, és a Windows-alkalmazások nem futtathatnak Linux-tárolókat. Figyelmeztetés: Ha ezt „Disabled” értékre állítja, az megszakíthatja azokat a Windows-alkalmazásokat, amelyek Linux-tárolóktól függenek.</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Engedélyezze a kiemelt WSL-tárolókat</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Ez a házirend szabályozza, hogy a WSL-tárolók futhatnak-e kiemelt jogosultságú módban ezen a gépen. Ha engedélyezve van vagy nincs beállítva, a felhasználók és a Windows-alkalmazások indíthatnak kiemelt tárolókat. Ha „Disabled” értékre van állítva, a kiemelt tároló indítására irányuló kéréseket minden felhasználó és Windows-alkalmazás esetében elutasítják. A kiemelt tárolók emelt Linux-képességekkel futnak, és kevésbé elkülönítettek a tároló gazdagépétől.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL-tárolóregisztrációs adatbázisok engedélyezési listája</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Ha engedélyezve van, a WSL-tároló csak az itt felsorolt tárolókból kérhet le lemezképeket. Ez hatással van a WSL-tároló CLI-re és a WSL-tároló API-t használó összes alkalmazásra is.</string>
     </stringTable>

@@ -350,6 +350,15 @@ if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
 endif()
 
+# Hybrid CRT: static-link the C++ runtime and STL (/MT|/MTd from CMAKE_MSVC_RUNTIME_LIBRARY),
+# but dynamic-link the Universal CRT (ucrt.dll) which is an OS component on Windows 10+.
+# This eliminates the VCRUNTIME/MSVCP redistributable dependency while avoiding the size
+# cost of statically linking the UCRT. See https://aka.ms/hybridcrt for details.
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE}    /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
+set(CMAKE_SHARED_LINKER_FLAGS_DEBUG   "${CMAKE_SHARED_LINKER_FLAGS_DEBUG}   /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG      "${CMAKE_EXE_LINKER_FLAGS_DEBUG}      /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
+
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
 set(COMMON_LINK_LIBRARIES
@@ -518,7 +527,7 @@ endif()
 if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smaller
     add_compile_definitions(WSL_SYSTEM_DISTRO_PATH="${WSL_DEV_BINARY_PATH}/system.vhd"
                             WSL_KERNEL_PATH="${WSL_DEV_BINARY_PATH}/kernel"
-                            WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/modules.vhd"
+                            WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/artifacts.vhd"
                             WSL_DEV_INSTALL_PATH="${WSL_DEV_BINARY_PATH}"
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
 endif()

@@ -37,6 +37,7 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    timestamp.cpp
     VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
@@ -125,6 +126,7 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    timestamp.hpp
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
