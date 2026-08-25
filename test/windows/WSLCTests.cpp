@@ -3898,7 +3898,7 @@ class WSLCTests
 
         static constexpr auto mountPoint = "/virtiofs-ownership-test";
 
-        VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), mountPoint, false));
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), mountPoint, false, TRUE));
 
         // Create a file and chown to uid 1000:100, then verify ownership is preserved.
         // Without the 'metadata' option on the virtiofs share, chown appears to succeed but
@@ -3925,7 +3925,7 @@ class WSLCTests
 
         VERIFY_ARE_EQUAL(result.Output[1], std::string("65534\n"));
 
-        VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint));
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint, TRUE));
     }
 
     // Validates that each mount owns an independent child on the shared aggregate device.
