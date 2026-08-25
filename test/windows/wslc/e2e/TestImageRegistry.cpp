@@ -83,6 +83,12 @@ void TestImageRegistry::Restore(const TestImage& image, const std::wstring& sess
     Load(image, sessionName);
 }
 
+void TestImageRegistry::InvalidateSession(const std::wstring& sessionName)
+{
+    std::erase_if(m_loaded, [&](const auto& image) { return image.SessionName == sessionName; });
+    m_seededSessions.erase(sessionName);
+}
+
 void TestImageRegistry::Load(const TestImage& image, const std::wstring& sessionName)
 {
     auto result = RunWslc(FormatCommand(sessionName, std::format(L"image load --input \"{}\"", image.Path.wstring())));
