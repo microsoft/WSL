@@ -1029,7 +1029,6 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     std::vector<std::unique_ptr<OverlappedIOHandle>> handles;
 
-    // Keep the socket alive until both relays are destroyed since they complete independently.
     // This is required for docker to know when stdin is closed.
     auto onInputComplete = [ioHandle]() { LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR); };
 
