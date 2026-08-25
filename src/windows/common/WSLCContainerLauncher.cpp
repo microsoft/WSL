@@ -230,7 +230,7 @@ void WSLCContainerLauncher::AddUlimit(const std::string& Name, std::int64_t Soft
 void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     AddMount({
-        .MountType = mount::Type::Bind,
+        .MountType = WSLCMountTypeBind,
         .Source = HostPath,
         .Target = ContainerPath,
         .ReadOnly = ReadOnly,
@@ -241,7 +241,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& 
 void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly)
 {
     AddMount({
-        .MountType = mount::Type::Volume,
+        .MountType = WSLCMountTypeVolume,
         .Source = wsl::shared::string::MultiByteToWide(Name),
         .Target = ContainerPath,
         .ReadOnly = ReadOnly,
@@ -251,20 +251,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::stri
 void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mount)
 {
     WSLCMountSpec mount{};
-    switch (Mount.MountType)
-    {
-    case mount::Type::Bind:
-        mount.Type = WSLCMountTypeBind;
-        break;
-
-    case mount::Type::Volume:
-        mount.Type = WSLCMountTypeVolume;
-        break;
-
-    case mount::Type::Tmpfs:
-        mount.Type = WSLCMountTypeTmpfs;
-        break;
-    }
+    mount.Type = Mount.MountType;
 
     if (!Mount.Source.empty())
     {
@@ -273,7 +260,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mo
 
     mount.Target = m_mountTargets.emplace_back(Mount.Target).c_str();
     mount.ReadOnly = Mount.ReadOnly ? TRUE : FALSE;
-    if (Mount.MountType == mount::Type::Bind && Mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
+    if (Mount.MountType == WSLCMountTypeBind && Mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
     {
         WI_SetFlag(mount.Flags, WSLCMountSpecFlagsCreateSourceIfMissing);
     }
@@ -292,7 +279,6 @@ void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mo
 
     if (Mount.TmpfsOptions.has_value())
     {
-        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsOptions);
         mount.TmpfsOptions = m_mountTmpfsOptions.emplace_back(Mount.TmpfsOptions.value()).c_str();
     }
 
@@ -315,7 +301,7 @@ void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Ke
 void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& ContainerPath, const std::string& Options)
 {
     AddMount({
-        .MountType = mount::Type::Tmpfs,
+        .MountType = WSLCMountTypeTmpfs,
         .Target = ContainerPath,
         .TmpfsOptions = Options,
     });
