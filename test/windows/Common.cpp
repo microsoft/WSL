@@ -2955,7 +2955,7 @@ private:
     std::string m_targetValue;
 };
 
-void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout)
+void WaitForOutput(wsl::windows::common::io::HandleWrapper handle, std::string_view targetValue, std::chrono::milliseconds timeout)
 {
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));

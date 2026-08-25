@@ -140,6 +140,26 @@ BOOL GetNextCharacter(_In_ INPUT_RECORD* InputRecord, _Out_ PWCHAR NextCharacter
 
 // HandleWrapper
 
+HandleWrapper::HandleWrapper(HandleWrapper&& other) noexcept :
+    Handle(std::exchange(other.Handle, nullptr)), OwnedHandle(std::move(other.OwnedHandle)), OnClose(std::move(other.OnClose))
+{
+    other.OnClose = nullptr;
+}
+
+HandleWrapper& HandleWrapper::operator=(HandleWrapper&& other) noexcept
+{
+    if (this != &other)
+    {
+        Reset();
+        Handle = std::exchange(other.Handle, nullptr);
+        OwnedHandle = std::move(other.OwnedHandle);
+        OnClose = std::move(other.OnClose);
+        other.OnClose = nullptr;
+    }
+
+    return *this;
+}
+
 HandleWrapper::HandleWrapper(wil::unique_handle&& handle, std::function<void()>&& OnClose) :
     Handle(handle.get()), OwnedHandle(std::move(handle)), OnClose(std::move(OnClose))
 {
@@ -187,6 +207,11 @@ HandleWrapper::~HandleWrapper()
 HANDLE HandleWrapper::Get() const
 {
     return Handle;
+}
+
+bool HandleWrapper::IsValid() const
+{
+    return Handle != nullptr && Handle != INVALID_HANDLE_VALUE;
 }
 
 void HandleWrapper::Reset()

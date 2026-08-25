@@ -22,9 +22,11 @@ enum class IOHandleStatus
 
 struct HandleWrapper
 {
-    DEFAULT_MOVABLE(HandleWrapper);
     NON_COPYABLE(HandleWrapper)
 
+    HandleWrapper() = default;
+    HandleWrapper(HandleWrapper&& other) noexcept;
+    HandleWrapper& operator=(HandleWrapper&& other) noexcept;
     HandleWrapper(wil::unique_handle&& handle, std::function<void()>&& OnClose = []() {});
     HandleWrapper(wil::unique_socket&& handle, std::function<void()>&& OnClose = []() {});
     HandleWrapper(wil::shared_handle handle, std::function<void()>&& OnClose = []() {});
@@ -36,6 +38,7 @@ struct HandleWrapper
     ~HandleWrapper();
 
     HANDLE Get() const;
+    bool IsValid() const;
     void Reset();
 
 private:

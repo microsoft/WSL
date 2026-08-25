@@ -1008,8 +1008,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     try
     {
         ioHandle = wil::shared_socket{
-            m_runtime.Docker().AttachContainer(
-                m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys))};
+            m_runtime.Docker().AttachContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys))};
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
@@ -1088,13 +1087,11 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         {
             if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
             {
-                io = std::make_unique<TTYProcessIO>(TypedHandle{
-                    wil::unique_handle{(HANDLE)m_runtime.Docker().AttachContainer(m_id, detachKeys).release()}, WSLCHandleTypeSocket});
+                io = std::make_unique<TTYProcessIO>(TypedHandle{m_runtime.Docker().AttachContainer(m_id, detachKeys), WSLCHandleTypeSocket});
             }
             else
             {
-                io = CreateRelayedProcessIO(
-                    wil::shared_socket{m_runtime.Docker().AttachContainer(m_id, detachKeys)}, m_initProcessFlags);
+                io = CreateRelayedProcessIO(wil::shared_socket{m_runtime.Docker().AttachContainer(m_id, detachKeys)}, m_initProcessFlags);
             }
         }
     }
@@ -1820,8 +1817,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
         std::unique_ptr<WSLCProcessIO> io;
         if (request.Tty)
         {
-            io = std::make_unique<TTYProcessIO>(
-                TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(stream.release())}, WSLCHandleTypeSocket});
+            io = std::make_unique<TTYProcessIO>(TypedHandle{std::move(stream), WSLCHandleTypeSocket});
         }
         else
         {
