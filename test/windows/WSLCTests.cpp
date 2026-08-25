@@ -6856,6 +6856,75 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerRestart)
+    {
+        // A running container is stopped and started again, replacing its init process.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-running", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            auto initProcess = container.GetInitProcess();
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+
+            VERIFY_ARE_EQUAL(initProcess.Wait(), WSLCSignalSIGKILL + 128);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        }
+
+        // A created container has no stop phase.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-created", {"sleep", "99999"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        }
+
+        // An exited container is started again.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-exited", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+
+            auto restartedProcess = container.GetInitProcess();
+            VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
+
+            COMOutputHandle stdoutLogs{};
+            COMOutputHandle stderrLogs{};
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, &stdoutLogs, &stderrLogs, 0, 0, 0));
+            ValidateHandleOutput(stdoutLogs.Get(), "OK\nOK\n");
+        }
+
+        // Restarting a container with the autorm flag set must not auto-delete it, but a later stop must.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-autorm", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsRm | WSLCContainerFlagsInit);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_DEFAULT, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr), RPC_E_DISCONNECTED);
+        }
+
+        // Validate that deleted containers can't be restarted.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-deleted", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+
+            VERIFY_ARE_EQUAL(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr), RPC_E_DISCONNECTED);
+        }
+    }
+
     WSLC_TEST_METHOD(OpenContainer)
     {
         auto expectOpen = [&](const char* Id, HRESULT expectedResult = S_OK) {
