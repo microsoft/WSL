@@ -23,6 +23,7 @@ Abstract:
 
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::policies;
 
@@ -306,13 +307,10 @@ try
         SetThreadpoolTimer(static_cast<WslService*>(Context)->m_updateCheckTimer.get(), nullptr, 0, 0);
 
         // Get current release date
-        std::wstring currentReleaseCreatedAtDate = GetGitHubReleaseByTag(TEXT(WSL_PACKAGE_VERSION)).created_at;
+        const std::wstring currentReleaseCreatedAtDate = GetGitHubReleaseByTag(TEXT(WSL_PACKAGE_VERSION)).created_at;
 
-        std::tm tm = {};
-        std::wstring dateTimeFormat = L"%Y-%m-%dT%H:%M:%SZ";
-        std::wistringstream ss(currentReleaseCreatedAtDate);
-        ss >> std::get_time(&tm, dateTimeFormat.c_str());
-        auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+        const auto tp = std::chrono::system_clock::from_time_t(
+            static_cast<std::time_t>(Rfc3339ToEpoch(WideToMultiByte(currentReleaseCreatedAtDate))));
 
         // If their release of WSL is older than 30 days, then show a notification to update
         if (std::chrono::system_clock::now() - std::chrono::days(30) > tp)

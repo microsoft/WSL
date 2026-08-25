@@ -26,6 +26,7 @@ enum class ContainerEvent
 {
     Create,
     Start,
+    Restart,
     Stop,
     Exit,
     Destroy,
@@ -61,8 +62,8 @@ public:
         DockerEventTracker* m_tracker = nullptr;
     };
 
-    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::uint64_t)>;
-    using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::uint64_t)>;
+    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::int64_t)>;
+    using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
 
     explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
@@ -81,31 +82,71 @@ public:
 
 private:
     void OnEvent(const std::string_view& event);
-    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTime);
-    void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTime);
+    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
+    void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
 
-    struct ContainerCallback
+    // Callbacks are invoked without holding m_lock so that a callback can register or unregister callbacks, and so
+    // that a callback taking its own lock can't invert with a thread that registers a callback under that same lock.
+    struct CallbackRegistration
     {
-        size_t CallbackId;
-        std::string ContainerId;
-        std::optional<std::string> ExecId;
-        ContainerStateChangeCallback Callback;
+        NON_COPYABLE(CallbackRegistration);
+        NON_MOVABLE(CallbackRegistration);
+
+        CallbackRegistration(size_t Id) noexcept : CallbackId(Id)
+        {
+        }
+
+        const size_t CallbackId;
+
+        // Held while the callback runs so it can't be invoked once UnregisterCallback() returned for it.
+        // N.B. Recursive so a running callback can unregister itself.
+        std::recursive_mutex InvokeLock;
+        _Guarded_by_(InvokeLock) bool Unregistered = false;
     };
 
-    struct VolumeCallback
+    struct ContainerCallback : CallbackRegistration
     {
-        size_t CallbackId;
-        VolumeEventCallback Callback;
+        ContainerCallback(size_t Id, std::string&& ContainerId, std::optional<std::string>&& ExecId, ContainerStateChangeCallback&& Callback) :
+            CallbackRegistration(Id), ContainerId(std::move(ContainerId)), ExecId(std::move(ExecId)), Callback(std::move(Callback))
+        {
+        }
+
+        const std::string ContainerId;
+        const std::optional<std::string> ExecId;
+        const ContainerStateChangeCallback Callback;
     };
 
-    std::vector<ContainerCallback> m_containerCallbacks;
-    std::vector<VolumeCallback> m_volumeCallbacks;
+    struct VolumeCallback : CallbackRegistration
+    {
+        VolumeCallback(size_t Id, VolumeEventCallback&& Callback) : CallbackRegistration(Id), Callback(std::move(Callback))
+        {
+        }
+
+        const VolumeEventCallback Callback;
+    };
+
+    _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
+    _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
+
+    // Invokes a snapshot of callbacks taken under m_lock, skipping registrations that have since been unregistered.
+    template <typename TCallback, typename TInvoke>
+    static void InvokeCallbacks(const std::vector<std::shared_ptr<TCallback>>& Callbacks, const TInvoke& Invoke)
+    {
+        for (const auto& e : Callbacks)
+        {
+            std::lock_guard invokeLock{e->InvokeLock};
+            if (!e->Unregistered)
+            {
+                Invoke(*e);
+            }
+        }
+    }
 
     _Guarded_by_(m_lock) std::unordered_set<std::string> m_createdObjects;
     _Guarded_by_(m_lock) wil::unique_event m_objectCreated { wil::EventOptions::ManualReset };
 
     WSLCSession& m_session;
-    std::recursive_mutex m_lock;
+    std::mutex m_lock;
     std::atomic<size_t> m_callbackId{0};
 };
 } // namespace wsl::windows::service::wslc

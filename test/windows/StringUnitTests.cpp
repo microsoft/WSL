@@ -4,8 +4,7 @@
 #include "Common.h"
 #include "string.hpp"
 
-using wsl::windows::common::string::FormatBytes;
-using wsl::windows::common::string::FormatStorageSize;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::common::string::ParseStorageSize;
 using wsl::windows::common::string::StorageSizeUnit;
 
@@ -15,8 +14,7 @@ struct StorageSizeFormatCase
 {
     uint64_t Bytes;
     StorageSizeUnit Unit;
-    uint32_t DecimalPlaces;
-    bool IncludeSpace;
+    uint32_t Precision;
     std::wstring Expected;
 };
 
@@ -24,8 +22,7 @@ struct StorageSizeTextRoundTripCase
 {
     std::wstring Text;
     StorageSizeUnit Unit;
-    uint32_t DecimalPlaces;
-    bool IncludeSpace;
+    uint32_t Precision;
 };
 
 void VerifyDockerStorageSize(const std::string& Input, StorageSizeUnit Unit, std::optional<uint64_t> Expected)
@@ -75,6 +72,14 @@ namespace StringUnitTests {
 class StringUnitTests
 {
     WSL_TEST_CLASS(StringUnitTests)
+
+    TEST_METHOD(FormatUtf8StringAsWideString)
+    {
+        const std::string input{"安装依赖"};
+        const auto expected = wsl::shared::string::MultiByteToWide(input);
+
+        VERIFY_ARE_EQUAL(expected, std::format(L"{}", input));
+    }
 
     TEST_METHOD(ParseMemorySize_LegacyForms)
     {
@@ -197,56 +202,93 @@ class StringUnitTests
         }
     }
 
-    TEST_METHOD(FormatStorageSize_UsesRequestedPrecision)
+    // Memory sizes are rendered in binary units with four significant digits and no space, matching
+    // docker's units.BytesSize.
+    TEST_METHOD(FormatHumanReadableSize_SupportsBinaryUnits)
     {
         const std::vector<StorageSizeFormatCase> TestCases{
-            {0, StorageSizeUnit::Decimal, 0, false, L"0B"},
-            {999, StorageSizeUnit::Decimal, 2, true, L"999 B"},
-            {1'000, StorageSizeUnit::Decimal, 0, false, L"1KB"},
-            {119'856'765, StorageSizeUnit::Decimal, 0, false, L"120MB"},
-            {119'856'765, StorageSizeUnit::Decimal, 1, false, L"119.9MB"},
-            {119'856'765, StorageSizeUnit::Decimal, 2, false, L"119.86MB"},
-            {1'000'000'000'000ULL, StorageSizeUnit::Decimal, 2, false, L"1.00TB"},
-            {1'000'000'000'000'000ULL, StorageSizeUnit::Decimal, 2, false, L"1.00PB"},
-            {1'000'000'000'000'000'000ULL, StorageSizeUnit::Decimal, 2, false, L"1000.00PB"},
-            {1'023, StorageSizeUnit::Binary, 2, true, L"1023 B"},
-            {1'024, StorageSizeUnit::Binary, 0, false, L"1KiB"},
-            {1'536, StorageSizeUnit::Binary, 1, false, L"1.5KiB"},
-            {1'610'612'736, StorageSizeUnit::Binary, 0, false, L"2GiB"},
-            {1'610'612'736, StorageSizeUnit::Binary, 1, false, L"1.5GiB"},
-            {1ULL << 40, StorageSizeUnit::Binary, 2, false, L"1.00TiB"},
-            {1ULL << 50, StorageSizeUnit::Binary, 2, false, L"1.00PiB"},
-            {1ULL << 60, StorageSizeUnit::Binary, 2, false, L"1024.00PiB"},
+            {0, StorageSizeUnit::Binary, 4, L"0B"},
+            {1'023, StorageSizeUnit::Binary, 4, L"1023B"},
+            {1'024, StorageSizeUnit::Binary, 4, L"1KiB"},
+            {1'536, StorageSizeUnit::Binary, 4, L"1.5KiB"},
+            {44'000, StorageSizeUnit::Binary, 4, L"42.97KiB"},
+            {1'610'612'736, StorageSizeUnit::Binary, 4, L"1.5GiB"},
+            {8ULL << 30, StorageSizeUnit::Binary, 4, L"8GiB"},
+            {1ULL << 40, StorageSizeUnit::Binary, 4, L"1TiB"},
+            {1ULL << 50, StorageSizeUnit::Binary, 4, L"1PiB"},
+            {1'536, StorageSizeUnit::Binary, 3, L"1.5KiB"},
+            {1'000, StorageSizeUnit::Decimal, 4, L"1kB"},
+            {1'610'612'736, StorageSizeUnit::Decimal, 4, L"1.611GB"},
         };
 
         for (const auto& TestCase : TestCases)
         {
-            VERIFY_ARE_EQUAL(TestCase.Expected, FormatStorageSize(TestCase.Bytes, TestCase.Unit, TestCase.DecimalPlaces, TestCase.IncludeSpace));
+            VERIFY_ARE_EQUAL(TestCase.Expected, FormatHumanReadableSize(TestCase.Bytes, TestCase.Precision, TestCase.Unit));
+        }
+    }
+
+    // Image sizes are rendered with three significant digits, base 1000, no space, and "kB" rather
+    // than "KB".
+    TEST_METHOD(FormatHumanReadableSize_MatchesImageSizePrecision)
+    {
+        const std::vector<std::pair<uint64_t, std::wstring>> TestCases{
+            {0, L"0B"},
+            {999, L"999B"},
+            {1'000, L"1kB"},
+            {1'500, L"1.5kB"},
+            {7'050'000, L"7.05MB"},
+            {119'856'765, L"120MB"},
+            {1'090'000'000, L"1.09GB"},
+            {1'000'000'000'000ULL, L"1TB"},
+        };
+
+        for (const auto& [bytes, expected] : TestCases)
+        {
+            VERIFY_ARE_EQUAL(expected, FormatHumanReadableSize(bytes));
         }
 
-        VERIFY_ARE_EQUAL(std::wstring{L"119.86 MB"}, FormatBytes(119'856'765));
+        // Three significant digits switch to exponent form just below the next unit, matching Go's %g.
+        VERIFY_ARE_EQUAL(std::wstring{L"1e+03MB"}, FormatHumanReadableSize(999'900'000));
+    }
+
+    TEST_METHOD(FormatHumanReadableSize_SupportsReclaimedSpacePrecision)
+    {
+        const std::vector<std::pair<uint64_t, std::wstring>> TestCases{
+            {0, L"0B"},
+            {999, L"999B"},
+            {12'288, L"12.29kB"},
+            {119'856'765, L"119.9MB"},
+            {1'090'000'000, L"1.09GB"},
+        };
+
+        for (const auto& [bytes, expected] : TestCases)
+        {
+            VERIFY_ARE_EQUAL(expected, FormatHumanReadableSize(bytes, 4));
+        }
     }
 
     TEST_METHOD(StorageSize_BytesToTextRoundTrips)
     {
-        const auto VerifyRoundTrip = [](uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace = false) {
-            const auto text = FormatStorageSize(Bytes, Unit, DecimalPlaces, IncludeSpace);
+        // The parser accepts suffixes up to peta, matching docker's unit map, so the round trip is
+        // only defined below one exabyte.
+        const auto VerifyRoundTrip = [](uint64_t Bytes, StorageSizeUnit Unit, uint32_t Precision) {
+            const auto text = FormatHumanReadableSize(Bytes, Precision, Unit);
             VERIFY_ARE_EQUAL(std::optional<uint64_t>{Bytes}, ParseStorageSize(text, Unit));
         };
 
-        VerifyRoundTrip(0, StorageSizeUnit::Decimal, 0);
-        VerifyRoundTrip(32, StorageSizeUnit::Decimal, 0, true);
-        VerifyRoundTrip(1'500, StorageSizeUnit::Decimal, 1);
-        VerifyRoundTrip(1'536, StorageSizeUnit::Binary, 1);
-        VerifyRoundTrip(1'000'000'000'000'000'000ULL, StorageSizeUnit::Decimal, 2);
-        VerifyRoundTrip(1ULL << 60, StorageSizeUnit::Binary, 2);
+        VerifyRoundTrip(0, StorageSizeUnit::Decimal, 3);
+        VerifyRoundTrip(32, StorageSizeUnit::Decimal, 3);
+        VerifyRoundTrip(1'500, StorageSizeUnit::Decimal, 3);
+        VerifyRoundTrip(1'536, StorageSizeUnit::Binary, 3);
+        VerifyRoundTrip(1'250'000'000'000ULL, StorageSizeUnit::Decimal, 4);
+        VerifyRoundTrip(1ULL << 50, StorageSizeUnit::Binary, 4);
 
         uint64_t decimalFactor = 1'000;
         uint64_t binaryFactor = 1'024;
         for (size_t index = 0; index < 5; ++index)
         {
-            VerifyRoundTrip(32 * decimalFactor, StorageSizeUnit::Decimal, 0);
-            VerifyRoundTrip(32 * binaryFactor, StorageSizeUnit::Binary, 0, true);
+            VerifyRoundTrip(32 * decimalFactor, StorageSizeUnit::Decimal, 3);
+            VerifyRoundTrip(32 * binaryFactor, StorageSizeUnit::Binary, 3);
             decimalFactor *= 1'000;
             binaryFactor *= 1'024;
         }
@@ -255,18 +297,18 @@ class StringUnitTests
     TEST_METHOD(StorageSize_TextToBytesRoundTrips)
     {
         const std::vector<StorageSizeTextRoundTripCase> TestCases{
-            {L"0B", StorageSizeUnit::Decimal, 0, false},
-            {L"32 B", StorageSizeUnit::Decimal, 0, true},
-            {L"32KB", StorageSizeUnit::Decimal, 0, false},
-            {L"32.5MB", StorageSizeUnit::Decimal, 1, false},
-            {L"1GB", StorageSizeUnit::Decimal, 0, false},
-            {L"1.25TB", StorageSizeUnit::Decimal, 2, false},
-            {L"1PB", StorageSizeUnit::Decimal, 0, false},
-            {L"32KiB", StorageSizeUnit::Binary, 0, false},
-            {L"1.5MiB", StorageSizeUnit::Binary, 1, false},
-            {L"1GiB", StorageSizeUnit::Binary, 0, false},
-            {L"1.25 TiB", StorageSizeUnit::Binary, 2, true},
-            {L"1PiB", StorageSizeUnit::Binary, 0, false},
+            {L"0B", StorageSizeUnit::Decimal, 3},
+            {L"32B", StorageSizeUnit::Decimal, 3},
+            {L"32kB", StorageSizeUnit::Decimal, 3},
+            {L"32.5MB", StorageSizeUnit::Decimal, 3},
+            {L"1GB", StorageSizeUnit::Decimal, 3},
+            {L"1.25TB", StorageSizeUnit::Decimal, 3},
+            {L"1PB", StorageSizeUnit::Decimal, 3},
+            {L"32KiB", StorageSizeUnit::Binary, 3},
+            {L"1.5MiB", StorageSizeUnit::Binary, 3},
+            {L"1GiB", StorageSizeUnit::Binary, 3},
+            {L"1.25TiB", StorageSizeUnit::Binary, 3},
+            {L"1PiB", StorageSizeUnit::Binary, 3},
         };
 
         for (const auto& TestCase : TestCases)
@@ -274,7 +316,7 @@ class StringUnitTests
             const auto bytes = ParseStorageSize(TestCase.Text, TestCase.Unit);
             VERIFY_IS_TRUE(bytes.has_value());
 
-            const auto text = FormatStorageSize(bytes.value(), TestCase.Unit, TestCase.DecimalPlaces, TestCase.IncludeSpace);
+            const auto text = FormatHumanReadableSize(bytes.value(), TestCase.Precision, TestCase.Unit);
             VERIFY_ARE_EQUAL(TestCase.Text, text);
             VERIFY_ARE_EQUAL(bytes, ParseStorageSize(text, TestCase.Unit));
         }

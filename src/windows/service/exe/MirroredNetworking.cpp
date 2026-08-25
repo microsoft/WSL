@@ -667,41 +667,41 @@ try
         WI_ASSERT(WI_IsFlagSet(callbackFlags, wsl::core::networking::GnsCallbackFlags::Wait));
     }
 
-    auto sendGnsMessage =
-        [this, messageType, capturedNotificationString = std::move(notificationString), callbackFlags, returnedValueFromGns]() mutable {
-            try
-            {
-                auto retryCount = 0ul;
-                // RetryWithTimeout throws if fails after the timeout has elapsed - which is caught and returned by m_gnsMessageQueue below
-                return wsl::shared::retry::RetryWithTimeout<HRESULT>(
-                    [&]() {
-                        const auto hr = wil::ResultFromException([&] {
-                            if (returnedValueFromGns && WI_IsFlagSet(callbackFlags, wsl::core::networking::GnsCallbackFlags::Wait))
-                            {
-                                *returnedValueFromGns =
-                                    m_gnsChannel.SendNetworkDeviceMessageReturnResult(messageType, capturedNotificationString.c_str());
-                            }
-                            else
-                            {
-                                m_gnsChannel.SendNetworkDeviceMessage(messageType, capturedNotificationString.c_str());
-                            }
-                        });
-                        WSL_LOG(
-                            "MirroredNetworking::NetworkManagerGnsMessageCallback",
-                            TraceLoggingValue(ToString(messageType), "messageType"),
-                            TraceLoggingValue(capturedNotificationString.c_str(), "notificationString"),
-                            TraceLoggingValue(hr, "hr"),
-                            TraceLoggingValue(returnedValueFromGns ? *returnedValueFromGns : 0xFFFFFFFF, "returnedValueFromGns"),
-                            TraceLoggingValue(retryCount, "retryCount"));
+    auto sendGnsMessage = [this, messageType, capturedNotificationString = std::move(notificationString), callbackFlags, returnedValueFromGns]() mutable {
+        try
+        {
+            auto retryCount = 0ul;
+            auto sendMessage = [&]() {
+                const auto hr = wil::ResultFromException([&] {
+                    if (returnedValueFromGns && WI_IsFlagSet(callbackFlags, wsl::core::networking::GnsCallbackFlags::Wait))
+                    {
+                        *returnedValueFromGns =
+                            m_gnsChannel.SendNetworkDeviceMessageReturnResult(messageType, capturedNotificationString.c_str());
+                    }
+                    else
+                    {
+                        m_gnsChannel.SendNetworkDeviceMessage(messageType, capturedNotificationString.c_str());
+                    }
+                });
+                const bool hasLinuxResult = returnedValueFromGns != nullptr;
+                const int linuxResultCode = hasLinuxResult ? *returnedValueFromGns : 0;
+                WSL_LOG(
+                    "MirroredNetworking::NetworkManagerGnsMessageCallback",
+                    TraceLoggingValue(ToString(messageType), "messageType"),
+                    TraceLoggingValue(capturedNotificationString.c_str(), "notificationString"),
+                    TraceLoggingValue(hr, "hr"),
+                    TraceLoggingValue(hasLinuxResult, "hasLinuxResult"),
+                    TraceLoggingValue(linuxResultCode, "linuxResultCode"),
+                    TraceLoggingValue(retryCount, "retryCount"));
 
-                        ++retryCount;
-                        return hr;
-                    },
-                    std::chrono::milliseconds(100),
-                    std::chrono::seconds(3));
-            }
-            CATCH_RETURN()
-        };
+                ++retryCount;
+                return networking::GetGnsCallbackResult(messageType, hr, linuxResultCode);
+            };
+
+            return wsl::shared::retry::RetryWithTimeout<HRESULT>(sendMessage, std::chrono::milliseconds(100), std::chrono::seconds(3));
+        }
+        CATCH_RETURN()
+    };
 
     if (WI_IsFlagSet(callbackFlags, wsl::core::networking::GnsCallbackFlags::Wait))
     {

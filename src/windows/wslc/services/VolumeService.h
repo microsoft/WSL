@@ -24,7 +24,8 @@ struct VolumeService
 {
     static WSLCVolumeInformation Create(models::Session& session, const models::CreateVolumeOptions& createOptions);
     static void Delete(models::Session& session, const std::string& name);
-    static std::vector<WSLCVolumeInformation> List(models::Session& session);
+    static std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> List(
+        models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
     static wsl::windows::common::wslc_schema::InspectVolume Inspect(models::Session& session, const std::string& name);
     static models::PruneVolumesResult Prune(
         Terminal& terminal, models::Session& session, bool all, const std::vector<std::pair<std::string, std::string>>& filters = {});

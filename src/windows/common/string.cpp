@@ -16,6 +16,7 @@ Abstract:
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <sstream>
 
 std::vector<std::string> wsl::windows::common::string::InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize)
 {
@@ -374,30 +375,26 @@ std::optional<uint64_t> wsl::windows::common::string::ParseStorageSize(std::wstr
     return static_cast<uint64_t>(bytes);
 }
 
-std::wstring wsl::windows::common::string::FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace)
+std::wstring wsl::windows::common::string::FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision, StorageSizeUnit Unit)
 {
-    constexpr size_t c_unitCount = 6;
-    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{L"B", L"KB", L"MB", L"GB", L"TB", L"PB"};
-    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB"};
+    constexpr size_t c_unitCount = 9;
+    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{
+        L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
+    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{
+        L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB", L"EiB", L"ZiB", L"YiB"};
 
     const double base = Unit == StorageSizeUnit::Decimal ? 1000.0 : 1024.0;
     const auto& units = Unit == StorageSizeUnit::Decimal ? c_decimalUnits : c_binaryUnits;
 
-    double value = static_cast<double>(Bytes);
+    auto value = static_cast<double>(Bytes);
     size_t unitIndex = 0;
     while (value >= base && unitIndex + 1 < c_unitCount)
     {
         value /= base;
-        ++unitIndex;
+        unitIndex++;
     }
 
-    const auto formattedValue = unitIndex == 0 ? std::to_wstring(Bytes) : std::format(L"{:.{}f}", value, DecimalPlaces);
-    return std::format(L"{}{}{}", formattedValue, IncludeSpace ? L" " : L"", units[unitIndex]);
-}
-
-std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
-{
-    return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
+    return std::format(L"{:.{}g}{}", value, Precision, units[unitIndex]);
 }
 
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)

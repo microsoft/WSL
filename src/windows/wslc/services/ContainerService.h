@@ -22,8 +22,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 struct ContainerService
 {
-    static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
-    static std::wstring FormatRelativeTime(ULONGLONG timestamp);
+    static std::wstring ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt = 0);
     static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
     static int Attach(Terminal& terminal, models::Session& session, const std::string& id);
     static int Run(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);
@@ -41,7 +40,7 @@ struct ContainerService
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
     static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
-    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail = 0);
+    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);
     static models::PruneContainersResult Prune(models::Session& session);
 };

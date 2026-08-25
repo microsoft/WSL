@@ -114,7 +114,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     auto timeEntry = parsed.find("time");
     THROW_HR_IF_MSG(
         E_INVALIDARG, timeEntry == parsed.end(), "Failed to parse time from event: %.*hs", static_cast<int>(event.size()), event.data());
-    std::uint64_t eventTime = timeEntry->get<std::uint64_t>();
+    std::int64_t eventTime = timeEntry->get<std::int64_t>();
 
     auto actionStr = action->get<std::string>();
 
@@ -154,10 +154,14 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     }
 }
 
-void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTime)
+void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
 {
     static std::map<std::string, ContainerEvent> events{
-        {"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}, {"destroy", ContainerEvent::Destroy}, {"exec_die", ContainerEvent::ExecDied}};
+        {"start", ContainerEvent::Start},
+        {"die", ContainerEvent::Stop},
+        {"destroy", ContainerEvent::Destroy},
+        {"exec_die", ContainerEvent::ExecDied},
+        {"restart", ContainerEvent::Restart}};
 
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
@@ -191,18 +195,26 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         }
     }
 
-    std::lock_guard lock{m_lock};
-
-    for (const auto& e : m_containerCallbacks)
+    // Snapshot the matching callbacks so that they can be invoked without holding m_lock. Callbacks can register and
+    // unregister callbacks (a container that stops releases its exec processes), which would otherwise mutate the
+    // vector being iterated.
+    std::vector<std::shared_ptr<ContainerCallback>> callbacks;
     {
-        if (e.ContainerId == containerId && (!e.ExecId.has_value() || e.ExecId == execId))
+        std::lock_guard lock{m_lock};
+
+        for (const auto& e : m_containerCallbacks)
         {
-            e.Callback(it->second, exitCode, eventTime);
+            if (e->ContainerId == containerId && (!e->ExecId.has_value() || e->ExecId == execId))
+            {
+                callbacks.emplace_back(e);
+            }
         }
     }
+
+    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTime); });
 }
 
-void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTime)
+void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
 {
     static std::map<std::string, VolumeEvent> events{{"create", VolumeEvent::Create}, {"destroy", VolumeEvent::Destroy}};
 
@@ -220,12 +232,13 @@ void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::
 
     auto volumeName = id->get<std::string>();
 
-    std::lock_guard lock{m_lock};
-
-    for (const auto& e : m_volumeCallbacks)
+    std::vector<std::shared_ptr<VolumeCallback>> callbacks;
     {
-        e.Callback(volumeName, it->second, eventTime);
+        std::lock_guard lock{m_lock};
+        callbacks = m_volumeCallbacks;
     }
+
+    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, it->second, eventTime); });
 }
 
 void DockerEventTracker::WaitForObjectCreated(const std::string& ObjectId)
@@ -257,10 +270,11 @@ void DockerEventTracker::WaitForObjectCreated(const std::string& ObjectId)
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerStateUpdates(
     const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept
 {
-    std::lock_guard lock{m_lock};
-
     auto id = m_callbackId++;
-    m_containerCallbacks.emplace_back(id, ContainerId, std::optional<std::string>{}, std::move(Callback));
+    auto entry = std::make_shared<ContainerCallback>(id, std::string{ContainerId}, std::optional<std::string>{}, std::move(Callback));
+
+    std::lock_guard lock{m_lock};
+    m_containerCallbacks.emplace_back(std::move(entry));
 
     return EventTrackingReference{this, id};
 }
@@ -268,39 +282,58 @@ DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainer
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterExecStateUpdates(
     const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept
 {
-    std::lock_guard lock{m_lock};
-
     auto id = m_callbackId++;
-    m_containerCallbacks.emplace_back(id, ContainerId, ExecId, std::move(Callback));
+    auto entry = std::make_shared<ContainerCallback>(id, std::string{ContainerId}, std::optional<std::string>{ExecId}, std::move(Callback));
+
+    std::lock_guard lock{m_lock};
+    m_containerCallbacks.emplace_back(std::move(entry));
 
     return EventTrackingReference{this, id};
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept
 {
-    std::lock_guard lock{m_lock};
-
     auto id = m_callbackId++;
-    m_volumeCallbacks.emplace_back(id, std::move(Callback));
+    auto entry = std::make_shared<VolumeCallback>(id, std::move(Callback));
+
+    std::lock_guard lock{m_lock};
+    m_volumeCallbacks.emplace_back(std::move(entry));
 
     return EventTrackingReference{this, id};
 }
 
 void DockerEventTracker::UnregisterCallback(size_t Id) noexcept
 {
-    std::lock_guard lock{m_lock};
+    std::shared_ptr<CallbackRegistration> registration;
 
-    // Try container callbacks first.
-    auto containerRemove = std::ranges::remove_if(m_containerCallbacks, [Id](auto& entry) { return entry.CallbackId == Id; });
-    if (!containerRemove.empty())
     {
-        WI_ASSERT(containerRemove.size() == 1);
-        m_containerCallbacks.erase(containerRemove.begin(), containerRemove.end());
-        return;
+        std::lock_guard lock{m_lock};
+
+        auto matches = [Id](const auto& e) { return e->CallbackId == Id; };
+
+        // Try container callbacks first, then volume callbacks.
+        if (auto container = std::ranges::find_if(m_containerCallbacks, matches); container != m_containerCallbacks.end())
+        {
+            registration = std::move(*container);
+            m_containerCallbacks.erase(container);
+        }
+        else
+        {
+            auto volume = std::ranges::find_if(m_volumeCallbacks, matches);
+            WI_ASSERT(volume != m_volumeCallbacks.end());
+
+            if (volume != m_volumeCallbacks.end())
+            {
+                registration = std::move(*volume);
+                m_volumeCallbacks.erase(volume);
+            }
+        }
     }
 
-    // Then volume callbacks.
-    auto volumeRemove = std::ranges::remove_if(m_volumeCallbacks, [Id](auto& entry) { return entry.CallbackId == Id; });
-    WI_ASSERT(volumeRemove.size() == 1);
-    m_volumeCallbacks.erase(volumeRemove.begin(), volumeRemove.end());
+    if (registration)
+    {
+        // Wait for any in-flight invocation to complete so the callback can't run once this returns.
+        std::lock_guard invokeLock{registration->InvokeLock};
+        registration->Unregistered = true;
+    }
 }

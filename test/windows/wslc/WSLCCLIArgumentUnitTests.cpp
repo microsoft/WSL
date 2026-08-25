@@ -22,6 +22,7 @@ Abstract:
 #include "ImageService.h"
 #include "JsonUtils.h"
 #include "Exceptions.h"
+#include <chrono>
 #include <wslc.h>
 
 using namespace wsl::windows::wslc;
@@ -33,6 +34,8 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLIArgumentUnitTests {
+namespace mount = wsl::windows::common::mount;
+
 using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
 
 static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
@@ -410,6 +413,22 @@ class WSLCCLIArgumentUnitTests
         // string -> int64_t (nano CPUs)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Cpus>(L"1.5"), validation::GetNanoCpusFromString(L"1.5"));
 
+        // mount strings -> mount::Spec
+        {
+            const auto volume = ValidateAndGetCached<ArgType::Volume>(LR"(C:\hostPath:/containerPath)");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Bind), static_cast<int>(volume.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(volume.BindSource));
+
+            const auto tmpfs = ValidateAndGetCached<ArgType::TMPFS>(L"/tmp:size=64k");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Tmpfs), static_cast<int>(tmpfs.MountType));
+            VERIFY_IS_TRUE(tmpfs.TmpfsOptions.has_value());
+            VERIFY_ARE_EQUAL(std::string("size=64k"), tmpfs.TmpfsOptions.value());
+
+            const auto structured = ValidateAndGetCached<ArgType::Mount>(L"type=volume,source=data-volume,target=/data");
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Volume), static_cast<int>(structured.MountType));
+            VERIFY_ARE_EQUAL(std::wstring(L"data-volume"), structured.Source);
+        }
+
         // string -> tuple<name, soft, hard> (ulimit)
         auto ulimit = ValidateAndGetCached<ArgType::Ulimit>(L"nofile=1024:2048");
         VERIFY_ARE_EQUAL(std::get<0>(ulimit), std::string("nofile"));
@@ -544,7 +563,6 @@ class WSLCCLIArgumentUnitTests
 
         const std::vector<Case> cases = {
             {ArgType::Gpus, L"all"},
-            {ArgType::Volume, LR"(C:\hostPath:/containerPath)"},
             {ArgType::WorkDir, L"/app"},
             {ArgType::NetworkAlias, L"myalias"},
         };
@@ -715,36 +733,114 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ValidateTimestamp_ValidUnixEpochSeconds)
     {
         // Integer timestamps should parse directly
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0"), 0ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1700000000"), 1700000000ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1"), 1ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999999999"), 9999999999ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0"), 0LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1700000000"), 1700000000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1"), 1LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999999999"), 9999999999LL);
     }
 
     TEST_METHOD(ValidateTimestamp_ValidRfc3339_UTC)
     {
         // Basic UTC timestamps with Z suffix
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00Z"), 1705314600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1970-01-01T00:00:00Z"), 0ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00z"), 1705314600ULL); // lowercase z
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1970-01-01T00:00:00Z"), 0LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00z"), 1705314600LL); // lowercase z
     }
 
     TEST_METHOD(ValidateTimestamp_ValidRfc3339_WithOffset)
     {
         // Timestamps with timezone offsets (+HH:MM / -HH:MM)
         // 2024-01-15T10:30:00+05:30 = 2024-01-15T05:00:00Z = 1705294800
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+05:30"), 1705294800ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+05:30"), 1705294800LL);
         // 2024-01-15T10:30:00-05:00 = 2024-01-15T15:30:00Z = 1705332600
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00-05:00"), 1705332600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+00:00"), 1705314600ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00-05:00"), 1705332600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+00:00"), 1705314600LL);
     }
 
     TEST_METHOD(ValidateTimestamp_ValidRfc3339_FractionalSeconds)
     {
         // Fractional seconds should be consumed (truncated to seconds)
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123Z"), 1705314600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123456789Z"), 1705314600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.1+05:30"), 1705294800ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123456789Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.1+05:30"), 1705294800LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidPreEpoch)
+    {
+        // No lower bound is applied, so pre-1970 values convert to a negative epoch.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1960-01-15T10:30:00Z"), -314371800LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0001-01-01T00:00:00Z"), -62135596800LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"-314371800"), -314371800LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_OutsideNanosecondRange)
+    {
+        // Values beyond the range of a nanosecond representation still convert exactly.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1600-01-01T00:00:00Z"), -11676096000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2300-01-01T00:00:00Z"), 10413792000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999-12-31T23:59:59Z"), 253402300799LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidZoneLessLocalTime)
+    {
+        // A value with no zone designator is resolved against the local UTC offset.
+        const auto offset = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::current_zone()->get_info(std::chrono::system_clock::now()).offset)
+                                .count();
+        const auto expected = 1705314600LL - offset;
+
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00"), expected);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123"), expected);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidPartialAndDateOnly)
+    {
+        // Hour-only, minute-only and date-only values are padded out to a full time.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15"), validation::GetTimestampFromString(L"2024-01-15T00:00:00"));
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10"), validation::GetTimestampFromString(L"2024-01-15T10:00:00"));
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30"), validation::GetTimestampFromString(L"2024-01-15T10:30:00"));
+
+        // The same padding applies when an explicit zone is present.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10Z"), 1705312800LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15Z"), 1705276800LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidGoDuration)
+    {
+        const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        // Durations are measured back from the current time, so allow a small window for the clock
+        // to advance while the test runs.
+        auto verifyDuration = [&](LPCWSTR value, LONGLONG expectedOffset) {
+            const auto parsed = validation::GetTimestampFromString(value);
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(parsed, now - expectedOffset);
+            VERIFY_IS_LESS_THAN_OR_EQUAL(parsed, now - expectedOffset + 30);
+        };
+
+        verifyDuration(L"10m", 600LL);
+        verifyDuration(L"1h30m", 5400LL);
+        verifyDuration(L"90s", 90LL);
+        verifyDuration(L"1.5h", 5400LL);
+        verifyDuration(L"2h45m30s", 9930LL);
+
+        // A negative duration selects a time in the future.
+        verifyDuration(L"-1h", -3600LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_SubSecondGoDuration)
+    {
+        // A sub-second duration is applied before the value is truncated, so a negative one still
+        // resolves at or after the current second rather than being rounded away.
+        const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        const auto future = validation::GetTimestampFromString(L"-500ms");
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(future, now);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(future, now + 30);
+
+        const auto past = validation::GetTimestampFromString(L"500ms");
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(past, now - 1);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(past, now + 30);
     }
 
     TEST_METHOD(ValidateTimestamp_InvalidRfc3339_Rejected)
@@ -755,10 +851,6 @@ class WSLCCLIArgumentUnitTests
         VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T25:30:00Z"), ArgumentException);
         // Invalid day (Feb 31)
         VERIFY_THROWS(validation::GetTimestampFromString(L"2024-02-31T10:30:00Z"), ArgumentException);
-        // Missing timezone
-        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00"), ArgumentException);
-        // Date only (no time)
-        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15"), ArgumentException);
         // Trailing characters
         VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00Zextra"), ArgumentException);
         // +HHMM without colon (not supported by %Ez)
@@ -768,8 +860,9 @@ class WSLCCLIArgumentUnitTests
         // Random text
         VERIFY_THROWS(validation::GetTimestampFromString(L"abc"), ArgumentException);
         VERIFY_THROWS(validation::GetTimestampFromString(L"not-a-timestamp"), ArgumentException);
-        // Negative epoch (pre-1970)
-        VERIFY_THROWS(validation::GetTimestampFromString(L"1960-01-15T10:30:00Z"), ArgumentException);
+        // Duration with no unit
+        VERIFY_THROWS(validation::GetTimestampFromString(L"10x"), ArgumentException);
+        VERIFY_THROWS(validation::GetTimestampFromString(L"1h30"), ArgumentException);
     }
 };
 } // namespace WSLCCLIArgumentUnitTests

@@ -29,6 +29,8 @@ Abstract:
 #include <wslc.h>
 
 namespace wsl::windows::wslc::services {
+namespace mount = wsl::windows::common::mount;
+
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using namespace wsl::windows::common::wslutil;
@@ -103,6 +105,18 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
+    if (options.IpAddress.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), options.Networks.empty());
+
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpAmbiguousWithMultipleNetworks(), options.Networks.size() > 1);
+
+        const auto& primary = options.Networks.front().Name;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcIpRequiresUserDefinedNetwork(), !SupportsNetworkAliases(primary));
+
+        containerLauncher.SetPrimaryNetworkIpAddress(std::string(options.IpAddress.value()));
+    }
+
     if (!options.Networks.empty())
     {
         const auto& primary = options.Networks.front();
@@ -148,20 +162,9 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         }
     }
 
-    // Add volumes if specified
-    for (const auto& volumeSpec : options.Volumes)
+    for (const auto& mountSpec : options.Mounts)
     {
-        auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = volume.Host();
-        auto container = volume.ContainerPath();
-        if (volume.IsNamedVolume())
-        {
-            containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
-        }
-        else
-        {
-            containerLauncher.AddVolume(host, container, volume.IsReadOnly());
-        }
+        containerLauncher.AddMount(mountSpec);
     }
 
     containerLauncher.SetContainerFlags(containerFlags);
@@ -268,12 +271,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
     }
 
-    for (const auto& tmpfsSpec : options.Tmpfs)
-    {
-        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
-        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
-    }
-
     for (const auto& [key, value] : options.Labels)
     {
         containerLauncher.AddLabel(key, value);
@@ -300,58 +297,6 @@ static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping&
         .Protocol = static_cast<int>(mapping.Protocol),
         .BindingAddress = mapping.BindingAddress,
     };
-}
-
-std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
-{
-    if (timestamp == 0)
-    {
-        return L"";
-    }
-
-    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
-    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
-    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
-    constexpr LONGLONG SecondsPerWeek = SecondsPerDay * 7;
-    constexpr LONGLONG SecondsPerMonth = SecondsPerDay * 30;
-    constexpr LONGLONG SecondsPerYear = SecondsPerDay * 365;
-
-    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
-    if (elapsed < 0)
-    {
-        elapsed = 0;
-    }
-
-    auto pluralize = [](LONGLONG count, const wchar_t* singular, const wchar_t* plural) {
-        return std::format(L"{} {} ago", count, (count == 1 ? singular : plural));
-    };
-
-    if (elapsed < SecondsPerMinute)
-    {
-        return pluralize(elapsed, L"second", L"seconds");
-    }
-    else if (elapsed < SecondsPerHour)
-    {
-        return pluralize(elapsed / SecondsPerMinute, L"minute", L"minutes");
-    }
-    else if (elapsed < SecondsPerDay)
-    {
-        return pluralize(elapsed / SecondsPerHour, L"hour", L"hours");
-    }
-    else if (elapsed < SecondsPerWeek)
-    {
-        return pluralize(elapsed / SecondsPerDay, L"day", L"days");
-    }
-    else if (elapsed < SecondsPerMonth)
-    {
-        return pluralize(elapsed / SecondsPerWeek, L"week", L"weeks");
-    }
-    else if (elapsed < SecondsPerYear)
-    {
-        return pluralize(elapsed / SecondsPerMonth, L"month", L"months");
-    }
-
-    return pluralize(elapsed / SecondsPerYear, L"year", L"years");
 }
 
 int ContainerService::Attach(Terminal& terminal, Session& session, const std::string& id)
@@ -395,7 +340,7 @@ int ContainerService::Attach(Terminal& terminal, Session& session, const std::st
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt)
+std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt)
 {
     std::wstring stateString;
     switch (state)
@@ -423,7 +368,7 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
         return stateString;
     }
 
-    return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
+    return std::format(L"{} {}", stateString, wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt));
 }
 
 std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
@@ -705,7 +650,7 @@ void ContainerService::CopyFromContainer(Session& session, const std::string& id
     THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, ULONGLONG since, ULONGLONG until, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
