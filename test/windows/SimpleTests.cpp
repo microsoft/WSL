@@ -193,31 +193,34 @@ class SimpleTests
             VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(wideString.c_str()));
         }
 
-        // Test wsl::shared::string::ParseMemoryString
-        const std::vector<std::pair<LPCSTR, std::optional<uint64_t>>> testCases{
-            {"0", 0},
-            {"1", 1},
-            {" 1", 1},
-            {"1B", 1},
-            {"1K", 1024},
-            {"1KB", 1024},
-            {"2M", 2 * 1024 * 1024},
-            {"100MB", 100 * 1024 * 1024},
-            {"9G", 9 * 1024ULL * 1024ULL * 1024ULL},
-            {"44GB", 44 * 1024ULL * 1024ULL * 1024ULL},
-            {"1TB", 1ULL << 40},
-            {"2T", 2ULL << 40},
-            {"1 B", std::nullopt},
+        // With AllowExtendedForms the single-letter "t"/"f" forms (case-insensitive) are also
+        // recognized, matching Go's strconv.ParseBool (and therefore the Docker CLI). Every
+        // form accepted by default must still parse identically in extended mode.
+        std::vector<std::pair<LPCSTR, std::optional<bool>>> extendedBoolTests = {
+            {"1", true},
+            {"0", false},
+            {"true", true},
+            {"false", false},
+            {"True", true},
+            {"False", false},
+            {"t", true},
+            {"T", true},
+            {"f", false},
+            {"F", false},
             {nullptr, std::nullopt},
             {"", std::nullopt},
-            {"foo", std::nullopt}};
+            {"2", std::nullopt},
+            {"tr", std::nullopt},
+            {"true_", std::nullopt},
+            {"false_", std::nullopt},
+        };
 
-        for (const auto& [input, expected] : testCases)
+        for (const auto& [input, expected] : extendedBoolTests)
         {
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(input), expected);
+            VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(input, true));
 
-            const auto wideInput = wsl::shared::string::MultiByteToWide(input);
-            VERIFY_ARE_EQUAL(wsl::shared::string::ParseMemorySize(wideInput.c_str()), expected);
+            std::wstring wideString = wsl::shared::string::MultiByteToWide(input);
+            VERIFY_ARE_EQUAL(expected, wsl::shared::string::ParseBool(wideString.c_str(), true));
         }
 
         // Test wsl::shared::string GUID helpers
@@ -259,6 +262,41 @@ class SimpleTests
         auto upperCaseGuidStringWide = wideGuidStringNoBraces;
         std::transform(upperCaseGuidStringWide.begin(), upperCaseGuidStringWide.end(), upperCaseGuidStringWide.begin(), toupper);
         VERIFY_ARE_EQUAL(upperCaseGuidStringWide, wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::Uppercase));
+
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(std::string{" \tvalue\r\n"}), std::string{"value"});
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(std::string{" \t\r\n"}), std::string{});
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(std::wstring{L" \tvalue\r\n"}), std::wstring{L"value"});
+
+        const std::vector<std::pair<std::string, std::string>> shellStrings{
+            {"", ""},
+            {"plain", "plain"},
+            {"\"\"", ""},
+            {"''", ""},
+            {"\"double quoted\"", "double quoted"},
+            {"'single quoted'", "single quoted"},
+            {"one' two'\" three\"", "one two three"},
+            {"escaped\\ value", "escaped value"},
+            {"escaped\\q", "escapedq"},
+            {"escaped\\'quote", "escaped'quote"},
+            {"abc\\\nedf", "abcedf"},
+            {"\"abc\\\nedf\"", "abcedf"},
+            {"'abc\\\nedf'", "abc\\\nedf"},
+            {"\"escaped \\\"quote\\\" and \\\\ slash\"", "escaped \"quote\" and \\ slash"},
+            {"\"escaped \\$dollar and \\`backtick\"", "escaped $dollar and `backtick"},
+            {"\"literal \\q\"", "literal \\q"},
+            {"'literal \\ value'", "literal \\ value"},
+            {"unterminated'", "unterminated'"},
+            {"\"unterminated", "\"unterminated"},
+            {"trailing\\", "trailing\\"},
+            {"\"trailing\\", "\"trailing\\"}};
+
+        for (const auto& [input, expected] : shellStrings)
+        {
+            VERIFY_ARE_EQUAL(wsl::shared::string::UnescapeShell(input), expected);
+            VERIFY_ARE_EQUAL(
+                wsl::shared::string::UnescapeShell(wsl::shared::string::MultiByteToWide(input)),
+                wsl::shared::string::MultiByteToWide(expected));
+        }
     }
 
     TEST_METHOD(WindowsPathWithSpaces)

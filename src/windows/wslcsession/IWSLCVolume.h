@@ -40,6 +40,9 @@ public:
     // The user-specified labels on this volume (excludes the WSLC metadata label).
     virtual const std::map<std::string, std::string>& Labels() const noexcept = 0;
 
+    // The path at which the volume is mounted inside the utility VM.
+    virtual const std::string& Mountpoint() const noexcept = 0;
+
     // The status of the volume as {Code, Message}: S_OK with an empty message when the volume
     // opened successfully and is usable, otherwise a failure HRESULT and a human-readable reason
     // (e.g. the backing VHD is missing).

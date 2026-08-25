@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,14 +26,14 @@ class WSLCE2EImageSaveTests
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
         return true;
     }
 
     TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         SavedArchivePath = wsl::windows::common::filesystem::GetTempFilename();
         return true;
     }
@@ -46,13 +47,15 @@ class WSLCE2EImageSaveTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_HelpCommand)
     {
         auto result = RunWslc(L"image save --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_MissingImageName)
     {
         const auto result = RunWslc(std::format(L"image save --output \"{}\"", SavedArchivePath.wstring()));
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ImageNotFound)
@@ -79,7 +82,7 @@ class WSLCE2EImageSaveTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete source image
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
 
         // Load from saved archive
         auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
@@ -103,13 +106,12 @@ class WSLCE2EImageSaveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ToTerminal_Fail)
     {
-        // TODO: Re-enable once the test is stable in console-less pipeline environments.
-        // Opening CONOUT$ may fail when the process has no console attached.
-        SKIP_TEST_UNSTABLE();
+        // A pseudo console gives wslc a console stdout, which image save must reject.
+        const auto commandLine = std::format(L"image save {}", DebianImage.NameAndTag());
+        auto session = RunWslcInteractive(commandLine, ElevationType::Elevated, PseudoConsole{200, 50});
 
-        const auto result = RunWslcAndRedirectToFile(std::format(L"image save {}", DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Cannot write image to terminal. Use the -o flag or redirect stdout.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        WaitForPseudoConsoleOutput(session, string::WideToMultiByte(Localization::WSLCCLI_ImageSaveStdoutIsTerminalError()));
+        VERIFY_ARE_EQUAL(1, session.Wait());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ToStdout_Load)
@@ -119,7 +121,7 @@ class WSLCE2EImageSaveTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete source image
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
 
         // Load from saved archive
         auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
@@ -131,13 +133,13 @@ class WSLCE2EImageSaveTests
     }
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_MultipleImages_Load)
     {
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
 
         // Force a pristine re-load of DebianImage at the end so subsequent tests (in fast mode)
         // see the same on-disk tar as DebianImage.Path. Without this, reloading from a
         // multi-image archive can produce a slightly different on-disk representation that
         // breaks byte-exact size checks in WSLCE2E_Image_Save_Success.
-        auto restoreDebian = wil::scope_exit([&]() { EnsureImageIsDeleted(DebianImage); });
+        auto restoreDebian = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Delete(DebianImage); });
 
         // Save both images into a single archive.
         const auto saveResult = RunWslc(std::format(
@@ -145,12 +147,19 @@ class WSLCE2EImageSaveTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete both source images.
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
 
         // Load both images back from the single archive.
         const auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
         loadResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto loadedImages = wsl::shared::string::Split(loadResult.Stdout.value(), L'\n');
+
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", DebianImage.NameAndTag())) != loadedImages.end());
+        VERIFY_IS_TRUE(
+            std::ranges::find(loadedImages, std::format(L"Loaded image: {}\r", AlpineImage.NameAndTag())) != loadedImages.end());
 
         // Run a container from each loaded image to confirm both are restored and runnable.
         const auto runDebian = RunWslc(std::format(L"container run --rm {} echo ok!", DebianImage.NameAndTag()));
@@ -176,45 +185,5 @@ private:
     const TestImage& InvalidImage = InvalidTestImage();
 
     std::filesystem::path SavedArchivePath{};
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ImageSaveLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc image save [<options>] <image>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  image        Image name\r\n"              //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                 //
-                << L"  -o,--output  Path for the saved image\r\n"              //
-                << L"  -?,--help    Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

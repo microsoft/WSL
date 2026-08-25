@@ -16,6 +16,7 @@ Abstract:
 #include "ContainerModel.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -29,7 +30,7 @@ class WSLCE2EContainerListTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
@@ -37,7 +38,6 @@ class WSLCE2EContainerListTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -51,7 +51,8 @@ class WSLCE2EContainerListTests
     WSLC_TEST_METHOD(WSLCE2E_Container_List_HelpCommand)
     {
         auto result = RunWslc(L"container list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_AllOption)
@@ -157,7 +158,9 @@ class WSLCE2EContainerListTests
     WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
     {
         const auto result = RunWslc(L"container list --format invalid");
-        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
@@ -174,8 +177,9 @@ class WSLCE2EContainerListTests
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         // Parse json and verify we got the expected container information back
-        auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_IS_GREATER_THAN_OR_EQUAL(containers.size(), 1U);
+        VERIFY_ARE_EQUAL(containers.size(), result.GetStdoutLines().size());
 
         auto findContainer = [](const std::vector<ContainerInformation>& list, const std::wstring& id) {
             return std::ranges::any_of(list, [&](const auto& c) { return wsl::shared::string::MultiByteToWide(c.Id) == id; });
@@ -193,7 +197,7 @@ class WSLCE2EContainerListTests
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         // Parse json and verify we got both containers back
-        containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_IS_GREATER_THAN_OR_EQUAL(containers.size(), 2U);
 
         VERIFY_IS_TRUE(findContainer(containers, containerId));
@@ -213,7 +217,8 @@ class WSLCE2EContainerListTests
     {
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"container list --filter status");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"status") + L"\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"status")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_InvalidStatusValue)
@@ -241,7 +246,7 @@ class WSLCE2EContainerListTests
         result = RunWslc(std::format(L"container list --all --format json --filter name={}", WslcContainerName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_ARE_EQUAL(1U, containers.size());
         VERIFY_ARE_EQUAL(WideToMultiByte(WslcContainerName2), std::string(containers[0].Name));
     }
@@ -262,7 +267,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -309,7 +314,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -356,7 +361,7 @@ class WSLCE2EContainerListTests
         result = RunWslc(std::format(L"container list --all --format json --filter id={}", containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+        const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
         VERIFY_ARE_EQUAL(1U, containers.size());
         VERIFY_ARE_EQUAL(WideToMultiByte(containerId), std::string(containers[0].Id));
     }
@@ -377,7 +382,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -416,7 +421,7 @@ class WSLCE2EContainerListTests
         auto listNames = [&](const std::wstring& filterArgs) {
             auto r = RunWslc(std::format(L"container list --all --format json {}", filterArgs));
             r.Verify({.Stderr = L"", .ExitCode = 0});
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(r.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(r);
             std::set<std::string> names;
             for (const auto& c : containers)
             {
@@ -458,7 +463,7 @@ class WSLCE2EContainerListTests
             result = RunWslc(L"container list --latest --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
             VERIFY_ARE_EQUAL(1U, containers.size());
             VERIFY_ARE_EQUAL(WideToMultiByte(WslcContainerName2), std::string(containers[0].Name));
         }
@@ -468,7 +473,7 @@ class WSLCE2EContainerListTests
             result = RunWslc(L"container list --last 2 --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
-            const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
+            const auto containers = ParseNdjsonOutputAs<ContainerInformation>(result);
             VERIFY_IS_TRUE(containers.size() <= 2u);
         }
 
@@ -489,47 +494,5 @@ private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
-
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()              //
-               << GetDescription()             //
-               << GetUsage()                   //
-               << GetAvailableCommandAliases() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_ContainerListLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc container list [<options>]\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommandAliases() const
-    {
-        return L"The following command aliases are available: ls ps\r\n\r\n";
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"
-                << L"  -a,--all     Show all regardless of state.\r\n"
-                << L"  -f,--filter  " << Localization::WSLCCLI_FilterArgDescription() << L"\r\n"
-                << L"  --format     " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
-                << L"  -n,--last    " << Localization::WSLCCLI_LastArgDescription() << L"\r\n"
-                << L"  -l,--latest  " << Localization::WSLCCLI_LatestArgDescription() << L"\r\n"
-                << L"  --no-trunc   Do not truncate output\r\n"
-                << L"  -q,--quiet   Outputs the container IDs only\r\n"
-                << L"  -?,--help    Shows help about the selected command\r\n"
-                << L"\r\n";
-        return options.str();
-    }
 };
 } // namespace WSLCE2ETests

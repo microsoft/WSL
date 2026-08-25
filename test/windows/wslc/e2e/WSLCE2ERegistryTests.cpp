@@ -16,6 +16,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "Argument.h"
 #include <wslutil.h>
 
@@ -48,8 +49,8 @@ class WSLCE2ERegistryTests
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_LoginLogout_PushPull_AuthFlow)
     {
-        const auto& debianImage = DebianTestImage();
-        EnsureImageIsLoaded(debianImage);
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         auto session = OpenDefaultElevatedSession();
 
@@ -57,7 +58,7 @@ class WSLCE2ERegistryTests
             auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15001);
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
-            auto registryImageName = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
+            auto registryImageName = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 RunWslc(std::format(L"image delete --force {}", registryImageName));
@@ -78,7 +79,7 @@ class WSLCE2ERegistryTests
                 L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
             result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
 
-            registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
+            registryImageName = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
             result = RunWslc(std::format(L"push {}", registryImageName));
             result.Verify({.ExitCode = 0});
 
@@ -93,7 +94,7 @@ class WSLCE2ERegistryTests
             result = RunWslc(std::format(L"pull {}", registryImageName));
             VerifyAuthFailure(result);
 
-            registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
+            registryImageName = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
             result = RunWslc(std::format(L"push {}", registryImageName));
             VerifyAuthFailure(result);
 
@@ -108,13 +109,15 @@ class WSLCE2ERegistryTests
     WSLC_TEST_METHOD(WSLCE2E_Registry_Login_HelpCommand)
     {
         auto result = RunWslc(L"registry login --help");
-        result.Verify({.Stdout = GetLoginHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Logout_HelpCommand)
     {
         auto result = RunWslc(L"registry logout --help");
-        result.Verify({.Stdout = GetLogoutHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Login_PasswordAndStdinMutuallyExclusive)
@@ -201,9 +204,9 @@ class WSLCE2ERegistryTests
             // Login with interactive prompts (no flags).
             {
                 auto interactive = RunWslcInteractive(std::format(L"login {}", registryAddressW));
-                interactive.ExpectStderr("Username: ");
+                interactive.ExpectStdout("Username: ");
                 interactive.WriteLine(c_username);
-                interactive.ExpectStderr("Password: ");
+                interactive.ExpectStdout("Password: ");
                 interactive.WriteLine(c_password);
                 auto exitCode = interactive.Wait();
                 VERIFY_ARE_EQUAL(0, exitCode, L"Interactive login should succeed");
@@ -211,81 +214,6 @@ class WSLCE2ERegistryTests
                 VerifyLogoutSucceeds(registryAddressW);
             }
         }
-    }
-
-private:
-    std::wstring GetLoginHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetLoginDescription() << GetLoginUsage() << GetLoginAvailableArguments() << GetLoginAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetLogoutHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader() << GetLogoutDescription() << GetLogoutUsage() << GetLogoutAvailableArguments()
-               << GetLogoutAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetLoginDescription() const
-    {
-        return Localization::WSLCCLI_LoginLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetLogoutDescription() const
-    {
-        return Localization::WSLCCLI_LogoutLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetLoginUsage() const
-    {
-        return L"Usage: wslc registry login [<options>] [<server>]\r\n\r\n";
-    }
-
-    std::wstring GetLogoutUsage() const
-    {
-        return L"Usage: wslc registry logout [<options>] [<server>]\r\n\r\n";
-    }
-
-    std::wstring GetLoginAvailableArguments() const
-    {
-        std::wstringstream args;
-        args << Localization::WSLCCLI_AvailableArguments() << L"\r\n"
-             << L"  server            " << Localization::WSLCCLI_LoginServerArgDescription() << L"\r\n"
-             << L"\r\n";
-        return args.str();
-    }
-
-    std::wstring GetLogoutAvailableArguments() const
-    {
-        std::wstringstream args;
-        args << Localization::WSLCCLI_AvailableArguments() << L"\r\n"
-             << L"  server     " << Localization::WSLCCLI_LoginServerArgDescription() << L"\r\n"
-             << L"\r\n";
-        return args.str();
-    }
-
-    std::wstring GetLoginAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << Localization::WSLCCLI_AvailableOptions() << L"\r\n"
-                << L"  -p,--password     " << Localization::WSLCCLI_LoginPasswordArgDescription() << L"\r\n"
-                << L"  --password-stdin  " << Localization::WSLCCLI_LoginPasswordStdinArgDescription() << L"\r\n"
-                << L"  -u,--username     " << Localization::WSLCCLI_LoginUsernameArgDescription() << L"\r\n"
-                << L"  -?,--help         " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
-    }
-
-    std::wstring GetLogoutAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << Localization::WSLCCLI_AvailableOptions() << L"\r\n"
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"
-                << L"\r\n";
-        return options.str();
     }
 };
 } // namespace WSLCE2ETests

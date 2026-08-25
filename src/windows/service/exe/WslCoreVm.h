@@ -51,7 +51,10 @@ class WslCoreVm
     void operator=(const WslCoreVm&) = delete;
 
 public:
-    static std::unique_ptr<WslCoreVm> Create(_In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId);
+    using InitializeDrvFsCallback = std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>;
+
+    static std::unique_ptr<WslCoreVm> Create(
+        _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs);
 
     ~WslCoreVm() noexcept;
 
@@ -119,6 +122,8 @@ public:
 
     void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
 
+    void TrimDistribution(_In_ ULONG Lun);
+
     _Requires_lock_not_held_(m_lock)
     void SaveAttachedDisksState();
 
@@ -158,6 +163,7 @@ private:
         ULONG Lun;
         std::map<ULONG, Mount> Mounts;
         DiskStateFlags Flags;
+        wil::unique_hfile BackingFile;
     };
 
     struct VirtioFsShare
@@ -174,7 +180,7 @@ private:
         bool operator==(const VirtioFsShare& other) const;
     };
 
-    WslCoreVm(_In_ wsl::core::Config&& VmConfig);
+    WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCallback InitializeDrvFs);
 
     _Requires_lock_held_(m_guestDeviceLock)
     void AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken);
@@ -183,7 +189,8 @@ private:
     void AddPlan9Share(_In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ wsl::windows::common::hcs::Plan9ShareFlags Flags, _In_ HANDLE UserToken, _In_ PCWSTR VirtIoTag);
 
     _Requires_lock_held_(m_guestDeviceLock)
-    std::pair<std::wstring, std::wstring> AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
+    std::tuple<std::wstring, std::wstring, std::wstring> AddVirtioFsShare(
+        _In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
 
     _Requires_lock_held_(m_lock)
     ULONG AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
@@ -255,8 +262,6 @@ private:
 
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
 
-    static LX_INIT_DRVFS_MOUNT s_InitializeDrvFs(_Inout_ WslCoreVm* VmContext, _In_ HANDLE UserToken);
-
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
 
     wil::srwlock m_guestDeviceLock;
@@ -265,6 +270,8 @@ private:
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
     _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
+    _Guarded_by_(m_guestDeviceLock) std::optional<GUID> m_virtioFsDevice;
+    _Guarded_by_(m_guestDeviceLock) std::optional<GUID> m_adminVirtioFsDevice;
     _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
@@ -277,6 +284,7 @@ private:
     std::wstring m_machineId;
     GUID m_runtimeId;
     wsl::core::Config m_vmConfig;
+    InitializeDrvFsCallback m_initializeDrvFs;
     std::wstring m_comPipe0;
     std::wstring m_comPipe1;
     int m_pageReportingOrder;
@@ -308,7 +316,6 @@ private:
     bool m_seccompAvailable;
     uint64_t m_hvPciSwiotlbBase = 0;
     uint64_t m_hvPciSwiotlbSize = 0;
-    std::wstring m_swiotlbOption;
     std::wstring m_sharedMemoryRoot;
     std::filesystem::path m_installPath;
     std::wstring m_userProfile;

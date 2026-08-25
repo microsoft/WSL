@@ -20,24 +20,21 @@ Abstract:
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
-
-void ImageProgressCallback::WriteTerminal(std::wstring_view content) const
-{
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
-}
+using wsl::windows::common::string::FormatBytes;
 
 auto ImageProgressCallback::MoveToLine(int line)
 {
     if (line > 0)
     {
-        WriteTerminal(Cursor::Up(line).Get());
+        m_terminal.Write(m_level, L"{}", Cursor::Up(line));
     }
 
-    return wil::scope_exit([line = line, this]() {
+    // scope_exit is noexcept and may fire during unwinding; scope_exit_log swallows output
+    // failures so a throw here can't call std::terminate.
+    return wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [line = line, this]() {
         if (line > 1)
         {
-            WriteTerminal(Cursor::Down(line - 1).Get());
+            m_terminal.Write(m_level, L"{}", Cursor::Down(line - 1));
         }
     });
 }
@@ -46,32 +43,57 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 {
     try
     {
-        if (!m_terminalMode.IsConsole())
+        // status is [unique] in the IDL, so it may be null; normalize before either path uses it.
+        status = (status != nullptr) ? status : "";
+
+        // The in-place progress display needs cursor movement, so when output is redirected fall
+        // back to a log stream: one line per new status, deduping the repeated byte-progress
+        // callbacks that share a status text.
+        if (!m_vtEnabled)
         {
+            if (id == nullptr || *id == '\0')
+            {
+                m_terminal.Write(m_level, L"{}\n", status);
+            }
+            else
+            {
+                auto [it, inserted] = m_lastStatusById.try_emplace(id, status);
+                if (inserted || it->second != status)
+                {
+                    it->second = status;
+                    m_terminal.Write(m_level, L"{}: {}\n", id, status);
+                }
+            }
+
             return S_OK;
         }
 
+        // Hide the cursor while rendering so it doesn't bounce through the movements; scope_exit_log
+        // restores it on every exit path and can't call std::terminate during unwinding.
+        m_terminal.Write(m_level, L"{}", Cursor::Hide);
+        auto showCursor = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { m_terminal.Write(m_level, L"{}", Cursor::Show); });
+
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            WriteTerminal(std::format(L"{}\n", status));
+            m_terminal.Write(m_level, L"{}\n", status);
             m_currentLine++;
             return S_OK;
         }
 
-        auto info = Info();
+        const int visibleWidth = m_terminal.GetConsoleWidth(m_level).value_or(c_fallbackConsoleWidth);
 
         auto it = m_statuses.find(id);
         if (it == m_statuses.end())
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
+            m_terminal.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            WriteTerminal(GenerateStatusLine(status, id, current, total, info) + L'\n');
+            m_terminal.Write(m_level, L"{}\n", GenerateStatusLine(status, id, current, total, visibleWidth));
         }
 
         return S_OK;
@@ -79,15 +101,12 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
     CATCH_RETURN();
 }
 
-CONSOLE_SCREEN_BUFFER_INFO ImageProgressCallback::Info()
+std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, int visibleWidth)
 {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-    return info;
-}
+    // status/id are [unique] in the IDL and may be null; treat null as empty before formatting.
+    const char* const safeStatus = (status != nullptr) ? status : "";
+    const char* const safeId = (id != nullptr) ? id : "";
 
-std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
-{
     std::wstring line;
     if (total != 0)
     {
@@ -114,28 +133,26 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
 
         // Docker's reported total is an estimate of the compressed layer size, so the actual bytes
         // transferred can exceed it. Drop the total in that case to avoid displaying a count over 100%.
-        auto progress = wsl::shared::string::FormatBytes(current);
+        auto progress = FormatBytes(current);
 
         if (current <= total)
         {
-            progress += std::format(L"/{}", wsl::shared::string::FormatBytes(total));
+            progress += std::format(L"/{}", FormatBytes(total));
         }
 
-        line = std::format(L"{}: {} [{}] {}", id, status, bar, progress);
+        line = std::format(L"{}: {} [{}] {}", safeId, safeStatus, bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}", id, status, wsl::shared::string::FormatBytes(current));
+        line = std::format(L"{}: {} {}", safeId, safeStatus, FormatBytes(current));
     }
     else
     {
-        line = std::format(L"{}: {}", id, status);
+        line = std::format(L"{}: {}", safeId, safeStatus);
     }
 
-    // Use the visible window width (not the buffer width) to prevent wrapping.
-    const auto visibleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left + 1);
-
-    // Truncate to console width to prevent wrapping that would break cursor repositioning.
+    // Truncate to the console width to prevent wrapping that breaks cursor repositioning, then pad
+    // to erase any previously written characters on the line.
     if (line.size() > static_cast<size_t>(visibleWidth))
     {
         line.resize(visibleWidth);
@@ -148,7 +165,6 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
         }
     }
 
-    // Erase any previously written char on that line.
     line.resize(visibleWidth, L' ');
 
     return line;

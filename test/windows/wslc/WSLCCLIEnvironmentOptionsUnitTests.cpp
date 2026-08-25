@@ -17,7 +17,8 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "Argument.h"
-#include "ArgumentTypes.h"
+#include "ArgumentConvertedTypes.h"
+#include "ArgMap.h"
 #include "EnvironmentOptions.h"
 
 using namespace wsl::windows::wslc;
@@ -57,7 +58,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
-        VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
+        VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
     }
 
     // NO_COLOR spec: "0" / "false" / "no" / "off" are not opt-outs.
@@ -72,7 +73,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
 
             LogComment(std::wstring(L"NO_COLOR=") + value);
             VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
-            VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
+            VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
 
             m_noColor->Clear();
         }
@@ -86,7 +87,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_IS_TRUE(target.Contains(ArgType::NoColor));
-        VERIFY_IS_TRUE(target.Get<ArgType::NoColor>());
+        VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
     }
 
     TEST_METHOD(ApplyEnvironmentOptions_NoColorAbsent_DoesNotSetFlag)
@@ -108,7 +109,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         ApplyEnvironmentOptions(target, NoColorDefs());
 
         VERIFY_ARE_EQUAL(1U, target.Count(ArgType::NoColor));
-        VERIFY_IS_FALSE(target.Get<ArgType::NoColor>());
+        VERIFY_IS_FALSE(target.GetValue<ArgType::NoColor>());
     }
 
     // Bindings outside definedArgs are ignored even if the env var is set.

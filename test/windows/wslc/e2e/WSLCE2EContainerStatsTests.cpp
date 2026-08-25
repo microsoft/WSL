@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 
@@ -27,14 +28,13 @@ class WSLCE2EContainerStatsTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -208,11 +208,10 @@ class WSLCE2EContainerStatsTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Parse and validate the JSON output
-        const auto json = nlohmann::json::parse(WideToMultiByte(result.Stdout.value()));
-        VERIFY_IS_TRUE(json.is_array());
-        VERIFY_IS_GREATER_THAN_OR_EQUAL(json.size(), 1U);
+        const auto entries = ParseNdjsonOutput(result);
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(entries.size(), 1U);
 
-        const auto& entry = json[0];
+        const auto& entry = entries[0];
         VERIFY_IS_TRUE(entry.contains("ID"));
         VERIFY_IS_TRUE(entry.contains("Name"));
         VERIFY_IS_TRUE(entry.contains("CPUPerc"));

@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #pragma once
+#include "MountSpecParsing.h"
 #include "WSLCProcessLauncher.h"
 #include "docker_schema.h"
 #include "wslc_schema.h"
@@ -59,11 +60,14 @@ public:
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly);
+    void AddMount(const mount::Spec& Mount);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol = IPPROTO_TCP, const std::optional<std::string>& BindingAddress = {});
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
     void AddAdditionalNetwork(const std::string& Name);
+    void AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases);
     void AddPrimaryNetworkAlias(const std::string& Alias);
+    void SetPrimaryNetworkIpAddress(std::string&& Address);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
     RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
@@ -77,6 +81,12 @@ public:
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetStopTimeout(LONG Timeout);
     void SetShmSize(int64_t ShmSize);
+    void SetHealthCmd(std::string&& HealthCmd);
+    void SetHealthInterval(int64_t Nanoseconds);
+    void SetHealthTimeout(int64_t Nanoseconds);
+    void SetHealthStartPeriod(int64_t Nanoseconds);
+    void SetHealthRetries(LONG Retries);
+    void SetNoHealthcheck();
     void SetContainerFlags(WSLCContainerFlags Flags);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
@@ -93,33 +103,41 @@ public:
     using WSLCProcessLauncher::SetWorkingDirectory;
 
 private:
+    struct NetworkConnection
+    {
+        std::string Name;
+        std::vector<std::string> Aliases;
+    };
+
     std::string m_image;
     std::string m_name;
     std::vector<WSLCPortMapping> m_ports;
-    std::vector<WSLCVolume> m_volumes;
-    std::vector<WSLCNamedVolume> m_namedVolumes;
-    std::deque<std::wstring> m_hostPaths;
-    std::deque<std::string> m_volumeNames;
-    std::deque<std::string> m_containerPaths;
+    std::vector<WSLCMountSpec> m_mounts;
+    std::deque<std::wstring> m_mountSources;
+    std::deque<std::string> m_mountTargets;
+    std::deque<std::string> m_mountTmpfsOptions;
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
     std::optional<LONG> m_stopTimeout;
     int64_t m_shmSize = 0;
+    std::optional<std::string> m_healthCmd;
+    std::optional<int64_t> m_healthInterval;
+    std::optional<int64_t> m_healthTimeout;
+    std::optional<int64_t> m_healthStartPeriod;
+    std::optional<LONG> m_healthRetries;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;
     std::string m_hostname;
     std::string m_domainname;
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
-    std::vector<std::string> m_additionalNetworks;
+    std::vector<NetworkConnection> m_additionalNetworks;
     std::vector<std::string> m_primaryNetworkAliases;
+    std::optional<std::string> m_primaryNetworkIpAddress;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
-    std::vector<WSLCTmpfsMount> m_tmpfsMounts;
-    std::deque<std::string> m_tmpfsContainerPaths;
-    std::deque<std::string> m_tmpfsOptions;
     std::int64_t m_memoryBytes = 0;
     std::int64_t m_nanoCpus = 0;
     std::vector<WSLCUlimit> m_ulimits;

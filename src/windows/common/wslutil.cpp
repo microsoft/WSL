@@ -22,6 +22,7 @@ Abstract:
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
 #include "MsiQuery.h"
+#include "WslInstall.h"
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
@@ -40,6 +41,7 @@ namespace {
 
 #define X(Error) {(Error), L## #Error}
 #define X_WIN32(Error) {HRESULT_FROM_WIN32(Error), L## #Error}
+#define X_NT(Error) {HRESULT_FROM_NT(Error), L## #Error}
 
 static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_DEFAULT_DISTRO_NOT_FOUND),
@@ -139,7 +141,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(HCS_E_INVALID_JSON),
     X_WIN32(ERROR_INVALID_SECURITY_DESCR),
     X(VM_E_INVALID_STATE),
-    X_WIN32(STATUS_SHUTDOWN_IN_PROGRESS),
+    X_NT(STATUS_SHUTDOWN_IN_PROGRESS),
     X(WININET_E_TIMEOUT),
     X(WSAEADDRNOTAVAIL),
     X_WIN32(ERROR_BAD_IMPERSONATION_LEVEL),
@@ -161,12 +163,73 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_INVALID_SESSION_NAME),
     X(WSLC_E_NETWORK_NOT_FOUND),
     X(WSLC_E_SESSION_NOT_FOUND),
+    X(WSLC_E_VM_NOT_RUNNING),
     X(WSLC_E_WU_SEARCH_FAILED),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED),
     X_WIN32(WSAEACCES),
-    X_WIN32(WSAEADDRINUSE)};
+    X_WIN32(WSAEADDRINUSE),
+    X(CO_E_SERVER_EXEC_FAILURE),
+    X(E_ILLEGAL_STATE_CHANGE),
+    X(E_NOTIMPL),
+    X(E_OUTOFMEMORY),
+    X(FVE_E_LOCKED_VOLUME),
+    X(HCS_E_SYSTEM_ALREADY_STOPPED),
+    X(HCS_E_TERMINATED),
+    X(HTTP_E_STATUS_BAD_GATEWAY),
+    X(HTTP_E_STATUS_FORBIDDEN),
+    X(HTTP_E_STATUS_SERVICE_UNAVAIL),
+    X(RPC_E_CALL_CANCELED),
+    X(WININET_E_CONNECTION_ABORTED),
+    X(WININET_E_CONNECTION_RESET),
+    X(WININET_E_INVALID_CA),
+    X(WININET_E_INVALID_SERVER_RESPONSE),
+    X(WININET_E_SECURITY_CHANNEL_ERROR),
+    X_WIN32(ERROR_BAD_EXE_FORMAT),
+    X_WIN32(ERROR_BAD_INHERITANCE_ACL),
+    X_WIN32(ERROR_BAD_NET_NAME),
+    X_WIN32(ERROR_COMMITMENT_LIMIT),
+    X_WIN32(ERROR_CONNECTION_ABORTED),
+    X_WIN32(ERROR_DEVICE_REMOVED),
+    X_WIN32(ERROR_DISK_FULL),
+    X_WIN32(ERROR_DRIVE_LOCKED),
+    X_WIN32(ERROR_FILE_CORRUPT),
+    X_WIN32(ERROR_FILE_SYSTEM_LIMITATION),
+    X_WIN32(ERROR_GEN_FAILURE),
+    X_WIN32(ERROR_INSTALL_ALREADY_RUNNING),
+    X_WIN32(ERROR_INSTALL_LOG_FAILURE),
+    X_WIN32(ERROR_INSTALL_PACKAGE_OPEN_FAILED),
+    X_WIN32(ERROR_INVALID_DRIVE),
+    X_WIN32(ERROR_INVALID_FUNCTION),
+    X_WIN32(ERROR_LOGON_TYPE_NOT_GRANTED),
+    X_WIN32(ERROR_NETNAME_DELETED),
+    X_WIN32(ERROR_NO_SUCH_DEVICE),
+    X_WIN32(ERROR_NO_SYSTEM_RESOURCES),
+    X_WIN32(ERROR_NOT_READY),
+    X_WIN32(ERROR_NOT_SAFEBOOT_SERVICE),
+    X_WIN32(ERROR_SEM_TIMEOUT),
+    X_WIN32(ERROR_SERVICE_DISABLED),
+    X_WIN32(ERROR_SHUTDOWN_IN_PROGRESS),
+    X_WIN32(ERROR_SUCCESS_REBOOT_INITIATED),
+    X_WIN32(ERROR_TIMEOUT),
+    X_WIN32(ERROR_UNRECOGNIZED_VOLUME),
+    X_WIN32(ERROR_VIRTDISK_PROVIDER_NOT_FOUND),
+    X_WIN32(ERROR_VIRTUAL_DISK_LIMITATION),
+    X_WIN32(RPC_S_CALL_CANCELLED),
+    X_WIN32(RPC_S_CALL_FAILED_DNE),
+    X_WIN32(RPC_S_SYSTEM_HANDLE_TYPE_MISMATCH),
+    X_WIN32(RPC_S_UNKNOWN_IF),
+    X_WIN32(WSAECONNABORTED),
+    X_WIN32(WSAECONNRESET),
+    X_WIN32(WSAENOBUFS),
+    X_WIN32(WSAEOPNOTSUPP),
+    X_NT(STATUS_ACCESS_DENIED),
+    X_NT(STATUS_CONNECTION_DISCONNECTED),
+    X_NT(STATUS_INVALID_PARAMETER),
+    X_NT(STATUS_RETRY)};
 
+#undef X_NT
+#undef X_WIN32
 #undef X
 
 #define X(Ctx) {Context::Ctx, L## #Ctx}
@@ -380,14 +443,45 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
         Filename = Url.substr(lastSlash + 1);
     }
 
-    const auto downloadFolder =
-        winrt::Windows::Storage::StorageFolder::GetFolderFromPathAsync(std::filesystem::temp_directory_path().wstring()).get();
+    // GetFolderFromPathAsync won't work if the folder is hidden or system.
+    auto downloadFolderPath = std::filesystem::temp_directory_path();
+    auto filenameStem = std::filesystem::path(Filename).stem().wstring();
+    auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
+    std::wstring filePath{};
+    winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
+    for (int suffix = 1; outputStream == nullptr; suffix++)
+    {
+        if (suffix == 1)
+        {
+            filePath = (downloadFolderPath / Filename).wstring();
+        }
+        else
+        {
+            filePath = (downloadFolderPath / std::format(L"{} ({}){}", filenameStem, suffix, filenameExtension)).wstring();
+        }
+        try
+        {
+            outputStream = winrt::Windows::Storage::Streams::FileRandomAccessStream::OpenAsync(
+                               filePath,
+                               winrt::Windows::Storage::FileAccessMode::ReadWrite,
+                               winrt::Windows::Storage::StorageOpenOptions::None,
+                               winrt::Windows::Storage::Streams::FileOpenDisposition::CreateNew)
+                               .get();
+        }
+        catch (...)
+        {
+            if (wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+            {
+                throw;
+            }
+        }
+    }
 
-    const auto file =
-        downloadFolder.CreateFileAsync(Filename, winrt::Windows::Storage::CreationCollisionOption::GenerateUniqueName).get();
-    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { file.DeleteAsync().get(); });
-
-    const auto outputStream = file.OpenAsync(winrt::Windows::Storage::FileAccessMode::ReadWrite).get().GetOutputStreamAt(0);
+    auto deleteFileOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        outputStream.Close();
+        std::error_code ec;
+        std::filesystem::remove(filePath, ec);
+    });
 
     // By default downloaded files are cached in %appdata%/local/packages/{package-family}/AC/InetCache .
     // Disable caching since there's no reason to keep local copies of .msixbundle files.
@@ -421,7 +515,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     download.get();
     deleteFileOnFailure.release();
 
-    return file.Path().c_str();
+    return filePath;
 }
 
 [[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess, _In_ BOOL InheritHandle)
@@ -1153,7 +1247,7 @@ std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
     return pids;
 }
 
-std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo(const std::string& Input)
+wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil::RepositoryReference::Parse(const std::string& input)
 {
     // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
 
@@ -1162,14 +1256,14 @@ std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo
     constexpr auto legacyDomain = "index.docker.io";
     constexpr auto localhost = "localhost";
 
-    auto slash = Input.find('/');
+    auto slash = input.find('/');
     if (slash == std::string::npos)
     {
-        return {defaultDomain, officialPrefix + Input};
+        return RepositoryReference{input, defaultDomain, officialPrefix + input};
     }
 
-    auto domain = Input.substr(0, slash);
-    auto path = Input.substr(slash + 1);
+    auto domain = input.substr(0, slash);
+    auto path = input.substr(slash + 1);
 
     if (domain == legacyDomain)
     {
@@ -1180,7 +1274,7 @@ std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo
              }))
     {
         domain = defaultDomain;
-        path = Input;
+        path = input;
     }
 
     if (domain == defaultDomain && path.find('/') == std::string::npos)
@@ -1188,7 +1282,12 @@ std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo
         path = "library/" + path;
     }
 
-    return {domain, path};
+    return RepositoryReference{input, std::move(domain), std::move(path)};
+}
+
+std::string wsl::windows::common::wslutil::RepositoryReference::GetCanonical() const
+{
+    return std::format("{}/{}", Server, Path);
 }
 
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
@@ -1250,10 +1349,20 @@ bool wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled()
 {
     // Note for Windows 11 22H2 and above builds: If hyper-v is installed but VMP platform isn't, HNS and vmcompute are
     // available but calls to HNS will fail if vfpext isn't installed.
-    return wsl::windows::common::helpers::IsServicePresent(L"HNS") &&
-           wsl::windows::common::helpers::IsServicePresent(L"vmcompute") &&
-           (helpers::GetWindowsVersion().BuildNumber < helpers::WindowsBuildNumbers::Nickel ||
-            wsl::windows::common::helpers::IsServicePresent(L"vfpext"));
+    if (!wsl::windows::common::helpers::IsServicePresent(L"HNS") || !wsl::windows::common::helpers::IsServicePresent(L"vmcompute") ||
+        (helpers::GetWindowsVersion().BuildNumber >= helpers::WindowsBuildNumbers::Nickel &&
+         !wsl::windows::common::helpers::IsServicePresent(L"vfpext")))
+    {
+        return false;
+    }
+
+    try
+    {
+        return WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameVmp);
+    }
+    CATCH_LOG()
+
+    return true;
 }
 
 wil::unique_handle wsl::windows::common::wslutil::OpenCallingProcess(_In_ DWORD access)
@@ -1305,40 +1414,58 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
-std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input, EnumReferenceFormat* Format)
+wsl::windows::common::wslutil::ImageReference wsl::windows::common::wslutil::ImageReference::Parse(const std::string& input)
 {
     static const auto regex = BuildImageReferenceRegex();
     std::smatch match;
-    if (!std::regex_match(Input, match, regex))
+    if (!std::regex_match(input, match, regex))
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(Input.c_str()));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
     }
 
     const auto& repo = match[1];
     const auto& tag = match[2];
     const auto& digest = match[3];
 
-    THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
+    THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", input.c_str());
 
-    EnumReferenceFormat referenceFormat = EnumReferenceFormat::None;
-    std::optional<std::string> tagOrDigest;
-    if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
+    std::optional<std::string> tagValue;
+    if (tag.matched)
     {
-        tagOrDigest = digest.str();
-        referenceFormat = EnumReferenceFormat::Digest;
-    }
-    else if (tag.matched) // <repo>:<tag>
-    {
-        tagOrDigest = tag.str();
-        referenceFormat = EnumReferenceFormat::Tag;
+        tagValue = tag.str();
     }
 
-    if (Format)
+    std::optional<std::string> digestValue;
+    if (digest.matched)
     {
-        *Format = referenceFormat;
+        digestValue = digest.str();
     }
 
-    return {repo.str(), std::move(tagOrDigest)};
+    // Classify the reference the way the Docker CLI does, where a digest takes precedence over a tag.
+    EnumReferenceFormat format = EnumReferenceFormatNone;
+    if (digestValue.has_value())
+    {
+        format = EnumReferenceFormatDigest;
+    }
+    else if (tagValue.has_value())
+    {
+        format = EnumReferenceFormatTag;
+    }
+
+    return ImageReference{RepositoryReference::Parse(repo.str()), std::move(tagValue), std::move(digestValue), format};
+}
+
+std::string wsl::windows::common::wslutil::ImageReference::GetCanonical() const
+{
+    // Mirror the Docker CLI's client-side reference normalization so the result matches `docker pull` exactly.
+    // See github.com/distribution/reference (normalize.go, reference.go) and github.com/docker/cli
+    // (cli/command/image/pull.go). Docker's canonical string keeps both a tag and a digest when both are present.
+
+    // A tag joins with ':' and a digest with '@'. A name-only reference (no tag and no digest) defaults to ":latest";
+    // a digest-only reference is not name-only, so it keeps no tag (matching Docker's TagNameOnly).
+    const std::string tag = Tag ? std::format(":{}", *Tag) : (Digest ? "" : ":latest");
+    const std::string digest = Digest ? std::format("@{}", *Digest) : "";
+    return std::format("{}{}{}", Repository.GetCanonical(), tag, digest);
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
@@ -1363,6 +1490,19 @@ void wsl::windows::common::wslutil::PrintMessageImpl(_In_ const std::wstring& me
 void wsl::windows::common::wslutil::PrintMessage(_In_ const std::wstring& message, _Inout_ FILE* const stream)
 {
     fwprintf(stream, L"%ls\n", message.c_str());
+}
+
+std::optional<std::wstring> wsl::windows::common::wslutil::ReadEnvironmentVariable(_In_ LPCWSTR Name)
+{
+    std::wstring value;
+    const HRESULT hr = wil::GetEnvironmentVariableW(Name, value);
+    if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
+    {
+        return std::nullopt;
+    }
+
+    THROW_IF_FAILED(hr);
+    return value;
 }
 
 void wsl::windows::common::wslutil::SetCrtEncoding(int Mode)

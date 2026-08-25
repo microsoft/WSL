@@ -36,6 +36,23 @@ try
     wslutil::ConfigureCrt();
     wslutil::InitializeWil();
 
+    // Extract the executable name from argv[0] for use in help/usage output.
+    if (argc > 0 && argv[0])
+    {
+        std::wstring_view exe{argv[0]};
+        auto lastSlash = exe.find_last_of(L"\\/");
+        if (lastSlash != std::wstring_view::npos)
+        {
+            exe = exe.substr(lastSlash + 1);
+        }
+        auto dot = exe.rfind(L'.');
+        if (dot != std::wstring_view::npos)
+        {
+            exe = exe.substr(0, dot);
+        }
+        s_ExecutableName = exe;
+    }
+
     WslTraceLoggingInitialize(WslcTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
 
@@ -75,7 +92,7 @@ try
     // throw can't reroute through the colored-help error path.
     auto envDefs = command->GetGlobalsAndEnvArguments();
     ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
-    context.ApplyGlobalOptions();
+    context.ApplyGlobalEnvironmentOptions();
 
     // Past this point, environment variable options are in effect.
 
@@ -102,9 +119,8 @@ try
             /*stopOnUnknown*/ true,
             /*overridableDefaults*/ envDefs);
         command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
-        context.ApplyGlobalOptions();
 
-        // Past this point, global options are in effect.
+        // Past this point, global option parsing and validation are complete.
 
         // Pass 2 - Subcommand and leaf command resolution.
         std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
@@ -118,10 +134,19 @@ try
         command->ValidateArguments(context.Args);
         command->Execute(context);
     }
+    catch (const ArgumentException& ae)
+    {
+        command->OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        return 1;
+    }
     catch (const CommandException& ce)
     {
-        // Input failure: show help alongside the error so the user can correct it.
-        command->OutputHelp(&ce);
+        command->OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        return 1;
+    }
+    catch (const ExecutionException& ee)
+    {
+        context.Terminal.Error(L"{}\n", ee.Message());
         return 1;
     }
     catch (...)
@@ -134,7 +159,7 @@ try
             // Cancel events are often considered warnings rather than errors, as the user
             // intentionally triggered it.
             const auto strings = wslutil::ErrorToString({.Code = HRESULT_FROM_WIN32(ERROR_CANCELLED)});
-            context.Reporter.Warn(L"\n{}\n", strings.Message);
+            context.Terminal.Warn(L"\n{}\n", strings.Message);
 
             // Exit with code 1 is consistent with Docker build and pull, but the POSIX-convention
             // for cancellation is exit code 130, which is used by Docker compose and most shells.
@@ -153,12 +178,12 @@ try
             {
                 auto strings = wslutil::ErrorToString(*reported);
                 auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Reporter.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
+                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
             }
             else
             {
                 // Fallback for errors without context
-                context.Reporter.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
+                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
             }
         }
     }

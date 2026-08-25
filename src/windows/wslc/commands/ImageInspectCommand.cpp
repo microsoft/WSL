@@ -28,7 +28,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true, NO_LIMIT),
+        Argument::Create(ArgType::ImageId, true, Limit::Unlimited),
+        Argument::Create(ArgType::InspectFormat),
     };
 }
 

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <chrono>
+#include <list>
 #include <map>
 #include "common.h"
 #include "lxinitshared.h"
@@ -44,8 +46,8 @@ private:
         wil::unique_fd m_tcpConnection;
 
         // Offset in m_currentDnsRequest indicating how much of the current DNS request on
-        // the TCP connection has been read. Using 2 bytes to represent the offset as the request length is represented using 2 bytes.
-        uint16_t m_currentRequestOffset = 0;
+        // the TCP connection has been read.
+        size_t m_currentRequestOffset = 0;
 
         // Buffer containing the current DNS request received on the TCP connection.
         std::vector<gsl::byte> m_currentDnsRequest;
@@ -68,6 +70,14 @@ private:
         TcpConnectionContext& operator=(TcpConnectionContext&&) = delete;
     };
 
+    using UdpRequestExpirationQueue = std::list<std::pair<std::chrono::steady_clock::time_point, uint32_t>>;
+
+    struct UdpRequestContext
+    {
+        sockaddr_in m_remoteAddress;
+        UdpRequestExpirationQueue::iterator m_expiration;
+    };
+
     void StartUdpDnsServer(const std::string& ipAddress) noexcept;
 
     void StartTcpDnsServer(const std::string& ipAddress) noexcept;
@@ -83,6 +93,8 @@ private:
 
     // Read the next DNS request from the UDP socket.
     void HandleUdpDnsRequest() noexcept;
+
+    int ExpireUdpRequestsAndGetTimeout() noexcept;
 
     void HandleUdpDnsResponse(const gsl::span<gsl::byte> dnsBuffer, const LX_GNS_DNS_CLIENT_IDENTIFIER& dnsClientIdentifier) noexcept;
 
@@ -105,7 +117,10 @@ private:
     // Mapping id of an UDP DNS request to the sockaddr_in struct storing the IP and port used by the Linux DNS client that made
     // the DNS request. Note: Since we only configure an IPv4 DNS server in Linux, we expect all Linux DNS clients to use IPv4
     // addresses. _Guarded_by_(m_udpLock)
-    std::map<uint32_t, sockaddr_in> m_udpRequests;
+    std::map<uint32_t, UdpRequestContext> m_udpRequests;
+
+    // UDP requests ordered by expiration time. _Guarded_by_(m_udpLock)
+    UdpRequestExpirationQueue m_udpRequestExpirations;
 
     wil::unique_fd m_tcpListenSocket;
 

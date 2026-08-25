@@ -22,8 +22,9 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
-void NetworkService::Create(models::Session& session, const models::CreateNetworkOptions& createOptions)
+void NetworkService::Create(Terminal& terminal, models::Session& session, const models::CreateNetworkOptions& createOptions)
 {
+    WarningCallback warningCallback(terminal);
     WSLCNetworkOptions options{};
     options.Name = createOptions.Name.c_str();
     if (createOptions.Driver.has_value())
@@ -50,8 +51,23 @@ void NetworkService::Create(models::Session& session, const models::CreateNetwor
     options.Labels = labels.data();
     options.LabelsCount = static_cast<ULONG>(labels.size());
 
-    auto warningCallback = Microsoft::WRL::Make<WarningCallback>();
-    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, warningCallback.Get()));
+    options.Internal = createOptions.Internal ? TRUE : FALSE;
+    if (createOptions.Subnet.has_value())
+    {
+        options.Subnet = createOptions.Subnet->c_str();
+    }
+
+    if (createOptions.Gateway.has_value())
+    {
+        options.Gateway = createOptions.Gateway->c_str();
+    }
+
+    if (createOptions.IpRange.has_value())
+    {
+        options.IpRange = createOptions.IpRange->c_str();
+    }
+
+    THROW_IF_FAILED(session.Get()->CreateNetwork(&options, &warningCallback));
 }
 
 void NetworkService::Delete(models::Session& session, const std::string& name)
@@ -59,20 +75,21 @@ void NetworkService::Delete(models::Session& session, const std::string& name)
     THROW_IF_FAILED(session.Get()->DeleteNetwork(name.c_str()));
 }
 
-std::vector<WSLCNetworkInformation> NetworkService::List(models::Session& session)
+std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> NetworkService::List(
+    models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
-    wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> rawNetworks;
-    ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListNetworks(&rawNetworks, &count));
-
-    std::vector<WSLCNetworkInformation> networks;
-    networks.reserve(count);
-    for (auto ptr = rawNetworks.get(), end = rawNetworks.get() + count; ptr != end; ++ptr)
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
     {
-        networks.push_back(*ptr);
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
     }
 
-    return networks;
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(session.Get()->ListNetworks(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &output));
+
+    return FromJson<std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>>(output.get());
 }
 
 wsl::windows::common::wslc_schema::Network NetworkService::Inspect(models::Session& session, const std::string& name)
@@ -103,5 +120,55 @@ models::PruneNetworksResult NetworkService::Prune(models::Session& session, cons
     }
 
     return result;
+}
+
+void NetworkService::Connect(models::Session& session, const models::ConnectNetworkOptions& connectOptions)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(connectOptions.ContainerId.c_str(), &container));
+
+    // Build KVPs so the pointers remain valid for the duration of the ConnectToNetwork call.
+    std::vector<KeyValuePair> settings;
+    settings.reserve(
+        connectOptions.Aliases.size() + connectOptions.Links.size() + connectOptions.LinkLocalIps.size() +
+        connectOptions.DriverOpts.size() + (connectOptions.IpAddress.has_value() ? 1 : 0));
+
+    for (const auto& alias : connectOptions.Aliases)
+    {
+        settings.push_back({.Key = "Aliases", .Value = alias.c_str()});
+    }
+
+    if (connectOptions.IpAddress.has_value())
+    {
+        settings.push_back({.Key = "IPAddress", .Value = connectOptions.IpAddress->c_str()});
+    }
+
+    for (const auto& link : connectOptions.Links)
+    {
+        settings.push_back({.Key = "Links", .Value = link.c_str()});
+    }
+
+    for (const auto& linkLocalIp : connectOptions.LinkLocalIps)
+    {
+        settings.push_back({.Key = "LinkLocalIPs", .Value = linkLocalIp.c_str()});
+    }
+
+    for (const auto& entry : connectOptions.DriverOpts)
+    {
+        settings.push_back({.Key = "DriverOpts", .Value = entry.c_str()});
+    }
+
+    WSLCNetworkConnectionOptions options{};
+    options.NetworkName = connectOptions.NetworkName.c_str();
+    options.Settings = settings.empty() ? nullptr : settings.data();
+    options.SettingsCount = static_cast<ULONG>(settings.size());
+    THROW_IF_FAILED(container->ConnectToNetwork(&options));
+}
+
+void NetworkService::Disconnect(models::Session& session, const std::string& networkName, const std::string& containerId)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(containerId.c_str(), &container));
+    THROW_IF_FAILED(container->DisconnectFromNetwork(networkName.c_str()));
 }
 } // namespace wsl::windows::wslc::services

@@ -38,6 +38,9 @@ using wsl::windows::common::helpers::LaunchWslRelayFlags;
 
 constexpr auto c_WslSupportInterfaceKey = L"Software\\Classes\\Interface\\{46f3c96d-ffa3-42f0-b052-52f5e7ecbb08}";
 constexpr auto c_WslSupportInterfaceName = L"IWslSupport";
+constexpr auto c_DcatRegistryVersionValueName = L"Version";
+
+constexpr ULONG c_MaxStorageHwQueues = 4;
 
 namespace {
 
@@ -744,6 +747,21 @@ bool wsl::windows::common::helpers::TryAttachConsole()
     return ReopenStdHandles();
 }
 
+std::optional<std::wstring> wsl::windows::common::helpers::VersionRegisteredWithDcat()
+{
+    try
+    {
+        auto [dcatKey, result] = wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_READ);
+        if (SUCCEEDED(result))
+        {
+            return wsl::windows::common::registry::ReadOptionalString(dcatKey.get(), nullptr, c_DcatRegistryVersionValueName);
+        }
+    }
+    CATCH_LOG()
+
+    return {};
+}
+
 void wsl::windows::common::helpers::RegisterWithDcat(_In_ bool IncludeVersionNumber)
 try
 {
@@ -758,12 +776,16 @@ try
     }
 
     wil::unique_hkey dcatKey = wsl::windows::common::registry::CreateKey(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_SET_VALUE);
-    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, L"Version", registeredVersion.c_str());
+    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, c_DcatRegistryVersionValueName, registeredVersion.c_str());
 }
 CATCH_LOG()
 
-void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes)
+void wsl::windows::common::helpers::AppendCommonKernelCommandLine(
+    _Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder, _In_ ULONG64 swiotlbSizeBytes, _In_ ULONG cpuCount)
 {
+    // Set number of processors.
+    kernelCmdLine += std::format(L" nr_cpus={}", cpuCount);
+
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
@@ -777,6 +799,12 @@ void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::w
     if (swiotlbSizeBytes != 0)
     {
         kernelCmdLine += std::format(L" swiotlb=force hv_pci_swiotlb={}", swiotlbSizeBytes);
+    }
+
+    // Cap the storage hw queue count. Default is CPU count.
+    if (cpuCount > c_MaxStorageHwQueues)
+    {
+        kernelCmdLine += std::format(L" hv_storvsc.storvsc_max_hw_queues={}", c_MaxStorageHwQueues);
     }
 }
 

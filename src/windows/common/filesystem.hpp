@@ -137,6 +137,21 @@ void EnsureDirectoryWithAttributes(_In_ PCWSTR Path, _In_ ULONG Mode, _In_ ULONG
 
 bool FileExists(_In_ LPCWSTR Path);
 
+/// <summary>
+/// Resolves Path to an absolute, canonical form. The path is made absolute against the current
+/// directory first because std::filesystem::weakly_canonical does not reliably resolve a relative
+/// path on its own. '..' components are collapsed and symlinks are resolved for the portion of the
+/// path that exists, so a path naming a file that does not exist yet still succeeds.
+/// Throws on failure.
+/// </summary>
+std::filesystem::path GetCanonicalPath(const std::filesystem::path& Path);
+
+/// <summary>
+/// Non-throwing overload of GetCanonicalPath. On failure Error is set and an empty path is
+/// returned; on success Error is cleared.
+/// </summary>
+std::filesystem::path GetCanonicalPath(const std::filesystem::path& Path, std::error_code& Error);
+
 std::filesystem::path GetFullPath(_In_ LPCWSTR Path);
 
 std::pair<std::string, std::string> GetHostAndDomainNames();

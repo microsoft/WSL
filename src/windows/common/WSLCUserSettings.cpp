@@ -47,9 +47,22 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size (e.g. 500GB default: 1TB)\n"
     "  # maxStorageSize: default\n"
     "\n"
+    "  # Base directory for the default session's storage; the session VHD is created at\n"
+    "  # <storagePath>\\wslc\\sessions\\<session>\\storage.vhdx. Must be an absolute path (e.g. D:\\data default: "
+    "%LOCALAPPDATA%). Changing this after a session already exists does not move existing storage, containers, or\n"
+    "  # images; the previous location is left in place and a new empty session is created at the new path.\n"
+    "  # storagePath: default\n"
+    "\n"
     "  # Default host address that published ports bind to when 'container run -p' is\n"
     "  # used without an explicit address (default: 127.0.0.1)\n"
     "  # defaultBindingAddress: default\n"
+    "\n"
+    "  # DNS name that resolves to the host loopback address (default: host.wslc.internal).\n"
+    "  # Set to \"none\" to disable the entry.\n"
+    "  # hostLoopback: default\n"
+    "\n"
+    "  # Seconds an idle session VM stays running before it is torn down (default: 30)\n"
+    "  # idleTimeout: default\n"
     "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
@@ -59,9 +72,17 @@ namespace details {
 
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
     {
-        auto parsed = wsl::shared::string::ParseMemorySize(value.c_str());
-        auto converted = parsed.has_value() ? *parsed / _1MB : 0; // To Mb, and anything less than 1Mb is considered invalid.
-        return converted > 0 ? std::optional{static_cast<uint32_t>(converted)} : std::nullopt;
+
+        // WSLC settings accept leading whitespace for compatibility with existing settings files.
+        const auto wideValue = MultiByteToWide(value);
+        const auto parsed = ParseStorageSize(StripLeadingWhitespace(wideValue), StorageSizeUnit::Binary);
+        const auto converted = parsed.has_value() ? *parsed / _1MB : 0;
+        if (converted == 0 || converted > std::numeric_limits<uint32_t>::max())
+        {
+            return std::nullopt;
+        }
+
+        return static_cast<uint32_t>(converted);
     }
 
 #define WSLC_VALIDATE_SETTING(_setting_) \
@@ -120,6 +141,16 @@ namespace details {
         return value;
     }
 
+    WSLC_VALIDATE_SETTING(SessionHostLoopback)
+    {
+        if (value == "none")
+        {
+            return std::string{};
+        }
+
+        return !value.empty() ? std::optional{value} : std::nullopt;
+    }
+
     WSLC_VALIDATE_SETTING(SessionPortRelay)
     {
         if (value == "virtionet")
@@ -145,6 +176,21 @@ namespace details {
         }
 
         return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionStoragePath)
+    {
+        if (value.empty() || !std::filesystem::path(value).is_absolute())
+        {
+            return std::nullopt;
+        }
+
+        return value;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionIdleTimeout)
+    {
+        return value > 0 ? std::optional{value} : std::nullopt;
     }
 
     WSLC_VALIDATE_SETTING(CredentialStore)

@@ -38,21 +38,32 @@ try
     {
         for (const auto& line : m_allLines)
         {
-            WriteTerminal(MultiByteToWide(line));
+            m_terminal.Info(L"{}", line);
         }
     }
 }
 CATCH_LOG()
 
-void BuildImageCallback::WriteTerminal(std::wstring_view content) const
-{
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
-}
-
 bool BuildImageCallback::IsCancelled() const
 {
     return WaitForSingleObject(m_cancelEvent, 0) == WAIT_OBJECT_0;
+}
+
+const wsl::windows::common::vt::Sequence& BuildImageCallback::Color(const wsl::windows::common::vt::Sequence& sequence) const
+{
+    static const wsl::windows::common::vt::Sequence empty{};
+    return m_color ? sequence : empty;
+}
+
+void BuildImageCallback::CaptureForReplay(std::string_view text)
+{
+    m_allLines.emplace_back(text);
+    m_allLinesBytes += m_allLines.back().size();
+    while (m_allLinesBytes > c_maxAllLinesBytes && !m_allLines.empty())
+    {
+        m_allLinesBytes -= m_allLines.front().size();
+        m_allLines.pop_front();
+    }
 }
 
 void BuildImageCallback::CollapseWindow()
@@ -60,7 +71,7 @@ void BuildImageCallback::CollapseWindow()
     if (m_displayedLines > 0)
     {
         // Move cursor up to the start of the display area, then erase to end of screen.
-        WriteTerminal(Cursor::Up(m_displayedLines) + Erase::ScreenForward);
+        m_terminal.Info(L"{}{}", Cursor::Up(m_displayedLines), Erase::ScreenForward);
         m_displayedLines = 0;
     }
 
@@ -98,12 +109,26 @@ try
     const bool isLog = (idView == "log");
     const bool isPullProgress = (!idView.empty() && total > 0 && !isLog);
 
-    if (m_verbose || !m_isConsole)
+    // quiet: suppress live progress but retain everything plain would have printed, so the destructor
+    // can replay the failing step and its logs on build failure. Pull progress is excluded because it
+    // is rewritten in place rather than appended, and so is the only message with no trailing newline.
+    if (m_mode == models::ProgressMode::Quiet)
     {
-        // Skip pull progress updates when output is redirected, show only major steps
         if (!isPullProgress)
         {
-            wprintf(L"%hs", status);
+            CaptureForReplay(status);
+        }
+        return S_OK;
+    }
+
+    if (m_verbose || !m_renderInPlace)
+    {
+        // Only major steps are reported here. Unlike docker's plain output, which appends
+        // throttled download lines, pull progress is omitted entirely: without in-place
+        // updates those lines are mostly noise.
+        if (!isPullProgress)
+        {
+            m_terminal.Info(L"{}", status);
         }
         return S_OK;
     }
@@ -177,16 +202,17 @@ try
     const auto newlines = wide.substr(bodyLength);
     wide.resize(bodyLength);
 
-    WriteTerminal(std::format(L"{}{}{}{}", Format::Fg::BrightGreen, wide, Format::Default, newlines));
+    // Pass the color sequences as arguments (not baked into the string) so Terminal strips
+    // them when --no-color is set. Color() additionally strips them outside Tty mode. The
+    // trailing newlines are emitted after the reset.
+    m_terminal.Info(L"{}{}{}{}", Color(Format::Fg::BrightGreen), wide, Color(Format::Default), newlines);
     return S_OK;
 }
 CATCH_RETURN();
 
 void BuildImageCallback::Redraw()
 {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    const int consoleWidth = std::max(0, static_cast<int>(info.srWindow.Right) - info.srWindow.Left);
+    const int consoleWidth = m_terminal.GetConsoleWidth(Terminal::Level::Info).value_or(c_fallbackConsoleWidth);
 
     const bool showPending = !m_pendingLine.empty();
     const int pullCount = static_cast<int>(m_pullLines.size());
@@ -198,16 +224,15 @@ void BuildImageCallback::Redraw()
     }
     const int displayCount = completedCount + reservedLines;
 
-    // Build the entire frame in one buffer to minimize console writes. Hide the cursor
-    // during the redraw so the user doesn't see it bouncing through the cursor movement,
-    // then show it again at the final position. The dim attribute (\033[2m) renders the
-    // scrolling lines de-emphasized regardless of the user's theme.
+    // Build the frame body in one buffer to minimize console writes. The cursor moves,
+    // erases, and text lines it holds are non-color VT. This only runs in Tty mode, where a
+    // VT console is attached. The cursor hide/show wrapper and the dim intensity attribute are
+    // passed as Sequence arguments to Terminal (below) so it strips the color ones (Dim/Normal)
+    // when --no-color is set, while leaving the non-color cursor moves intact.
     //
     // m_frameBuffer is a member so its backing allocation is reused across frames -
     // it grows to the high-water mark and is never freed between redraws.
     m_frameBuffer.clear();
-    m_frameBuffer += Cursor::Hide;
-    m_frameBuffer += Format::Dim;
 
     // Move cursor to the start of the display area and erase from there to the end of
     // the screen. \033[J handles the case where the new display is shorter than the
@@ -252,10 +277,10 @@ void BuildImageCallback::Redraw()
         appendLine(line);
     }
 
-    m_frameBuffer += Format::Normal;
-    m_frameBuffer += Cursor::Show;
-
-    WriteTerminal(m_frameBuffer);
+    // Emit the frame as a single atomic write. Cursor Hide/Show are non-color and always
+    // rendered here (VT is on); Format::Dim/Normal are color sequences that Terminal strips
+    // under --no-color. The buffered body carries the cursor moves, erases, and text lines.
+    m_terminal.Info(L"{}{}{}{}{}", Cursor::Hide, Color(Format::Dim), std::wstring_view{m_frameBuffer}, Color(Format::Normal), Cursor::Show);
     m_displayedLines = displayCount;
 }
 

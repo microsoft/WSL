@@ -108,7 +108,7 @@ private:
     // Iterates over all sessions, cleaning up released sessions.
     // The routine receives a SessionEntry& and can return an optional<T> to stop iteration.
     template <typename T>
-    inline auto ForEachSession(const auto& Routine)
+    inline auto ForEachSession(const auto& Routine, bool DeferSessionCleanup = false)
     {
         std::lock_guard lock(m_wslcSessionsLock);
 
@@ -129,6 +129,13 @@ private:
             wil::com_ptr<IWSLCSession> lockedSession;
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
+                // FindSession is used by plugin callbacks into the API. Defer cleanup in that path so
+                // OnWslcSessionStopping is not nested inside another plugin notification.
+                if (DeferSessionCleanup)
+                {
+                    return false; // Keep in tracking; clean up on a later pass.
+                }
+
                 // Session is gone: notify plugins (if not already), then drop persistent reference if any.
                 NotifySessionStoppingLockHeld(entry);
 

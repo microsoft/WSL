@@ -23,6 +23,11 @@ Abstract:
 
 namespace WSLCE2ETests {
 
+inline std::wstring FormatWslcError(const std::wstring& message, std::wstring_view errorCode = L"E_INVALIDARG")
+{
+    return std::format(L"{}\r\nError code: {}\r\n", message, errorCode);
+}
+
 // VT sequence constants and helpers for TTY testing.
 // Sequences are sourced from wsl::windows::common::vt (VTSupport.h).
 namespace VT {
@@ -57,6 +62,38 @@ namespace VT {
     }
 } // namespace VT
 
+// The shape emitted by "network list --format json"; every value is reported as a string.
+struct NetworkListOutput
+{
+    std::string CreatedAt;
+    std::string Driver;
+    std::string ID;
+    std::string IPv4;
+    std::string IPv6;
+    std::string Internal;
+    std::string Labels;
+    std::string Name;
+    std::string Scope;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListOutput, CreatedAt, Driver, ID, IPv4, IPv6, Internal, Labels, Name, Scope);
+};
+
+struct VolumeListOutput
+{
+    std::string Availability;
+    std::string Driver;
+    std::string Group;
+    std::string Labels;
+    std::string Links;
+    std::string Mountpoint;
+    std::string Name;
+    std::string Scope;
+    std::string Size;
+    std::string Status;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeListOutput, Availability, Driver, Group, Labels, Links, Mountpoint, Name, Scope, Size, Status);
+};
+
 struct TestImage
 {
     std::wstring Name;
@@ -70,6 +107,7 @@ struct TestImage
 
 const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
+const TestImage& HelloWorldTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
@@ -125,8 +163,7 @@ wsl::windows::common::wslc_schema::Network InspectNetwork(const std::wstring& ne
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
-void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
-void EnsureImageIsDeleted(const TestImage& image);
+void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureNoUntaggedImages();
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
@@ -154,6 +191,9 @@ std::wstring GetPythonUdpEchoServerScript(uint16_t port);
 std::string SendUdpAndReceive(uint16_t hostPort, const std::string& payload, const std::string& expectedReply, int family = AF_INET);
 
 void WaitForContainerOutput(const std::wstring& containerName, std::string_view expected, std::chrono::milliseconds timeout = std::chrono::seconds(60));
+
+wsl::windows::common::wslc_schema::Health WaitForContainerHealth(
+    const std::wstring& containerName, const std::string_view& expectedStatus, std::chrono::milliseconds timeout = std::chrono::seconds(120));
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
@@ -205,6 +245,10 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
 
 void VerifyPseudoConsoleTtySize(WSLCInteractiveSession& session, SHORT columns, SHORT rows);
 
+// Waits for a substring to appear in the session's pseudo console output.
+void WaitForPseudoConsoleOutput(
+    const WSLCInteractiveSession& session, const std::string& expected, std::chrono::seconds timeout = std::chrono::seconds(60));
+
 // Starts a local registry container using the COM API and returns the running container (holds it
 // alive) plus the registry address. Host network for plain http, bridge network for tls enabled.
 std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
@@ -216,6 +260,55 @@ std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalReg
 
 // Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
 std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
+
+// Verifies "--format json" output was emitted as a single compact line and returns the parsed document.
+inline nlohmann::json VerifyCompactJsonOutput(const WSLCExecutionResult& result)
+{
+    VERIFY_IS_TRUE(result.Stdout.has_value());
+
+    const auto lines = result.GetStdoutLines();
+    VERIFY_ARE_EQUAL(1u, lines.size(), L"'--format json' output must be a single line");
+
+    return nlohmann::json::parse(wsl::shared::string::WideToMultiByte(lines[0]));
+}
+
+// Parses list output emitted as one compact JSON object per line.
+inline std::vector<nlohmann::json> ParseNdjsonOutput(const WSLCExecutionResult& result)
+{
+    VERIFY_IS_TRUE(result.Stdout.has_value());
+
+    std::vector<nlohmann::json> entries;
+    for (const auto& line : result.GetStdoutLines())
+    {
+        if (line.empty())
+        {
+            continue;
+        }
+
+        auto entry = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(line));
+        if (!entry.is_object())
+        {
+            VERIFY_FAIL(std::format(L"Line is not a JSON object: '{}'", line).c_str());
+        }
+
+        entries.push_back(std::move(entry));
+    }
+
+    return entries;
+}
+
+// Typed form of ParseNdjsonOutput() that deserializes each line into T.
+template <typename T>
+std::vector<T> ParseNdjsonOutputAs(const WSLCExecutionResult& result)
+{
+    std::vector<T> entries;
+    for (const auto& entry : ParseNdjsonOutput(result))
+    {
+        entries.push_back(entry.get<T>());
+    }
+
+    return entries;
+}
 
 // Verifies that a string is a valid hex ID output.
 // truncated=true expects 12 hex chars, truncated=false expects 64 hex chars.

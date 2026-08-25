@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "ImageModel.h"
 
 namespace WSLCE2ETests {
@@ -26,16 +27,15 @@ class WSLCE2EImageImportTests
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(ImportedImage);
+        TestImageRegistry::Instance().Delete(ImportedImage);
         EnsureNoUntaggedImages();
         return true;
     }
 
     TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsDeleted(ImportedImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().Delete(ImportedImage);
         EnsureNoUntaggedImages();
         SavedArchivePath = wsl::windows::common::filesystem::GetTempFilename();
         return true;
@@ -57,9 +57,8 @@ class WSLCE2EImageImportTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_MissingFile)
     {
         const auto result = RunWslc(L"image import");
-        result.Verify({.ExitCode = 1});
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_TRUE(result.Stderr->find(L"Required argument not provided: 'file'") != std::wstring::npos);
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'file'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_Success)
@@ -104,11 +103,11 @@ class WSLCE2EImageImportTests
         auto countUntaggedImages = [&]() {
             auto result = RunWslc(L"image list --format json");
             result.Verify({.Stderr = L"", .ExitCode = 0});
-            auto images = FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+            auto images = ParseNdjsonOutputAs<wsl::windows::wslc::models::ImageOutputInformation>(result);
             size_t count = 0;
             for (const auto& img : images)
             {
-                if (!img.Repository.has_value() || img.Repository.value() == "<none>")
+                if (img.Repository == wsl::windows::wslc::models::c_none)
                 {
                     count++;
                 }
@@ -141,8 +140,16 @@ class WSLCE2EImageImportTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_FromStdin_Success)
     {
-        // TODO: http://task.ms/62246732
-        SKIP_TEST_NOT_IMPL();
+        // Save image as a tarball
+        auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
+        saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // '-' reads the archive from stdin; a file handle is required because import needs the size.
+        auto importResult = RunWslcWithStdinFile(std::format(L"image import - {}", ImportedImage.NameAndTag()), SavedArchivePath);
+        importResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyIdOutput(importResult.GetStdoutOneLine(), true);
+        VerifyImageIsListed(ImportedImage);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_InvalidPath)

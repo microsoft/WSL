@@ -23,6 +23,22 @@ using SOCKADDR_INET = union _SOCKADDR_INET;
 
 namespace wsl::windows::common::string {
 
+enum class StorageSizeUnit
+{
+    Decimal,
+    Binary
+};
+
+std::optional<uint64_t> ParseStorageSize(std::wstring_view String, StorageSizeUnit Unit);
+
+std::wstring FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace = false);
+
+std::wstring FormatBytes(uint64_t Bytes);
+
+// Formats a size as base 1000 with no space and the given number of significant digits
+// (119856765 -> "120MB" at precision 3, "119.9MB" at 4).
+std::wstring FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision = 3);
+
 std::vector<std::string> InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize);
 
 bool IsPathComponentEqual(const std::wstring_view String1, const std::wstring_view String2);

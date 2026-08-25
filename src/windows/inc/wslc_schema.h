@@ -30,13 +30,32 @@ struct InspectPortBinding
 
 struct InspectMount
 {
-    // TODO: Support different mount types (plan9/VHD) when VHD volumes are implemented.
     std::string Type;
+    std::string Name;
     std::string Source;
     std::string Destination;
     bool ReadWrite{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, ReadWrite);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Name, Source, Destination, ReadWrite);
+};
+
+struct HealthcheckResult
+{
+    std::string Start;
+    std::string End;
+    int ExitCode{};
+    std::string Output;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthcheckResult, Start, End, ExitCode, Output);
+};
+
+struct Health
+{
+    std::string Status;
+    int FailingStreak{};
+    std::vector<HealthcheckResult> Log;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Health, Status, FailingStreak, Log);
 };
 
 struct ContainerInspectState
@@ -46,8 +65,9 @@ struct ContainerInspectState
     int ExitCode{};
     std::string StartedAt;
     std::string FinishedAt;
+    std::optional<Health> Health;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt, Health);
 };
 
 struct Ulimit
@@ -69,16 +89,38 @@ struct InspectHostConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
 };
 
+struct HealthConfig
+{
+    std::optional<std::vector<std::string>> Test;
+    std::optional<std::int64_t> Interval;
+    std::optional<std::int64_t> Timeout;
+    std::optional<std::int64_t> StartPeriod;
+    std::optional<int> Retries;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HealthConfig, Test, Interval, Timeout, StartPeriod, Retries);
+};
+
 struct ContainerConfig
 {
+    std::string Image;
     std::optional<std::vector<std::string>> Env;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
     std::string User;
     std::string WorkingDir;
     std::optional<int> StopTimeout;
+    std::optional<HealthConfig> Healthcheck;
+    std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, Env, Cmd, Entrypoint, User, WorkingDir, StopTimeout, Healthcheck, Labels);
+};
+
+struct InspectEndpointIPAMConfig
+{
+    std::string IPv4Address;
+    std::vector<std::string> LinkLocalIPs;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
 };
 
 struct InspectEndpointSettings
@@ -88,8 +130,11 @@ struct InspectEndpointSettings
     std::string MacAddress;
     int IPPrefixLen{};
     std::vector<std::string> Aliases;
+    std::vector<std::string> Links;
+    std::map<std::string, std::string> DriverOpts;
+    std::optional<InspectEndpointIPAMConfig> IPAMConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen, Aliases, Links, DriverOpts, IPAMConfig);
 };
 
 struct InspectNetworkSettings
@@ -164,40 +209,143 @@ struct InspectVolume
     std::string Name;
     std::string Driver;
     std::string CreatedAt;
-    std::map<std::string, std::string> DriverOpts;
-    std::map<std::string, std::string> Labels;
+    std::string Mountpoint;
+    std::string Scope;
+    std::optional<std::map<std::string, std::string>> Options;
+    std::optional<std::map<std::string, std::string>> Labels;
     std::optional<std::map<std::string, std::string>> Status;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVolume, Name, Driver, CreatedAt, DriverOpts, Labels, Status);
 };
+
+// Labels and options are reported as null rather than as empty objects, and the driver-specific
+// status is omitted entirely when the driver reports nothing.
+inline void to_json(nlohmann::json& j, const InspectVolume& volume)
+{
+    const auto mapOrNull = [](const std::optional<std::map<std::string, std::string>>& value) {
+        return value.has_value() && !value->empty() ? nlohmann::json(*value) : nlohmann::json(nullptr);
+    };
+
+    j = nlohmann::json::object();
+    j["CreatedAt"] = volume.CreatedAt;
+    j["Driver"] = volume.Driver;
+    j["Labels"] = mapOrNull(volume.Labels);
+    j["Mountpoint"] = volume.Mountpoint;
+    j["Name"] = volume.Name;
+    j["Options"] = mapOrNull(volume.Options);
+    j["Scope"] = volume.Scope;
+
+    if (volume.Status.has_value() && !volume.Status->empty())
+    {
+        j["Status"] = *volume.Status;
+    }
+}
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(InspectVolume, Name, Driver, CreatedAt, Mountpoint, Scope, Options, Labels, Status);
 
 struct IPAMConfig
 {
     std::string Subnet;
     std::string Gateway;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway);
+    std::string IPRange;
 };
+
+// The gateway and ip range are omitted when unset rather than emitted as empty strings.
+inline void to_json(nlohmann::json& j, const IPAMConfig& config)
+{
+    j = nlohmann::json::object();
+    j["Subnet"] = config.Subnet;
+
+    if (!config.Gateway.empty())
+    {
+        j["Gateway"] = config.Gateway;
+    }
+
+    if (!config.IPRange.empty())
+    {
+        j["IPRange"] = config.IPRange;
+    }
+}
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(IPAMConfig, Subnet, Gateway, IPRange);
 
 struct IPAM
 {
     std::string Driver;
     std::optional<std::vector<IPAMConfig>> Config;
+    std::map<std::string, std::string> Options;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAM, Driver, Config);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAM, Driver, Config, Options);
+};
+
+struct NetworkConfigFrom
+{
+    std::string Network;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkConfigFrom, Network);
+};
+
+struct NetworkContainer
+{
+    std::string Name;
+    std::string EndpointID;
+    std::string MacAddress;
+    std::string IPv4Address;
+    std::string IPv6Address;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkContainer, Name, EndpointID, MacAddress, IPv4Address, IPv6Address);
 };
 
 struct Network
 {
     std::string Id;
     std::string Name;
+    std::string Created;
     std::string Driver;
     std::string Scope;
+    bool EnableIPv4{true};
+    bool EnableIPv6{};
     bool Internal{};
+    bool Attachable{};
+    bool Ingress{};
+    bool ConfigOnly{};
+    NetworkConfigFrom ConfigFrom;
     IPAM IPAM;
+    std::map<std::string, std::string> Options;
+    std::map<std::string, std::string> Labels;
+    std::map<std::string, NetworkContainer> Containers;
+    nlohmann::json Status = nlohmann::json::object();
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        Network, Id, Name, Created, Driver, Scope, EnableIPv4, EnableIPv6, Internal, Attachable, Ingress, ConfigOnly, ConfigFrom, IPAM, Options, Labels, Containers, Status);
+};
+
+// The network properties carried from the session to the CLI for "network list". Values keep their
+// native types; the CLI renders the string output.
+struct NetworkListEntry
+{
+    std::string Id;
+    std::string Name;
+    std::string Driver;
+    std::string Scope;
+    std::string Created;
+    bool EnableIPv4{true};
+    bool EnableIPv6{};
+    bool Internal{};
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels);
+};
+
+// The volume properties carried from the session to the CLI for "volume list". Values keep their
+// native types; the CLI renders the string output.
+struct VolumeListEntry
+{
+    std::string Name;
+    std::string Driver;
+    std::string Mountpoint;
+    std::string Scope;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeListEntry, Name, Driver, Mountpoint, Scope, Labels);
 };
 
 struct EventActor

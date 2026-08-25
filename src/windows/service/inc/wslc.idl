@@ -30,6 +30,7 @@ cpp_quote("#endif")
 #define WSLC_MAX_VOLUME_NAME_LENGTH 255
 #define WSLC_MAX_VOLUME_DRIVER_LENGTH 255
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
+#define WSLC_MAX_IMAGE_ID_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 #define WSLC_EPHEMERAL_PORT 0
@@ -40,6 +41,7 @@ cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
 cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
+cpp_quote("#define WSLC_MAX_IMAGE_ID_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
@@ -89,6 +91,23 @@ interface IWarningCallback : IUnknown
     HRESULT OnWarning([in, string] LPCWSTR Message);
 };
 
+typedef enum _EnumReferenceFormat
+{
+    EnumReferenceFormatNone = 0,
+    EnumReferenceFormatTag = 1,
+    EnumReferenceFormatDigest = 2,
+} EnumReferenceFormat;
+
+[
+    uuid(7F3B62FD-E1C1-4F69-A8E2-853CAD9051BD),
+    pointer_default(unique),
+    object
+]
+interface IImageLoadCallback : IUnknown
+{
+    HRESULT OnImageLoaded([in, string] LPCSTR Image, [in] EnumReferenceFormat Format);
+};
+
 [
     uuid(F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2),
     pointer_default(unique),
@@ -108,16 +127,26 @@ interface IWSLCPluginNotifier : IUnknown
 
     // Called when an image is deleted. 'ImageId' is the image identifier. Errors are logged but ignored.
     HRESULT OnImageDeleted([in] LPCSTR ImageId);
+
+    // Called when the VM backing the session has started (first start or recreation after idle
+    // teardown). Errors are logged but ignored.
+    HRESULT OnVmStarted();
+
+    // Called when the VM backing the session is about to stop. The VM is still running, and is
+    // committed to stopping: session calls made from this callback are served by it, while any other
+    // caller waits for the teardown and is served by the next VM. Errors are logged but ignored.
+    HRESULT OnVmStopping();
 };
 
 typedef struct _WSLCImageInformation
 {
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
-    char Hash[256];
+    char Hash[WSLC_MAX_IMAGE_ID_LENGTH + 1];
     char Digest[256];
     LONGLONG Size; // Matches Docker's int64 image size
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
+    LONGLONG Containers; // Number of containers created from the image, or -1 if it wasn't requested
 } WSLCImageInformation;
 
 typedef struct _KeyValuePairInformation
@@ -151,6 +180,28 @@ typedef struct _WSLCStringArray
     [unique, size_is(Count)] LPCSTR const* Values;
     ULONG Count;
 } WSLCStringArray;
+
+typedef struct _WSLCBuildSecret
+{
+    [string] LPCSTR Id; // Value for docker's --secret id= field.
+    // For file (src=) secrets: the resolved absolute host path of the secret file. The server mounts the
+    // file's parent directory into the build VM read-only over virtiofs and references the file in place,
+    // so the secret bytes are never copied off their original (possibly EFS-encrypted) location. Null for
+    // env/in-memory secrets.
+    [string, unique] LPCWSTR SourcePath;
+    // For env/in-memory secrets: raw secret bytes (never cross into argv). Carried as a counted byte array
+    // so arbitrary binary content - including embedded NULs - round-trips losslessly; the server writes it
+    // to a host file exposed to the VM read-only over virtiofs and references it with docker's --secret
+    // src=. Null for file secrets.
+    [unique, size_is(ValueSize)] const byte* Value;
+    ULONG ValueSize;
+} WSLCBuildSecret;
+
+typedef struct _WSLCBuildSecretArray
+{
+    [unique, size_is(Count)] const WSLCBuildSecret* Values;
+    ULONG Count;
+} WSLCBuildSecretArray;
 
 typedef struct _WSLCProcessOptions
 {
@@ -197,6 +248,37 @@ typedef struct _WSLCTmpfsMount
     [unique] LPCSTR Options;
 } WSLCTmpfsMount;
 
+typedef enum _WSLCMountType
+{
+    WSLCMountTypeBind,
+    WSLCMountTypeVolume,
+    WSLCMountTypeTmpfs,
+} WSLCMountType;
+
+typedef enum _WSLCMountSpecFlags
+{
+    WSLCMountSpecFlagsNone = 0,
+    WSLCMountSpecFlagsTmpfsSize = 1,
+    WSLCMountSpecFlagsTmpfsMode = 2,
+    WSLCMountSpecFlagsCreateSourceIfMissing = 4,
+    WSLCMountSpecFlagsTmpfsOptions = 8,
+} WSLCMountSpecFlags;
+
+cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing | WSLCMountSpecFlagsTmpfsOptions)")
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCMountSpecFlags);")
+
+typedef struct _WSLCMountSpec
+{
+    WSLCMountType Type;
+    [unique, string] LPCWSTR Source;
+    [string] LPCSTR Target;
+    BOOL ReadOnly;
+    WSLCMountSpecFlags Flags;
+    LONGLONG TmpfsSizeBytes;
+    ULONG TmpfsMode;
+    [unique, string] LPCSTR TmpfsOptions;
+} WSLCMountSpec;
+
 typedef struct _WSLCUlimit
 {
     [string] LPCSTR Name;
@@ -207,6 +289,9 @@ typedef struct _WSLCUlimit
 typedef struct _WSLCNetworkConnection
 {
     [string] LPCSTR NetworkName;
+
+    // Settings for this endpoint.
+    // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
     [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
     ULONG SettingsCount;
 } WSLCNetworkConnection;
@@ -215,7 +300,10 @@ typedef struct _WSLCNetworkConnection
 typedef struct _WSLCNetworkConnectionOptions
 {
     [unique] LPCSTR NetworkName;
-    [unique] LPCSTR ContainerIpAddress; // Reserved for future --ip support; must be NULL today.
+    // Endpoint settings for the network connection (Aliases, IPAddress, Links, LinkLocalIPs, DriverOpts).
+    // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
+    [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
+    ULONG SettingsCount;
 } WSLCNetworkConnectionOptions;
 
 typedef struct _WSLCContainerNetwork
@@ -268,6 +356,15 @@ typedef struct _WSLCContainerOptions
 
     // Ignored unless WSLCContainerFlagsStopTimeout is set in Flags.
     LONG StopTimeout;
+
+    [unique] LPCSTR HealthCmd;
+    LONGLONG HealthIntervalNs;
+    LONGLONG HealthTimeoutNs;
+    LONGLONG HealthStartPeriodNs;
+    LONG HealthRetries;
+
+    [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
+    ULONG MountsCount;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
@@ -277,8 +374,8 @@ typedef struct _WSLCContainerEntry
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
     WSLCContainerId Id;
-    ULONGLONG StateChangedAt;
-    ULONGLONG CreatedAt;
+    LONGLONG StateChangedAt;
+    LONGLONG CreatedAt;
     WSLCContainerState State;
 } WSLCContainerEntry;
 
@@ -383,11 +480,10 @@ interface IWSLCVirtualMachine : IUnknown
     HRESULT RemoveShare([in] REFGUID ShareId);
 
     // Configures the per-VM state discovered from the guest kernel after boot
-    // (currently the hv_pci swiotlb pool). Subsequent calls to AddShare and
-    // ConfigureNetworking forward these values to wsldevicehost via the
-    // swiotlb device-options token. A capabilities struct whose fields are
-    // all zero means the guest kernel does not support the feature; the
-    // token is then omitted.
+    // (currently the hv_pci swiotlb pool). Non-zero values are forwarded to
+    // wsldevicehost before virtiofs shares or Consomme networking devices are
+    // created. A capabilities struct whose fields are all zero means the guest
+    // kernel does not support the feature.
     HRESULT ApplyGuestCapabilities([in] const WSLCGuestCapabilities* Capabilities);
 
     // Returns an event that is signaled when the VM exits (graceful or forced).
@@ -442,8 +538,10 @@ typedef struct _WSLCSessionSettings {
     ULONG BootTimeoutMs;
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
+    [unique] LPCSTR HostLoopback;
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
+    ULONG IdleTimeoutSec;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
@@ -467,7 +565,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
     HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] const WSLCProcessStartOptions* StartOptions, [out] IWSLCProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] LONGLONG Since, [in] LONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
@@ -475,6 +573,8 @@ interface IWSLCContainer : IUnknown
     HRESULT Stats([out] LPSTR* Output);
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
+    HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
+    HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] WSLCHandle OutHandle);
 }
 
 typedef struct _WSLCDeletedImageInformation
@@ -499,6 +599,12 @@ typedef struct _WSLCBuildImageOptions
     LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
     WSLCStringArray Labels;    // KEY=VALUE pairs passed as --label to docker.
+    WSLCBuildSecretArray Secrets; // --secret entries; the server writes each secret's bytes to a host file exposed to the VM read-only over virtiofs and emits the corresponding id=...,src=... spec.
+    [unique, string] LPCSTR Output; // buildx exporter spec passed as --output to docker build (e.g. type=tar, type=oci). The client omits dest= for exporters with a client destination; the server rewrites it to a VM temp path (streamed back over OutputHandle) or into the OutputMountPath mount (single-file exporters with a real destination). Directory exporters (type=local, or oci/docker with tar=false) are not supported.
+    WSLCHandle OutputHandle; // When Type != WSLCHandleTypeUnknown, the server streams the single-file exporter output (a tar/oci/docker tarball, or dest=- stdout) to this handle after a successful build.
+    [unique, string] LPCWSTR OutputMountPath; // When set, the server mounts this Windows directory read-write into the VM and points the exporter's dest at it (plus OutputMountFile). Used for single-file exporters with a real destination; mutually exclusive with OutputHandle.
+    [unique, string] LPCWSTR OutputMountFile; // Leaf filename within OutputMountPath that a single-file exporter writes to.
+    [unique, string] LPCWSTR IidFilePath; // Absolute path of the client's --iidfile destination. The server mounts its parent directory read-write into the VM and passes --iidfile pointing at it, so buildx writes the image ID straight to the destination.
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
@@ -534,16 +640,13 @@ typedef struct _WSLCNetworkOptions
     ULONG DriverOptsCount;
     [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
     ULONG LabelsCount;
+    BOOL Internal;
+    [unique] LPCSTR Subnet;
+    [unique] LPCSTR Gateway;
+    [unique] LPCSTR IpRange;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
-
-typedef struct _WSLCNetworkInformation
-{
-    char Name[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
-    char Id[WSLC_CONTAINER_ID_LENGTH + 1];
-    char Driver[64];
-} WSLCNetworkInformation;
 
 typedef struct _WSLCPruneContainersResults
 {
@@ -587,6 +690,7 @@ typedef struct _WSLCSessionInitSettings
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
+    ULONG IdleTimeoutSec;
 } WSLCSessionInitSettings;
 
 [
@@ -624,8 +728,8 @@ interface IWSLCSession : IUnknown
     // Image management.
     HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback);
-    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in, unique] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [out] LPSTR* ImageId);
+    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [in, unique] IImageLoadCallback* LoadCallback);
+    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in, unique] LPCSTR ImageName, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [out] LPSTR* ImageId);
     HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT SaveImages([in] WSLCHandle OutputHandle, [in] const WSLCStringArray* ImageNames, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImagesOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
@@ -641,7 +745,13 @@ interface IWSLCSession : IUnknown
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [out] IWSLCProcess** Process, [out] int* Errno);
+    // 'AcquireVmLease' controls whether the call may bring a VM up. TRUE is the normal client
+    // behaviour: start the VM if there is none, and wait out an announced stop so the call is served
+    // by a fresh VM. FALSE is what the service passes for plugin-originated calls: the call is served
+    // by whatever VM is already running -- including one committed to stopping, which is what lets a
+    // plugin do last-minute work from its OnVmStopping handler without deadlocking against the
+    // teardown it is blocking -- and fails with WSLC_E_VM_NOT_RUNNING when there is no VM.
+    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [in] BOOL AcquireVmLease, [out] IWSLCProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
@@ -651,9 +761,10 @@ interface IWSLCSession : IUnknown
     // Terminate the VM and containers.
     HRESULT Terminate();
 
-    // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
-    HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath);
+    // Used only for testing (and by the plugin API). TODO: Think about moving them to a dedicated
+    // testing-only interface. See CreateRootNamespaceProcess for 'AcquireVmLease'.
+    HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly, [in] BOOL AcquireVmLease);
+    HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath, [in] BOOL AcquireVmLease);
     HRESULT MapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
@@ -671,7 +782,7 @@ interface IWSLCSession : IUnknown
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
     HRESULT DeleteVolume([in] LPCSTR Name);
-    HRESULT ListVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
+    HRESULT ListVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] LPSTR* Output);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
@@ -681,11 +792,26 @@ interface IWSLCSession : IUnknown
     // Network management.
     HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options, [in, unique] IWarningCallback* WarningCallback);
     HRESULT DeleteNetwork([in] LPCSTR Name);
-    HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
+    // Returns a JSON array of wslc_schema::NetworkListEntry objects describing the session's networks.
+    HRESULT ListNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] LPSTR* Output);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
     HRESULT PruneNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *NetworksCount)] WSLCNetworkName** Networks, [out] ULONG* NetworksCount);
 
     HRESULT RegisterCrashDumpCallback([in] ICrashDumpCallback* Callback, [out] IUnknown** Subscription);
+
+    // Used only for testing. Synchronously runs the idle-termination teardown path. The production
+    // activity-count and persistent-storage guards are honored, so an active container keeps the VM
+    // alive and a tmpfs-backed session is never torn down.
+    // WasAlreadyIdle is TRUE when the VM was not running.
+    HRESULT TriggerIdleTermination([out] BOOL* WasAlreadyIdle);
+
+    // Keeps the VM alive for the duration of a client-side container operation. The CLI performs
+    // each mutation as two round-trips (OpenContainer followed by the operation) and may stream
+    // output afterwards. With on-demand VM idle-termination the VM could otherwise tear down
+    // between those calls, disconnecting the container wrapper and failing the second call with
+    // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
+    // it (or the client exiting) lets the VM idle-terminate again.
+    HRESULT BeginContainerOperation([out] IUnknown** Operation);
 }
 
 //
@@ -773,5 +899,8 @@ cpp_quote("#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILI
 cpp_quote("#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */")
 cpp_quote("#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14) /* 0x8004060E */")
 cpp_quote("#define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15) /* 0x8004060F */")
-cpp_quote("#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16) /* 0x80040610 */")
-cpp_quote("#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17) /* 0x80040611 */")
+// N.B. WSLC_E_VM_NOT_RUNNING is part of the plugin API contract and is also defined in WslPluginApi.h.
+// The two definitions must stay in sync.
+cpp_quote("#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16) /* 0x80040610 */")
+cpp_quote("#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17) /* 0x80040611 */")
+cpp_quote("#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18) /* 0x80040612 */")
