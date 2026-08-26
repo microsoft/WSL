@@ -105,11 +105,11 @@ void ThrowIfOperationError(
     const auto result = WaitForDeploymentOperation(operation);
     THROW_IF_FAILED_MSG(
         result.ExtendedErrorCode(),
-        "%ls Source: %hs() - %hs:%lu",
+        "%ls Source: %hs() - %hs:%u",
         result.ErrorText().c_str(),
         source.function_name(),
         source.file_name(),
-        source.line());
+        static_cast<unsigned int>(source.line()));
 }
 
 std::wstring GetMsiProperty(MSIHANDLE install, LPCWSTR name)
