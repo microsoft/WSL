@@ -3,8 +3,8 @@ parameters:
     type: object
     default: [x64, arm64]
 
-  - name: dcatEnvironment
-    type: string
+  - name: isProduction
+    type: boolean
 
 stages:
   # Internal ring. Runs automatically.
@@ -18,7 +18,7 @@ stages:
           displayName: Submit MSFlight content
           distributionIntent: MSFlight
           platforms: ${{ parameters.platforms }}
-          dcatEnvironment: ${{ parameters.dcatEnvironment }}
+          isProduction: ${{ parameters.isProduction }}
 
       - template: dcat-audience-job.yml
         parameters:
@@ -27,7 +27,7 @@ stages:
           audience: Internal
           dependsOn: [submit_msflight]
           platforms: ${{ parameters.platforms }}
-          dcatEnvironment: ${{ parameters.dcatEnvironment }}
+          isProduction: ${{ parameters.isProduction }}
 
   # Preview ring.
   - template: publish-gate-stage.yml
@@ -57,7 +57,7 @@ stages:
           distributionIntent: External
           platforms: ${{ parameters.platforms }}
           dependsOn: [probe] # TEMPORARY
-          dcatEnvironment: ${{ parameters.dcatEnvironment }}
+          isProduction: ${{ parameters.isProduction }}
 
       - template: dcat-audience-job.yml
         parameters:
@@ -66,7 +66,7 @@ stages:
           audience: Insider
           dependsOn: [submit_external]
           platforms: ${{ parameters.platforms }}
-          dcatEnvironment: ${{ parameters.dcatEnvironment }}
+          isProduction: ${{ parameters.isProduction }}
 
   - template: publish-gate-stage.yml
     parameters:
@@ -94,4 +94,4 @@ stages:
           audience: Public
           platforms: ${{ parameters.platforms }}
           dependsOn: [probe] # TEMPORARY
-          dcatEnvironment: ${{ parameters.dcatEnvironment }}
+          isProduction: ${{ parameters.isProduction }}

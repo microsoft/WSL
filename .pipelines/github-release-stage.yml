@@ -1,5 +1,10 @@
-# Creates the GitHub release. create-release.py creates it as a draft, so someone still has to review the
-# notes and publish it by hand.
+# Creates the GitHub release as a draft with the real assets attached. create-release.py always creates a
+# draft (regardless of --publish, which only gates whether it calls the GitHub API at all) — a human still
+# has to review the notes and publish it by hand.
+
+parameters:
+  - name: isProduction
+    type: boolean
 
 stages:
   - stage: github_release
@@ -15,7 +20,7 @@ stages:
 
         templateContext:
           type: releaseJob
-          isProduction: true # Publishes a real GitHub release, even though it's created as a draft.
+          isProduction: ${{ parameters.isProduction }}
           inputs:
             - input: pipelineArtifact
               pipeline: releaseBuild

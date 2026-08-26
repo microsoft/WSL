@@ -2,13 +2,10 @@
 # only reads artifacts from a completed release build and pushes them where they need to go.
 
 parameters:
-  - name: dcatEnvironment
-    displayName: 'DCAT environment'
-    type: string
-    default: PPE
-    values:
-      - PPE
-      - PROD
+  - name: isProduction
+    displayName: 'Production release (PROD DCAT + Store + NuGet + published GitHub release, Official template)'
+    type: boolean
+    default: false
 
   - name: versionOverride
     displayName: 'Version to publish (defaults to the release build tag)'
@@ -35,23 +32,25 @@ resources:
       ref: refs/tags/v1
 
 variables:
-  - name: dcatEnvironment
-    value: ${{ parameters.dcatEnvironment }}
   - name: dcatTenantId
     value: 33e01921-4d64-4f8c-a055-5bdaffd5e33d
   - name: dcatPublisher
     value: WSL
 
-  - ${{ if eq(parameters.dcatEnvironment, 'PPE') }}:
-      - name: dcatServiceConnection
-        value: wsl-dcat-publish-ppe
-      - name: dcatClientId
-        value: 793bdf5b-a802-4c14-9857-2c3047139431
-  - ${{ else }}:
+  - ${{ if eq(parameters.isProduction, true) }}:
+      - name: dcatEnvironment
+        value: PROD
       - name: dcatServiceConnection
         value: wsl-dcat-publish-prod
       - name: dcatClientId
         value: 9752ce08-bcf4-432b-ab86-d60856f646c0
+  - ${{ else }}:
+      - name: dcatEnvironment
+        value: PPE
+      - name: dcatServiceConnection
+        value: wsl-dcat-publish-ppe
+      - name: dcatClientId
+        value: 793bdf5b-a802-4c14-9857-2c3047139431
 
   # The release build is triggered by a tag, so its source branch carries the version being published.
   - ${{ if ne(parameters.versionOverride, '') }}:
@@ -66,7 +65,13 @@ variables:
     value: $(packageVersion).0
 
 extends:
-  template: v1/1ES.Unofficial.PipelineTemplate.yml@1ESPipelineTemplates
+  # A 1ES pipeline extending the Unofficial template can never contain an isProduction: true release job.
+  # Store, NuGet, and a fully-published GitHub release are all genuine production actions, so a real
+  # production run has to extend Official instead.
+  ${{ if eq(parameters.isProduction, true) }}:
+    template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  ${{ else }}:
+    template: v1/1ES.Unofficial.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     pool:
       name: Azure-Pipelines-1ESPT-ExDShared
@@ -79,10 +84,14 @@ extends:
     stages:
       - template: dcat-publish-stages.yml@self
         parameters:
-          dcatEnvironment: ${{ parameters.dcatEnvironment }}
+          isProduction: ${{ parameters.isProduction }}
 
-      - template: store-flight-stage.yml@self
+      - ${{ if eq(parameters.isProduction, true) }}:
+          - template: store-flight-stage.yml@self
 
       - template: github-release-stage.yml@self
+        parameters:
+          isProduction: ${{ parameters.isProduction }}
 
-      - template: nuget-publish-stage.yml@self
+      - ${{ if eq(parameters.isProduction, true) }}:
+          - template: nuget-publish-stage.yml@self

@@ -19,8 +19,8 @@ parameters:
     type: object
     default: [x64, arm64]
 
-  - name: dcatEnvironment
-    type: string
+  - name: isProduction
+    type: boolean
 
 jobs:
   - job: ${{ parameters.name }}
@@ -34,8 +34,7 @@ jobs:
 
     templateContext:
       type: releaseJob
-      # DCAT submissions against the PROD environment are real production releases; PPE submissions are not.
-      isProduction: ${{ eq(parameters.dcatEnvironment, 'PROD') }}
+      isProduction: ${{ parameters.isProduction }}
       inputs:
         - input: pipelineArtifact
           pipeline: releaseBuild
