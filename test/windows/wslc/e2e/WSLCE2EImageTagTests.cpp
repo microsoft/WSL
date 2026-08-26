@@ -63,7 +63,8 @@ class WSLCE2EImageTagTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Tag_SourceImageNotFound)
     {
         auto result = RunWslc(std::format(L"image tag {} {}", InvalidImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
+        auto errorMessage =
+            FormatErrorMessage(std::format(L"No such image: {}", InvalidImage.NameAndTag()), L"WSLC_E_IMAGE_NOT_FOUND");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -71,8 +72,8 @@ class WSLCE2EImageTagTests
     {
         auto imageWithDigest = L"debian-mock:tag@sha256:11111111111111111111111111111111";
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), imageWithDigest));
-        auto errorMessage =
-            std::format(L"Invalid image tag format: '{}'. Expected format is 'name:tag'\r\nError code: E_INVALIDARG\r\n", imageWithDigest);
+        auto errorMessage = FormatErrorMessage(
+            std::format(L"Invalid image tag format: '{}'. Expected format is 'name:tag'", imageWithDigest), L"E_INVALIDARG");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
