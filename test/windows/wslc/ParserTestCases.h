@@ -63,7 +63,7 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
             Argument::Create(ArgType::Verbose),
             Argument::Create(ArgType::Remove),
             Argument::Create(ArgType::Signal),
-            Argument::Create(ArgType::Time),
+            Argument::Create(ArgType::Timeout),
             Argument::Create(ArgType::Publish, false, Limit::Unlimited), // Not required, unlimited.
         };
 

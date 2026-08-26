@@ -129,6 +129,26 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 namespace wsl::windows::wslc::task {
 
+// Every container is attempted even if an earlier one fails; the command still exits nonzero.
+template <typename TAction>
+static void ForEachContainerBestEffort(CLIExecutionContext& context, TAction&& action)
+{
+    for (const auto& id : context.Args.GetAllValues<ArgType::ContainerId>())
+    {
+        try
+        {
+            action(WideToMultiByte(id));
+            context.Terminal.Output(L"{}\n", id);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            context.OutputError(wil::ResultFromCaughtException());
+            context.ExitCode = 1;
+        }
+    }
+}
+
 static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
 {
     try
@@ -228,14 +248,9 @@ void KillContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     const auto signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGKILL);
 
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Kill(session, WideToMultiByte(id), signal);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    ForEachContainerBestEffort(context, [&](const std::string& id) { ContainerService::Kill(session, id, signal); });
 }
 
 void ExportContainer(CLIExecutionContext& context)
@@ -605,14 +620,10 @@ void RemoveContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
-    bool force = context.Args.GetValue<ArgType::Force>();
-    bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Delete(session, WideToMultiByte(id), force, deleteVolumes);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    const bool force = context.Args.GetValue<ArgType::Force>();
+    const bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
+
+    ForEachContainerBestEffort(context, [&](const std::string& id) { ContainerService::Delete(session, id, force, deleteVolumes); });
 }
 
 void RunContainer(CLIExecutionContext& context)
@@ -1016,44 +1027,35 @@ void StopContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
 
     // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
     options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
 
-    if (context.Args.Contains(ArgType::Time))
+    if (context.Args.Contains(ArgType::Timeout))
     {
-        options.Timeout = context.Args.GetValue<ArgType::Time>();
+        options.Timeout = context.Args.GetValue<ArgType::Timeout>();
     }
 
-    for (const auto& id : containersToStop)
-    {
-        ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    ForEachContainerBestEffort(context, [&](const std::string& id) { ContainerService::Stop(session, id, options); });
 }
 
 void RestartContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containersToRestart = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
 
     // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
     options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
 
-    if (context.Args.Contains(ArgType::Time))
+    if (context.Args.Contains(ArgType::Timeout))
     {
-        options.Timeout = context.Args.GetValue<ArgType::Time>();
+        options.Timeout = context.Args.GetValue<ArgType::Timeout>();
     }
 
-    for (const auto& id : containersToRestart)
-    {
-        ContainerService::Restart(context.Terminal, session, WideToMultiByte(id), options);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    ForEachContainerBestEffort(
+        context, [&](const std::string& id) { ContainerService::Restart(context.Terminal, session, id, options); });
 }
 
 void ViewContainerLogs(CLIExecutionContext& context)

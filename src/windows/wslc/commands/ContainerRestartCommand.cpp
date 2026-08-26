@@ -29,7 +29,7 @@ std::vector<Argument> ContainerRestartCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
         Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, Localization::WSLCCLI_ContainerStopSignalArgDescription()),
-        Argument::Create(ArgType::Time),
+        Argument::Create(ArgType::Timeout),
     };
 }
 

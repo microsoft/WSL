@@ -3324,7 +3324,7 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>New image reference in the image-name[:tag] format</value>
   </data>
-  <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
+  <data name="WSLCCLI_TimeoutArgDescription" xml:space="preserve">
     <value>Time in seconds to wait before executing (default 5)</value>
   </data>
   <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">

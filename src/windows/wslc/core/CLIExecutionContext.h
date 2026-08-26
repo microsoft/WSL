@@ -52,6 +52,9 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Applies and freezes environment-only global options before command-line parsing reports errors.
     void ApplyGlobalEnvironmentOptions();
+
+    // Prints a caught error and clears it so a later failure in the same invocation reports its own message.
+    void OutputError(HRESULT result);
 };
 
 } // namespace wsl::windows::wslc::execution
