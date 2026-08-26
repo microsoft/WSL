@@ -20,6 +20,7 @@ stages:
 
         templateContext:
           type: releaseJob
+          isProduction: true # Flights to Partner Center, a real production system.
           inputs:
             - input: pipelineArtifact
               pipeline: releaseBuild

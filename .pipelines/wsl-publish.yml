@@ -78,6 +78,8 @@ extends:
 
     stages:
       - template: dcat-publish-stages.yml@self
+        parameters:
+          dcatEnvironment: ${{ parameters.dcatEnvironment }}
 
       - template: store-flight-stage.yml@self
 

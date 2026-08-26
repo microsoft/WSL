@@ -20,6 +20,7 @@ stages:
 
         templateContext:
           type: releaseJob
+          isProduction: true # Pushes to the real nuget.org feed.
           inputs:
             - input: pipelineArtifact
               pipeline: releaseBuild

@@ -15,6 +15,7 @@ stages:
 
         templateContext:
           type: releaseJob
+          isProduction: true # Publishes a real GitHub release, even though it's created as a draft.
           inputs:
             - input: pipelineArtifact
               pipeline: releaseBuild
