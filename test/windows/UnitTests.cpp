@@ -166,7 +166,8 @@ class UnitTests
             auto [out, err] =
                 LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdPath), -1);
 
-            VERIFY_ARE_EQUAL(out, L"This operation is only supported by WSL2.\r\nError code: Wsl/Service/WSL_E_WSL2_NEEDED\r\n");
+            VERIFY_ARE_EQUAL(
+                out, FormatErrorMessage(L"This operation is only supported by WSL2.", L"Wsl/Service/WSL_E_WSL2_NEEDED"));
             VERIFY_ARE_EQUAL(err, L"");
         }
 
@@ -1195,17 +1196,14 @@ class UnitTests
         {
             validateOutput(
                 commandLine.c_str(),
-                std::format(
-                    L"Failed to create disk '{}ext4.vhdx': The file exists. \r\n"
-                    L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n",
-                    LXSST_IMPORT_DISTRO_TEST_DIR));
+                FormatErrorMessage(
+                    std::format(L"Failed to create disk '{}ext4.vhdx': The file exists. ", LXSST_IMPORT_DISTRO_TEST_DIR),
+                    L"Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS"));
         }
         else
         {
             validateOutput(
-                commandLine.c_str(),
-                L"The file exists. \r\n"
-                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+                commandLine.c_str(), FormatErrorMessage(L"The file exists. ", L"Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS"));
         }
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
@@ -1216,8 +1214,7 @@ class UnitTests
             commandLine = std::format(L"--import dummy {} {} --vhd --version 1", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName);
             validateOutput(
                 commandLine.c_str(),
-                L"This operation is only supported by WSL2.\r\n"
-                L"Error code: Wsl/Service/RegisterDistro/WSL_E_WSL2_NEEDED\r\n");
+                FormatErrorMessage(L"This operation is only supported by WSL2.", L"Wsl/Service/RegisterDistro/WSL_E_WSL2_NEEDED"));
         }
 
         //
@@ -1235,8 +1232,8 @@ class UnitTests
             commandLine = std::format(L"--import path-conflict-distro \"{}\" \"{}\" --version {}", basePath, tarFileName, version);
             validateOutput(
                 commandLine.c_str(),
-                L"The supplied install location is already in use.\r\n"
-                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+                FormatErrorMessage(
+                    L"The supplied install location is already in use.", L"Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS"));
         }
 
         //
@@ -1277,7 +1274,7 @@ class UnitTests
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(commandLine.c_str(), -1);
 
         VERIFY_ARE_EQUAL(
-            out, L"Importing the distribution failed.\r\nError code: Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
+            out, FormatErrorMessage(L"Importing the distribution failed.", L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED"));
         VERIFY_ARE_EQUAL(err, L"bsdtar: Error opening archive: Unrecognized archive format\n");
     }
 
@@ -1422,7 +1419,7 @@ class UnitTests
         auto [output, _] = LxsstuLaunchWslAndCaptureOutput(
             Cmd.c_str(), wcscmp(EntryPoint, L"bash.exe") == 0 ? 1 : -1, nullptr, nullptr, EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, EntryPoint);
 
-        const auto expectedOutput = Message + L"\r\nError code: " + Code + L"\r\n";
+        const auto expectedOutput = FormatErrorMessage(Message, Code);
 
         if (!wsl::shared::string::IsEqual(output, expectedOutput, ignoreCasing))
         {
@@ -1519,9 +1516,7 @@ class UnitTests
                     L"-d DummyBrokenDistro",
                     L"An error occurred accessing the registry. Path: '\\REGISTRY\\USER\\" + Sid +
                         L"\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{baa405ef-1822-4bbe-84e2-30e4c6330d42}"
-                        L"\\Version'."
-                        L" "
-                        L"Error: Data of this type is not supported. ",
+                        L"\\Version'. Error: Data of this type is not supported. ",
                     L"Wsl/Service/ReadDistroConfig/ERROR_UNSUPPORTED_TYPE",
                     {},
                     L"wsl.exe",
@@ -1932,12 +1927,6 @@ Usage:
         Unregisters the distribution and deletes the root filesystem.
 )""";
 
-        const std::wstring WslInstallHelpMessage =
-            LR"""(Invalid distribution name: 'foo'.
-To get a list of valid distributions, use 'wsl.exe --list --online'.
-Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
-)""";
-
         auto AddCrlf = [](const std::wstring& Input) {
             std::wstring MessageWithCrlf;
 
@@ -1963,7 +1952,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         RegistryKeyChange<std::wstring> keyChange(
             HKEY_LOCAL_MACHINE, LXSS_REGISTRY_PATH, wsl::windows::common::distribution::c_distroUrlRegistryValue, c_testDistributionEndpoint);
 
-        VerifyOutput(L"--install foo", AddCrlf(WslInstallHelpMessage), -1);
+        VerifyOutput(
+            L"--install foo",
+            FormatErrorMessage(
+                L"Invalid distribution name: 'foo'.\r\nTo get a list of valid distributions, use 'wsl.exe --list --online'.",
+                L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"),
+            -1);
     }
 
     WSL2_TEST_METHOD(TestExistingSwapVhd)
@@ -2288,16 +2282,20 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         validateWarnings(
             L"networkingMode=bridged",
-            L"wsl: Bridged networking requires wsl2.vmSwitch to be set.\r\n"
-            L"Error code: CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_SET\r\n"
-            L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
+            L"wsl: " +
+                FormatErrorMessage(
+                    L"Bridged networking requires wsl2.vmSwitch to be set.",
+                    L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_SET") +
+                L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
             L"[wsl2]\n");
 
         validateWarnings(
             L"networkingMode=bridged\nvmSwitch=DoesNotExist",
-            L"wsl: The VmSwitch 'DoesNotExist' was not found. Available switches:*\r\n"
-            L"Error code: CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_FOUND\r\n"
-            L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
+            L"wsl: " +
+                FormatErrorMessage(
+                    L"The VmSwitch 'DoesNotExist' was not found. Available switches:*",
+                    L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_FOUND") +
+                L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
             L"[wsl2]\n",
             true);
 
@@ -2511,9 +2509,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"--system echo not ok", -1);
 
             const std::wstring configPath = wsl::windows::common::helpers::GetWslConfigPath();
-            const auto expectedOutput =
-                L"GUI application support is disabled via " + configPath +
-                L" or /etc/wsl.conf.\r\nError code: Wsl/Service/CreateInstance/WSL_E_GUI_APPLICATIONS_DISABLED\r\n";
+            const auto expectedOutput = FormatErrorMessage(
+                L"GUI application support is disabled via " + configPath + L" or /etc/wsl.conf.",
+                L"Wsl/Service/CreateInstance/WSL_E_GUI_APPLICATIONS_DISABLED");
 
             VERIFY_ARE_EQUAL(output, expectedOutput);
             VERIFY_ARE_EQUAL(L"", warnings);
@@ -2678,11 +2676,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Attempt to import a vhd with an open handle.
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
-            std::format(
-                L"Failed to attach disk '\\\\?\\{}' to WSL2: The process cannot access the file because it is being used by "
-                L"another process. \r\n"
-                L"Error code: Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION\r\n",
-                vhdPath.wstring()));
+            FormatErrorMessage(
+                std::format(
+                    L"Failed to attach disk '\\\\?\\{}' to WSL2: The process cannot access the file because it is being used by "
+                    L"another process. ",
+                    vhdPath.wstring()),
+                L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
 
         vhd.reset();
 
@@ -2707,14 +2706,16 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             // Validate that starting the distribution fails with the correct error code.
             validateOutput(
                 L"-d BrokenDistro echo ok",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED\r\n");
+                FormatErrorMessage(
+                    L"The distribution failed to start because its virtual disk is corrupted.",
+                    L"Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED"));
 
             // Validate that trying to export the distribution fails with the correct error code.
             validateOutput(
                 L"--export BrokenDistro dummy.tar",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/WSL_E_DISK_CORRUPTED\r\n");
+                FormatErrorMessage(
+                    L"The distribution failed to start because its virtual disk is corrupted.",
+                    L"Wsl/Service/WSL_E_DISK_CORRUPTED"));
 
             // Shutdown WSL to force the disk to detach.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0L);
@@ -2723,8 +2724,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Import a corrupted vhd.
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
-            L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-            L"Error code: Wsl/Service/RegisterDistro/WSL_E_DISK_CORRUPTED\r\n");
+            FormatErrorMessage(
+                L"The distribution failed to start because its virtual disk is corrupted.",
+                L"Wsl/Service/RegisterDistro/WSL_E_DISK_CORRUPTED"));
 
         // Ensure the VHD can be deleted to make sure it was properly ejected from the VM.
         VERIFY_ARE_EQUAL(DeleteFileW(vhdPath.c_str()), TRUE);
@@ -2941,17 +2943,17 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         WslConfigChange configChange(LxssGenerateTestConfig({.kernel = nonExistentFile.c_str()}));
         ValidateOutput(
             L"echo ok",
-            std::format(
-                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
-                wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, nonExistentFile)),
+            FormatErrorMessage(
+                wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, nonExistentFile),
+                L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
             L"");
 
         configChange.Update(LxssGenerateTestConfig({.kernelModules = nonExistentFile.c_str()}));
         ValidateOutput(
             L"echo ok",
-            std::format(
-                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
-                wsl::shared::Localization::MessageCustomKernelModulesNotFound(wslConfigPath, nonExistentFile)),
+            FormatErrorMessage(
+                wsl::shared::Localization::MessageCustomKernelModulesNotFound(wslConfigPath, nonExistentFile),
+                L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
             L"");
 
 #ifdef WSL_DEV_INSTALL_PATH
@@ -2981,9 +2983,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         configChange.Update(LxssGenerateTestConfig({.kernelModules = kernelModulesPath.c_str()}));
         ValidateOutput(
             L"echo ok",
-            std::format(
-                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
-                wsl::shared::Localization::MessageMismatchedKernelModulesError()),
+            FormatErrorMessage(
+                wsl::shared::Localization::MessageMismatchedKernelModulesError(),
+                L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
             L"");
 
         configChange.Update(LxssGenerateTestConfig());
@@ -3132,8 +3134,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The supplied install location is already in use.\r\nError code: "
-                L"Wsl/Service/MoveDistro/ERROR_FILE_EXISTS\r\n");
+                FormatErrorMessage(
+                    L"The supplied install location is already in use.", L"Wsl/Service/MoveDistro/ERROR_FILE_EXISTS"));
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
@@ -3147,8 +3149,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The filename, directory name, or volume label syntax is incorrect. \r\nError code: "
-                L"Wsl/Service/MoveDistro/ERROR_INVALID_NAME\r\n");
+                FormatErrorMessage(
+                    L"The filename, directory name, or volume label syntax is incorrect. ",
+                    L"Wsl/Service/MoveDistro/ERROR_INVALID_NAME"));
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
@@ -3309,9 +3312,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanupName =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
 
-        auto validateDistro = [name](LPCWSTR size, LPCWSTR expectedSize, LPCWSTR expectedError = nullptr) {
-            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --resize {}", name, size), expectedError ? -1 : 0);
-            if (expectedError)
+        auto validateDistro = [name](LPCWSTR size, LPCWSTR expectedSize, const std::wstring& expectedError = {}) {
+            auto [out, _] =
+                LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --resize {}", name, size), expectedError.empty() ? 0 : -1);
+            if (!expectedError.empty())
             {
                 VERIFY_ARE_EQUAL(expectedError, out);
                 return;
@@ -3324,14 +3328,16 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         validateDistro(L"1500G", L"1.5T");
         validateDistro(L"500G", L"492G");
-        validateDistro(L"1M", nullptr, L"Failed to resize disk.\r\nError code: Wsl/Service/E_FAIL\r\n");
+        validateDistro(L"1M", nullptr, FormatErrorMessage(L"Failed to resize disk.", L"Wsl/Service/E_FAIL"));
 
         {
             WslKeepAlive keepAlive;
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --resize 1500GB", -1);
             VERIFY_ARE_EQUAL(
-                L"The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe "
-                L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
+                FormatErrorMessage(
+                    L"The operation could not be completed because the VHD is currently in use. To force WSL "
+                    L"to stop use: wsl.exe --shutdown",
+                    L"Wsl/Service/WSL_E_DISTRO_NOT_STOPPED"),
                 out);
         }
     }
@@ -4368,7 +4374,7 @@ localhostForwarding=true
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
         VERIFY_ARE_EQUAL(
-            out, L"There is no distribution with the supplied name.\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_FOUND\r\n");
+            out, FormatErrorMessage(L"There is no distribution with the supplied name.", L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND"));
 
         constexpr auto injectionMarker = L"/tmp/wsl-manage-default-user-injection";
         LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/rm -f {}", injectionMarker));
@@ -4615,7 +4621,7 @@ VERSION_ID="Invalid|Format"
         const auto testDistroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
         VERIFY_IS_TRUE(testDistroId.has_value());
 
-        auto validateOutput = [](const std::wstring& Cmd, LPCWSTR ExpectedOutput, int ExitCode = 0) {
+        auto validateOutput = [](const std::wstring& Cmd, const std::wstring& ExpectedOutput, int ExitCode = 0) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(Cmd, ExitCode);
 
             VERIFY_ARE_EQUAL(out, ExpectedOutput);
@@ -4639,11 +4645,12 @@ VERSION_ID="Invalid|Format"
                 wsl::shared::string::GuidToString<wchar_t>(testDistroId.value(), wsl::shared::string::GuidToStringFlags::Uppercase)),
             L"OK");
 
-        validateOutput(L"--distribution-id InvalidGuid", L"The parameter is incorrect. \r\nError code: Wsl/E_INVALIDARG\r\n", -1);
+        validateOutput(L"--distribution-id InvalidGuid", FormatErrorMessage(L"The parameter is incorrect. ", L"Wsl/E_INVALIDARG"), -1);
         validateOutput(
             L"--distribution-id  {C13B2B63-F9D5-4840-8105-F6ABECCF46CA}",
-            L"There is no distribution with the supplied name.\r\nError code: "
-            L"Wsl/Service/CreateInstance/ReadDistroConfig/WSL_E_DISTRO_NOT_FOUND\r\n",
+            FormatErrorMessage(
+                L"There is no distribution with the supplied name.",
+                L"Wsl/Service/CreateInstance/ReadDistroConfig/WSL_E_DISTRO_NOT_FOUND"),
             -1);
     }
 
@@ -4953,12 +4960,13 @@ VERSION_ID="Invalid|Format"
             CreateTarFromManifest(L"", L"distro-no-default-name.tar");
 
             // Import should fail without --name
-            constexpr auto expectedOutput =
-                L"Installing: distro-no-default-name.tar\r\n\
-This distribution doesn't contain a default name. Use --name to choose the distribution name.\r\n\
-Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
+            const auto expectedOutput = L"Installing: distro-no-default-name.tar\r\n" +
+                                        FormatErrorMessage(
+                                            L"This distribution doesn't contain a default name. Use --name to choose the "
+                                            L"distribution name.",
+                                            L"Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED");
 
-            InstallFromTar(L"distro-no-default-name.tar", L"", -1, expectedOutput);
+            InstallFromTar(L"distro-no-default-name.tar", L"", -1, expectedOutput.c_str());
 
             // And succeed with --name
             InstallFromTar(L"distro-no-default-name.tar", L"--name test-distro-no-default-name");
@@ -5212,12 +5220,13 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
             CreateTarFromManifest(L"[oobe]\ndefaultName = test_distro", L"conflict.tar");
 
-            constexpr auto expectedOutput =
-                L"Installing: conflict.tar\r\n\
-A distribution with the supplied name already exists. Use --name to choose a different name.\r\n\
-Error code: Wsl/Service/RegisterDistro/ERROR_ALREADY_EXISTS\r\n";
+            const auto expectedOutput = L"Installing: conflict.tar\r\n" +
+                                        FormatErrorMessage(
+                                            L"A distribution with the supplied name already exists. Use --name to choose a "
+                                            L"different name.",
+                                            L"Wsl/Service/RegisterDistro/ERROR_ALREADY_EXISTS");
 
-            InstallFromTar(L"conflict.tar", L"", -1, expectedOutput);
+            InstallFromTar(L"conflict.tar", L"", -1, expectedOutput.c_str());
         }
 
         // Distribution default name is invalid
@@ -5226,12 +5235,11 @@ Error code: Wsl/Service/RegisterDistro/ERROR_ALREADY_EXISTS\r\n";
 
             CreateTarFromManifest(L"[oobe]\ndefaultName = invalid!", L"invalid.tar");
 
-            constexpr auto expectedOutput =
-                L"Installing: invalid.tar\r\n\
-Invalid distribution name: \"invalid!\".\r\n\
-Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
+            const auto expectedOutput =
+                L"Installing: invalid.tar\r\n" +
+                FormatErrorMessage(L"Invalid distribution name: \"invalid!\".", L"Wsl/Service/RegisterDistro/E_INVALIDARG");
 
-            InstallFromTar(L"invalid.tar", L"", -1, expectedOutput);
+            InstallFromTar(L"invalid.tar", L"", -1, expectedOutput.c_str());
         }
 
         // Distribution icon file is too big
@@ -5604,9 +5612,10 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
 
             ValidateInstallError(
                 L"--install DoesNotExists",
-                L"Invalid distribution name: 'DoesNotExists'.\r\n\
-To get a list of valid distributions, use 'wsl.exe --list --online'.\r\n\
-Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
+                FormatErrorMessage(
+                    L"Invalid distribution name: 'DoesNotExists'.\r\nTo get a list of valid distributions, use 'wsl.exe "
+                    L"--list --online'.",
+                    L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
 
@@ -5750,16 +5759,16 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             // There's no easy way to automate the appx package installation, but verify that we take the legacy path
             ValidateInstallError(
                 L"--install legacy --no-launch --web-download",
-                L"Downloading: legacy\r\n\
-A connection with the server could not be established \r\n\
-Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
+                L"Downloading: legacy\r\n" +
+                    FormatErrorMessage(
+                        L"A connection with the server could not be established ", L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT"),
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
 
             ValidateInstallError(
                 L"--install legacy --no-launch --web-download --legacy",
-                L"Downloading: legacy\r\n\
-A connection with the server could not be established \r\n\
-Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
+                L"Downloading: legacy\r\n" +
+                    FormatErrorMessage(
+                        L"A connection with the server could not be established ", L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT"),
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
@@ -5801,9 +5810,9 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
             // Validate that --legacy takes the appx path.
             ValidateInstallError(
                 L"--install debian-12 --no-launch --web-download --legacy",
-                L"Downloading: debian-12\r\n\
-A connection with the server could not be established \r\n\
-Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
+                L"Downloading: debian-12\r\n" +
+                    FormatErrorMessage(
+                        L"A connection with the server could not be established ", L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT"),
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
@@ -5921,11 +5930,10 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
 
             ValidateInstallError(
                 L"--install debian-12",
-                std::format(
-                    L"Installing: DebianFriendlyName\r\n\
-The distribution hash doesn't match. Expected: 0x12, actual hash: {}\r\n\
-Error code: Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST\r\n",
-                    wsl::shared::string::MultiByteToWide(tarHash)),
+                L"Installing: DebianFriendlyName\r\n" +
+                    FormatErrorMessage(
+                        std::format(L"The distribution hash doesn't match. Expected: 0x12, actual hash: {}", wsl::shared::string::MultiByteToWide(tarHash)),
+                        L"Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST"),
                 L"");
         }
 
@@ -5952,9 +5960,8 @@ Error code: Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST\r\n",
 
             ValidateInstallError(
                 L"--install debian-12",
-                L"Installing: DebianFriendlyName\r\n\
-Invalid hex string: wrongformat\r\n\
-Error code: Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG\r\n",
+                L"Installing: DebianFriendlyName\r\n" +
+                    FormatErrorMessage(L"Invalid hex string: wrongformat", L"Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG"),
                 L"");
         }
 
@@ -5989,9 +5996,10 @@ Error code: Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG\r\n",
 
             ValidateInstallError(
                 L"--install invalid",
-                L"Invalid distribution name: 'invalid'.\r\n\
-To get a list of valid distributions, use 'wsl.exe --list --online'.\r\n\
-Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
+                FormatErrorMessage(
+                    L"Invalid distribution name: 'invalid'.\r\nTo get a list of valid distributions, use 'wsl.exe --list "
+                    L"--online'.",
+                    L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"),
                 L"");
         }
 
@@ -6029,8 +6037,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"Cannot create a file when that file already exists. \r\n"
-                    L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
+                    FormatErrorMessage(
+                        L"Cannot create a file when that file already exists. ", L"Wsl/InstallDistro/ERROR_ALREADY_EXISTS"));
 
                 VERIFY_ARE_EQUAL(err, L"");
             }
@@ -6040,8 +6048,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"Cannot create a file when that file already exists. \r\n"
-                    L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
+                    FormatErrorMessage(
+                        L"Cannot create a file when that file already exists. ", L"Wsl/InstallDistro/ERROR_ALREADY_EXISTS"));
 
                 VERIFY_ARE_EQUAL(err, L"");
             }
@@ -6068,8 +6076,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
             auto restore = SetManifest(manifest);
             ValidateInstallError(
                 L"--install",
-                L"No default distribution has been configured. Please provide a distribution to install.\r\n\
-Error code: Wsl/InstallDistro/E_UNEXPECTED\r\n",
+                FormatErrorMessage(
+                    L"No default distribution has been configured. Please provide a distribution to install.",
+                    L"Wsl/InstallDistro/E_UNEXPECTED"),
                 L"");
         }
 
@@ -6079,8 +6088,10 @@ Error code: Wsl/InstallDistro/E_UNEXPECTED\r\n",
 
             ValidateInstallError(
                 L"--install debian",
-                L"Invalid JSON document. Parse error: [json.exception.parse_error.101] parse error at line 1, column 1: syntax error while parsing value - invalid literal; last read: 'B'\r\n\
-Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
+                FormatErrorMessage(
+                    L"Invalid JSON document. Parse error: [json.exception.parse_error.101] parse error at line 1, column 1: "
+                    L"syntax error while parsing value - invalid literal; last read: 'B'",
+                    L"Wsl/InstallDistro/WSL_E_INVALID_JSON"),
                 L"");
         }
 
@@ -6910,8 +6921,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The imported file is not a valid Linux distribution.\r\nError code: "
-                L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO\r\n");
+                FormatErrorMessage(
+                    L"The imported file is not a valid Linux distribution.",
+                    L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO"));
 
             // TODO: Uncomment once SetVersionDebug is removed from the tests .wslconfig.
             // VERIFY_ARE_EQUAL(err, L"");
@@ -6923,8 +6935,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"Installing: NUL\r\nThe imported file is not a valid Linux distribution.\r\nError code: "
-                L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO\r\n");
+                L"Installing: NUL\r\n" + FormatErrorMessage(
+                                             L"The imported file is not a valid Linux distribution.",
+                                             L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO"));
             // TODO: Uncomment once SetVersionDebug is removed from the tests .wslconfig.
             // VERIFY_ARE_EQUAL(err, L"");
         }
@@ -6946,8 +6959,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The imported file is not a valid Linux distribution.\r\nError code: "
-                L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO\r\n");
+                FormatErrorMessage(
+                    L"The imported file is not a valid Linux distribution.",
+                    L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO"));
             // TODO: Uncomment once SetVersionDebug is removed from the tests .wslconfig.
             // VERIFY_ARE_EQUAL(err, L"");
         }
@@ -7113,7 +7127,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto [out, err] =
             LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdPath), -1);
         VERIFY_ARE_EQUAL(
-            out, L"The specified file must have the .vhdx file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+            out,
+            FormatErrorMessage(L"The specified file must have the .vhdx file extension.", L"Wsl/Service/WSL_E_EXPORT_FAILED"));
         VERIFY_ARE_EQUAL(err, L"");
 
         // Export the distribution to a .vhdx.
@@ -7139,7 +7154,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // Attempt to export to a .vhdx (should fail).
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", newDistroName, vhdxPath), -1);
         VERIFY_ARE_EQUAL(
-            out, L"The specified file must have the .vhd file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+            out, FormatErrorMessage(L"The specified file must have the .vhd file extension.", L"Wsl/Service/WSL_E_EXPORT_FAILED"));
         VERIFY_ARE_EQUAL(err, L"");
 
         // Attempt to import to a non VHD file.
@@ -7153,8 +7168,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             std::format(L"--import {} {} {} --vhd", negativeVariationDistro, negativeVariationDistro, tempFile.Path), -1);
         VERIFY_ARE_EQUAL(
             out,
-            L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
-            L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
+            FormatErrorMessage(
+                L"The specified file must have the .vhd or .vhdx file extension.",
+                L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED"));
         VERIFY_ARE_EQUAL(err, L"");
     }
 

@@ -230,7 +230,7 @@ class WSLCE2EGlobalTests
         result = RunWslc(std::format(L"--session \"{}\" container list", adminName), ElevationType::NonElevated);
 
         // Should fail with access denied.
-        result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = FormatErrorMessage(L"The requested operation requires elevation. ", L"ERROR_ELEVATION_REQUIRED"), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_ElevatedCanAccessNonElevatedSession)
@@ -256,11 +256,13 @@ class WSLCE2EGlobalTests
         auto nonAdminName = GetExpectedDefaultSessionName(false);
         auto adminName = GetExpectedDefaultSessionName(true);
         auto result = RunWslc(std::format(L"--session \"{}\" container list", nonAdminName), ElevationType::Elevated);
-        result.Verify({.Stderr = std::format(L"Session not found: '{}'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", nonAdminName), .ExitCode = 1});
+        result.Verify(
+            {.Stderr = FormatErrorMessage(std::format(L"Session not found: '{}'", nonAdminName), L"WSLC_E_SESSION_NOT_FOUND"), .ExitCode = 1});
 
         // Ensure non-elevated cannot create the elevated session.
         result = RunWslc(std::format(L"--session \"{}\" container list", adminName), ElevationType::NonElevated);
-        result.Verify({.Stderr = std::format(L"Session not found: '{}'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", adminName), .ExitCode = 1});
+        result.Verify(
+            {.Stderr = FormatErrorMessage(std::format(L"Session not found: '{}'", adminName), L"WSLC_E_SESSION_NOT_FOUND"), .ExitCode = 1});
     }
 
     // Regression test for session name squatting vulnerability.
@@ -461,7 +463,7 @@ class WSLCE2EGlobalTests
 
         // Attempt to terminate the admin session from the non-elevated process and fail.
         result = RunWslc(std::format(L"--session \"{}\" system session terminate", adminName), ElevationType::NonElevated);
-        result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = FormatErrorMessage(L"The requested operation requires elevation. ", L"ERROR_ELEVATION_REQUIRED"), .ExitCode = 1});
 
         // Terminate the non-elevated session from the elevated process.
         result = RunWslc(std::format(L"--session \"{}\" system session terminate", nonAdminName), ElevationType::Elevated);
@@ -491,7 +493,9 @@ class WSLCE2EGlobalTests
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"--session INVALID_SESSION_NAME container list");
         result.Verify(
-            {.Stdout = L"", .Stderr = L"Session not found: 'INVALID_SESSION_NAME'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", .ExitCode = 1});
+            {.Stdout = L"",
+             .Stderr = FormatErrorMessage(L"Session not found: 'INVALID_SESSION_NAME'", L"WSLC_E_SESSION_NOT_FOUND"),
+             .ExitCode = 1});
 
         // Verify session list
         result = RunWslc(L"system session list");
@@ -621,12 +625,13 @@ class WSLCE2EGlobalTests
 
         {
             auto result = RunWslc(L"--session not-found system session run echo OK");
-            result.Verify({.Stderr = L"Session not found: 'not-found'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = FormatErrorMessage(L"Session not found: 'not-found'", L"WSLC_E_SESSION_NOT_FOUND"), .ExitCode = 1});
         }
 
         {
             auto result = RunWslc(L"system session run not-found");
-            result.Verify({.Stdout = L"", .Stderr = L"Failed to launch command not-found. Errno = 2\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify(
+                {.Stdout = L"", .Stderr = FormatErrorMessage(L"Failed to launch command not-found. Errno = 2", L"E_FAIL"), .ExitCode = 1});
         }
     }
 

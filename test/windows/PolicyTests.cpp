@@ -110,8 +110,9 @@ class PolicyTest
         auto revert = SetPolicy(c_allowDiskMount, 1);
         ValidateOutput(
             L"--mount DoesNotExist",
-            L"Failed to attach disk 'DoesNotExist' to WSL2: The system cannot find the file specified. \r\n"
-            L"Error code: Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND\r\n");
+            FormatErrorMessage(
+                L"Failed to attach disk 'DoesNotExist' to WSL2: The system cannot find the file specified. ",
+                L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND"));
     }
 
     WSL2_TEST_METHOD(MountPolicyDisabled)
@@ -120,7 +121,7 @@ class PolicyTest
         auto revert = SetPolicy(c_allowDiskMount, 0);
         ValidateOutput(
             L"--mount DoesNotExist",
-            L"wsl.exe --mount is disabled by the computer policy.\r\nError code: Wsl/Service/WSL_E_DISK_MOUNT_DISABLED\r\n");
+            FormatErrorMessage(L"wsl.exe --mount is disabled by the computer policy.", L"Wsl/Service/WSL_E_DISK_MOUNT_DISABLED"));
     }
 
     void ValidatePolicy(LPCWSTR Name, LPCWSTR Config, LPCWSTR ExpectedWarnings, const std::function<void(DWORD)>& Validate = [](auto) {})
@@ -210,9 +211,9 @@ class PolicyTest
 
             ValidateOutput(
                 L"echo ok",
-                std::format(
-                    L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
-                    wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, nonExistentFile)));
+                FormatErrorMessage(
+                    wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, nonExistentFile),
+                    L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"));
         }
 
         // Disable the custom kernel policy and validate that the expected warnings are shown.
@@ -246,9 +247,9 @@ class PolicyTest
 
             ValidateOutput(
                 L"echo ok",
-                L"The custom system distribution specified in " + wslConfigPath +
-                    L" was not found or is not the correct format.\r\nError code: "
-                    L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_SYSTEM_DISTRO_ERROR\r\n");
+                FormatErrorMessage(
+                    L"The custom system distribution specified in " + wslConfigPath + L" was not found or is not the correct format.",
+                    L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_SYSTEM_DISTRO_ERROR"));
         }
 
         {
@@ -321,13 +322,16 @@ class PolicyTest
             {
                 ValidateOutput(
                     L"--set-version " LXSS_DISTRO_NAME_TEST_L L" 1",
-                    L"WSL1 is disabled by the computer policy.\r\nError code: Wsl/Service/WSL_E_WSL1_DISABLED\r\n");
+                    FormatErrorMessage(L"WSL1 is disabled by the computer policy.", L"Wsl/Service/WSL_E_WSL1_DISABLED"));
             }
             else
             {
                 ValidateOutput(
-                L"echo ok",
-                L"WSL1 is disabled by the computer policy.\r\nPlease run 'wsl.exe --set-version " LXSS_DISTRO_NAME_TEST_L L" 2' to upgrade to WSL2.\r\nError code: Wsl/Service/CreateInstance/WSL_E_WSL1_DISABLED\r\n");
+                    L"echo ok",
+                    FormatErrorMessage(
+                        L"WSL1 is disabled by the computer policy.\r\nPlease run 'wsl.exe "
+                        L"--set-version " LXSS_DISTRO_NAME_TEST_L L" 2' to upgrade to WSL2.",
+                        L"Wsl/Service/CreateInstance/WSL_E_WSL1_DISABLED"));
             }
         }
     }
@@ -361,9 +365,9 @@ class PolicyTest
                 auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"/bin/true", -1);
                 VERIFY_ARE_EQUAL(
                     output,
-                    L"This program is blocked by group policy. For more information, contact your system administrator. "
-                    L"\r\nError "
-                    L"code: Wsl/ERROR_ACCESS_DISABLED_BY_POLICY\r\n");
+                    FormatErrorMessage(
+                        L"This program is blocked by group policy. For more information, contact your system administrator. ",
+                        L"Wsl/ERROR_ACCESS_DISABLED_BY_POLICY"));
             }
         };
 
@@ -456,10 +460,10 @@ class PolicyTest
         // The disabled message must go to stderr only -- never to stdout.
         VERIFY_ARE_EQUAL(L"", stdoutText);
 
-        // The wslc CLI renders failures via MessageErrorCode("{}\nError code: {}") and
+        // The wslc CLI renders failures via MessageErrorCode and
         // PrintMessage adds a trailing newline; line endings are \r\n through console pipes.
         const auto expected =
-            wsl::shared::Localization::MessageWSLContainerDisabled() + L"\r\nError code: WSLC_E_CONTAINER_DISABLED\r\n";
+            FormatErrorMessage(wsl::shared::Localization::MessageWSLContainerDisabled(), L"WSLC_E_CONTAINER_DISABLED");
         VERIFY_ARE_EQUAL(expected, stderrText);
     }
 
@@ -476,8 +480,8 @@ class PolicyTest
         VERIFY_ARE_NOT_EQUAL(0, exitCode);
         VERIFY_ARE_EQUAL(L"", stdoutText);
 
-        const auto expected = wsl::shared::Localization::MessageRegistryBlockedByPolicy(L"docker.io") +
-                              L"\r\nError code: WSLC_E_REGISTRY_BLOCKED_BY_POLICY\r\n";
+        const auto expected = FormatErrorMessage(
+            wsl::shared::Localization::MessageRegistryBlockedByPolicy(L"docker.io"), L"WSLC_E_REGISTRY_BLOCKED_BY_POLICY");
         VERIFY_ARE_EQUAL(expected, stderrText);
     }
 
