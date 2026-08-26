@@ -471,6 +471,107 @@ class WSLCE2EImageListTests
         VERIFY_IS_TRUE(noTruncResult.StdoutContainsSubstring(fullDebianIdW));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_AddsColumnBetweenTagAndImageId)
+    {
+        const auto result = RunWslc(L"image list --digests");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto lines = result.GetStdoutLines();
+        VERIFY_IS_FALSE(lines.empty());
+
+        // Matches docker's `--digests` table: REPOSITORY TAG DIGEST IMAGE ID CREATED SIZE.
+        const auto& header = lines[0];
+        const auto tag = header.find(L"TAG");
+        const auto digest = header.find(L"DIGEST");
+        const auto imageId = header.find(L"IMAGE ID");
+
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, digest, L"DIGEST column missing from `image list --digests`");
+        VERIFY_IS_TRUE(tag < digest, L"DIGEST must follow TAG");
+        VERIFY_IS_TRUE(digest < imageId, L"DIGEST must precede IMAGE ID");
+
+        // The default listing must not gain the column.
+        const auto defaultResult = RunWslc(L"image list");
+        defaultResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(defaultResult.GetStdoutLines()[0].find(L"DIGEST") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_ReportsDigestOnlyWhenRequested)
+    {
+        const auto digestFor = [](const std::wstring& command, const std::string& repository) {
+            auto result = RunWslc(command);
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            for (const auto& image : ParseNdjsonOutputAs<ImageOutputInformation>(result))
+            {
+                if (image.Repository == repository)
+                {
+                    return image.Digest;
+                }
+            }
+
+            return std::string{};
+        };
+
+        const auto debian = wsl::shared::string::WideToMultiByte(DebianImage.Name);
+
+        // Matches docker: the digest is only reported when --digests is passed. json output does
+        // not imply it, because docker gates on the flag or an explicit {{.Digest}} in the format.
+        VERIFY_ARE_EQUAL(std::string{c_none}, digestFor(L"image list --format json", debian));
+
+        // The test images are loaded from a tarball, so like docker they carry no repo digest and
+        // report "<none>" even when digests are requested. Anything reported must be a bare digest.
+        const auto digest = digestFor(L"image list --digests --format json", debian);
+        VERIFY_ARE_NOT_EQUAL(std::string{}, digest, L"Debian image was missing from `image list --digests --format json`");
+
+        if (digest != c_none)
+        {
+            VERIFY_IS_TRUE(digest.starts_with("sha256:"), L"Digest should be reported as 'sha256:...'");
+            VERIFY_IS_TRUE(digest.find('@') == std::string::npos, L"Digest should not retain the 'repo@' prefix");
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_TableMatchesJson)
+    {
+        auto jsonResult = RunWslc(L"image list --digests --format json");
+        jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto tableResult = RunWslc(L"image list --digests");
+        tableResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Every digest reported by json output must appear in the table's DIGEST column, so the two
+        // renderings cannot drift.
+        for (const auto& image : ParseNdjsonOutputAs<ImageOutputInformation>(jsonResult))
+        {
+            const auto digest = wsl::shared::string::MultiByteToWide(image.Digest);
+            VERIFY_IS_TRUE(
+                tableResult.StdoutContainsSubstring(digest),
+                WEX::Common::String().Format(L"'%ls' was missing from the table DIGEST column", digest.c_str()));
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_QuietStillOutputsIdsOnly)
+    {
+        const auto result = RunWslc(L"image list --digests --quiet");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Matches docker: --quiet wins, so no digest or header is emitted.
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"DIGEST"));
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"sha256:"));
+
+        for (const auto& line : result.GetStdoutLines())
+        {
+            VERIFY_ARE_EQUAL(12u, line.size(), L"--quiet should emit truncated image ids only");
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_ListedInHelp)
+    {
+        const auto result = RunWslc(L"image list --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--digests"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_DigestsArgDescription()));
+    }
+
 private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();

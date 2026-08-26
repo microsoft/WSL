@@ -28,6 +28,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageListCommand::GetArguments() const
 {
     return {
+        Argument::Create(ArgType::Digests),
         Argument::Create(ArgType::Filter, false, Limit::Unlimited),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),

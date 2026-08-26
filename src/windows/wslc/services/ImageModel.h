@@ -19,12 +19,14 @@ struct ImageInformation
     std::optional<std::string> Repository;
     std::optional<std::string> Tag;
     std::string Id;
+    // Content digest ("sha256:..."), empty when the image has none or --digests wasn't requested.
+    std::string Digest;
     LONGLONG Created{};
     int64_t Size{};
     // Number of containers created from the image, or -1 when the count wasn't requested.
     LONGLONG Containers{-1};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Digest, Created, Size);
 };
 
 // The shape emitted by "image list --format json". Every value is reported as a string, and
@@ -48,6 +50,14 @@ struct ImageOutputInformation
 };
 
 inline constexpr std::string_view c_none = "<none>";
+
+// The service reports digests as repo digests ("repo@sha256:..."), while docker's DIGEST column
+// and json output show only the digest itself. Values without a separator are returned unchanged.
+inline std::string_view DigestFromRepoDigest(std::string_view repoDigest)
+{
+    const auto separator = repoDigest.find('@');
+    return separator == std::string_view::npos ? repoDigest : repoDigest.substr(separator + 1);
+}
 
 struct DeletedImageEntry
 {

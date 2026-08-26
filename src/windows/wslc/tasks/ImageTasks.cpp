@@ -71,7 +71,7 @@ namespace {
         Terminal& m_terminal;
     };
 
-    // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
+    // Placeholder for values that are unavailable. wslc does not track layer sharing.
     constexpr std::string_view c_imageNotAvailable = "N/A";
 
     // Builds the representation of an image, shared by the table and json output so the two cannot
@@ -84,7 +84,7 @@ namespace {
 
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
         entry.CreatedSince = WideToMultiByte(FormatRelativeTime(image.Created));
-        entry.Digest = c_none;
+        entry.Digest = image.Digest.empty() ? std::string{c_none} : image.Digest;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
         entry.SharedSize = c_imageNotAvailable;
@@ -184,7 +184,7 @@ void GetImages(CLIExecutionContext& context)
     const bool containerCounts =
         context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
 
-    auto images = ImageService::List(session, filters, containerCounts);
+    auto images = ImageService::List(session, filters, containerCounts, context.Args.GetValue<ArgType::Digests>());
     context.Data.Add<Data::Images>(std::move(images));
 }
 
@@ -222,17 +222,46 @@ void ListImages(CLIExecutionContext& context)
     {
         using enum ColumnOverflow;
 
-        // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
+        constexpr ColumnWidthConfig c_shrink{.Overflow = Shrink};
+
+        // Only IMAGE ID uses fixed width; other columns shrink to fit the console.
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
+        constexpr ColumnWidthConfig c_imageId{.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink};
+
+        // Matches docker: DIGEST sits between TAG and IMAGE ID, and is only shown with --digests.
+        if (context.Args.GetValue<ArgType::Digests>())
+        {
+            auto table =
+                trunc
+                    ? wsl::windows::wslc::TableOutput<6>(
+                          context.Terminal,
+                          {{{L"REPOSITORY", c_shrink}, {L"TAG", c_shrink}, {L"DIGEST", c_shrink}, {L"IMAGE ID", c_imageId}, {L"CREATED", c_shrink}, {L"SIZE", c_shrink}}},
+                          images.size())
+                    : wsl::windows::wslc::TableOutput<6>(
+                          context.Terminal, {L"REPOSITORY", L"TAG", L"DIGEST", L"IMAGE ID", L"CREATED", L"SIZE"});
+
+            for (const auto& image : images)
+            {
+                const auto entry = ToImageOutput(image, trunc);
+                table.WriteRow({
+                    MultiByteToWide(entry.Repository),
+                    MultiByteToWide(entry.Tag),
+                    MultiByteToWide(entry.Digest),
+                    MultiByteToWide(entry.ID),
+                    MultiByteToWide(entry.CreatedSince),
+                    MultiByteToWide(entry.Size),
+                });
+            }
+
+            table.Complete();
+            break;
+        }
+
         auto table =
             trunc
                 ? wsl::windows::wslc::TableOutput<5>(
                       context.Terminal,
-                      {{{L"REPOSITORY", {.Overflow = Shrink}},
-                        {L"TAG", {.Overflow = Shrink}},
-                        {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
-                        {L"CREATED", {.Overflow = Shrink}},
-                        {L"SIZE", {.Overflow = Shrink}}}},
+                      {{{L"REPOSITORY", c_shrink}, {L"TAG", c_shrink}, {L"IMAGE ID", c_imageId}, {L"CREATED", c_shrink}, {L"SIZE", c_shrink}}},
                       images.size())
                 : wsl::windows::wslc::TableOutput<5>(context.Terminal, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
