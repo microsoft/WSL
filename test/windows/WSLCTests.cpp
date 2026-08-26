@@ -9169,8 +9169,9 @@ class WSLCTests
 
             // Verify basic container metadata.
             VERIFY_IS_FALSE(details.Id.empty());
-            VERIFY_ARE_EQUAL(details.Name, "test-container-inspect");
-            VERIFY_ARE_EQUAL(details.Image, "debian:latest");
+            VERIFY_ARE_EQUAL(details.Name, "/test-container-inspect");
+            VERIFY_IS_TRUE(details.Image.starts_with("sha256:"));
+            VERIFY_ARE_EQUAL(details.Config.Image, "debian:latest");
             VERIFY_IS_FALSE(details.Created.empty());
 
             // Verify container state.
@@ -9206,8 +9207,9 @@ class WSLCTests
 
             // Verify basic container metadata is present.
             VERIFY_IS_FALSE(details.Id.empty());
-            VERIFY_ARE_EQUAL(details.Name, "test-container-inspect-exited");
-            VERIFY_ARE_EQUAL(details.Image, "debian:latest");
+            VERIFY_ARE_EQUAL(details.Name, "/test-container-inspect-exited");
+            VERIFY_IS_TRUE(details.Image.starts_with("sha256:"));
+            VERIFY_ARE_EQUAL(details.Config.Image, "debian:latest");
             VERIFY_IS_FALSE(details.Created.empty());
 
             // Verify exited state is correct.
@@ -11566,7 +11568,7 @@ class WSLCTests
 
             const auto inspect = container.Inspect();
             VERIFY_ARE_EQUAL(c_image, inspect.Config.Image);
-            VERIFY_ARE_EQUAL(inspect.Image, inspect.Config.Image);
+            VERIFY_IS_TRUE(inspect.Image.starts_with("sha256:"));
 
             // Keep the container alive after the handle is dropped so we can validate labels are persisted across sessions.
             container.SetDeleteOnClose(false);
@@ -11589,7 +11591,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(inspect.Config.Labels, inspect.Labels);
             VERIFY_IS_TRUE(inspect.Config.Labels.find(c_metadataLabel) == inspect.Config.Labels.end());
             VERIFY_ARE_EQUAL(c_image, inspect.Config.Image);
-            VERIFY_ARE_EQUAL(inspect.Image, inspect.Config.Image);
+            VERIFY_IS_TRUE(inspect.Image.starts_with("sha256:"));
         }
 
         // Test nullptr key

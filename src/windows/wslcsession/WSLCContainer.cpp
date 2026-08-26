@@ -1889,9 +1889,9 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     WslcInspectContainer wslcInspect{};
 
     wslcInspect.Id = dockerInspect.Id;
-    wslcInspect.Name = CleanContainerName(dockerInspect.Name);
+    wslcInspect.Name = dockerInspect.Name;
     wslcInspect.Created = dockerInspect.Created;
-    wslcInspect.Image = m_image;
+    wslcInspect.Image = dockerInspect.Image;
 
     // Map container state.
     wslcInspect.State.Status = dockerInspect.State.Status;

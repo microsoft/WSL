@@ -77,7 +77,7 @@ class WSLCE2EImagePruneTests
         bool foundDeleted = false;
         for (const auto& line : result.GetStdoutLines())
         {
-            if (line.find(L"Deleted:") != std::wstring::npos || line.find(L"Untagged:") != std::wstring::npos)
+            if (line.find(L"deleted:") != std::wstring::npos || line.find(L"untagged:") != std::wstring::npos)
             {
                 foundDeleted = true;
                 break;
@@ -152,9 +152,9 @@ class WSLCE2EImagePruneTests
         for (const auto& line : filteredPrune.GetStdoutLines())
         {
             VERIFY_IS_FALSE(
-                line.find(L"Deleted:") != std::wstring::npos, L"Filtered prune should not have deleted the dangling image");
+                line.find(L"deleted:") != std::wstring::npos, L"Filtered prune should not have deleted the dangling image");
             VERIFY_IS_FALSE(
-                line.find(L"Untagged:") != std::wstring::npos, L"Filtered prune should not have untagged the dangling image");
+                line.find(L"untagged:") != std::wstring::npos, L"Filtered prune should not have untagged the dangling image");
         }
 
         // A subsequent unfiltered prune should still find and remove the dangling image,
@@ -165,7 +165,7 @@ class WSLCE2EImagePruneTests
         bool foundDeleted = false;
         for (const auto& line : unfilteredPrune.GetStdoutLines())
         {
-            if (line.find(L"Deleted:") != std::wstring::npos || line.find(L"Untagged:") != std::wstring::npos)
+            if (line.find(L"deleted:") != std::wstring::npos || line.find(L"untagged:") != std::wstring::npos)
             {
                 foundDeleted = true;
                 break;

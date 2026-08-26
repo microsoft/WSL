@@ -309,7 +309,14 @@ void DeleteImage(CLIExecutionContext& context)
     bool noPrune = context.Args.GetValue<ArgType::NoPrune>();
     for (const auto& id : imageIds)
     {
-        services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+        const auto deleted = services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+        for (const auto& entry : deleted)
+        {
+            context.Terminal.Output(
+                L"{}\n",
+                entry.Deleted ? Localization::WSLCCLI_ImageDeleteDeleted(entry.Image)
+                              : Localization::WSLCCLI_ImageDeleteUntagged(entry.Image));
+        }
     }
 }
 
@@ -428,17 +435,23 @@ void PruneImages(CLIExecutionContext& context)
 
     auto result = ImageService::Prune(session, all, filters);
 
-    for (const auto& image : result.UntaggedImages)
+    if (!result.UntaggedImages.empty() || !result.DeletedImages.empty())
     {
-        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(image));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeletedHeader());
+
+        for (const auto& image : result.UntaggedImages)
+        {
+            context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(image));
+        }
+
+        for (const auto& image : result.DeletedImages)
+        {
+            context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(image));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    for (const auto& image : result.DeletedImages)
-    {
-        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(image));
-    }
-
-    context.Terminal.Output(L"\n");
     context.Terminal.Output(
         L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
