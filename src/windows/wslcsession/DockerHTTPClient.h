@@ -136,7 +136,7 @@ public:
     void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<LONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes = false);
     void SignalContainer(const std::string& Id, std::optional<WSLCSignal> Signal);
-    common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
+    common::docker_schema::InspectContainer InspectContainer(const std::string& Id, bool Size = false);
     common::docker_schema::ContainerStats ContainerStats(const std::string& Id);
     common::docker_schema::InspectExec InspectExec(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);

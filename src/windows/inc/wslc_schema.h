@@ -157,9 +157,32 @@ struct InspectContainer
     std::vector<InspectMount> Mounts;
     std::map<std::string, std::string> Labels;
     InspectNetworkSettings NetworkSettings;
+    std::optional<std::int64_t> SizeRw;
+    std::optional<std::int64_t> SizeRootFs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
 };
+
+// Serializes a container inspect document, dropping the size fields when the daemon was not asked
+// to compute them. Docker only emits SizeRw and SizeRootFs when `inspect --size` is used, so the
+// keys are omitted entirely rather than reported as null.
+inline nlohmann::json ToInspectJson(const InspectContainer& container)
+{
+    nlohmann::json document = container;
+
+    if (!container.SizeRw.has_value())
+    {
+        document.erase("SizeRw");
+    }
+
+    if (!container.SizeRootFs.has_value())
+    {
+        document.erase("SizeRootFs");
+    }
+
+    return document;
+}
 
 struct ImageConfig
 {

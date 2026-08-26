@@ -543,8 +543,11 @@ struct InspectContainer
     HostConfig HostConfig;
     std::vector<InspectMount> Mounts;
     NetworkSettings NetworkSettings;
+    std::optional<int64_t> SizeRw;
+    std::optional<int64_t> SizeRootFs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings, SizeRw, SizeRootFs);
 };
 
 struct InspectExec

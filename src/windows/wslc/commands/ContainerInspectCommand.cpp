@@ -28,6 +28,7 @@ std::vector<Argument> ContainerInspectCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
+        Argument::Create(ArgType::Size),
         Argument::Create(ArgType::InspectFormat),
     };
 }

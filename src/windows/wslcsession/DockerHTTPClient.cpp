@@ -355,9 +355,12 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool D
     Transaction(verb::delete_, url);
 }
 
-docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
+docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id, bool Size)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
+    auto url = URL::Create("/containers/{}/json", Id);
+    url.SetParameter("size", Size);
+
+    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, url);
 }
 
 docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string& Id)
