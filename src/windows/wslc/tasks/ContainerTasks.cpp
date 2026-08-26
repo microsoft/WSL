@@ -129,8 +129,6 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 namespace wsl::windows::wslc::task {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
-
 // Every container is attempted even if an earlier one fails; the command still exits nonzero.
 template <typename TAction>
 static void ForEachContainerBestEffort(CLIExecutionContext& context, TAction&& action)
