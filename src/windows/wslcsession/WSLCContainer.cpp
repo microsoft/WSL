@@ -430,15 +430,14 @@ auto MountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& par
         const auto sourceExists = std::filesystem::exists(volume.HostPath, error);
         if (error)
         {
-            throw wsl::windows::common::mount::MountValidationException(
-                Localization::MessageWslcBindSourcePathError(volume.HostPath, error.message()));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBindSourcePathError(volume.HostPath, error.message()));
         }
 
         if (!sourceExists)
         {
             if (!volume.CreateSourceIfMissing)
             {
-                throw wsl::windows::common::mount::MountValidationException(Localization::MessageWslcBindSourcePathNotFound(volume.HostPath));
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBindSourcePathNotFound(volume.HostPath));
             }
 
             auto result = wil::CreateDirectoryDeepNoThrow(volume.HostPath.c_str());
@@ -455,18 +454,6 @@ auto MountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& par
     }
 
     return std::move(errorCleanup);
-}
-
-auto MountVolumesWithUserError(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& parentVM)
-{
-    try
-    {
-        return MountVolumes(volumes, parentVM);
-    }
-    catch (const wsl::windows::common::mount::MountValidationException& ex)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, ex.Reason());
-    }
 }
 
 WSLCContainerState DockerStateToWSLCState(ContainerState state)
@@ -546,6 +533,9 @@ std::map<std::string, std::string> StripInternalLabels(std::optional<std::map<st
     return StripInternalLabels(std::move(labels).value_or(std::map<std::string, std::string>{}));
 }
 
+// Validate every mount representation as one collection before preparing VM shares or calling Docker.
+// Docker handles duplicate destinations differently across Binds, Mounts, and Tmpfs and can create named volumes while processing the request.
+// This service-boundary check gives every caller consistent duplicate semantics and keeps invalid requests side-effect free.
 std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WSLCContainerOptions& containerOptions)
 {
     namespace mount = wsl::windows::common::mount;
@@ -565,39 +555,31 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
             i,
             value.Flags);
 
-        mount::Type type;
         switch (value.Type)
         {
         case WSLCMountTypeBind:
-            type = mount::Type::Bind;
-            break;
-
         case WSLCMountTypeVolume:
-            type = mount::Type::Volume;
-            break;
-
         case WSLCMountTypeTmpfs:
-            type = mount::Type::Tmpfs;
             break;
 
         default:
             THROW_HR_MSG(E_INVALIDARG, "Mount at index %lu has invalid type: %d", i, value.Type);
         }
 
+        const auto type = value.Type;
         THROW_HR_IF_MSG(
             E_INVALIDARG,
-            type != mount::Type::Bind && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsCreateSourceIfMissing),
+            type != WSLCMountTypeBind && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsCreateSourceIfMissing),
             "Mount at index %lu specifies create-source-if-missing for a non-bind mount",
             i);
         THROW_HR_IF_MSG(
             E_INVALIDARG,
-            type != mount::Type::Tmpfs && WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsOptions),
+            type != WSLCMountTypeTmpfs && value.TmpfsOptions != nullptr,
             "Mount at index %lu specifies tmpfs options for a non-tmpfs mount",
             i);
         THROW_HR_IF_MSG(
             E_INVALIDARG,
-            WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsOptions) &&
-                WI_IsAnyFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode),
+            value.TmpfsOptions != nullptr && WI_IsAnyFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode),
             "Mount at index %lu combines legacy and structured tmpfs options",
             i);
 
@@ -610,9 +592,7 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
                                                                                              : mount::BindSourcePolicy::RequireExisting,
             .TmpfsSizeBytes = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsSize) ? std::optional<int64_t>{value.TmpfsSizeBytes} : std::nullopt,
             .TmpfsMode = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsMode) ? std::optional<uint32_t>{value.TmpfsMode} : std::nullopt,
-            .TmpfsOptions = WI_IsFlagSet(value.Flags, WSLCMountSpecFlagsTmpfsOptions)
-                                ? std::optional<std::string>{value.TmpfsOptions != nullptr ? value.TmpfsOptions : ""}
-                                : std::nullopt,
+            .TmpfsOptions = value.TmpfsOptions != nullptr ? std::optional<std::string>{value.TmpfsOptions} : std::nullopt,
         });
     }
 
@@ -621,7 +601,7 @@ std::vector<wsl::windows::common::mount::Spec> ConvertAndValidateMounts(const WS
         mount::ValidateMountCollection(mounts);
         for (const auto& mount : mounts)
         {
-            if (mount.MountType == mount::Type::Bind)
+            if (mount.MountType == WSLCMountTypeBind)
             {
                 if (mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
                 {
@@ -706,35 +686,28 @@ enum class MissingBindSource
 
 PreparedBindMount PrepareBindMount(const std::wstring& source, const std::string& target, bool readOnly, MissingBindSource missingSource)
 {
-    GUID volumeId;
-    THROW_IF_FAILED(CoCreateGuid(&volumeId));
-
-    auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
     std::filesystem::path hostPath = source;
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(source), !hostPath.is_absolute());
 
     std::wstring sourceFilename;
     {
         std::error_code ec;
-        hostPath = std::filesystem::canonical(hostPath, ec);
-        if (!ec)
+        hostPath = wsl::windows::common::filesystem::GetCanonicalPath(hostPath, ec);
+        if (ec)
         {
-            if (std::filesystem::is_regular_file(hostPath))
-            {
-                sourceFilename = hostPath.filename().wstring();
-                hostPath = hostPath.parent_path();
-            }
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ec.value()), Localization::MessageWslcFailedToMountVolume(source, ec.message()));
         }
-        else if (ec == std::errc::no_such_file_or_directory)
+
+        if (std::filesystem::is_regular_file(hostPath))
         {
-            hostPath = source;
-        }
-        else
-        {
-            THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(source, ec.message()));
+            sourceFilename = hostPath.filename().wstring();
+            hostPath = hostPath.parent_path();
         }
     }
 
+    GUID volumeId;
+    THROW_IF_FAILED(CoCreateGuid(&volumeId));
+    auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
     auto dockerSource = sourceFilename.empty() ? parentVMPath : std::format("{}/{}", parentVMPath, sourceFilename);
     return {
         .Volume =
@@ -1133,7 +1106,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessSt
         Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
         !unavailableVolumes.empty());
 
-    auto volumeCleanup = MountVolumesWithUserError(m_mountedVolumes, m_runtime.Vm());
+    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_runtime.Vm());
 
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
     MapPorts();
@@ -2289,7 +2262,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
         switch (mount.MountType)
         {
-        case wsl::windows::common::mount::Type::Bind:
+        case WSLCMountTypeBind:
         {
             // Docker's colon-delimited bind format cannot represent ':' in the target.
             const auto missingSource = mount.BindSource == wsl::windows::common::mount::BindSourcePolicy::CreateIfMissing
@@ -2302,12 +2275,12 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             break;
         }
 
-        case wsl::windows::common::mount::Type::Volume:
+        case WSLCMountTypeVolume:
             dockerMount.Source = wsl::shared::string::WideToMultiByte(mount.Source);
             dockerMount.Type = "volume";
             break;
 
-        case wsl::windows::common::mount::Type::Tmpfs:
+        case WSLCMountTypeTmpfs:
             if (mount.TmpfsOptions.has_value())
             {
                 request.HostConfig.Tmpfs[mount.Target] = mount.TmpfsOptions.value();
@@ -2470,7 +2443,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // Docker validates structured bind sources during container creation, so their VM paths must exist here.
     // Release the temporary shares before returning; Start remounts them for the container lifetime.
     auto result = [&]() {
-        auto volumeCleanup = MountVolumesWithUserError(volumes, virtualMachine);
+        auto volumeCleanup = MountVolumes(volumes, virtualMachine);
         return DockerClient.CreateContainer(request, containerName);
     }();
 
@@ -2534,7 +2507,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     for (const auto& mount : mounts)
     {
-        if (mount.MountType == wsl::windows::common::mount::Type::Volume && !mount.Source.empty())
+        if (mount.MountType == WSLCMountTypeVolume && !mount.Source.empty())
         {
             namedVolumes.emplace_back(wsl::shared::string::WideToMultiByte(mount.Source));
         }

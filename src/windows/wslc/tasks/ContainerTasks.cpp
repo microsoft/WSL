@@ -851,8 +851,6 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(tmpfs.begin()), std::make_move_iterator(tmpfs.end()));
     }
 
-    ValidateUniqueMountDestinations(options);
-
     for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
     {
         options.Labels.push_back(label);
