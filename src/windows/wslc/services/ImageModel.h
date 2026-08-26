@@ -19,7 +19,6 @@ struct ImageInformation
     std::optional<std::string> Repository;
     std::optional<std::string> Tag;
     std::string Id;
-    // Content digest ("sha256:..."), empty when the image has none or --digests wasn't requested.
     std::string Digest;
     LONGLONG Created{};
     int64_t Size{};
@@ -51,8 +50,6 @@ struct ImageOutputInformation
 
 inline constexpr std::string_view c_none = "<none>";
 
-// The service reports digests as repo digests ("repo@sha256:..."), while docker's DIGEST column
-// and json output show only the digest itself. Values without a separator are returned unchanged.
 inline std::string_view DigestFromRepoDigest(std::string_view repoDigest)
 {
     const auto separator = repoDigest.find('@');

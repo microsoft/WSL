@@ -327,7 +327,6 @@ std::vector<ImageInformation> ImageService::List(
 
         info.Id = image.Hash;
 
-        // Matches docker: the digest is only reported when it was explicitly requested.
         if (digests)
         {
             info.Digest = DigestFromRepoDigest(image.Digest);
