@@ -2439,6 +2439,30 @@ Usage:
             std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:22 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
 
         validateWarnings(
+            L"ephemeralPortRangeSize=1",
+            std::format(
+                L"wsl: Invalid integer value '1' for key 'experimental.ephemeralPortRangeSize' in {}:2\r\n", wslConfigPath),
+            L"[experimental]\n");
+
+        validateWarnings(
+            L"ephemeralPortRangeSize=65536",
+            std::format(
+                L"wsl: Invalid integer value '65536' for key 'experimental.ephemeralPortRangeSize' in {}:2\r\n", wslConfigPath),
+            L"[experimental]\n");
+
+        validateWarnings(
+            L"ephemeralPortRangeSize=8194",
+            std::format(
+                L"wsl: Invalid integer value '8194' for key 'experimental.ephemeralPortRangeSize' in {}:2\r\n", wslConfigPath),
+            L"[experimental]\n");
+
+        validateWarnings(
+            L"ephemeralPortRangeSize=4097",
+            std::format(
+                L"wsl: Invalid integer value '4097' for key 'experimental.ephemeralPortRangeSize' in {}:2\r\n", wslConfigPath),
+            L"[experimental]\n");
+
+        validateWarnings(
             L"ipv6=true\nipv6=false",
             std::format(L"wsl: Duplicated config key 'wsl2.ipv6' in {}:23 (Conflicting key: 'wsl2.ipv6' in {}:22)\r\n", wslConfigPath, wslConfigPath));
 
