@@ -177,7 +177,7 @@ class WSLCE2EContainerRemoveTests
         const auto containerId2 = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId2.empty());
 
-        // A container that cannot be removed is reported without stopping the ones after it
+        // A container that cannot be removed is reported without skipping the ones after it
         result = RunWslc(std::format(L"container remove {} {} {}", containerId1, InvalidContainerName, containerId2));
         result.Verify(
             {.Stdout = std::format(L"{}\r\n{}\r\n", containerId1, containerId2),

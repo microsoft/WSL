@@ -141,7 +141,7 @@ class WSLCE2EContainerRestartTests
         const auto secondContainerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(secondContainerId.empty());
 
-        // A container that cannot be restarted is reported without stopping the ones after it
+        // A container that cannot be restarted is reported without skipping the ones after it
         result = RunWslc(std::format(L"container restart {} {} {} -t 0", firstContainerId, InvalidContainerName, secondContainerId));
         result.Verify(
             {.Stdout = std::format(L"{}\r\n{}\r\n", firstContainerId, secondContainerId),

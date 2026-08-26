@@ -159,7 +159,7 @@ class WSLCE2EContainerKillTests
         const auto secondContainerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(secondContainerId.empty());
 
-        // A container that cannot be killed is reported without stopping the ones after it
+        // A container that cannot be killed is reported without skipping the ones after it
         result = RunWslc(std::format(L"container kill {} {} {}", firstContainerId, InvalidContainerName, secondContainerId));
         result.Verify(
             {.Stdout = std::format(L"{}\r\n{}\r\n", firstContainerId, secondContainerId),

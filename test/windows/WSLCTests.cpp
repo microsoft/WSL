@@ -6835,7 +6835,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr), RPC_E_DISCONNECTED);
         }
 
-        // Validate restart behavior for a container with the autorm flag set
+        // Validate restart behavior for a container with WSLCContainerFlagsRm set
         {
             WSLCContainerLauncher launcher("debian:latest", "test-stop-start-3", {"sleep", "99999"});
             launcher.SetContainerFlags(WSLCContainerFlagsRm);
@@ -6900,7 +6900,7 @@ class WSLCTests
             ValidateHandleOutput(stdoutLogs.Get(), "OK\nOK\n");
         }
 
-        // Restarting a container with the autorm flag set must not auto-delete it, but a later stop must.
+        // Restarting a container with WSLCContainerFlagsRm set must not auto-delete it, but a later stop must.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-restart-autorm", {"sleep", "99999"});
             launcher.SetContainerFlags(WSLCContainerFlagsRm | WSLCContainerFlagsInit);

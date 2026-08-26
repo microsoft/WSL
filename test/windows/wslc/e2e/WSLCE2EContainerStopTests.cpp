@@ -263,7 +263,7 @@ class WSLCE2EContainerStopTests
         const auto secondContainerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(secondContainerId.empty());
 
-        // A container that cannot be stopped is reported without stopping the ones after it
+        // A container that cannot be stopped is reported without skipping the ones after it
         result = RunWslc(std::format(L"container stop {} {} {} -t 0", firstContainerId, InvalidContainerName, secondContainerId));
         result.Verify(
             {.Stdout = std::format(L"{}\r\n{}\r\n", firstContainerId, secondContainerId),
