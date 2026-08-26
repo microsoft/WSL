@@ -3325,6 +3325,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>New image reference in the image-name[:tag] format</value>
   </data>
+  <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
+    <value>Seconds to wait before killing the container (default: the container's configured stop timeout)</value>
+  </data>
   <data name="WSLCCLI_TimeoutArgDescription" xml:space="preserve">
     <value>Seconds to wait before killing the container (default: the container's configured stop timeout)</value>
   </data>

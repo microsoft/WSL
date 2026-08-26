@@ -105,6 +105,8 @@ COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal 9", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal SIGALRM", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal sigkill", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 -s KILL", L"stop", true)
+COMMAND_LINE_TEST_CASE(L"container stop cont1 --time 5", L"stop", true)
+COMMAND_LINE_TEST_CASE(L"container stop cont1 -t 5", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"restart", L"restart", false)           // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container restart", L"restart", false) // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"restart cont1", L"restart", true)

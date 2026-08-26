@@ -1032,9 +1032,9 @@ void StopContainers(CLIExecutionContext& context)
     // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
     options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
 
-    if (context.Args.Contains(ArgType::Timeout))
+    if (context.Args.Contains(ArgType::Time))
     {
-        options.Timeout = context.Args.GetValue<ArgType::Timeout>();
+        options.Timeout = context.Args.GetValue<ArgType::Time>();
     }
 
     ForEachContainerBestEffort(context, [&](const std::string& id) { ContainerService::Stop(session, id, options); });
