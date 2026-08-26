@@ -74,8 +74,7 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
 // Parses a --filter spec ("key=value"); the separator is required.
 std::pair<std::string, std::string> ParseFilter(const std::wstring& value);
 
-// Parses a prune --filter spec ("key=value"); the separator is required. Reports the option as
-// '--filter' only, since prune commands reserve the 'f' alias for --force.
+// Parses a prune --filter spec ("key=value"); the separator is required.
 std::pair<std::string, std::string> ParsePruneFilter(const std::wstring& value);
 
 struct ParsedNetworkArgument
