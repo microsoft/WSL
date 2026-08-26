@@ -129,8 +129,6 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 namespace wsl::windows::wslc::task {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
-
 static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
 {
     try
