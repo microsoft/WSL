@@ -780,10 +780,13 @@ struct ContainerInfo
     std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
     int64_t Created{};
+    int64_t SizeRw{};
+    int64_t SizeRootFs{};
     HostConfig HostConfig;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, ImageID, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ContainerInfo, Id, Names, Image, ImageID, Labels, Ports, Mounts, State, Created, SizeRw, SizeRootFs, HostConfig, NetworkSettings);
 };
 
 struct BuildKitVertex

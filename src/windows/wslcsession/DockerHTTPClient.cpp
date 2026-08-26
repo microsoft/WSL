@@ -265,11 +265,12 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std
 }
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(
-    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters)
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);
     url.SetParameter("limit", std::to_string(limit));
+    url.SetParameter("size", size);
 
     if (!filters.empty())
     {

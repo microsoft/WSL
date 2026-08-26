@@ -55,6 +55,20 @@ std::string FormatStatsIo(uint64_t Bytes)
     return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
+// Matches docker's ps SIZE column: the writable layer on its own, and the total including the
+// read-only image layers in parentheses when the daemon reported one.
+// (docker/cli cli/command/formatter/container.go, ContainerContext.Size).
+std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs)
+{
+    const auto writable = FormatHumanReadableSize(static_cast<uint64_t>(std::max<LONGLONG>(SizeRw, 0)), c_statsIoPrecision);
+    if (SizeRootFs <= 0)
+    {
+        return writable;
+    }
+
+    return std::format(L"{} (virtual {})", writable, FormatHumanReadableSize(static_cast<uint64_t>(SizeRootFs), c_statsIoPrecision));
+}
+
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
 {
     // Calculate CPU %
@@ -198,7 +212,10 @@ void GetContainers(CLIExecutionContext& context)
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters));
+    // `container stats` reuses this task and does not register --size.
+    const bool size = context.Args.Contains(ArgType::Size) && context.Args.GetValue<ArgType::Size>();
+
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters, size));
 }
 
 void InspectContainers(CLIExecutionContext& context)
@@ -559,41 +576,67 @@ void ListContainers(CLIExecutionContext& context)
     case FormatType::Table:
     {
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
+        const bool showSize = context.Args.GetValue<ArgType::Size>();
         using enum ColumnOverflow;
 
-        // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
-                                 context.Terminal,
-                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}}}},
-                                 containers.size())
-                           : wsl::windows::wslc::TableOutput<6>(
-                                 context.Terminal,
-                                 {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderName(),
-                                  Localization::WSLCCLI_TableHeaderImage(),
-                                  Localization::WSLCCLI_TableHeaderCreated(),
-                                  Localization::WSLCCLI_TableHeaderStatus(),
-                                  Localization::WSLCCLI_TableHeaderPorts()});
+        const auto idConfig = trunc ? ColumnWidthConfig{.MaxWidth = 12, .Overflow = Shrink} : ColumnWidthConfig{};
+        const auto nameConfig = trunc ? ColumnWidthConfig{.MaxWidth = 20, .Overflow = Shrink} : ColumnWidthConfig{};
+        const auto imageConfig = trunc ? ColumnWidthConfig{.MaxWidth = 20, .Overflow = Shrink} : ColumnWidthConfig{};
+        const auto shrinkConfig = trunc ? ColumnWidthConfig{.Overflow = Shrink} : ColumnWidthConfig{};
 
-        // Add each container as a row
-        for (const auto& container : containers)
+        const auto writeTable = [&]<size_t FieldCount>(std::array<ColumnDefinition, FieldCount>&& columns) {
+            wsl::windows::wslc::TableOutput<FieldCount> table(context.Terminal, std::move(columns), containers.size());
+
+            for (const auto& container : containers)
+            {
+                std::array<FormattedCell, FieldCount> row{
+                    MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
+                    MultiByteToWide(container.Name),
+                    MultiByteToWide(container.Image),
+                    FormatRelativeTime(container.CreatedAt),
+                    ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
+                    ContainerService::FormatPorts(container.State, container.Ports),
+                };
+
+                if constexpr (FieldCount == 7)
+                {
+                    row[6] = FormatContainerSize(container.SizeRw, container.SizeRootFs);
+                }
+
+                table.WriteRow(std::move(row));
+            }
+
+            table.Complete();
+        };
+
+        std::array<ColumnDefinition, 6> columns{
+            ColumnDefinition{Localization::WSLCCLI_TableHeaderContainerId(), idConfig},
+            ColumnDefinition{Localization::WSLCCLI_TableHeaderName(), nameConfig},
+            ColumnDefinition{Localization::WSLCCLI_TableHeaderImage(), imageConfig},
+            ColumnDefinition{Localization::WSLCCLI_TableHeaderCreated(), shrinkConfig},
+            ColumnDefinition{Localization::WSLCCLI_TableHeaderStatus(), shrinkConfig},
+            ColumnDefinition{Localization::WSLCCLI_TableHeaderPorts(), shrinkConfig},
+        };
+
+        if (showSize)
         {
-            table.WriteRow({
-                MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
-                MultiByteToWide(container.Name),
-                MultiByteToWide(container.Image),
-                FormatRelativeTime(container.CreatedAt),
-                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
-                ContainerService::FormatPorts(container.State, container.Ports),
-            });
+            std::array<ColumnDefinition, 7> sizedColumns{
+                std::move(columns[0]),
+                std::move(columns[1]),
+                std::move(columns[2]),
+                std::move(columns[3]),
+                std::move(columns[4]),
+                std::move(columns[5]),
+                ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), shrinkConfig},
+            };
+
+            writeTable.template operator()<7>(std::move(sizedColumns));
+        }
+        else
+        {
+            writeTable.template operator()<6>(std::move(columns));
         }
 
-        table.Complete();
         break;
     }
     default:

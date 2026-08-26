@@ -155,6 +155,82 @@ class WSLCE2EContainerListTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = TruncateId(result.GetStdoutOneLine());
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Without --size the SIZE column is absent.
+        result = RunWslc(L"container list");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"SIZE"));
+
+        const auto findContainerLine = [&](const WSLCExecutionResult& listResult) {
+            std::optional<std::wstring> line;
+            for (const auto& candidate : listResult.GetStdoutLines())
+            {
+                if (candidate.find(containerId) != std::wstring::npos)
+                {
+                    line = candidate;
+                    break;
+                }
+            }
+
+            return line;
+        };
+
+        // --size appends a SIZE column reporting the writable layer and the virtual total.
+        result = RunWslc(L"container list --size");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"SIZE"));
+
+        auto sizedLine = findContainerLine(result);
+        VERIFY_IS_TRUE(sizedLine.has_value());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, sizedLine->find(L"(virtual "));
+
+        // -s is the docker alias and produces the same column.
+        auto aliasResult = RunWslc(L"container list -s");
+        aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(aliasResult.StdoutContainsSubstring(L"SIZE"));
+
+        auto aliasLine = findContainerLine(aliasResult);
+        VERIFY_IS_TRUE(aliasLine.has_value());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, aliasLine->find(L"(virtual "));
+
+        // ps is an alias of list and accepts the option too.
+        auto psResult = RunWslc(L"ps --size");
+        psResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(psResult.StdoutContainsSubstring(L"SIZE"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption_QuietStillOutputsIdsOnly)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // --quiet wins over --size, exactly as docker does.
+        result = RunWslc(L"container list --all --quiet --size");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"SIZE"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption_ListedInHelp)
+    {
+        auto result = RunWslc(L"container list --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
     {
         const auto result = RunWslc(L"container list --format invalid");

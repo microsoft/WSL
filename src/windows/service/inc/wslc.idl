@@ -375,6 +375,8 @@ typedef struct _WSLCContainerEntry
     WSLCContainerId Id;
     LONGLONG StateChangedAt;
     LONGLONG CreatedAt;
+    LONGLONG SizeRw;
+    LONGLONG SizeRootFs;
     WSLCContainerState State;
 } WSLCContainerEntry;
 

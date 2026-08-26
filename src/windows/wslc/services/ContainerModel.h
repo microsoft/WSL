@@ -137,9 +137,11 @@ struct ContainerInformation
     WSLCContainerState State;
     LONGLONG StateChangedAt{};
     LONGLONG CreatedAt{};
+    LONGLONG SizeRw{};
+    LONGLONG SizeRootFs{};
     std::vector<PortInformation> Ports;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, SizeRw, SizeRootFs, Ports);
 };
 
 struct EnvironmentVariable
