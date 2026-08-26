@@ -2580,6 +2580,49 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Manage the lifecycle of WSL containers, including creating, starting, stopping, and removing them.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
+  <data name="WSLCCLI_ComposeCommandDesc" xml:space="preserve">
+    <value>Manage compose sessions.</value>
+  </data>
+  <data name="WSLCCLI_ComposeCommandLongDesc" xml:space="preserve">
+    <value>Create and manage containers declared by a compose file.</value>
+  </data>
+  <data name="WSLCCLI_ComposeCreateDesc" xml:space="preserve">
+    <value>Create a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeCreateLongDesc" xml:space="preserve">
+    <value>Create the containers declared by a compose file.</value>
+  </data>
+  <data name="WSLCCLI_ComposeUpDesc" xml:space="preserve">
+    <value>Start and attach to a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeUpLongDesc" xml:space="preserve">
+    <value>Start all containers in a compose session, then attach interactively and display their output.</value>
+  </data>
+  <data name="WSLCCLI_ComposeStartDesc" xml:space="preserve">
+    <value>Start a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeStartLongDesc" xml:space="preserve">
+    <value>Start all containers in a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeAttachDesc" xml:space="preserve">
+    <value>Attach to a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeAttachLongDesc" xml:space="preserve">
+    <value>Attach interactively and display output from all containers in a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeStopDesc" xml:space="preserve">
+    <value>Stop a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposeStopLongDesc" xml:space="preserve">
+    <value>Stop all containers in a compose session.</value>
+  </data>
+  <data name="WSLCCLI_ComposePathArgDescription" xml:space="preserve">
+    <value>Path to the compose YAML file</value>
+  </data>
+  <data name="MessageWslcComposeFileInvalid" xml:space="preserve">
+    <value>The compose file '{0}' is invalid: {1}.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths, property names, and error details should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerAttachDesc" xml:space="preserve">
     <value>Attach to a container.</value>
   </data>

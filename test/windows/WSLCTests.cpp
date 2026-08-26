@@ -36,6 +36,10 @@ using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::io::OverlappedIOHandle;
 using wsl::windows::common::io::WriteHandle;
 using namespace wsl::windows::common::wslutil;
+using wsl::test::CreateSession;
+using wsl::test::GetDefaultWSLCSessionSettings;
+using wsl::test::LoadTestImages;
+using wsl::test::OpenSessionManager;
 using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDataPath;
@@ -60,38 +64,9 @@ class WSLCTests
         m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLCNetworkingModeConsomme);
         m_defaultSession = CreateSession(m_defaultSessionSettings);
 
-        wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
-        VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
-
-        auto hasImage = [&](const std::string& imageName) {
-            return std::ranges::any_of(
-                images.get(), images.get() + images.size(), [&](const auto& e) { return e.Image == imageName; });
-        };
-
-        if (!hasImage("debian:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "debian:latest");
-        }
-
-        if (!hasImage("python:3.12-alpine"))
-        {
-            LoadTestImage(*m_defaultSession, "python:3.12-alpine");
-        }
-
-        if (!hasImage("hello-world:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "hello-world:latest");
-        }
-
-        if (!hasImage("alpine:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "alpine:latest");
-        }
-
-        if (!hasImage("wslc-registry:latest"))
-        {
-            LoadTestImage(*m_defaultSession, "wslc-registry:latest");
-        }
+        LoadTestImages(
+            *m_defaultSession,
+            {"debian:latest", "python:3.12-alpine", "hello-world:latest", "alpine:latest", "wslc-registry:latest"});
 
         PruneResult result;
         VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
@@ -123,16 +98,7 @@ class WSLCTests
 
     WSLCSessionSettings GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone)
     {
-        WSLCSessionSettings settings{};
-        settings.DisplayName = Name;
-        settings.CpuCount = 4;
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
-        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB.
-        settings.NetworkingMode = networkingMode;
-
-        return settings;
+        return GetDefaultWSLCSessionSettings(Name, enableStorage ? m_storagePath.c_str() : nullptr, networkingMode);
     }
 
     auto ResetTestSession()
@@ -140,15 +106,6 @@ class WSLCTests
         m_defaultSession.reset();
 
         return wil::scope_exit([this]() { m_defaultSession = CreateSession(m_defaultSessionSettings); });
-    }
-
-    static wil::com_ptr<IWSLCSessionManager> OpenSessionManager()
-    {
-        wil::com_ptr<IWSLCSessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
-
-        return sessionManager;
     }
 
     // Returns true for the names the wslc CLI reserves for its default sessions.
@@ -181,22 +138,6 @@ class WSLCTests
         }
 
         return names;
-    }
-
-    wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags Flags = WSLCSessionFlagsNone)
-    {
-        const auto sessionManager = OpenSessionManager();
-
-        wil::com_ptr<IWSLCSession> session;
-
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, &session));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-
-        WSLCSessionState state{};
-        VERIFY_SUCCEEDED(session->GetState(&state));
-        VERIFY_ARE_EQUAL(state, WSLCSessionStateRunning);
-
-        return session;
     }
 
     RunningWSLCContainer OpenContainer(IWSLCSession* session, const std::string& name)

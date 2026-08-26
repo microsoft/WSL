@@ -8,8 +8,11 @@ set(SOURCES
     WSLCSessionReference.cpp
 
     # Session and container implementation
+    ComposeSpec.cpp
+    ServiceContainerLauncher.cpp
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
+    WSLCComposeSession.cpp
     WSLCContainer.cpp
     WSLCVirtualMachine.cpp
 
@@ -33,12 +36,15 @@ set(SOURCES
     )
 
 set(HEADERS
+    ComposeSpec.h
     DockerEventTracker.h
     DockerHTTPClient.h
     IORelay.h
     OptionParser.h
     ServiceProcessLauncher.h
+    ServiceContainerLauncher.h
     WSLCContainer.h
+    WSLCComposeSession.h
     WSLCContainerMetadata.h
     WindowsCertStore.h
     WSLCProcess.h
@@ -62,6 +68,7 @@ add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
 target_link_libraries(wslcsession
                       ${COMMON_LINK_LIBRARIES}
+                      yaml-cpp
                       common
                       legacy_stdio_definitions
                       VirtDisk.lib

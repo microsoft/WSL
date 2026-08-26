@@ -102,6 +102,27 @@ public:
     using WSLCProcessLauncher::SetUser;
     using WSLCProcessLauncher::SetWorkingDirectory;
 
+protected:
+    struct ContainerOptionsStorage
+    {
+        ContainerOptionsStorage() = default;
+        NON_COPYABLE(ContainerOptionsStorage);
+        DEFAULT_MOVABLE(ContainerOptionsStorage);
+
+        WSLCContainerOptions Options{};
+        std::vector<const char*> EntrypointStorage;
+        std::vector<const char*> CommandLineStorage;
+        std::vector<const char*> EnvironmentStorage;
+        std::vector<const char*> DnsServersStorage;
+        std::vector<const char*> DnsSearchDomainsStorage;
+        std::vector<const char*> DnsOptionsStorage;
+        std::vector<WSLCNetworkConnection> NetworkConnections;
+        std::vector<std::vector<KeyValuePair>> NetworkConnectionSettings;
+        std::vector<KeyValuePair> PrimaryNetworkSettings;
+    };
+
+    ContainerOptionsStorage CreateOptions();
+
 private:
     struct NetworkConnection
     {
