@@ -4428,6 +4428,47 @@ class MirroredTests
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:0", true);
     }
 
+    WSL2_TEST_METHOD(ConfigurableEphemeralPortRangeSize)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        constexpr int portCount = 8192;
+        m_config->Update(LxssGenerateTestConfig(
+            {.networkingMode = wsl::core::NetworkingMode::Mirrored, .ephemeralPortRangeSize = portCount}));
+        WaitForMirroredStateInLinux();
+
+        auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        VERIFY_IS_TRUE(warnings.empty());
+
+        uint32_t startPort{};
+        uint32_t endPort{};
+        std::wistringstream range{output};
+        range >> startPort >> endPort;
+        VERIFY_IS_FALSE(range.fail());
+        VERIFY_ARE_EQUAL(static_cast<uint32_t>(portCount), endPort - startPort + 1);
+
+        std::wstring expectedReservedPorts;
+        if (startPort > 1)
+        {
+            expectedReservedPorts = std::format(L"1-{}", startPort - 1);
+        }
+        if (endPort < USHRT_MAX)
+        {
+            if (!expectedReservedPorts.empty())
+            {
+                expectedReservedPorts += L',';
+            }
+            expectedReservedPorts += std::format(L"{}-{}", endPort + 1, USHRT_MAX);
+        }
+
+        std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_reserved_ports", 0);
+        VERIFY_IS_TRUE(warnings.empty());
+        VERIFY_ARE_EQUAL(expectedReservedPorts + L'\n', output);
+
+        auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:0", true);
+        auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:0", true);
+    }
+
     WSL2_TEST_METHOD(PortZeroBindIsTracked)
     {
         MIRRORED_NETWORKING_TEST_ONLY();

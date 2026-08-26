@@ -3650,7 +3650,29 @@ try
     //      https://tldp.org/HOWTO/Linux+IPv6-HOWTO/ch11s03.html.
     //
 
-    return WriteToFile("/proc/sys/net/ipv4/ip_local_port_range", Content.c_str());
+    if (WriteToFile("/proc/sys/net/ipv4/ip_local_port_range", Content.c_str()) < 0)
+    {
+        return -1;
+    }
+
+    // Mirrored networking reserves this exact range on the Windows host. Keep ports outside the range out of Linux
+    // autobind selection even if a distro later widens ip_local_port_range. Explicit bind() calls are unaffected.
+    std::string ReservedPorts;
+    if (Start > 1)
+    {
+        ReservedPorts = std::format("1-{}", Start - 1);
+    }
+
+    if (End < USHRT_MAX)
+    {
+        if (!ReservedPorts.empty())
+        {
+            ReservedPorts += ',';
+        }
+        ReservedPorts += std::format("{}-{}", End + 1, USHRT_MAX);
+    }
+
+    return WriteToFile("/proc/sys/net/ipv4/ip_local_reserved_ports", ReservedPorts.c_str());
 }
 CATCH_RETURN_ERRNO()
 

@@ -49,6 +49,18 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         }
     };
 
+    auto parseEphemeralPortRangeSize = [&](const char* name, const char* value, const wchar_t* fileName, unsigned long fileLine) {
+        int number = 0;
+        if (FAILED(wil::ResultFromException([&]() { number = std::stoi(value); })) || number < 2 || number > 8192 || (number % 2) != 0)
+        {
+            EMIT_USER_WARNING(shared::Localization::MessageConfigInvalidInteger(value, name, fileName, fileLine));
+        }
+        else
+        {
+            EphemeralPortRangeSize = number;
+        }
+    };
+
     auto parseDnsTunnelingIp = [&](const char* name, const char* value, const wchar_t* fileName, unsigned long fileLine) {
         // If the IP is invalid, DNS tunneling is disabled.
         in_addr address{};
@@ -125,6 +137,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::DnsTunnelingIpAddress, std::move(parseDnsTunnelingIp)),
         ConfigKey(ConfigSetting::Experimental::InitialAutoProxyTimeout, InitialAutoProxyTimeout),
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
+        ConfigKey(ConfigSetting::Experimental::EphemeralPortRangeSize, std::move(parseEphemeralPortRangeSize)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
         ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
