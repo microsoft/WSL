@@ -1176,8 +1176,9 @@ Este prompt expirará em 60 segundos.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Código de erro: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Código de erro: {}
+Se esse erro foi inesperado, considere pesquisar problemas existentes ou registrar um novo problema em https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Documento JSON inválido. Erro de análise: {}</value>

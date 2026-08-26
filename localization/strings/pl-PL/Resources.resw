@@ -1169,8 +1169,9 @@ Ten monit przekroczy limit czasu w ciągu 60 sekund.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Kod błędu: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Kod błędu: {}
+Jeśli ten błąd był nieoczekiwany, rozważ wyszukanie istniejących problemów lub zgłoszenie nowego problemu w https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Nieprawidłowy dokument JSON. Błąd analizy: {}</value>

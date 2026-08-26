@@ -53,7 +53,7 @@ namespace {
                 entry.Labels += ",";
             }
 
-            entry.Labels += value.empty() ? key : std::format("{}={}", key, value);
+            entry.Labels += std::format("{}={}", key, value);
         }
 
         return entry;

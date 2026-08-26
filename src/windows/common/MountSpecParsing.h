@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "wslc.h"
 #include <cstdint>
 #include <exception>
 #include <optional>
@@ -24,14 +25,7 @@ Abstract:
 
 namespace wsl::windows::common::mount {
 
-inline constexpr std::string_view c_dockerCliMountGrammarVersion = "25.0.3";
-
-enum class Type
-{
-    Bind,
-    Volume,
-    Tmpfs,
-};
+using Type = WSLCMountType;
 
 enum class BindSourcePolicy
 {
@@ -41,7 +35,7 @@ enum class BindSourcePolicy
 
 struct Spec
 {
-    Type MountType = Type::Volume;
+    Type MountType = WSLCMountTypeVolume;
     std::wstring Source;
     std::string Target;
     bool ReadOnly = false;

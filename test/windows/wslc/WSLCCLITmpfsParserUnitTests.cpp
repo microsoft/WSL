@@ -41,7 +41,7 @@ class WSLCCLITmpfsParserUnitTests
         for (const auto& [input, expectedTarget, expectedOptions] : validTmpfsSpecs)
         {
             const auto result = mount::ParseDockerTmpfsString(input);
-            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Tmpfs), static_cast<int>(result.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeTmpfs), static_cast<int>(result.MountType));
             VERIFY_ARE_EQUAL(expectedTarget, result.Target);
             VERIFY_IS_TRUE(result.TmpfsOptions.has_value());
             VERIFY_ARE_EQUAL(expectedOptions, result.TmpfsOptions.value());

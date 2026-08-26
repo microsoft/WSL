@@ -350,7 +350,8 @@ std::string ImageService::Import(Terminal& terminal, wsl::windows::wslc::models:
     return imageId.get() ? std::string(imageId.get()) : std::string();
 }
 
-void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
+std::vector<wsl::windows::wslc::models::DeletedImageEntry> ImageService::Delete(
+    wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
     WSLCDeleteImageOptions options{};
     options.Image = image.c_str();
@@ -367,6 +368,15 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+
+    std::vector<wsl::windows::wslc::models::DeletedImageEntry> result;
+    result.reserve(deletedImages.size());
+    for (const auto& entry : deletedImages)
+    {
+        result.push_back({entry.Image, entry.Type == WSLCDeletedImageTypeDeleted});
+    }
+
+    return result;
 }
 
 void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
@@ -474,15 +484,15 @@ wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(
 
     wsl::windows::wslc::models::PruneImagesResult result;
     result.SpaceReclaimed = spaceReclaimed;
-    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    for (const auto& entry : deletedImages)
     {
-        if (ptr->Type == WSLCDeletedImageTypeDeleted)
+        if (entry.Type == WSLCDeletedImageTypeDeleted)
         {
-            result.DeletedImages.push_back(ptr->Image);
+            result.DeletedImages.push_back(entry.Image);
         }
         else
         {
-            result.UntaggedImages.push_back(ptr->Image);
+            result.UntaggedImages.push_back(entry.Image);
         }
     }
 

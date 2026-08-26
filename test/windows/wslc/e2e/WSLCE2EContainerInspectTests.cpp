@@ -76,7 +76,7 @@ class WSLCE2EContainerInspectTests
         auto inspectData =
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
-        VERIFY_ARE_EQUAL(WideToMultiByte(TestContainerName1), inspectData[0].Name);
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_FormatJson_IsSingleLine)
@@ -90,7 +90,7 @@ class WSLCE2EContainerInspectTests
         const auto document = VerifyCompactJsonOutput(result);
         VERIFY_IS_TRUE(document.is_array());
         VERIFY_ARE_EQUAL(1u, document.size());
-        VERIFY_ARE_EQUAL(WideToMultiByte(TestContainerName1), document[0]["Name"].get<std::string>());
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), document[0]["Name"].get<std::string>());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_InspectMultiple_Success)
@@ -107,8 +107,8 @@ class WSLCE2EContainerInspectTests
         auto inspectData =
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(2u, inspectData.size());
-        VERIFY_ARE_EQUAL(WideToMultiByte(TestContainerName1), inspectData[0].Name);
-        VERIFY_ARE_EQUAL(WideToMultiByte(TestContainerName2), inspectData[1].Name);
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName2), inspectData[1].Name);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_MixedFoundNotFound)
@@ -125,7 +125,7 @@ class WSLCE2EContainerInspectTests
         auto inspectData =
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
-        VERIFY_ARE_EQUAL(WideToMultiByte(TestContainerName1), inspectData[0].Name);
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
     }
 
 private:

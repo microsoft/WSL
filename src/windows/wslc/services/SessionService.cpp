@@ -92,7 +92,7 @@ int SessionService::Attach(Terminal& terminal, const Session& session)
         try
         {
             wsl::windows::common::relay::StandardInputRelay(
-                GetStdHandle(STD_INPUT_HANDLE), tty.get(), updateTerminalSize, exitEvent.get());
+                GetStdHandle(STD_INPUT_HANDLE), tty.Get(), updateTerminalSize, exitEvent.get());
         }
         catch (...)
         {
@@ -109,7 +109,7 @@ int SessionService::Attach(Terminal& terminal, const Session& session)
     });
 
     // Relay tty output -> console (blocks until output ends).
-    wsl::windows::common::relay::InterruptableRelay(tty.get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
+    wsl::windows::common::relay::InterruptableRelay(tty.Get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
 
     process.GetExitEvent().wait();
 
