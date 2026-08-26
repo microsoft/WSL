@@ -37,11 +37,8 @@ using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
-constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
-constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
-constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 constexpr uint32_t c_progressPrecision = 4;
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
@@ -576,7 +573,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     if (Settings.StoragePath == nullptr)
     {
         // If no storage path is specified, use a tmpfs for convenience.
-        m_runtime.Vm().Mount("", c_containerdStorage, "tmpfs", "", 0);
+        m_runtime.Vm().Mount("", wsl::windows::wslc::ContainerdStorageMountPoint, "tmpfs", "", 0);
         m_runtime.SetStorageMounted(true);
         return;
     }
@@ -642,7 +639,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "discard", 0);
+    m_runtime.Vm().Mount(diskDevice.c_str(), wsl::windows::wslc::ContainerdStorageMountPoint, "ext4", "discard", 0);
     m_runtime.SetStorageMounted(true);
 
     // Configure swap on a separate ephemeral VHD.

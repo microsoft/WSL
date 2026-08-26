@@ -36,6 +36,9 @@ std::optional<uint64_t> ParseStorageSize(std::wstring_view String, StorageSizeUn
 // 119856765 -> "120MB" at precision 3, "119.9MB" at precision 4.
 std::wstring FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision = 3, StorageSizeUnit Unit = StorageSizeUnit::Decimal);
 
+// Precision used when reporting space reclaimed by a prune operation.
+inline constexpr uint32_t c_reclaimedSpacePrecision = 4;
+
 std::vector<std::string> InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize);
 
 bool IsPathComponentEqual(const std::wstring_view String1, const std::wstring_view String2);

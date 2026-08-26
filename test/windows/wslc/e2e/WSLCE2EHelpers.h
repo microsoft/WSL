@@ -23,6 +23,8 @@ Abstract:
 
 namespace WSLCE2ETests {
 
+namespace string = wsl::shared::string;
+
 // VT sequence constants and helpers for TTY testing.
 // Sequences are sourced from wsl::windows::common::vt (VTSupport.h).
 namespace VT {

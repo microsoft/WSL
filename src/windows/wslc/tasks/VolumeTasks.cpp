@@ -31,13 +31,7 @@ using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
-
 namespace {
-
-    // Reported for the fields that only carry a value when volume usage data or swarm cluster
-    // information is available, neither of which applies here.
-    constexpr std::string_view c_notAvailable = "N/A";
 
     // Converts session volume entries into the all-string shape used for "volume list --format json".
     VolumeOutputInformation ToVolumeOutput(const wslc_schema::VolumeListEntry& volume)

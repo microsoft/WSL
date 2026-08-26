@@ -137,7 +137,7 @@ std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
 // TODO: Remove once the port relay can allocate ephemeral ports.
 uint16_t AllocateEphemeralPort(int family, const char* address)
 {
-    wil::unique_socket sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
+    wil::unique_socket sock(::socket(family, SOCK_STREAM, IPPROTO_TCP));
     THROW_LAST_ERROR_IF(!sock);
 
     SOCKADDR_INET addr{};

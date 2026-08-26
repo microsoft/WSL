@@ -37,8 +37,6 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
-
 namespace {
 
     class DECLSPEC_UUID("91EF98A7-99A8-41C2-893C-43CDFB7DB69F") WSLCImageLoadCallback
@@ -72,9 +70,6 @@ namespace {
     private:
         Terminal& m_terminal;
     };
-
-    // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
-    constexpr std::string_view c_notAvailable = "N/A";
 
     // Builds the representation of an image, shared by the table and json output so the two cannot
     // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,

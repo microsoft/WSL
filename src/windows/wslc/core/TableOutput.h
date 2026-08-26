@@ -32,6 +32,9 @@ namespace wsl::windows::wslc {
 
 using wsl::windows::common::vt::Sequence;
 
+// Placeholder for table cells whose value is unavailable.
+inline constexpr std::string_view c_notAvailable = "N/A";
+
 // A table cell: either plain text or a format string with Sequence placeholders.
 // Every {} in the format string corresponds to a Sequence (zero display width).
 // Visible width is the count of non-placeholder characters in the format string.

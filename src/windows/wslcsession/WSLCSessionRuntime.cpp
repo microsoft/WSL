@@ -21,10 +21,7 @@ using wsl::windows::service::wslc::WSLCSessionRuntime;
 
 namespace {
 
-constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
-constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
-constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
 // How long a VM lease waits for an announced stop to complete before logging that it is still
 // blocked. Purely diagnostic: the wait itself is unbounded (see VmLease).
@@ -548,13 +545,15 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
         if (m_dockerdProcess.has_value())
         {
-            auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            auto dockerdExitCode =
+                StopProcess(m_dockerdProcess.value(), wsl::windows::wslc::ProcessTerminateTimeoutMs, wsl::windows::wslc::ProcessKillTimeoutMs);
             WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
         }
 
         if (m_containerdProcess.has_value())
         {
-            auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            auto containerdExitCode =
+                StopProcess(m_containerdProcess.value(), wsl::windows::wslc::ProcessTerminateTimeoutMs, wsl::windows::wslc::ProcessKillTimeoutMs);
             WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
         }
 
@@ -563,7 +562,7 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         {
             try
             {
-                m_virtualMachine->Unmount(c_containerdStorage);
+                m_virtualMachine->Unmount(wsl::windows::wslc::ContainerdStorageMountPoint);
             }
             CATCH_LOG();
         }

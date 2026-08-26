@@ -460,7 +460,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 
     for (auto& command : commands)
     {
-        if (string::IsEqual(*itr, command->Name()))
+        if (wsl::shared::string::IsEqual(*itr, command->Name()))
         {
             inv.consume(itr);
             return std::move(command);
@@ -468,7 +468,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 
         for (const auto& alias : command->Aliases())
         {
-            if (string::IsEqual(*itr, alias))
+            if (wsl::shared::string::IsEqual(*itr, alias))
             {
                 inv.consume(itr);
                 return std::move(command);
