@@ -1039,6 +1039,7 @@ void ViewContainerLogs(CLIExecutionContext& context)
     auto containerId = context.Args.GetValue<ArgType::ContainerId>();
     bool follow = context.Args.GetValue<ArgType::Follow>();
     bool timestamps = context.Args.GetValue<ArgType::Timestamps>();
+    bool details = context.Args.GetValue<ArgType::Details>();
 
     ULONGLONG tail = 0;
     if (context.Args.Contains(ArgType::Tail))
@@ -1061,7 +1062,7 @@ void ViewContainerLogs(CLIExecutionContext& context)
         until = context.Args.GetValue<ArgType::Until>();
     }
 
-    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, details, since, until, tail);
 }
 
 void PruneContainers(CLIExecutionContext& context)

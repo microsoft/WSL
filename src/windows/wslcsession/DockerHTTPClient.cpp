@@ -529,6 +529,7 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLo
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
     url.SetParameter("timestamps", WI_IsFlagSet(Flags, WSLCLogsFlagsTimestamps));
+    url.SetParameter("details", WI_IsFlagSet(Flags, WSLCLogsFlagsDetails));
 
     if (Tail != 0)
     {

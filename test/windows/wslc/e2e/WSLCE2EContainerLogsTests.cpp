@@ -57,6 +57,43 @@ class WSLCE2EContainerLogsTests
         result.Verify({.Stdout = L"line1\nline2\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --name {} {} sh -c \"echo detail1 && echo detail2\"", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"detail1\ndetail2\n", .Stderr = L"", .ExitCode = 0});
+
+        // --details asks the daemon to prefix each line with the extra attributes supplied to the
+        // log driver. The container was created without any such attributes, so the output is
+        // identical to a plain `logs` — the same thing `docker logs --details` does here.
+        auto plain = RunWslc(std::format(L"container logs {}", WslcContainerName));
+        plain.Verify({.Stdout = L"detail1\ndetail2\n", .Stderr = L"", .ExitCode = 0});
+
+        auto details = RunWslc(std::format(L"container logs --details {}", WslcContainerName));
+        details.Verify({.Stdout = L"detail1\ndetail2\n", .Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(plain.Stdout.value(), details.Stdout.value());
+
+        // --details composes with the other log options.
+        auto combined = RunWslc(std::format(L"container logs --details --tail 1 {}", WslcContainerName));
+        combined.Verify({.Stdout = L"detail2\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details_NoShortAlias)
+    {
+        // docker logs defines --details with no short form, so -d must not be accepted.
+        auto result = RunWslc(std::format(L"container logs -d {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"-d"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details_ListedInHelp)
+    {
+        auto result = RunWslc(L"container logs --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--details"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Show extra details provided to logs"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Timestamps)
     {
         // Run a container that outputs a line

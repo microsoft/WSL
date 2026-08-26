@@ -180,9 +180,10 @@ typedef enum _WSLCLogsFlags
     WSLCLogsFlagsNone = 0,
     WSLCLogsFlagsFollow = 1,
     WSLCLogsFlagsTimestamps = 2,
+    WSLCLogsFlagsDetails = 4,
 } WSLCLogsFlags;
 
-cpp_quote("#define WSLCLogsFlagsValid (WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps)")
+cpp_quote("#define WSLCLogsFlagsValid (WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps | WSLCLogsFlagsDetails)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);")
 
