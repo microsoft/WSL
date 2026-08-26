@@ -31,25 +31,27 @@ using wsl::windows::common::string::FormatHumanReadableSize;
 
 namespace wsl::windows::wslc::task {
 
+constexpr uint32_t c_reclaimedSpacePrecision = 4;
+
 namespace {
 
     // Reported for the fields that only carry a value when volume usage data or swarm cluster
     // information is available, neither of which applies here.
-    constexpr std::string_view c_volumeNotAvailable = "N/A";
+    constexpr std::string_view c_notAvailable = "N/A";
 
     // Converts session volume entries into the all-string shape used for "volume list --format json".
     VolumeOutputInformation ToVolumeOutput(const wslc_schema::VolumeListEntry& volume)
     {
         VolumeOutputInformation entry;
-        entry.Availability = c_volumeNotAvailable;
+        entry.Availability = c_notAvailable;
         entry.Driver = volume.Driver;
-        entry.Group = c_volumeNotAvailable;
-        entry.Links = c_volumeNotAvailable;
+        entry.Group = c_notAvailable;
+        entry.Links = c_notAvailable;
         entry.Mountpoint = volume.Mountpoint;
         entry.Name = volume.Name;
         entry.Scope = volume.Scope;
-        entry.Size = c_volumeNotAvailable;
-        entry.Status = c_volumeNotAvailable;
+        entry.Size = c_notAvailable;
+        entry.Status = c_notAvailable;
 
         for (const auto& [key, value] : volume.Labels)
         {
