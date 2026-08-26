@@ -6969,7 +6969,8 @@ class WSLCTests
             // The gap between the two phases is short, so poll for it: until the container has exited, every
             // delete is turned away by the ordinary running-container guard rather than by the restart.
             HRESULT deleteResult = WSLC_E_CONTAINER_IS_RUNNING;
-            while (deleteResult == WSLC_E_CONTAINER_IS_RUNNING && restartFuture.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            while (deleteResult == WSLC_E_CONTAINER_IS_RUNNING &&
+                   restartFuture.wait_for(std::chrono::milliseconds(10)) != std::future_status::ready)
             {
                 deleteResult = container.Get().Delete(WSLCDeleteFlagsNone);
             }
