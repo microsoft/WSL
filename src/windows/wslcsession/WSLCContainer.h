@@ -97,6 +97,7 @@ public:
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
+    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
@@ -173,6 +174,13 @@ private:
         unique_com_disconnect Wrapper;
     };
 
+    // Restart() runs a stop phase followed by a start phase. This marks the pair as one transaction so
+    // that Start() and Stop() cannot land in between.
+    struct RestartTransaction
+    {
+        wil::unique_event Completed{wil::EventOptions::ManualReset};
+    };
+
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
@@ -186,6 +194,15 @@ private:
         wil::rwlock_release_shared_scope_exit& lifecycleLock,
         std::optional<TransitionKind> kind = std::nullopt);
 
+    // Returns with both locks held once no restart is in flight.
+    void WaitForRestartToComplete(wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock);
+
+    // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
+    // restart they are part of.
+    void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
+    void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+
+    void WaitForCompletionEvent(HANDLE Event) const;
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
     void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
 
@@ -231,6 +248,11 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
+    // Non-null while Restart() owns both phases. Start() and Stop() stand down until it completes, and
+    // OnStopped() skips the auto-delete of an --rm container. Delete() does not stand down: a remove
+    // that lands between the two phases takes effect, and the restart's start phase fails.
+    _Guarded_by_(m_lock) std::shared_ptr<RestartTransaction> m_restart;
+
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
     // fetched from the (stable) runtime at each use rather than cached, since a cached reference
@@ -270,6 +292,7 @@ public:
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
+    IFACEMETHOD(Restart)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;

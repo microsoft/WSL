@@ -1022,10 +1022,25 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
+    StartPhase(Flags, StartOptions, false);
+}
+
+void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase)
+{
     std::shared_ptr<StateTransition> transition;
     auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
+
+    if (!RestartPhase)
+    {
+        WaitForRestartToComplete(lock, lifecycleLock);
+    }
+
     WaitForConflictingTransitionToComplete(lock, lifecycleLock);
+
+    // A Delete() that raced a restart may have already moved the container to the Deleted state.
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_MARKED_FOR_REMOVAL, Localization::MessageWslcContainerMarkedForRemoval(m_id), m_state == WslcContainerStateDeleted);
 
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
 
@@ -1181,6 +1196,22 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
     }
 }
 
+void WSLCContainerImpl::WaitForRestartToComplete(wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock)
+{
+    while (m_restart)
+    {
+        {
+            auto restart = m_restart;
+            lock.reset();
+            lifecycleLock.reset();
+            WaitForCompletionEvent(restart->Completed.get());
+        }
+
+        lifecycleLock = m_lifecycleLock.lock_shared();
+        lock = m_lock.lock_exclusive();
+    }
+}
+
 __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateTransition> WSLCContainerImpl::StartTransition(
     TransitionKind kind, ContainerEvent expectedEvent)
 {
@@ -1190,11 +1221,16 @@ __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateT
     return transition;
 }
 
-void WSLCContainerImpl::WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const
+void WSLCContainerImpl::WaitForCompletionEvent(HANDLE Event) const
 {
     auto io = m_wslcSession.CreateIOContext();
-    io.AddHandle(std::make_unique<EventHandle>(transition->Completed.get()));
+    io.AddHandle(std::make_unique<EventHandle>(Event));
     io.Run({});
+}
+
+void WSLCContainerImpl::WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const
+{
+    WaitForCompletionEvent(transition->Completed.get());
 
     WI_ASSERT(transition->Completed.is_signaled());
 }
@@ -1288,11 +1324,22 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
+    StopPhase(Signal, TimeoutSeconds, Kill, false);
+}
+
+void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase)
+{
     std::shared_ptr<StateTransition> transition;
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
         auto lock = m_lock.lock_exclusive();
+
+        if (!RestartPhase)
+        {
+            WaitForRestartToComplete(lock, lifecycleLock);
+        }
+
         WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop);
 
         transition = m_transition;
@@ -1397,6 +1444,45 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 }
 
+void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
+{
+    bool wasRunning{};
+    auto restart = std::make_shared<RestartTransaction>();
+
+    {
+        auto lifecycleLock = m_lifecycleLock.lock_shared();
+        auto lock = m_lock.lock_exclusive();
+        WaitForRestartToComplete(lock, lifecycleLock);
+
+        wasRunning = m_state == WslcContainerStateRunning;
+
+        // N.B. Stop() and Start() each take m_lock, so it cannot be held across both phases. m_restart
+        // keeps the pair indivisible instead.
+        m_restart = restart;
+    }
+
+    auto restartCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, restart]() {
+        {
+            auto lock = m_lock.lock_exclusive();
+
+            // CommitState() clears this once the start phase lands, so a later restart may already own it.
+            if (m_restart == restart)
+            {
+                m_restart.reset();
+            }
+        }
+
+        restart->Completed.SetEvent();
+    });
+
+    if (wasRunning)
+    {
+        StopPhase(Signal, TimeoutSeconds, false, true);
+    }
+
+    StartPhase(WSLCContainerStartFlagsNone, nullptr, true);
+}
+
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::optional<std::int64_t> stopTimestamp)
 {
     auto transition = m_transition;
@@ -1440,7 +1526,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 
     // Stop with Rm must initiate Delete.
-    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
+    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm) && !m_restart)
     {
         try
         {
@@ -1514,6 +1600,9 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     std::shared_ptr<StateTransition> transition;
     auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
+
+    // N.B. Unlike Start() and Stop(), this deliberately does not wait for an in-flight restart.
+    // A remove that lands between the two phases takes effect, and the restart's start phase fails.
     WaitForConflictingTransitionToComplete(lock, lifecycleLock);
 
     RequestDeleteExclusiveLockHeld(Flags);
@@ -2933,6 +3022,12 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
     m_stateGeneration++;
     m_stateChangedAt = stateChangedAt.value_or(static_cast<std::int64_t>(std::time(nullptr)));
 
+    if (State == WslcContainerStateRunning)
+    {
+        // The restart's start phase landed, so a later exit must auto-delete an --rm container again.
+        m_restart.reset();
+    }
+
     // Keep the VM alive while this container is Running and release the hold once it leaves that
     // state, even when no client holds the wrapper (e.g. a detached `run -d` container). Dropping
     // the hold on the transition out of Running is what lets an otherwise-idle VM be torn down; a
@@ -3068,6 +3163,18 @@ try
     // Hold a VM lease for the same reason as Stop(): --rm can self-delete and drop activity.
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, IWarningCallback* WarningCallback)
+try
+{
+    WSLCExecutionContext context(&m_session, WarningCallback);
+
+    // Hold a VM lease across both phases: the container is not Running in between, so nothing else
+    // keeps the VM alive.
+    auto vmLease = m_session.Runtime().AcquireVmLease();
+    return CallImpl(&WSLCContainerImpl::Restart, Signal, TimeoutSeconds);
 }
 CATCH_RETURN();
 
