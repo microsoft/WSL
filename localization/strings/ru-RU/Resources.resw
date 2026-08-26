@@ -1176,8 +1176,9 @@
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Код ошибки: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Код ошибки: {}
+Если эта ошибка была непредвиденной, попробуйте найти существующие проблемы или сообщить о новой проблеме по адресу https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Недопустимый документ JSON. Ошибка интерпретации параметров: {}</value>

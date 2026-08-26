@@ -1169,8 +1169,9 @@ Ez a kérés 60 másodpercen belül túllépi az időkorlátot.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Hibakód: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Hibakód: {}
+Ha ez a hiba váratlanul jelentkezett, kérjük, keressen rá a meglévő problémák között, vagy nyisson egy új problémát a https://github.com/microsoft/WSL/issues oldalon.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Érvénytelen JSON-dokumentum. Elemzési hiba: {}</value>
