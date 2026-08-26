@@ -202,7 +202,7 @@ private:
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
 
-    std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLCProcessFlags flags);
+    std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::shared_socket stream, WSLCProcessFlags flags);
 
     wsl::windows::common::wslc_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
 
