@@ -267,7 +267,8 @@ class WSLCE2EContainerStopTests
         result = RunWslc(std::format(L"container stop {} {} {} -t 0", firstContainerId, InvalidContainerName, secondContainerId));
         result.Verify(
             {.Stdout = std::format(L"{}\r\n{}\r\n", firstContainerId, secondContainerId),
-             .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", InvalidContainerName),
+             .Stderr = FormatErrorMessage(
+                 std::format(L"Container '{}' not found.", InvalidContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
 
         VerifyContainerIsListed(firstContainerId, L"exited");

@@ -181,7 +181,8 @@ class WSLCE2EContainerRemoveTests
         result = RunWslc(std::format(L"container remove {} {} {}", containerId1, InvalidContainerName, containerId2));
         result.Verify(
             {.Stdout = std::format(L"{}\r\n{}\r\n", containerId1, containerId2),
-             .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", InvalidContainerName),
+             .Stderr = FormatErrorMessage(
+                 std::format(L"Container '{}' not found.", InvalidContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
 
         VerifyContainerIsNotListed(containerId1);

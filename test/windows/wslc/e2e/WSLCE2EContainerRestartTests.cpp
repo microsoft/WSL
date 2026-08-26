@@ -145,7 +145,8 @@ class WSLCE2EContainerRestartTests
         result = RunWslc(std::format(L"container restart {} {} {} -t 0", firstContainerId, InvalidContainerName, secondContainerId));
         result.Verify(
             {.Stdout = std::format(L"{}\r\n{}\r\n", firstContainerId, secondContainerId),
-             .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", InvalidContainerName),
+             .Stderr = FormatErrorMessage(
+                 std::format(L"Container '{}' not found.", InvalidContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
 
         VerifyContainerIsListed(firstContainerId, L"running");
@@ -160,11 +161,10 @@ class WSLCE2EContainerRestartTests
         auto result = RunWslc(std::format(L"container restart {} {} -t 0", InvalidContainerName, InvalidContainerName2));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = std::format(
-                 L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\nContainer '{}' not found.\r\nError "
-                 L"code: WSLC_E_CONTAINER_NOT_FOUND\r\n",
-                 InvalidContainerName,
-                 InvalidContainerName2),
+             .Stderr = FormatErrorMessage(
+                           std::format(L"Container '{}' not found.", InvalidContainerName), L"WSLC_E_CONTAINER_NOT_FOUND") +
+                       FormatErrorMessage(
+                           std::format(L"Container '{}' not found.", InvalidContainerName2), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 
@@ -174,7 +174,8 @@ class WSLCE2EContainerRestartTests
 
         auto result = RunWslc(std::format(L"container restart {} -t 0", WslcContainerName));
         result.Verify(
-            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+            {.Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 
