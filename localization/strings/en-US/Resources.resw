@@ -3328,9 +3328,6 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
     <value>Seconds to wait before killing the container (default: the container's configured stop timeout)</value>
   </data>
-  <data name="WSLCCLI_TimeoutArgDescription" xml:space="preserve">
-    <value>Seconds to wait before killing the container (default: the container's configured stop timeout)</value>
-  </data>
   <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
     <value>Open a TTY with the container process.</value>
     <comment>{Locked="TTY"}Command line arguments should not be translated</comment>
