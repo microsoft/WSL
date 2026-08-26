@@ -692,6 +692,13 @@ class InstallerTests
         wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
         auto processHandle = process.Start();
 
+        // Terminate the session before the MSI is reinstalled so the activity marker doesn't leak into later tests.
+        auto terminateSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(processHandle.get(), 0));
+            WaitForSingleObject(processHandle.get(), INFINITE);
+            WslShutdown();
+        });
+
         wsl::shared::retry::RetryWithTimeout<void>(
             []() { THROW_HR_IF(E_ABORT, !wsl::windows::common::WslActivityMarker::IsWslActive()); },
             std::chrono::seconds(1),

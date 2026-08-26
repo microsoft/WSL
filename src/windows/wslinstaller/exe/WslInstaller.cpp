@@ -61,6 +61,13 @@ catch (...)
 
 std::pair<UINT, std::wstring> InstallMsipackageImpl()
 {
+    // LaunchInstall() already checked, but WSL can become active while the install thread starts.
+    if (wsl::windows::common::WslActivityMarker::IsWslActive())
+    {
+        wsl::windows::common::install::WriteInstallLog("WSL became active after the upgrade was scheduled; deferring MSI upgrade.");
+        return {ERROR_RETRY, {}};
+    }
+
     const auto logFile = GetUpgradeLogFileLocation();
 
     // Delete MSI log on success, preserve on failure for diagnostics (same as wsl --update).
