@@ -2296,6 +2296,12 @@ Usage:
             L"[experimental]\n");
 
         validateWarnings(
+            L"ephemeralPortRangeSize=4096abc",
+            std::format(
+                L"wsl: Invalid integer value '4096abc' for key 'experimental.ephemeralPortRangeSize' in {}:2\r\n", wslConfigPath),
+            L"[experimental]\n");
+
+        validateWarnings(
             L"ipv6=true\nipv6=false",
             std::format(L"wsl: Duplicated config key 'wsl2.ipv6' in {}:22 (Conflicting key: 'wsl2.ipv6' in {}:21)\r\n", wslConfigPath, wslConfigPath));
 

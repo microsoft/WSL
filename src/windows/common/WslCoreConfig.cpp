@@ -50,14 +50,15 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
     };
 
     auto parseEphemeralPortRangeSize = [&](const char* name, const char* value, const wchar_t* fileName, unsigned long fileLine) {
-        int number = 0;
-        if (FAILED(wil::ResultFromException([&]() { number = std::stoi(value); })) || number < 2 || number > 8192 || (number % 2) != 0)
+        char* end{};
+        const long number = strtol(value, &end, 0);
+        if (*value == '\0' || *end != '\0' || number < 2 || number > 8192 || (number % 2) != 0)
         {
             EMIT_USER_WARNING(shared::Localization::MessageConfigInvalidInteger(value, name, fileName, fileLine));
         }
         else
         {
-            EphemeralPortRangeSize = number;
+            EphemeralPortRangeSize = static_cast<int>(number);
         }
     };
 
