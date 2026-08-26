@@ -290,7 +290,7 @@ void ImageService::Build(
 }
 
 std::vector<ImageInformation> ImageService::List(
-    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts)
+    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts, bool all)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -300,7 +300,9 @@ std::vector<ImageInformation> ImageService::List(
     }
 
     WSLCListImagesOptions options{};
-    options.Flags = containerCounts ? WSLCListImagesFlagsContainerCounts : WSLCListImagesFlagsNone;
+    options.Flags = WSLCListImagesFlagsNone;
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsContainerCounts, containerCounts);
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsAll, all);
     options.Filters = filterEntries.empty() ? nullptr : filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
