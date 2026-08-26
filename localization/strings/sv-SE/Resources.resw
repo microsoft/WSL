@@ -1169,8 +1169,9 @@ Tidsgränsen för den här frågan går ut om 60 sekunder.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Felkod: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Felkod: {}
+Om det här felet var oväntat kan du söka efter befintliga problem eller skapa ett nytt problem på https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Ogiltigt JSON-dokument. Syntaxfel: {}</value>
