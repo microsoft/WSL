@@ -123,6 +123,44 @@ class WSLCE2EPushPullTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Push_QuietOption)
+    {
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
+
+        auto session = OpenDefaultElevatedSession();
+
+        {
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15005);
+            auto registryAddressW = string::MultiByteToWide(registryAddress);
+
+            auto registryImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
+            auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
+
+            // Quiet push (Docker parity): progress is suppressed and stdout is exactly the resolved
+            // canonical reference. The registry image is already fully-qualified, so it equals the
+            // printed reference. GetStdoutOneLine() also asserts there is exactly one output line,
+            // proving progress was suppressed.
+            auto result = RunWslc(std::format(L"push --quiet {}", registryImage));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_ARE_EQUAL(registryImage, result.GetStdoutOneLine());
+
+            // The alias form behaves identically.
+            auto aliasResult = RunWslc(std::format(L"push -q {}", registryImage));
+            aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_ARE_EQUAL(registryImage, aliasResult.GetStdoutOneLine());
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Push_QuietOption_FailurePrintsNoReference)
+    {
+        // The canonical reference is only printed once the push has succeeded, so a failed quiet
+        // push leaves stdout empty rather than claiming a reference was pushed.
+        auto result = RunWslc(L"push -q does-not-exist:latest");
+        auto errorMessage = FormatErrorMessage(L"An image does not exist locally with the tag: does-not-exist", L"E_FAIL");
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Push_NonExistentImage)
     {
         auto result = RunWslc(L"push does-not-exist:latest");

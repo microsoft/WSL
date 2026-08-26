@@ -21,6 +21,7 @@ Abstract:
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
+#include "ImageCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
@@ -243,6 +244,25 @@ class WSLCCLICommandUnitTests
 
             VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
         }
+    }
+
+    // docker exposes -q/--quiet on load, push and cp; wslc must register the same spelling on each
+    // (docker/cli cli/command/image/load.go, image/push.go and container/cp.go).
+    TEST_METHOD(QuietParityCommands_RegisterQuietArgument)
+    {
+        const auto VerifyQuietArgument = [](const Command& command) {
+            const auto args = command.GetArguments();
+            const auto found = std::ranges::find_if(args, [](const auto& arg) { return arg.Type() == ArgType::Quiet; });
+
+            VERIFY_IS_TRUE(found != args.end(), std::format(L"Command '{}' does not register --quiet", command.FullName()).c_str());
+            VERIFY_ARE_EQUAL(std::wstring(L"quiet"), found->Name());
+            VERIFY_ARE_EQUAL(std::wstring(L"q"), found->Alias());
+            VERIFY_ARE_EQUAL(Kind::Flag, found->Kind());
+        };
+
+        VerifyQuietArgument(ImageLoadCommand(L"image"));
+        VerifyQuietArgument(ImagePushCommand(L"image"));
+        VerifyQuietArgument(ContainerCpCommand(L"container"));
     }
 
     // Walk every command in the root tree and verify no argument collisions.

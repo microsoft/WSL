@@ -93,6 +93,32 @@ class WSLCE2EImageSaveTests
         runResult.Verify({.Stdout = L"Hello from saved image!\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Load_QuietFlag)
+    {
+        // Save source image.
+        auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
+        saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        TestImageRegistry::Instance().Delete(DebianImage);
+
+        // docker's `load -q` only suppresses per-layer progress; moby writes the "Loaded image:"
+        // line to the output stream unconditionally (daemon/internal/image/tarexport/load.go).
+        // wslc surfaces no layer progress, so a quiet load is byte-identical to a plain one and the
+        // "Loaded image:" line must still appear.
+        auto quietResult = RunWslc(std::format(L"image load --quiet --input \"{}\"", SavedArchivePath.wstring()));
+        quietResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(quietResult.StdoutContainsLine(std::format(L"Loaded image: {}", DebianImage.NameAndTag())));
+
+        // The loaded image is usable.
+        auto runResult = RunWslc(std::format(L"container run --rm {} echo Hello from quiet load!", DebianImage.NameAndTag()));
+        runResult.Verify({.Stdout = L"Hello from quiet load!\n", .Stderr = L"", .ExitCode = 0});
+
+        // The alias form produces the same output.
+        auto aliasResult = RunWslc(std::format(L"image load -q --input \"{}\"", SavedArchivePath.wstring()));
+        aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(quietResult.Stdout.value(), aliasResult.Stdout.value());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ToStdout_Success)
     {
         const auto result = RunWslcAndRedirectToFile(std::format(L"image save {}", DebianImage.NameAndTag()), SavedArchivePath);
