@@ -13,11 +13,14 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "ComposeSpec.h"
 #include "WSLCSession.h"
+#include "WSLCComposeSession.h"
 #include "WSLCExecutionContext.h"
 #include "WSLCContainer.h"
 #include "WSLCNetworkMetadata.h"
 #include "ContainerNameGenerator.h"
+#include "ServiceContainerLauncher.h"
 #include "ServiceProcessLauncher.h"
 #include "WindowsCertStore.h"
 #include "WslCoreFilesystem.h"
@@ -974,6 +977,14 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
+    auto runtime = m_runtime.Acquire();
+    PullImageLockHeld(Image, RegistryAuthenticationInformation, AllTags, ProgressCallback);
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLCSession::PullImageLockHeld(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback)
+{
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
@@ -987,7 +998,6 @@ try
 
     EnforceRegistryAllowlist(repo);
 
-    auto runtime = m_runtime.Acquire();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
     std::optional<std::string> registryAuth;
@@ -997,7 +1007,7 @@ try
         registryAuth = std::string(RegistryAuthenticationInformation);
     }
 
-    auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
+    auto requestContext = m_runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
 
     const auto pulledDigests = StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
@@ -1009,10 +1019,7 @@ try
     {
         OnImageCreated(Image);
     }
-
-    return S_OK;
 }
-CATCH_RETURN();
 
 HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
@@ -2414,6 +2421,118 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::CreateComposeSession(LPCWSTR Path, IWSLCComposeSession** ComposeSession)
+try
+{
+    WSLCExecutionContext context(this);
+    RETURN_HR_IF_NULL(E_POINTER, Path);
+    RETURN_HR_IF_NULL(E_POINTER, ComposeSession);
+    *ComposeSession = nullptr;
+
+    std::error_code error;
+    const auto configPath = std::filesystem::canonical(Path, error);
+    THROW_IF_WIN32_ERROR_MSG(error.value(), "Failed to resolve compose path %ls", Path);
+
+    auto key = configPath.wstring();
+    std::ranges::transform(key, key.begin(), [](wchar_t value) { return std::towlower(value); });
+
+    std::lock_guard composeLock(m_composeSessionsLock);
+    if (const auto existing = m_composeSessions.find(key); existing != m_composeSessions.end())
+    {
+        // TODO: Check the state of the compose session before returning.
+        return existing->second.CopyTo(ComposeSession);
+    }
+
+    const auto spec = ComposeSpec::Parse(configPath);
+    auto containers = CreateComposeContainers(spec);
+
+    Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
+    THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, this, configPath.wstring(), spec, std::move(containers)));
+    auto [entry, inserted] = m_composeSessions.emplace(std::move(key), std::move(composeSession));
+    WI_ASSERT(inserted);
+
+    return entry->second.CopyTo(ComposeSession);
+}
+CATCH_RETURN();
+
+std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& Spec)
+{
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
+    std::string networkName = Spec.ProjectName + "_default"; // TODO: Implement this properly.
+
+    // Create a network for the compose session.
+    // TODO: open an existing network instead of deleting.
+
+    auto networkCleanup = DeleteNetworkImpl(networkName.c_str());
+    THROW_HR_IF_MSG(
+        networkCleanup,
+        FAILED(networkCleanup) && networkCleanup != WSLC_E_NETWORK_NOT_FOUND,
+        "Failed to delete network %hs",
+        networkName.c_str());
+
+    WSLCNetworkOptions networkOptions{};
+    networkOptions.Name = networkName.c_str();
+    THROW_IF_FAILED(CreateNetworkImpl(&networkOptions));
+
+    auto cleanup = wil::scope_exit([&] {
+        for (const auto& container : containers)
+        {
+            LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+        }
+
+        LOG_IF_FAILED(DeleteNetworkImpl(networkName.c_str()));
+    });
+
+    auto lease = AcquireLease();
+    for (const auto& definition : Spec.Containers)
+    {
+        ServiceContainerLauncher launcher(
+            definition.Image, definition.Name, definition.Command, definition.Environment, networkName, WSLCProcessFlagsStdin);
+        if (!definition.WorkingDirectory.empty())
+        {
+            launcher.SetWorkingDirectory(std::string{definition.WorkingDirectory});
+        }
+
+        for (const auto& port : definition.Ports)
+        {
+            launcher.AddPort(port.HostPort, port.ContainerPort, AF_INET);
+        }
+
+        launcher.AddPrimaryNetworkAlias(definition.Name);
+
+        for (const auto& volume : definition.Volumes)
+        {
+            if (volume.HostPath.has_value())
+            {
+                launcher.AddVolume(*volume.HostPath, volume.ContainerPath, volume.ReadOnly);
+            }
+            else
+            {
+                launcher.AddNamedVolume(volume.Name, volume.ContainerPath, volume.ReadOnly);
+            }
+        }
+
+        Microsoft::WRL::ComPtr<IWSLCContainer> container;
+        HRESULT result = wil::ResultFromException([&]() { container = launcher.Create(*this); });
+        if (result == WSLC_E_IMAGE_NOT_FOUND)
+        {
+            // TODO: Wire the pull output to caller.
+            PullImageLockHeld(definition.Image.c_str(), nullptr, FALSE, nullptr);
+            container = launcher.Create(*this);
+        }
+        else
+        {
+            THROW_IF_FAILED(result);
+        }
+
+        containers.emplace_back(std::move(container));
+    }
+
+    cleanup.release();
+
+    return containers;
+}
+
 void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
@@ -3185,7 +3304,13 @@ HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options, IWarningCa
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
+    return CreateNetworkImpl(Options);
+}
+CATCH_RETURN();
 
+HRESULT WSLCSession::CreateNetworkImpl(const WSLCNetworkOptions* Options)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
 
@@ -3313,7 +3438,13 @@ HRESULT WSLCSession::DeleteNetwork(LPCSTR Name)
 try
 {
     WSLCExecutionContext context(this);
+    return DeleteNetworkImpl(Name);
+}
+CATCH_RETURN();
 
+HRESULT WSLCSession::DeleteNetworkImpl(LPCSTR Name)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);

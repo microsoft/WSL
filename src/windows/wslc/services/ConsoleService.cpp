@@ -135,6 +135,11 @@ bool ConsoleService::RelayInteractiveTty(wsl::windows::common::ConsoleState& Con
 
 void ConsoleService::RelayNonTtyProcess(HandleWrapper&& Stdin, HandleWrapper&& Stdout, HandleWrapper&& Stderr)
 {
+    RelayNonTtyProcess(std::move(Stdin), std::move(Stdout), std::move(Stderr), GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE));
+}
+
+void ConsoleService::RelayNonTtyProcess(HandleWrapper&& Stdin, HandleWrapper&& Stdout, HandleWrapper&& Stderr, HANDLE Output, HANDLE Error)
+{
     // Process output is UTF-8.
     wsl::windows::common::ConsoleState console;
     console.SetOutputCodePageUtf8();
@@ -174,8 +179,15 @@ void ConsoleService::RelayNonTtyProcess(HandleWrapper&& Stdin, HandleWrapper&& S
         }
     }
 
-    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
-    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stderr), GetStdHandle(STD_ERROR_HANDLE)));
+    if (Stdout.IsValid())
+    {
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stdout), Output));
+    }
+
+    if (Stderr.IsValid())
+    {
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stderr), Error));
+    }
 
     io.Run({});
 }

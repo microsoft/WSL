@@ -350,9 +350,10 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::L
     return std::make_pair(result, std::move(container));
 }
 
-std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback)
+WSLCContainerLauncher::ContainerOptionsStorage WSLCContainerLauncher::CreateOptions()
 {
-    WSLCContainerOptions options{};
+    ContainerOptionsStorage storage;
+    auto& options = storage.Options;
     options.Image = m_image.c_str();
 
     if (!m_name.empty())
@@ -360,7 +361,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
         options.Name = m_name.c_str();
     }
 
-    std::vector<const char*> entrypointStorage;
+    auto& entrypointStorage = storage.EntrypointStorage;
 
     for (const auto& e : m_entrypoint)
     {
@@ -368,6 +369,8 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     }
 
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
+    storage.CommandLineStorage = std::move(commandLinePtrs);
+    storage.EnvironmentStorage = std::move(environmentPtrs);
     options.InitProcessOptions = processOptions;
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
@@ -411,7 +414,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
         options.DomainName = m_domainname.c_str();
     }
 
-    std::vector<const char*> dnsServersStorage;
+    auto& dnsServersStorage = storage.DnsServersStorage;
     for (const auto& e : m_dnsServers)
     {
         dnsServersStorage.push_back(e.c_str());
@@ -422,7 +425,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
         options.DnsServers = {dnsServersStorage.data(), static_cast<ULONG>(dnsServersStorage.size())};
     }
 
-    std::vector<const char*> dnsSearchDomainsStorage;
+    auto& dnsSearchDomainsStorage = storage.DnsSearchDomainsStorage;
     for (const auto& e : m_dnsSearchDomains)
     {
         dnsSearchDomainsStorage.push_back(e.c_str());
@@ -433,7 +436,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
         options.DnsSearchDomains = {dnsSearchDomainsStorage.data(), static_cast<ULONG>(dnsSearchDomainsStorage.size())};
     }
 
-    std::vector<const char*> dnsOptionsStorage;
+    auto& dnsOptionsStorage = storage.DnsOptionsStorage;
     for (const auto& e : m_dnsOptions)
     {
         dnsOptionsStorage.push_back(e.c_str());
@@ -458,9 +461,9 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.ContainerNetwork.NetworkMode = m_networkMode.c_str();
 
     // Each additional network becomes an entry in NetworkingConfig.EndpointsConfig.
-    std::vector<WSLCNetworkConnection> connections;
+    auto& connections = storage.NetworkConnections;
     connections.reserve(m_additionalNetworks.size());
-    std::vector<std::vector<KeyValuePair>> connectionSettings;
+    auto& connectionSettings = storage.NetworkConnectionSettings;
     connectionSettings.reserve(m_additionalNetworks.size());
     for (const auto& e : m_additionalNetworks)
     {
@@ -482,7 +485,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
 
     // Settings for the primary endpoint.
-    std::vector<KeyValuePair> primarySettings;
+    auto& primarySettings = storage.PrimaryNetworkSettings;
     primarySettings.reserve(m_primaryNetworkAliases.size() + (m_primaryNetworkIpAddress.has_value() ? 1 : 0));
     for (const auto& alias : m_primaryNetworkAliases)
     {
@@ -502,9 +505,14 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.UlimitsCount = static_cast<ULONG>(m_ulimits.size());
     options.Ulimits = m_ulimits.size() > 0 ? m_ulimits.data() : nullptr;
 
-    // TODO: Support volumes, ports, flags, container networking mode, etc.
+    return storage;
+}
+
+std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback)
+{
+    auto storage = CreateOptions();
     wil::com_ptr<IWSLCContainer> container;
-    auto result = Session.CreateContainer(&options, WarningCallback, &container);
+    auto result = Session.CreateContainer(&storage.Options, WarningCallback, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLCContainer>>(result, std::optional<RunningWSLCContainer>{});

@@ -32,5 +32,11 @@ public:
         wsl::windows::common::io::HandleWrapper&& Stdin,
         wsl::windows::common::io::HandleWrapper&& Stdout,
         wsl::windows::common::io::HandleWrapper&& Stderr);
+    static void RelayNonTtyProcess(
+        wsl::windows::common::io::HandleWrapper&& Stdin,
+        wsl::windows::common::io::HandleWrapper&& Stdout,
+        wsl::windows::common::io::HandleWrapper&& Stderr,
+        HANDLE Output,
+        HANDLE Error);
 };
 } // namespace wsl::windows::wslc::services
