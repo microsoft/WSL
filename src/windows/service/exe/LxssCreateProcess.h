@@ -16,6 +16,7 @@ Abstract:
 
 #include "SocketChannel.h"
 #include "WslPluginApi.h"
+#include "WslActivityMarker.h"
 
 // Macro to test if Windows interop is enabled.
 #define LXSS_INTEROP_FLAGS (LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING | LXSS_DISTRO_FLAGS_ENABLE_INTEROP)
@@ -163,4 +164,6 @@ public:
 
 private:
     int m_idleTimeout;
+
+    wsl::windows::common::WslActivityMarker m_activityMarker;
 };

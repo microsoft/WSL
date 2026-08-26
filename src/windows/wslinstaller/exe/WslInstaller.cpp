@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "install.h"
 #include "WslInstaller.h"
+#include "WslActivityMarker.h"
 
 extern wil::unique_event g_stopEvent;
 
@@ -174,6 +175,12 @@ std::shared_ptr<InstallContext> LaunchInstall()
     auto [updateNeeded, existingVersion] = IsUpdateNeeded();
     if (!updateNeeded)
     {
+        return {};
+    }
+
+    if (wsl::windows::common::WslActivityMarker::IsWslActive())
+    {
+        wsl::windows::common::install::WriteInstallLog("WSL is active; deferring MSI upgrade until WSL is idle.");
         return {};
     }
 

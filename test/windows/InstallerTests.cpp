@@ -19,6 +19,7 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "WslActivityMarker.h"
 #include "wslcsdk.h"
 
 using namespace wsl::windows::common::registry;
@@ -675,6 +676,38 @@ class InstallerTests
         const auto versionValue = wsl::windows::common::registry::ReadString(key.get(), L"MSI", L"Version");
 
         VERIFY_ARE_EQUAL(versionValue, L"999.0.0");
+    }
+
+    TEST_METHOD(MsixUpgradeDefersWhileWslIsActive)
+    {
+        InstallMsi();
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InstallMsi(); });
+
+        RegistryKeyChange<std::wstring> changeVersion(
+            HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\MSI", L"Version", L"1.0.0");
+
+        const auto commandLine = LxssGenerateWslCommandLine(L"sleep infinity");
+        wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+        auto processHandle = process.Start();
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            []() { THROW_HR_IF(E_ABORT, !wsl::windows::common::WslActivityMarker::IsWslActive()); },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30));
+
+        // Reinstalling the MSIX starts WslInstaller. The active marker must make it defer the MSI upgrade rather than
+        // stopping or replacing binaries that the running WSL session is using.
+        UninstallMsix();
+        VERIFY_IS_FALSE(IsMsixInstalled());
+        InstallMsix();
+        VERIFY_IS_TRUE(IsMsixInstalled());
+        WaitForInstallerServiceStop();
+
+        const auto key = wsl::windows::common::registry::OpenLxssMachineKey();
+        VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadString(key.get(), L"MSI", L"Version"), L"1.0.0");
+        VERIFY_ARE_EQUAL(WaitForSingleObject(processHandle.get(), 0), static_cast<DWORD>(WAIT_TIMEOUT));
     }
 
     TEST_METHOD(MsixUpgradeManual)
