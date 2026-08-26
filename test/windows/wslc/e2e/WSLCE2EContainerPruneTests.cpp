@@ -136,10 +136,10 @@ class WSLCE2EContainerPruneTests
         auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(ConfirmContainerName); });
 
         const auto result = RunWslc(L"container prune");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.ExitCode = 0});
 
-        // The warning and the question are both written to stdout.
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_ContainerPruneConfirm()));
+        // The warning goes to stderr; the question goes to stdout.
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_ContainerPruneConfirm()));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_PruneConfirmPrompt()));
 
         // Declining prunes nothing, so no deleted header is emitted and the container is still listed.
@@ -165,9 +165,9 @@ class WSLCE2EContainerPruneTests
         auto removeAnswer = wil::scope_exit([&]() { DeleteFileW(answerPath.c_str()); });
 
         const auto result = RunWslcWithStdinFile(L"container prune", answerPath);
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_ContainerPruneConfirm()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_ContainerPruneConfirm()));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerId));
         VerifyContainerIsNotListed(ConfirmContainerName);
     }

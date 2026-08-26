@@ -23,7 +23,9 @@ bool CLIExecutionContext::ConfirmPrune(std::wstring_view warning)
         return true;
     }
 
-    return Terminal.Confirm(std::format(L"{}\n{}", warning, wsl::shared::Localization::WSLCCLI_PruneConfirmPrompt()));
+    Terminal.Warn(L"{}\n", warning);
+
+    return Terminal.Confirm(wsl::shared::Localization::WSLCCLI_PruneConfirmPrompt());
 }
 
 void CLIExecutionContext::ApplyGlobalEnvironmentOptions()
