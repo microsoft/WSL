@@ -87,6 +87,10 @@ class WSLCE2EAliasTests
             VERIFY_IS_TRUE(result.StdoutContainsSubstring(startAliases));
         }
 
+        const auto containerResult = RunContainerExe(L"start --help");
+        containerResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(containerResult.StdoutContainsSubstring(L"Aliases:\r\n  container container start, container start\r\n"));
+
         const auto imageListResult = RunWslc(L"image list --help");
         imageListResult.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(imageListResult.StdoutContainsSubstring(L"Aliases:\r\n  wslc image list, wslc image ls, wslc images\r\n"));
