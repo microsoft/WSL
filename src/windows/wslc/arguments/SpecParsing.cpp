@@ -457,6 +457,17 @@ std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
 }
 
+std::pair<std::string, std::string> ParsePruneFilter(const std::wstring& value)
+{
+    const auto kv = SplitKeyValue(value);
+    if (!kv.HadSeparator)
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidPruneFilterError(value));
+    }
+
+    return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
+}
+
 ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::wstring& argName)
 {
     ParsedNetworkArgument result;

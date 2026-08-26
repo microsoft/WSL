@@ -29,7 +29,8 @@ std::vector<Argument> ImagePruneCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::All, std::nullopt, std::nullopt, Localization::WSLCCLI_ImagePruneAllArgDescription()),
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::PruneFilter, false, Limit::Unlimited),
+        Argument::Create(ArgType::Force, std::nullopt, std::nullopt, Localization::WSLCCLI_PruneForceArgDescription()),
     };
 }
 

@@ -265,8 +265,13 @@ void PruneNetworks(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
+    if (!context.ConfirmPrune(Localization::WSLCCLI_NetworkPruneConfirm()))
+    {
+        return;
+    }
+
     // Filter values are parsed and cached during argument validation.
-    auto filters = context.Args.GetAllValues<ArgType::Filter>();
+    auto filters = context.Args.GetAllValues<ArgType::PruneFilter>();
 
     auto result = NetworkService::Prune(session, filters);
 

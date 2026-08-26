@@ -26,7 +26,10 @@ namespace wsl::windows::wslc {
 // Container Prune Command
 std::vector<Argument> ContainerPruneCommand::GetArguments() const
 {
-    return {};
+    return {
+        Argument::Create(ArgType::PruneFilter, false, Limit::Unlimited),
+        Argument::Create(ArgType::Force, std::nullopt, std::nullopt, Localization::WSLCCLI_PruneForceArgDescription()),
+    };
 }
 
 std::wstring ContainerPruneCommand::ShortDescription() const

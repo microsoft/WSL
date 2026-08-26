@@ -16,6 +16,16 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
     return CancelEvent.get();
 }
 
+bool CLIExecutionContext::ConfirmPrune(std::wstring_view warning)
+{
+    if (Args.GetValue<ArgType::Force>())
+    {
+        return true;
+    }
+
+    return Terminal.Confirm(std::format(L"{}\n{}", warning, wsl::shared::Localization::WSLCCLI_PruneConfirmPrompt()));
+}
+
 void CLIExecutionContext::ApplyGlobalEnvironmentOptions()
 {
     // NoColor is environment-only and resolved before any output. Freezing it keeps the terminal
