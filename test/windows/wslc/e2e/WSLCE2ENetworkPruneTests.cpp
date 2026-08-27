@@ -195,7 +195,7 @@ class WSLCE2ENetworkPruneTests
     {
         const auto result = RunWslc(L"network prune --filter label");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_Filter_InvalidKey)

@@ -326,7 +326,7 @@ class WSLCE2EImageListTests
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"image list --filter dangling");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"dangling", L"filter")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"dangling")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Filter_InvalidKey)

@@ -218,7 +218,7 @@ class WSLCE2EContainerListTests
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"container list --filter status");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"status", L"filter")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"status")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_InvalidStatusValue)

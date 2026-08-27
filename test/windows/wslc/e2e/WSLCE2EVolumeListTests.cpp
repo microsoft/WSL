@@ -131,7 +131,7 @@ class WSLCE2EVolumeListTests
     {
         const auto result = RunWslc(L"volume list --filter label");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_Filter_InvalidKey)
