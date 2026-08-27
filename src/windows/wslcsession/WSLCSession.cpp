@@ -1903,8 +1903,11 @@ try
         return it == containersByImage.end() ? 0LL : it->second;
     };
 
-    // Rows match docker's image formatter: one row per tag, and when digests are requested one row
-    // per (tag, digest) pair, so a tag carrying several digests repeats its ID once per digest.
+    // Rows are grouped the way docker's image formatter groups them: an image is reported once per
+    // repository it belongs to, tagged repositories emit one row per tag, and when digests are
+    // requested each of those rows is repeated once per digest of that repository. A repository that
+    // is only referenced by digest is reported with no tag, and an image with neither tags nor
+    // digests is reported with neither.
     struct ImageRow
     {
         const docker_schema::Image* Source;
@@ -1915,7 +1918,7 @@ try
     std::vector<ImageRow> rows;
     for (const auto& e : images)
     {
-        // RepoDigests format: "repo@sha256:digest"
+        // RepoDigests format: "repo@sha256:digest". A repository can be referenced by several digests.
         std::map<std::string, std::vector<std::string>> digestsByRepo;
         for (const auto& repoDigest : e.RepoDigests)
         {
@@ -1924,29 +1927,13 @@ try
             digestsByRepo[repoDigest.substr(0, separator)].push_back(repoDigest);
         }
 
-        if (e.RepoTags.empty())
-        {
-            // Image has no tags (dangling, or pulled by digest).
-            if (digests && !e.RepoDigests.empty())
-            {
-                for (const auto& repoDigest : e.RepoDigests)
-                {
-                    rows.push_back({&e, "<none>:<none>", repoDigest});
-                }
-            }
-            else
-            {
-                rows.push_back({&e, "<none>:<none>", e.RepoDigests.empty() ? std::string{} : e.RepoDigests.front()});
-            }
-
-            continue;
-        }
-
+        std::set<std::string> taggedRepos;
         for (const auto& tag : e.RepoTags)
         {
             // Extract repo name from tag (format: "repo:tag") and look up its digests.
-            const auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
+            auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
             const auto it = digestsByRepo.find(repoName);
+            taggedRepos.insert(std::move(repoName));
 
             if (it == digestsByRepo.end())
             {
@@ -1963,6 +1950,34 @@ try
                     rows.push_back({&e, tag, repoDigest});
                 }
             }
+        }
+
+        // Repositories that only have digests are reported after the tagged ones. The image name is
+        // the bare repository, which leaves the reference without a tag.
+        for (const auto& [repoName, repoDigests] : digestsByRepo)
+        {
+            if (taggedRepos.contains(repoName))
+            {
+                continue;
+            }
+
+            if (!digests)
+            {
+                rows.push_back({&e, repoName, repoDigests.front()});
+            }
+            else
+            {
+                for (const auto& repoDigest : repoDigests)
+                {
+                    rows.push_back({&e, repoName, repoDigest});
+                }
+            }
+        }
+
+        // A dangling image belongs to no repository at all.
+        if (e.RepoTags.empty() && digestsByRepo.empty())
+        {
+            rows.push_back({&e, "<none>:<none>", std::string{}});
         }
     }
 

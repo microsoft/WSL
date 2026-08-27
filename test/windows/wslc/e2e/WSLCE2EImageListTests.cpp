@@ -569,6 +569,13 @@ class WSLCE2EImageListTests
             VERIFY_IS_TRUE(
                 seen.emplace(image.Repository, image.Tag, image.Digest).second,
                 L"A repository, tag and digest triple must not be listed twice");
+
+            // A digest is always qualified by the repository it was pulled from, so a row that
+            // reports one names that repository instead of falling back to the placeholder.
+            if (image.Digest != c_none)
+            {
+                VERIFY_ARE_NOT_EQUAL(std::string{c_none}, image.Repository, L"A row reporting a digest must name its repository");
+            }
         }
 
         // Expanding per digest can only ever add rows relative to the default listing.
