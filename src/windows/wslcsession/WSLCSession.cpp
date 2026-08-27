@@ -1903,82 +1903,84 @@ try
         return it == containersByImage.end() ? 0LL : it->second;
     };
 
-    // Compute the number of entries - one entry per tag, or one per image if no tags
-    auto entries = std::accumulate(images.begin(), images.end(), size_t{0}, [](auto sum, const auto& e) {
-        return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
-    });
+    // Rows match docker's image formatter: one row per tag, and when digests are requested one row
+    // per (tag, digest) pair, so a tag carrying several digests repeats its ID once per digest.
+    struct ImageRow
+    {
+        const docker_schema::Image* Source;
+        std::string Image;
+        std::string Digest;
+    };
 
-    auto output = wil::make_unique_cotaskmem<WSLCImageInformation[]>(entries);
-
-    size_t index = 0;
+    std::vector<ImageRow> rows;
     for (const auto& e : images)
     {
-        // Build a map from repo name to digest for this image
         // RepoDigests format: "repo@sha256:digest"
-        std::map<std::string, std::string> repoToDigest;
+        std::map<std::string, std::vector<std::string>> digestsByRepo;
         for (const auto& repoDigest : e.RepoDigests)
         {
-            size_t atPos = repoDigest.find('@');
-            THROW_HR_IF(E_UNEXPECTED, atPos == std::string::npos || atPos == 0);
-            std::string repoName = repoDigest.substr(0, atPos);
-            repoToDigest[repoName] = repoDigest;
+            const auto separator = repoDigest.find('@');
+            THROW_HR_IF(E_UNEXPECTED, separator == std::string::npos || separator == 0);
+            digestsByRepo[repoDigest.substr(0, separator)].push_back(repoDigest);
         }
 
         if (e.RepoTags.empty())
         {
-            // Image has no tags (dangling image)
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, "<none>:<none>") != 0);
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
-
-            // Set digest if available
-            if (!e.RepoDigests.empty())
+            // Image has no tags (dangling, or pulled by digest).
+            if (digests && !e.RepoDigests.empty())
             {
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, e.RepoDigests[0].c_str()) != 0);
+                for (const auto& repoDigest : e.RepoDigests)
+                {
+                    rows.push_back({&e, "<none>:<none>", repoDigest});
+                }
             }
             else
             {
-                output[index].Digest[0] = '\0';
+                rows.push_back({&e, "<none>:<none>", e.RepoDigests.empty() ? std::string{} : e.RepoDigests.front()});
             }
 
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
-            output[index].Size = e.Size;
-            output[index].Created = e.Created;
-            output[index].Containers = containersForImage(e.Id);
-            index++;
+            continue;
         }
-        else
+
+        for (const auto& tag : e.RepoTags)
         {
-            // Image has tags - create one entry per tag
-            for (const auto& tag : e.RepoTags)
+            // Extract repo name from tag (format: "repo:tag") and look up its digests.
+            const auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
+            const auto it = digestsByRepo.find(repoName);
+
+            if (it == digestsByRepo.end())
             {
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
-
-                // Extract repo name from tag (format: "repo:tag")
-                // and lookup corresponding digest from the map
-                auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
-                auto it = repoToDigest.find(repoName);
-                if (it != repoToDigest.end())
+                rows.push_back({&e, tag, std::string{}});
+            }
+            else if (!digests)
+            {
+                rows.push_back({&e, tag, it->second.front()});
+            }
+            else
+            {
+                for (const auto& repoDigest : it->second)
                 {
-                    THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, it->second.c_str()) != 0);
+                    rows.push_back({&e, tag, repoDigest});
                 }
-                else
-                {
-                    output[index].Digest[0] = '\0';
-                }
-
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
-                output[index].Size = e.Size;
-                output[index].Created = e.Created;
-                output[index].Containers = containersForImage(e.Id);
-                index++;
             }
         }
     }
 
-    WI_ASSERT(index == entries);
+    auto output = wil::make_unique_cotaskmem<WSLCImageInformation[]>(rows.size());
 
-    *Count = static_cast<ULONG>(entries);
+    for (size_t index = 0; index < rows.size(); ++index)
+    {
+        const auto& row = rows[index];
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, row.Image.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, row.Source->Id.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, row.Digest.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, row.Source->ParentId.c_str()) != 0);
+        output[index].Size = row.Source->Size;
+        output[index].Created = row.Source->Created;
+        output[index].Containers = containersForImage(row.Source->Id);
+    }
+
+    *Count = static_cast<ULONG>(rows.size());
     *Images = output.release();
     return S_OK;
 }

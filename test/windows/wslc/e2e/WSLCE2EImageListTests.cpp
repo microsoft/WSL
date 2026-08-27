@@ -549,6 +549,35 @@ class WSLCE2EImageListTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_RepeatsIdOncePerDigest)
+    {
+        auto result = RunWslc(L"image list --digests --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto digestRows = ParseNdjsonOutputAs<ImageOutputInformation>(result);
+
+        // Matches docker's formatter: a tag carrying several digests is emitted once per digest, so
+        // rows stay unique per repository, tag and digest while the image ID repeats across them.
+        std::map<std::pair<std::string, std::string>, std::string> idByRepoTag;
+        std::set<std::tuple<std::string, std::string, std::string>> seen;
+
+        for (const auto& image : digestRows)
+        {
+            const auto it = idByRepoTag.emplace(std::make_pair(image.Repository, image.Tag), image.ID).first;
+            VERIFY_ARE_EQUAL(it->second, image.ID, L"Rows sharing a repository and tag must report the same image ID");
+
+            VERIFY_IS_TRUE(
+                seen.emplace(image.Repository, image.Tag, image.Digest).second,
+                L"A repository, tag and digest triple must not be listed twice");
+        }
+
+        // Expanding per digest can only ever add rows relative to the default listing.
+        auto defaultResult = RunWslc(L"image list --format json");
+        defaultResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(digestRows.size() >= ParseNdjsonOutputAs<ImageOutputInformation>(defaultResult).size());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_QuietStillOutputsIdsOnly)
     {
         const auto result = RunWslc(L"image list --digests --quiet");
