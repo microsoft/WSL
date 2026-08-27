@@ -31,7 +31,6 @@ std::vector<Argument> VolumeCreateCommand::GetArguments() const
         Argument::Create(ArgType::Driver),
         Argument::Create(ArgType::Options, false, NO_LIMIT),
         Argument::Create(ArgType::Label, false, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -47,7 +46,7 @@ std::wstring VolumeCreateCommand::LongDescription() const
 
 void VolumeCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << CreateVolume;
 }
 } // namespace wsl::windows::wslc

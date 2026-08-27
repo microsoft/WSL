@@ -29,27 +29,39 @@ namespace wsl::windows::wslc::task {
 
 void AttachToSession(CLIExecutionContext& context)
 {
-    std::wstring sessionId;
-    if (context.Args.Contains(ArgType::SessionId))
-    {
-        sessionId = context.Args.Get<ArgType::SessionId>();
-    }
-
-    context.ExitCode = SessionService::Attach(sessionId);
+    auto& session = context.Data.Get<Data::Session>();
+    context.ExitCode = SessionService::Attach(context.Reporter, session);
 }
 
-void CreateSession(CLIExecutionContext& context)
+void OpenSessionIfSpecified(CLIExecutionContext& context)
 {
-    if (context.Args.Contains(ArgType::Session))
+    if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        // User specified a session name — open only, don't create.
-        const auto& sessionName = context.Args.Get<ArgType::Session>();
+        const auto& sessionName = context.GlobalArgs.Get<ArgType::Session>();
         context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
-        return;
     }
+}
 
-    // Create/open the default session.
-    context.Data.Add<Data::Session>(SessionService::CreateDefaultSession());
+void OpenOrCreateDefaultSession(CLIExecutionContext& context)
+{
+    if (!context.Data.Contains(Data::Session))
+    {
+        context.Data.Add<Data::Session>(SessionService::OpenOrCreateDefaultSession(context.Reporter));
+    }
+}
+
+void OpenDefaultSession(CLIExecutionContext& context)
+{
+    if (!context.Data.Contains(Data::Session))
+    {
+        context.Data.Add<Data::Session>(SessionService::OpenDefaultSession());
+    }
+}
+
+void ResolveSession(CLIExecutionContext& context)
+{
+    OpenSessionIfSpecified(context);
+    OpenOrCreateDefaultSession(context);
 }
 
 void ListSessions(CLIExecutionContext& context)
@@ -58,15 +70,16 @@ void ListSessions(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Verbose))
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
+        context.Reporter.Output(L"[wslc] Found {} session{}\n", sessions.size(), plural);
     }
 
     TableOutput<3> table(
+        context.Reporter,
         {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
 
     for (const auto& session : sessions)
     {
-        table.OutputLine({
+        table.WriteRow({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
             session.DisplayName,
@@ -78,13 +91,25 @@ void ListSessions(CLIExecutionContext& context)
 
 void TerminateSession(CLIExecutionContext& context)
 {
-    std::wstring sessionId;
-    if (context.Args.Contains(ArgType::SessionId))
+    auto& session = context.Data.Get<Data::Session>();
+    context.ExitCode = SessionService::TerminateSession(context.Reporter, session);
+}
+
+void RunInSession(CLIExecutionContext& context)
+{
+    auto& session = context.Data.Get<Data::Session>();
+
+    std::vector<std::string> arguments;
+    arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(context.Args.Get<ArgType::Command>()));
+    if (context.Args.Contains(ArgType::ForwardArgs))
     {
-        sessionId = context.Args.Get<ArgType::SessionId>();
+        for (const auto& arg : context.Args.Get<ArgType::ForwardArgs>())
+        {
+            arguments.emplace_back(wsl::windows::common::string::WideToMultiByte(arg));
+        }
     }
 
-    context.ExitCode = SessionService::TerminateSession(sessionId);
+    context.ExitCode = SessionService::Run(context.Reporter, session, arguments);
 }
 
 void EnterSession(CLIExecutionContext& context)
@@ -103,7 +128,7 @@ void EnterSession(CLIExecutionContext& context)
         sessionName = wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::None);
     }
 
-    context.ExitCode = SessionService::Enter(storagePath.wstring(), sessionName);
+    context.ExitCode = SessionService::Enter(context.Reporter, storagePath.wstring(), sessionName);
 }
 
 } // namespace wsl::windows::wslc::task

@@ -28,7 +28,6 @@ std::vector<Argument> ContainerInspectCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -46,7 +45,7 @@ std::wstring ContainerInspectCommand::LongDescription() const
 void ContainerInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << InspectContainers;
 }
 // clang-format on

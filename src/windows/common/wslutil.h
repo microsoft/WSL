@@ -48,13 +48,6 @@ inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
 inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLC: Does this apply to WSLC ?
 
-enum class EnumReferenceFormat
-{
-    None,
-    Tag,
-    Digest
-};
-
 struct GitHubReleaseAsset
 {
     std::wstring url;
@@ -209,7 +202,7 @@ std::wstring ConstructPipePath(_In_ std::wstring_view PipeName);
 
 GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> name);
 
-std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
+std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress = true);
 
 std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
 
@@ -228,6 +221,10 @@ ErrorStrings ErrorToString(const Error& error);
 [[nodiscard]] HANDLE FromCOMInputHandle(WSLCHandle Handle);
 
 std::filesystem::path GetBasePath();
+
+// Returns the fully-qualified canonical image reference for the given input, matching the string
+// printed by `docker pull` (e.g. "ubuntu" -> "docker.io/library/ubuntu:latest").
+std::string GetCanonicalImageReference(const std::string& input);
 
 std::optional<COMErrorInfo> GetCOMErrorInfo();
 

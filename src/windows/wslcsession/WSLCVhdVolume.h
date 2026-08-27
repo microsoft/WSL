@@ -42,10 +42,13 @@ public:
         ULONGLONG SizeBytes,
         ULONG Lun,
         std::string&& VirtualMachinePath,
+        std::string&& CreatedAt,
         std::map<std::string, std::string>&& DriverOpts,
         std::map<std::string, std::string>&& Labels,
         WSLCVirtualMachine& VirtualMachine,
-        DockerHTTPClient& DockerClient);
+        DockerHTTPClient& DockerClient,
+        bool Attached = true,
+        std::pair<HRESULT, std::string> Status = {S_OK, {}});
 
     ~WSLCVhdVolumeImpl();
 
@@ -74,6 +77,11 @@ public:
         return m_labels;
     }
 
+    std::pair<HRESULT, std::string> Status() const override
+    {
+        return m_status;
+    }
+
     void Delete() override;
     std::string Inspect() const override;
     WSLCVolumeInformation GetVolumeInformation() const override;
@@ -97,7 +105,9 @@ private:
     ULONG m_lun{};
     WSLCVirtualMachine& m_virtualMachine;
     DockerHTTPClient& m_dockerClient;
-    bool m_attached{true};
+    bool m_attached;
+
+    std::pair<HRESULT, std::string> m_status;
 };
 
 } // namespace wsl::windows::service::wslc

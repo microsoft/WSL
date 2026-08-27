@@ -51,12 +51,12 @@ void ProcessSettings::WorkingDirectory(hstring const& value)
     m_workingDirectory = winrt::to_string(value);
 }
 
-winrt::Windows::Foundation::Collections::IVector<hstring> ProcessSettings::CmdLine()
+winrt::Windows::Foundation::Collections::IVector<hstring> ProcessSettings::CommandLine()
 {
-    return m_cmdLine;
+    return m_commandLine;
 }
 
-void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
+void ProcessSettings::CommandLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
 {
     if (m_processSettings)
     {
@@ -65,10 +65,10 @@ void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<h
 
     if (!value)
     {
-        throw winrt::hresult_error(E_POINTER, L"CmdLine cannot be null");
+        throw winrt::hresult_error(E_POINTER, L"CommandLine cannot be null");
     }
 
-    m_cmdLine = value;
+    m_commandLine = value;
 }
 
 winrt::Windows::Foundation::Collections::IMap<hstring, hstring> ProcessSettings::EnvironmentVariables()
@@ -121,16 +121,16 @@ WslcProcessSettings* ProcessSettings::ToStructPointer()
         winrt::check_hresult(WslcSetProcessSettingsWorkingDirectory(m_processSettings.get(), m_workingDirectory.c_str()));
     }
 
-    if (m_cmdLine && m_cmdLine.Size() > 0)
+    if (m_commandLine && m_commandLine.Size() > 0)
     {
-        auto argc = m_cmdLine.Size();
-        m_cmdLineStrings = StringArray{argc};
-        for (auto const& arg : m_cmdLine)
+        auto argc = m_commandLine.Size();
+        m_commandLineStrings = StringArray{argc};
+        for (auto const& arg : m_commandLine)
         {
-            m_cmdLineStrings.Add(winrt::to_string(arg));
+            m_commandLineStrings.Add(winrt::to_string(arg));
         }
 
-        winrt::check_hresult(WslcSetProcessSettingsCmdLine(m_processSettings.get(), m_cmdLineStrings.GetRawPointer(), argc));
+        winrt::check_hresult(WslcSetProcessSettingsCmdLine(m_processSettings.get(), m_commandLineStrings.GetRawPointer(), argc));
     }
 
     if (m_environmentVariables.Size() > 0)

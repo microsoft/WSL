@@ -951,20 +951,30 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     // Move the VHD to the new location.
     THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
 
-    // Restore the original VHD owner on the moved file.
+    // Restore the original VHD owner on the moved file. Open the file while impersonating
+    // the caller, then use ReOpenFile to add WRITE_OWNER as SYSTEM with SE_RESTORE_NAME
+    // (needed since a cross-volume MoveFileEx may leave the file owned by
+    // BUILTIN\Administrators). ReOpenFile reuses the already-open file object instead of
+    // resolving the path again.
     auto setVhdOwner = [&originalOwner](const std::filesystem::path& vhdPath) {
         wil::unique_hfile vhdHandle(CreateFileW(
-            vhdPath.c_str(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+            vhdPath.c_str(), READ_CONTROL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
         THROW_LAST_ERROR_IF(!vhdHandle);
 
         auto runAsSelf = wil::run_as_self();
         auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
-        THROW_IF_WIN32_ERROR(
-            ::SetSecurityInfo(vhdHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
+
+        wil::unique_hfile privilegedHandle(ReOpenFile(
+            vhdHandle.get(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_FLAG_OPEN_REPARSE_POINT));
+        THROW_LAST_ERROR_IF(!privilegedHandle);
+
+        THROW_IF_WIN32_ERROR(::SetSecurityInfo(
+            privilegedHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
     };
 
-    setVhdOwner(newVhdPath);
-
+    // Install the rollback before fixing up ownership so a failure there (e.g. the caller
+    // lacking access on the moved file) still moves the VHD back instead of leaving the
+    // registration pointing at a file that no longer exists at the old location.
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(
             newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
@@ -975,6 +985,8 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
         // Write the location back to the original path in case the second registry write failed. Otherwise, this is a no-op.
         registration.Write(Property::BasePath, distro.BasePath.c_str());
     });
+
+    setVhdOwner(newVhdPath);
 
     // Update the registry location
     registration.Write(Property::BasePath, Location);
@@ -1039,7 +1051,7 @@ HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCou
         static_assert((RTL_NUMBER_OF(current->DistroName) - 1) == LX_INIT_DISTRO_NAME_MAX);
 
         memset(current->DistroName, 0, sizeof(current->DistroName));
-        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName) - 1, configuration.Name.c_str());
+        wcscpy_s(current->DistroName, RTL_NUMBER_OF(current->DistroName), configuration.Name.c_str());
     }
 
     *DistributionCount = numberOfDistributions;
@@ -2993,7 +3005,16 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
-                LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str()));
+                // The VHD might be in use so try to delete it for up to 10 seconds.
+                try
+                {
+                    wsl::shared::retry::RetryWithTimeout<void>(
+                        [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.VhdFilePath.c_str())); },
+                        std::chrono::milliseconds(100),
+                        std::chrono::seconds(10),
+                        []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+                }
+                CATCH_LOG_MSG("Failed to delete %ls", Configuration.VhdFilePath.c_str())
             }
         }
     }
@@ -3010,8 +3031,16 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         // Remove start menu entry for the distribution, if any.
         if (Configuration.ShortcutPath.has_value())
         {
-            LOG_IF_WIN32_BOOL_FALSE_MSG(
-                DeleteFileW(Configuration.ShortcutPath->c_str()), "Failed to delete %ls", Configuration.ShortcutPath->c_str());
+            // The shortcut file may be in use. Try to delete it for up to 10 seconds, and then give up.
+            try
+            {
+                wsl::shared::retry::RetryWithTimeout<void>(
+                    [&]() { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(Configuration.ShortcutPath->c_str())); },
+                    std::chrono::milliseconds(100),
+                    std::chrono::seconds(10),
+                    []() { return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION); });
+            }
+            CATCH_LOG_MSG("Failed to delete %ls", Configuration.ShortcutPath->c_str())
         }
 
         // Remove the terminal profile, if any.
@@ -3206,10 +3235,20 @@ try
 
     // Attach the disk to the VM, reusing the same LUN if possible.
     //
-    // N.B. The user token is not provided because the key that holds the disk
-    // state can only be written by elevated users.
+    // N.B. The disk-mount state is stored under the user's SID in a volatile (per-boot)
+    // registry key, so the disk being restored here was mounted earlier in this same boot
+    // by this same user. For a VHD we therefore pass the user token so the access grant and
+    // the path resolution run under the mounting user's identity: a privileged operation can
+    // only ever touch a file that user can already reach, which closes the restore-time
+    // junction/symlink swap (TOCTOU) without re-resolving the path as SYSTEM.
+    //
+    // A pass-through (raw block device) attach is elevation-gated and the reconnecting user
+    // may no longer be elevated, so it is restored as SYSTEM (no token). Block-device paths
+    // (\\.\PhysicalDriveN) have no reparse-point surface, so there is no swap to defend
+    // against.
     auto lun = std::stoul(LunStr);
-    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, nullptr);
+    const HANDLE userToken = (diskType == WslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
+    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, userToken);
 
     // Restore each mount point.
     for (const auto& e : wsl::windows::common::registry::EnumKeys(Key, KEY_READ))
@@ -4088,6 +4127,14 @@ try
         // We only add uppercase as there is no standard environment variable for PAC proxies.
         // This at least makes the PAC url available to the user in case they wish to use it.
         environment.emplace_back(std::format("{}={}", c_pacProxy, proxySettings.PacUrl));
+
+        // When PAC is used, the reply only populates the proxy field.
+        // Set both envs to this value as best effort since PAC is not functional in headless Linux.
+        if (proxySettings.SecureProxy.empty() && !proxySettings.Proxy.empty())
+        {
+            environment.emplace_back(std::format("{}={}", c_httpsProxyLower, proxySettings.Proxy));
+            environment.emplace_back(std::format("{}={}", c_httpsProxyUpper, proxySettings.Proxy));
+        }
     }
 }
 CATCH_LOG()

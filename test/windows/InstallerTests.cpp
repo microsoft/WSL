@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include <Sfc.h>
+#include <msiquery.h>
 
 #include "Common.h"
 #include "registry.hpp"
@@ -21,6 +22,7 @@ Abstract:
 #include "wslcsdk.h"
 
 using namespace wsl::windows::common::registry;
+using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 extern std::wstring g_dumpFolder;
 static std::wstring g_pipelineBuildId;
@@ -145,7 +147,7 @@ class InstallerTests
         return m_packageManager.FindPackagesForUser(L"", wsl::windows::common::wslutil::c_msixPackageFamilyName).First().HasCurrent();
     }
 
-    static void CallMsiExec(const std::wstring& Args)
+    static DWORD RunMsiExec(const std::wstring& Args)
     {
         std::wstring commandLine;
         THROW_IF_FAILED(wil::GetSystemDirectoryW(commandLine));
@@ -168,7 +170,12 @@ class InstallerTests
             std::chrono::minutes(2),
             []() { return wil::ResultFromCaughtException() == E_ABORT; });
 
-        VERIFY_ARE_EQUAL(0L, exitCode);
+        return exitCode;
+    }
+
+    static void CallMsiExec(const std::wstring& Args)
+    {
+        VERIFY_ARE_EQUAL(0L, RunMsiExec(Args));
     }
 
     std::wstring GetMsiProductCode() const
@@ -343,6 +350,28 @@ class InstallerTests
     {
         const auto msiKey = wsl::windows::common::registry::OpenKey(m_lxssKey.get(), L"MSI", KEY_ALL_ACCESS);
         wsl::windows::common::registry::DeleteKeyValue(msiKey.get(), L"ProductCode");
+    }
+
+    // Queries the MSI database for the sequence number of the given action in InstallExecuteSequence.
+    // Returns -1 if the action is not found.
+    int GetMsiSequenceNumber(MSIHANDLE database, LPCWSTR action)
+    {
+        unique_msi_handle view;
+        THROW_IF_WIN32_ERROR(MsiDatabaseOpenViewW(database, L"SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = ?", &view));
+        unique_msi_handle rec{MsiCreateRecord(1)};
+        THROW_IF_WIN32_ERROR(MsiRecordSetStringW(rec.get(), 1, action));
+        THROW_IF_WIN32_ERROR(MsiViewExecute(view.get(), rec.get()));
+
+        MSIHANDLE hResult = 0;
+        auto fetchResult = MsiViewFetch(view.get(), &hResult);
+        if (fetchResult == ERROR_NO_MORE_ITEMS)
+        {
+            return -1;
+        }
+
+        THROW_IF_WIN32_ERROR(fetchResult);
+        unique_msi_handle result{hResult};
+        return MsiRecordGetInteger(result.get(), 1);
     }
 
     void InstallGitHubRelease(const std::wstring& version)
@@ -692,6 +721,76 @@ class InstallerTests
             L"Update failed (exit code: 1603).\r\n"
             L"Error code: Wsl/CallMsi/Install/ERROR_INSTALL_FAILURE\r\n",
             output);
+    }
+
+    TEST_METHOD(MsiRemoveExistingProductsScheduledInsideTransaction)
+    {
+        // Verify that RemoveExistingProducts is scheduled between InstallInitialize
+        // and InstallFinalize in the MSI sequence table. This is the effect of
+        // Schedule="afterInstallInitialize" on <MajorUpgrade> in package.wix.in.
+
+        unique_msi_handle database;
+        THROW_IF_WIN32_ERROR(MsiOpenDatabaseW(m_msiPath.c_str(), MSIDBOPEN_READONLY, &database));
+
+        auto installInitialize = GetMsiSequenceNumber(database.get(), L"InstallInitialize");
+        auto removeExistingProducts = GetMsiSequenceNumber(database.get(), L"RemoveExistingProducts");
+        auto installFinalize = GetMsiSequenceNumber(database.get(), L"InstallFinalize");
+
+        LogInfo("MSI sequence: InstallInitialize=%d, RemoveExistingProducts=%d, InstallFinalize=%d", installInitialize, removeExistingProducts, installFinalize);
+
+        VERIFY_ARE_NOT_EQUAL(-1, installInitialize);
+        VERIFY_ARE_NOT_EQUAL(-1, removeExistingProducts);
+        VERIFY_ARE_NOT_EQUAL(-1, installFinalize);
+
+        VERIFY_IS_GREATER_THAN(
+            removeExistingProducts, installInitialize, L"RemoveExistingProducts must be after InstallInitialize");
+
+        VERIFY_IS_LESS_THAN(removeExistingProducts, installFinalize, L"RemoveExistingProducts must precede InstallFinalize");
+    }
+
+    TEST_METHOD(MsiUpgradeFailureRestoresFiles)
+    {
+#ifdef WSL_OFFICIAL_BUILD
+        Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
+        return;
+#else
+        // End-to-end rollback test: install an older version, then attempt a major
+        // upgrade that fails inside the transaction. Verify the old version's files
+        // are restored by MSI rollback.
+
+        UninstallMsi();
+        InstallGitHubRelease(L"2.0.2");
+
+        auto restore = wil::scope_exit([this]() { InstallMsi(); });
+
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        const auto wslExe = m_installedPath / L"wsl.exe";
+        const auto wslService = m_installedPath / L"wslservice.exe";
+        const auto systemVhd = m_installedPath / L"system.vhd";
+
+        VERIFY_IS_TRUE(std::filesystem::exists(wslExe), L"wsl.exe must exist before upgrade");
+        VERIFY_IS_TRUE(std::filesystem::exists(wslService), L"wslservice.exe must exist before upgrade");
+        VERIFY_IS_TRUE(std::filesystem::exists(systemVhd), L"system.vhd must exist before upgrade");
+
+        // Attempt a major upgrade forced to fail after RemoveExistingProducts.
+        PrepareForMsiOperation();
+        auto msiArgs = std::format(
+            L"/qn /norestart /i \"{}\" WSL_TEST_FORCE_INSTALL_FAILURE=1 SKIPVALIDATION=1 "
+            L"/L*V \"{}\"",
+            m_msiPath,
+            GenerateMsiLogPath());
+        auto exitCode = RunMsiExec(msiArgs);
+
+        VERIFY_ARE_NOT_EQUAL(0L, exitCode, L"Upgrade should have failed due to forced failure CA");
+
+        // Verify rollback restored the previous installation
+        VERIFY_IS_TRUE(IsMsiPackageInstalled(), L"MSI package must still be installed after rollback");
+        VERIFY_IS_TRUE(std::filesystem::exists(wslExe), L"wsl.exe must be restored after rollback");
+        VERIFY_IS_TRUE(std::filesystem::exists(wslService), L"wslservice.exe must be restored after rollback");
+        VERIFY_IS_TRUE(std::filesystem::exists(systemVhd), L"system.vhd must be restored after rollback");
+        ValidateInstalledVersion(L"2.0.2");
+#endif
     }
 
     TEST_METHOD(WslUpdateNoNewVersion)

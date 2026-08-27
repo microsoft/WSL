@@ -63,7 +63,6 @@ class DockerExecProcessControl : public WSLCProcessControl
 {
 public:
     DockerExecProcessControl(WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker);
-    ~DockerExecProcessControl();
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;

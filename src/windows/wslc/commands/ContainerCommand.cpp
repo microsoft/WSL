@@ -23,8 +23,10 @@ std::vector<std::unique_ptr<Command>> ContainerCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerCpCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerExportCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerInspectCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
@@ -55,6 +57,6 @@ std::wstring ContainerCommand::LongDescription() const
 
 void ContainerCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Reporter);
 }
 } // namespace wsl::windows::wslc

@@ -46,13 +46,13 @@ void Container::Start()
     }
 
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcStartContainer(m_container.get(), startFlags, errorMessage.put());
+    auto hr = WslcStartContainer(ToHandle(), startFlags, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 
     if (m_initProcess)
     {
         WslcProcess initHandle;
-        winrt::check_hresult(WslcGetContainerInitProcess(m_container.get(), &initHandle));
+        winrt::check_hresult(WslcGetContainerInitProcess(ToHandle(), &initHandle));
         m_initProcess->AttachHandle(initHandle);
     }
 }
@@ -75,7 +75,7 @@ void Container::Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, Ti
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
-void Container::Delete(winrt::Microsoft::WSL::Containers::DeleteContainerFlags const& flags)
+void Container::Delete(winrt::Microsoft::WSL::Containers::DeleteContainerOption const& flags)
 {
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcDeleteContainer(ToHandle(), static_cast<WslcDeleteContainerFlags>(flags), errorMessage.put());
@@ -118,9 +118,32 @@ winrt::Microsoft::WSL::Containers::ContainerState Container::State()
     return static_cast<winrt::Microsoft::WSL::Containers::ContainerState>(state);
 }
 
+void Container::EnsureNotClosed() const
+{
+    if (!m_container)
+    {
+        throw winrt::hresult_error(RO_E_CLOSED, L"Container has been closed");
+    }
+}
+
 WslcContainer Container::ToHandle()
 {
+    EnsureNotClosed();
     return m_container.get();
+}
+
+void Container::Close()
+{
+    m_initProcess = nullptr;
+
+    // Methods called after Close() will fail due to EnsureNotClosed().
+    m_container.reset();
+}
+
+void Container::final_release(std::unique_ptr<Container> self)
+{
+    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
+    self->Close();
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

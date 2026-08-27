@@ -37,8 +37,11 @@ Abstract:
 #include "WSLCPluginNotifier.h"
 #include "PluginManager.h"
 #include "ExecutionContext.h"
+#include "helpers.hpp"
 #include "wslutil.h"
 #include "filesystem.hpp"
+#include "APICompat.h"
+#include "Localization.h"
 
 extern wsl::windows::service::PluginManager g_pluginManager;
 
@@ -50,7 +53,9 @@ using wsl::windows::service::wslc::OpenVmmVirtualMachine;
 #endif
 using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
+using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
 namespace wslutil = wsl::windows::common::wslutil;
+namespace apicompat = wsl::windows::common::apicompat;
 namespace settings = wsl::windows::wslc::settings;
 
 namespace {
@@ -87,12 +92,20 @@ struct SessionSettings
     static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, const std::wstring& ResolvedName)
     {
         auto userSettings = LoadUserSettings(UserToken);
-        auto localAppData = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
 
-        auto storagePath = (localAppData / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName).wstring();
+        auto configuredStorageBase = userSettings.Get<settings::Setting::SessionStoragePath>();
+        const bool customConfigured = !configuredStorageBase.empty();
+        const std::filesystem::path defaultBase = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
+        const std::filesystem::path storageBase =
+            customConfigured ? std::filesystem::path(wsl::shared::string::MultiByteToWide(configuredStorageBase)) : defaultBase;
 
-        return std::unique_ptr<SessionSettings>(
-            new SessionSettings(std::wstring(ResolvedName), std::move(storagePath), WSLCSessionStorageFlagsNone, userSettings));
+        const auto storageDir = storageBase / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName;
+
+        // wslcsession emits the custom-location warning when it actually creates the VHD, so the notice
+        // fires once at creation without a service-side callback that could stall CreateSession.
+        const auto storageFlags = customConfigured ? WSLCSessionStorageFlagsWarnCustomLocation : WSLCSessionStorageFlagsNone;
+
+        return std::unique_ptr<SessionSettings>(new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), storageFlags, userSettings));
     }
 
     // Custom session: caller provides name and storage path.
@@ -123,6 +136,10 @@ private:
             Settings.FeatureFlags,
             WslcFeatureFlagsVirtioFs,
             userSettings.Get<settings::Setting::SessionHostFileShareMode>() == settings::HostFileShareMode::VirtioFs);
+        WI_SetFlagIf(
+            Settings.FeatureFlags,
+            WslcFeatureFlagsPortRelayWslRelay,
+            userSettings.Get<settings::Setting::SessionPortRelay>() == settings::PortRelayType::WslRelay);
         Settings.StorageFlags = storageFlags;
     }
 };
@@ -169,8 +186,11 @@ try
 }
 CATCH_LOG()
 
-void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
+void WSLCSessionManagerImpl::CreateSession(
+    _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {
+    THROW_HR_IF_NULL(E_POINTER, WslcSession);
+
     auto tokenInfo = GetCallingProcessTokenInfo();
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
@@ -187,6 +207,9 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
         THROW_HR_IF(E_INVALIDARG, Settings->StoragePath != nullptr && wcslen(Settings->StoragePath) == 0);
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, wcslen(Settings->DisplayName) >= std::size(WSLCSessionListEntry{}.DisplayName));
+        THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCSessionFlagsValid), "Invalid session flags: 0x%x", Flags);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG, WI_IsAnyFlagSet(Settings->FeatureFlags, ~WSLCFeatureFlagsValid), "Invalid feature flags: 0x%x", Settings->FeatureFlags);
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
@@ -267,12 +290,13 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         notifier = wil::MakeOrThrow<WSLCPluginNotifier>(
             g_pluginManager, sessionId, creatorPid, std::wstring(resolvedDisplayName), wil::shared_handle(sharedToken), std::vector<BYTE>(storedSid));
 
-        // Create the VM in the SYSTEM service (privileged).
-        // Determine VMM backend based on user settings: OpenVMM (experimental) or HCS (default).
-        Microsoft::WRL::ComPtr<IWSLCVirtualMachine> vm;
+    // Create the VM factory in the SYSTEM service (privileged). The per-user session
+    // uses it to create the VM. Funneling VM creation through a factory lets the session
+    // own when VMs are created, rather than having one handed to it up front.
+    bool useOpenVmm = false;
 
 #if WSL_INCLUDE_OPENVMM
-        const bool useOpenVmm = SessionSettings::LoadUserSettings(userToken.get()).Get<settings::Setting::SessionOpenVmm>();
+    useOpenVmm = SessionSettings::LoadUserSettings(userToken.get()).Get<settings::Setting::SessionOpenVmm>();
 
         // For OpenVMM, disable unsupported features before creating the VM and session.
         // The copy must outlive all uses of Settings below (CreateSessionSettings, etc.).
@@ -290,27 +314,32 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
             openVmmSettings.NetworkingMode = WSLCNetworkingModeConsomme;
 
             Settings = &openVmmSettings;
-
-            vm = Microsoft::WRL::Make<OpenVmmVirtualMachine>(Settings);
         }
 #endif
-        if (!vm)
-        {
-            vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
-        }
+    auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings, useOpenVmm);
 
-        // Launch per-user COM server factory and add it to our job object for crash cleanup.
+        // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());
-        AddSessionProcessToJobObject(factory.get());
+        wil::unique_handle sessionJob = CreateSessionProcessJob(factory.get());
 
-        auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
+        const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
-        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), notifier.Get(), &session, &serviceRef));
+        const auto factoryHr =
+            factory->CreateSession(&sessionSettings, vmFactory.Get(), notifier.Get(), WarningCallback, &session, &serviceRef);
+        if (FAILED(factoryHr))
+        {
+            if (auto comError = wslutil::GetCOMErrorInfo(); comError && comError->Message)
+            {
+                THROW_HR_WITH_USER_ERROR(factoryHr, comError->Message.get());
+            }
+
+            THROW_HR(factoryHr);
+        }
 
         // Track the session via its service ref, along with metadata and security info.
         m_sessions.push_back(SessionEntry{
-            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid)});
+            std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo), notifier, false, sharedToken, std::move(storedSid), std::move(sessionJob)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -350,11 +379,12 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     });
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
-    WSL_LOG_TELEMETRY(
+    WSL_LOG(
         "WSLCCreateSession",
-        PDT_ProductAndServicePerformance,
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(resolvedDisplayName.c_str(), "Name"),
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
@@ -367,6 +397,8 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
 void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
 {
+    THROW_HR_IF_NULL(E_POINTER, Session);
+
     auto tokenInfo = GetCallingProcessTokenInfo();
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
         if (entry.SessionId != Id)
@@ -381,11 +413,13 @@ void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
         return S_OK;
     });
 
-    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%lu' not found", Id);
+    THROW_IF_FAILED_MSG(result.value_or(WSLC_E_SESSION_NOT_FOUND), "Session '%lu' not found", Id);
 }
 
 void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession** Session)
 {
+    THROW_HR_IF_NULL(E_POINTER, Session);
+
     auto tokenInfo = GetCallingProcessTokenInfo();
 
     // Null name = default session, resolved from caller's token + username.
@@ -409,11 +443,17 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
         return S_OK;
     });
 
-    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%ls' not found", DisplayName);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_SESSION_NOT_FOUND, wsl::shared::Localization::MessageWslcSessionNotFound(DisplayName), !result.has_value());
+
+    THROW_IF_FAILED_MSG(result.value(), "Failed to open session '%ls'", DisplayName);
 }
 
 void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
 {
+    THROW_HR_IF_NULL(E_POINTER, Sessions);
+    THROW_HR_IF_NULL(E_POINTER, SessionsCount);
+
     std::vector<WSLCSessionListEntry> sessionInfo;
 
     ForEachSession<void>([&](auto& entry, const auto&) noexcept {
@@ -436,22 +476,23 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions,
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
 }
 
-void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
+void WSLCSessionManagerImpl::EnterSession(
+    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
     THROW_HR_IF(E_INVALIDARG, DisplayName[0] == L'\0' || StoragePath[0] == L'\0');
 
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     auto sessionSettings = SessionSettings::Custom(callerToken.get(), DisplayName, StoragePath, WSLCSessionStorageFlagsNoCreate);
-    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WslcSession);
+    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WarningCallback, WslcSession);
 }
 
 WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
-    _In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName)
+    _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName)
 {
     WSLCSessionInitSettings sessionSettings{};
     sessionSettings.SessionId = SessionId;
-    sessionSettings.CreatorPid = CreatorPid;
+    sessionSettings.CreatorProcessName = CreatorProcessName;
     sessionSettings.DisplayName = ResolvedDisplayName;
     sessionSettings.StoragePath = Settings->StoragePath;
     sessionSettings.MaximumStorageSizeMb = Settings->MaximumStorageSizeMb;
@@ -464,31 +505,18 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     return sessionSettings;
 }
 
-void WSLCSessionManagerImpl::AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory)
+wil::unique_handle WSLCSessionManagerImpl::CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory)
 {
-    EnsureJobObjectCreated();
+    // Use a fresh job per session; reusing one fails intermittently with
+    // ERROR_ACCESS_DENIED once it's assigned to a process the system put in another job.
+    wil::unique_handle jobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 
     wil::unique_handle process;
     THROW_IF_FAILED(Factory->GetProcessHandle(process.put()));
 
-    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_sessionJobObject.get(), process.get()));
-}
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(jobObject.get(), process.get()));
 
-void WSLCSessionManagerImpl::EnsureJobObjectCreated()
-{
-    // Create a job object that will automatically terminate all child processes
-    // when the job handle is closed (i.e., when wslservice exits or crashes).
-    std::call_once(m_jobObjectInitFlag, [this] {
-        m_sessionJobObject.reset(CreateJobObjectW(nullptr, nullptr));
-        THROW_LAST_ERROR_IF(!m_sessionJobObject);
-
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
-        jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        THROW_IF_WIN32_BOOL_FALSE(
-            SetInformationJobObject(m_sessionJobObject.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
-
-        WSL_LOG("SessionManagerJobObjectCreated", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
-    });
+    return jobObject;
 }
 
 CallingProcessTokenInfo WSLCSessionManagerImpl::GetCallingProcessTokenInfo()
@@ -553,8 +581,9 @@ HRESULT WSLCSessionManagerImpl::CheckTokenAccess(const SessionEntry& Entry, cons
     return S_OK;
 }
 
-WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl) : COMImplClass<WSLCSessionManagerImpl>(Impl)
+WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl)
 {
+    Initialize(Impl);
 }
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
@@ -570,7 +599,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCVersion* ClientVersion, _Out_ BOOL* IsSupported)
+HRESULT WSLCSessionManager::IsClientVersionSupported(_In_ const WSLCCompatVersion* ClientVersion, _Out_ BOOL* IsSupported)
 try
 {
     RETURN_HR_IF(E_POINTER, ClientVersion == nullptr || IsSupported == nullptr);
@@ -592,20 +621,21 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::CreateSession(
+    const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 try
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WarningCallback, WslcSession);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WarningCallback, WslcSession);
 }
 
 HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
@@ -629,6 +659,50 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
 
+HRESULT WSLCSessionManager::InterfaceSupportsErrorInfo(_In_ REFIID riid)
+{
+    return riid == __uuidof(IWSLCSessionManager) ? S_OK : S_FALSE;
+}
+
+HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCCompatVersion* Version)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Version);
+
+    WSLCVersion version{};
+    RETURN_IF_FAILED(GetVersion(&version));
+
+    *Version = apicompat::Convert(version);
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSessionManager::CreateSession(
+    const WSLCCompatSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatSession** Session)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Session);
+    *Session = nullptr;
+
+    const auto warning = apicompat::Convert(WarningCallback);
+
+    Microsoft::WRL::ComPtr<IWSLCSession> session;
+    if (Settings == nullptr)
+    {
+        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), Flags, warning.Get(), &session));
+    }
+    else
+    {
+        const auto settings = apicompat::Convert(*Settings);
+        RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
+    }
+
+    RETURN_HR_IF_NULL(E_UNEXPECTED, session);
+
+    return session.CopyTo(Session);
+}
+CATCH_RETURN();
+
 namespace wsl::windows::service::wslc {
 
 WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
@@ -650,7 +724,7 @@ wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
         return S_OK;
     });
 
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !result, "WSLC session %lu not found", Id);
+    THROW_HR_IF_MSG(WSLC_E_SESSION_NOT_FOUND, !result, "WSLC session %lu not found", Id);
     return result;
 }
 

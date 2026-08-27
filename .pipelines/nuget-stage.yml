@@ -28,6 +28,10 @@ stages:
       ob_outputDirectory: '$(Build.SourcesDirectory)\out'
       ob_artifactBaseName: 'drop_wsl'
       ob_artifactSuffix: '_nuget'
+      # The per-stage SDL CodeSign post-analysis scans the checked-out repo, which contains unsigned
+      # helper .ps1 scripts. The pipeline-level exclude does not flow into per-stage SDL, so it must be
+      # set on this job as well (mirrors build-job.yml). The published .nupkg files remain validated.
+      ob_sdl_codeSignValidation_excludes: -|**\*.ps1
 
     steps:
 

@@ -164,7 +164,7 @@ try
     ConfigureCrt();
 
     // Enable contextualized errors
-    wsl::windows::common::EnableContextualizedErrors(true);
+    wsl::windows::common::EnableContextualizedErrors(true, false, true);
 
     // Initialize telemetry.
     WslTraceLoggingInitialize(WslServiceTelemetryProvider, !wsl::shared::OfficialBuild);

@@ -25,16 +25,21 @@ struct Container : ContainerT<Container>
 
     void Start();
     void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, winrt::Windows::Foundation::TimeSpan timeout);
-    void Delete(winrt::Microsoft::WSL::Containers::DeleteContainerFlags const& flags);
+    void Delete(winrt::Microsoft::WSL::Containers::DeleteContainerOption const& flags);
     winrt::Microsoft::WSL::Containers::Process CreateProcess(winrt::Microsoft::WSL::Containers::ProcessSettings const& newProcessSettings);
     hstring Inspect();
     hstring Id();
     winrt::Microsoft::WSL::Containers::Process InitProcess();
     winrt::Microsoft::WSL::Containers::ContainerState State();
 
+    void Close();
+    static void final_release(std::unique_ptr<Container> self);
+
     WslcContainer ToHandle();
 
 private:
+    void EnsureNotClosed() const;
+
     winrt::com_ptr<implementation::Process> m_initProcess;
 
     // Releasing the container handle will end the processes and disconnect the callbacks.

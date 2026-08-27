@@ -24,12 +24,28 @@ Abstract:
 #include <type_traits>
 
 namespace wsl::windows::wslc {
-// The argument parsing state machine.
-// It is broken out to enable completion to process arguments, ignore errors,
-// and determine the likely state of the word to be completed.
+// State machine is exposed so completion can run the parser, ignore errors,
+// and inspect the in-progress state of the word being completed.
 struct ParseArgumentsStateMachine
 {
-    ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments);
+    // optionsOnly:          stop (without consuming) at the first positional token.
+    // stopOnUnknown:        stop (without consuming) at the first unknown option
+    //                       token instead of throwing.
+    // overridableDefaults:  ArgTypes whose existing entries in execArgs are
+    //                       treated as preloaded defaults (e.g. from environment
+    //                       variables). The first CLI Add for one of these types
+    //                       clears the preexisting entry first, so a single-value
+    //                       arg can be overridden on the command line even though
+    //                       Limit() == 1. Subsequent Adds in the same parse run
+    //                       behave normally and still enforce Limit, so
+    //                       duplicates on the command line itself are caught.
+    ParseArgumentsStateMachine(
+        Invocation& inv,
+        ArgMap& execArgs,
+        std::vector<Argument> arguments,
+        bool optionsOnly = false,
+        bool stopOnUnknown = false,
+        const std::vector<Argument>& overridableDefaults = {});
 
     ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
     ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -37,16 +53,12 @@ struct ParseArgumentsStateMachine
     ParseArgumentsStateMachine(ParseArgumentsStateMachine&&) = default;
     ParseArgumentsStateMachine& operator=(ParseArgumentsStateMachine&&) = default;
 
-    // Processes the next argument from the invocation.
-    // Returns true if there was an argument to process;
-    // returns false if there were none.
+    // Returns false when there is nothing left to process.
     bool Step();
 
-    // Throws if there was an error during the prior step.
     void ThrowIfError() const;
 
-    // The current state of the state machine.
-    // An empty state indicates that the next argument can be anything.
+    // Empty state means the next argument can be anything.
     struct State
     {
         State() = default;
@@ -57,19 +69,17 @@ struct ParseArgumentsStateMachine
         {
         }
 
-        // If set, indicates that the next argument is a value for this type.
+        // If set, the next argument is a value for this type.
         const std::optional<ArgType>& Type() const
         {
             return m_type;
         }
 
-        // The actual argument string associated with Type.
         const std::wstring& Arg() const
         {
             return m_arg;
         }
 
-        // If set, indicates that the last argument produced an error.
         const std::optional<ArgumentException>& Exception() const
         {
             return m_exception;
@@ -86,15 +96,20 @@ struct ParseArgumentsStateMachine
         return m_state;
     }
 
-    // Gets the next positional argument, or nullptr if there is not one.
     const Argument* NextPositional();
 
-    // Returns true if there is a next positional argument available, without advancing the iterator.
+    // Non-advancing variant of NextPositional.
     bool HasNextPositional() const;
 
     const std::vector<Argument>& Arguments() const
     {
         return m_arguments;
+    }
+
+    // In optionsOnly / stopOnUnknown modes this points at the first unconsumed token.
+    Invocation::iterator Position() const
+    {
+        return m_invocationItr;
     }
 
 private:
@@ -105,8 +120,24 @@ private:
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
 
-    // Advances the given iterator past any positionals that have reached their limit.
     void AdvanceToNextPositional(std::vector<Argument>::iterator& itr) const;
+
+    // Backs up one token and stops cleanly so Position() points at the unconsumed token.
+    State BackUpAndStop();
+
+    // Routes a flag add through the override/idempotency rules:
+    //  - if type is in m_overridableDefaults, the preloaded value is replaced;
+    //  - else if the flag is already set, the add is a no-op (CLI duplicates
+    //    fold to a single entry, matching docker / kubectl / git style).
+    void AddFlag(ArgType type);
+
+    // Routes a value add through the override rule. CLI duplicates of value
+    // args still stack, so Validate() will catch exceeding Limit.
+    void AddValue(ArgType type, std::wstring value);
+
+    // If type is in m_overridableDefaults, removes any existing entry and
+    // consumes the override slot. Returns true if an override was consumed.
+    bool ConsumeOverrideIfPresent(ArgType type);
 
     Invocation& m_invocation;
     ArgMap& m_executionArgs;
@@ -115,14 +146,27 @@ private:
     Invocation::iterator m_invocationItr;
     std::vector<Argument>::iterator m_positionalSearchItr;
 
-    // The anchor positional is the first positional argument processed.
+    // First positional processed; anchors handling of subsequent positionals/forwards.
     std::optional<Argument> m_anchorPositional = std::nullopt;
 
-    // Separate arguments by Kind
     std::vector<Argument> m_standardArgs = {};
     std::vector<Argument> m_positionalArgs = {};
     std::vector<Argument> m_forwardArgs = {};
 
     State m_state;
+
+    // When true, stop cleanly at the first positional token (do not consume it).
+    bool m_optionsOnly = false;
+
+    // When true, stop cleanly (do not consume) at the first unknown option token.
+    bool m_stopOnUnknown = false;
+
+    // Set when m_optionsOnly or m_stopOnUnknown stopped processing.
+    bool m_stopped = false;
+
+    // ArgTypes whose preloaded value should be replaced by the first CLI add.
+    // Empties as overrides are consumed so a single preload can only be
+    // overridden once per parse.
+    std::vector<ArgType> m_overridableDefaults;
 };
 } // namespace wsl::windows::wslc

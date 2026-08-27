@@ -34,7 +34,6 @@ std::vector<Argument> ContainerExecCommand::GetArguments() const
         Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
         Argument::Create(ArgType::Interactive),
-        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::WorkDir),
@@ -54,7 +53,7 @@ std::wstring ContainerExecCommand::LongDescription() const
 void ContainerExecCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context 
-        << CreateSession
+        << ResolveSession
         << SetContainerOptionsFromArgs
         << ExecContainer;
 }

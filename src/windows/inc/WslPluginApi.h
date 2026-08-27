@@ -26,9 +26,6 @@ extern "C" {
 #define WSLPLUGINAPI_ENTRYPOINTV1 WSLPluginAPIV1_EntryPoint
 #define WSL_E_PLUGIN_REQUIRES_UPDATE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x032A)
 
-// Maximum size for mount points returned by WSLCPluginAPI_MountFolder. This includes the null terminator.
-#define WSLC_MOUNTPOINT_LENGTH 256
-
 #define WSL_PLUGIN_REQUIRE_VERSION(_Major, _Minor, _Revision, Api) \
     if (Api->Version.Major < (_Major) || (Api->Version.Major == (_Major) && Api->Version.Minor < (_Minor)) || \
         (Api->Version.Major == (_Major) && Api->Version.Minor == (_Minor) && Api->Version.Revision < (_Revision))) \
@@ -148,9 +145,8 @@ typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation
 // WSLC plugin API calls.
 //
 
-// Mount a Windows folder into the WSLC session VM. The mount path is returned via 'Mountpoint'.
-// 'Mountpoint' must point to a buffer of at least WSLC_MOUNTPOINT_LENGTH chars, including the null terminator.
-typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPSTR Mountpoint);
+// Mount a Windows folder into the WSLC session VM at the given 'Mountpoint' path. If the 'Mountpoint' doesn't exist, it will be created.
+typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly);
 
 // Unmount a folder previously mounted via WSLCPluginAPI_MountFolder.
 typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCSTR Mountpoint);

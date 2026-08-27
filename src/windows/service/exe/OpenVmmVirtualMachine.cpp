@@ -413,13 +413,13 @@ void OpenVmmVirtualMachine::WatchProcessExit()
         TraceLoggingValue(exitCode, "ExitCode"),
         TraceLoggingValue(m_vmIdString.c_str(), "VmId"));
 
+    m_terminationReason = (exitCode == 0) ? WSLCVirtualMachineTerminationReasonShutdown : WSLCVirtualMachineTerminationReasonCrashed;
+    m_terminationDetails = std::format(L"openvmm process exited with code {}", exitCode);
     m_vmExitEvent.SetEvent();
 
     if (m_terminationCallback)
     {
-        auto reason = (exitCode == 0) ? WSLCVirtualMachineTerminationReasonShutdown : WSLCVirtualMachineTerminationReasonCrashed;
-        auto details = std::format(L"openvmm process exited with code {}", exitCode);
-        LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, details.c_str()));
+        LOG_IF_FAILED(m_terminationCallback->OnTermination(m_terminationReason, m_terminationDetails.c_str()));
     }
 }
 
@@ -631,6 +631,12 @@ try
 }
 CATCH_RETURN()
 
+HRESULT OpenVmmVirtualMachine::ApplyGuestCapabilities(_In_ const WSLCGuestCapabilities* Capabilities)
+{
+    RETURN_HR_IF_NULL(E_POINTER, Capabilities);
+    return S_OK;
+}
+
 HRESULT OpenVmmVirtualMachine::GetTerminationEvent(_Out_ HANDLE* Event)
 try
 {
@@ -713,6 +719,44 @@ try
     THROW_LAST_ERROR_IF(unixSock == INVALID_SOCKET);
 
     *Socket = reinterpret_cast<HANDLE>(unixSock);
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT OpenVmmVirtualMachine::MapVirtioNetPort(
+    _In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort)
+try
+{
+    RETURN_HR_IF(E_POINTER, ListenAddress == nullptr || AllocatedHostPort == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP);
+
+    const auto listenAddress = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
+    THROW_IF_FAILED(MapPort(listenAddress.si_family, HostPort, GuestPort));
+    *AllocatedHostPort = HostPort;
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT OpenVmmVirtualMachine::UnmapVirtioNetPort(
+    _In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress)
+try
+{
+    RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP);
+
+    const auto listenAddress = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
+    return UnmapPort(listenAddress.si_family, HostPort, GuestPort);
+}
+CATCH_RETURN()
+
+HRESULT OpenVmmVirtualMachine::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vmExitEvent.is_signaled());
+
+    *Reason = m_terminationReason;
+    *Details = wil::make_cotaskmem_string(m_terminationDetails.c_str()).release();
     return S_OK;
 }
 CATCH_RETURN()

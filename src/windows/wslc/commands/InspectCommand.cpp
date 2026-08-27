@@ -24,7 +24,6 @@ std::vector<Argument> InspectCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ObjectId, true, NO_LIMIT),
         Argument::Create(ArgType::Type),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -40,7 +39,7 @@ std::wstring InspectCommand::LongDescription() const
 
 void InspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << Inspect;
 }
 } // namespace wsl::windows::wslc

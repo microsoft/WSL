@@ -78,7 +78,7 @@ Abstract:
 //
 // The hard-coded link-local addresses used for communicating over the loopback to the host
 //
-#define LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS "169.254.73.152"
+#define LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS "169.254.73.249"
 #define LX_INIT_IPV6_LOOPBACK_GATEWAY_ADDRESS "fe80::500:4aef:feef:2aa2"
 
 //
@@ -247,6 +247,11 @@ Abstract:
 
 #define LX_INIT_WSL_INIT_WATCHER "init-watcher"
 
+#define LX_INIT_WSLC_GPU_HOOK "wsl-gpu-hook"
+
+#define LX_WSLC_CDI_KIND "microsoft.com/wslc"
+#define LX_WSLC_GPU_CDI_DEVICE LX_WSLC_CDI_KIND "=gpu"
+
 //
 // WSL2-specific environment variables.
 //
@@ -268,6 +273,7 @@ Abstract:
 #define LX_WSL2_DISTRO_READ_ONLY_ENV "WSL_DISTRO_READ_ONLY"
 #define LX_WSL2_NETWORKING_MODE_ENV "WSL2_NETWORKING_MODE"
 #define LX_WSL2_DISTRO_INIT_PID "WSL2_DISTRO_INIT_PID"
+#define LX_WSL2_DISTRO_CGROUP_PATH "WSL2_DISTRO_CGROUP_PATH"
 
 //
 // Command line arguments shared between init & mini_init
@@ -403,6 +409,10 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCWatchProcesses,
     LxMessageWSLCProcessExited,
     LxMessageWSLCUnixConnect,
+    LxMessageWSLCGetGuestCapabilities,
+    LxMessageWSLCGetGuestCapabilitiesResult,
+    LxMessageWSLCListDir,
+    LxMessageWSLCListDirResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -513,6 +523,10 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCWatchProcesses)
         X(LxMessageWSLCProcessExited)
         X(LxMessageWSLCUnixConnect)
+        X(LxMessageWSLCGetGuestCapabilities)
+        X(LxMessageWSLCGetGuestCapabilitiesResult)
+        X(LxMessageWSLCListDir)
+        X(LxMessageWSLCListDirResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -640,7 +654,7 @@ typedef struct _LX_PROCESS_CRASH
     MESSAGE_HEADER Header;
     std::uint64_t Timestamp;
     std::uint32_t Signal;
-    std::uint64_t Pid;
+    std::uint32_t Pid;
 
     char Buffer[];
 
@@ -1146,10 +1160,11 @@ typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE
     MESSAGE_HEADER Header;
     int Result;
     unsigned int TagOffset;
+    unsigned int ChildNameOffset;
     unsigned int SourceOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(SourceOffset));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_FIELD(TagOffset), STRING_FIELD(ChildNameOffset), STRING_FIELD(SourceOffset));
 } LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE, *PLX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE;
 
 typedef struct _LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE
@@ -1261,6 +1276,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
     bool EnableDnsTunneling;
     bool EnableSafeMode;
     bool DefaultKernel;
+    bool IsolateDistroCgroup;
     unsigned int KernelModulesDeviceId;
     unsigned int HostnameOffset;
     unsigned int KernelModulesListOffset;
@@ -1277,6 +1293,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
         FIELD(EnableDnsTunneling),
         FIELD(EnableSafeMode),
         FIELD(DefaultKernel),
+        FIELD(IsolateDistroCgroup),
         FIELD(KernelModulesDeviceId),
         STRING_FIELD(HostnameOffset),
         STRING_FIELD(KernelModulesListOffset));
@@ -1298,7 +1315,7 @@ typedef enum _LX_MINI_INIT_NETWORKING_MODE
     LxMiniInitNetworkingModeNat = 1,
     LxMiniInitNetworkingModeBridged = 2,
     LxMiniInitNetworkingModeMirrored = 3,
-    LxMiniInitNetworkingModeVirtioProxy = 4
+    LxMiniInitNetworkingModeConsomme = 4
 } LX_MINI_INIT_NETWORKING_MODE,
     *PLX_MINI_INIT_NETWORKING_MODE;
 
@@ -1430,9 +1447,11 @@ typedef struct _LX_INIT_GUEST_CAPABILITIES
 
     MESSAGE_HEADER Header;
     bool SeccompAvailable;
+    uint64_t HvPciSwiotlbBase;
+    uint64_t HvPciSwiotlbSize;
     char Buffer[]; // Contains the kernel version string
 
-    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), BUFFER_FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize), BUFFER_FIELD(Buffer));
 } LX_INIT_GUEST_CAPABILITIES, *PLX_INIT_GUEST_CAPABILITIES;
 
 typedef struct _LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE
@@ -1572,6 +1591,33 @@ struct WSLC_GET_DISK
     unsigned int ScsiLun{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+};
+
+struct WSLC_LISTDIR_RESULT
+{
+    static inline auto Type = LxMessageWSLCListDirResult;
+
+    DECLARE_MESSAGE_CTOR(WSLC_LISTDIR_RESULT);
+
+    MESSAGE_HEADER Header;
+    int Result{};
+    unsigned int EntriesIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_ARRAY_FIELD(EntriesIndex));
+};
+
+struct WSLC_LISTDIR
+{
+    static inline auto Type = LxMessageWSLCListDir;
+    using TResponse = WSLC_LISTDIR_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_LISTDIR);
+
+    MESSAGE_HEADER Header;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
 };
 
 struct WSLC_MOUNT_RESULT
@@ -1834,6 +1880,29 @@ struct WSLC_UNIX_CONNECT
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset));
+};
+
+struct WSLC_GET_GUEST_CAPABILITIES_RESULT
+{
+    static inline auto Type = LxMessageWSLCGetGuestCapabilitiesResult;
+
+    MESSAGE_HEADER Header{};
+    uint64_t HvPciSwiotlbBase{};
+    uint64_t HvPciSwiotlbSize{};
+
+    PRETTY_PRINT(FIELD(Header), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize));
+};
+
+struct WSLC_GET_GUEST_CAPABILITIES
+{
+    static inline auto Type = LxMessageWSLCGetGuestCapabilities;
+    using TResponse = WSLC_GET_GUEST_CAPABILITIES_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_GET_GUEST_CAPABILITIES);
+
+    MESSAGE_HEADER Header{};
+
+    PRETTY_PRINT(FIELD(Header));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

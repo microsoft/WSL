@@ -460,6 +460,65 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + absolutePath.wstring()), (DWORD)0);
     }
 
+    // A VHD whose path is a symbolic link is a legitimate, supported scenario: the link is
+    // followed and the real VHD is attached. Access is granted while impersonating the user,
+    // so the user can only ever attach a file they can already reach; there is no need to
+    // reject reparse points in the path.
+    WSL2_TEST_METHOD(MountVhdThroughSymlinkSucceeds)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+
+        const auto symlink = std::filesystem::absolute(L"TestVhdSymlink.vhd");
+        DeleteFileW(symlink.c_str());
+
+        const auto absoluteTarget = std::filesystem::absolute(TEST_MOUNT_VHD);
+
+        // Create a file symbolic link pointing at the real VHD.
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+
+        auto cleanup = wil::scope_exit([&]() { DeleteFileW(symlink.c_str()); });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + symlink.wstring() + L" --vhd --bare"), (DWORD)0);
+
+        const auto disk = GetBlockDeviceInWsl();
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + symlink.wstring()), (DWORD)0);
+    }
+
+    // A symlinked VHD must still be restored after the VM is torn down on idle. Restore runs
+    // under the mounting user's identity (the disk-mount state is stored per-SID for the
+    // current boot), so the same access check applies and the symlinked VHD re-attaches.
+    WSL2_TEST_METHOD(MountVhdThroughSymlinkSurvivesVmTimeout)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+
+        const auto symlink = std::filesystem::absolute(L"TestVhdSymlinkRestore.vhd");
+        DeleteFileW(symlink.c_str());
+
+        const auto absoluteTarget = std::filesystem::absolute(TEST_MOUNT_VHD);
+
+        VERIFY_IS_TRUE(CreateSymbolicLinkW(symlink.c_str(), absoluteTarget.c_str(), SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE));
+
+        auto cleanup = wil::scope_exit([&]() { DeleteFileW(symlink.c_str()); });
+
+        WslKeepAlive keepAlive;
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + symlink.wstring() + L" --vhd --bare"), (DWORD)0);
+
+        auto disk = GetBlockDeviceInWsl();
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+
+        WaitForVmTimeout(keepAlive);
+
+        // Recreating the VM restores the persisted disk mount; the symlinked VHD must re-attach. The
+        // block device name is not guaranteed to be stable across the VM teardown, so re-query it.
+        disk = GetBlockDeviceInWsl();
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + symlink.wstring()), (DWORD)0);
+    }
+
     // Attach a disk, but don't mount it
     WSL2_TEST_METHOD(TestBareMount)
     {

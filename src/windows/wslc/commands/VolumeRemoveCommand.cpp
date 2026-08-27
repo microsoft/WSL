@@ -28,7 +28,7 @@ std::vector<Argument> VolumeRemoveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::VolumeName, true, NO_LIMIT),
-        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::Force, std::nullopt, std::nullopt, Localization::WSLCCLI_VolumeForceArgDescription()),
     };
 }
 
@@ -44,7 +44,7 @@ std::wstring VolumeRemoveCommand::LongDescription() const
 
 void VolumeRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession //
+    context << ResolveSession //
             << DeleteVolumes;
 }
 } // namespace wsl::windows::wslc

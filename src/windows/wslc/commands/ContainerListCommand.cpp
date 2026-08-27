@@ -35,7 +35,6 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
         Argument::Create(ArgType::Latest),
         Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -53,7 +52,7 @@ std::wstring ContainerListCommand::LongDescription() const
 void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << ResolveSession
         << GetContainers
         << ListContainers;
 }

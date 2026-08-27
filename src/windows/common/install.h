@@ -23,7 +23,8 @@ void MsiMessageCallback(INSTALLMESSAGE type, LPCWSTR message);
 
 wil::unique_hfile ValidateFileSignature(LPCWSTR Path);
 
-int UpdatePackage(bool PreRelease, bool Repair);
+// Setting CallerOwnsProcess to false will prevent this function from making process wide changes or printing output.
+int UpdatePackage(bool PreRelease, bool Repair, bool CallerOwnsProcess = true);
 
 UINT UpgradeViaMsi(_In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
 

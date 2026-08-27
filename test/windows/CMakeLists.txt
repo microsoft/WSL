@@ -42,7 +42,8 @@ target_link_libraries(wsltests
                       Wer.lib
                       Dbghelp.lib
                       sfc.lib
-                      Crypt32.lib)
+                      Crypt32.lib
+                      Ncrypt.lib)
 
 add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk wslcsdkwinrtidl)
 add_subdirectory(testplugin)

@@ -1501,6 +1501,7 @@ int RunDebugShell()
 
     // Create a thread to relay stdin to the pipe.
     wsl::windows::common::ConsoleState console;
+    console.SetInteractiveMode();
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread([&]() {
         wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), []() {}, exitEvent.get());

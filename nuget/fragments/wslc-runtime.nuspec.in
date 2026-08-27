@@ -1,0 +1,2 @@
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\${PLATFORM}\${CMAKE_BUILD_TYPE}\wslcsdk.lib" target="runtimes\win-${PLATFORM}\"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\${PLATFORM}\${CMAKE_BUILD_TYPE}\wslcsdk.dll" target="runtimes\win-${PLATFORM}\native\"/>

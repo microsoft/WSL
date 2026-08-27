@@ -52,7 +52,7 @@ public:
 
     std::string InspectVolume(_In_ const std::string& Name) const;
 
-    bool ContainsVolume(_In_ const std::string& Name) const;
+    std::pair<HRESULT, std::string> GetVolumeStatus(_In_ const std::string& Name) const;
 
 private:
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);

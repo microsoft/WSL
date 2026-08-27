@@ -48,11 +48,17 @@ public:
     IFACEMETHOD(DetachDisk)(_In_ ULONG Lun) override;
     IFACEMETHOD(AddShare)(_In_ LPCWSTR WindowsPath, _In_ BOOL ReadOnly, _Out_ GUID* ShareId) override;
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
+    IFACEMETHOD(ApplyGuestCapabilities)(_In_ const WSLCGuestCapabilities* Capabilities) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(ConnectToVsockPort)(_In_ ULONG Port, _Out_ HANDLE* Socket) override;
     IFACEMETHOD(AcceptCrashDumpConnection)(_Out_ HANDLE* Socket) override;
     IFACEMETHOD(MapPort)(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort) override;
     IFACEMETHOD(UnmapPort)(_In_ int Family, _In_ unsigned short HostPort, _In_ unsigned short GuestPort) override;
+    IFACEMETHOD(MapVirtioNetPort)
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort) override;
+    IFACEMETHOD(UnmapVirtioNetPort)
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress) override;
+    IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
 private:
     struct DiskInfo
@@ -141,6 +147,8 @@ private:
     std::wstring m_crashDumpListenPath;
 
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
+    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
+    std::wstring m_terminationDetails;
 
     std::map<ULONG, DiskInfo> m_attachedDisks;
     std::bitset<MAX_VHD_COUNT> m_lunBitmap;

@@ -65,7 +65,7 @@ Abstract:
 #include "SocketChannel.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
-#define BINFMT_REGISTER_STRING ":" LX_INIT_BINFMT_NAME ":M::MZ::" LX_INIT_PATH ":FP\n"
+#define BINFMT_REGISTER_STRING BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"
 #define BINFMT_PATH PROCFS_PATH "/sys/fs/binfmt_misc"
 #define CHRONY_CONF_PATH ETC_PATH "/chrony.conf"
 #define CHRONYD_PATH "/sbin/chronyd"
@@ -89,7 +89,6 @@ Abstract:
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
 #define RESOLV_CONF_PATH ETC_PATH "/" RESOLV_CONF_FILE
-#define RECLAIM_PATH "/sys/fs/cgroup/memory.reclaim"
 #define SCSI_DEVICE_PATH "/sys/bus/scsi/devices"
 #define SCSI_DEVICE_NAME_PREFIX "0:0:0:"
 #define SCSI_DEVICE_PREFIX SCSI_DEVICE_PATH "/" SCSI_DEVICE_NAME_PREFIX
@@ -103,6 +102,9 @@ Abstract:
 #define syscall_arch (offsetof(struct seccomp_data, arch))
 
 constexpr auto c_trueString = "1";
+constexpr size_t c_systemReservedMemory = 32 * 1024 * 1024; // 32MiB reserved for WSL system processes
+constexpr long c_cpuPeriodMicros = 100000;
+constexpr long c_systemReservedCpuMicros = 1000; // 0.01 Logical core reserved for WSL system processes
 
 struct VmConfiguration
 {
@@ -121,8 +123,6 @@ int g_TelemetryFd = -1;
 std::optional<bool> g_EnableSocketLogging;
 
 int Chroot(const char* Target);
-
-void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
 
 void CreateSwap(unsigned int Lun);
 
@@ -146,10 +146,6 @@ int GetDiskPartitionIndex(const char* DiskPath, const char* PartitionName);
 
 std::string GetMountTarget(const char* Name);
 
-long long int GetUserCpuTime(void);
-
-ssize_t GetMemoryInUse(void);
-
 int ImportFromSocket(const char* Destination, int Socket, int ErrorSocket, unsigned int Flags);
 
 int Initialize(const char* Hostname);
@@ -166,7 +162,8 @@ void LaunchInit(
     const char* SharedMemoryRoot = nullptr,
     const char* InstallPath = nullptr,
     const char* UserProfile = nullptr,
-    std::optional<pid_t> DistroInitPid = {});
+    std::optional<pid_t> DistroInitPid = {},
+    const char* DistroCgroupPath = nullptr);
 
 void LaunchSystemDistro(
     int SocketFd,
@@ -177,7 +174,8 @@ void LaunchSystemDistro(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    pid_t DistroInitPid);
+    pid_t DistroInitPid,
+    const char* DistroCgroupPath);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
 
@@ -218,6 +216,8 @@ void StartTimeSyncAgent(void);
 void WaitForBlockDevice(const char* Path);
 
 int WaitForChild(pid_t Pid, const char* Name);
+
+void SetupWslUserCgroup();
 
 int Chroot(const char* Target)
 
@@ -264,160 +264,6 @@ Return Value:
 
     return 0;
 }
-
-void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
-
-/*++
-
-Routine Description:
-
-    This routine configures memory reduction behavior including memory reclaim and compaction.
-
-Arguments:
-
-    Mode - Supplies the memory reclaim mode.
-
-Return Value:
-
-    None.
-
---*/
-
-try
-{
-    //
-    // Create a worker thread to periodically check if the VM is idle and performs memory compaction
-    // and memory reclaim. This ensures that the maximum number of pages can be discarded to the host.
-    //
-
-    std::thread([Mode]() mutable {
-        try
-        {
-            //
-            // Set the thread's scheduling policy to idle.
-            //
-
-            sched_param Parameter{};
-            Parameter.sched_priority = 0;
-            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) != 0);
-
-            //
-            // Periodically check if the machine is idle by querying procfs for CPU usage.
-            // Memory compaction will occur if both of the following conditions are true:
-            //     1. The CPU time since the last check is greater than the idle threshold.
-            //     2. The current CPU usage is below the idle threshold. This is measured by taking two readings one second apart.
-            //
-
-            double MemoryLow = 1024 * 1024 * 1024;
-            double MemoryHigh = 1.1 * 1024.0 * 1024.0 * 1024.0;
-            const int IdleThreshold = get_nprocs(); // Change math to adjust if sysconf(_SC_CLK_TCK) != 100? Is 1%
-            long long int Start, Stop = 0;
-            auto constexpr SleepDuration = std::chrono::seconds(30);
-            size_t ReclaimIndex = 0;
-            long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
-            long long int ReclaimWindow[20] = {}; // 10 minutes
-            long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling = false;
-
-            //
-            // Fall back to drop cache if the required cgroup path is not present.
-            //
-
-            if (Mode == LxMiniInitMemoryReclaimModeGradual && access(RECLAIM_PATH, W_OK) < 0)
-            {
-                LOG_WARNING("access({}, W_OK) failed {}, falling back to autoMemoryReclaim = dropcache", RECLAIM_PATH, errno);
-                Mode = LxMiniInitMemoryReclaimModeDropCache;
-            }
-
-            if (Mode == LxMiniInitMemoryReclaimModeGradual)
-            {
-                static_assert(COUNT_OF(ReclaimWindow) >= 6);
-                ReclaimWindowLength = 6; // Set to 3 minutes.
-            }
-
-            for (auto i = 1; i < ReclaimWindowLength; i++)
-            {
-                ReclaimWindow[i] = LLONG_MIN;
-            }
-
-            std::this_thread::sleep_for(SleepDuration);
-            for (;;)
-            {
-                auto const Target = std::chrono::steady_clock::now() + SleepDuration;
-                Start = GetUserCpuTime();
-                THROW_LAST_ERROR_IF(Start == -1);
-
-                if (Mode != LxMiniInitMemoryReclaimModeDisabled)
-                {
-                    //
-                    // Ensure that utilization is below 0.5% from the last 30 seconds, and last n minutes, of usage.
-                    //
-
-                    size_t const LastIndex = (ReclaimIndex + 1) % ReclaimWindowLength;
-                    if ((ReclaimWindow[LastIndex] > Start - ReclaimThreshold * (ReclaimWindowLength + 1)) &&
-                        (ReclaimWindow[ReclaimIndex] > Start - ReclaimThreshold))
-                    {
-                        if (Mode == LxMiniInitMemoryReclaimModeGradual)
-                        {
-                            double MemorySize = GetMemoryInUse();
-                            THROW_LAST_ERROR_IF(MemorySize < 0);
-
-                            if (MemorySize > MemoryHigh)
-                            {
-                                ReclaimIdling = false;
-                            }
-
-                            if (!ReclaimIdling && MemorySize > MemoryLow)
-                            {
-                                double MemoryTargetSize = MemorySize * 0.97;
-                                std::string MemoryToFree = std::to_string(size_t(MemorySize - MemoryTargetSize));
-                                // EAGAIN Means that it attempted, but was unable to evict sufficient pages.
-                                THROW_LAST_ERROR_IF(WriteToFile(RECLAIM_PATH, MemoryToFree.c_str()) < 0 && errno != EAGAIN);
-
-                                if (MemoryTargetSize < MemoryLow)
-                                {
-                                    ReclaimIdling = true;
-                                }
-                            }
-                        }
-                        else if (!ReclaimIdling)
-                        {
-                            ReclaimIdling = true;
-                            THROW_LAST_ERROR_IF(WriteToFile(PROCFS_PATH "/sys/vm/drop_caches", "1\n") < 0);
-                        }
-                    }
-                    else
-                    {
-                        ReclaimIdling = false;
-                    }
-
-                    ReclaimIndex = LastIndex;
-                    ReclaimWindow[ReclaimIndex] = Start;
-                }
-
-                //
-                // Perform memory compaction if the VM is idle.
-                // This coalesces free pages into larger blocks for more efficient page reporting.
-                //
-
-                if ((Start - Stop) > IdleThreshold)
-                {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    Stop = GetUserCpuTime();
-                    THROW_LAST_ERROR_IF(Stop == -1);
-                    if ((Stop - Start) < IdleThreshold)
-                    {
-                        THROW_LAST_ERROR_IF(WriteToFile(PROCFS_PATH "/sys/vm/compact_memory", "1\n") < 0);
-                    }
-                }
-
-                std::this_thread::sleep_until(Target);
-            }
-        }
-        CATCH_LOG()
-    }).detach();
-}
-CATCH_LOG()
 
 wil::unique_fd CreateNetlinkSocket(void)
 
@@ -1031,77 +877,6 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-long long int GetUserCpuTime(void)
-
-/*++
-
-Routine Description:
-
-    This routine parses /proc/stat to query a summary of all user CPU time.
-
-Arguments:
-
-    None.
-
-Return Value:
-
-    The current user CPU counter for all cores.
-
---*/
-
-{
-    wil::unique_fd Fd{open(PROCFS_PATH "/stat", O_RDONLY)};
-    if (!Fd)
-    {
-        LOG_ERROR("open failed {}", errno);
-        return -1;
-    }
-
-    char Buffer[32];
-    int Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer, (sizeof(Buffer) - 1)));
-    if (Result < 0)
-    {
-        LOG_ERROR("read failed {}", errno);
-        return -1;
-    }
-
-    //
-    // Parse the first line of /proc/stat which is in the format
-    // "cpu  <counter>".
-    //
-
-    Buffer[Result] = '\0';
-    char* Sp1;
-    char* Info = strtok_r(Buffer, " \n", &Sp1);
-    Info = strtok_r(nullptr, " \n", &Sp1);
-    return strtoll(Info, nullptr, 10);
-}
-
-ssize_t GetMemoryInUse(void)
-
-/*++
-
-Routine Description:
-
-    This routine returns the amount memory in use in bytes.
-
-Arguments:
-
-    None.
-
-Return Value:
-
-    Total memory - Free memory. Includes that used by cache and buffers.
-
---*/
-try
-{
-    struct sysinfo Info = {};
-    THROW_LAST_ERROR_IF(sysinfo(&Info) < 0);
-    return Info.totalram - Info.freeram;
-}
-CATCH_RETURN_ERRNO()
-
 int ImportFromSocket(const char* Destination, int Socket, int ErrorSocket, unsigned int Flags)
 
 /*++
@@ -1651,7 +1426,8 @@ void LaunchInit(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    std::optional<pid_t> DistroInitPid)
+    std::optional<pid_t> DistroInitPid,
+    const char* DistroCgroupPath)
 
 /*++
 
@@ -1689,6 +1465,8 @@ Arguments:
         environment variable.
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
+
+    DistroCgroupPath - Supplies the cgroup path of this distribution.
 
 Return Value:
 
@@ -1796,6 +1574,7 @@ try
     AddEnvironmentVariable(LX_WSL2_INSTALL_PATH, InstallPath);
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
+    AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_PATH, DistroCgroupPath);
 
     if (DistroInitPid.has_value())
     {
@@ -1897,7 +1676,8 @@ void LaunchSystemDistro(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
-    pid_t DistroInitPid)
+    pid_t DistroInitPid,
+    const char* DistroCgroupPath)
 
 /*++
 
@@ -1934,6 +1714,8 @@ Arguments:
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
+    DistroCgroupPath - Supplies the cgroup path of this distribution.
+
 Return Value:
 
     None. This method does not return.
@@ -1952,7 +1734,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid);
+    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupPath);
     _exit(1);
 }
 catch (...)
@@ -2459,6 +2241,52 @@ void ProcessLaunchInitMessage(
 
         THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
 
+        auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
+        pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
+
+        bool bootInit = false;
+        bool enableGuiApps = Config.EnableGuiApps;
+        {
+            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+            if (File)
+            {
+                std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit), ConfigKey("general.guiApplications", enableGuiApps)};
+                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            }
+        }
+
+        //
+        // Set up the per-distro cgroup before potentially forking into two inits.
+        //
+
+        std::string DistroCgroupPath{};
+        if (access(WSL_USER_CGROUP_PATH, F_OK) == 0)
+        {
+            DistroCgroupPath = UtilGetDistroCgroupPath(MiniInitDirectChildPid);
+
+            auto cleanup = wil::scope_exit([&]() {
+                rmdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str());
+                rmdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str());
+                rmdir(DistroCgroupPath.c_str());
+                DistroCgroupPath.clear();
+            });
+
+            try
+            {
+                THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0);
+
+                if (bootInit)
+                {
+                    THROW_LAST_ERROR_IF(UtilEnableAllCgroupControllers(DistroCgroupPath) < 0);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
+                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
+                }
+
+                cleanup.release();
+            }
+            CATCH_LOG();
+        }
+
         //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
         //
@@ -2466,17 +2294,9 @@ void ProcessLaunchInitMessage(
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
-        bool enableGuiApps = Config.EnableGuiApps;
         if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
         {
             Step = LxInitCreateInstanceStepLaunchSystemDistro;
-            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-            if (File)
-            {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
-                File.reset();
-            }
 
             //
             // If the distro did not opt-out of GUI applications, continue launching the system distro.
@@ -2533,7 +2353,8 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->SharedMemoryRootOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
-                        ChildPid);
+                        ChildPid,
+                        DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
                 }
             }
 
@@ -2554,7 +2375,9 @@ void ProcessLaunchInitMessage(
             wsl::shared::string::FromSpan(Buffer, Message->DistributionNameOffset),
             nullptr,
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
-            wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset));
+            wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
+            std::nullopt,
+            DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
     }
     catch (...)
     {
@@ -3239,6 +3062,11 @@ try
             Config.EnableSafeMode = true;
         }
 
+        if (EarlyConfig->IsolateDistroCgroup && access(CGROUP_MOUNTPOINT "/cgroup.controllers", F_OK) == 0)
+        {
+            SetupWslUserCgroup();
+        }
+
         //
         // Establish the connection for the guest network service.
         //
@@ -3267,7 +3095,7 @@ try
         // Configure memory reclamation.
         //
 
-        ConfigureMemoryReduction(EarlyConfig->MemoryReclaimMode);
+        StartMemoryReductionThread(EarlyConfig->MemoryReclaimMode);
 
         //
         // Initialize system distro if supported.
@@ -3459,7 +3287,14 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Transaction, Buffer);
+        if (access(WSL_USER_NON_DISTRO_CGROUP_PATH, F_OK) == 0)
+        {
+            return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
+        }
+        else
+        {
+            return ProcessCreateProcessMessage(Transaction, Buffer, std::nullopt);
+        }
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3501,7 +3336,12 @@ wil::unique_fd RegisterSeccompHook()
 
 Routine Description:
 
-    Register a seccomp notification for bind() & ioctl(*, TUNSETIFF, *) calls.
+    Register a seccomp notification for bind() & listen() calls (both the native and 32-bit
+    compat ABIs), plus ioctl(*, SIOCSIFFLAGS, *) calls on the native 64-bit ABI only.
+
+    listen() is intercepted in addition to bind() because it can perform an implicit
+    autobind (assigning an ephemeral port) on a socket that was never explicitly bind()'d;
+    that autobind would otherwise be invisible to the port tracker.
 
 Arguments:
 
@@ -3525,11 +3365,13 @@ Return Value:
         // If syscall_arch & __AUDIT_ARCH_64BIT then continue else goto :32bit
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arch),
         // For now, notify on all non-native arch
-        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 7),
+        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 8),
         // If syscall_nr == __NR_bind then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 3, 0),
-        // if (syscall_nr == __NR_bind) then continue else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 4, 0),
+        // if (syscall_nr == __NR_listen) then goto user_notify: else continue
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_listen, 3, 0),
+        // if (syscall_nr == __NR_ioctl) then continue else goto allow:
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_ioctl, 0, 3),
         // if (syscall arg1 == SIOCSIFFLAGS) goto user_notify else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(1)),
@@ -3542,15 +3384,17 @@ Return Value:
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 
     // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND to make bind system call.
+    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls.
 #ifdef __x86_64__
         // 32bit:
         // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 3),
-        // if syscall arg0 == SYS_BIND then goto user_notify: else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 4),
+        // if syscall arg0 == SYS_BIND then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(0)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_BIND, 0, 1),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_BIND, 1, 0),
+        // if syscall arg0 == SYS_LISTEN then continue else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_LISTEN, 0, 1),
         // user_notify:
         //     return SECCOMP_RET_USER_NOTIF;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
@@ -3559,9 +3403,11 @@ Return Value:
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 #else
         // 32bit:
-        // If syscall_nr == __NR_bind then goto user_notify: else goto allow:
+        // If syscall_nr == __NR_bind then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_bind, 0, 1),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_bind, 1, 0),
+        // if (syscall_nr == __NR_listen) then goto user_notify: else goto allow:
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_listen, 0, 1),
         // user_notify:
         //     return SECCOMP_RET_USER_NOTIF;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
@@ -3623,14 +3469,15 @@ try
     wsl::shared::MessageWriter<LX_INIT_GUEST_CAPABILITIES> Message(LxMiniInitMessageGuestCapabilities);
     Message.WriteString(Version.release);
 
-    //
     // SECCOMP_USER_NOTIF_FLAG_CONTINUE is the latest flag that flow steering needs
     // but there's no way to test for its presence. The assumption is that if seccomp is available
-    // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available
-    //
-
+    // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available.
     uint32_t SeccompFlag = SECCOMP_RET_USER_NOTIF;
     Message->SeccompAvailable = syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &SeccompFlag) == 0;
+
+    auto pool = UtilReadHvPciSwiotlbPool();
+    Message->HvPciSwiotlbBase = pool.Base;
+    Message->HvPciSwiotlbSize = pool.Size;
 
     Channel.SendMessage<LX_INIT_GUEST_CAPABILITIES>(Message.Span());
     return 0;
@@ -3888,6 +3735,102 @@ void EnableDebugMode(const std::string& Mode)
     }
 }
 
+void SetupWslUserCgroup()
+
+/*++
+
+Routine Description:
+
+    This routine creates a memory-limited cgroup for user processes. All user workloads
+    (systemd, session leaders, boot commands) are placed into this cgroup so that they
+    cannot exhaust all VM memory. This reserves a fixed amount of memory for critical
+    WSL system processes (mini_init, GNS, Plan9, WSL init) that remain in the root cgroup.
+
+    The memory.max limit is set to totalram - c_systemReservedMemory, which provides a
+    hard cap. When this limit is reached, the cgroup-local OOM killer activates and only
+    kills processes within wsl-user, leaving system processes unaffected.
+
+    The cpu.max limit is set to (nproc * c_cpuPeriodMicros - c_systemReservedCpuMicros) per
+    c_cpuPeriodMicros period, reserving a small portion of the CPU for WSL system processes so they remain
+    schedulable even when user workloads saturate every CPU.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    None.
+
+--*/
+
+{
+    struct sysinfo info = {};
+    if (sysinfo(&info) < 0)
+    {
+        LOG_ERROR("sysinfo failed {}", errno);
+        return;
+    }
+
+    uint64_t totalRam = static_cast<uint64_t>(info.totalram) * info.mem_unit;
+
+    if (totalRam <= c_systemReservedMemory)
+    {
+        LOG_WARNING("Total RAM ({}) is too small to reserve {} for system processes", totalRam, c_systemReservedMemory);
+        return;
+    }
+
+    if (UtilEnableAllCgroupControllers(CGROUP_MOUNTPOINT) < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for root {}", errno);
+        return;
+    }
+
+    if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0)
+    {
+        LOG_ERROR("Failed to create wsl-user cgroup directory {}", errno);
+        return;
+    }
+
+    if (UtilEnableAllCgroupControllers(WSL_USER_CGROUP_PATH) < 0)
+    {
+        LOG_ERROR("Failed to enable cgroup controllers for wsl-user {}", errno);
+        return;
+    }
+
+    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0)
+    {
+        LOG_ERROR("Failed to create wsl-user non-distro cgroup directory {}", errno);
+        return;
+    }
+
+    auto userMemoryMax = std::to_string(totalRam - c_systemReservedMemory);
+    if (WriteToFile(WSL_USER_CGROUP_PATH "/memory.max", userMemoryMax.c_str()) < 0)
+    {
+        LOG_ERROR("Failed to set memory.max for wsl-user cgroup {}", errno);
+        return;
+    }
+
+    LOG_INFO("WSL user cgroup created with memory.max={} (totalram={}, reserved={})", userMemoryMax, totalRam, c_systemReservedMemory);
+
+    const long nproc = get_nprocs();
+    if (nproc <= 0)
+    {
+        LOG_WARNING("get_nprocs returned {}, skipping cpu.max", nproc);
+        return;
+    }
+
+    const long cpuQuota = (nproc * c_cpuPeriodMicros) - c_systemReservedCpuMicros;
+    auto userCpuMax = std::format("{} {}", cpuQuota, c_cpuPeriodMicros);
+    if (WriteToFile(WSL_USER_CGROUP_PATH "/cpu.max", userCpuMax.c_str()) < 0)
+    {
+        LOG_ERROR("Failed to set cpu.max for wsl-user cgroup {}", errno);
+        return;
+    }
+
+    LOG_INFO("WSL user cgroup cpu.max={} (nproc={}, reserved={}us)", userCpuMax, nproc, c_systemReservedCpuMicros);
+}
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -4095,7 +4038,12 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr);
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
+    {
+        Result = -1;
+        LOG_ERROR("Failed to mount cgroup2: {}", errno);
+        goto ErrorExit;
+    }
 
     UtilSetThreadName("mini_init");
 
@@ -4201,6 +4149,47 @@ int main(int Argc, char* Argv[])
                     //
 
                     sync();
+
+                    //
+                    // Clear the distro cgroup
+                    //
+
+                    auto CgroupDir = UtilGetDistroCgroupPath(Result);
+                    if (access(CgroupDir.c_str(), F_OK) == 0)
+                    {
+                        LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
+
+                        //
+                        // Recursively rmdir the cgroup subtree.
+                        //
+
+                        try
+                        {
+                            std::vector<std::string> dirs;
+                            for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                                     CgroupDir, std::filesystem::directory_options::skip_permission_denied))
+                            {
+                                if (entry.is_directory())
+                                {
+                                    dirs.emplace_back(entry.path().string());
+                                }
+                            }
+
+                            for (auto it = dirs.rbegin(); it != dirs.rend(); ++it)
+                            {
+                                if (rmdir(it->c_str()) < 0 && errno != ENOENT)
+                                {
+                                    LOG_ERROR("rmdir({}) failed {}", *it, errno);
+                                }
+                            }
+
+                            if (rmdir(CgroupDir.c_str()) < 0 && errno != ENOENT)
+                            {
+                                LOG_ERROR("rmdir({}) failed {}", CgroupDir, errno);
+                            }
+                        }
+                        CATCH_LOG();
+                    }
 
                     //
                     // Send a message with the child's pid to the service.

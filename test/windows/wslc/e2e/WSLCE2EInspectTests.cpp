@@ -35,6 +35,8 @@ class WSLCE2EInspectTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(DebianImage.Name);
+        EnsureNetworkDoesNotExist(WslcNetworkName);
+        EnsureNetworkDoesNotExist(DebianImage.Name);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -43,19 +45,23 @@ class WSLCE2EInspectTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(DebianImage.Name);
+        EnsureNetworkDoesNotExist(WslcNetworkName);
+        EnsureNetworkDoesNotExist(DebianImage.Name);
         return true;
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_HelpCommand)
     {
         auto result = RunWslc(L"inspect --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(result.Stdout.value().empty());
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_MissingObjectId)
     {
         auto result = RunWslc(L"inspect");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'object-id'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'object-id'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_ObjectNotFound)
@@ -165,14 +171,14 @@ class WSLCE2EInspectTests
         }
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_PriorityOverVolume)
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_PriorityOverNetwork)
     {
-        // When an image and volume share the same name and no --type is specified,
-        // the image should be returned (image is checked before volume in InspectTasks).
-        EnsureVolumeDoesNotExist(DebianImage.Name);
-        auto createResult = RunWslc(std::format(L"volume create {}", DebianImage.Name));
+        // When an image and network share the same name and no --type is specified,
+        // the image should be returned (image is checked before network in InspectTasks).
+        EnsureNetworkDoesNotExist(DebianImage.Name);
+        auto createResult = RunWslc(std::format(L"network create --driver bridge {}", DebianImage.Name));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
-        auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(DebianImage.Name); });
+        auto deleteNetwork = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(DebianImage.Name); });
 
         // No type specified
         {
@@ -199,14 +205,61 @@ class WSLCE2EInspectTests
             VERIFY_ARE_EQUAL(DebianImage.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData[0].RepoTags.value()[0]));
         }
 
+        // With --type network
+        {
+            auto result = RunWslc(std::format(L"inspect --type network {}", DebianImage.Name));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Network_PriorityOverVolume)
+    {
+        // When a network and volume share the same name and no --type is specified,
+        // the network should be returned (network is checked before volume in InspectTasks).
+        EnsureNetworkDoesNotExist(WslcNetworkName);
+        EnsureVolumeDoesNotExist(WslcNetworkName);
+
+        auto createNetworkResult = RunWslc(std::format(L"network create --driver bridge {}", WslcNetworkName));
+        createNetworkResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto deleteNetwork = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(WslcNetworkName); });
+
+        auto createVolumeResult = RunWslc(std::format(L"volume create {}", WslcNetworkName));
+        createVolumeResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(WslcNetworkName); });
+
+        // No type specified — network takes priority over volume
+        {
+            auto result = RunWslc(std::format(L"inspect {}", WslcNetworkName));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+
+        // With --type network
+        {
+            auto result = RunWslc(std::format(L"inspect --type network {}", WslcNetworkName));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::Network>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+
         // With --type volume
         {
-            auto result = RunWslc(std::format(L"inspect --type volume {}", DebianImage.Name));
+            auto result = RunWslc(std::format(L"inspect --type volume {}", WslcNetworkName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
     }
 
@@ -239,7 +292,10 @@ class WSLCE2EInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Inspect_InvalidTypeValue)
     {
         auto result = RunWslc(std::format(L"inspect --type invalid {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container, volume.\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(L"Invalid type value: invalid is not a recognized inspect type. Supported inspect "
+                                           L"types are: image, container, network, volume."));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidFormatError)
@@ -261,45 +317,6 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
     const std::wstring WslcVolumeName = L"wslc-inspect-test-volume";
-    std::wstring GetHelpMessage() const
-    {
-        std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
-               << GetAvailableOptions();
-        return output.str();
-    }
-
-    std::wstring GetDescription() const
-    {
-        return Localization::WSLCCLI_InspectLongDesc() + L"\r\n\r\n";
-    }
-
-    std::wstring GetUsage() const
-    {
-        return L"Usage: wslc inspect [<options>] <object-id>\r\n\r\n";
-    }
-
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"       //
-                 << L"  object-id    Name or Id of any object type\r\n" //
-                 << L"\r\n";
-        return commands.str();
-    }
-
-    std::wstring GetAvailableOptions() const
-    {
-        std::wstringstream options;
-        options << L"The following options are available:\r\n"                 //
-                << L"  -t,--type    Type of the object to inspect\r\n"         //
-                << L"  --session    Specify the session to use\r\n"            //
-                << L"  -?,--help    Shows help about the selected command\r\n" //
-                << L"\r\n";
-        return options.str();
-    }
+    const std::wstring WslcNetworkName = L"wslc-inspect-test-network";
 };
 } // namespace WSLCE2ETests

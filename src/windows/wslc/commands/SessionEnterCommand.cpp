@@ -43,6 +43,11 @@ std::wstring SessionEnterCommand::LongDescription() const
 
 void SessionEnterCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    if (context.GlobalArgs.Contains(ArgType::Session))
+    {
+        throw CommandException(Localization::MessageWslcSessionOptionNotSupported());
+    }
+
     context << EnterSession;
 }
 } // namespace wsl::windows::wslc

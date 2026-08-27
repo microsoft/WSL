@@ -23,7 +23,7 @@ static_assert(NetworkingConfiguration::None == static_cast<int32_t>(wsl::core::N
 static_assert(NetworkingConfiguration::Nat == static_cast<int32_t>(wsl::core::NetworkingMode::Nat));
 static_assert(NetworkingConfiguration::Bridged == static_cast<int32_t>(wsl::core::NetworkingMode::Bridged));
 static_assert(NetworkingConfiguration::Mirrored == static_cast<int32_t>(wsl::core::NetworkingMode::Mirrored));
-static_assert(NetworkingConfiguration::VirtioProxy == static_cast<int32_t>(wsl::core::NetworkingMode::VirtioProxy));
+static_assert(NetworkingConfiguration::Consomme == static_cast<int32_t>(wsl::core::NetworkingMode::Consomme));
 
 static_assert(MemoryReclaimConfiguration::Disabled == static_cast<int32_t>(wsl::core::MemoryReclaimMode::Disabled));
 static_assert(MemoryReclaimConfiguration::Gradual == static_cast<int32_t>(wsl::core::MemoryReclaimMode::Gradual));

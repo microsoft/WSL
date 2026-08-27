@@ -123,17 +123,15 @@ try
 
         THROW_LAST_ERROR_IF(listen(listenSocket.get(), 1) == SOCKET_ERROR);
 
-        const wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
-        THROW_LAST_ERROR_IF(!socket);
-
-        if (!wsl::windows::common::socket::CancellableAccept(listenSocket.get(), socket.get(), INFINITE, exitEvent.get()))
+        auto socket = wsl::windows::common::socket::CancellableAccept(listenSocket.get(), INFINITE, exitEvent.get());
+        if (!socket)
         {
             return 1;
         }
 
         // Begin the relay.
         wsl::windows::common::relay::BidirectionalRelay(
-            reinterpret_cast<HANDLE>(socket.get()), pipe.get(), 0x1000, wsl::windows::common::relay::RelayFlags::LeftIsSocket);
+            reinterpret_cast<HANDLE>(socket->get()), pipe.get(), 0x1000, wsl::windows::common::relay::RelayFlags::LeftIsSocket);
 
         break;
     }

@@ -34,6 +34,19 @@ namespace wsl::shared {
 
 constexpr int c_jsonPrettyPrintIndent = 2;
 
+struct EmptyObject
+{
+};
+
+inline void to_json(nlohmann::json& j, const EmptyObject&)
+{
+    j = nlohmann::json::object();
+}
+
+inline void from_json(const nlohmann::json&, EmptyObject&)
+{
+}
+
 template <typename T>
 std::string ToJson(const T& Value, int indent = -1)
 {
@@ -188,6 +201,26 @@ struct adl_serializer<WSLCVolumeInformation>
 
         strncpy_s(volume.Name, sizeof(volume.Name), name.c_str(), _TRUNCATE);
         strncpy_s(volume.Driver, sizeof(volume.Driver), driver.c_str(), _TRUNCATE);
+    }
+};
+
+template <>
+struct adl_serializer<WSLCNetworkInformation>
+{
+    static void to_json(json& j, const WSLCNetworkInformation& network)
+    {
+        j = json{{"Name", std::string(network.Name)}, {"Id", std::string(network.Id)}, {"Driver", std::string(network.Driver)}};
+    }
+
+    static void from_json(const json& j, WSLCNetworkInformation& network)
+    {
+        std::string name = j.at("Name").get<std::string>();
+        std::string id = j.at("Id").get<std::string>();
+        std::string driver = j.at("Driver").get<std::string>();
+
+        strncpy_s(network.Name, sizeof(network.Name), name.c_str(), _TRUNCATE);
+        strncpy_s(network.Id, sizeof(network.Id), id.c_str(), _TRUNCATE);
+        strncpy_s(network.Driver, sizeof(network.Driver), driver.c_str(), _TRUNCATE);
     }
 };
 #endif

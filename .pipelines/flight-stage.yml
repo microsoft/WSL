@@ -11,6 +11,10 @@ parameters:
   type: boolean
   default: false
 
+- name: pushToStore
+  type: boolean
+  default: false
+
 stages:
   - stage: flight
     ${{ if eq(parameters.bypassTests, true) }}:
@@ -89,7 +93,7 @@ stages:
       # submit the package flight to the WSL SelfHost Flight Group
       - task: MS-RDX-MRO.windows-store-publish.flight-task.store-flight@3
         displayName: 'Flight StoreBroker Package to Partner Center - WSL SelfHost Flight Group'
-        condition: and(succeeded(), eq('${{ parameters.publishPackage }}', true))
+        condition: and(succeeded(), eq('${{ parameters.publishPackage }}', true), eq('${{ parameters.pushToStore }}', true))
         inputs:
           serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
           appId: $(AppId)
@@ -112,7 +116,7 @@ stages:
       # Create a draft github release
       - powershell: |
                 pip install --user -r tools/devops/requirements.txt
-                python tools/devops/create-release.py '${{ parameters.packageVersion }}' drop\bundle\Microsoft.WSL_${{ parameters.packageVersion }}.0_x64_ARM64.msixbundle drop\bundle\wsl.${{ parameters.packageVersion }}.0.arm64.msi drop\bundle\wsl.${{ parameters.packageVersion }}.0.x64.msi --no-fetch --github-token "$env:token" ${{ iif(parameters.publishPackage, '--publish --auto-release-notes', '--use-current-ref') }}
+                python tools/devops/create-release.py '${{ parameters.packageVersion }}' drop\bundle\Microsoft.WSL_${{ parameters.packageVersion }}.0_x64_ARM64.msixbundle drop\bundle\wsl.${{ parameters.packageVersion }}.0.arm64.msi drop\bundle\wsl.${{ parameters.packageVersion }}.0.x64.msi drop\nuget\Microsoft.WSL.Containers.${{ parameters.packageVersion }}.nupkg --no-fetch --github-token "$env:token" ${{ iif(parameters.publishPackage, '--publish --auto-release-notes', '--use-current-ref') }}
 
         displayName: Create GitHub release
         env:

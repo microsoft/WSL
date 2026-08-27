@@ -21,8 +21,9 @@ struct WslcService
 {
     WslcService() = default;
 
-    static winrt::Microsoft::WSL::Containers::ComponentFlags GetMissingComponents();
+    static winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::Component> GetMissingComponents();
     static winrt::Microsoft::WSL::Containers::ServiceVersion GetVersion();
+    static void InstallWithDependencies();
     static winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::InstallProgress> InstallWithDependenciesAsync();
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation

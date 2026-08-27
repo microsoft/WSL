@@ -20,6 +20,7 @@ namespace wsl::windows::wslc {
 inline constexpr const wchar_t DefaultSessionName[] = L"wslc-cli";
 inline constexpr const wchar_t DefaultAdminSessionName[] = L"wslc-cli-admin";
 inline constexpr const wchar_t DefaultStorageSubPath[] = L"wslc\\sessions";
+inline constexpr const wchar_t DefaultStorageVhdName[] = L"storage.vhdx";
 inline constexpr uint32_t DefaultBootTimeoutMs = 30000;
 
 } // namespace wsl::windows::wslc
