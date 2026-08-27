@@ -76,4 +76,13 @@ struct ExecutionException : CLIException
     {
     }
 };
+
+// Specific exception for a user declining a confirmation prompt. The requested action is abandoned
+// and the program exits successfully.
+struct TerminateException : CLIException
+{
+    TerminateException() : CLIException(std::wstring_view{})
+    {
+    }
+};
 } // namespace wsl::windows::wslc

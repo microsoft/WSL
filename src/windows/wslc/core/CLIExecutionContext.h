@@ -50,11 +50,6 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     HANDLE CreateCancelEvent();
 
-    // Returns true when a destructive prune may proceed, either because --force was passed or
-    // because the user accepted the confirmation prompt. End of input declines, so a prune with no
-    // interactive input aborts rather than blocking.
-    bool ConfirmPrune(std::wstring_view warning);
-
     // Applies and freezes environment-only global options before command-line parsing reports errors.
     void ApplyGlobalEnvironmentOptions();
 };

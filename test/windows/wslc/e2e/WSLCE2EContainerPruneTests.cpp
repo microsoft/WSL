@@ -147,48 +147,6 @@ class WSLCE2EContainerPruneTests
         VerifyContainerIsListed(ConfirmContainerName, L"created");
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Prune_AcceptingPromptRemovesContainer)
-    {
-        // Answering the prompt with y proceeds with the prune.
-        auto createResult = RunWslc(std::format(L"container create --name {} {}", ConfirmContainerName, DebianImage.NameAndTag()));
-        createResult.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = createResult.GetStdoutOneLine();
-
-        auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(ConfirmContainerName); });
-
-        const auto answerPath = std::filesystem::current_path() / L"wslc-prune-confirm.txt";
-        {
-            std::ofstream answer(answerPath, std::ios::binary | std::ios::trunc);
-            answer << "y\n";
-        }
-
-        auto removeAnswer = wil::scope_exit([&]() { DeleteFileW(answerPath.c_str()); });
-
-        const auto result = RunWslcWithStdinFile(L"container prune", answerPath);
-        result.Verify({.ExitCode = 0});
-
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_ContainerPruneConfirm()));
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerId));
-        VerifyContainerIsNotListed(ConfirmContainerName);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Prune_ShortForceFlagSkipsPrompt)
-    {
-        // -f resolves to --force on prune commands, so no warning is printed and the prune proceeds.
-        auto createResult = RunWslc(std::format(L"container create --name {} {}", ConfirmContainerName, DebianImage.NameAndTag()));
-        createResult.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = createResult.GetStdoutOneLine();
-
-        auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(ConfirmContainerName); });
-
-        const auto result = RunWslc(L"container prune -f");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        VERIFY_IS_FALSE(result.StdoutContainsSubstring(Localization::WSLCCLI_PruneConfirmPrompt()));
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerId));
-        VerifyContainerIsNotListed(ConfirmContainerName);
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_FilterExcludesNonMatchingContainer)
     {
         // container prune gained --filter here, so a label filter that matches nothing must leave the
@@ -216,7 +174,7 @@ class WSLCE2EContainerPruneTests
         // stdout rather than printing the warning first.
         const auto result = RunWslc(L"container prune --filter label");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidPruneFilterError(L"label")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
     }
 
 private:

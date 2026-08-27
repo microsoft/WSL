@@ -1071,11 +1071,6 @@ void PruneContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    if (!context.ConfirmPrune(Localization::WSLCCLI_ContainerPruneConfirm()))
-    {
-        return;
-    }
-
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::PruneFilter>();
 

@@ -430,11 +430,6 @@ void PruneImages(CLIExecutionContext& context)
 
     bool all = context.Args.GetValue<ArgType::All>();
 
-    if (!context.ConfirmPrune(all ? Localization::WSLCCLI_ImagePruneAllConfirm() : Localization::WSLCCLI_ImagePruneConfirm()))
-    {
-        return;
-    }
-
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::PruneFilter>();
 

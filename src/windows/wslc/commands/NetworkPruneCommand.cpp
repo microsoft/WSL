@@ -14,6 +14,7 @@ Abstract:
 
 #include "NetworkCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "NetworkTasks.h"
 #include "Task.h"
@@ -44,8 +45,12 @@ std::wstring NetworkPruneCommand::LongDescription() const
 
 void NetworkPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_NetworkPruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+
     context               //
         << ResolveSession //
+        << ConfirmAction  //
         << PruneNetworks;
 }
 } // namespace wsl::windows::wslc

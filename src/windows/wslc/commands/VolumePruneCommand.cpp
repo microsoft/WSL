@@ -14,6 +14,7 @@ Abstract:
 
 #include "VolumeCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "VolumeTasks.h"
 #include "Task.h"
@@ -45,8 +46,13 @@ std::wstring VolumePruneCommand::LongDescription() const
 
 void VolumePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_VolumePruneAllConfirm() : Localization::WSLCCLI_VolumePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+
     context               //
         << ResolveSession //
+        << ConfirmAction  //
         << PruneVolumes;
 }
 } // namespace wsl::windows::wslc

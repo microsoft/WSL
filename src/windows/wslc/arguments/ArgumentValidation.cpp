@@ -208,13 +208,11 @@ void Argument::Validate(ArgMap& execArgs) const
         break;
 
     case ArgType::Filter:
-        CacheConverted<ArgType::Filter>(
-            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseFilter(value); });
+        CacheConverted<ArgType::Filter>(execArgs, m_name, validation::ParseFilter);
         break;
 
     case ArgType::PruneFilter:
-        CacheConverted<ArgType::PruneFilter>(
-            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParsePruneFilter(value); });
+        CacheConverted<ArgType::PruneFilter>(execArgs, m_name, validation::ParseFilter);
         break;
 
     case ArgType::Label:
@@ -354,16 +352,6 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLCSignalFromString(value, argName);
-    }
-}
-
-// Validates that each --filter argument is in the form "key=value". Rejects entries without an '=';
-// the runtime validates the key and value for specific objects.
-void ValidateFilter(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = ParseFilter(value);
     }
 }
 

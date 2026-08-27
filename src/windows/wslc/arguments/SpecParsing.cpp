@@ -446,23 +446,12 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
 }
 
-std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value, const std::wstring& argName)
 {
     const auto kv = SplitKeyValue(value);
     if (!kv.HadSeparator)
     {
-        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
-    }
-
-    return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
-}
-
-std::pair<std::string, std::string> ParsePruneFilter(const std::wstring& value)
-{
-    const auto kv = SplitKeyValue(value);
-    if (!kv.HadSeparator)
-    {
-        throw ArgumentException(Localization::WSLCCLI_InvalidPruneFilterError(value));
+        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value, argName));
     }
 
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
