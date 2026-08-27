@@ -179,6 +179,28 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(2u, cmd.GetAllArguments().size());
     }
 
+    // Test: Verify ContainerCpCommand exposes --follow-link with docker's -L alias
+    TEST_METHOD(ContainerCpCommand_HasFollowLinkArgumentWithDockerAlias)
+    {
+        auto cmd = ContainerCpCommand(L"wslc");
+
+        bool found = false;
+        for (const auto& arg : cmd.GetArguments())
+        {
+            if (arg.Type() == ArgType::FollowLink)
+            {
+                found = true;
+                VERIFY_ARE_EQUAL(std::wstring(L"follow-link"), arg.Name());
+                VERIFY_ARE_EQUAL(std::wstring(L"L"), arg.Alias());
+                VERIFY_ARE_EQUAL(Kind::Flag, arg.Kind());
+                VERIFY_IS_FALSE(arg.Required());
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"ContainerCpCommand should expose --follow-link");
+    }
+
     // Test: Verify RootCommand contains VersionCommand as a subcommand
     TEST_METHOD(RootCommand_ContainsVersionCommand)
     {

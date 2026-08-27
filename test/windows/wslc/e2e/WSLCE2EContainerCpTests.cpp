@@ -53,6 +53,16 @@ class WSLCE2EContainerCpTests
         VERIFY_ARE_EQUAL(L"", result.Stderr.value());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_HelpListsFollowLink)
+    {
+        auto result = RunWslc(L"container cp --help");
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_TRUE(result.Stdout->find(L"--follow-link") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"-L") != std::wstring::npos);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_MissingBothArgs)
     {
         const auto result = RunWslc(L"container cp");
