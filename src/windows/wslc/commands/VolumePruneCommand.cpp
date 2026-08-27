@@ -14,7 +14,6 @@ Abstract:
 
 #include "VolumeCommand.h"
 #include "CLIExecutionContext.h"
-#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "VolumeTasks.h"
 #include "Task.h"
@@ -52,7 +51,6 @@ void VolumePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 
     context               //
         << ResolveSession //
-        << ConfirmAction  //
         << PruneVolumes;
 }
 } // namespace wsl::windows::wslc

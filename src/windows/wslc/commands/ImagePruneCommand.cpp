@@ -14,7 +14,6 @@ Abstract:
 
 #include "ImageCommand.h"
 #include "CLIExecutionContext.h"
-#include "CommonTasks.h"
 #include "ImageTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
@@ -53,7 +52,6 @@ void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 
     context               //
         << ResolveSession //
-        << ConfirmAction  //
         << PruneImages;
 }
 } // namespace wsl::windows::wslc

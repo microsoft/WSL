@@ -14,7 +14,6 @@ Abstract:
 
 #include "NetworkCommand.h"
 #include "CLIExecutionContext.h"
-#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "NetworkTasks.h"
 #include "Task.h"
@@ -50,7 +49,6 @@ void NetworkPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 
     context               //
         << ResolveSession //
-        << ConfirmAction  //
         << PruneNetworks;
 }
 } // namespace wsl::windows::wslc

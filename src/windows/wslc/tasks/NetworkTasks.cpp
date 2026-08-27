@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "NetworkModel.h"
 #include "NetworkService.h"
 #include "NetworkTasks.h"
@@ -262,6 +263,8 @@ void ListNetworks(CLIExecutionContext& context)
 
 void PruneNetworks(CLIExecutionContext& context)
 {
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

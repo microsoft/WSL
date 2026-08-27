@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
@@ -238,6 +239,8 @@ void ListVolumes(CLIExecutionContext& context)
 
 void PruneVolumes(CLIExecutionContext& context)
 {
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

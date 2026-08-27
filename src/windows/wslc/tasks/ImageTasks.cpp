@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
@@ -425,6 +426,8 @@ void TagImage(CLIExecutionContext& context)
 
 void PruneImages(CLIExecutionContext& context)
 {
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

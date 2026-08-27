@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "AsyncExecution.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerModel.h"
 #include "ContainerService.h"
 #include "ContainerTasks.h"
@@ -1068,6 +1069,8 @@ void ViewContainerLogs(CLIExecutionContext& context)
 
 void PruneContainers(CLIExecutionContext& context)
 {
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
