@@ -26,7 +26,7 @@ void CLIExecutionContext::ApplyGlobalEnvironmentOptions()
     Terminal.SetNoColor(GlobalArgs.GetValue<ArgType::NoColor>());
 }
 
-void CLIExecutionContext::OutputError(HRESULT result)
+void CLIExecutionContext::ReportError(HRESULT result)
 {
     std::wstring message;
     if (const auto& reported = ReportedError())
@@ -36,6 +36,10 @@ void CLIExecutionContext::OutputError(HRESULT result)
     }
 
     Terminal.Error(L"{}\n", Localization::MessageErrorCode(message, wslutil::ErrorCodeToString(result)));
+}
+
+void CLIExecutionContext::ClearError()
+{
     m_error.reset();
 }
 

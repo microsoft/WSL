@@ -174,7 +174,7 @@ try
 
         if (FAILED(result))
         {
-            context.OutputError(result);
+            context.ReportError(result);
         }
     }
 

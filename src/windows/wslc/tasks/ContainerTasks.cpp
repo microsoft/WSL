@@ -131,7 +131,7 @@ namespace wsl::windows::wslc::task {
 
 // Every container is attempted even if an earlier one fails; the command still exits nonzero.
 template <typename TAction>
-static void ForEachContainerBestEffort(CLIExecutionContext& context, TAction&& action)
+static void ForEachContainer(CLIExecutionContext& context, TAction&& action)
 {
     for (const auto& id : context.Args.GetAllValues<ArgType::ContainerId>())
     {
@@ -143,7 +143,10 @@ static void ForEachContainerBestEffort(CLIExecutionContext& context, TAction&& a
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-            context.OutputError(wil::ResultFromCaughtException());
+            context.ReportError(wil::ResultFromCaughtException());
+
+            // CollectErrorImpl keeps the first message when the next container fails with the same HRESULT.
+            context.ClearError();
             context.ExitCode = 1;
         }
     }
@@ -250,7 +253,7 @@ void KillContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     const auto signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGKILL);
 
-    ForEachContainerBestEffort(context, [&](const std::string& id) { ContainerService::Kill(session, id, signal); });
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Kill(session, id, signal); });
 }
 
 void ExportContainer(CLIExecutionContext& context)
@@ -623,7 +626,7 @@ void RemoveContainers(CLIExecutionContext& context)
     const bool force = context.Args.GetValue<ArgType::Force>();
     const bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
 
-    ForEachContainerBestEffort(context, [&](const std::string& id) { ContainerService::Delete(session, id, force, deleteVolumes); });
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Delete(session, id, force, deleteVolumes); });
 }
 
 void RunContainer(CLIExecutionContext& context)
@@ -1035,7 +1038,7 @@ void StopContainers(CLIExecutionContext& context)
         options.Timeout = context.Args.GetValue<ArgType::Time>();
     }
 
-    ForEachContainerBestEffort(context, [&](const std::string& id) { ContainerService::Stop(session, id, options); });
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Stop(session, id, options); });
 }
 
 void RestartContainers(CLIExecutionContext& context)
@@ -1052,8 +1055,7 @@ void RestartContainers(CLIExecutionContext& context)
         options.Timeout = context.Args.GetValue<ArgType::Timeout>();
     }
 
-    ForEachContainerBestEffort(
-        context, [&](const std::string& id) { ContainerService::Restart(context.Terminal, session, id, options); });
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Restart(context.Terminal, session, id, options); });
 }
 
 void ViewContainerLogs(CLIExecutionContext& context)
