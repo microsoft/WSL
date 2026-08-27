@@ -1069,6 +1069,8 @@ void ViewContainerLogs(CLIExecutionContext& context)
 
 void PruneContainers(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_ContainerPruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
     ConfirmAction(context);
 
     WI_ASSERT(context.Data.Contains(Data::Session));

@@ -46,10 +46,6 @@ std::wstring ImagePruneCommand::LongDescription() const
 
 void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context.Data.Add<Data::ConfirmWarning>(
-        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_ImagePruneAllConfirm() : Localization::WSLCCLI_ImagePruneConfirm());
-    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
-
     context               //
         << ResolveSession //
         << PruneImages;

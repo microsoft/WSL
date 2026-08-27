@@ -44,9 +44,6 @@ std::wstring NetworkPruneCommand::LongDescription() const
 
 void NetworkPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_NetworkPruneConfirm());
-    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
-
     context               //
         << ResolveSession //
         << PruneNetworks;

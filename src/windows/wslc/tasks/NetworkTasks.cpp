@@ -263,6 +263,8 @@ void ListNetworks(CLIExecutionContext& context)
 
 void PruneNetworks(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_NetworkPruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
     ConfirmAction(context);
 
     WI_ASSERT(context.Data.Contains(Data::Session));

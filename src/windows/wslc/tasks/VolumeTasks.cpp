@@ -239,6 +239,9 @@ void ListVolumes(CLIExecutionContext& context)
 
 void PruneVolumes(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_VolumePruneAllConfirm() : Localization::WSLCCLI_VolumePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
     ConfirmAction(context);
 
     WI_ASSERT(context.Data.Contains(Data::Session));

@@ -44,9 +44,6 @@ std::wstring ContainerPruneCommand::LongDescription() const
 
 void ContainerPruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_ContainerPruneConfirm());
-    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
-
     context               //
         << ResolveSession //
         << PruneContainers;
