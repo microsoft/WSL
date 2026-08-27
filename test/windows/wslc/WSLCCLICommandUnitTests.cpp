@@ -111,9 +111,10 @@ class WSLCCLICommandUnitTests
         for (const auto name : {L"unsupported", L"unsupported-alias"})
         {
             Invocation invocation{std::vector<std::wstring>{name}};
-            VERIFY_THROWS_SPECIFIC(command.FindSubCommand(invocation), UnsupportedFeatureException, [](const auto& exception) {
-                return exception.Type() == UnsupportedFeatureType::Command && exception.Feature() == L"unsupported" &&
-                       exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedCommandError(L"unsupported");
+            VERIFY_THROWS_SPECIFIC(command.FindSubCommand(invocation), UnsupportedException, [](const auto& exception) {
+                return exception.Message() == wsl::shared::Localization::MessageErrorCode(
+                                                  wsl::shared::Localization::WSLCCLI_UnsupportedCommandError(L"unsupported"),
+                                                  wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
             });
         }
     }

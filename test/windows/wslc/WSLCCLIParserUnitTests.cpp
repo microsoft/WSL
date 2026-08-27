@@ -53,9 +53,10 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Platform)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedFeatureException, [](const auto& exception) {
-            return exception.Type() == UnsupportedFeatureType::Option && exception.Feature() == L"--platform" &&
-                   exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform");
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::MessageErrorCode(
+                                              wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform"),
+                                              wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::Platform));
     }
@@ -66,8 +67,10 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Force)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedFeatureException, [](const auto& exception) {
-            return exception.Type() == UnsupportedFeatureType::Option && exception.Feature() == L"--force";
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::MessageErrorCode(
+                                              wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--force"),
+                                              wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::Force));
     }
@@ -78,9 +81,10 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::ContainerId)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedFeatureException, [](const auto& exception) {
-            return exception.Type() == UnsupportedFeatureType::Argument && exception.Feature() == L"container-id" &&
-                   exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedArgumentError(L"container-id");
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::MessageErrorCode(
+                                              wsl::shared::Localization::WSLCCLI_UnsupportedArgumentError(L"container-id"),
+                                              wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::ContainerId));
     }

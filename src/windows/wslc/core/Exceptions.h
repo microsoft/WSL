@@ -14,6 +14,8 @@ Abstract:
 #pragma once
 
 #include "Argument.h"
+#include "Localization.h"
+#include "wslutil.h"
 
 #include <string>
 #include <string_view>
@@ -44,33 +46,12 @@ struct CommandException : CLIException
     }
 };
 
-enum class UnsupportedFeatureType
+struct UnsupportedException : CommandException
 {
-    Command,
-    Option,
-    Argument,
-};
-
-struct UnsupportedFeatureException : CommandException
-{
-    UnsupportedFeatureException(UnsupportedFeatureType type, std::wstring_view feature, std::wstring_view message) :
-        CommandException(message), m_type(type), m_feature(feature)
+    UnsupportedException(std::wstring_view message) :
+        CommandException(wsl::shared::Localization::MessageErrorCode(message, wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED)))
     {
     }
-
-    UnsupportedFeatureType Type() const
-    {
-        return m_type;
-    }
-
-    const std::wstring& Feature() const
-    {
-        return m_feature;
-    }
-
-private:
-    UnsupportedFeatureType m_type;
-    std::wstring m_feature;
 };
 
 // Specific exception for argument parsing errors

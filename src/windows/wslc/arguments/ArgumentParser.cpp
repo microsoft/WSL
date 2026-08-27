@@ -21,10 +21,9 @@ namespace {
     [[noreturn]] void ThrowUnsupportedArgument(const Argument& argument)
     {
         const auto feature = argument.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name() : argument.Name();
-        const auto type = argument.IsOption() ? UnsupportedFeatureType::Option : UnsupportedFeatureType::Argument;
         const auto message = argument.IsOption() ? Localization::WSLCCLI_UnsupportedOptionError(feature)
                                                  : Localization::WSLCCLI_UnsupportedArgumentError(feature);
-        throw UnsupportedFeatureException(type, feature, message);
+        throw UnsupportedException(message);
     }
 } // namespace
 
