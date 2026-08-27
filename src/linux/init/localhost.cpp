@@ -664,7 +664,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                         }
 
                         LOG_ERROR("accept4 failed, {}", error);
-                        break;
+                        THROW_ERRNO(error);
                     }
 
                     THROW_ERRNO_IF(EOVERFLOW, nextConnectionId > c_connectionIdMask);
