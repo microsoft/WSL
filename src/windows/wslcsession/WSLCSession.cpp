@@ -919,7 +919,7 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -934,7 +934,12 @@ try
     auto runtime = m_runtime.Acquire();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
-    if (!tagOrDigest.has_value())
+    // Omitting the tag makes the daemon pull every tag in the repository.
+    if (AllTags)
+    {
+        tagOrDigest.reset();
+    }
+    else if (!tagOrDigest.has_value())
     {
         tagOrDigest = "latest";
     }
@@ -3509,7 +3514,7 @@ HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+    return PullImage(Image, RegistryAuthenticationInformation, FALSE, progress.Get(), warning.Get());
 }
 
 HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback*, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
