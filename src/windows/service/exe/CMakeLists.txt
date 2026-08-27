@@ -59,9 +59,39 @@ set(HEADERS
 
 if (INCLUDE_OPENVMM)
     list(APPEND SOURCES
-         OpenVmmVirtualMachine.cpp)
+        OpenVmmVirtualMachine.cpp
+        OpenVmmGrpcClient.cpp)
     list(APPEND HEADERS
-         OpenVmmVirtualMachine.h)
+        OpenVmmVirtualMachine.h
+        OpenVmmGrpcClient.h)
+
+    set(GRPC_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc")
+    set(GRPC_VM_SERVICE_PROTO "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto")
+    set(GRPC_VM_SERVICE_SOURCES
+        "${GRPC_GENERATED_DIR}/VMService.pb.cc"
+        "${GRPC_GENERATED_DIR}/VMService.grpc.pb.cc")
+    set(GRPC_VM_SERVICE_HEADERS
+        "${GRPC_GENERATED_DIR}/VMService.pb.h"
+        "${GRPC_GENERATED_DIR}/VMService.grpc.pb.h")
+
+    add_custom_command(
+        OUTPUT ${GRPC_VM_SERVICE_SOURCES} ${GRPC_VM_SERVICE_HEADERS}
+        COMMAND "${GRPC_INSTALL_DIR}/bin/protoc.exe"
+            --proto_path=${WSL_DEVICE_HOST_SOURCE_DIR}/proto
+            --proto_path=${GRPC_INSTALL_DIR}/include
+            --cpp_out=${GRPC_GENERATED_DIR}
+            --grpc_out=${GRPC_GENERATED_DIR}
+            --plugin=protoc-gen-grpc=${GRPC_INSTALL_DIR}/bin/grpc_cpp_plugin.exe
+                "${GRPC_VM_SERVICE_PROTO}"
+        DEPENDS "${GRPC_VM_SERVICE_PROTO}"
+        VERBATIM)
+
+    list(APPEND SOURCES ${GRPC_VM_SERVICE_SOURCES})
+    list(APPEND HEADERS ${GRPC_VM_SERVICE_HEADERS})
+    set_source_files_properties(
+        OpenVmmGrpcClient.cpp
+        ${GRPC_VM_SERVICE_SOURCES}
+        PROPERTIES COMPILE_OPTIONS "/wd4244;/wd4267;/wd4996")
 endif()
 
 add_executable(wslservice ${SOURCES} ${HEADERS})
@@ -84,6 +114,22 @@ target_link_libraries(wslservice
                       Winhttp.lib
                       Synchronization.lib
                       yaml-cpp)
+
+if (INCLUDE_OPENVMM)
+    file(GLOB GRPC_NATIVE_LIBRARIES CONFIGURE_DEPENDS "${GRPC_INSTALL_DIR}/lib/*.lib")
+    list(SORT GRPC_NATIVE_LIBRARIES ORDER DESCENDING)
+    target_include_directories(wslservice PRIVATE "${GRPC_INSTALL_DIR}/include" "${GRPC_GENERATED_DIR}")
+    target_compile_options(wslservice PRIVATE /wd4244 /wd4267 /wd4996)
+    target_link_libraries(wslservice
+                          ${GRPC_NATIVE_LIBRARIES}
+                          Ws2_32.lib
+                          Crypt32.lib
+                          Advapi32.lib
+                          Bcrypt.lib
+                          Iphlpapi.lib
+                          Userenv.lib)
+
+endif()
 
 target_precompile_headers(wslservice REUSE_FROM common)
 set_target_properties(wslservice PROPERTIES FOLDER windows)

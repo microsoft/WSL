@@ -359,29 +359,6 @@ interface IWSLCProcess : IUnknown
 // fields here instead of new IDL methods so the interface does not need a new
 // IID for each kernel-published value.
 //
-typedef enum _WSLCNetworkingMode
-{
-    WSLCNetworkingModeNone,
-    WSLCNetworkingModeNAT,
-    WSLCNetworkingModeVirtioProxy,
-    WSLCNetworkingModeConsomme
-} WSLCNetworkingMode;
-
-typedef enum _WSLCFeatureFlags
-{
-    WslcFeatureFlagsNone = 0,
-    WslcFeatureFlagsDnsTunneling = 1,
-    WslcFeatureFlagsEarlyBootDmesg = 2,
-    WslcFeatureFlagsGPU = 4,
-    WslcFeatureFlagsVirtioFs = 8,
-    WslcFeatureFlagsDebug = 16,
-    WslcFeatureFlagsPortRelayWslRelay = 32,
-} WSLCFeatureFlags;
-
-cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug | WslcFeatureFlagsPortRelayWslRelay)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
-
 typedef struct _WSLCGuestCapabilities
 {
     // (base, size) of the hv_pci swiotlb pool the kernel reserved and

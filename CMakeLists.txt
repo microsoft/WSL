@@ -42,6 +42,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 # Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
 option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
 option(INCLUDE_OPENVMM "Include OpenVMM build integrations" OFF)
+set(GRPC_INSTALL_DIR "" CACHE PATH "Path to a staged grpc.native package configuration directory")
 if (BUNDLE_ONLY)
     if (NOT PACKAGE_VERSION)
         message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
@@ -171,12 +172,16 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
 endif()
 
-# Resolve OpenVMM packages. UserConfig.cmake can set WSL_DEVICE_HOST_SOURCE_DIR
-# and/or WSL_VM_SERVICE_SOURCE_DIR to local paths to skip the NuGet lookup.
-# When INCLUDE_OPENVMM is set and WSL_VM_SERVICE_SOURCE_DIR is not already
-# overridden, resolve from the NuGet feed.
-if (INCLUDE_OPENVMM AND NOT WSL_VM_SERVICE_SOURCE_DIR)
-    find_nuget_package(Microsoft.WSL.VmService WSL_VM_SERVICE /build/native)
+if (INCLUDE_OPENVMM)
+    if (NOT GRPC_INSTALL_DIR)
+        message(FATAL_ERROR "GRPC_INSTALL_DIR is required when INCLUDE_OPENVMM is enabled")
+    endif()
+
+    foreach(directory bin include lib)
+        if (NOT EXISTS "${GRPC_INSTALL_DIR}/${directory}")
+            message(FATAL_ERROR "GRPC_INSTALL_DIR is missing '${directory}': ${GRPC_INSTALL_DIR}")
+        endif()
+    endforeach()
 endif()
 
 # --- Local OpenVMM binary override ---

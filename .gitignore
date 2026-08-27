@@ -79,3 +79,5 @@ test-output*.txt
 test-results.txt
 testfile.txt
 output/
+*.pb.cc
+*.pb.h

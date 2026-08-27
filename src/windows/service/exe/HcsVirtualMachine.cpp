@@ -929,7 +929,7 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::AcceptCrashDumpConnection(_Out_ HANDLE* Socket)
 try
 {
-    auto socket = wsl::windows::common::hvsocket::CancellableAccept(
+    auto socket = wsl::windows::common::socket::CancellableAccept(
         m_crashDumpListenSocket.get(), INFINITE, m_vmExitEvent.get());
 
     THROW_HR_IF(E_ABORT, !socket.has_value());
@@ -954,8 +954,6 @@ HRESULT HcsVirtualMachine::UnmapPort(_In_ int Family, _In_ unsigned short HostPo
     UNREFERENCED_PARAMETER(GuestPort);
     return E_NOTIMPL;
 }
-
-} // namespace wsl::windows::service::wslc
 
 namespace wsl::windows::service::wslc {
 

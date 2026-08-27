@@ -241,12 +241,6 @@ private:
 class HostFileChange
 {
 public:
-// RAII wrapper for host file change.
-//
-
-class HostFileChange
-{
-public:
     HostFileChange(const std::filesystem::path& Path, const std::string& NewContent);
 
     ~HostFileChange();

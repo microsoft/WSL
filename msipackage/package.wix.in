@@ -290,7 +290,6 @@
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
 
                 <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll" />
-                <File Id="wslvmservice.dll" Source="${WSL_VM_SERVICE_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wslvmservice.dll" />
                 <File Id="openvmm.exe" Source="${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe" />
 
                 <!-- WSLC COM app - activated through WSLService -->

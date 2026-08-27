@@ -404,8 +404,8 @@ void WSLCVirtualMachine::ConfigureNetworking()
 
     // Virtio proxy forwards DNS via the host proxy, and consomme provides DNS via its
     // built-in resolver on the gateway, so the DNS channel and /gns args are only needed for NAT mode.
-    const bool enableDnsTunneling = FeatureEnabled(WslcFeatureFlagsDnsTunneling) &&
-                                    m_networkingMode != WSLCNetworkingModeVirtioProxy && m_networkingMode != WSLCNetworkingModeConsomme;
+    const bool enableDnsTunneling =
+        FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode != WSLCNetworkingModeConsomme;
     if (enableDnsTunneling)
     {
         fds.emplace_back(WSLCProcessFd{.Fd = -1, .Type = WSLCFdType::WSLCFdTypeDefault});

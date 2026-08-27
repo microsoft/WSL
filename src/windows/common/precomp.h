@@ -36,6 +36,9 @@ Abstract:
 #include <KnownFolders.h>
 #include <shtypes.h>
 #include <Shlwapi.h>
+#ifdef StrCat
+#undef StrCat
+#endif
 #include <Shlobj.h>
 #include <icu.h>
 #define ENABLE_INTSAFE_SIGNED_FUNCTIONS

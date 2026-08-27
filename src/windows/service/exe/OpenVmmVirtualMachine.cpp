@@ -10,7 +10,7 @@ Abstract:
 
     Implementation of IWSLCVirtualMachine using OpenVMM as the VMM backend.
 
-    Spawns openvmm.exe in ttrpc orchestration mode and configures the VM via
+    Spawns openvmm.exe in gRPC orchestration mode and configures the VM via
     vmservice RPCs (CreateVM, ResumeVM, ModifyResource, etc.).
 
     Current limitations:
@@ -50,12 +50,6 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     m_bootTimeoutMs = Settings->BootTimeoutMs;
     m_cpuCount = Settings->CpuCount;
     m_memoryMb = Settings->MemoryMb;
-
-    // Configure termination callback
-    if (Settings->TerminationCallback)
-    {
-        m_terminationCallback = Settings->TerminationCallback;
-    }
 
     // Resolve paths for kernel, initrd, and root VHD.
     auto basePath = wslutil::GetBasePath();
@@ -127,7 +121,12 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     m_kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
 
     // Append common WSL kernel parameters (timesync, printk, page reporting).
-    helpers::AppendCommonKernelCommandLine(m_kernelCmdLine, c_pageReportingOrder);
+    ULONG64 swiotlbSizeBytes = 0;
+    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
+    {
+        swiotlbSizeBytes = helpers::ComputeDefaultSwiotlbConfig(static_cast<UINT64>(Settings->MemoryMb) * _1MB);
+    }
+    helpers::AppendCommonKernelCommandLine(m_kernelCmdLine, c_pageReportingOrder, swiotlbSizeBytes, Settings->CpuCount);
 
     // Setup dmesg collector with optional DmesgOutput handle, matching HcsVirtualMachine.
     // The DmesgCollector creates named pipes that we pass to OpenVMM via serial and
@@ -139,7 +138,7 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     }
 
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent.get(), true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
 
     if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
     {
@@ -159,9 +158,9 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     // Use first 8 chars of the GUID to keep it short but unique.
     m_vsockPath = vsockDir / std::format(L"vm-{:.8}", m_vmIdString);
 
-    // Set up the ttrpc socket path for runtime VM management.
-    m_ttrpcSocketPath = vsockDir / std::format(L"vm-{:.8}.ttrpc", m_vmIdString);
-    DeleteFileW(m_ttrpcSocketPath.c_str());
+    // Set up the gRPC socket path for runtime VM management.
+    m_grpcSocketPath = vsockDir / std::format(L"vm-{:.8}.grpc", m_vmIdString);
+    DeleteFileW(m_grpcSocketPath.c_str());
 
     // Setup boot VHDs — use the same pattern as HcsVirtualMachine.
     auto attachBootDisk = [&](PCWSTR path) {
@@ -208,9 +207,9 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
 
         try
         {
-            if (!m_ttrpcSocketPath.empty())
+            if (!m_grpcSocketPath.empty())
             {
-                std::filesystem::remove(m_ttrpcSocketPath);
+                std::filesystem::remove(m_grpcSocketPath);
             }
         }
         CATCH_LOG()
@@ -266,7 +265,7 @@ std::pair<SOCKET, std::wstring> OpenVmmVirtualMachine::CreateVsockListener(ULONG
 std::wstring OpenVmmVirtualMachine::BuildCommandLine() const
 {
     std::wstring cmd = std::format(L"\"{}\"", m_openvmmPath.wstring());
-    cmd += std::format(L" --ttrpc \"{}\"", m_ttrpcSocketPath.wstring());
+    cmd += std::format(L" --rpc path={},transport=grpc", m_grpcSocketPath.wstring());
 
     return cmd;
 }
@@ -342,7 +341,7 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
         GetEnvironmentVariableW(L"OPENVMM_LOG", previousLog.get(), prevLen);
     }
 
-    SetEnvironmentVariableW(L"OPENVMM_LOG", L"info,openvmm=debug");
+    SetEnvironmentVariableW(L"OPENVMM_LOG", L"info,openvmm=debug,mesh_rpc=trace,h2=trace");
     auto restoreEnv = wil::scope_exit([&] {
         SetEnvironmentVariableW(L"OPENVMM_LOG", previousLog.get());
     });
@@ -385,19 +384,19 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
     // Monitor the openvmm process and signal m_vmExitEvent on exit.
     m_processWatchThread = std::thread(&OpenVmmVirtualMachine::WatchProcessExit, this);
 
-    m_vmService = std::make_unique<WslVmServiceClient>();
+    m_vmService = std::make_unique<OpenVmmGrpcClient>();
     THROW_IF_FAILED_MSG(
-        m_vmService->Connect(m_ttrpcSocketPath.c_str(), 30000),
-        "Failed to connect to OpenVMM ttrpc server");
+        m_vmService->Connect(m_grpcSocketPath.c_str(), 30000),
+        "Failed to connect to OpenVMM gRPC server");
 
     ConfigureVmService();
     THROW_IF_FAILED_MSG(
         m_vmService->CreateVm(),
-        "Failed to create VM via ttrpc CreateVM");
+        "Failed to create VM via gRPC CreateVM");
 
     THROW_IF_FAILED_MSG(
         m_vmService->ResumeVm(),
-        "Failed to resume VM via ttrpc ResumeVM");
+        "Failed to resume VM via gRPC ResumeVM");
 
 }
 
@@ -417,10 +416,6 @@ void OpenVmmVirtualMachine::WatchProcessExit()
     m_terminationDetails = std::format(L"openvmm process exited with code {}", exitCode);
     m_vmExitEvent.SetEvent();
 
-    if (m_terminationCallback)
-    {
-        LOG_IF_FAILED(m_terminationCallback->OnTermination(m_terminationReason, m_terminationDetails.c_str()));
-    }
 }
 
 OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
@@ -470,7 +465,7 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     // std::filesystem to avoid exceptions — the files may still be held
     // briefly by the OS after force-terminating the openvmm process.
     DeleteFileW(m_vsockPath.c_str());
-    DeleteFileW(m_ttrpcSocketPath.c_str());
+    DeleteFileW(m_grpcSocketPath.c_str());
 }
 
 bool OpenVmmVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const

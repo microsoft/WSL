@@ -11,7 +11,7 @@ Abstract:
     Implementation of IWSLCVirtualMachine using OpenVMM as the VMM backend.
 
     This class spawns openvmm.exe as a child process, configures the VM via
-    ttrpc RPCs (vmservice.proto), and implements the same IWSLCVirtualMachine
+    gRPC calls (vmservice.proto), and implements the same IWSLCVirtualMachine
     interface as HcsVirtualMachine so the rest of WSLC can work unchanged.
 
 --*/
@@ -21,7 +21,7 @@ Abstract:
 #include "wslc.h"
 #include "INetworkingEngine.h"
 #include "Dmesg.h"
-#include "WslVmServiceClient.h"
+#include "OpenVmmGrpcClient.h"
 #include <windowsdefs.h>
 #include <filesystem>
 #include <map>
@@ -69,17 +69,17 @@ private:
 
     bool FeatureEnabled(WSLCFeatureFlags Value) const;
 
-    // Build the openvmm.exe command line (ttrpc-only in orchestration mode).
+    // Build the openvmm.exe command line with its gRPC management endpoint.
     std::wstring BuildCommandLine() const;
 
-    // Configure the VM via IWslVmService COM calls (kernel, disks, NIC, etc.).
+    // Configure the VM through gRPC (kernel, disks, NIC, etc.).
     void ConfigureVmService() const;
 
     // Create a Unix domain socket listener for the hybrid_vsock bridge at the given port.
     // Returns the listening socket and the filesystem path for cleanup.
     std::pair<SOCKET, std::wstring> CreateVsockListener(ULONG port);
 
-    // Spawn the openvmm.exe process, connect ttrpc, and create+resume the VM.
+    // Spawn the openvmm.exe process, connect gRPC, and create+resume the VM.
     void LaunchOpenVmm();
 
     // Monitor the openvmm process and signal m_vmExitEvent on exit.
@@ -91,7 +91,7 @@ private:
     // Timeout for waiting for the openvmm process to exit gracefully before force-terminating.
     static constexpr DWORD c_processTerminationTimeoutMs = 5000;
 
-    // Directory for vsock bridge and ttrpc socket files.
+    // Directory for vsock bridge and gRPC socket files.
     // Must be short — hybrid_vsock appends port GUIDs and Unix sockets have a 108-byte path limit.
     static constexpr wchar_t c_vsockBridgeDir[] = L"C:\\ProgramData\\wslc";
 
@@ -164,12 +164,8 @@ private:
     // Networking engine (ConsommeNetworking for the OpenVMM backend).
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
-    // ttrpc client (wslvmservice.dll) for runtime VM management (disk hot-add/remove etc.).
-    std::filesystem::path m_ttrpcSocketPath;
-    std::unique_ptr<WslVmServiceClient> m_vmService;
-
-    // Termination callback to invoke when the VM exits.
-    wil::com_ptr<ITerminationCallback> m_terminationCallback;
+    std::filesystem::path m_grpcSocketPath;
+    std::unique_ptr<OpenVmmGrpcClient> m_vmService;
 
     // Dmesg collector for early boot and virtio serial console output.
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
