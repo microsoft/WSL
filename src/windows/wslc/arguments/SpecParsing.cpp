@@ -446,12 +446,14 @@ std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value)
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};
 }
 
-std::pair<std::string, std::string> ParseFilter(const std::wstring& value)
+// Parses a filter argument in the form "key=value". Entries without an '=' are rejected; the runtime
+// validates the key and value for specific objects.
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value, const std::wstring& argName)
 {
     const auto kv = SplitKeyValue(value);
     if (!kv.HadSeparator)
     {
-        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value));
+        throw ArgumentException(Localization::WSLCCLI_InvalidFilterError(value, argName));
     }
 
     return {WideToMultiByte(kv.Key), WideToMultiByte(kv.Value)};

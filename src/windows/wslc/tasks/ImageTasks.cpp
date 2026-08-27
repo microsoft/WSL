@@ -179,12 +179,15 @@ void GetImages(CLIExecutionContext& context)
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    // The container count is only reported by json output, and gathering it costs an extra query in
-    // the service, so it is only requested when it will be shown.
-    const bool containerCounts =
-        context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
+    // Quiet output only prints image ids, and both the container count and the digests cost extra
+    // work in the service, so they are only requested when the output will show them.
+    const bool quiet = context.Args.GetValue<ArgType::Quiet>();
 
-    auto images = ImageService::List(session, filters, containerCounts, context.Args.GetValue<ArgType::Digests>());
+    // The container count is only reported by json output.
+    const bool containerCounts = context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !quiet;
+    const bool digests = context.Args.GetValue<ArgType::Digests>() && !quiet;
+
+    auto images = ImageService::List(session, filters, containerCounts, digests);
     context.Data.Add<Data::Images>(std::move(images));
 }
 
