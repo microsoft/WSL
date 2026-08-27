@@ -53,7 +53,7 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Platform)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedException, [](const auto& exception) {
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ExecutionException, [](const auto& exception) {
             return exception.Message() == wsl::shared::Localization::MessageErrorCode(
                                               wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform"),
                                               wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
@@ -67,7 +67,7 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Force)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedException, [](const auto& exception) {
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ExecutionException, [](const auto& exception) {
             return exception.Message() == wsl::shared::Localization::MessageErrorCode(
                                               wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--force"),
                                               wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
@@ -81,7 +81,7 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::ContainerId)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedException, [](const auto& exception) {
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ExecutionException, [](const auto& exception) {
             return exception.Message() == wsl::shared::Localization::MessageErrorCode(
                                               wsl::shared::Localization::WSLCCLI_UnsupportedArgumentError(L"container-id"),
                                               wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));

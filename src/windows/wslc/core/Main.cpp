@@ -136,11 +136,6 @@ try
         command->ValidateArguments(context.Args);
         command->Execute(context);
     }
-    catch (const UnsupportedException& unsupported)
-    {
-        context.Terminal.Error(L"{}\n", unsupported.Message());
-        return 1;
-    }
     catch (const ArgumentException& ae)
     {
         command->OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());

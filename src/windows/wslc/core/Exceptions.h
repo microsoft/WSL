@@ -46,14 +46,6 @@ struct CommandException : CLIException
     }
 };
 
-struct UnsupportedException : CommandException
-{
-    UnsupportedException(std::wstring_view message) :
-        CommandException(wsl::shared::Localization::MessageErrorCode(message, wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED)))
-    {
-    }
-};
-
 // Specific exception for argument parsing errors
 struct ArgumentException : CommandException
 {
@@ -79,10 +71,15 @@ private:
     std::vector<Argument> m_arguments;
 };
 
-// Specific exception for failures after command and argument validation
+// Specific exception for errors displayed without command help
 struct ExecutionException : CLIException
 {
     ExecutionException(std::wstring_view message) : CLIException(message)
+    {
+    }
+
+    ExecutionException(HRESULT error, std::wstring_view message) :
+        CLIException(wsl::shared::Localization::MessageErrorCode(message, wsl::windows::common::wslutil::ErrorCodeToString(error)))
     {
     }
 };
