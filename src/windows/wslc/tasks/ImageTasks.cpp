@@ -228,42 +228,22 @@ void ListImages(CLIExecutionContext& context)
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
         constexpr ColumnWidthConfig c_imageId{.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink};
 
-        // Matches docker: DIGEST sits between TAG and IMAGE ID, and is only shown with --digests.
-        if (context.Args.GetValue<ArgType::Digests>())
-        {
-            auto table =
-                trunc
-                    ? wsl::windows::wslc::TableOutput<6>(
-                          context.Terminal,
-                          {{{L"REPOSITORY", c_shrink}, {L"TAG", c_shrink}, {L"DIGEST", c_shrink}, {L"IMAGE ID", c_imageId}, {L"CREATED", c_shrink}, {L"SIZE", c_shrink}}},
-                          images.size())
-                    : wsl::windows::wslc::TableOutput<6>(
-                          context.Terminal, {L"REPOSITORY", L"TAG", L"DIGEST", L"IMAGE ID", L"CREATED", L"SIZE"});
-
-            for (const auto& image : images)
-            {
-                const auto entry = ToImageOutput(image, trunc);
-                table.WriteRow({
-                    MultiByteToWide(entry.Repository),
-                    MultiByteToWide(entry.Tag),
-                    MultiByteToWide(entry.Digest),
-                    MultiByteToWide(entry.ID),
-                    MultiByteToWide(entry.CreatedSince),
-                    MultiByteToWide(entry.Size),
-                });
-            }
-
-            table.Complete();
-            break;
-        }
+        // Matches docker: DIGEST sits between TAG and IMAGE ID. The column is always declared, and is
+        // left empty and hidden unless --digests was passed.
+        constexpr size_t c_digestColumn = 2;
+        const bool digests = context.Args.GetValue<ArgType::Digests>();
 
         auto table =
             trunc
-                ? wsl::windows::wslc::TableOutput<5>(
+                ? wsl::windows::wslc::TableOutput<6>(
                       context.Terminal,
-                      {{{L"REPOSITORY", c_shrink}, {L"TAG", c_shrink}, {L"IMAGE ID", c_imageId}, {L"CREATED", c_shrink}, {L"SIZE", c_shrink}}},
+                      {{{L"REPOSITORY", c_shrink}, {L"TAG", c_shrink}, {L"DIGEST", c_shrink}, {L"IMAGE ID", c_imageId}, {L"CREATED", c_shrink}, {L"SIZE", c_shrink}}},
                       images.size())
-                : wsl::windows::wslc::TableOutput<5>(context.Terminal, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+                : wsl::windows::wslc::TableOutput<6>(
+                      context.Terminal, {L"REPOSITORY", L"TAG", L"DIGEST", L"IMAGE ID", L"CREATED", L"SIZE"});
+
+        table.SetDropEmptyColumns(true);
+        table.SetColumnHidden(c_digestColumn, !digests);
 
         for (const auto& image : images)
         {
@@ -271,6 +251,7 @@ void ListImages(CLIExecutionContext& context)
             table.WriteRow({
                 MultiByteToWide(entry.Repository),
                 MultiByteToWide(entry.Tag),
+                digests ? MultiByteToWide(entry.Digest) : std::wstring{},
                 MultiByteToWide(entry.ID),
                 MultiByteToWide(entry.CreatedSince),
                 MultiByteToWide(entry.Size),
