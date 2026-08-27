@@ -207,8 +207,8 @@ if (OPENVMM_BUILD_DIR)
         file(CREATE_LINK "${OPENVMM_BUILD_DIR}/openvmm.exe"
              "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe" COPY_ON_ERROR)
 
-        # When WSL_DEVICE_HOST_SOURCE_DIR was overridden (e.g. to local_overrides/),
-        # the proto file from the NuGet package is no longer reachable.  Copy it over.
+        # When WSL_DEVICE_HOST_SOURCE_DIR is overridden, the proto file from the
+        # NuGet package is no longer reachable. Copy it over.
         if (NOT EXISTS "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto"
             AND EXISTS "${WSL_DEVICE_HOST_NUGET_DIR}/proto/VMService.proto")
             file(MAKE_DIRECTORY "${WSL_DEVICE_HOST_SOURCE_DIR}/proto")
