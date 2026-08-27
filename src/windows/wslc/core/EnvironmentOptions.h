@@ -31,6 +31,7 @@ struct EnvBinding
 // Many-to-one allowed: multiple env var names may bind to one ArgType.
 constexpr EnvBinding c_envBindings[] = {
     {L"NO_COLOR", ArgType::NoColor},
+    {L"WSLC_SESSION", ArgType::Session},
 };
 
 // Populates target for any ArgType in definedArgs not already set.

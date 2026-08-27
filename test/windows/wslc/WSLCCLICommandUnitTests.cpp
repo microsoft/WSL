@@ -210,15 +210,17 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(Kind::Value, globals[0].Kind());
     }
 
-    // RootCommand exposes NoColor as the sole env-eligible global option.
-    TEST_METHOD(RootCommand_EnvArguments_OnlyNoColor)
+    // RootCommand exposes only the options with supported environment bindings.
+    TEST_METHOD(RootCommand_EnvArguments_NoColorAndSession)
     {
         auto root = RootCommand();
         auto envArgs = root.GetEnvArguments();
 
-        VERIFY_ARE_EQUAL(1u, envArgs.size());
+        VERIFY_ARE_EQUAL(2u, envArgs.size());
         VERIFY_ARE_EQUAL(ArgType::NoColor, envArgs[0].Type());
         VERIFY_ARE_EQUAL(Kind::Flag, envArgs[0].Kind());
+        VERIFY_ARE_EQUAL(ArgType::Session, envArgs[1].Type());
+        VERIFY_ARE_EQUAL(Kind::Value, envArgs[1].Kind());
     }
 
     // Every ArgType advertised by GetEnvArguments() must have at least one entry
