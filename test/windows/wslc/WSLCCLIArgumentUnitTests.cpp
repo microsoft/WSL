@@ -19,6 +19,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgMap.h"
 #include "ArgumentValidation.h"
+#include "Command.h"
 #include "ImageService.h"
 #include "JsonUtils.h"
 #include "Exceptions.h"
@@ -41,6 +42,44 @@ using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument:
 static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
 static_assert(!std::is_copy_assignable_v<ArgMap>);
 static_assert(!std::is_move_assignable_v<ArgMap>);
+
+constexpr std::wstring_view c_deprecatedOptionDescription = L"Use --replacement instead";
+constexpr std::wstring_view c_deprecatedOptionWarning = L"'--force' is deprecated. Use --replacement instead";
+constexpr std::wstring_view c_deprecatedArgumentDescription = L"Use replacement-id instead";
+constexpr std::wstring_view c_deprecatedArgumentWarning = L"'container-id' is deprecated. Use replacement-id instead";
+
+class DeprecatedArgumentCommand : public Command
+{
+public:
+    DeprecatedArgumentCommand() : Command(L"deprecated", L"")
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override
+    {
+        return {
+            Argument::CreateDeprecated(ArgType::Force, std::nullopt, std::wstring{c_deprecatedOptionDescription}),
+            Argument::CreateDeprecated(ArgType::ContainerId, std::nullopt, std::wstring{c_deprecatedArgumentDescription}),
+            Argument::CreateDeprecated(ArgType::Quiet, std::nullopt, std::wstring{}),
+            Argument::CreateUnsupported(ArgType::Platform),
+        };
+    }
+
+    std::wstring ShortDescription() const override
+    {
+        return L"Deprecated argument test command";
+    }
+
+    std::wstring LongDescription() const override
+    {
+        return ShortDescription();
+    }
+
+private:
+    void ExecuteInternal(CLIExecutionContext&) const override
+    {
+    }
+};
 
 class WSLCCLIArgumentUnitTests
 {
@@ -67,6 +106,94 @@ class WSLCCLIArgumentUnitTests
         const ArgumentException withArgument{L"error", argument};
         VERIFY_ARE_EQUAL(1u, withArgument.Arguments().size());
         VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
+    }
+
+    TEST_METHOD(ArgumentCreate_State)
+    {
+        const auto supported = Argument::Create(ArgType::Force);
+        VERIFY_ARE_EQUAL(ArgumentState::Supported, supported.State());
+        VERIFY_IS_TRUE(supported.IsSupported());
+        VERIFY_IS_TRUE(supported.IsVisible());
+        VERIFY_IS_FALSE(supported.IsDeprecated());
+
+        const auto unsupported = Argument::CreateUnsupported(ArgType::Force);
+        VERIFY_ARE_EQUAL(ArgumentState::Unsupported, unsupported.State());
+        VERIFY_IS_FALSE(unsupported.IsSupported());
+        VERIFY_IS_FALSE(unsupported.IsVisible());
+        VERIFY_IS_FALSE(unsupported.IsDeprecated());
+
+        const auto deprecated = Argument::CreateDeprecated(ArgType::Force, std::nullopt, std::wstring{c_deprecatedOptionDescription});
+        VERIFY_ARE_EQUAL(ArgumentState::Deprecated, deprecated.State());
+        VERIFY_IS_TRUE(deprecated.IsSupported());
+        VERIFY_IS_FALSE(deprecated.IsVisible());
+        VERIFY_IS_TRUE(deprecated.IsDeprecated());
+        VERIFY_ARE_EQUAL(std::wstring{c_deprecatedOptionDescription}, deprecated.Description());
+    }
+
+    TEST_METHOD(DeprecatedOption_ParsesValidatesAndWarns)
+    {
+        DeprecatedArgumentCommand command;
+
+        for (const auto commandLine : {L"wslc --force", L"wslc -f"})
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_NO_THROW(command.ValidateArguments(args));
+            VERIFY_IS_TRUE(args.GetValue<ArgType::Force>());
+
+            CaptureTerminal capture;
+            command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+            VERIFY_ARE_EQUAL(std::wstring{c_deprecatedOptionWarning} + L"\n", capture.captured());
+        }
+    }
+
+    TEST_METHOD(DeprecatedPositionalArgument_ParsesValidatesAndWarns)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc container");
+        ArgMap args;
+
+        VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+        VERIFY_NO_THROW(command.ValidateArguments(args));
+        VERIFY_IS_TRUE(args.Contains(ArgType::ContainerId));
+
+        CaptureTerminal capture;
+        command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+        VERIFY_ARE_EQUAL(std::wstring{c_deprecatedArgumentWarning} + L"\n", capture.captured());
+    }
+
+    TEST_METHOD(DeprecatedArgument_WithoutDescriptionOmitsGuidance)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --quiet");
+        ArgMap args;
+
+        VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+        VERIFY_NO_THROW(command.ValidateArguments(args));
+        VERIFY_IS_TRUE(args.GetValue<ArgType::Quiet>());
+
+        CaptureTerminal capture;
+        command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+        VERIFY_ARE_EQUAL(std::wstring{L"'--quiet' is deprecated.\n"}, capture.captured());
+    }
+
+    TEST_METHOD(NonVisibleArguments_AreHiddenFromHelp)
+    {
+        DeprecatedArgumentCommand command;
+        CaptureTerminal capture;
+
+        command.OutputHelp(capture.terminal);
+        const auto help = capture.captured();
+
+        VERIFY_IS_TRUE(help.find(L"--force") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--quiet") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--platform") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"container-id") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(c_deprecatedOptionDescription) == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(c_deprecatedArgumentDescription) == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(wsl::shared::Localization::WSLCCLI_PlatformArgDescription()) == std::wstring::npos);
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values

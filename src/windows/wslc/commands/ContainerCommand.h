@@ -25,7 +25,6 @@ struct ContainerCommand final : public Command
     std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
-
     std::vector<std::unique_ptr<Command>> GetCommands() const override;
 
 protected:

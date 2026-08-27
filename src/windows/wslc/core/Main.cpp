@@ -118,6 +118,7 @@ try
             /*optionsOnly*/ true,
             /*stopOnUnknown*/ true,
             /*overridableDefaults*/ envDefs);
+        command->OutputDeprecatedArgumentWarnings(context.Terminal, context.GlobalArgs, envDefs);
         command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
 
         // Past this point, global option parsing and validation are complete.
@@ -131,8 +132,37 @@ try
         }
 
         command->ParseArguments(invocation, context.Args);
+        command->OutputDeprecatedArgumentWarnings(context.Terminal, context.Args);
         command->ValidateArguments(context.Args);
         command->Execute(context);
+    }
+    catch (const UnsupportedFeatureException& unsupported)
+    {
+        PCWSTR featureType = L"argument";
+        switch (unsupported.Type())
+        {
+        case UnsupportedFeatureType::Command:
+            featureType = L"command";
+            break;
+        case UnsupportedFeatureType::Option:
+            featureType = L"option";
+            break;
+        case UnsupportedFeatureType::Argument:
+            break;
+        }
+
+        WSL_LOG_TELEMETRY(
+            "UnsupportedCLIFeature",
+            PDT_ProductAndServiceUsage,
+            TraceLoggingValue(WSLC_E_NOT_SUPPORTED, "result"),
+            TraceLoggingWideString(featureType, "featureType"),
+            TraceLoggingWideString(command->FullName().c_str(), "command"),
+            TraceLoggingWideString(unsupported.Feature().c_str(), "feature"));
+
+        const CommandException displayException{
+            Localization::MessageErrorCode(unsupported.Message(), wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED))};
+        command->OutputHelp(context.Terminal, HelpOutput::Command, &displayException);
+        return 1;
     }
     catch (const ArgumentException& ae)
     {

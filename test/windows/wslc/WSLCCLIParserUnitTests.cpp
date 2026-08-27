@@ -47,6 +47,44 @@ class WSLCCLIParserUnitTests
         return true;
     }
 
+    TEST_METHOD(UnsupportedNamedOption_ThrowsSpecificException)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --platform linux/amd64");
+        ArgMap args;
+        ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Platform)}};
+
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedFeatureException, [](const auto& exception) {
+            return exception.Type() == UnsupportedFeatureType::Option && exception.Feature() == L"--platform" &&
+                   exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform");
+        });
+        VERIFY_IS_FALSE(args.Contains(ArgType::Platform));
+    }
+
+    TEST_METHOD(UnsupportedAliasOption_ThrowsSpecificException)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc -f");
+        ArgMap args;
+        ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Force)}};
+
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedFeatureException, [](const auto& exception) {
+            return exception.Type() == UnsupportedFeatureType::Option && exception.Feature() == L"--force";
+        });
+        VERIFY_IS_FALSE(args.Contains(ArgType::Force));
+    }
+
+    TEST_METHOD(UnsupportedPositionalArgument_ThrowsSpecificException)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc container");
+        ArgMap args;
+        ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::ContainerId)}};
+
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), UnsupportedFeatureException, [](const auto& exception) {
+            return exception.Type() == UnsupportedFeatureType::Argument && exception.Feature() == L"container-id" &&
+                   exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedArgumentError(L"container-id");
+        });
+        VERIFY_IS_FALSE(args.Contains(ArgType::ContainerId));
+    }
+
     TEST_METHOD(ParserTest_ParserCases)
     {
         std::vector<ParserTestCase> testCases = {

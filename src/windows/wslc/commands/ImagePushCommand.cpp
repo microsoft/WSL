@@ -28,6 +28,7 @@ std::vector<Argument> ImagePushCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
+        Argument::CreateUnsupported(ArgType::Platform),
     };
 }
 

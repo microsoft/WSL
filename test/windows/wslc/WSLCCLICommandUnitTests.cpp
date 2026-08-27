@@ -13,14 +13,16 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <array>
 #include <unordered_map>
 #include <unordered_set>
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
 #include "Command.h"
-#include "RootCommand.h"
 #include "ContainerCommand.h"
+#include "ImageCommand.h"
+#include "RootCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
@@ -33,6 +35,34 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLICommandUnitTests {
+class UnsupportedCommandTestCommand : public Command
+{
+public:
+    UnsupportedCommandTestCommand() : Command(L"test", L"")
+    {
+    }
+
+    std::vector<UnsupportedCommand> GetUnsupportedCommands() const override
+    {
+        return {{L"unsupported", {L"unsupported-alias"}}};
+    }
+
+    std::wstring ShortDescription() const override
+    {
+        return L"Unsupported command test";
+    }
+
+    std::wstring LongDescription() const override
+    {
+        return ShortDescription();
+    }
+
+private:
+    void ExecuteInternal(CLIExecutionContext&) const override
+    {
+    }
+};
+
 class WSLCCLICommandUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLICommandUnitTests)
@@ -65,6 +95,68 @@ class WSLCCLICommandUnitTests
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
         }
+    }
+
+    TEST_METHOD(Command_UnsupportedCommandIsHiddenAndRecognized)
+    {
+        UnsupportedCommandTestCommand command;
+
+        const auto supportedCommands = command.GetCommands();
+        VERIFY_IS_TRUE(supportedCommands.empty());
+
+        const auto unsupportedCommands = command.GetUnsupportedCommands();
+        VERIFY_ARE_EQUAL(1u, unsupportedCommands.size());
+        VERIFY_ARE_EQUAL(std::wstring_view{L"unsupported"}, unsupportedCommands.front().Name());
+
+        for (const auto name : {L"unsupported", L"unsupported-alias"})
+        {
+            Invocation invocation{std::vector<std::wstring>{name}};
+            VERIFY_THROWS_SPECIFIC(command.FindSubCommand(invocation), UnsupportedFeatureException, [](const auto& exception) {
+                return exception.Type() == UnsupportedFeatureType::Command && exception.Feature() == L"unsupported" &&
+                       exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedCommandError(L"unsupported");
+            });
+        }
+    }
+
+    TEST_METHOD(DockerPlatformCommands_DeclarePlatformUnsupported)
+    {
+        ContainerCreateCommand containerCreate{L"container"};
+        ContainerRunCommand containerRun{L"container"};
+        ImageBuildCommand imageBuild{L"image"};
+        ImageImportCommand imageImport{L"image"};
+        ImageInspectCommand imageInspect{L"image"};
+        ImageLoadCommand imageLoad{L"image"};
+        ImagePullCommand imagePull{L"image"};
+        ImagePushCommand imagePush{L"image"};
+        ImageRemoveCommand imageRemove{L"image"};
+        ImageSaveCommand imageSave{L"image"};
+
+        const std::array<const Command*, 10> commands{
+            &containerCreate,
+            &containerRun,
+            &imageBuild,
+            &imageImport,
+            &imageInspect,
+            &imageLoad,
+            &imagePull,
+            &imagePush,
+            &imageRemove,
+            &imageSave,
+        };
+
+        for (const auto command : commands)
+        {
+            LogComment(L"Checking " + command->FullName());
+            const auto arguments = command->GetArguments();
+            const auto platform = std::ranges::find(arguments, ArgType::Platform, &Argument::Type);
+            VERIFY_IS_TRUE(platform != arguments.end());
+            VERIFY_ARE_EQUAL(ArgumentState::Unsupported, platform->State());
+        }
+    }
+
+    TEST_METHOD(NotSupportedError_HasSymbolicName)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L"WSLC_E_NOT_SUPPORTED"}, wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
     }
 
     // Test: Verify SystemCommand has subcommands

@@ -44,6 +44,35 @@ struct CommandException : CLIException
     }
 };
 
+enum class UnsupportedFeatureType
+{
+    Command,
+    Option,
+    Argument,
+};
+
+struct UnsupportedFeatureException : CommandException
+{
+    UnsupportedFeatureException(UnsupportedFeatureType type, std::wstring_view feature, std::wstring_view message) :
+        CommandException(message), m_type(type), m_feature(feature)
+    {
+    }
+
+    UnsupportedFeatureType Type() const
+    {
+        return m_type;
+    }
+
+    const std::wstring& Feature() const
+    {
+        return m_feature;
+    }
+
+private:
+    UnsupportedFeatureType m_type;
+    std::wstring m_feature;
+};
+
 // Specific exception for argument parsing errors
 struct ArgumentException : CommandException
 {

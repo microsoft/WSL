@@ -30,6 +30,7 @@ std::vector<Argument> ImageImportCommand::GetArguments() const
         Argument::Create(ArgType::ImportFile, true),
         Argument::Create(ArgType::ImageId),
         Argument::Create(ArgType::NoTrunc),
+        Argument::CreateUnsupported(ArgType::Platform),
     };
 }
 

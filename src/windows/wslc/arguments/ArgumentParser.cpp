@@ -17,6 +17,16 @@ Abstract:
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+namespace {
+    [[noreturn]] void ThrowUnsupportedArgument(const Argument& argument)
+    {
+        const auto feature = argument.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name() : argument.Name();
+        const auto type = argument.IsOption() ? UnsupportedFeatureType::Option : UnsupportedFeatureType::Argument;
+        const auto message = argument.IsOption() ? Localization::WSLCCLI_UnsupportedOptionError(feature)
+                                                 : Localization::WSLCCLI_UnsupportedArgumentError(feature);
+        throw UnsupportedFeatureException(type, feature, message);
+    }
+} // namespace
 
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
@@ -282,6 +292,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalA
         return ArgumentException(Localization::WSLCCLI_ExtraPositionalError(currArg));
     }
 
+    if (!nextPositional->IsSupported())
+    {
+        ThrowUnsupportedArgument(*nextPositional);
+    }
+
     // First positional found is the anchor positional.
     if (!m_anchorPositional.has_value())
     {
@@ -315,6 +330,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     const Argument* nextPositional = NextPositional();
     if (nextPositional)
     {
+        if (!nextPositional->IsSupported())
+        {
+            ThrowUnsupportedArgument(*nextPositional);
+        }
+
         m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
         return {};
     }
@@ -325,6 +345,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     if (m_forwardArgs.empty())
     {
         return ArgumentException(Localization::WSLCCLI_CommandHasNoForwardArgumentsError(currArg));
+    }
+
+    if (!m_forwardArgs.front().IsSupported())
+    {
+        ThrowUnsupportedArgument(m_forwardArgs.front());
     }
 
     // currArg is the first forwarded argument
@@ -382,6 +407,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
     }
 
+    if (!firstArg->IsSupported())
+    {
+        ThrowUnsupportedArgument(*firstArg);
+    }
+
     // Position after the first alias
     size_t currentPos = 1 + aliasLength;
 
@@ -423,6 +453,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         if (!nextArg)
         {
             return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
+        }
+
+        if (!nextArg->IsSupported())
+        {
+            ThrowUnsupportedArgument(*nextArg);
         }
 
         // Update position before checking Kind
@@ -500,6 +535,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
     {
         if (string::IsEqual(argName, arg.Name()))
         {
+            if (!arg.IsSupported())
+            {
+                ThrowUnsupportedArgument(arg);
+            }
+
             // Found a match, process by kind.
             if (arg.Kind() == Kind::Flag)
             {

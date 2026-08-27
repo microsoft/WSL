@@ -99,6 +99,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     auto commandAliases = Aliases();
     auto commands = GetCommands();
     auto arguments = GetAllArguments();
+    std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
     std::vector<Argument> helpArguments;
     if (fullHelp)
     {
@@ -107,6 +108,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     else if (argumentHelp)
     {
         helpArguments.assign(relevantArguments.begin(), relevantArguments.end());
+        std::erase_if(helpArguments, [](const Argument& argument) { return !argument.IsVisible(); });
     }
 
     std::vector<Argument> standardArgs;
@@ -158,6 +160,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     const bool hasHelpForwardArgs = !helpForwardArgs.empty();
 
     auto globalArgs = RootCommand().GetGlobalArguments();
+    std::erase_if(globalArgs, [](const Argument& argument) { return !argument.IsVisible(); });
 
     // Build usage line with Write calls for each segment.
     {
@@ -453,7 +456,8 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
     }
 
     auto commands = GetCommands();
-    if (commands.empty())
+    auto unsupportedCommands = GetUnsupportedCommands();
+    if (commands.empty() && unsupportedCommands.empty())
     {
         return {};
     }
@@ -473,6 +477,16 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
                 inv.consume(itr);
                 return std::move(command);
             }
+        }
+    }
+
+    for (const auto& command : unsupportedCommands)
+    {
+        if (string::IsEqual(*itr, command.Name()) ||
+            std::ranges::any_of(command.Aliases(), [&](const auto alias) { return string::IsEqual(*itr, alias); }))
+        {
+            throw UnsupportedFeatureException(
+                UnsupportedFeatureType::Command, command.Name(), Localization::WSLCCLI_UnsupportedCommandError(command.Name()));
         }
     }
 
@@ -521,6 +535,11 @@ void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& def
 
     for (const auto& arg : definedArgs)
     {
+        if (!arg.IsSupported())
+        {
+            continue;
+        }
+
         if (arg.Required() && !source.Contains(arg.Type()))
         {
             const auto name = arg.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + arg.Name() : arg.Name();
@@ -564,6 +583,23 @@ void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& def
     }
 }
 
+void Command::OutputDeprecatedArgumentWarnings(Terminal& terminal, const ArgMap& source, const std::vector<Argument>& definedArgs) const
+{
+    for (const auto& argument : definedArgs)
+    {
+        if (argument.IsDeprecated() && source.Contains(argument.Type()))
+        {
+            const auto name = argument.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name() : argument.Name();
+
+            // A deprecated argument's description provides optional command-specific guidance appended to the standard warning.
+            const auto warning = argument.Description().empty()
+                                     ? Localization::WSLCCLI_DeprecatedArgumentWarning(name)
+                                     : Localization::WSLCCLI_DeprecatedArgumentWarningWithMessage(name, argument.Description());
+            terminal.Warn(L"{}\n", warning);
+        }
+    }
+}
+
 void Command::Execute(CLIExecutionContext& context) const
 {
     // If Help was part of the validated argument set, we will output help instead of executing.
@@ -592,7 +628,9 @@ void Command::ValidateArgumentsInternal(ArgMap&) const
 std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType> types) const
 {
     auto arguments = GetAllArguments();
+    std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
     auto globalArguments = RootCommand().GetGlobalArguments();
+    std::erase_if(globalArguments, [](const Argument& argument) { return !argument.IsVisible(); });
     arguments.insert(arguments.end(), globalArguments.begin(), globalArguments.end());
 
     std::vector<Argument> result;
