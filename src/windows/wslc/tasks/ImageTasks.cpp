@@ -292,10 +292,27 @@ void PushImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.GetValue<ArgType::ImageId>();
+    const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
+    const bool allTags = context.Args.GetValue<ArgType::AllTags>();
+
+    const auto reference = ImageReference::Parse(image);
+
+    // Match `docker push`: --all-tags pushes every tag in the repository, so a reference that already names one is
+    // rejected instead of being silently ignored.
+    if (allTags && reference.Format != EnumReferenceFormatNone)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
+    }
+
+    // Match `docker push`: for a name-only reference the tag defaults to "latest", and the client reports this on
+    // stdout before contacting the registry.
+    if (!allTags && reference.Format == EnumReferenceFormatNone)
+    {
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
+    }
 
     ImageProgressCallback callback(context.Terminal, Terminal::Level::Output);
-    services::ImageService::Push(context.Terminal, session, WideToMultiByte(imageId), &callback);
+    services::ImageService::Push(context.Terminal, session, image, &callback, allTags);
 }
 
 void DeleteImage(CLIExecutionContext& context)

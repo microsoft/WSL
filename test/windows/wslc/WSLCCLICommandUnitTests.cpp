@@ -21,6 +21,7 @@ Abstract:
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
+#include "ImageCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
@@ -243,6 +244,28 @@ class WSLCCLICommandUnitTests
 
             VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
         }
+    }
+
+    // `docker push` exposes --all-tags with the -a short alias.
+    TEST_METHOD(ImagePushCommand_HasAllTagsArgumentWithDockerAlias)
+    {
+        auto cmd = ImagePushCommand(L"image");
+
+        bool found = false;
+        for (const auto& arg : cmd.GetArguments())
+        {
+            if (arg.Type() == argument::ArgType::AllTags)
+            {
+                found = true;
+                VERIFY_ARE_EQUAL(argument::Kind::Flag, arg.Kind());
+                VERIFY_IS_FALSE(arg.Required());
+                VERIFY_ARE_EQUAL(std::wstring(L"all-tags"), std::wstring(arg.Name()));
+                VERIFY_ARE_EQUAL(std::wstring(L"a"), std::wstring(arg.Alias()));
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"image push does not register --all-tags");
     }
 
     // Walk every command in the root tree and verify no argument collisions.
