@@ -127,13 +127,19 @@ class WSLCE2EContainerPruneTests
         VerifyContainerIsNotListed(L"prune-multi-2");
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Prune_WithoutForceDeclinesWithoutInput)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Prune_WithoutForcePromptsAndDeclines)
     {
         // Without --force the prune asks for confirmation. No input is attached here, so the read hits
         // end of input and declines: the container survives and the command still succeeds.
         RunWslc(std::format(L"container create --name {} {}", ConfirmContainerName, DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
 
         auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(ConfirmContainerName); });
+
+        // Argument validation runs before the confirmation prompt, so a bad filter fails with empty
+        // stdout rather than printing the warning first.
+        const auto malformed = RunWslc(L"container prune --filter label");
+        malformed.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(malformed.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
 
         const auto result = RunWslc(L"container prune");
         result.Verify({.ExitCode = 0});
@@ -166,15 +172,6 @@ class WSLCE2EContainerPruneTests
         unfiltered.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(unfiltered.StdoutContainsSubstring(containerId));
         VerifyContainerIsNotListed(ConfirmContainerName);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Prune_MalformedFilterIsRejectedBeforePrompting)
-    {
-        // Argument validation runs before the confirmation prompt, so a bad filter fails with empty
-        // stdout rather than printing the warning first.
-        const auto result = RunWslc(L"container prune --filter label");
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
     }
 
 private:

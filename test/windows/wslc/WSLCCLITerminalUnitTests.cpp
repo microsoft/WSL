@@ -552,55 +552,42 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(expected, result);
     }
 
-    TEST_METHOD(Terminal_ConfirmAcceptsLowercaseY)
+    TEST_METHOD(Terminal_Confirm)
     {
-        InputCaptureTerminal cap{L"y\n"};
-        VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
+        // The prompt is written inline on stdout with the standard suffix appended, and nothing
+        // goes to stderr.
+        {
+            InputCaptureTerminal cap{L"y\n"};
+            VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
+            VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
+            VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
+        }
 
-        // The prompt is written inline on stdout with the standard suffix appended.
-        VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
-        VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
-    }
+        // Only a bare y accepts, in either case and with surrounding whitespace trimmed.
+        for (const auto* answer : {L"y\n", L"Y\n", L"  y  \n"})
+        {
+            InputCaptureTerminal cap{answer};
+            VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
+        }
 
-    TEST_METHOD(Terminal_ConfirmAcceptsUppercaseY)
-    {
-        InputCaptureTerminal cap{L"Y\n"};
-        VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
-    }
-
-    TEST_METHOD(Terminal_ConfirmTrimsSurroundingWhitespace)
-    {
-        InputCaptureTerminal cap{L"  y  \n"};
-        VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
-    }
-
-    TEST_METHOD(Terminal_ConfirmRejectsAnswersOtherThanY)
-    {
-        // Only a bare y accepts; a spelled-out yes declines, matching the container CLI ecosystem.
-        for (const auto* answer : {L"yes\n", L"n\n", L"N\n", L"no\n", L"\n", L"maybe\n"})
+        // Anything else declines, including a spelled-out yes, matching the container CLI ecosystem.
+        // A prune with no input attached must abort rather than block, so end of input declines too.
+        for (const auto* answer : {L"yes\n", L"n\n", L"N\n", L"no\n", L"\n", L"maybe\n", L""})
         {
             InputCaptureTerminal cap{answer};
             VERIFY_IS_FALSE(cap.terminal.Confirm(L"Remove everything?"));
+            VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
         }
-    }
 
-    TEST_METHOD(Terminal_ConfirmDeclinesAtEndOfInput)
-    {
-        // A prune with no input attached must abort rather than block, so end of input declines.
-        InputCaptureTerminal cap{L""};
-        VERIFY_IS_FALSE(cap.terminal.Confirm(L"Remove everything?"));
-        VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
-    }
-
-    TEST_METHOD(Terminal_ConfirmEmitsMessageVerbatimWithFormatCharacters)
-    {
         // The message is a formatting argument, not a format string, so braces must not be
         // interpreted.
-        InputCaptureTerminal cap{L"y\n"};
-        const std::wstring message = L"Remove {} {0} {name} 100%?";
+        {
+            InputCaptureTerminal cap{L"y\n"};
+            const std::wstring message = L"Remove {} {0} {name} 100%?";
 
-        VERIFY_IS_TRUE(cap.terminal.Confirm(message));
-        VERIFY_ARE_EQUAL(message + L" [y/N] ", cap.outPipe.captured());
+            VERIFY_IS_TRUE(cap.terminal.Confirm(message));
+            VERIFY_ARE_EQUAL(message + L" [y/N] ", cap.outPipe.captured());
+        }
     }
 
     TEST_METHOD(Terminal_ReadLineMaskDefaultsToUnmasked)

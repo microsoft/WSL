@@ -3039,7 +3039,8 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
     <value>Invalid value "{}" for the '--{}' option: bad format of filter (expected name=value)</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
     <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
