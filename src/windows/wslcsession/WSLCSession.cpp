@@ -1949,13 +1949,10 @@ try
             const auto it = digestsByRepo.find(repoName);
             taggedRepos.insert(std::move(repoName));
 
-            if (it == digestsByRepo.end())
+            // The digest is only reported when it was requested, matching docker.
+            if (it == digestsByRepo.end() || !digests)
             {
                 rows.push_back({&e, tag, std::string{}});
-            }
-            else if (!digests)
-            {
-                rows.push_back({&e, tag, it->second.front()});
             }
             else
             {
@@ -1977,7 +1974,7 @@ try
 
             if (!digests)
             {
-                rows.push_back({&e, repoName, repoDigests.front()});
+                rows.push_back({&e, repoName, std::string{}});
             }
             else
             {
