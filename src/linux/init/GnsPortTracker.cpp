@@ -23,8 +23,6 @@
 
 constexpr size_t c_bind_timeout_seconds = 60;
 constexpr auto c_sock_diag_refresh_delay = std::chrono::milliseconds(500);
-constexpr auto c_sock_diag_poll_timeout = std::chrono::milliseconds(10);
-constexpr auto c_bpf_poll_timeout = std::chrono::milliseconds(500);
 
 GnsPortTracker::GnsPortTracker(
     std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
@@ -54,11 +52,10 @@ void GnsPortTracker::RunPortRefresh()
         // Netlink will sometimes return EBUSY. Don't fail for that
         try
         {
-            std::promise<void> resume;
-            auto result = PortRefreshResult{ListAllocatedPorts(), time(nullptr), std::bind(&std::promise<void>::set_value, &resume)};
-            m_allocatedPortsRefresh.set_value(result);
+            auto result = PortRefreshResult{ListAllocatedPorts(), time(nullptr)};
+            m_events.post(TrackerEvent{std::move(result)});
 
-            resume.get_future().wait();
+            m_portRefreshResume.get();
         }
         catch (const NetlinkTransactionError& e)
         {
@@ -74,8 +71,7 @@ void GnsPortTracker::RunPortRefresh()
 
 int GnsPortTracker::ProcessSecCompNotification(seccomp_notif* notification)
 {
-    seccomp_notif notificationCopy = *notification;
-    m_request.post(notificationCopy);
+    m_events.post(TrackerEvent{*notification});
     return m_reply.get();
 }
 
@@ -88,103 +84,93 @@ void GnsPortTracker::Run()
 
     std::thread{std::bind(&GnsPortTracker::RunPortRefresh, this)}.detach();
 
-    auto future = std::make_optional(m_allocatedPortsRefresh.get_future());
-    std::optional<PortRefreshResult> refreshResult;
+    bool portRefreshAwaitingAcknowledgement = false;
 
     for (;;)
     {
-        std::optional<BindCall> bindCall;
-        try
+        auto event = m_events.get();
+        if (const auto* notification = std::get_if<seccomp_notif>(&event))
         {
-            bindCall = ReadNextRequest();
-        }
-        catch (const std::exception& e)
-        {
-            GNS_LOG_ERROR("Failed to read bind request, {}", e.what());
-        }
-
-        if (bindCall.has_value())
-        {
-            int result = 0;
-            if (bindCall->Request.has_value())
-            {
-                PortAllocation& allocationRequest = bindCall->Request.value();
-                result = HandleRequest(allocationRequest);
-                if (result == 0)
-                {
-                    TrackPort(allocationRequest);
-                    GNS_LOG_INFO(
-                        "Tracking bind call: family ({}) port ({}) protocol ({})",
-                        allocationRequest.Family,
-                        allocationRequest.Port,
-                        allocationRequest.Protocol);
-                }
-            }
-
+            std::optional<BindCall> bindCall;
             try
             {
-                CompleteRequest(bindCall->CallId, result);
+                bindCall = ReadRequest(*notification);
             }
             catch (const std::exception& e)
             {
-                GNS_LOG_ERROR("Failed to complete bind request, {}", e.what());
+                GNS_LOG_ERROR("Failed to read bind request, {}", e.what());
             }
 
-            if (bindCall->PortZeroBind.has_value())
+            if (bindCall.has_value())
             {
+                int result = 0;
+                if (bindCall->Request.has_value())
+                {
+                    PortAllocation& allocationRequest = bindCall->Request.value();
+                    result = HandleRequest(allocationRequest);
+                    if (result == 0)
+                    {
+                        TrackPort(allocationRequest);
+                        GNS_LOG_INFO(
+                            "Tracking bind call: family ({}) port ({}) protocol ({})",
+                            allocationRequest.Family,
+                            allocationRequest.Port,
+                            allocationRequest.Protocol);
+                    }
+                }
+
                 try
                 {
-                    auto allocation = ResolvePortZeroBind(std::move(bindCall->PortZeroBind.value()));
-                    if (allocation.has_value())
-                    {
-                        const auto portResult = HandleRequest(allocation.value());
-                        if (portResult == 0)
-                        {
-                            TrackPort(std::move(allocation.value()));
-                        }
-                        else
-                        {
-                            GNS_LOG_ERROR(
-                                "Failed to register resolved port-0 bind: family ({}) port ({}) protocol ({}), error {}",
-                                allocation->Family,
-                                allocation->Port,
-                                allocation->Protocol,
-                                portResult);
-                        }
-                    }
+                    CompleteRequest(result);
                 }
                 catch (const std::exception& e)
                 {
-                    GNS_LOG_ERROR("Failed to resolve port-0 bind, {}", e.what());
+                    GNS_LOG_ERROR("Failed to complete bind request, {}", e.what());
+                }
+
+                if (bindCall->PortZeroBind.has_value())
+                {
+                    try
+                    {
+                        auto allocation = ResolvePortZeroBind(std::move(bindCall->PortZeroBind.value()));
+                        if (allocation.has_value())
+                        {
+                            const auto portResult = HandleRequest(allocation.value());
+                            if (portResult == 0)
+                            {
+                                TrackPort(std::move(allocation.value()));
+                            }
+                            else
+                            {
+                                GNS_LOG_ERROR(
+                                    "Failed to register resolved port-0 bind: family ({}) port ({}) protocol ({}), error {}",
+                                    allocation->Family,
+                                    allocation->Port,
+                                    allocation->Protocol,
+                                    portResult);
+                            }
+                        }
+                    }
+                    catch (const std::exception& e)
+                    {
+                        GNS_LOG_ERROR("Failed to resolve port-0 bind, {}", e.what());
+                    }
                 }
             }
         }
-
-        // If bindCall is empty, then the read() timed out. Look for any closed port
-        if (future.has_value() && future->wait_for(c_sock_diag_poll_timeout) == std::future_status::ready)
+        else
         {
-            refreshResult.emplace(future->get());
-            future.reset();
-            m_allocatedPortsRefresh = {};
+            auto refreshResult = std::get<PortRefreshResult>(std::move(event));
+            OnRefreshAllocatedPorts(refreshResult.Ports, refreshResult.Timestamp);
 
-            // If this loop's iteration had a bind call, it's possible that RefreshAllocatedPort
-            // was called before the bind called was processed. Make sure that the port list
-            // is up to date (If this is called, the next block will schedule another refresh)
-            if (!bindCall.has_value())
-            {
-                OnRefreshAllocatedPorts(refreshResult->Ports, refreshResult->Timestamp);
-            }
+            portRefreshAwaitingAcknowledgement = true;
         }
 
         // Only look at bound ports if there's something to deallocate to avoid wasting cycles
-        if (refreshResult.has_value())
+        if (portRefreshAwaitingAcknowledgement && !m_allocatedPorts.empty())
         {
-            if (!m_allocatedPorts.empty())
-            {
-                future = m_allocatedPortsRefresh.get_future();
-                refreshResult->Resume(); // This will resume the sock_diag thread
-                refreshResult.reset();
-            }
+            m_portRefreshResume.post(true);
+            portRefreshAwaitingAcknowledgement = false;
         }
     }
 }
@@ -344,17 +330,8 @@ int GnsPortTracker::HandleRequest(const PortAllocation& Port)
     return error;
 }
 
-std::optional<GnsPortTracker::BindCall> GnsPortTracker::ReadNextRequest()
+std::optional<GnsPortTracker::BindCall> GnsPortTracker::ReadRequest(const seccomp_notif& Notification)
 {
-    // Read the call information
-    auto request_value = m_request.try_get(c_bpf_poll_timeout);
-    if (!request_value.has_value())
-    {
-        return {};
-    }
-
-    auto callInfo = request_value.value();
-
     // This logic needs to be defensive because the calling process is blocked until
     // CompleteRequest() is called, so if the call information can't be processed because
     // the caller has done something wrong (bad pointer, fd, or protocol), just let it go through
@@ -362,17 +339,18 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::ReadNextRequest()
 
     try
     {
-        return GetCallInfo(callInfo.id, callInfo.pid, callInfo.data.arch, callInfo.data.nr, gsl::make_span(callInfo.data.args));
+        return GetCallInfo(
+            Notification.id, Notification.pid, Notification.data.arch, Notification.data.nr, gsl::make_span(Notification.data.args));
     }
     catch (const std::exception& e)
     {
-        GNS_LOG_ERROR("Failed to read bind() call info with ID {} for pid {}, {}", callInfo.id, callInfo.pid, e.what());
-        return {{{}, {}, callInfo.id}};
+        GNS_LOG_ERROR("Failed to read bind() call info with ID {} for pid {}, {}", Notification.id, Notification.pid, e.what());
+        return {{{}, {}, Notification.id}};
     }
 }
 
 std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
-    uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<unsigned long long>& Arguments)
+    uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<const unsigned long long>& Arguments)
 {
     auto ParseSocket = [&](int Socket, size_t AddressPtr, size_t AddressLength) -> std::optional<BindCall> {
         if (AddressLength < sizeof(sockaddr) || AddressLength > sizeof(sockaddr_storage))
@@ -583,7 +561,7 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
 #endif
 }
 
-void GnsPortTracker::CompleteRequest(uint64_t id, int result)
+void GnsPortTracker::CompleteRequest(int result)
 {
     m_reply.post(result);
 }
