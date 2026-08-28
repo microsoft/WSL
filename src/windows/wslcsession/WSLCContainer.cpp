@@ -1114,10 +1114,17 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         Localization::MessageWslcVolumeNotAvailable(wsl::shared::string::Join(unavailableVolumes, ',')),
         !unavailableVolumes.empty());
 
-    auto volumeCleanup = MountVolumes(m_mountedVolumes, m_runtime.Vm());
+    // A restart keeps its ports and mounts across both phases, so re-acquiring them here would collide
+    // with the container's own reservations. Release them if the start does not land, since an exited
+    // container must not keep holding them.
+    auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { ReleaseRuntimeResources(); });
 
-    auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
-    MapPorts();
+    if (!m_runtimeResourcesHeld)
+    {
+        MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+        MapPorts();
+        m_runtimeResourcesHeld = true;
+    }
 
     try
     {
@@ -1165,8 +1172,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
 
     transition = StartTransition(TransitionKind::Start, ContainerEvent::Start);
 
-    portCleanup.release();
-    volumeCleanup.release();
+    resourceCleanup.release();
     cleanup.release();
 
     lock.reset();
@@ -1499,7 +1505,12 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 
     ReleaseProcesses();
-    ReleaseRuntimeResources();
+
+    // A restart's start phase relies on the container's ports and mounts still being held.
+    if (!m_restart)
+    {
+        ReleaseRuntimeResources();
+    }
 
     // Ignore duplicate or late Stop events so they do not overwrite an already committed state.
     if (m_state == WslcContainerStateRunning)
@@ -2943,6 +2954,8 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseProcesses(
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeResources()
 {
     WSL_LOG("ReleaseRuntimeResources", TraceLoggingValue(m_id.c_str(), "ID"));
+
+    m_runtimeResourcesHeld = false;
 
     // Release runtime resources (port relays, volume mounts) that were set up at Start().
     UnmapPorts();
