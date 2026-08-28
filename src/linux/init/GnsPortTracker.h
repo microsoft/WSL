@@ -149,9 +149,9 @@ private:
 
     ActivePorts ListAllocatedPorts();
 
-    std::optional<BindCall> ReadRequest(const seccomp_notif& Notification);
+    BindCall ReadRequest(const seccomp_notif& Notification);
 
-    std::optional<BindCall> GetCallInfo(uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<const unsigned long long>& Arguments);
+    BindCall GetCallInfo(uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<const unsigned long long>& Arguments);
 
     int RequestPort(const PortAllocation& Port, bool Allocate);
 
