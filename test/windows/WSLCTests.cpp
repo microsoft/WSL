@@ -6962,8 +6962,8 @@ class WSLCTests
         verifyEventFilter("kill");
         verifyEventFilter("stop");
 
-        // An integer until-bound denotes the start of that second. A Docker event later within the
-        // same second is outside the window, even though its whole-second time equals the bound.
+        // The until-bound covers the whole second it names, so a Docker event later within that same
+        // second is still inside the window.
         {
             const auto fractionalEvent = std::ranges::find_if(lifecycleEvents, [](const auto& event) {
                 return nanoseconds{event.timeNano} != duration_cast<seconds>(nanoseconds{event.timeNano});
@@ -6973,7 +6973,7 @@ class WSLCTests
             WSLCFilter filters[]{{"container", id.c_str()}, {"event", fractionalEvent->Action.c_str()}};
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, fractionalEvent->time, filters, ARRAYSIZE(filters), &stream));
-            VERIFY_IS_TRUE(drain(stream.get()).empty());
+            VERIFY_IS_FALSE(drain(stream.get()).empty());
         }
 
         // Image events are not recorded yet, so a 'type=image' filter excludes the container's

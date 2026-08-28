@@ -23,8 +23,6 @@ namespace {
         return std::chrono::sys_seconds{std::chrono::seconds{TimeSeconds}};
     }
 
-    constexpr int64_t c_maxBoundSeconds = INT64_MAX / 1'000'000'000;
-
 } // namespace
 
 void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
@@ -107,13 +105,11 @@ namespace {
 Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
     Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters)
 {
-    // Bounds are compared against nanosecond event timestamps in Get(), so anything past
-    // c_maxBoundSeconds overflows; zero means unbounded, so it never makes the window backwards.
+    // Zero means unbounded on that end, so it never makes the window run backwards.
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG,
         Localization::MessageWslcEventsInvalidTimeWindow(SinceTime, UntilTime),
-        SinceTime < 0 || SinceTime > c_maxBoundSeconds || UntilTime < 0 || UntilTime > c_maxBoundSeconds ||
-            (SinceTime != 0 && UntilTime != 0 && SinceTime > UntilTime));
+        SinceTime < 0 || UntilTime < 0 || (SinceTime != 0 && UntilTime != 0 && SinceTime > UntilTime));
 
     Microsoft::WRL::ComPtr<EventStream> stream;
     THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<EventStream>(&stream, std::move(Session), this, SinceTime, UntilTime, std::move(Filters)));
@@ -196,7 +192,7 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         }
 
         const auto event = GetLockHeld(SequenceNumber.value()).value();
-        const std::chrono::sys_time<std::chrono::nanoseconds> eventTime{std::chrono::nanoseconds{event.timeNano}};
+        const std::chrono::sys_seconds eventTime{std::chrono::seconds{event.time}};
 
         // Advance in delivery order before applying the time window. Docker timestamps are not an
         // ordering key, so an event past Until cannot prove that every later event is also past it.
