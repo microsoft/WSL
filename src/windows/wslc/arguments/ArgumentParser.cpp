@@ -291,7 +291,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalA
         return ArgumentException(Localization::WSLCCLI_ExtraPositionalError(currArg));
     }
 
-    if (!nextPositional->IsSupported())
+    if (!nextPositional->IsAccepted())
     {
         ThrowUnsupportedArgument(*nextPositional);
     }
@@ -329,7 +329,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     const Argument* nextPositional = NextPositional();
     if (nextPositional)
     {
-        if (!nextPositional->IsSupported())
+        if (!nextPositional->IsAccepted())
         {
             ThrowUnsupportedArgument(*nextPositional);
         }
@@ -346,7 +346,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
         return ArgumentException(Localization::WSLCCLI_CommandHasNoForwardArgumentsError(currArg));
     }
 
-    if (!m_forwardArgs.front().IsSupported())
+    if (!m_forwardArgs.front().IsAccepted())
     {
         ThrowUnsupportedArgument(m_forwardArgs.front());
     }
@@ -406,7 +406,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
     }
 
-    if (!firstArg->IsSupported())
+    if (!firstArg->IsAccepted())
     {
         ThrowUnsupportedArgument(*firstArg);
     }
@@ -454,7 +454,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
         }
 
-        if (!nextArg->IsSupported())
+        if (!nextArg->IsAccepted())
         {
             ThrowUnsupportedArgument(*nextArg);
         }
@@ -534,7 +534,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
     {
         if (string::IsEqual(argName, arg.Name()))
         {
-            if (!arg.IsSupported())
+            if (!arg.IsAccepted())
             {
                 ThrowUnsupportedArgument(arg);
             }

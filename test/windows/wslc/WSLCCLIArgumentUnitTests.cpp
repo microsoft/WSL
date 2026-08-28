@@ -120,19 +120,19 @@ class WSLCCLIArgumentUnitTests
     {
         const auto supported = Argument::Create(ArgType::Force);
         VERIFY_ARE_EQUAL(ArgumentState::Supported, supported.State());
-        VERIFY_IS_TRUE(supported.IsSupported());
+        VERIFY_IS_TRUE(supported.IsAccepted());
         VERIFY_IS_TRUE(supported.IsVisible());
         VERIFY_IS_FALSE(supported.IsDeprecated());
 
         const auto unsupported = Argument::CreateUnsupported(ArgType::Force);
         VERIFY_ARE_EQUAL(ArgumentState::Unsupported, unsupported.State());
-        VERIFY_IS_FALSE(unsupported.IsSupported());
+        VERIFY_IS_FALSE(unsupported.IsAccepted());
         VERIFY_IS_FALSE(unsupported.IsVisible());
         VERIFY_IS_FALSE(unsupported.IsDeprecated());
 
         const auto deprecated = Argument::CreateDeprecated(ArgType::Force, std::nullopt, std::wstring{c_deprecatedOptionDescription});
         VERIFY_ARE_EQUAL(ArgumentState::Deprecated, deprecated.State());
-        VERIFY_IS_TRUE(deprecated.IsSupported());
+        VERIFY_IS_TRUE(deprecated.IsAccepted());
         VERIFY_IS_FALSE(deprecated.IsVisible());
         VERIFY_IS_TRUE(deprecated.IsDeprecated());
         VERIFY_ARE_EQUAL(std::wstring{c_deprecatedOptionDescription}, deprecated.Description());

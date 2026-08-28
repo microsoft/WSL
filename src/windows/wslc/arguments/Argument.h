@@ -105,7 +105,7 @@ struct Argument
     {
         return m_type == argument::Kind::Flag || m_type == argument::Kind::Value;
     }
-    bool IsSupported() const
+    bool IsAccepted() const
     {
         return m_state != ArgumentState::Unsupported;
     }

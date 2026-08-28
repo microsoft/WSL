@@ -30,10 +30,10 @@ namespace wsl::windows::wslc {
 std::wstring s_ExecutableName = L"wslc";
 
 namespace {
-void FilterArgumentsByVisibility(std::vector<Argument>& arguments)
-{
-    std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
-}
+    void FilterArgumentsByVisibility(std::vector<Argument>& arguments)
+    {
+        std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
+    }
 } // namespace
 
 Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
@@ -549,7 +549,7 @@ void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& def
 
     for (const auto& arg : definedArgs)
     {
-        if (!arg.IsSupported())
+        if (!arg.IsAccepted())
         {
             continue;
         }
