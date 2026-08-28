@@ -167,7 +167,6 @@ HRESULT LxssUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ RE
     }
     CATCH_RETURN()
 
-
     WSL_LOG("LxssUserSessionCreateInstanceEnd", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
 
     return S_OK;
