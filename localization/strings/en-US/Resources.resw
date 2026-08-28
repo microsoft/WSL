@@ -1727,7 +1727,7 @@ Take a moment to preview some of the community’s favorite features or view our
     
 You can use the `wslc.exe` CLI to build, run, push, pull and manage Linux containers all directly on Windows.
 
-As well you can use the WSLc API to create Windows applications that have runtime logic powered by Linux containers, making it easier to embed Linux contianers as a direct component of your Windows applications. This feature makes it easy to use code that would run in a Linux environment right on Windows, useful for applications like cloud to local, AI applications, and isolation.</value>
+As well you can use the WSLc API to create Windows applications that have runtime logic powered by Linux containers, making it easier to embed Linux containers as a direct component of your Windows applications. This feature makes it easy to use code that would run in a Linux environment right on Windows, useful for applications like cloud to local, AI applications, and isolation.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
     <value>WSL container</value>
