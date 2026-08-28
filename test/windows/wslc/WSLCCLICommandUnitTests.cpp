@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "Command.h"
+#include "ClusterCommand.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
 #include "SessionCommand.h"
@@ -65,6 +66,38 @@ class WSLCCLICommandUnitTests
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
         }
+    }
+
+    TEST_METHOD(RootCommand_ContainsClusterCommand)
+    {
+        auto commands = RootCommand().GetCommands();
+        const auto found =
+            std::ranges::find_if(commands, [](const auto& command) { return command->Name() == ClusterCommand::CommandName; });
+        VERIFY_IS_TRUE(found != commands.end());
+    }
+
+    TEST_METHOD(ClusterCommand_HasLifecycleSubcommands)
+    {
+        const auto commands = ClusterCommand(L"wslc").GetCommands();
+        VERIFY_ARE_EQUAL(4u, commands.size());
+        VERIFY_ARE_EQUAL(std::wstring_view(L"create"), commands[0]->Name());
+        VERIFY_ARE_EQUAL(std::wstring_view(L"delete"), commands[1]->Name());
+        VERIFY_ARE_EQUAL(std::wstring_view(L"status"), commands[2]->Name());
+        VERIFY_ARE_EQUAL(std::wstring_view(L"kubeconfig"), commands[3]->Name());
+    }
+
+    TEST_METHOD(ClusterCreateCommand_HasConfigAndFlagArguments)
+    {
+        const auto arguments = ClusterCreateCommand(L"wslc:cluster").GetArguments();
+        const auto hasType = [&](ArgType type) {
+            return std::ranges::any_of(arguments, [&](const auto& argument) { return argument.Type() == type; });
+        };
+
+        VERIFY_IS_TRUE(hasType(ArgType::ClusterConfig));
+        VERIFY_IS_TRUE(hasType(ArgType::ClusterSubscription));
+        VERIFY_IS_TRUE(hasType(ArgType::ClusterResourceGroup));
+        VERIFY_IS_TRUE(hasType(ArgType::ClusterTenantId));
+        VERIFY_IS_TRUE(hasType(ArgType::ClusterEnableGpu));
     }
 
     // Test: Verify SystemCommand has subcommands

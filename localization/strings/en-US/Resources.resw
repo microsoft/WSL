@@ -3499,6 +3499,87 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Manage networks.</value>
   </data>
+  <data name="WSLCCLI_ClusterCommandDesc" xml:space="preserve">
+    <value>Manage AKS Arc clusters on WSL.</value>
+  </data>
+  <data name="WSLCCLI_ClusterCommandLongDesc" xml:space="preserve">
+    <value>Create, delete, inspect, and retrieve credentials for an AKS Arc cluster hosted in a dedicated WSL distro.</value>
+  </data>
+  <data name="WSLCCLI_ClusterCreateDesc" xml:space="preserve">
+    <value>Create an AKS Arc cluster.</value>
+  </data>
+  <data name="WSLCCLI_ClusterCreateLongDesc" xml:space="preserve">
+    <value>Creates a dedicated WSL distro, prepares it as an Arc-enabled host, and deploys an AKS Arc cluster.</value>
+  </data>
+  <data name="WSLCCLI_ClusterDeleteDesc" xml:space="preserve">
+    <value>Delete an AKS Arc cluster.</value>
+  </data>
+  <data name="WSLCCLI_ClusterDeleteLongDesc" xml:space="preserve">
+    <value>Undeploys AKS Arc resources, disconnects the Arc machine, and unregisters the dedicated WSL distro.</value>
+  </data>
+  <data name="WSLCCLI_ClusterStatusDesc" xml:space="preserve">
+    <value>Show AKS Arc cluster status.</value>
+  </data>
+  <data name="WSLCCLI_ClusterStatusLongDesc" xml:space="preserve">
+    <value>Shows the WSL distro, Arc agent, and AKS Arc provisioning state.</value>
+  </data>
+  <data name="WSLCCLI_ClusterKubeconfigDesc" xml:space="preserve">
+    <value>Retrieve the cluster kubeconfig.</value>
+  </data>
+  <data name="WSLCCLI_ClusterKubeconfigLongDesc" xml:space="preserve">
+    <value>Writes the node-local administrator kubeconfig to standard output or a file.</value>
+  </data>
+  <data name="WSLCCLI_ClusterConfigArgDescription" xml:space="preserve">
+    <value>Read cluster settings from a KEY=VALUE file</value>
+  </data>
+  <data name="WSLCCLI_ClusterSubscriptionArgDescription" xml:space="preserve">
+    <value>Azure subscription ID</value>
+  </data>
+  <data name="WSLCCLI_ClusterResourceGroupArgDescription" xml:space="preserve">
+    <value>Azure resource group</value>
+  </data>
+  <data name="WSLCCLI_ClusterTenantIdArgDescription" xml:space="preserve">
+    <value>Microsoft Entra tenant ID</value>
+  </data>
+  <data name="WSLCCLI_ClusterLocationArgDescription" xml:space="preserve">
+    <value>Azure location (default: eastus)</value>
+  </data>
+  <data name="WSLCCLI_ClusterDistributionArgDescription" xml:space="preserve">
+    <value>Kubernetes distribution (default: k8s)</value>
+  </data>
+  <data name="WSLCCLI_ClusterDistroArgDescription" xml:space="preserve">
+    <value>Dedicated WSL distro name (default: aks-edge)</value>
+  </data>
+  <data name="WSLCCLI_ClusterAuthModeArgDescription" xml:space="preserve">
+    <value>Azure authentication mode: browser, device-code, or sp</value>
+  </data>
+  <data name="WSLCCLI_ClusterClientIdArgDescription" xml:space="preserve">
+    <value>Service-principal client ID</value>
+  </data>
+  <data name="WSLCCLI_ClusterClientSecretArgDescription" xml:space="preserve">
+    <value>Service-principal client secret</value>
+  </data>
+  <data name="WSLCCLI_ClusterCmpSubscriptionArgDescription" xml:space="preserve">
+    <value>Private CMP subscription ID (K3s)</value>
+  </data>
+  <data name="WSLCCLI_ClusterCmpResourceGroupArgDescription" xml:space="preserve">
+    <value>Private CMP resource group (K3s)</value>
+  </data>
+  <data name="WSLCCLI_ClusterCmpNameArgDescription" xml:space="preserve">
+    <value>Private CMP cluster name (K3s)</value>
+  </data>
+  <data name="WSLCCLI_ClusterWheelArgDescription" xml:space="preserve">
+    <value>WSL path to an AKS Arc Azure CLI extension wheel</value>
+  </data>
+  <data name="WSLCCLI_ClusterBuildIdArgDescription" xml:space="preserve">
+    <value>Azure DevOps build ID containing the AKS Arc extension wheel</value>
+  </data>
+  <data name="WSLCCLI_ClusterEnableGpuArgDescription" xml:space="preserve">
+    <value>Enable the NVIDIA Kubernetes device plugin</value>
+  </data>
+  <data name="WSLCCLI_ClusterOutputArgDescription" xml:space="preserve">
+    <value>Write the kubeconfig to this file instead of standard output</value>
+  </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
     <value>Manage the lifecycle of WSL networks, including creating, inspecting, listing, and deleting them.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>

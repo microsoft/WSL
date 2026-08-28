@@ -13,3 +13,5 @@ Abstract:
 --*/
 
 #define ID_ICON 1
+#define IDR_AKSARC_DEPLOY_SCRIPT 101
+#define IDR_AKSARC_GPU_SCRIPT 102
