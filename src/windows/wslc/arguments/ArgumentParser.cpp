@@ -23,7 +23,7 @@ namespace {
         const auto feature = argument.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name() : argument.Name();
         const auto message = argument.IsOption() ? Localization::WSLCCLI_UnsupportedOptionError(feature)
                                                  : Localization::WSLCCLI_UnsupportedArgumentError(feature);
-        throw ExecutionException(WSLC_E_NOT_SUPPORTED, message);
+        throw ArgumentException(message, argument);
     }
 } // namespace
 

@@ -111,10 +111,8 @@ class WSLCCLICommandUnitTests
         for (const auto name : {L"unsupported", L"unsupported-alias"})
         {
             Invocation invocation{std::vector<std::wstring>{name}};
-            VERIFY_THROWS_SPECIFIC(command.FindSubCommand(invocation), ExecutionException, [](const auto& exception) {
-                return exception.Message() == wsl::shared::Localization::MessageErrorCode(
-                                                  wsl::shared::Localization::WSLCCLI_UnsupportedCommandError(L"unsupported"),
-                                                  wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
+            VERIFY_THROWS_SPECIFIC(command.FindSubCommand(invocation), CommandException, [](const auto& exception) {
+                return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedCommandError(L"unsupported");
             });
         }
     }
@@ -152,12 +150,8 @@ class WSLCCLICommandUnitTests
             const auto platform = std::ranges::find(arguments, ArgType::Platform, &Argument::Type);
             VERIFY_IS_TRUE(platform != arguments.end());
             VERIFY_ARE_EQUAL(ArgumentState::Unsupported, platform->State());
+            VERIFY_IS_TRUE(platform->Description().empty());
         }
-    }
-
-    TEST_METHOD(NotSupportedError_HasSymbolicName)
-    {
-        VERIFY_ARE_EQUAL(std::wstring{L"WSLC_E_NOT_SUPPORTED"}, wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
     }
 
     // Test: Verify SystemCommand has subcommands

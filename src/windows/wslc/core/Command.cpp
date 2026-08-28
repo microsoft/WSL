@@ -485,7 +485,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
         if (string::IsEqual(*itr, command.Name()) ||
             std::ranges::any_of(command.Aliases(), [&](const auto alias) { return string::IsEqual(*itr, alias); }))
         {
-            throw ExecutionException(WSLC_E_NOT_SUPPORTED, Localization::WSLCCLI_UnsupportedCommandError(command.Name()));
+            throw CommandException(Localization::WSLCCLI_UnsupportedCommandError(command.Name()));
         }
     }
 

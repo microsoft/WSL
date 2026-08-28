@@ -2244,7 +2244,7 @@ Usage:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage: {} {}</value>
+    <value>Usage:  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -3273,9 +3273,6 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
     <value>Path to the build context directory</value>
-  </data>
-  <data name="WSLCCLI_PlatformArgDescription" xml:space="preserve">
-    <value>Set platform if server is multi-platform capable</value>
   </data>
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Publish a port from a container to host</value>

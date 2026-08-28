@@ -53,10 +53,9 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Platform)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ExecutionException, [](const auto& exception) {
-            return exception.Message() == wsl::shared::Localization::MessageErrorCode(
-                                              wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform"),
-                                              wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform") &&
+                   exception.Arguments().size() == 1 && exception.Arguments().front().Type() == ArgType::Platform;
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::Platform));
     }
@@ -67,10 +66,9 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Force)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ExecutionException, [](const auto& exception) {
-            return exception.Message() == wsl::shared::Localization::MessageErrorCode(
-                                              wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--force"),
-                                              wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--force") &&
+                   exception.Arguments().size() == 1 && exception.Arguments().front().Type() == ArgType::Force;
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::Force));
     }
@@ -81,10 +79,9 @@ class WSLCCLIParserUnitTests
         ArgMap args;
         ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::ContainerId)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ExecutionException, [](const auto& exception) {
-            return exception.Message() == wsl::shared::Localization::MessageErrorCode(
-                                              wsl::shared::Localization::WSLCCLI_UnsupportedArgumentError(L"container-id"),
-                                              wsl::windows::common::wslutil::ErrorCodeToString(WSLC_E_NOT_SUPPORTED));
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedArgumentError(L"container-id") &&
+                   exception.Arguments().size() == 1 && exception.Arguments().front().Type() == ArgType::ContainerId;
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::ContainerId));
     }

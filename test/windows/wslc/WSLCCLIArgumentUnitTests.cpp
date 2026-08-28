@@ -193,7 +193,32 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_TRUE(help.find(L"container-id") == std::wstring::npos);
         VERIFY_IS_TRUE(help.find(c_deprecatedOptionDescription) == std::wstring::npos);
         VERIFY_IS_TRUE(help.find(c_deprecatedArgumentDescription) == std::wstring::npos);
-        VERIFY_IS_TRUE(help.find(wsl::shared::Localization::WSLCCLI_PlatformArgDescription()) == std::wstring::npos);
+    }
+
+    TEST_METHOD(UnsupportedArgument_DisplaysShortHelpWithoutArgumentDetails)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --platform linux/amd64");
+        ArgMap args;
+
+        try
+        {
+            command.ParseArguments(invocation, args);
+            VERIFY_FAIL(L"Expected unsupported argument to throw");
+        }
+        catch (const ArgumentException& exception)
+        {
+            CaptureTerminal capture;
+            command.OutputHelp(capture.terminal, HelpOutput::Argument, &exception, exception.Arguments());
+            const auto help = capture.captured();
+            const auto expectedError = wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform");
+
+            VERIFY_IS_TRUE(help.find(expectedError) != std::wstring::npos);
+            const auto argumentName = help.find(L"--platform");
+            VERIFY_IS_TRUE(argumentName != std::wstring::npos);
+            VERIFY_IS_TRUE(help.find(L"--platform", argumentName + 1) == std::wstring::npos);
+            VERIFY_IS_TRUE(help.find(wsl::shared::Localization::WSLCCLI_HeadingRelatedOptions()) == std::wstring::npos);
+        }
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values

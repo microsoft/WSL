@@ -14,8 +14,6 @@ Abstract:
 #pragma once
 
 #include "Argument.h"
-#include "Localization.h"
-#include "wslutil.h"
 
 #include <string>
 #include <string_view>
@@ -75,11 +73,6 @@ private:
 struct ExecutionException : CLIException
 {
     ExecutionException(std::wstring_view message) : CLIException(message)
-    {
-    }
-
-    ExecutionException(HRESULT error, std::wstring_view message) :
-        CLIException(wsl::shared::Localization::MessageErrorCode(message, wsl::windows::common::wslutil::ErrorCodeToString(error)))
     {
     }
 };
