@@ -1022,7 +1022,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
-    StartPhase(Flags, StartOptions, false);
+    StartPhase(Flags, StartOptions, /* RestartPhase */ false);
 }
 
 void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase)
@@ -1322,7 +1322,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
-    StopPhase(Signal, TimeoutSeconds, Kill, false);
+    StopPhase(Signal, TimeoutSeconds, Kill, /* RestartPhase */ false);
 }
 
 void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase)
@@ -1476,10 +1476,10 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
 
         if (wasRunning)
         {
-            StopPhase(Signal, TimeoutSeconds, false, true);
+            StopPhase(Signal, TimeoutSeconds, /* Kill */ false, /* RestartPhase */ true);
         }
 
-        StartPhase(WSLCContainerStartFlagsNone, nullptr, true);
+        StartPhase(WSLCContainerStartFlagsNone, nullptr, /* RestartPhase */ true);
     }
 
     failureCleanup.release();
