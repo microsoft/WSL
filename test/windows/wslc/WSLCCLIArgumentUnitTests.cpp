@@ -43,10 +43,6 @@ static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
 static_assert(!std::is_copy_assignable_v<ArgMap>);
 static_assert(!std::is_move_assignable_v<ArgMap>);
 
-constexpr std::wstring_view c_deprecatedTimeWarning = L"'--time' is deprecated. Use --stop-timeout instead.";
-constexpr std::wstring_view c_deprecatedForceWarning = L"'--force' is deprecated. Use --quiet instead.";
-constexpr std::wstring_view c_deprecatedEnvFileWarning = L"'--env-file' is deprecated. Use --env instead.";
-
 class DeprecatedArgumentCommand : public Command
 {
 public:
@@ -145,6 +141,8 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(DeprecatedValueOption_ParsesAsReplacementAndWarns)
     {
         DeprecatedArgumentCommand command;
+        const auto expectedWarning =
+            wsl::shared::Localization::WSLCCLI_DeprecatedArgumentWarning(L"--time", L"--stop-timeout") + L"\n";
 
         for (const auto commandLine : {L"wslc --time 10", L"wslc -t 10"})
         {
@@ -162,13 +160,14 @@ class WSLCCLIArgumentUnitTests
 
             CaptureTerminal capture;
             command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
-            VERIFY_ARE_EQUAL(std::wstring{c_deprecatedTimeWarning} + L"\n", capture.captured());
+            VERIFY_ARE_EQUAL(expectedWarning, capture.captured());
         }
     }
 
     TEST_METHOD(DeprecatedFlag_ParsesAsReplacementAndWarns)
     {
         DeprecatedArgumentCommand command;
+        const auto expectedWarning = wsl::shared::Localization::WSLCCLI_DeprecatedArgumentWarning(L"--force", L"--quiet") + L"\n";
 
         for (const auto commandLine : {L"wslc --force", L"wslc -f"})
         {
@@ -181,7 +180,7 @@ class WSLCCLIArgumentUnitTests
 
             CaptureTerminal capture;
             command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
-            VERIFY_ARE_EQUAL(std::wstring{c_deprecatedForceWarning} + L"\n", capture.captured());
+            VERIFY_ARE_EQUAL(expectedWarning, capture.captured());
         }
     }
 
@@ -259,7 +258,8 @@ class WSLCCLIArgumentUnitTests
 
         CaptureTerminal capture;
         command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
-        VERIFY_ARE_EQUAL(std::wstring{c_deprecatedEnvFileWarning} + L"\n", capture.captured());
+        const auto expectedWarning = wsl::shared::Localization::WSLCCLI_DeprecatedArgumentWarning(L"--env-file", L"--env") + L"\n";
+        VERIFY_ARE_EQUAL(expectedWarning, capture.captured());
     }
 
     TEST_METHOD(DeprecatedAndUnsupportedArguments_AreHiddenFromHelp)
