@@ -34,11 +34,15 @@ enum class IOHandleStatus
 
 struct HandleWrapper
 {
-    DEFAULT_MOVABLE(HandleWrapper);
     NON_COPYABLE(HandleWrapper)
 
+    HandleWrapper() = default;
+    HandleWrapper(HandleWrapper&& other) noexcept;
+    HandleWrapper& operator=(HandleWrapper&& other) noexcept;
     HandleWrapper(wil::unique_handle&& handle, std::function<void()>&& OnClose = []() {});
     HandleWrapper(wil::unique_socket&& handle, std::function<void()>&& OnClose = []() {});
+    HandleWrapper(wil::shared_handle handle, std::function<void()>&& OnClose = []() {});
+    HandleWrapper(wil::shared_socket handle, std::function<void()>&& OnClose = []() {});
     HandleWrapper(wil::unique_event&& handle, std::function<void()>&& OnClose = []() {});
     HandleWrapper(SOCKET handle, std::function<void()>&& OnClose = []() {});
     HandleWrapper(HANDLE handle, std::function<void()>&& OnClose = []() {});
@@ -46,11 +50,12 @@ struct HandleWrapper
     ~HandleWrapper();
 
     HANDLE Get() const;
+    bool IsValid() const;
     void Reset();
 
 private:
     HANDLE Handle{};
-    std::variant<wil::unique_handle, wil::unique_socket> OwnedHandle;
+    std::variant<wil::unique_handle, wil::unique_socket, wil::shared_handle, wil::shared_socket> OwnedHandle;
     std::function<void()> OnClose;
 };
 

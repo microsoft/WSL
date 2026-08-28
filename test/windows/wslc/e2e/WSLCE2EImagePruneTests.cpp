@@ -93,7 +93,10 @@ class WSLCE2EImagePruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_AllFlag)
     {
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Restore(DebianImage); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            TestImageRegistry::Instance().InvalidateSession();
+            TestImageRegistry::Instance().Restore(DebianImage);
+        });
 
         // --all should prune unused images (not just dangling)
         const auto result = RunWslc(L"image prune --all");

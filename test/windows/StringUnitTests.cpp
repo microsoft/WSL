@@ -4,6 +4,7 @@
 #include "Common.h"
 #include "string.hpp"
 
+using wsl::windows::common::string::c_reclaimedSpacePrecision;
 using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::common::string::ParseStorageSize;
 using wsl::windows::common::string::StorageSizeUnit;
@@ -263,7 +264,7 @@ class StringUnitTests
 
         for (const auto& [bytes, expected] : TestCases)
         {
-            VERIFY_ARE_EQUAL(expected, FormatHumanReadableSize(bytes, 4));
+            VERIFY_ARE_EQUAL(expected, FormatHumanReadableSize(bytes, c_reclaimedSpacePrecision));
         }
     }
 

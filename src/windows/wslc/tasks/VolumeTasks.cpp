@@ -33,19 +33,23 @@ namespace wsl::windows::wslc::task {
 
 namespace {
 
+    // Reported for the fields that only carry a value when volume usage data or swarm cluster
+    // information is available, neither of which applies here.
+    constexpr std::string_view c_volumeNotAvailable = "N/A";
+
     // Converts session volume entries into the all-string shape used for "volume list --format json".
     VolumeOutputInformation ToVolumeOutput(const wslc_schema::VolumeListEntry& volume)
     {
         VolumeOutputInformation entry;
-        entry.Availability = c_notAvailable;
+        entry.Availability = c_volumeNotAvailable;
         entry.Driver = volume.Driver;
-        entry.Group = c_notAvailable;
-        entry.Links = c_notAvailable;
+        entry.Group = c_volumeNotAvailable;
+        entry.Links = c_volumeNotAvailable;
         entry.Mountpoint = volume.Mountpoint;
         entry.Name = volume.Name;
         entry.Scope = volume.Scope;
-        entry.Size = c_notAvailable;
-        entry.Status = c_notAvailable;
+        entry.Size = c_volumeNotAvailable;
+        entry.Status = c_volumeNotAvailable;
 
         for (const auto& [key, value] : volume.Labels)
         {

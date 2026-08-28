@@ -3669,7 +3669,7 @@ class WSLCTests
         WSLCProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
         auto process = launcher.Launch(*m_defaultSession);
 
-        wil::unique_handle tty = process.GetStdHandle(WSLCFDTty);
+        auto tty = process.GetStdHandle(WSLCFDTty);
 
         auto validateTtyOutput = [&](const std::string& expected) {
             std::string buffer(expected.size(), '\0');
@@ -3679,7 +3679,7 @@ class WSLCTests
             while (offset < buffer.size())
             {
                 DWORD bytesRead{};
-                VERIFY_IS_TRUE(ReadFile(tty.get(), buffer.data() + offset, static_cast<DWORD>(buffer.size() - offset), &bytesRead, nullptr));
+                VERIFY_IS_TRUE(ReadFile(tty.Get(), buffer.data() + offset, static_cast<DWORD>(buffer.size() - offset), &bytesRead, nullptr));
 
                 offset += bytesRead;
             }
@@ -3689,7 +3689,7 @@ class WSLCTests
         };
 
         auto writeTty = [&](const std::string& content) {
-            VERIFY_IS_TRUE(WriteFile(tty.get(), content.data(), static_cast<DWORD>(content.size()), nullptr, nullptr));
+            VERIFY_IS_TRUE(WriteFile(tty.Get(), content.data(), static_cast<DWORD>(content.size()), nullptr, nullptr));
         };
 
         // Expect the shell prompt to be displayed
@@ -7360,7 +7360,7 @@ class WSLCTests
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
-        PartialHandleRead output{outputHandle.get()};
+        PartialHandleRead output{outputHandle.Get()};
         output.ExpectConsume("ready\n");
 
         HRESULT stopResult{};
@@ -7369,7 +7369,7 @@ class WSLCTests
         std::thread killThread;
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            input.reset();
+            input.Reset();
 
             if (stopThread.joinable())
             {
@@ -7401,9 +7401,9 @@ class WSLCTests
 
         const char stopInput = '\n';
         DWORD bytesWritten{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.Get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
         VERIFY_ARE_EQUAL(bytesWritten, static_cast<DWORD>(sizeof(stopInput)));
-        input.reset();
+        input.Reset();
 
         VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
 
@@ -7431,7 +7431,7 @@ class WSLCTests
         auto container = launcher.Launch(*m_defaultSession);
         auto initProcess = container.GetInitProcess();
         auto outputHandle = initProcess.GetStdHandle(1);
-        PartialHandleRead output{outputHandle.get()};
+        PartialHandleRead output{outputHandle.Get()};
         output.ExpectConsume("ready\n");
 
         HRESULT stopResult{};
@@ -7484,7 +7484,7 @@ class WSLCTests
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
-        PartialHandleRead output{outputHandle.get()};
+        PartialHandleRead output{outputHandle.Get()};
         output.ExpectConsume("ready\n");
 
         HRESULT indefiniteStopResult{};
@@ -7493,7 +7493,7 @@ class WSLCTests
         std::thread immediateStopThread;
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            input.reset();
+            input.Reset();
 
             if (indefiniteStopThread.joinable())
             {
@@ -7532,7 +7532,7 @@ class WSLCTests
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
-        PartialHandleRead output{outputHandle.get()};
+        PartialHandleRead output{outputHandle.Get()};
         output.ExpectConsume("ready\n");
 
         HRESULT stopResult{};
@@ -7541,7 +7541,7 @@ class WSLCTests
         std::thread startThread;
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            input.reset();
+            input.Reset();
 
             if (stopThread.joinable())
             {
@@ -7568,9 +7568,9 @@ class WSLCTests
 
         const char stopInput = '\n';
         DWORD bytesWritten{};
-        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(input.Get(), &stopInput, sizeof(stopInput), &bytesWritten, nullptr));
         VERIFY_ARE_EQUAL(bytesWritten, static_cast<DWORD>(sizeof(stopInput)));
-        input.reset();
+        input.Reset();
 
         VERIFY_ARE_EQUAL(WaitForSingleObject(stopThread.native_handle(), 30 * 1000), WAIT_OBJECT_0);
         stopThread.join();
@@ -7586,7 +7586,7 @@ class WSLCTests
         auto initProcess = container.GetInitProcess();
         auto input = initProcess.GetStdHandle(0);
         auto outputHandle = initProcess.GetStdHandle(1);
-        PartialHandleRead output{outputHandle.get()};
+        PartialHandleRead output{outputHandle.Get()};
         output.ExpectConsume("ready\n");
 
         HRESULT stopResult{};
@@ -7595,7 +7595,7 @@ class WSLCTests
         std::thread deleteThread;
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            input.reset();
+            input.Reset();
 
             if (stopThread.joinable())
             {
@@ -7620,7 +7620,7 @@ class WSLCTests
 
         deleteThread.join();
         stopThread.join();
-        input.reset();
+        input.Reset();
         cleanup.release();
 
         VERIFY_SUCCEEDED(stopResult);
@@ -11432,7 +11432,7 @@ class WSLCTests
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
 
-            ValidateHandleOutput(initProcess.GetStdHandle(WSLCFDTty).get(), "Type: devpts\r\n");
+            ValidateHandleOutput(initProcess.GetStdHandle(WSLCFDTty).Get(), "Type: devpts\r\n");
             VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
 
             expectLogs(container.Get(), "Type: devpts\r\n", {});
@@ -11458,13 +11458,13 @@ class WSLCTests
             PartialHandleRead reader(stdoutHandle.Get());
 
             auto containerStdin = initProcess.GetStdHandle(0);
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "line1\n", 6, nullptr, nullptr));
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.Get(), "line1\n", 6, nullptr, nullptr));
 
             reader.Expect("line1\n");
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "line2\n", 6, nullptr, nullptr));
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.Get(), "line2\n", 6, nullptr, nullptr));
             reader.Expect("line1\nline2\n");
 
-            containerStdin.reset();
+            containerStdin.Reset();
             reader.ExpectClosed();
 
             expectLogs(container.Get(), "line1\nline2\n", "");
@@ -11492,7 +11492,7 @@ class WSLCTests
         auto initProcess = container.GetInitProcess();
 
         auto containerStdin = initProcess.GetStdHandle(0);
-        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "OK\n", 3, nullptr, nullptr));
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.Get(), "OK\n", 3, nullptr, nullptr));
 
         std::atomic<size_t> readersReady{0};
         std::atomic<size_t> readersSucceeded{0};
@@ -11873,11 +11873,11 @@ class WSLCTests
             stderrHandle.Reset();
             VERIFY_SUCCEEDED(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
 
-            PartialHandleRead originalReader(originalStdout.get());
+            PartialHandleRead originalReader(originalStdout.Get());
             PartialHandleRead attachedReader(stdoutHandle.Get());
 
             // Write content on the original stdin.
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(originalStdin.get(), "line1\n", 6, nullptr, nullptr));
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(originalStdin.Get(), "line1\n", 6, nullptr, nullptr));
 
             // Content should be relayed on both stdouts.
             originalReader.Expect("line1\n");
@@ -11891,7 +11891,7 @@ class WSLCTests
             attachedReader.Expect("line1\nline2\n");
 
             // Close the original stdin.
-            originalStdin.reset();
+            originalStdin.Reset();
 
             // Expect both readers to be closed.
             originalReader.ExpectClosed();
@@ -11936,7 +11936,7 @@ class WSLCTests
             COMOutputHandle attachedStderr;
             VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
 
-            PartialHandleRead originalReader(originalStdout.get());
+            PartialHandleRead originalReader(originalStdout.Get());
             PartialHandleRead attachedReader(attachedStdout.Get());
 
             attachedStdin.Reset();
@@ -11959,7 +11959,7 @@ class WSLCTests
             COMOutputHandle dummyHandle2{};
             VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedTty, &dummyHandle1, &dummyHandle2));
 
-            PartialHandleRead originalReader(originalTty.get());
+            PartialHandleRead originalReader(originalTty.Get());
             PartialHandleRead attachedReader(attachedTty.Get());
 
             // Read the prompt from the original tty (hardcoded bytes since behavior is constant).
@@ -11972,12 +11972,12 @@ class WSLCTests
             auto attachedPrompt = attachedReader.ReadBytes(13);
             VerifyPatternMatch(attachedPrompt, "*root@*");
 
-            // Close the tty.
-            originalTty.reset();
-            attachedTty.Reset();
+            // Stop pending reads before closing the handles borrowed by the readers.
+            originalReader.Stop();
+            attachedReader.Stop();
 
-            originalReader.ExpectClosed();
-            attachedReader.ExpectClosed();
+            originalTty.Reset();
+            attachedTty.Reset();
         }
 
         // Validate that containers can be started in detached mode and attached to later.
@@ -12026,7 +12026,7 @@ class WSLCTests
             auto tty = process.GetStdHandle(WSLCFDTty);
 
             // Wait for the size to be reflected in a loop, since the tty size is applied asynchronously.
-            PartialHandleRead reader(tty.get());
+            PartialHandleRead reader(tty.Get());
             wsl::shared::retry::RetryWithTimeout<void>(
                 [&]() { THROW_HR_IF(E_ABORT, reader.GetData().find(expectedSize) == std::string::npos); },
                 std::chrono::milliseconds(100),
@@ -12652,7 +12652,7 @@ class WSLCTests
             // Validate detaching from a started container with the attach flag.
             {
                 auto tty = initProcess.GetStdHandle(WSLCFDTty);
-                validateDetaches(tty.get(), tty.get(), DetachSequence);
+                validateDetaches(tty.Get(), tty.Get(), DetachSequence);
             }
 
             // Validate detaching from an attached tty.
@@ -12677,7 +12677,7 @@ class WSLCTests
                 auto process = processLauncher.Launch(container.Get());
                 auto tty = process.GetStdHandle(WSLCFDTty);
 
-                validateDetaches(tty.get(), tty.get(), DetachSequence);
+                validateDetaches(tty.Get(), tty.Get(), DetachSequence);
             }
         };
 

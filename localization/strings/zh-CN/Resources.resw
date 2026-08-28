@@ -1169,8 +1169,9 @@ Windows 版本: {}</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-错误代码: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+错误代码： {}
+如果此错误是意外错误，请考虑搜索现有问题或在 https://github.com/microsoft/WSL/issues 提交新问题。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>JSON 文档无效。分析错误: {}</value>

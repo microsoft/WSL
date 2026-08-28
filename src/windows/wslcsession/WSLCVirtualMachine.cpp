@@ -25,6 +25,7 @@ Abstract:
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
+using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VmPortAllocation;
 using wsl::windows::service::wslc::VMPortMapping;
@@ -463,15 +464,15 @@ void WSLCVirtualMachine::ConfigureNetworking()
     // Call back to the service to configure the networking engine.
     auto gnsHandle = process->GetStdHandle(gnsChannelFd);
 
-    wil::unique_handle dnsHandle;
+    HandleWrapper dnsHandle;
     HANDLE dnsSocketHandle = nullptr;
     if (enableDnsTunneling)
     {
         dnsHandle = process->GetStdHandle(dnsChannelFd);
-        dnsSocketHandle = dnsHandle.get();
+        dnsSocketHandle = dnsHandle.Get();
     }
 
-    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsHandle.get(), enableDnsTunneling ? &dnsSocketHandle : nullptr));
+    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsHandle.Get(), enableDnsTunneling ? &dnsSocketHandle : nullptr));
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
@@ -929,7 +930,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     std::map<ULONG, TypedHandle> stdHandles;
     for (auto& [fd, handle] : sockets)
     {
-        stdHandles.emplace(fd, TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(handle.release())}, WSLCHandleTypeSocket});
+        stdHandles.emplace(fd, TypedHandle{std::move(handle), WSLCHandleTypeSocket});
     }
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
