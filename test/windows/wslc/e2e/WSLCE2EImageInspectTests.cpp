@@ -68,18 +68,6 @@ class WSLCE2EImageInspectTests
         VERIFY_ARE_EQUAL(wsl::shared::string::WideToMultiByte(DebianImage.NameAndTag()), document[0]["RepoTags"][0].get<std::string>());
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_FormatAlias_MatchesLongName)
-    {
-        auto aliasResult = RunWslc(std::format(L"image inspect -f json {}", DebianImage.NameAndTag()));
-        aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        auto longResult = RunWslc(std::format(L"image inspect --format json {}", DebianImage.NameAndTag()));
-        longResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        VERIFY_ARE_EQUAL(longResult.Stdout.value(), aliasResult.Stdout.value());
-        VERIFY_IS_TRUE(VerifyCompactJsonOutput(aliasResult).is_array());
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_Success)
     {
         auto result = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));

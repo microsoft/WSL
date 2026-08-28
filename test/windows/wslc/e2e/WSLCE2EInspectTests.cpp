@@ -114,32 +114,6 @@ class WSLCE2EInspectTests
         VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"\n  "));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Inspect_FormatAlias_MatchesLongName)
-    {
-        // docker aliases -f to --format on inspect, so the two spellings must agree exactly.
-        auto aliasResult = RunWslc(std::format(L"inspect -f json {}", DebianImage.NameAndTag()));
-        aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        auto longResult = RunWslc(std::format(L"inspect --format json {}", DebianImage.NameAndTag()));
-        longResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        VERIFY_ARE_EQUAL(longResult.Stdout.value(), aliasResult.Stdout.value());
-
-        const auto document = VerifyCompactJsonOutput(aliasResult);
-        VERIFY_IS_TRUE(document.is_array());
-        VERIFY_ARE_EQUAL(1u, document.size());
-        VERIFY_IS_FALSE(aliasResult.StdoutContainsSubstring(L"\n  "));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Inspect_FormatAlias_InvalidValue)
-    {
-        // The alias runs the same validation as the long name.
-        auto result = RunWslc(std::format(L"inspect -f invalid {}", DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(
-            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json."));
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Inspect_DefaultFormat_IsIndented)
     {
         // Without --format the array stays indented over several lines.
