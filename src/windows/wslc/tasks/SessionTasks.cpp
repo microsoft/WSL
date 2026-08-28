@@ -147,6 +147,9 @@ void ShowSystemInfo(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
+        const auto managerVersionText = FormatManagerVersion(SessionService::ManagerVersion());
+        const auto sessions = SessionService::List();
+
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_SystemInfoClientHeader());
         context.Terminal.Output(
             L"{}\n", Localization::WSLCCLI_SystemInfoVersions(WSL_PACKAGE_VERSION, KERNEL_VERSION, DIRECT3D_VERSION, DXCORE_VERSION, windowsVersion));
@@ -157,11 +160,6 @@ void ShowSystemInfo(CLIExecutionContext& context)
         }
 
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_SystemInfoSettingsFile(settingsFilePath));
-
-        // Query the service only after the client block is written so a stopped service still reports client info.
-        context.Terminal.Flush(Terminal::Level::Output);
-        const auto managerVersionText = FormatManagerVersion(SessionService::ManagerVersion());
-        const auto sessions = SessionService::List();
 
         context.Terminal.Output(L"\n{}\n", Localization::WSLCCLI_SystemInfoServerHeader());
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_SystemInfoSessionManagerVersion(managerVersionText));

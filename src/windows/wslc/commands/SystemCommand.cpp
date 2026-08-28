@@ -12,13 +12,10 @@ Abstract:
 
 --*/
 #include "CLIExecutionContext.h"
-#include "SystemCommand.h"
 #include "SessionCommand.h"
-#include "SessionTasks.h"
-#include "Task.h"
+#include "SystemCommand.h"
 
 using namespace wsl::windows::wslc::execution;
-using namespace wsl::windows::wslc::task;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
@@ -48,28 +45,5 @@ std::wstring SystemCommand::LongDescription() const
 void SystemCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     OutputHelp(context.Terminal);
-}
-
-// System Info Command
-std::vector<Argument> SystemInfoCommand::GetArguments() const
-{
-    return {
-        Argument::Create(ArgType::Format),
-    };
-}
-
-std::wstring SystemInfoCommand::ShortDescription() const
-{
-    return Localization::WSLCCLI_SystemInfoDesc();
-}
-
-std::wstring SystemInfoCommand::LongDescription() const
-{
-    return Localization::WSLCCLI_SystemInfoLongDesc();
-}
-
-void SystemInfoCommand::ExecuteInternal(CLIExecutionContext& context) const
-{
-    context << ShowSystemInfo;
 }
 } // namespace wsl::windows::wslc
