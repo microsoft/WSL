@@ -667,8 +667,8 @@ class WSLCCLIParserUnitTests
     {
         std::vector<Argument> defs = {Argument::Create(ArgType::InspectFormat), Argument::Create(ArgType::ObjectId, false, Limit::Unlimited)};
 
-        VERIFY_ARE_EQUAL(ParseFlags(L"wslc -f json cont1", defs).GetValue<ArgType::InspectFormat>(), wsl::shared::c_jsonCompactIndent);
-        VERIFY_ARE_EQUAL(ParseFlags(L"wslc -f=json cont1", defs).GetValue<ArgType::InspectFormat>(), wsl::shared::c_jsonCompactIndent);
+        VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f json cont1", defs).GetValue<ArgType::InspectFormat>());
+        VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f=json cont1", defs).GetValue<ArgType::InspectFormat>());
 
         // The positional still lands where it belongs once the alias has taken its value.
         auto args = ParseFlags(L"wslc -f json cont1", defs);
