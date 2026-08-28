@@ -295,9 +295,6 @@ void PushImage(CLIExecutionContext& context)
     const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
 
-    // Match `docker push`: in quiet mode the progress stream is discarded by passing no progress
-    // callback. Warnings are unaffected because the warning callback is built internally by
-    // ImageService::Push from the Terminal.
     std::optional<ImageProgressCallback> callback;
     if (!quiet)
     {
@@ -307,8 +304,6 @@ void PushImage(CLIExecutionContext& context)
     IProgressCallback* progress = callback ? &*callback : nullptr;
     services::ImageService::Push(context.Terminal, session, image, progress);
 
-    // Match `docker push`: quiet mode replaces the progress stream with the resolved canonical
-    // reference, printed only once the push has succeeded.
     if (quiet)
     {
         context.Terminal.Output(L"{}\n", MultiByteToWide(ImageReference::Parse(image).GetCanonical()));
