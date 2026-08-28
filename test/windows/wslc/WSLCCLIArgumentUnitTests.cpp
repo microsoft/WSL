@@ -72,6 +72,7 @@ public:
     {
         return {
             {ArgType::Time, ArgType::StopTimeout},
+            {ArgType::HealthTimeout, ArgType::StopTimeout},
             {ArgType::Force, ArgType::Quiet},
             {ArgType::EnvFile, ArgType::Env},
         };
@@ -199,19 +200,47 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_TRUE(capture.captured().empty());
     }
 
-    TEST_METHOD(DeprecatedAndReplacementSingleValueOptions_AreMutuallyExclusive)
+    TEST_METHOD(DeprecatedAndReplacementSingleValueOptions_UseLastValue)
     {
         DeprecatedArgumentCommand command;
-        const auto expected = wsl::shared::Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--time, --stop-timeout");
 
         for (const auto commandLine : {L"wslc --time 5 --stop-timeout 10", L"wslc --stop-timeout 5 --time 10"})
         {
             auto invocation = CreateInvocationFromCommandLine(commandLine);
             ArgMap args;
-            VERIFY_THROWS_SPECIFIC(command.ParseArguments(invocation, args), ArgumentException, [&](const auto& exception) {
-                return exception.Message() == expected;
-            });
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
         }
+    }
+
+    TEST_METHOD(DifferentDeprecatedSingleValueOptions_UseLastValue)
+    {
+        DeprecatedArgumentCommand command;
+
+        const std::array commandLines{
+            L"wslc --time 5 --health-timeout 10",
+            L"wslc --health-timeout 5 --time 10",
+        };
+
+        for (const auto commandLine : commandLines)
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
+        }
+    }
+
+    TEST_METHOD(RepeatedDeprecatedSingleValueOption_UsesLastValue)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --time 5 --time 10");
+        ArgMap args;
+
+        VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+        VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
     }
 
     TEST_METHOD(DeprecatedAndReplacementUnlimitedOptions_Accumulate)
@@ -242,6 +271,7 @@ class WSLCCLIArgumentUnitTests
         const auto help = capture.captured();
 
         VERIFY_IS_TRUE(help.find(L"--time") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--health-timeout") == std::wstring::npos);
         VERIFY_IS_TRUE(help.find(L"--force") == std::wstring::npos);
         VERIFY_IS_TRUE(help.find(L"--env-file") == std::wstring::npos);
         VERIFY_IS_TRUE(help.find(L"--platform") == std::wstring::npos);

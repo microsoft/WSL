@@ -17,7 +17,6 @@ Abstract:
 #include "Invocation.h"
 #include "ArgMap.h"
 
-#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -204,10 +203,5 @@ private:
     // Empties as overrides are consumed so a single preload can only be
     // overridden once per parse.
     std::vector<ArgType> m_overridableDefaults;
-
-    // Tracks which syntax was used for each canonical argument so single-value deprecated and
-    // replacement forms can be rejected when mixed.
-    std::set<ArgType> m_canonicalArgumentsUsed;
-    std::map<ArgType, ArgType> m_deprecatedReplacementTypesUsed;
 };
 } // namespace wsl::windows::wslc

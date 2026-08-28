@@ -276,36 +276,9 @@ ArgType ParseArgumentsStateMachine::ResolveArgumentType(const Argument& argument
     const auto deprecation = FindArgumentDeprecation(argument.Type());
     if (deprecation == nullptr)
     {
-        if (argument.IsSingle())
-        {
-            const auto deprecatedType = m_deprecatedReplacementTypesUsed.find(argument.Type());
-            if (deprecatedType != m_deprecatedReplacementTypesUsed.end())
-            {
-                const auto deprecatedArgument = Argument::Create(deprecatedType->second);
-                throw ArgumentException(
-                    Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(
-                        std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + deprecatedArgument.Name() + L", " +
-                        std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name()),
-                    argument);
-            }
-        }
-
-        m_canonicalArgumentsUsed.emplace(argument.Type());
         return argument.Type();
     }
 
-    const auto replacement = FindArgument(deprecation->ReplacementType());
-    WI_ASSERT(replacement != nullptr);
-    if (replacement != nullptr && replacement->IsSingle() && m_canonicalArgumentsUsed.contains(replacement->Type()))
-    {
-        throw ArgumentException(
-            Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(
-                std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name() + L", " + std::wstring(2, WSLC_CLI_ARG_ID_CHAR) +
-                replacement->Name()),
-            *replacement);
-    }
-
-    m_deprecatedReplacementTypesUsed.emplace(deprecation->ReplacementType(), deprecation->DeprecatedType());
     m_executionArgs.RecordDeprecatedArgumentUse(deprecation->DeprecatedType());
     return deprecation->ReplacementType();
 }
