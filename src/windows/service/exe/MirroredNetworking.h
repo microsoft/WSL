@@ -66,7 +66,6 @@ private:
     static void GuestNetworkServiceCallback(DWORD NotificationType, HRESULT NotificationStatus, _In_opt_ PCWSTR NotificationData) noexcept;
     static void CALLBACK s_GuestNetworkServiceCallback(DWORD NotificationType, _In_ void* Context, HRESULT NotificationStatus, _In_opt_ PCWSTR NotificationData);
 
-    // Handle owned by WslCoreVm
     const HCS_SYSTEM m_system{};
     const GUID m_runtimeId;
     const Config& m_config;

@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "WslCoreVm.h"
+#include "WslCoreVmDiskState.h"
 #include "WslCoreNetworkingSupport.h"
 #include <lxfsshares.h>
 #include "disk.hpp"
@@ -1331,6 +1332,11 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
 wil::unique_socket WslCoreVm::CreateListeningSocket() const
 {
     return wsl::windows::common::hvsocket::Listen(m_runtimeId, 0);
+}
+
+wil::unique_socket WslCoreVm::ConnectToGuest(_In_ ULONG Port) const
+{
+    return wsl::windows::common::hvsocket::Connect(m_runtimeId, Port);
 }
 
 std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)

@@ -27,6 +27,7 @@ Abstract:
 #include "WslSecurity.h"
 #include "WslCoreFilesystem.h"
 #include "INetworkingEngine.h"
+#include "IWslCoreVm.h"
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
 #include "GuestDeviceManager.h"
@@ -34,40 +35,26 @@ Abstract:
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
 
-inline constexpr auto c_diskValueName = L"Disk";
-inline constexpr auto c_disktypeValueName = L"DiskType";
-inline constexpr auto c_optionsValueName = L"Options";
-inline constexpr auto c_typeValueName = L"Type";
-inline constexpr auto c_mountNameValueName = L"Name";
-
 namespace wrl = Microsoft::WRL;
 
 /// <summary>
 /// This object tracks a running WSL Core VM.
 /// </summary>
-class WslCoreVm
+class WslCoreVm final : public IWslCoreVm
 {
     WslCoreVm(const WslCoreVm&) = delete;
     void operator=(const WslCoreVm&) = delete;
 
 public:
-    using InitializeDrvFsCallback = std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>;
-
     static std::unique_ptr<WslCoreVm> Create(
         _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs);
 
-    ~WslCoreVm() noexcept;
+    ~WslCoreVm() noexcept override;
 
     wil::unique_socket AcceptConnection(_In_ DWORD ReceiveTimeout = 0, _In_ const std::source_location& Location = std::source_location::current()) const;
 
-    enum class DiskType
-    {
-        Invalid = 0x0,
-        VHD = 0x1,
-        PassThrough = 0x2
-    };
-
-    ULONG AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
+    ULONG AttachDisk(
+        _In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken) override;
 
     std::shared_ptr<LxssRunningInstance> CreateInstance(
         _In_ const GUID& InstanceId,
@@ -77,35 +64,35 @@ public:
         _In_ ULONG DefaultUid = LX_UID_ROOT,
         _In_ ULONG64 ClientLifetimeId = 0,
         _In_ ULONG ExportFlags = 0,
-        _Out_opt_ ULONG* ConnectPort = nullptr);
+        _Out_opt_ ULONG* ConnectPort = nullptr) override;
 
     wil::unique_socket CreateListeningSocket() const;
 
-    wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments);
+    wil::unique_socket ConnectToGuest(_In_ ULONG Port) const override;
 
-    std::pair<int, LX_MINI_MOUNT_STEP> DetachDisk(_In_opt_ PCWSTR Disk);
+    wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments) override;
 
-    struct DiskMountResult
-    {
-        std::string MountPointName;
-        int Result;
-        LX_MINI_MOUNT_STEP Step;
-    };
+    std::pair<int, LX_MINI_MOUNT_STEP> DetachDisk(_In_opt_ PCWSTR Disk) override;
 
-    void EjectVhd(_In_ PCWSTR VhdPath);
+    void EjectVhd(_In_ PCWSTR VhdPath) override;
 
-    const wsl::core::Config& GetConfig() const noexcept;
+    const wsl::core::Config& GetConfig() const noexcept override;
 
-    GUID GetRuntimeId() const;
+    GUID GetRuntimeId() const override;
 
-    int GetVmIdleTimeout() const;
+    int GetVmIdleTimeout() const override;
 
-    bool InitializeDrvFs(_In_ HANDLE UserToken);
+    bool InitializeDrvFs(_In_ HANDLE UserToken) override;
 
-    bool IsVhdAttached(_In_ PCWSTR VhdPath);
+    bool IsVhdAttached(_In_ PCWSTR VhdPath) override;
 
     DiskMountResult MountDisk(
-        _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options);
+        _In_ PCWSTR Disk,
+        _In_ DiskType MountDiskType,
+        _In_ ULONG PartitionIndex,
+        _In_opt_ PCWSTR Name,
+        _In_opt_ PCWSTR Type,
+        _In_opt_ PCWSTR Options) override;
 
     enum MountFlags
     {
@@ -116,16 +103,19 @@ public:
     ULONG
     MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly);
 
-    void MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name);
+    void MountRootNamespaceFolder(
+        _In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name) override;
 
-    void RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroExitCallback = {}, _In_ const std::function<void(GUID)>& TerminationCallback = {});
+    void RegisterCallbacks(
+        _In_ const std::function<void(ULONG)>& DistroExitCallback = {},
+        _In_ const std::function<void(GUID)>& TerminationCallback = {}) override;
 
-    void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
+    void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize) override;
 
-    void TrimDistribution(_In_ ULONG Lun);
+    void TrimDistribution(_In_ ULONG Lun) override;
 
     _Requires_lock_not_held_(m_lock)
-    void SaveAttachedDisksState();
+    void SaveAttachedDisksState() override;
 
     _Requires_lock_held_(m_guestDeviceLock)
     void VerifyPlan9Servers();

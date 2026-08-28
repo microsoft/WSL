@@ -19,7 +19,8 @@ Abstract:
 #include "LxssCreateProcess.h"
 #include "filesystem.hpp"
 #include "LxssHttpProxy.h"
-#include "WslCoreVm.h"
+#include "IWslCoreVm.h"
+#include "IWslCoreVmFactory.h"
 #include "PluginManager.h"
 #include "Lifetime.h"
 #include "DistributionRegistration.h"
@@ -38,7 +39,6 @@ Abstract:
 
 class ConsoleManager;
 class LxssRunningInstance;
-class WslCoreVm;
 class LxssUserSessionImpl;
 
 typedef struct _LXSS_RUN_ELF_CONTEXT
@@ -316,7 +316,11 @@ private:
 class LxssUserSessionImpl : public std::enable_shared_from_this<LxssUserSessionImpl>
 {
 public:
-    LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager);
+    LxssUserSessionImpl(
+        _In_ PSID userSid,
+        _In_ DWORD sessionId,
+        _Inout_ wsl::windows::service::PluginManager& pluginManager,
+        _In_ std::unique_ptr<IWslCoreVmFactory> VmFactory);
     virtual ~LxssUserSessionImpl();
     LxssUserSessionImpl(const LxssUserSessionImpl&) = delete;
     LxssUserSessionImpl& operator=(const LxssUserSessionImpl&) = delete;
@@ -825,7 +829,9 @@ private:
     /// <summary>
     /// The running utility vm for WSL2 distributions.
     ///
-    _Guarded_by_(m_instanceLock) std::unique_ptr<WslCoreVm> m_utilityVm;
+    std::unique_ptr<IWslCoreVmFactory> m_vmFactory;
+
+    _Guarded_by_(m_instanceLock) std::unique_ptr<IWslCoreVm> m_utilityVm;
 
     std::atomic<GUID> m_vmId{GUID_NULL};
 
@@ -871,7 +877,7 @@ private:
     bool m_disableNewInstanceCreation = false;
 
     /// <summary>
-    /// The user's token. Shared with WslCoreVm and plugins.
+    /// The user's token. Shared with the utility VM and plugins.
     /// </summary>
     wil::shared_handle m_userToken;
 

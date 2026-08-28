@@ -5,7 +5,6 @@
 #include "WslCoreFirewallSupport.h"
 #include "WslCoreNetworkingSupport.h"
 #include "WslMirroredNetworking.h"
-#include "WslCoreVm.h"
 
 using wsl::core::MirroredNetworking;
 using wsl::core::networking::NetworkEndpoint;

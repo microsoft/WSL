@@ -19,7 +19,9 @@ Abstract:
 #include "LxssSecurity.h"
 #include "notifications.h"
 #include "WslInstall.h"
+#include "WslCoreFilesystem.h"
 #include "WslCoreInstance.h"
+#include "WslCoreVmDiskState.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
 #include <nlohmann\json.hpp>
@@ -569,9 +571,15 @@ try
 }
 CATCH_RETURN()
 
-LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager) :
+LxssUserSessionImpl::LxssUserSessionImpl(
+    _In_ PSID userSid,
+    _In_ DWORD sessionId,
+    _Inout_ wsl::windows::service::PluginManager& pluginManager,
+    _In_ std::unique_ptr<IWslCoreVmFactory> VmFactory) :
     m_sessionId(sessionId), m_pluginManager(pluginManager)
 {
+    THROW_HR_IF(E_INVALIDARG, !VmFactory);
+    m_vmFactory = std::move(VmFactory);
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
     try
@@ -707,7 +715,7 @@ HRESULT LxssUserSessionImpl::AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags)
 
     return wil::ResultFromException([&]() {
         _CreateVm();
-        const auto diskType = WI_IsFlagSet(Flags, LXSS_ATTACH_MOUNT_FLAGS_VHD) ? WslCoreVm::DiskType::VHD : WslCoreVm::DiskType::PassThrough;
+        const auto diskType = WI_IsFlagSet(Flags, LXSS_ATTACH_MOUNT_FLAGS_VHD) ? IWslCoreVm::DiskType::VHD : IWslCoreVm::DiskType::PassThrough;
         const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
         m_utilityVm->AttachDisk(Disk, diskType, {}, true, userToken.get());
     });
@@ -910,7 +918,7 @@ HRESULT LxssUserSessionImpl::MountDisk(
     return wil::ResultFromException([&]() {
         _CreateVm();
         ExecutionContext context(Context::MountDisk);
-        const auto MountDiskType = WI_IsFlagSet(Flags, LXSS_ATTACH_MOUNT_FLAGS_VHD) ? WslCoreVm::DiskType::VHD : WslCoreVm::DiskType::PassThrough;
+        const auto MountDiskType = WI_IsFlagSet(Flags, LXSS_ATTACH_MOUNT_FLAGS_VHD) ? IWslCoreVm::DiskType::VHD : IWslCoreVm::DiskType::PassThrough;
         const auto MountResult = m_utilityVm->MountDisk(Disk, MountDiskType, PartitionIndex, Name, Type, Options);
         const auto MountNameWide = wsl::shared::string::MultiByteToWide(MountResult.MountPointName);
         *Result = MountResult.Result;
@@ -1842,7 +1850,7 @@ try
 
     // Ensure VM exists and attach the VHD.
     _CreateVm();
-    const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+    const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), IWslCoreVm::DiskType::VHD, {}, true, userToken.get());
 
     // Resize the underlying filesystem.
     //
@@ -1901,7 +1909,7 @@ try
         try
         {
             _CreateVm();
-            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), IWslCoreVm::DiskType::VHD, {}, true, userToken.get());
             auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
             m_utilityVm->TrimDistribution(lun);
         }
@@ -2205,14 +2213,9 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
             auto vmId = m_vmId.load();
             if (!IsEqualGUID(vmId, GUID_NULL))
             {
-                auto vmIdStr = wsl::shared::string::GuidToString<wchar_t>(vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
-
                 m_suppressVmTerminationCallback.store(true);
 
-                auto result = wil::ResultFromException([&]() {
-                    auto computeSystem = wsl::windows::common::hcs::OpenComputeSystem(vmIdStr.c_str(), GENERIC_ALL);
-                    wsl::windows::common::hcs::TerminateComputeSystem(computeSystem.get());
-                });
+                auto result = wil::ResultFromException([&]() { m_vmFactory->ForceTerminate(vmId); });
 
                 WSL_LOG("ForceTerminateVm", TraceLoggingValue(result, "Result"));
             }
@@ -2984,7 +2987,7 @@ void LxssUserSessionImpl::_CreateVm()
         };
 
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
+        m_utilityVm = m_vmFactory->Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
         if (m_httpProxyStateTracker)
         {
@@ -3020,10 +3023,10 @@ void LxssUserSessionImpl::_CreateVm()
 
         auto callback = [this](auto Pid) {
             // If the vm is currently being destroyed, the instance lock might be held
-            // while WslCoreVm's destructor is waiting on this thread.
+            // while the utility VM's destructor is waiting on this thread.
             // Cancel the call if the vm destruction is signaled.
             // Note: This is safe because m_instanceLock is always initialized
-            // and because WslCoreVm's destructor waits for this thread, the session can't be gone
+            // and because the utility VM's destructor waits for this thread, the session can't be gone
             // until this callback completes.
 
             auto lock = m_instanceLock.try_lock();
@@ -3323,10 +3326,10 @@ try
     const auto path = wsl::windows::common::registry::ReadString(Key, nullptr, c_diskValueName);
 
     // Get the disk type; throw if unexpected type
-    const auto diskType = static_cast<WslCoreVm::DiskType>(wsl::windows::common::registry::ReadDword(
-        Key, nullptr, c_disktypeValueName, static_cast<DWORD>(WslCoreVm::DiskType::PassThrough)));
+    const auto diskType = static_cast<IWslCoreVm::DiskType>(wsl::windows::common::registry::ReadDword(
+        Key, nullptr, c_disktypeValueName, static_cast<DWORD>(IWslCoreVm::DiskType::PassThrough)));
 
-    THROW_HR_IF(E_UNEXPECTED, (diskType != WslCoreVm::DiskType::VHD && diskType != WslCoreVm::DiskType::PassThrough));
+    THROW_HR_IF(E_UNEXPECTED, (diskType != IWslCoreVm::DiskType::VHD && diskType != IWslCoreVm::DiskType::PassThrough));
 
     // Attach the disk to the VM, reusing the same LUN if possible.
     //
@@ -3342,7 +3345,7 @@ try
     // (\\.\PhysicalDriveN) have no reparse-point surface, so there is no swap to defend
     // against.
     auto lun = std::stoul(LunStr);
-    const HANDLE userToken = (diskType == WslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
+    const HANDLE userToken = (diskType == IWslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
     m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, userToken);
 
     // Restore each mount point.
@@ -3664,8 +3667,8 @@ LxssUserSessionImpl::_RunUtilityVmSetup(_In_ const LXSS_DISTRO_CONFIGURATION& Co
     context.instance = m_utilityVm->CreateInstance(instanceId, Configuration, MessageType, 0, 0, 0, ExportFlags, &connectPort);
 
     // Establish the socket that will be used to transfer the tar file contents.
-    context.tarSocket = wsl::windows::common::hvsocket::Connect(m_utilityVm->GetRuntimeId(), connectPort);
-    context.errorSocket = wsl::windows::common::hvsocket::Connect(m_utilityVm->GetRuntimeId(), connectPort);
+    context.tarSocket = m_utilityVm->ConnectToGuest(connectPort);
+    context.errorSocket = m_utilityVm->ConnectToGuest(connectPort);
     WI_ASSERT(context.tarSocket.is_valid());
 
     return context;
@@ -4042,7 +4045,7 @@ void LxssUserSessionImpl::_VmTerminate()
     m_session.UserToken = nullptr;
 
     // Reset the event since the VM can be recreated.
-    // This can done safely because WslCoreVm's destructor waits until
+    // This can done safely because the utility VM's destructor waits until
     // its distro exit callback is done before returning, so at this point
     // it's guaranteed that no one is waiting (or about to wait) on the event.
     // Note: Using an auto-reset event wouldn't work since the callback can be invoked
