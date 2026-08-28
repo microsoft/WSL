@@ -1492,10 +1492,19 @@ void WSLCContainerImpl::OnFailedRestart() noexcept
     try
     {
         {
+            // N.B. m_lifecycleLock is not needed here: nothing below publishes a transition, and the state
+            // read is already ordered against OnEvent() by m_lock.
             auto lock = m_lock.lock_exclusive();
 
+            // The start phase waits for the start event after Docker has accepted the start, so it can throw
+            // on a container that is coming up. Leave that container alone; it still owns its resources.
+            if (m_transition || m_state == WslcContainerStateRunning)
+            {
+                return;
+            }
+
             // The stop phase held these back for a start phase that never landed.
-            if (m_runtimeResourcesHeld && m_state != WslcContainerStateRunning)
+            if (m_runtimeResourcesHeld)
             {
                 ReleaseRuntimeResources();
             }
