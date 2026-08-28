@@ -65,6 +65,14 @@ public:
         };
     }
 
+    std::vector<Argument> GetGlobalArguments() const override
+    {
+        return {
+            Argument::Create(ArgType::Session),
+            Argument::CreateDeprecated(ArgType::NoColor),
+        };
+    }
+
     std::wstring ShortDescription() const override
     {
         return L"Deprecated argument test command";
@@ -128,6 +136,19 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_FALSE(deprecated.IsVisible());
         VERIFY_IS_TRUE(deprecated.IsDeprecated());
         VERIFY_ARE_EQUAL(std::wstring{c_deprecatedOptionDescription}, deprecated.Description());
+    }
+
+    TEST_METHOD(ArgumentAccessors_GetVisibleArguments)
+    {
+        DeprecatedArgumentCommand command;
+
+        VERIFY_ARE_EQUAL(4u, command.GetArguments().size());
+        VERIFY_IS_TRUE(command.GetVisibleArguments().empty());
+
+        const auto globalArguments = command.GetVisibleGlobalArguments();
+        VERIFY_ARE_EQUAL(1u, globalArguments.size());
+        VERIFY_ARE_EQUAL(ArgType::Session, globalArguments.front().Type());
+        VERIFY_ARE_EQUAL(2u, command.GetGlobalArguments().size());
     }
 
     TEST_METHOD(DeprecatedOption_ParsesValidatesAndWarns)

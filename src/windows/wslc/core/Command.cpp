@@ -29,6 +29,13 @@ namespace wsl::windows::wslc {
 
 std::wstring s_ExecutableName = L"wslc";
 
+namespace {
+void FilterArgumentsByVisibility(std::vector<Argument>& arguments)
+{
+    std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
+}
+} // namespace
+
 Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
     m_name(name), m_aliases(std::move(aliases))
 {
@@ -43,6 +50,27 @@ Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliase
     {
         m_fullName = name;
     }
+}
+
+std::vector<Argument> Command::GetVisibleArguments() const
+{
+    auto arguments = GetArguments();
+    FilterArgumentsByVisibility(arguments);
+    return arguments;
+}
+
+std::vector<Argument> Command::GetAllVisibleArguments() const
+{
+    auto arguments = GetAllArguments();
+    FilterArgumentsByVisibility(arguments);
+    return arguments;
+}
+
+std::vector<Argument> Command::GetVisibleGlobalArguments() const
+{
+    auto arguments = GetGlobalArguments();
+    FilterArgumentsByVisibility(arguments);
+    return arguments;
 }
 
 void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const
@@ -98,8 +126,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
     auto commandAliases = Aliases();
     auto commands = GetCommands();
-    auto arguments = GetAllArguments();
-    std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
+    auto arguments = GetAllVisibleArguments();
     std::vector<Argument> helpArguments;
     if (fullHelp)
     {
@@ -158,9 +185,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     const bool hasHelpArguments = !helpPositionalArgs.empty();
     const bool hasHelpOptions = !helpStandardArgs.empty();
     const bool hasHelpForwardArgs = !helpForwardArgs.empty();
-
-    auto globalArgs = RootCommand().GetGlobalArguments();
-    std::erase_if(globalArgs, [](const Argument& argument) { return !argument.IsVisible(); });
+    auto globalArgs = RootCommand().GetVisibleGlobalArguments();
 
     // Build usage line with Write calls for each segment.
     {
@@ -456,8 +481,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
     }
 
     auto commands = GetCommands();
-    auto unsupportedCommands = GetUnsupportedCommands();
-    if (commands.empty() && unsupportedCommands.empty())
+    if (commands.empty())
     {
         return {};
     }
@@ -477,15 +501,6 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
                 inv.consume(itr);
                 return std::move(command);
             }
-        }
-    }
-
-    for (const auto& command : unsupportedCommands)
-    {
-        if (string::IsEqual(*itr, command.Name()) ||
-            std::ranges::any_of(command.Aliases(), [&](const auto alias) { return string::IsEqual(*itr, alias); }))
-        {
-            throw CommandException(Localization::WSLCCLI_UnsupportedCommandError(command.Name()));
         }
     }
 
@@ -626,10 +641,8 @@ void Command::ValidateArgumentsInternal(ArgMap&) const
 
 std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType> types) const
 {
-    auto arguments = GetAllArguments();
-    std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
-    auto globalArguments = RootCommand().GetGlobalArguments();
-    std::erase_if(globalArguments, [](const Argument& argument) { return !argument.IsVisible(); });
+    auto arguments = GetAllVisibleArguments();
+    auto globalArguments = RootCommand().GetVisibleGlobalArguments();
     arguments.insert(arguments.end(), globalArguments.begin(), globalArguments.end());
 
     std::vector<Argument> result;

@@ -35,34 +35,6 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLICommandUnitTests {
-class UnsupportedCommandTestCommand : public Command
-{
-public:
-    UnsupportedCommandTestCommand() : Command(L"test", L"")
-    {
-    }
-
-    std::vector<UnsupportedCommand> GetUnsupportedCommands() const override
-    {
-        return {{L"unsupported", {L"unsupported-alias"}}};
-    }
-
-    std::wstring ShortDescription() const override
-    {
-        return L"Unsupported command test";
-    }
-
-    std::wstring LongDescription() const override
-    {
-        return ShortDescription();
-    }
-
-private:
-    void ExecuteInternal(CLIExecutionContext&) const override
-    {
-    }
-};
-
 class WSLCCLICommandUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLICommandUnitTests)
@@ -94,26 +66,6 @@ class WSLCCLICommandUnitTests
         for (const auto& subcmd : subcommands)
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
-        }
-    }
-
-    TEST_METHOD(Command_UnsupportedCommandIsHiddenAndRecognized)
-    {
-        UnsupportedCommandTestCommand command;
-
-        const auto supportedCommands = command.GetCommands();
-        VERIFY_IS_TRUE(supportedCommands.empty());
-
-        const auto unsupportedCommands = command.GetUnsupportedCommands();
-        VERIFY_ARE_EQUAL(1u, unsupportedCommands.size());
-        VERIFY_ARE_EQUAL(std::wstring_view{L"unsupported"}, unsupportedCommands.front().Name());
-
-        for (const auto name : {L"unsupported", L"unsupported-alias"})
-        {
-            Invocation invocation{std::vector<std::wstring>{name}};
-            VERIFY_THROWS_SPECIFIC(command.FindSubCommand(invocation), CommandException, [](const auto& exception) {
-                return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedCommandError(L"unsupported");
-            });
         }
     }
 

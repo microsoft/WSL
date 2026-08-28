@@ -43,28 +43,6 @@ enum class HelpOutput
 // The executable name shown in usage/help output, set from argv[0] at startup.
 extern std::wstring s_ExecutableName;
 
-struct UnsupportedCommand
-{
-    UnsupportedCommand(std::wstring_view name, std::vector<std::wstring_view> aliases = {}) :
-        m_name(name), m_aliases(std::move(aliases))
-    {
-    }
-
-    std::wstring_view Name() const
-    {
-        return m_name;
-    }
-
-    const std::vector<std::wstring_view>& Aliases() const
-    {
-        return m_aliases;
-    }
-
-private:
-    std::wstring_view m_name;
-    std::vector<std::wstring_view> m_aliases;
-};
-
 struct Command
 {
     // The character used to split between commands and their parents in FullName.
@@ -100,15 +78,11 @@ struct Command
     {
         return {};
     }
-    // Commands declared here are recognized by the parser but rejected and omitted from help.
-    virtual std::vector<UnsupportedCommand> GetUnsupportedCommands() const
-    {
-        return {};
-    }
     virtual std::vector<Argument> GetArguments() const
     {
         return {};
     }
+    std::vector<Argument> GetVisibleArguments() const;
 
     virtual std::vector<Argument> GetAllArguments() const
     {
@@ -116,12 +90,14 @@ struct Command
         args.emplace_back(Argument::Create(ArgType::Help));
         return args;
     }
+    std::vector<Argument> GetAllVisibleArguments() const;
 
     // Options accepted before any subcommand on the command line.
     virtual std::vector<Argument> GetGlobalArguments() const
     {
         return {};
     }
+    std::vector<Argument> GetVisibleGlobalArguments() const;
 
     // Args eligible for environment binding.
     virtual std::vector<Argument> GetEnvArguments() const
