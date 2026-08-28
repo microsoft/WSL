@@ -49,6 +49,12 @@ struct ImageOutputInformation
 
 inline constexpr std::string_view c_none = "<none>";
 
+struct DeletedImageEntry
+{
+    std::string Image;
+    bool Deleted{};
+};
+
 struct PruneImagesResult
 {
     std::vector<std::string> DeletedImages;

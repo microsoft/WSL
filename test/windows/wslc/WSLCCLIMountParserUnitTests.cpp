@@ -62,34 +62,34 @@ namespace {
     };
 
     constexpr ValidMountCase c_validMountCases[] = {
-        {L"type=volume,target=/data", mount::Type::Volume, L"", "/data", false, {}, {}, ""},
-        {L"source=data-volume,target=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=volume,target=/data", WSLCMountTypeVolume, L"", "/data", false, {}, {}, ""},
+        {L"source=data-volume,target=/data", WSLCMountTypeVolume, L"data-volume", "/data", false, {}, {}, ""},
         {L"type=volume,source=data-volume,target=/path:voldir",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/path:voldir",
          false,
          {},
          {},
          ""},
-        {L"TYPE=VOLUME,SOURCE=data-volume,TARGET=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
-        {L"type=VoLuMe,source=data-volume,target=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
-        {L"type=volume,src=data-volume,dst=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
-        {L"type=volume,src=data-volume,destination=/data", mount::Type::Volume, L"data-volume", "/data", false, {}, {}, ""},
-        {L"type=volume,source=first,source=second,target=/data", mount::Type::Volume, L"second", "/data", false, {}, {}, ""},
+        {L"TYPE=VOLUME,SOURCE=data-volume,TARGET=/data", WSLCMountTypeVolume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=VoLuMe,source=data-volume,target=/data", WSLCMountTypeVolume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=volume,src=data-volume,dst=/data", WSLCMountTypeVolume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=volume,src=data-volume,destination=/data", WSLCMountTypeVolume, L"data-volume", "/data", false, {}, {}, ""},
+        {L"type=volume,source=first,source=second,target=/data", WSLCMountTypeVolume, L"second", "/data", false, {}, {}, ""},
         {L"type=volume,source=data-volume,target=/first,target=/second",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/second",
          false,
          {},
          {},
          ""},
-        {L"type=volume,type=bind,source=C:\\data,target=/data", mount::Type::Bind, L"C:\\data", "/data", false, {}, {}, ""},
-        {L"type=volume,source=data-volume,target=/data,readonly", mount::Type::Volume, L"data-volume", "/data", true, {}, {}, ""},
-        {L"type=volume,source=data-volume,target=/data,ro", mount::Type::Volume, L"data-volume", "/data", true, {}, {}, ""},
+        {L"type=volume,type=bind,source=C:\\data,target=/data", WSLCMountTypeBind, L"C:\\data", "/data", false, {}, {}, ""},
+        {L"type=volume,source=data-volume,target=/data,readonly", WSLCMountTypeVolume, L"data-volume", "/data", true, {}, {}, ""},
+        {L"type=volume,source=data-volume,target=/data,ro", WSLCMountTypeVolume, L"data-volume", "/data", true, {}, {}, ""},
         {L"type=volume,source=data-volume,target=/data,readonly=1",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          true,
@@ -97,7 +97,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=t",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          true,
@@ -105,7 +105,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=T",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          true,
@@ -113,7 +113,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=TRUE",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          true,
@@ -121,7 +121,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=true",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          true,
@@ -129,7 +129,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=True",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          true,
@@ -137,7 +137,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=0",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          false,
@@ -145,7 +145,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=f",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          false,
@@ -153,7 +153,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=F",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          false,
@@ -161,7 +161,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=FALSE",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          false,
@@ -169,7 +169,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=false",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          false,
@@ -177,7 +177,7 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=False",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          false,
@@ -185,63 +185,70 @@ namespace {
          {},
          ""},
         {L"type=volume,source=data-volume,target=/data,readonly=true,readonly=false",
-         mount::Type::Volume,
+         WSLCMountTypeVolume,
          L"data-volume",
          "/data",
          false,
          {},
          {},
          ""},
-        {L"type=bind,\"source=C:\\mount,a\",target=/data", mount::Type::Bind, L"C:\\mount,a", "/data", false, {}, {}, ""},
+        {L"type=volume,source=data-volume,target=/data,bind-recursive=enabled",
+         WSLCMountTypeVolume,
+         L"data-volume",
+         "/data",
+         false,
+         {},
+         {},
+         ""},
+        {L"type=bind,\"source=C:\\mount,a\",target=/data", WSLCMountTypeBind, L"C:\\mount,a", "/data", false, {}, {}, ""},
         {L"type=bind,source=C:\\mount with spaces,target=/data",
-         mount::Type::Bind,
+         WSLCMountTypeBind,
          L"C:\\mount with spaces",
          "/data",
          false,
          {},
          {},
          ""},
-        {L"type=bind,source=C:\\mount,target=/path:mntdir", mount::Type::Bind, L"C:\\mount", "/path:mntdir", false, {}, {}, ""},
-        {L"type=bind,source=C:\\,target=/data", mount::Type::Bind, L"C:\\", "/data", false, {}, {}, ""},
-        {L"type=bind,source=\\\\server\\share,target=/data", mount::Type::Bind, L"\\\\server\\share", "/data", false, {}, {}, ""},
+        {L"type=bind,source=C:\\mount,target=/path:mntdir", WSLCMountTypeBind, L"C:\\mount", "/path:mntdir", false, {}, {}, ""},
+        {L"type=bind,source=C:\\,target=/data", WSLCMountTypeBind, L"C:\\", "/data", false, {}, {}, ""},
+        {L"type=bind,source=\\\\server\\share,target=/data", WSLCMountTypeBind, L"\\\\server\\share", "/data", false, {}, {}, ""},
         {L"type=bind,source=C:\\mount,target=/data,bind-recursive=enabled",
-         mount::Type::Bind,
+         WSLCMountTypeBind,
          L"C:\\mount",
          "/data",
          false,
          {},
          {},
          ""},
-        {L"type=volume,source=A_,target=/data", mount::Type::Volume, L"A_", "/data", false, {}, {}, ""},
-        {L"type=volume,source=data.volume-1,target=/data", mount::Type::Volume, L"data.volume-1", "/data", false, {}, {}, ""},
-        {L"type=tmpfs,target=/tmp", mount::Type::Tmpfs, L"", "/tmp", false, {}, {}, ""},
-        {L"type=tmpfs,target=/path:tmpfs", mount::Type::Tmpfs, L"", "/path:tmpfs", false, {}, {}, ""},
-        {L"type=tmpfs,target=/tmp,readonly", mount::Type::Tmpfs, L"", "/tmp", true, {}, {}, "ro"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=0", mount::Type::Tmpfs, L"", "/tmp", false, 0, {}, ""},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1", mount::Type::Tmpfs, L"", "/tmp", false, 1, {}, "size=1"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1024", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1536", mount::Type::Tmpfs, L"", "/tmp", false, 1536, {}, "size=1536"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1k", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1KB", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1KiB", mount::Type::Tmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1MB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1MiB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1GB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 30, {}, "size=1g"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1.5MB", mount::Type::Tmpfs, L"", "/tmp", false, 1536LL << 10, {}, "size=1536k"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=+1MB", mount::Type::Tmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=1e3", mount::Type::Tmpfs, L"", "/tmp", false, 1000, {}, "size=1000"},
-        {L"type=tmpfs,target=/tmp,tmpfs-mode=0000", mount::Type::Tmpfs, L"", "/tmp", false, {}, 0, ""},
-        {L"type=tmpfs,target=/tmp,tmpfs-mode=0700", mount::Type::Tmpfs, L"", "/tmp", false, {}, 0700, "mode=700"},
-        {L"type=tmpfs,target=/tmp,tmpfs-mode=+0700", mount::Type::Tmpfs, L"", "/tmp", false, {}, 0700, "mode=700"},
+        {L"type=volume,source=A_,target=/data", WSLCMountTypeVolume, L"A_", "/data", false, {}, {}, ""},
+        {L"type=volume,source=data.volume-1,target=/data", WSLCMountTypeVolume, L"data.volume-1", "/data", false, {}, {}, ""},
+        {L"type=tmpfs,target=/tmp", WSLCMountTypeTmpfs, L"", "/tmp", false, {}, {}, ""},
+        {L"type=tmpfs,target=/path:tmpfs", WSLCMountTypeTmpfs, L"", "/path:tmpfs", false, {}, {}, ""},
+        {L"type=tmpfs,target=/tmp,readonly", WSLCMountTypeTmpfs, L"", "/tmp", true, {}, {}, "ro"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=0", WSLCMountTypeTmpfs, L"", "/tmp", false, 0, {}, ""},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1", WSLCMountTypeTmpfs, L"", "/tmp", false, 1, {}, "size=1"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1024", WSLCMountTypeTmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1536", WSLCMountTypeTmpfs, L"", "/tmp", false, 1536, {}, "size=1536"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1k", WSLCMountTypeTmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1KB", WSLCMountTypeTmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1KiB", WSLCMountTypeTmpfs, L"", "/tmp", false, 1024, {}, "size=1k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1MB", WSLCMountTypeTmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1MiB", WSLCMountTypeTmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1GB", WSLCMountTypeTmpfs, L"", "/tmp", false, 1LL << 30, {}, "size=1g"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1.5MB", WSLCMountTypeTmpfs, L"", "/tmp", false, 1536LL << 10, {}, "size=1536k"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=+1MB", WSLCMountTypeTmpfs, L"", "/tmp", false, 1LL << 20, {}, "size=1m"},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=1e3", WSLCMountTypeTmpfs, L"", "/tmp", false, 1000, {}, "size=1000"},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=0000", WSLCMountTypeTmpfs, L"", "/tmp", false, {}, 0, ""},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=0700", WSLCMountTypeTmpfs, L"", "/tmp", false, {}, 0700, "mode=700"},
         {L"type=tmpfs,target=/tmp,tmpfs-size=1MB,tmpfs-mode=0700,readonly",
-         mount::Type::Tmpfs,
+         WSLCMountTypeTmpfs,
          L"",
          "/tmp",
          true,
          1LL << 20,
          0700,
          "ro,mode=700,size=1m"},
-        {L"type=tmpfs,target=/tmp,tmpfs-size=0,tmpfs-mode=0000,readonly=false", mount::Type::Tmpfs, L"", "/tmp", false, 0, 0, ""},
+        {L"type=tmpfs,target=/tmp,tmpfs-size=0,tmpfs-mode=0000,readonly=false", WSLCMountTypeTmpfs, L"", "/tmp", false, 0, 0, ""},
     };
 
     const InvalidMountCase c_invalidMountCases[] = {
@@ -339,8 +346,6 @@ namespace {
          Localization::WSLCCLI_MountOptionFamilyMismatchError(L"volume-*", L"bind")},
         {L"type=volume,source=data-volume,target=/data,bind-propagation=rprivate",
          Localization::WSLCCLI_MountOptionFamilyMismatchError(L"bind-*", L"volume")},
-        {L"type=volume,source=data-volume,target=/data,bind-recursive=enabled",
-         Localization::WSLCCLI_MountOptionFamilyMismatchError(L"bind-*", L"volume")},
         {L"type=volume,source=data-volume,target=/data,tmpfs-size=1m",
          Localization::WSLCCLI_MountOptionFamilyMismatchError(L"tmpfs-*", L"volume")},
         {L"type=tmpfs,target=/tmp,volume-label=a=b", Localization::WSLCCLI_MountOptionFamilyMismatchError(L"volume-*", L"tmpfs")},
@@ -357,6 +362,7 @@ namespace {
         {L"type=tmpfs,target=/tmp,tmpfs-size=9223372036854775808",
          Localization::WSLCCLI_MountInvalidValueError(L"tmpfs-size", L"9223372036854775808")},
         {L"type=tmpfs,target=/tmp,tmpfs-mode=", Localization::WSLCCLI_MountInvalidValueError(L"tmpfs-mode", L"")},
+        {L"type=tmpfs,target=/tmp,tmpfs-mode=+0700", Localization::WSLCCLI_MountInvalidValueError(L"tmpfs-mode", L"+0700")},
         {L"type=tmpfs,target=/tmp,tmpfs-mode=-1", Localization::WSLCCLI_MountInvalidValueError(L"tmpfs-mode", L"-1")},
         {L"type=tmpfs,target=/tmp,tmpfs-mode=8", Localization::WSLCCLI_MountInvalidValueError(L"tmpfs-mode", L"8")},
         {L"type=tmpfs,target=/tmp,tmpfs-mode=0899", Localization::WSLCCLI_MountInvalidValueError(L"tmpfs-mode", L"0899")},
@@ -394,7 +400,7 @@ class WSLCCLIMountParserUnitTests
                 VERIFY_ARE_EQUAL(testCase.TmpfsMode.value(), actual.TmpfsMode.value());
             }
 
-            const auto actualTmpfsOptions = actual.MountType == mount::Type::Tmpfs ? mount::FormatTmpfsOptions(actual) : std::string{};
+            const auto actualTmpfsOptions = actual.MountType == WSLCMountTypeTmpfs ? mount::FormatTmpfsOptions(actual) : std::string{};
             VERIFY_ARE_EQUAL(std::string(testCase.TmpfsOptions), actualTmpfsOptions);
         }
     }
@@ -434,18 +440,34 @@ class WSLCCLIMountParserUnitTests
     TEST_METHOD(Volume_ValidCases)
     {
         const auto bind = mount::ParseDockerVolumeString(LR"(C:\hostPath:/data:ro)");
-        VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Bind), static_cast<int>(bind.MountType));
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeBind), static_cast<int>(bind.MountType));
         VERIFY_ARE_EQUAL(std::wstring(LR"(C:\hostPath)"), bind.Source);
         VERIFY_ARE_EQUAL(std::string("/data"), bind.Target);
         VERIFY_IS_TRUE(bind.ReadOnly);
         VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(bind.BindSource));
 
+        const auto relativeBind = mount::ParseDockerVolumeString(L".\\mount:/data");
+        VERIFY_ARE_EQUAL(std::filesystem::weakly_canonical(std::filesystem::current_path() / L"mount").wstring(), relativeBind.Source);
+
         const auto volume = mount::ParseDockerVolumeString(L"named-volume:/data");
-        VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Volume), static_cast<int>(volume.MountType));
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeVolume), static_cast<int>(volume.MountType));
         VERIFY_ARE_EQUAL(std::wstring(L"named-volume"), volume.Source);
         VERIFY_ARE_EQUAL(std::string("/data"), volume.Target);
         VERIFY_IS_FALSE(volume.ReadOnly);
         VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::RequireExisting), static_cast<int>(volume.BindSource));
+    }
+
+    TEST_METHOD(Volume_InvalidHostPath)
+    {
+        try
+        {
+            (void)mount::ParseDockerVolumeString(L"::/container:ro");
+            VERIFY_FAIL(L"Expected MountParseException for an invalid host path");
+        }
+        catch (const mount::MountParseException& ex)
+        {
+            VERIFY_ARE_EQUAL(Localization::WSLCCLI_VolumeHostPathInvalid(L"::/container:ro", L":"), ex.Reason());
+        }
     }
 
     TEST_METHOD(Mount_DotRelativeBindSourceUsesCurrentDirectory)
@@ -458,28 +480,28 @@ class WSLCCLIMountParserUnitTests
     TEST_METHOD(Mount_TypedSpecsAreValidated)
     {
         const mount::Spec relativeBind{
-            .MountType = mount::Type::Bind,
+            .MountType = WSLCMountTypeBind,
             .Source = L"relative",
             .Target = "/data",
         };
         VERIFY_THROWS(mount::ValidateMountSpec(relativeBind), mount::MountValidationException);
 
         const mount::Spec relativeTarget{
-            .MountType = mount::Type::Volume,
+            .MountType = WSLCMountTypeVolume,
             .Source = L"data-volume",
             .Target = "data",
         };
         VERIFY_THROWS(mount::ValidateMountSpec(relativeTarget), mount::MountValidationException);
 
         const mount::Spec tmpfsWithSource{
-            .MountType = mount::Type::Tmpfs,
+            .MountType = WSLCMountTypeTmpfs,
             .Source = L"data-volume",
             .Target = "/data",
         };
         VERIFY_THROWS(mount::ValidateMountSpec(tmpfsWithSource), mount::MountValidationException);
 
         const mount::Spec bindWithTmpfsOptions{
-            .MountType = mount::Type::Bind,
+            .MountType = WSLCMountTypeBind,
             .Source = L"C:\\data",
             .Target = "/data",
             .TmpfsSizeBytes = 1024,
@@ -487,14 +509,14 @@ class WSLCCLIMountParserUnitTests
         VERIFY_THROWS(mount::ValidateMountSpec(bindWithTmpfsOptions), mount::MountValidationException);
 
         const mount::Spec negativeTmpfsSize{
-            .MountType = mount::Type::Tmpfs,
+            .MountType = WSLCMountTypeTmpfs,
             .Target = "/data",
             .TmpfsSizeBytes = -1,
         };
         VERIFY_THROWS(mount::ValidateMountSpec(negativeTmpfsSize), mount::MountValidationException);
 
         const mount::Spec tmpfs{
-            .MountType = mount::Type::Tmpfs,
+            .MountType = WSLCMountTypeTmpfs,
             .Target = "/data",
             .TmpfsSizeBytes = 1024,
             .TmpfsMode = 0700,
@@ -502,8 +524,8 @@ class WSLCCLIMountParserUnitTests
         VERIFY_NO_THROW(mount::ValidateMountSpec(tmpfs));
 
         const mount::Spec duplicateMounts[] = {
-            {.MountType = mount::Type::Tmpfs, .Target = "/data"},
-            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data/"},
+            {.MountType = WSLCMountTypeTmpfs, .Target = "/data"},
+            {.MountType = WSLCMountTypeVolume, .Source = L"data-volume", .Target = "/data/"},
         };
         try
         {
@@ -515,33 +537,12 @@ class WSLCCLIMountParserUnitTests
             VERIFY_ARE_EQUAL(static_cast<int>(mount::ValidationError::DuplicateDestination), static_cast<int>(ex.Error()));
             VERIFY_ARE_EQUAL(std::string("/data"), ex.Destination());
         }
-    }
 
-    TEST_METHOD(Mount_DuplicateDestinationsAreRejected)
-    {
-        ContainerOptions options;
-        options.Mounts = {
-            mount::ParseDockerTmpfsString(L"/data"),
-            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data/"},
+        const mount::Spec distinctBackslashMounts[] = {
+            {.MountType = WSLCMountTypeTmpfs, .Target = "/data\\cache"},
+            {.MountType = WSLCMountTypeVolume, .Source = L"data-volume", .Target = "/data/cache"},
         };
-        VERIFY_THROWS(ValidateUniqueMountDestinations(options), wil::ResultException);
-
-        options.Mounts = {
-            {.MountType = mount::Type::Tmpfs, .Target = "/data/../cache"},
-            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/cache"},
-        };
-        VERIFY_THROWS(ValidateUniqueMountDestinations(options), wil::ResultException);
-    }
-
-    TEST_METHOD(Mount_UniqueDestinationsAreAccepted)
-    {
-        ContainerOptions options;
-        options.Mounts = {
-            mount::ParseDockerTmpfsString(L"/cache"),
-            {.MountType = mount::Type::Volume, .Source = L"data-volume", .Target = "/data"},
-            {.MountType = mount::Type::Bind, .Source = L"C:\\logs", .Target = "/logs"},
-        };
-        VERIFY_NO_THROW(ValidateUniqueMountDestinations(options));
+        VERIFY_NO_THROW(mount::ValidateMountCollection(distinctBackslashMounts));
     }
 };
 

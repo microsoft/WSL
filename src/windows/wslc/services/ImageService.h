@@ -70,7 +70,8 @@ public:
         bool containerCounts = false);
     static void Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback = nullptr);
     static std::string Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
-    static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
+    static std::vector<wsl::windows::wslc::models::DeletedImageEntry> Delete(
+        wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
     static wsl::windows::common::wslc_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
     static void Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);

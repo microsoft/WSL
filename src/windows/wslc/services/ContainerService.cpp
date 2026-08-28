@@ -329,7 +329,7 @@ int ContainerService::Attach(Terminal& terminal, Session& session, const std::st
         // TTY process - relay using interactive TTY handling
         WI_ASSERT(stderrLogs.Empty());
         wsl::windows::common::ConsoleState console;
-        if (!ConsoleService::RelayInteractiveTty(console, runningProcess, stdinLogs.Release().get(), true))
+        if (!ConsoleService::RelayInteractiveTty(console, runningProcess, stdinLogs.Release().Get(), true))
         {
             terminal.Info(L"[detached]\n");
             return 0; // Exit early if user detached

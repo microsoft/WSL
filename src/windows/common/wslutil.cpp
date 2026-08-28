@@ -21,6 +21,7 @@ Abstract:
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
+#include "HandleIO.h"
 #include "MsiQuery.h"
 #include "WslInstall.h"
 
@@ -33,6 +34,21 @@ using namespace wsl::windows::common::wslutil;
 
 constexpr auto c_latestReleaseUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/latest";
 constexpr auto c_releaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases";
+
+wsl::windows::common::io::HandleWrapper COMOutputHandle::Release()
+{
+    const auto type = Type;
+    const auto handle = Handle.File;
+    Handle.File = nullptr;
+    Type = WSLCHandleTypeUnknown;
+
+    if (type == WSLCHandleTypeSocket)
+    {
+        return wsl::windows::common::io::HandleWrapper{wil::unique_socket{reinterpret_cast<SOCKET>(handle)}};
+    }
+
+    return wsl::windows::common::io::HandleWrapper{wil::unique_handle{handle}};
+}
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
 constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";

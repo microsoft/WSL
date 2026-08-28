@@ -311,8 +311,6 @@ private:
     bool m_isNamedVolume = false;
 };
 
-void ValidateUniqueMountDestinations(const ContainerOptions& options);
-
 class CidFile
 {
 public:

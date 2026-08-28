@@ -416,16 +416,16 @@ class WSLCCLIArgumentUnitTests
         // mount strings -> mount::Spec
         {
             const auto volume = ValidateAndGetCached<ArgType::Volume>(LR"(C:\hostPath:/containerPath)");
-            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Bind), static_cast<int>(volume.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeBind), static_cast<int>(volume.MountType));
             VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(volume.BindSource));
 
             const auto tmpfs = ValidateAndGetCached<ArgType::TMPFS>(L"/tmp:size=64k");
-            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Tmpfs), static_cast<int>(tmpfs.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeTmpfs), static_cast<int>(tmpfs.MountType));
             VERIFY_IS_TRUE(tmpfs.TmpfsOptions.has_value());
             VERIFY_ARE_EQUAL(std::string("size=64k"), tmpfs.TmpfsOptions.value());
 
             const auto structured = ValidateAndGetCached<ArgType::Mount>(L"type=volume,source=data-volume,target=/data");
-            VERIFY_ARE_EQUAL(static_cast<int>(mount::Type::Volume), static_cast<int>(structured.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeVolume), static_cast<int>(structured.MountType));
             VERIFY_ARE_EQUAL(std::wstring(L"data-volume"), structured.Source);
         }
 

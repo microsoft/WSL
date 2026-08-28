@@ -110,7 +110,9 @@ class WSLCE2ENetworkCreateTests
 
         result = RunWslc(std::format(L"network create --driver bridge {}", TestNetworkName));
         result.Verify(
-            {.Stdout = L"", .Stderr = L"Cannot create a file when that file already exists. \r\nError code: ERROR_ALREADY_EXISTS\r\n", .ExitCode = 1});
+            {.Stdout = L"",
+             .Stderr = FormatErrorMessage(L"Cannot create a file when that file already exists. ", L"ERROR_ALREADY_EXISTS"),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_Internal_Success)
@@ -162,7 +164,7 @@ class WSLCE2ENetworkCreateTests
         auto result = RunWslc(std::format(L"network create --gateway 172.47.0.1 {}", TestNetworkName));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = L"The '--gateway' option requires '--subnet' to also be specified.\r\nError code: E_INVALIDARG\r\n",
+             .Stderr = FormatErrorMessage(L"The '--gateway' option requires '--subnet' to also be specified.", L"E_INVALIDARG"),
              .ExitCode = 1});
 
         VerifyNetworkIsNotListed(TestNetworkName);
@@ -190,7 +192,7 @@ class WSLCE2ENetworkCreateTests
         auto result = RunWslc(std::format(L"network create --ip-range 172.52.10.0/24 {}", TestNetworkName));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = L"The '--ip-range' option requires '--subnet' to also be specified.\r\nError code: E_INVALIDARG\r\n",
+             .Stderr = FormatErrorMessage(L"The '--ip-range' option requires '--subnet' to also be specified.", L"E_INVALIDARG"),
              .ExitCode = 1});
 
         VerifyNetworkIsNotListed(TestNetworkName);
