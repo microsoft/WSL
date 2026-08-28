@@ -1169,8 +1169,9 @@ Tämä kehote aikakatkaistiin 60 sekunnin kuluttua.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Virhekoodi: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Virhekoodi: {}
+Jos tämä virhe oli odottamaton, harkitse olemassa olevien ongelmien etsimistä tai uuden ongelman kirjaamista https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Virheellinen JSON-asiakirja. Jäsennysvirhe: {}</value>

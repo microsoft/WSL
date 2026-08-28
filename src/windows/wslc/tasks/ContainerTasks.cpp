@@ -159,8 +159,6 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
 
 namespace wsl::windows::wslc::task {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
-
 static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
 {
     try
@@ -886,8 +884,6 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(tmpfs.begin()), std::make_move_iterator(tmpfs.end()));
     }
 
-    ValidateUniqueMountDestinations(options);
-
     for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
     {
         options.Labels.push_back(label);
@@ -1110,12 +1106,17 @@ void PruneContainers(CLIExecutionContext& context)
 
     auto result = ContainerService::Prune(session);
 
-    for (const auto& containerId : result.PrunedContainers)
+    if (!result.PrunedContainers.empty())
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneDeletedHeader());
+        for (const auto& containerId : result.PrunedContainers)
+        {
+            context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    context.Terminal.Output(L"\n");
     context.Terminal.Output(
         L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }

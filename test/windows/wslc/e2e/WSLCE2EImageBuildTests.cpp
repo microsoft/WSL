@@ -1205,7 +1205,7 @@ class WSLCE2EImageBuildTests
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));
         buildResult.Verify(
             {.Stderr =
-                 L"Both Dockerfile and Containerfile found. Use -f to select the file to use\r\nError code: E_INVALIDARG\r\n",
+                 FormatErrorMessage(L"Both Dockerfile and Containerfile found. Use -f to select the file to use", L"E_INVALIDARG"),
              .ExitCode = 1});
     }
 
@@ -1217,7 +1217,8 @@ class WSLCE2EImageBuildTests
         auto absolutePath = std::filesystem::absolute(testRoot);
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));
         buildResult.Verify(
-            {.Stderr = std::format(L"No Containerfile or Dockerfile found in '{}'\r\nError code: E_INVALIDARG\r\n", absolutePath.wstring()),
+            {.Stderr = FormatErrorMessage(
+                 std::format(L"No Containerfile or Dockerfile found in '{}'", absolutePath.wstring()), L"E_INVALIDARG"),
              .ExitCode = 1});
     }
 
@@ -1237,8 +1238,8 @@ class WSLCE2EImageBuildTests
         auto absoluteContainerfilePath = std::filesystem::absolute(containerfilePath);
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));
         buildResult.Verify(
-            {.Stderr = std::format(
-                 L"Failed to open '{}': Access is denied. \r\nError code: E_ACCESSDENIED\r\n", absoluteContainerfilePath.wstring()),
+            {.Stderr = FormatErrorMessage(
+                 std::format(L"Failed to open '{}': Access is denied. ", absoluteContainerfilePath.wstring()), L"E_ACCESSDENIED"),
              .ExitCode = 1});
     }
 
