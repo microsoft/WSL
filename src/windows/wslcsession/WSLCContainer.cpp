@@ -1457,26 +1457,58 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
         m_restart = restart;
     }
 
-    auto restartCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, restart]() {
+    auto failureCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { OnFailedRestart(); });
+
+    {
+        auto restartCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, restart]() {
+            {
+                auto lock = m_lock.lock_exclusive();
+
+                // CommitState() clears this once the start phase lands, so a later restart may already own it.
+                if (m_restart == restart)
+                {
+                    m_restart.reset();
+                }
+            }
+
+            restart->Completed.SetEvent();
+        });
+
+        if (wasRunning)
+        {
+            StopPhase(Signal, TimeoutSeconds, false, true);
+        }
+
+        StartPhase(WSLCContainerStartFlagsNone, nullptr, true);
+    }
+
+    failureCleanup.release();
+}
+
+// N.B. Runs after the restart transaction has been released, so the delete below is no longer
+// suppressed by OnStopped().
+void WSLCContainerImpl::OnFailedRestart() noexcept
+{
+    try
+    {
         {
             auto lock = m_lock.lock_exclusive();
 
-            // CommitState() clears this once the start phase lands, so a later restart may already own it.
-            if (m_restart == restart)
+            // The stop phase held these back for a start phase that never landed.
+            if (m_runtimeResourcesHeld && m_state != WslcContainerStateRunning)
             {
-                m_restart.reset();
+                ReleaseRuntimeResources();
+            }
+
+            if (WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm) || m_state != WslcContainerStateExited)
+            {
+                return;
             }
         }
 
-        restart->Completed.SetEvent();
-    });
-
-    if (wasRunning)
-    {
-        StopPhase(Signal, TimeoutSeconds, false, true);
+        Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
     }
-
-    StartPhase(WSLCContainerStartFlagsNone, nullptr, true);
+    CATCH_LOG()
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::optional<std::int64_t> stopTimestamp)

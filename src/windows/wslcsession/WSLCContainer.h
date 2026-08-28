@@ -201,6 +201,10 @@ private:
     void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
 
+    // Undoes what the phases left half-done: releases the resources the stop phase held back and
+    // performs the auto-delete OnStopped() deferred.
+    void OnFailedRestart() noexcept;
+
     void WaitForCompletionEvent(HANDLE Event) const;
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
     void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
