@@ -11478,7 +11478,7 @@ class WSLCTests
 
             COMOutputHandle stdoutHandle{};
             COMOutputHandle stderrHandle{};
-            VERIFY_ARE_EQUAL(container.Get().Logs(static_cast<WSLCLogsFlags>(0x4), &stdoutHandle, &stderrHandle, 0, 0, 0), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(container.Get().Logs(static_cast<WSLCLogsFlags>(0x8), &stdoutHandle, &stderrHandle, 0, 0, 0), E_INVALIDARG);
         }
     }
 
