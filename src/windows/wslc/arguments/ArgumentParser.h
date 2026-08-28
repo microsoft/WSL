@@ -48,7 +48,8 @@ struct ParseArgumentsStateMachine
         bool optionsOnly = false,
         bool stopOnUnknown = false,
         const std::vector<Argument>& overridableDefaults = {},
-        std::vector<ArgumentDeprecation> deprecations = {});
+        std::vector<ArgumentDeprecation> deprecations = {},
+        std::vector<ArgType> unsupportedArguments = {});
 
     ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
     ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -165,6 +166,7 @@ private:
     const Argument* FindArgument(ArgType type) const;
 
     const ArgumentDeprecation* FindArgumentDeprecation(ArgType type) const;
+    bool IsUnsupportedArgument(ArgType type) const;
     ArgType ResolveArgumentType(const Argument& argument);
 
     // If type is in m_overridableDefaults, removes any existing entry and
@@ -175,6 +177,7 @@ private:
     ArgMap& m_executionArgs;
     std::vector<Argument> m_arguments;
     std::vector<ArgumentDeprecation> m_argumentDeprecations;
+    std::set<ArgType> m_unsupportedArguments;
 
     Invocation::iterator m_invocationItr;
     std::vector<Argument>::iterator m_positionalSearchItr;

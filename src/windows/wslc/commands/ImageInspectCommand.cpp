@@ -25,12 +25,16 @@ using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 // Image Inspect Command
+std::vector<ArgType> ImageInspectCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImageInspectCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true, Limit::Unlimited),
         Argument::Create(ArgType::InspectFormat),
-        Argument::CreateUnsupported(ArgType::Platform),
     };
 }
 

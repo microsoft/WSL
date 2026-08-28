@@ -20,10 +20,8 @@ namespace wsl::windows::wslc {
 namespace {
     [[noreturn]] void ThrowUnsupportedArgument(const Argument& argument)
     {
-        const auto feature = argument.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name() : argument.Name();
-        const auto message = argument.IsOption() ? Localization::WSLCCLI_UnsupportedOptionError(feature)
-                                                 : Localization::WSLCCLI_UnsupportedArgumentError(feature);
-        throw ArgumentException(message, argument);
+        WI_ASSERT(argument.IsOption());
+        throw ArgumentException(Localization::WSLCCLI_UnsupportedOptionError(std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name()));
     }
 } // namespace
 
@@ -34,7 +32,8 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     bool optionsOnly,
     bool stopOnUnknown,
     const std::vector<Argument>& overridableDefaults,
-    std::vector<ArgumentDeprecation> deprecations) :
+    std::vector<ArgumentDeprecation> deprecations,
+    std::vector<ArgType> unsupportedArguments) :
     m_invocation(inv),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
@@ -62,6 +61,23 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
         }
     }
 
+    for (const auto type : unsupportedArguments)
+    {
+        const auto argument = Argument::Create(type);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            !m_unsupportedArguments.emplace(type).second,
+            "Argument type %d is declared unsupported more than once",
+            static_cast<int>(type));
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            FindArgument(type) != nullptr,
+            "Unsupported argument type %d is also declared as a command argument",
+            static_cast<int>(type));
+        THROW_HR_IF_MSG(E_INVALIDARG, !argument.IsOption(), "Unsupported argument type %d is not an option", static_cast<int>(type));
+        m_standardArgs.emplace_back(argument);
+    }
+
     std::set<ArgType> deprecatedTypes;
     for (const auto& deprecation : m_argumentDeprecations)
     {
@@ -84,9 +100,11 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
             static_cast<int>(deprecatedType));
         THROW_HR_IF_MSG(
             E_INVALIDARG,
-            replacementArgument == nullptr || !replacementArgument->IsVisible(),
-            "Replacement argument type %d is not a supported command argument",
-            static_cast<int>(replacementType));
+            m_unsupportedArguments.contains(deprecatedType),
+            "Argument type %d is declared both deprecated and unsupported",
+            static_cast<int>(deprecatedType));
+        THROW_HR_IF_MSG(
+            E_INVALIDARG, replacementArgument == nullptr, "Replacement argument type %d is not a command argument", static_cast<int>(replacementType));
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             !deprecatedArgument.IsOption() || deprecatedArgument.Kind() != replacementArgument->Kind(),
@@ -248,6 +266,11 @@ const ArgumentDeprecation* ParseArgumentsStateMachine::FindArgumentDeprecation(A
     return deprecation != m_argumentDeprecations.end() ? &*deprecation : nullptr;
 }
 
+bool ParseArgumentsStateMachine::IsUnsupportedArgument(ArgType type) const
+{
+    return m_unsupportedArguments.contains(type);
+}
+
 ArgType ParseArgumentsStateMachine::ResolveArgumentType(const Argument& argument)
 {
     const auto deprecation = FindArgumentDeprecation(argument.Type());
@@ -387,11 +410,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalA
         return ArgumentException(Localization::WSLCCLI_ExtraPositionalError(currArg));
     }
 
-    if (!nextPositional->IsAccepted())
-    {
-        ThrowUnsupportedArgument(*nextPositional);
-    }
-
     // First positional found is the anchor positional.
     if (!m_anchorPositional.has_value())
     {
@@ -425,11 +443,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     const Argument* nextPositional = NextPositional();
     if (nextPositional)
     {
-        if (!nextPositional->IsAccepted())
-        {
-            ThrowUnsupportedArgument(*nextPositional);
-        }
-
         m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
         return {};
     }
@@ -440,11 +453,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     if (m_forwardArgs.empty())
     {
         return ArgumentException(Localization::WSLCCLI_CommandHasNoForwardArgumentsError(currArg));
-    }
-
-    if (!m_forwardArgs.front().IsAccepted())
-    {
-        ThrowUnsupportedArgument(m_forwardArgs.front());
     }
 
     // currArg is the first forwarded argument
@@ -502,7 +510,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
     }
 
-    if (!firstArg->IsAccepted())
+    if (IsUnsupportedArgument(firstArg->Type()))
     {
         ThrowUnsupportedArgument(*firstArg);
     }
@@ -554,7 +562,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
         }
 
-        if (!nextArg->IsAccepted())
+        if (IsUnsupportedArgument(nextArg->Type()))
         {
             ThrowUnsupportedArgument(*nextArg);
         }
@@ -638,7 +646,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
     {
         if (string::IsEqual(argName, arg.Name()))
         {
-            if (!arg.IsAccepted())
+            if (IsUnsupportedArgument(arg.Type()))
             {
                 ThrowUnsupportedArgument(arg);
             }

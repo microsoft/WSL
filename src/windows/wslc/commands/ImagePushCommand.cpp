@@ -24,11 +24,15 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Push Command
+std::vector<ArgType> ImagePushCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImagePushCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        Argument::CreateUnsupported(ArgType::Platform),
     };
 }
 

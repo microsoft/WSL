@@ -98,11 +98,13 @@ class WSLCCLICommandUnitTests
         for (const auto command : commands)
         {
             LogComment(L"Checking " + command->FullName());
+            const auto unsupportedArguments = command->GetUnsupportedArguments();
+            VERIFY_ARE_EQUAL(1u, unsupportedArguments.size());
+            VERIFY_ARE_EQUAL(ArgType::Platform, unsupportedArguments.front());
+
             const auto arguments = command->GetArguments();
             const auto platform = std::ranges::find(arguments, ArgType::Platform, &Argument::Type);
-            VERIFY_IS_TRUE(platform != arguments.end());
-            VERIFY_ARE_EQUAL(ArgumentState::Unsupported, platform->State());
-            VERIFY_IS_TRUE(platform->Description().empty());
+            VERIFY_IS_TRUE(platform == arguments.end());
         }
     }
 
@@ -318,16 +320,18 @@ class WSLCCLICommandUnitTests
             const std::wstring commandFullName(current->FullName());
             auto arguments = current->GetAllArguments();
             const auto deprecations = current->GetArgumentDeprecations();
-            if (!deprecations.empty())
-            {
-                Invocation invocation{std::vector<std::wstring>{}};
-                ArgMap args;
-                ParseArgumentsStateMachine stateMachine{invocation, args, arguments, false, false, {}, deprecations};
-            }
+            const auto unsupportedArguments = current->GetUnsupportedArguments();
+            Invocation invocation{std::vector<std::wstring>{}};
+            ArgMap args;
+            ParseArgumentsStateMachine stateMachine{invocation, args, arguments, false, false, {}, deprecations, unsupportedArguments};
 
             for (const auto& deprecation : deprecations)
             {
                 arguments.emplace_back(Argument::Create(deprecation.DeprecatedType()));
+            }
+            for (const auto type : unsupportedArguments)
+            {
+                arguments.emplace_back(Argument::Create(type));
             }
 
             std::unordered_set<size_t> seenTypes;

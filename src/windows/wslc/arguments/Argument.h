@@ -26,12 +26,6 @@ Abstract:
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
-enum class ArgumentState
-{
-    Supported,
-    Unsupported,
-};
-
 struct ArgumentDeprecation
 {
     ArgumentDeprecation(ArgType deprecatedType, ArgType replacementType) :
@@ -88,9 +82,6 @@ struct Argument
         std::optional<argument::Limit> limit = std::nullopt,
         std::optional<std::wstring> desc = std::nullopt);
 
-    // Creates an argument that is recognized by the parser but rejected and omitted from help.
-    static Argument CreateUnsupported(ArgType type, std::optional<argument::Limit> limit = std::nullopt);
-
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;
 
@@ -123,18 +114,6 @@ struct Argument
     {
         return m_type == argument::Kind::Flag || m_type == argument::Kind::Value;
     }
-    bool IsAccepted() const
-    {
-        return m_state != ArgumentState::Unsupported;
-    }
-    bool IsVisible() const
-    {
-        return m_state == ArgumentState::Supported;
-    }
-    ArgumentState State() const
-    {
-        return m_state;
-    }
     Limit Limit() const
     {
         return m_limit;
@@ -164,6 +143,5 @@ private:
     bool m_required = DefaultRequired;
     argument::Kind m_type = DefaultKind;
     argument::Limit m_limit = DefaultLimit;
-    ArgumentState m_state = ArgumentState::Supported;
 };
 } // namespace wsl::windows::wslc

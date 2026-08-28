@@ -31,11 +31,6 @@ namespace wsl::windows::wslc {
 std::wstring s_ExecutableName = L"wslc";
 
 namespace {
-    void FilterArgumentsByVisibility(std::vector<Argument>& arguments)
-    {
-        std::erase_if(arguments, [](const Argument& argument) { return !argument.IsVisible(); });
-    }
-
     std::vector<std::wstring> WrapAliases(std::span<const std::wstring> aliases, std::optional<size_t> consoleWidth, size_t indent)
     {
         std::vector<std::wstring> lines;
@@ -157,27 +152,6 @@ Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliase
     }
 }
 
-std::vector<Argument> Command::GetVisibleArguments() const
-{
-    auto arguments = GetArguments();
-    FilterArgumentsByVisibility(arguments);
-    return arguments;
-}
-
-std::vector<Argument> Command::GetAllVisibleArguments() const
-{
-    auto arguments = GetAllArguments();
-    FilterArgumentsByVisibility(arguments);
-    return arguments;
-}
-
-std::vector<Argument> Command::GetVisibleGlobalArguments() const
-{
-    auto arguments = GetGlobalArguments();
-    FilterArgumentsByVisibility(arguments);
-    return arguments;
-}
-
 void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const
 {
     constexpr size_t c_helpRowIndent = 2;
@@ -235,7 +209,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         commandAliases = GetCommandInvocations(*this);
     }
     auto commands = GetCommands();
-    auto arguments = GetAllVisibleArguments();
+    auto arguments = GetAllArguments();
     std::vector<Argument> helpArguments;
     if (fullHelp)
     {
@@ -244,7 +218,6 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     else if (argumentHelp)
     {
         helpArguments.assign(relevantArguments.begin(), relevantArguments.end());
-        std::erase_if(helpArguments, [](const Argument& argument) { return !argument.IsVisible(); });
     }
 
     std::vector<Argument> standardArgs;
@@ -294,7 +267,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     const bool hasHelpArguments = !helpPositionalArgs.empty();
     const bool hasHelpOptions = !helpStandardArgs.empty();
     const bool hasHelpForwardArgs = !helpForwardArgs.empty();
-    auto globalArgs = RootCommand().GetVisibleGlobalArguments();
+    auto globalArgs = RootCommand().GetGlobalArguments();
 
     // Build usage line with Write calls for each segment.
     {
@@ -627,15 +600,16 @@ void Command::ParseArguments(
     bool optionsOnly,
     bool stopOnUnknown,
     const std::vector<Argument>& overridableDefaults,
-    std::vector<ArgumentDeprecation> deprecations) const
+    std::vector<ArgumentDeprecation> deprecations,
+    std::vector<ArgType> unsupportedArguments) const
 {
-    if (definedArgs.empty())
+    if (definedArgs.empty() && deprecations.empty() && unsupportedArguments.empty())
     {
         return;
     }
 
     ParseArgumentsStateMachine stateMachine{
-        inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults, std::move(deprecations)};
+        inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults, std::move(deprecations), std::move(unsupportedArguments)};
 
     while (stateMachine.Step())
     {
@@ -665,11 +639,6 @@ void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& def
 
     for (const auto& arg : definedArgs)
     {
-        if (!arg.IsAccepted())
-        {
-            continue;
-        }
-
         if (arg.Required() && !source.Contains(arg.Type()))
         {
             const auto name = arg.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + arg.Name() : arg.Name();
@@ -753,8 +722,8 @@ void Command::ValidateArgumentsInternal(ArgMap&) const
 
 std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType> types) const
 {
-    auto arguments = GetAllVisibleArguments();
-    auto globalArguments = RootCommand().GetVisibleGlobalArguments();
+    auto arguments = GetAllArguments();
+    auto globalArguments = RootCommand().GetGlobalArguments();
     arguments.insert(arguments.end(), globalArguments.begin(), globalArguments.end());
 
     std::vector<Argument> result;

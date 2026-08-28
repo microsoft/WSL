@@ -24,11 +24,15 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Pull Command
+std::vector<ArgType> ImagePullCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImagePullCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        Argument::CreateUnsupported(ArgType::Platform),
         Argument::Create(ArgType::Quiet, std::nullopt, std::nullopt, Localization::WSLCCLI_PullQuietArgDescription()),
         // Argument::Create(ArgType::Scheme),
         // Argument::Create(ArgType::Progress),

@@ -25,13 +25,17 @@ using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 // Image Remove Command
+std::vector<ArgType> ImageRemoveCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImageRemoveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true, Limit::Unlimited),
         Argument::Create(ArgType::ImageForce),
         Argument::Create(ArgType::NoPrune),
-        Argument::CreateUnsupported(ArgType::Platform),
     };
 }
 

@@ -54,6 +54,7 @@ struct ContainerCreateCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -190,6 +191,7 @@ struct ContainerRunCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 

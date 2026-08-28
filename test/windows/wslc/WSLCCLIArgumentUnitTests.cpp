@@ -60,8 +60,12 @@ public:
             Argument::Create(ArgType::StopTimeout),
             Argument::Create(ArgType::Quiet),
             Argument::Create(ArgType::Env, false, Limit::Unlimited),
-            Argument::CreateUnsupported(ArgType::Platform),
         };
+    }
+
+    std::vector<ArgType> GetUnsupportedArguments() const override
+    {
+        return {ArgType::Platform};
     }
 
     std::vector<ArgumentDeprecation> GetArgumentDeprecations() const override
@@ -77,7 +81,6 @@ public:
     {
         return {
             Argument::Create(ArgType::Session),
-            Argument::CreateUnsupported(ArgType::NoColor),
         };
     }
 
@@ -124,30 +127,18 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
     }
 
-    TEST_METHOD(ArgumentCreate_State)
-    {
-        const auto supported = Argument::Create(ArgType::Force);
-        VERIFY_ARE_EQUAL(ArgumentState::Supported, supported.State());
-        VERIFY_IS_TRUE(supported.IsAccepted());
-        VERIFY_IS_TRUE(supported.IsVisible());
-
-        const auto unsupported = Argument::CreateUnsupported(ArgType::Force);
-        VERIFY_ARE_EQUAL(ArgumentState::Unsupported, unsupported.State());
-        VERIFY_IS_FALSE(unsupported.IsAccepted());
-        VERIFY_IS_FALSE(unsupported.IsVisible());
-    }
-
-    TEST_METHOD(ArgumentAccessors_GetVisibleArguments)
+    TEST_METHOD(CommandArguments_SeparateUnsupportedOptions)
     {
         DeprecatedArgumentCommand command;
 
-        VERIFY_ARE_EQUAL(4u, command.GetArguments().size());
-        VERIFY_ARE_EQUAL(3u, command.GetVisibleArguments().size());
+        VERIFY_ARE_EQUAL(3u, command.GetArguments().size());
+        const auto unsupportedArguments = command.GetUnsupportedArguments();
+        VERIFY_ARE_EQUAL(1u, unsupportedArguments.size());
+        VERIFY_ARE_EQUAL(ArgType::Platform, unsupportedArguments.front());
 
-        const auto globalArguments = command.GetVisibleGlobalArguments();
+        const auto globalArguments = command.GetGlobalArguments();
         VERIFY_ARE_EQUAL(1u, globalArguments.size());
         VERIFY_ARE_EQUAL(ArgType::Session, globalArguments.front().Type());
-        VERIFY_ARE_EQUAL(2u, command.GetGlobalArguments().size());
     }
 
     TEST_METHOD(DeprecatedValueOption_ParsesAsReplacementAndWarns)
@@ -242,7 +233,7 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(std::wstring{c_deprecatedEnvFileWarning} + L"\n", capture.captured());
     }
 
-    TEST_METHOD(NonVisibleArguments_AreHiddenFromHelp)
+    TEST_METHOD(DeprecatedAndUnsupportedArguments_AreHiddenFromHelp)
     {
         DeprecatedArgumentCommand command;
         CaptureTerminal capture;

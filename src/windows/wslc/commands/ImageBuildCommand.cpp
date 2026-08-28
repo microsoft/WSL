@@ -24,6 +24,11 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Build Command
+std::vector<ArgType> ImageBuildCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImageBuildCommand::GetArguments() const
 {
     return {
@@ -36,7 +41,6 @@ std::vector<Argument> ImageBuildCommand::GetArguments() const
         Argument::Create(ArgType::BuildLabel, false, Limit::Unlimited),
         Argument::Create(ArgType::NoCache),
         Argument::Create(ArgType::BuildOutput, false, std::nullopt, Localization::WSLCCLI_BuildOutputArgDescription()),
-        Argument::CreateUnsupported(ArgType::Platform),
         Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Secret, false, Limit::Unlimited),
         Argument::Create(ArgType::Tag, false, Limit::Unlimited),

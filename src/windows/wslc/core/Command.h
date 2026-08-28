@@ -73,7 +73,6 @@ struct Command
     {
         return m_aliases;
     }
-
     virtual std::vector<std::unique_ptr<Command>> GetCommands() const
     {
         return {};
@@ -82,11 +81,14 @@ struct Command
     {
         return {};
     }
+    virtual std::vector<ArgType> GetUnsupportedArguments() const
+    {
+        return {};
+    }
     virtual std::vector<ArgumentDeprecation> GetArgumentDeprecations() const
     {
         return {};
     }
-    std::vector<Argument> GetVisibleArguments() const;
 
     virtual std::vector<Argument> GetAllArguments() const
     {
@@ -94,14 +96,12 @@ struct Command
         args.emplace_back(Argument::Create(ArgType::Help));
         return args;
     }
-    std::vector<Argument> GetAllVisibleArguments() const;
 
     // Options accepted before any subcommand on the command line.
     virtual std::vector<Argument> GetGlobalArguments() const
     {
         return {};
     }
-    std::vector<Argument> GetVisibleGlobalArguments() const;
 
     // Args eligible for environment binding.
     virtual std::vector<Argument> GetEnvArguments() const
@@ -141,11 +141,12 @@ struct Command
         bool optionsOnly = false,
         bool stopOnUnknown = false,
         const std::vector<Argument>& overridableDefaults = {},
-        std::vector<ArgumentDeprecation> deprecations = {}) const;
+        std::vector<ArgumentDeprecation> deprecations = {},
+        std::vector<ArgType> unsupportedArguments = {}) const;
 
     void ParseArguments(Invocation& inv, ArgMap& target) const
     {
-        ParseArguments(inv, target, GetAllArguments(), false, false, {}, GetArgumentDeprecations());
+        ParseArguments(inv, target, GetAllArguments(), false, false, {}, GetArgumentDeprecations(), GetUnsupportedArguments());
     }
 
     void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;

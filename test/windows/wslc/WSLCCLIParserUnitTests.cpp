@@ -51,11 +51,11 @@ class WSLCCLIParserUnitTests
     {
         auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --platform linux/amd64");
         ArgMap args;
-        ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Platform)}};
+        ParseArgumentsStateMachine stateMachine{inv, args, {}, false, false, {}, {}, {ArgType::Platform}};
 
         VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
             return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform") &&
-                   exception.Arguments().size() == 1 && exception.Arguments().front().Type() == ArgType::Platform;
+                   exception.Arguments().empty();
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::Platform));
     }
@@ -64,26 +64,24 @@ class WSLCCLIParserUnitTests
     {
         auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc -f");
         ArgMap args;
-        ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::Force)}};
+        ParseArgumentsStateMachine stateMachine{inv, args, {}, false, false, {}, {}, {ArgType::Force}};
 
         VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
             return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--force") &&
-                   exception.Arguments().size() == 1 && exception.Arguments().front().Type() == ArgType::Force;
+                   exception.Arguments().empty();
         });
         VERIFY_IS_FALSE(args.Contains(ArgType::Force));
     }
 
-    TEST_METHOD(UnsupportedPositionalArgument_ThrowsSpecificException)
+    TEST_METHOD(UnsupportedArgument_RequiresNamedOption)
     {
-        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc container");
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc");
         ArgMap args;
-        ParseArgumentsStateMachine stateMachine{inv, args, {Argument::CreateUnsupported(ArgType::ContainerId)}};
 
-        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
-            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedArgumentError(L"container-id") &&
-                   exception.Arguments().size() == 1 && exception.Arguments().front().Type() == ArgType::ContainerId;
-        });
-        VERIFY_IS_FALSE(args.Contains(ArgType::ContainerId));
+        VERIFY_THROWS_SPECIFIC(
+            ParseArgumentsStateMachine(inv, args, {}, false, false, {}, {}, {ArgType::ContainerId}),
+            wil::ResultException,
+            [](const wil::ResultException& exception) { return exception.GetErrorCode() == E_INVALIDARG; });
     }
 
     TEST_METHOD(DeprecatedMapping_RequiresDeclaredReplacement)

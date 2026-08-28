@@ -24,6 +24,11 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Run Command
+std::vector<ArgType> ContainerRunCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ContainerRunCommand::GetArguments() const
 {
     // clang-format off
@@ -60,7 +65,6 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::NoHealthcheck),
-        Argument::CreateUnsupported(ArgType::Platform),
         Argument::Create(ArgType::Publish, false, Limit::Unlimited),
         Argument::Create(ArgType::PublishAll),
         Argument::Create(ArgType::Pull),
