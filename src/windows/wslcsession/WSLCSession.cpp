@@ -1924,19 +1924,13 @@ try
         std::map<std::string, std::vector<std::string>> digestsByRepo;
         for (const auto& repoDigest : e.RepoDigests)
         {
-            const auto separator = repoDigest.find('@');
-            if (separator == std::string::npos || separator == 0)
+            const auto reference = wslutil::ImageReference::TryParse(repoDigest);
+            if (!reference.has_value() || !reference->Digest.has_value())
             {
                 continue;
             }
 
-            auto repoName = repoDigest.substr(0, separator);
-            if (!wslutil::ImageReference::TryParse(repoName).has_value())
-            {
-                continue;
-            }
-
-            digestsByRepo[std::move(repoName)].push_back(repoDigest);
+            digestsByRepo[reference->Repository.Name].push_back(repoDigest);
         }
 
         const auto rowsBefore = rows.size();

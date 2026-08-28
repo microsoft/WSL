@@ -13063,6 +13063,12 @@ class WSLCTests
         VERIFY_IS_FALSE(ImageReference::TryParse("<none>:<none>").has_value());
         VERIFY_IS_FALSE(ImageReference::TryParse("<none>@<none>").has_value());
 
+        // A repository digest is only usable when the digest itself is well formed.
+        VERIFY_IS_FALSE(ImageReference::TryParse("debian@").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse("debian@sha256:").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse("debian@sha256:notahexdigest").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse("debian").value().Digest.has_value());
+
         const auto parsed = ImageReference::TryParse("ubuntu:22.04");
         VERIFY_IS_TRUE(parsed.has_value());
         VERIFY_ARE_EQUAL(parsed->Repository.Name, std::string{"ubuntu"});
