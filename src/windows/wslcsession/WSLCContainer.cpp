@@ -1453,7 +1453,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
         wasRunning = m_state == WslcContainerStateRunning;
 
         // N.B. Stop() and Start() each take m_lock, so it cannot be held across both phases. m_restart
-        // keeps the pair indivisible instead.
+        // stands them down until the start phase commits Running instead.
         m_restart = restart;
     }
 
