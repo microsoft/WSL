@@ -61,11 +61,6 @@ std::optional<int> Terminal::GetConsoleWidth(Level level) const
     return ChannelFor(level).GetConsoleWidth();
 }
 
-void Terminal::Flush(Level level) const
-{
-    ChannelFor(level).Flush();
-}
-
 std::wstring Terminal::PromptForLine(Level level, std::wstring_view label, bool mask)
 {
     // Write the label without a trailing newline so the cursor stays inline (matching

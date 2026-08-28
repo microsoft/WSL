@@ -271,24 +271,6 @@ class WSLCCLITerminalUnitTests
         VERIFY_IS_FALSE(cap.terminal.GetConsoleWidth(Terminal::Level::Error).has_value());
     }
 
-    TEST_METHOD(Terminal_FlushPushesBufferedOutputToTheFile)
-    {
-        // CapturePipe disables CRT buffering, so this test opens its own fully buffered file
-        // to reproduce how a redirected wslc stream actually behaves.
-        const auto path = std::filesystem::temp_directory_path() / std::format(L"wslc-terminal-flush-{}.txt", GetCurrentProcessId());
-        auto cleanup = wil::scope_exit([&] { std::filesystem::remove(path); });
-
-        wil::unique_file file{_wfopen(path.c_str(), L"w")};
-        VERIFY_IS_NOT_NULL(file.get());
-
-        Terminal terminal{file.get(), /*outVt*/ false, file.get(), /*errVt*/ false};
-        terminal.Output(L"buffered\n");
-        VERIFY_ARE_EQUAL(static_cast<uintmax_t>(0), std::filesystem::file_size(path));
-
-        terminal.Flush(Terminal::Level::Output);
-        VERIFY_ARE_NOT_EQUAL(static_cast<uintmax_t>(0), std::filesystem::file_size(path));
-    }
-
     TEST_METHOD(Terminal_Write_MixesSequencesWithStandardFormatArgs)
     {
         // Terminal.Write is std::format under the hood — any formattable type works

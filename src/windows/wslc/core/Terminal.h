@@ -156,9 +156,6 @@ struct Terminal
     // Console write width minus one (autowrap guard), or nullopt when redirected.
     std::optional<int> GetConsoleWidth(Level level) const;
 
-    // Redirected stdout is fully buffered while stderr is not, so later output on another level can overtake it.
-    void Flush(Level level) const;
-
 private:
     const OutputChannel& ChannelFor(Level level) const noexcept
     {
