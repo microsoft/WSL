@@ -13,22 +13,28 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    // Normalizes a seconds-since-epoch window bound from the COM boundary, treating zero as "unset".
-    std::optional<uint64_t> ToTimeBound(uint64_t TimeSeconds)
+    std::optional<std::chrono::sys_seconds> ToTimeBound(int64_t TimeSeconds)
     {
         if (TimeSeconds == 0)
         {
             return std::nullopt;
         }
 
-        return TimeSeconds;
+        return std::chrono::sys_seconds{std::chrono::seconds{TimeSeconds}};
     }
+
+    constexpr int64_t c_maxBoundSeconds = INT64_MAX / 1'000'000'000;
 
 } // namespace
 
 void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
 {
     std::lock_guard lock(m_lock);
+
+    // Events are recorded in Docker's delivery order, which is also timestamp order. Subscribers rely on
+    // this: they resume from a sequence number, so an out-of-order event could never be inserted where it
+    // belongs without hiding it from readers that already moved past that point.
+    WI_ASSERT(m_events.empty() || m_events.back().timeNano <= Event.timeNano);
 
     m_events.push_back(std::move(Event));
 
@@ -41,8 +47,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(
-    std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::optional<uint64_t> TimeSeconds) noexcept
+void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
@@ -50,9 +55,8 @@ try
     event.Action = std::move(Action);
     event.Actor.ID = ActorId;
     event.Actor.Attributes = std::move(ActorAttributes);
-
-    event.time = TimeSeconds.value_or(static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count()));
+    event.time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
+    event.timeNano = TimeNano;
 
     Append(std::move(event));
 }
@@ -101,11 +105,15 @@ namespace {
 } // namespace
 
 Microsoft::WRL::ComPtr<IWSLCEventStream> EventStore::CreateStream(
-    Microsoft::WRL::ComPtr<WSLCSession> Session, uint64_t SinceTime, uint64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters)
+    Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters)
 {
-    // A non-zero until earlier than since describes a backwards, empty window.
+    // Bounds are compared against nanosecond event timestamps in Get(), so anything past
+    // c_maxBoundSeconds overflows; zero means unbounded, so it never makes the window backwards.
     THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcEventsInvalidTimeWindow(SinceTime, UntilTime), UntilTime != 0 && SinceTime > UntilTime);
+        E_INVALIDARG,
+        Localization::MessageWslcEventsInvalidTimeWindow(SinceTime, UntilTime),
+        SinceTime < 0 || SinceTime > c_maxBoundSeconds || UntilTime < 0 || UntilTime > c_maxBoundSeconds ||
+            (SinceTime != 0 && UntilTime != 0 && SinceTime > UntilTime));
 
     Microsoft::WRL::ComPtr<EventStream> stream;
     THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<EventStream>(&stream, std::move(Session), this, SinceTime, UntilTime, std::move(Filters)));
@@ -127,7 +135,7 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::GetLockHeld(
     return m_events[index];
 }
 
-bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<uint64_t> Until)
+bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until)
 {
     // Ready once the reader's event is buffered, its slot is evicted, or the session terminates.
     // Eviction while parked wakes us too, so the caller reports the gap on its next pass.
@@ -135,9 +143,7 @@ bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t Seque
 
     if (Until.has_value())
     {
-        // Until is Unix seconds and system_clock shares that epoch, so it doubles as the wait deadline.
-        const std::chrono::sys_seconds deadline{std::chrono::seconds{static_cast<int64_t>(Until.value())}};
-        if (!m_updated.wait_until(Lock, deadline, ready))
+        if (!m_updated.wait_until(Lock, Until.value(), ready))
         {
             return false;
         }
@@ -153,8 +159,8 @@ bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t Seque
 
 std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
     std::optional<uint64_t>& SequenceNumber,
-    std::optional<uint64_t> Since,
-    std::optional<uint64_t> Until,
+    std::optional<std::chrono::sys_seconds> Since,
+    std::optional<std::chrono::sys_seconds> Until,
     const std::map<std::string, std::vector<std::string>>& Filters)
 {
     std::unique_lock lock(m_lock);
@@ -190,19 +196,20 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         }
 
         const auto event = GetLockHeld(SequenceNumber.value()).value();
+        const std::chrono::sys_time<std::chrono::nanoseconds> eventTime{std::chrono::nanoseconds{event.timeNano}};
 
-        // An event past the until-bound closes the window: the stream is finished.
-        if (Until.has_value() && event.time > Until.value())
-        {
-            return std::nullopt;
-        }
-
-        // Advance past this event so the next read resumes at the following one.
+        // Advance in delivery order before applying the time window. Docker timestamps are not an
+        // ordering key, so an event past Until cannot prove that every later event is also past it.
         SequenceNumber.value()++;
+
+        if (Until.has_value() && eventTime > Until.value())
+        {
+            continue;
+        }
 
         // Return the event if it falls within the since-bound and matches the caller's filters;
         // otherwise loop to skip it.
-        if ((!Since.has_value() || event.time >= Since.value()) && EventMatchesFilters(event, Filters))
+        if ((!Since.has_value() || eventTime >= Since.value()) && EventMatchesFilters(event, Filters))
         {
             return event;
         }
@@ -222,8 +229,8 @@ void EventStore::OnSessionTerminating()
 HRESULT EventStream::RuntimeClassInitialize(
     Microsoft::WRL::ComPtr<WSLCSession> Session,
     EventStore* Store,
-    uint64_t SinceTime,
-    uint64_t UntilTime,
+    int64_t SinceTime,
+    int64_t UntilTime,
     std::map<std::string, std::vector<std::string>> Filters)
 {
     m_session = std::move(Session);

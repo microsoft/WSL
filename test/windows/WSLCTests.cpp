@@ -6900,6 +6900,7 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
                 VERIFY_ARE_EQUAL(c_labelValue, event.Actor.Attributes.at(c_labelKey));
                 VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+                VERIFY_ARE_EQUAL(event.time, duration_cast<seconds>(nanoseconds{event.timeNano}).count());
 
                 if (action == "stop")
                 {
@@ -6909,17 +6910,11 @@ class WSLCTests
                 {
                     VERIFY_IS_FALSE(event.Actor.Attributes.contains("exitCode"));
                 }
-
-                // Events are reported in non-decreasing time order.
-                if (i > 0)
-                {
-                    VERIFY_IS_TRUE(event.time >= events[i - 1].time);
-                }
             }
         };
 
         // Run a container through its create/start/kill/stop lifecycle inside a bounded time window.
-        const ULONGLONG since = now();
+        const LONGLONG since = now();
         std::string id;
         {
             WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
@@ -6934,7 +6929,8 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
         }
 
-        ULONGLONG until = now();
+        const LONGLONG until = now() + 1;
+        std::vector<wsl::windows::common::wslc_schema::Event> lifecycleEvents;
 
         // The container's create, start, kill then stop events are reported in order, each carrying
         // the container's 64-hex id as the actor.
@@ -6943,12 +6939,12 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
-            auto events = drain(stream.get());
-            verifyEvents(events, id, {"create", "start", "kill", "stop", "destroy"});
+            lifecycleEvents = drain(stream.get());
+            verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "stop", "destroy"});
 
             // The whole lifecycle falls inside the requested window.
-            VERIFY_IS_TRUE(events[0].time >= since);
-            VERIFY_IS_TRUE(events[4].time <= until);
+            VERIFY_IS_TRUE(lifecycleEvents[0].time >= since);
+            VERIFY_IS_TRUE(lifecycleEvents[4].time <= until);
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
@@ -6965,6 +6961,20 @@ class WSLCTests
         verifyEventFilter("start");
         verifyEventFilter("kill");
         verifyEventFilter("stop");
+
+        // An integer until-bound denotes the start of that second. A Docker event later within the
+        // same second is outside the window, even though its whole-second time equals the bound.
+        {
+            const auto fractionalEvent = std::ranges::find_if(lifecycleEvents, [](const auto& event) {
+                return nanoseconds{event.timeNano} != duration_cast<seconds>(nanoseconds{event.timeNano});
+            });
+            VERIFY_IS_TRUE(fractionalEvent != lifecycleEvents.end());
+
+            WSLCFilter filters[]{{"container", id.c_str()}, {"event", fractionalEvent->Action.c_str()}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, fractionalEvent->time, filters, ARRAYSIZE(filters), &stream));
+            VERIFY_IS_TRUE(drain(stream.get()).empty());
+        }
 
         // Image events are not recorded yet, so a 'type=image' filter excludes the container's
         // events and leaves the stream empty.
@@ -6996,7 +7006,7 @@ class WSLCTests
     WSLC_TEST_METHOD(EventStreamSessionTerminationAbortsReader)
     {
         WSLCFilter filter{"type", "container"};
-        const ULONGLONG since = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+        const LONGLONG since = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
         wil::com_ptr<IWSLCEventStream> stream;
         VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 0, &filter, 1, &stream));
 
