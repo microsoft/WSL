@@ -6988,6 +6988,27 @@ class WSLCTests
                 VERIFY_SUCCEEDED(restartHr);
             }
         }
+
+        // A restart issued during a restart waits for both of the first one's phases, so the two pairs
+        // cannot interleave and the container is left running.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-restart", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit([&]() { restartThread.join(); });
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            // The first restart is still in its stop phase, so this one only returns once that pair is done.
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            VERIFY_SUCCEEDED(restartResult.get_future().get());
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        }
     }
 
     WSLC_TEST_METHOD(OpenContainer)
