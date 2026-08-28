@@ -154,7 +154,7 @@ class WSLCE2EInspectTests
         auto inspectData =
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
-        VERIFY_ARE_EQUAL(WslcContainerName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        VERIFY_ARE_EQUAL(std::format(L"/{}", WslcContainerName), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
 
         // Config.Labels must be present in the emitted JSON even when empty.
         auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
@@ -237,7 +237,7 @@ class WSLCE2EInspectTests
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(std::format(L"/{}", DebianImage.Name), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
 
         // With --type container
@@ -247,7 +247,7 @@ class WSLCE2EInspectTests
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(std::format(L"/{}", DebianImage.Name), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
 
         // With --type image
