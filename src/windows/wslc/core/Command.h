@@ -82,6 +82,10 @@ struct Command
     {
         return {};
     }
+    virtual std::vector<ArgumentDeprecation> GetArgumentDeprecations() const
+    {
+        return {};
+    }
     std::vector<Argument> GetVisibleArguments() const;
 
     virtual std::vector<Argument> GetAllArguments() const
@@ -136,11 +140,12 @@ struct Command
         std::vector<Argument> definedArgs,
         bool optionsOnly = false,
         bool stopOnUnknown = false,
-        const std::vector<Argument>& overridableDefaults = {}) const;
+        const std::vector<Argument>& overridableDefaults = {},
+        std::vector<ArgumentDeprecation> deprecations = {}) const;
 
     void ParseArguments(Invocation& inv, ArgMap& target) const
     {
-        ParseArguments(inv, target, GetAllArguments());
+        ParseArguments(inv, target, GetAllArguments(), false, false, {}, GetArgumentDeprecations());
     }
 
     void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
@@ -150,12 +155,7 @@ struct Command
         ValidateArguments(source, GetAllArguments(), true);
     }
 
-    void OutputDeprecatedArgumentWarnings(Terminal& terminal, const ArgMap& source, const std::vector<Argument>& definedArgs) const;
-
-    void OutputDeprecatedArgumentWarnings(Terminal& terminal, const ArgMap& source) const
-    {
-        OutputDeprecatedArgumentWarnings(terminal, source, GetAllArguments());
-    }
+    void OutputDeprecatedArgumentWarnings(Terminal& terminal, const ArgMap& source) const;
 
     virtual void Execute(CLIExecutionContext& context) const;
 

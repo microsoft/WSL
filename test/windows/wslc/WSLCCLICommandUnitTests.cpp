@@ -316,11 +316,24 @@ class WSLCCLICommandUnitTests
             VERIFY_IS_NOT_NULL(current.get());
 
             const std::wstring commandFullName(current->FullName());
+            auto arguments = current->GetAllArguments();
+            const auto deprecations = current->GetArgumentDeprecations();
+            if (!deprecations.empty())
+            {
+                Invocation invocation{std::vector<std::wstring>{}};
+                ArgMap args;
+                ParseArgumentsStateMachine stateMachine{invocation, args, arguments, false, false, {}, deprecations};
+            }
+
+            for (const auto& deprecation : deprecations)
+            {
+                arguments.emplace_back(Argument::Create(deprecation.DeprecatedType()));
+            }
+
             std::unordered_set<size_t> seenTypes;
             std::unordered_map<std::wstring, argument::ArgType> seenNames;
             std::unordered_map<std::wstring, argument::ArgType> seenAliases;
-
-            for (const auto& arg : current->GetAllArguments())
+            for (const auto& arg : arguments)
             {
                 // Check for duplicate ArgType registration.
                 if (!seenTypes.emplace(static_cast<size_t>(arg.Type())).second)

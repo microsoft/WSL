@@ -35,7 +35,7 @@ using namespace wsl::windows::wslc::execution;
 // or to allow multiple uses within a command, then those properties can be set using the Create
 // function below inside the command. In this way all arguments default to "1" use and not required, and
 // this can only be changed in the command's GetArguments function, so the defaults are always clear and
-// consistent. Unsupported and deprecated arguments use the same base definitions so their syntax remains recognizable.
+// consistent. Unsupported arguments use the same base definitions so their syntax remains recognizable.
 Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
 {
     switch (type)
@@ -63,13 +63,6 @@ Argument Argument::CreateUnsupported(ArgType type, std::optional<argument::Limit
 {
     auto argument = Create(type, false, limit);
     argument.m_state = ArgumentState::Unsupported;
-    return argument;
-}
-
-Argument Argument::CreateDeprecated(ArgType type, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
-{
-    auto argument = Create(type, false, limit, std::move(desc));
-    argument.m_state = ArgumentState::Deprecated;
     return argument;
 }
 

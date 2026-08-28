@@ -30,7 +30,28 @@ enum class ArgumentState
 {
     Supported,
     Unsupported,
-    Deprecated,
+};
+
+struct ArgumentDeprecation
+{
+    ArgumentDeprecation(ArgType deprecatedType, ArgType replacementType) :
+        m_deprecatedType(deprecatedType), m_replacementType(replacementType)
+    {
+    }
+
+    ArgType DeprecatedType() const
+    {
+        return m_deprecatedType;
+    }
+
+    ArgType ReplacementType() const
+    {
+        return m_replacementType;
+    }
+
+private:
+    ArgType m_deprecatedType;
+    ArgType m_replacementType;
 };
 
 // An argument to a command.
@@ -69,9 +90,6 @@ struct Argument
 
     // Creates an argument that is recognized by the parser but rejected and omitted from help.
     static Argument CreateUnsupported(ArgType type, std::optional<argument::Limit> limit = std::nullopt);
-
-    // Creates an argument that is accepted and omitted from help. Its description provides guidance in the warning.
-    static Argument CreateDeprecated(ArgType type, std::optional<argument::Limit> limit = std::nullopt, std::optional<std::wstring> desc = std::nullopt);
 
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;
@@ -112,10 +130,6 @@ struct Argument
     bool IsVisible() const
     {
         return m_state == ArgumentState::Supported;
-    }
-    bool IsDeprecated() const
-    {
-        return m_state == ArgumentState::Deprecated;
     }
     ArgumentState State() const
     {

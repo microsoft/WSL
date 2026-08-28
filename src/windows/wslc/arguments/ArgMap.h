@@ -16,6 +16,7 @@ Abstract:
 #pragma once
 #include "ArgumentTypes.h"
 #include "EnumVariantMap.h"
+#include <algorithm>
 #include <any>
 #include <map>
 #include <set>
@@ -53,15 +54,14 @@ namespace details {
 // so this header stays decoupled from the converter/domain headers.
 void EnsureArgumentValidated(ArgMap& map, ArgType type);
 
-// Map-action callback (defined after ArgMap, as it calls a member): operations that can mutate raw
-// values update that ArgType's validation state.
-inline void ArgMapInvalidateValidatedCache(const void* map, ArgType type, EnumBasedVariantMapAction action);
+// Map-action callback defined after ArgMap because it calls a member.
+inline void ArgMapHandleAction(const void* map, ArgType type, EnumBasedVariantMapAction action);
 
 // This is the main ArgType map used for storing parsed arguments.
-struct ArgMap : private wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>
+struct ArgMap : private wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapHandleAction>
 {
 private:
-    using Base = wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
+    using Base = wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapHandleAction>;
 
     friend struct details::RawArgMapAccess;
 
@@ -82,11 +82,17 @@ public:
     using Base::Count;
     using Base::GetCount;
     using Base::GetKeys;
-    using Base::IsMatchingType;
     using Base::Remove;
 
     template <ArgType E>
     using value_t = typename details::ArgValueTraits<E>::value_t;
+
+    template <typename V>
+    bool IsMatchingType(ArgType type) const
+    {
+        ThrowIfDeprecatedArgument(type);
+        return Base::template IsMatchingType<V>(type);
+    }
 
     // Validated-value cache. Argument validation converts raw strings into typed values and caches
     // them here so execution reuses them without re-parsing. The store is type-erased (std::any keyed
@@ -97,6 +103,8 @@ public:
     template <ArgType E>
     void AddValidated(typename details::ArgConvertedTypeMapping<E>::value_t value)
     {
+        ThrowIfDeprecatedArgument(E);
+
         using value_t = typename details::ArgConvertedTypeMapping<E>::value_t;
         static_assert(
             !std::is_same_v<value_t, details::NoConversion>,
@@ -109,16 +117,19 @@ public:
 
     bool ContainsValidated(ArgType type) const
     {
+        ThrowIfDeprecatedArgument(type);
         return m_validated.find(type) != m_validated.end();
     }
 
     size_t CountValidated(ArgType type) const
     {
+        ThrowIfDeprecatedArgument(type);
         return m_validated.count(type);
     }
 
     bool IsValidated(ArgType type) const
     {
+        ThrowIfDeprecatedArgument(type);
         return m_validatedTypes.count(type) != 0;
     }
 
@@ -126,6 +137,7 @@ public:
     // outlives the raw data.
     void InvalidateValidated(ArgType type)
     {
+        ThrowIfDeprecatedArgument(type);
         ThrowIfImmutable(type, "invalidate cached validation data");
         ClearValidated(type);
     }
@@ -133,6 +145,7 @@ public:
     // Records `type` as validated for its current raw values so reads skip re-validation.
     void MarkValidated(ArgType type)
     {
+        ThrowIfDeprecatedArgument(type);
         if (IsValidated(type))
         {
             return;
@@ -142,9 +155,9 @@ public:
         m_validatedTypes.insert(type);
     }
 
-    void HandleMapMutation(ArgType type, EnumBasedVariantMapAction action)
+    void HandleMapAction(ArgType type, EnumBasedVariantMapAction action)
     {
-        WI_ASSERT(action == EnumBasedVariantMapAction::Add || action == EnumBasedVariantMapAction::GetMutable || action == EnumBasedVariantMapAction::Remove);
+        ThrowIfDeprecatedArgument(type);
 
         const char* operation = nullptr;
         switch (action)
@@ -162,12 +175,50 @@ public:
             break;
 
         default:
-            WI_ASSERT(false);
             return;
         }
 
         ThrowIfImmutable(type, operation);
         ClearValidated(type);
+    }
+
+    void RegisterArgumentDeprecation(ArgType deprecatedType, ArgType replacementType)
+    {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG, deprecatedType == replacementType, "Deprecated argument type %d cannot replace itself", static_cast<int>(deprecatedType));
+
+        const auto [itr, inserted] = m_argumentDeprecations.emplace(deprecatedType, replacementType);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            !inserted && itr->second != replacementType,
+            "Deprecated argument type %d maps to multiple replacement types",
+            static_cast<int>(deprecatedType));
+    }
+
+    void RecordDeprecatedArgumentUse(ArgType deprecatedType)
+    {
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            m_argumentDeprecations.find(deprecatedType) == m_argumentDeprecations.end(),
+            "Deprecated argument type %d was not registered",
+            static_cast<int>(deprecatedType));
+
+        if (std::ranges::find(m_usedDeprecatedArguments, deprecatedType) == m_usedDeprecatedArguments.end())
+        {
+            m_usedDeprecatedArguments.emplace_back(deprecatedType);
+        }
+    }
+
+    std::vector<std::pair<ArgType, ArgType>> GetUsedArgumentDeprecations() const
+    {
+        std::vector<std::pair<ArgType, ArgType>> result;
+        result.reserve(m_usedDeprecatedArguments.size());
+        for (const auto deprecatedType : m_usedDeprecatedArguments)
+        {
+            result.emplace_back(deprecatedType, m_argumentDeprecations.at(deprecatedType));
+        }
+
+        return result;
     }
 
     // Reads an argument in one call: the cached converted value if the argument declares a
@@ -178,6 +229,8 @@ public:
     template <ArgType E>
     const value_t<E>& GetValue(value_t<E> defaultValue = {})
     {
+        ThrowIfDeprecatedArgument(E);
+
         if (const auto* resolvedDefault = GetResolvedDefault<E>())
         {
             return *resolvedDefault;
@@ -216,6 +269,8 @@ public:
     template <ArgType E>
     auto GetAllValues()
     {
+        ThrowIfDeprecatedArgument(E);
+
         static_assert(details::ArgDataMapping<E>::c_kind != Kind::Flag, "GetAllValues is not valid for Kind::Flag arguments.");
 
         if constexpr (!details::ArgValueTraits<E>::Converted)
@@ -336,8 +391,21 @@ private:
             operation);
     }
 
+    void ThrowIfDeprecatedArgument(ArgType type) const
+    {
+        const auto itr = m_argumentDeprecations.find(type);
+        THROW_HR_IF_MSG(
+            E_ILLEGAL_METHOD_CALL,
+            itr != m_argumentDeprecations.end(),
+            "Argument type %d is deprecated for this command; use replacement type %d",
+            static_cast<int>(type),
+            itr != m_argumentDeprecations.end() ? static_cast<int>(itr->second) : -1);
+    }
+
     std::multimap<ArgType, std::any> m_validated;
     std::map<ArgType, std::any> m_resolvedDefaults;
+    std::map<ArgType, ArgType> m_argumentDeprecations;
+    std::vector<ArgType> m_usedDeprecatedArguments;
 
     // ArgTypes validated against their current raw values. Distinct from m_validated (only converted
     // arguments populate that), so validate-only arguments are covered too. Cleared per type by
@@ -348,15 +416,11 @@ private:
     std::set<ArgType> m_immutableTypes;
 };
 
-// Only operations that can mutate raw values affect validation state; const reads are ignored.
 // Recovering the non-const ArgMap from the callback's type-erased pointer is valid because these
-// actions originate from non-const base operations. The base subobject is at offset 0 of ArgMap.
-inline void ArgMapInvalidateValidatedCache(const void* map, ArgType type, EnumBasedVariantMapAction action)
+// actions originate from the private base subobject at offset 0 of ArgMap.
+inline void ArgMapHandleAction(const void* map, ArgType type, EnumBasedVariantMapAction action)
 {
-    if (action == EnumBasedVariantMapAction::Add || action == EnumBasedVariantMapAction::GetMutable || action == EnumBasedVariantMapAction::Remove)
-    {
-        const_cast<ArgMap*>(static_cast<const ArgMap*>(map))->HandleMapMutation(type, action);
-    }
+    const_cast<ArgMap*>(static_cast<const ArgMap*>(map))->HandleMapAction(type, action);
 }
 
 } // namespace wsl::windows::wslc::argument

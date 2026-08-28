@@ -86,6 +86,29 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_FALSE(args.Contains(ArgType::ContainerId));
     }
 
+    TEST_METHOD(DeprecatedMapping_RequiresDeclaredReplacement)
+    {
+        auto inv = CreateInvocationFromCommandLine(L"wslc --time 10");
+        ArgMap args;
+
+        VERIFY_THROWS_SPECIFIC(
+            ParseArgumentsStateMachine(inv, args, {Argument::Create(ArgType::Help)}, false, false, {}, {{ArgType::Time, ArgType::StopTimeout}}),
+            wil::ResultException,
+            [](const wil::ResultException& exception) { return exception.GetErrorCode() == E_INVALIDARG; });
+    }
+
+    TEST_METHOD(DeprecatedMapping_RequiresCompatibleKinds)
+    {
+        auto inv = CreateInvocationFromCommandLine(L"wslc --force");
+        ArgMap args;
+
+        VERIFY_THROWS_SPECIFIC(
+            ParseArgumentsStateMachine(
+                inv, args, {Argument::Create(ArgType::StopTimeout)}, false, false, {}, {{ArgType::Force, ArgType::StopTimeout}}),
+            wil::ResultException,
+            [](const wil::ResultException& exception) { return exception.GetErrorCode() == E_INVALIDARG; });
+    }
+
     TEST_METHOD(ParserTest_ParserCases)
     {
         std::vector<ParserTestCase> testCases = {

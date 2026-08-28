@@ -37,16 +37,15 @@ using namespace WEX::TestExecution;
 namespace WSLCCLIArgumentUnitTests {
 namespace mount = wsl::windows::common::mount;
 
-using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
+using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapHandleAction>;
 
 static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
 static_assert(!std::is_copy_assignable_v<ArgMap>);
 static_assert(!std::is_move_assignable_v<ArgMap>);
 
-constexpr std::wstring_view c_deprecatedOptionDescription = L"Use --replacement instead";
-constexpr std::wstring_view c_deprecatedOptionWarning = L"'--force' is deprecated. Use --replacement instead";
-constexpr std::wstring_view c_deprecatedArgumentDescription = L"Use replacement-id instead";
-constexpr std::wstring_view c_deprecatedArgumentWarning = L"'container-id' is deprecated. Use replacement-id instead";
+constexpr std::wstring_view c_deprecatedTimeWarning = L"'--time' is deprecated. Use --stop-timeout instead.";
+constexpr std::wstring_view c_deprecatedForceWarning = L"'--force' is deprecated. Use --quiet instead.";
+constexpr std::wstring_view c_deprecatedEnvFileWarning = L"'--env-file' is deprecated. Use --env instead.";
 
 class DeprecatedArgumentCommand : public Command
 {
@@ -58,10 +57,19 @@ public:
     std::vector<Argument> GetArguments() const override
     {
         return {
-            Argument::CreateDeprecated(ArgType::Force, std::nullopt, std::wstring{c_deprecatedOptionDescription}),
-            Argument::CreateDeprecated(ArgType::ContainerId, std::nullopt, std::wstring{c_deprecatedArgumentDescription}),
-            Argument::CreateDeprecated(ArgType::Quiet, std::nullopt, std::wstring{}),
+            Argument::Create(ArgType::StopTimeout),
+            Argument::Create(ArgType::Quiet),
+            Argument::Create(ArgType::Env, false, Limit::Unlimited),
             Argument::CreateUnsupported(ArgType::Platform),
+        };
+    }
+
+    std::vector<ArgumentDeprecation> GetArgumentDeprecations() const override
+    {
+        return {
+            {ArgType::Time, ArgType::StopTimeout},
+            {ArgType::Force, ArgType::Quiet},
+            {ArgType::EnvFile, ArgType::Env},
         };
     }
 
@@ -69,7 +77,7 @@ public:
     {
         return {
             Argument::Create(ArgType::Session),
-            Argument::CreateDeprecated(ArgType::NoColor),
+            Argument::CreateUnsupported(ArgType::NoColor),
         };
     }
 
@@ -122,20 +130,11 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ArgumentState::Supported, supported.State());
         VERIFY_IS_TRUE(supported.IsAccepted());
         VERIFY_IS_TRUE(supported.IsVisible());
-        VERIFY_IS_FALSE(supported.IsDeprecated());
 
         const auto unsupported = Argument::CreateUnsupported(ArgType::Force);
         VERIFY_ARE_EQUAL(ArgumentState::Unsupported, unsupported.State());
         VERIFY_IS_FALSE(unsupported.IsAccepted());
         VERIFY_IS_FALSE(unsupported.IsVisible());
-        VERIFY_IS_FALSE(unsupported.IsDeprecated());
-
-        const auto deprecated = Argument::CreateDeprecated(ArgType::Force, std::nullopt, std::wstring{c_deprecatedOptionDescription});
-        VERIFY_ARE_EQUAL(ArgumentState::Deprecated, deprecated.State());
-        VERIFY_IS_TRUE(deprecated.IsAccepted());
-        VERIFY_IS_FALSE(deprecated.IsVisible());
-        VERIFY_IS_TRUE(deprecated.IsDeprecated());
-        VERIFY_ARE_EQUAL(std::wstring{c_deprecatedOptionDescription}, deprecated.Description());
     }
 
     TEST_METHOD(ArgumentAccessors_GetVisibleArguments)
@@ -143,7 +142,7 @@ class WSLCCLIArgumentUnitTests
         DeprecatedArgumentCommand command;
 
         VERIFY_ARE_EQUAL(4u, command.GetArguments().size());
-        VERIFY_IS_TRUE(command.GetVisibleArguments().empty());
+        VERIFY_ARE_EQUAL(3u, command.GetVisibleArguments().size());
 
         const auto globalArguments = command.GetVisibleGlobalArguments();
         VERIFY_ARE_EQUAL(1u, globalArguments.size());
@@ -151,7 +150,31 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(2u, command.GetGlobalArguments().size());
     }
 
-    TEST_METHOD(DeprecatedOption_ParsesValidatesAndWarns)
+    TEST_METHOD(DeprecatedValueOption_ParsesAsReplacementAndWarns)
+    {
+        DeprecatedArgumentCommand command;
+
+        for (const auto commandLine : {L"wslc --time 10", L"wslc -t 10"})
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_NO_THROW(command.ValidateArguments(args));
+            const auto keys = args.GetKeys();
+            VERIFY_IS_TRUE(std::ranges::find(keys, ArgType::Time) == keys.end());
+            VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
+            VERIFY_THROWS_SPECIFIC(args.GetValue<ArgType::Time>(), wil::ResultException, [](const wil::ResultException& exception) {
+                return exception.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+
+            CaptureTerminal capture;
+            command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+            VERIFY_ARE_EQUAL(std::wstring{c_deprecatedTimeWarning} + L"\n", capture.captured());
+        }
+    }
+
+    TEST_METHOD(DeprecatedFlag_ParsesAsReplacementAndWarns)
     {
         DeprecatedArgumentCommand command;
 
@@ -162,42 +185,61 @@ class WSLCCLIArgumentUnitTests
 
             VERIFY_NO_THROW(command.ParseArguments(invocation, args));
             VERIFY_NO_THROW(command.ValidateArguments(args));
-            VERIFY_IS_TRUE(args.GetValue<ArgType::Force>());
+            VERIFY_IS_TRUE(args.GetValue<ArgType::Quiet>());
 
             CaptureTerminal capture;
             command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
-            VERIFY_ARE_EQUAL(std::wstring{c_deprecatedOptionWarning} + L"\n", capture.captured());
+            VERIFY_ARE_EQUAL(std::wstring{c_deprecatedForceWarning} + L"\n", capture.captured());
         }
     }
 
-    TEST_METHOD(DeprecatedPositionalArgument_ParsesValidatesAndWarns)
+    TEST_METHOD(ReplacementOption_DoesNotWarn)
     {
         DeprecatedArgumentCommand command;
-        auto invocation = CreateInvocationFromCommandLine(L"wslc container");
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --stop-timeout 10");
         ArgMap args;
 
         VERIFY_NO_THROW(command.ParseArguments(invocation, args));
         VERIFY_NO_THROW(command.ValidateArguments(args));
-        VERIFY_IS_TRUE(args.Contains(ArgType::ContainerId));
+        VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
 
         CaptureTerminal capture;
         command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
-        VERIFY_ARE_EQUAL(std::wstring{c_deprecatedArgumentWarning} + L"\n", capture.captured());
+        VERIFY_IS_TRUE(capture.captured().empty());
     }
 
-    TEST_METHOD(DeprecatedArgument_WithoutDescriptionOmitsGuidance)
+    TEST_METHOD(DeprecatedAndReplacementSingleValueOptions_AreMutuallyExclusive)
     {
         DeprecatedArgumentCommand command;
-        auto invocation = CreateInvocationFromCommandLine(L"wslc --quiet");
+        const auto expected = wsl::shared::Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--time, --stop-timeout");
+
+        for (const auto commandLine : {L"wslc --time 5 --stop-timeout 10", L"wslc --stop-timeout 5 --time 10"})
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+            VERIFY_THROWS_SPECIFIC(command.ParseArguments(invocation, args), ArgumentException, [&](const auto& exception) {
+                return exception.Message() == expected;
+            });
+        }
+    }
+
+    TEST_METHOD(DeprecatedAndReplacementUnlimitedOptions_Accumulate)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --env-file one --env two --env-file=three");
         ArgMap args;
 
         VERIFY_NO_THROW(command.ParseArguments(invocation, args));
         VERIFY_NO_THROW(command.ValidateArguments(args));
-        VERIFY_IS_TRUE(args.GetValue<ArgType::Quiet>());
+        const auto values = args.GetAllValues<ArgType::Env>();
+        VERIFY_ARE_EQUAL(3u, values.size());
+        VERIFY_ARE_EQUAL(std::wstring{L"one"}, values[0]);
+        VERIFY_ARE_EQUAL(std::wstring{L"two"}, values[1]);
+        VERIFY_ARE_EQUAL(std::wstring{L"three"}, values[2]);
 
         CaptureTerminal capture;
         command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
-        VERIFY_ARE_EQUAL(std::wstring{L"'--quiet' is deprecated.\n"}, capture.captured());
+        VERIFY_ARE_EQUAL(std::wstring{c_deprecatedEnvFileWarning} + L"\n", capture.captured());
     }
 
     TEST_METHOD(NonVisibleArguments_AreHiddenFromHelp)
@@ -208,12 +250,13 @@ class WSLCCLIArgumentUnitTests
         command.OutputHelp(capture.terminal);
         const auto help = capture.captured();
 
+        VERIFY_IS_TRUE(help.find(L"--time") == std::wstring::npos);
         VERIFY_IS_TRUE(help.find(L"--force") == std::wstring::npos);
-        VERIFY_IS_TRUE(help.find(L"--quiet") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--env-file") == std::wstring::npos);
         VERIFY_IS_TRUE(help.find(L"--platform") == std::wstring::npos);
-        VERIFY_IS_TRUE(help.find(L"container-id") == std::wstring::npos);
-        VERIFY_IS_TRUE(help.find(c_deprecatedOptionDescription) == std::wstring::npos);
-        VERIFY_IS_TRUE(help.find(c_deprecatedArgumentDescription) == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--stop-timeout") != std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--quiet") != std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--env") != std::wstring::npos);
     }
 
     TEST_METHOD(UnsupportedArgument_DisplaysShortHelpWithoutArgumentDetails)

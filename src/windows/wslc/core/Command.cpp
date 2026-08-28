@@ -621,14 +621,21 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
 // the argument data.
 void Command::ParseArguments(
-    Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) const
+    Invocation& inv,
+    ArgMap& target,
+    std::vector<Argument> definedArgs,
+    bool optionsOnly,
+    bool stopOnUnknown,
+    const std::vector<Argument>& overridableDefaults,
+    std::vector<ArgumentDeprecation> deprecations) const
 {
     if (definedArgs.empty())
     {
         return;
     }
 
-    ParseArgumentsStateMachine stateMachine{inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults};
+    ParseArgumentsStateMachine stateMachine{
+        inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults, std::move(deprecations)};
 
     while (stateMachine.Step())
     {
@@ -706,20 +713,16 @@ void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& def
     }
 }
 
-void Command::OutputDeprecatedArgumentWarnings(Terminal& terminal, const ArgMap& source, const std::vector<Argument>& definedArgs) const
+void Command::OutputDeprecatedArgumentWarnings(Terminal& terminal, const ArgMap& source) const
 {
-    for (const auto& argument : definedArgs)
+    for (const auto& [deprecatedType, replacementType] : source.GetUsedArgumentDeprecations())
     {
-        if (argument.IsDeprecated() && source.Contains(argument.Type()))
-        {
-            const auto name = argument.IsOption() ? std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name() : argument.Name();
-
-            // A deprecated argument's description provides optional command-specific guidance appended to the standard warning.
-            const auto warning = argument.Description().empty()
-                                     ? Localization::WSLCCLI_DeprecatedArgumentWarning(name)
-                                     : Localization::WSLCCLI_DeprecatedArgumentWarningWithMessage(name, argument.Description());
-            terminal.Warn(L"{}\n", warning);
-        }
+        const auto deprecated = Argument::Create(deprecatedType);
+        const auto replacement = Argument::Create(replacementType);
+        terminal.Warn(
+            L"{}\n",
+            Localization::WSLCCLI_DeprecatedArgumentWarning(
+                std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + deprecated.Name(), std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + replacement.Name()));
     }
 }
 

@@ -118,7 +118,6 @@ try
             /*optionsOnly*/ true,
             /*stopOnUnknown*/ true,
             /*overridableDefaults*/ envDefs);
-        command->OutputDeprecatedArgumentWarnings(context.Terminal, context.GlobalArgs, envDefs);
         command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
 
         // Past this point, global option parsing and validation are complete.
