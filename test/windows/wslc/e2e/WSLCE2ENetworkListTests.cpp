@@ -197,7 +197,7 @@ class WSLCE2ENetworkListTests
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"network list --filter label");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_List_Filter_InvalidKey)

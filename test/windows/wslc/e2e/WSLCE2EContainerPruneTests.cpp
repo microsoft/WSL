@@ -139,7 +139,7 @@ class WSLCE2EContainerPruneTests
         // stdout rather than printing the warning first.
         const auto malformed = RunWslc(L"container prune --filter label");
         malformed.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(malformed.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
+        VERIFY_IS_TRUE(malformed.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label")));
 
         const auto result = RunWslc(L"container prune");
         result.Verify({.ExitCode = 0});

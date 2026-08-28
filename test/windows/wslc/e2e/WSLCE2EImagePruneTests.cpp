@@ -120,7 +120,7 @@ class WSLCE2EImagePruneTests
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"image prune --filter label");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_Filter_InvalidKey)

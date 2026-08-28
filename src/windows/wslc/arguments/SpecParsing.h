@@ -72,7 +72,7 @@ std::pair<std::string, std::string> ParseLabel(const std::wstring& value);
 std::pair<std::string, std::string> ParseDriverOption(const std::wstring& value);
 
 // Parses a --filter spec ("key=value"); the separator is required.
-std::pair<std::string, std::string> ParseFilter(const std::wstring& value, const std::wstring& argName);
+std::pair<std::string, std::string> ParseFilter(const std::wstring& value);
 
 struct ParsedNetworkArgument
 {

@@ -215,7 +215,7 @@ class WSLCE2EVolumePruneTests
     {
         const auto result = RunWslc(L"volume prune --filter label");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label", L"filter")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_InvalidFilterError(L"label")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_Filter_InvalidKey)
