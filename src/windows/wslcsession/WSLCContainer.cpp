@@ -1446,6 +1446,9 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
 
 void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
 {
+    // The stop phase is skipped when the container is not running, so it cannot be the only validation.
+    ValidateStopTimeout(TimeoutSeconds, true);
+
     bool wasRunning{};
     auto restart = std::make_shared<RestartTransaction>();
 
