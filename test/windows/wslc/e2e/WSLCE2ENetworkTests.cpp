@@ -132,7 +132,8 @@ class WSLCE2ENetworkTests
 
         result = RunWslc(std::format(L"network connect {} {}", TestNetworkName, WslcContainerName));
         result.Verify(
-            {.Stderr = std::format(L"Network not found: '{}'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", TestNetworkName), .ExitCode = 1});
+            {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", TestNetworkName), L"WSLC_E_NETWORK_NOT_FOUND"),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_UnknownContainer)
@@ -142,7 +143,8 @@ class WSLCE2ENetworkTests
 
         result = RunWslc(std::format(L"network connect {} {}", TestNetworkName, WslcContainerName));
         result.Verify(
-            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+            {.Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 
@@ -160,7 +162,8 @@ class WSLCE2ENetworkTests
         VERIFY_IS_TRUE(result.Stderr.has_value());
         VerifyPatternMatch(
             string::WideToMultiByte(result.Stderr.value()),
-            "*does not support connecting or disconnecting additional networks*Error code: *\r\n");
+            string::WideToMultiByte(
+                FormatErrorMessage(L"*does not support connecting or disconnecting additional networks*", L"*")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_AlreadyConnected_DockerErrorPropagated)
@@ -175,7 +178,9 @@ class WSLCE2ENetworkTests
         result = RunWslc(std::format(L"network connect {} {}", TestNetworkName, WslcContainerName));
         VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VerifyPatternMatch(string::WideToMultiByte(result.Stderr.value()), "*already exists*Error code: *\r\n");
+        VerifyPatternMatch(
+            string::WideToMultiByte(result.Stderr.value()),
+            string::WideToMultiByte(FormatErrorMessage(L"*already exists*", L"*")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Connect_WithEndpointFlags_RoundTrips)
@@ -310,7 +315,8 @@ class WSLCE2ENetworkTests
 
         result = RunWslc(std::format(L"network disconnect {} {}", TestNetworkName, WslcContainerName));
         result.Verify(
-            {.Stderr = std::format(L"Network not found: '{}'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", TestNetworkName), .ExitCode = 1});
+            {.Stderr = FormatErrorMessage(std::format(L"Network not found: '{}'", TestNetworkName), L"WSLC_E_NETWORK_NOT_FOUND"),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Disconnect_UnknownContainer)
@@ -320,7 +326,8 @@ class WSLCE2ENetworkTests
 
         result = RunWslc(std::format(L"network disconnect {} {}", TestNetworkName, WslcContainerName));
         result.Verify(
-            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+            {.Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 

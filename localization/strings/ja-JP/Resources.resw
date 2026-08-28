@@ -1175,8 +1175,9 @@ WSL を修復するには任意のキーを押すか、取り消すには CTRL-C
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-エラー コード: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+エラー コード: {}
+このエラーが予期しないものである場合は、既存の問題を検索するか、https://github.com/microsoft/WSL/issues で新しい問題を提出することを検討してください。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>無効な JSON ドキュメント。解析エラー: {}</value>

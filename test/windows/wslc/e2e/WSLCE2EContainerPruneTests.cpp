@@ -52,11 +52,13 @@ class WSLCE2EContainerPruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_NoStoppedContainers)
     {
-        // Prune when no stopped containers exist should succeed with zero reclaimed space
-        const auto result = RunWslc(L"container prune");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        // Establish a clean baseline first so this does not depend on what other tests left behind.
+        RunWslc(L"container prune").Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Total reclaimed space:"));
+        const auto result = RunWslc(L"container prune");
+
+        // With nothing pruned docker emits only the reclaimed-space line, with no header or leading blank line.
+        result.Verify({.Stdout = L"Total reclaimed space: 0B\r\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_StoppedContainer)
@@ -74,6 +76,7 @@ class WSLCE2EContainerPruneTests
 
         // Verify pruned container ID is in output
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerId));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_ContainerPruneDeletedHeader()));
 
         // Verify the container is actually removed
         VerifyContainerIsNotListed(L"prune-test-container");

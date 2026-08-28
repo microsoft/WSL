@@ -30,7 +30,7 @@ using io::MultiHandleWait;
 using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
-using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -42,6 +42,7 @@ constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
+constexpr uint32_t c_progressPrecision = 4;
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
 // session's IdleTimeoutSec setting is 0/unset). This avoids thrashing the VM (repeated
@@ -1435,8 +1436,8 @@ try
             {
                 auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
                 auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
-                auto current = FormatBytes(currentBytes);
-                auto total = FormatBytes(totalBytes);
+                auto current = FormatHumanReadableSize(currentBytes, c_progressPrecision);
+                auto total = FormatHumanReadableSize(totalBytes, c_progressPrecision);
                 reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)

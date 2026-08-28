@@ -1169,8 +1169,9 @@ Er treedt over 60 seconden een time-out op voor deze prompt.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Foutcode: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Foutcode: {}
+Als deze fout onverwacht is, kunt u zoeken naar bestaande problemen of een nieuw probleem indienen bij https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Ongeldig JSON-document. Fout bij parseren: {}</value>

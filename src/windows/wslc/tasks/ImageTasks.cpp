@@ -34,7 +34,6 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
-using wsl::windows::common::string::FormatBytes;
 
 namespace wsl::windows::wslc::task {
 
@@ -73,7 +72,7 @@ namespace {
     };
 
     // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
-    constexpr std::string_view c_notAvailable = "N/A";
+    constexpr std::string_view c_imageNotAvailable = "N/A";
 
     // Builds the representation of an image, shared by the table and json output so the two cannot
     // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,
@@ -81,17 +80,17 @@ namespace {
     ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
     {
         ImageOutputInformation entry;
-        entry.Containers = image.Containers < 0 ? std::string{c_notAvailable} : std::to_string(image.Containers);
+        entry.Containers = image.Containers < 0 ? std::string{c_imageNotAvailable} : std::to_string(image.Containers);
 
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
         entry.CreatedSince = WideToMultiByte(FormatRelativeTime(image.Created));
         entry.Digest = c_none;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
-        entry.SharedSize = c_notAvailable;
+        entry.SharedSize = c_imageNotAvailable;
         entry.Size = WideToMultiByte(FormatHumanReadableSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
         entry.Tag = image.Tag.value_or(std::string{c_none});
-        entry.UniqueSize = c_notAvailable;
+        entry.UniqueSize = c_imageNotAvailable;
 
         return entry;
     }
@@ -308,7 +307,14 @@ void DeleteImage(CLIExecutionContext& context)
     bool noPrune = context.Args.GetValue<ArgType::NoPrune>();
     for (const auto& id : imageIds)
     {
-        services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+        const auto deleted = services::ImageService::Delete(session, WideToMultiByte(id), force, noPrune);
+        for (const auto& entry : deleted)
+        {
+            context.Terminal.Output(
+                L"{}\n",
+                entry.Deleted ? Localization::WSLCCLI_ImageDeleteDeleted(entry.Image)
+                              : Localization::WSLCCLI_ImageDeleteUntagged(entry.Image));
+        }
     }
 }
 
@@ -427,17 +433,24 @@ void PruneImages(CLIExecutionContext& context)
 
     auto result = ImageService::Prune(session, all, filters);
 
-    for (const auto& image : result.UntaggedImages)
+    if (!result.UntaggedImages.empty() || !result.DeletedImages.empty())
     {
-        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(image));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeletedHeader());
+
+        for (const auto& image : result.UntaggedImages)
+        {
+            context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneUntagged(image));
+        }
+
+        for (const auto& image : result.DeletedImages)
+        {
+            context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(image));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    for (const auto& image : result.DeletedImages)
-    {
-        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneDeleted(image));
-    }
-
-    context.Terminal.Output(L"\n");
-    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(FormatBytes(result.SpaceReclaimed)));
+    context.Terminal.Output(
+        L"{}\n", Localization::WSLCCLI_ImagePruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task

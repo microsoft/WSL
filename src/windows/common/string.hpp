@@ -31,13 +31,14 @@ enum class StorageSizeUnit
 
 std::optional<uint64_t> ParseStorageSize(std::wstring_view String, StorageSizeUnit Unit);
 
-std::wstring FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace = false);
+// Formats a size with the given number of significant digits and no space before the unit, matching
+// docker's go-units. Decimal uses base 1000 (kB, MB, GB) and Binary uses base 1024 (KiB, MiB, GiB).
+// 119856765 -> "120MB" at precision 3, "119.9MB" at precision 4.
+std::wstring FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision = 3, StorageSizeUnit Unit = StorageSizeUnit::Decimal);
 
-std::wstring FormatBytes(uint64_t Bytes);
-
-// Formats a size as base 1000 with no space and the given number of significant digits
-// (119856765 -> "120MB" at precision 3, "119.9MB" at 4).
-std::wstring FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision = 3);
+// Precision used when reporting the space reclaimed by prune, so that container, image and volume
+// prune agree on a single decimal place.
+inline constexpr uint32_t c_reclaimedSpacePrecision = 4;
 
 std::vector<std::string> InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize);
 

@@ -20,7 +20,9 @@ Abstract:
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::common::vt;
-using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatHumanReadableSize;
+
+constexpr uint32_t c_progressPrecision = 4;
 
 auto ImageProgressCallback::MoveToLine(int line)
 {
@@ -133,18 +135,18 @@ std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id,
 
         // Docker's reported total is an estimate of the compressed layer size, so the actual bytes
         // transferred can exceed it. Drop the total in that case to avoid displaying a count over 100%.
-        auto progress = FormatBytes(current);
+        auto progress = FormatHumanReadableSize(current, c_progressPrecision);
 
         if (current <= total)
         {
-            progress += std::format(L"/{}", FormatBytes(total));
+            progress += std::format(L"/{}", FormatHumanReadableSize(total, c_progressPrecision));
         }
 
         line = std::format(L"{}: {} [{}] {}", safeId, safeStatus, bar, progress);
     }
     else if (current != 0)
     {
-        line = std::format(L"{}: {} {}", safeId, safeStatus, FormatBytes(current));
+        line = std::format(L"{}: {} {}", safeId, safeStatus, FormatHumanReadableSize(current, c_progressPrecision));
     }
     else
     {
