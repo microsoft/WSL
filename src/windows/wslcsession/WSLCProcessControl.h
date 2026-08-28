@@ -72,7 +72,7 @@ public:
     void SetExitCode(int ExitCode);
 
 private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t eventTimeNano);
+    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t eventTime);
 
     mutable std::mutex m_lock;
     std::string m_id;

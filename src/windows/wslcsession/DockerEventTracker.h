@@ -65,7 +65,7 @@ public:
 
     using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::int64_t)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
-    using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t TimeNano)>;
+    using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t Time)>;
 
     explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
@@ -86,9 +86,9 @@ public:
 
 private:
     void OnEvent(const std::string_view& event);
-    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
-    void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
-    void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
+    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
+    void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime);
+    void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
 
     // Callbacks are invoked without holding m_lock so that a callback can register or unregister callbacks, and so
     // that a callback taking its own lock can't invert with a thread that registers a callback under that same lock.

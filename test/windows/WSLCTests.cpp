@@ -6900,7 +6900,6 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
                 VERIFY_ARE_EQUAL(c_labelValue, event.Actor.Attributes.at(c_labelKey));
                 VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
-                VERIFY_ARE_EQUAL(event.time, duration_cast<seconds>(nanoseconds{event.timeNano}).count());
 
                 if (action == "stop")
                 {
@@ -6961,20 +6960,6 @@ class WSLCTests
         verifyEventFilter("start");
         verifyEventFilter("kill");
         verifyEventFilter("stop");
-
-        // The until-bound covers the whole second it names, so a Docker event later within that same
-        // second is still inside the window.
-        {
-            const auto fractionalEvent = std::ranges::find_if(lifecycleEvents, [](const auto& event) {
-                return nanoseconds{event.timeNano} != duration_cast<seconds>(nanoseconds{event.timeNano});
-            });
-            VERIFY_IS_TRUE(fractionalEvent != lifecycleEvents.end());
-
-            WSLCFilter filters[]{{"container", id.c_str()}, {"event", fractionalEvent->Action.c_str()}};
-            wil::com_ptr<IWSLCEventStream> stream;
-            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, fractionalEvent->time, filters, ARRAYSIZE(filters), &stream));
-            VERIFY_IS_FALSE(drain(stream.get()).empty());
-        }
 
         // Image events are not recorded yet, so a 'type=image' filter excludes the container's
         // events and leaves the stream empty.

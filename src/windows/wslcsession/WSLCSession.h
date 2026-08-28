@@ -346,7 +346,7 @@ private:
     // because the container ID isn't known until Docker assigns it.
     void WaitForConflictingCreateToComplete(std::unique_lock<std::mutex>& ContainersLock);
 
-    void OnContainerCreated(const std::string& ContainerId, std::int64_t TimeNano) noexcept;
+    void OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept;
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 

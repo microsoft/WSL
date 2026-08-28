@@ -112,14 +112,10 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     auto action = parsed.find("Action");
     THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
-    const auto timeNanoEntry = parsed.find("timeNano");
+    auto timeEntry = parsed.find("time");
     THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        timeNanoEntry == parsed.end(),
-        "Failed to parse timeNano from event: %.*hs",
-        static_cast<int>(event.size()),
-        event.data());
-    const auto eventTimeNano = timeNanoEntry->get<std::int64_t>();
+        E_INVALIDARG, timeEntry == parsed.end(), "Failed to parse time from event: %.*hs", static_cast<int>(event.size()), event.data());
+    std::int64_t eventTime = timeEntry->get<std::int64_t>();
 
     auto actionStr = action->get<std::string>();
 
@@ -129,20 +125,20 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
 
     if (typeStr == "container")
     {
-        OnContainerEvent(parsed, actionStr, eventTimeNano);
+        OnContainerEvent(parsed, actionStr, eventTime);
 
         if (actionStr == "create")
         {
-            OnContainerCreated(parsed, eventTimeNano);
+            OnContainerCreated(parsed, eventTime);
         }
     }
     else if (typeStr == "volume")
     {
-        OnVolumeEvent(parsed, actionStr, eventTimeNano);
+        OnVolumeEvent(parsed, actionStr, eventTime);
     }
 }
 
-void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
+void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
 {
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start},
@@ -200,10 +196,10 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
         }
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTimeNano); });
+    InvokeCallbacks(callbacks, [&](const ContainerCallback& e) { e.Callback(it->second, exitCode, eventTime); });
 }
 
-void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano)
+void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime)
 {
     static std::map<std::string, VolumeEvent> events{{"create", VolumeEvent::Create}, {"destroy", VolumeEvent::Destroy}};
 
@@ -227,10 +223,10 @@ void DockerEventTracker::OnVolumeEvent(const nlohmann::json& parsed, const std::
         callbacks = m_volumeCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, it->second, eventTimeNano); });
+    InvokeCallbacks(callbacks, [&](const VolumeCallback& e) { e.Callback(volumeName, it->second, eventTime); });
 }
 
-void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano)
+void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime)
 {
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
@@ -246,7 +242,7 @@ void DockerEventTracker::OnContainerCreated(const nlohmann::json& parsed, std::i
         callbacks = m_containerCreateCallbacks;
     }
 
-    InvokeCallbacks(callbacks, [&](const ContainerCreateCallbackEntry& e) { e.Callback(containerId, eventTimeNano); });
+    InvokeCallbacks(callbacks, [&](const ContainerCreateCallbackEntry& e) { e.Callback(containerId, eventTime); });
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerStateUpdates(

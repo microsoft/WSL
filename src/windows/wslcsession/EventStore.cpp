@@ -32,7 +32,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     // Events are recorded in Docker's delivery order, which is also timestamp order. Subscribers rely on
     // this: they resume from a sequence number, so an out-of-order event could never be inserted where it
     // belongs without hiding it from readers that already moved past that point.
-    WI_ASSERT(m_events.empty() || m_events.back().timeNano <= Event.timeNano);
+    WI_ASSERT(m_events.empty() || m_events.back().time <= Event.time);
 
     m_events.push_back(std::move(Event));
 
@@ -45,7 +45,7 @@ void EventStore::Append(wsl::windows::common::wslc_schema::Event Event)
     m_updated.notify_all();
 }
 
-void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t TimeNano) noexcept
+void EventStore::Record(std::string&& Type, std::string&& Action, const std::string& ActorId, std::map<std::string, std::string> ActorAttributes, std::int64_t Time) noexcept
 try
 {
     wsl::windows::common::wslc_schema::Event event;
@@ -53,8 +53,7 @@ try
     event.Action = std::move(Action);
     event.Actor.ID = ActorId;
     event.Actor.Attributes = std::move(ActorAttributes);
-    event.time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds{TimeNano}).count();
-    event.timeNano = TimeNano;
+    event.time = Time;
 
     Append(std::move(event));
 }

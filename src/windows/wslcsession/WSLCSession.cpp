@@ -2432,7 +2432,7 @@ void WSLCSession::WaitForConflictingCreateToComplete(std::unique_lock<std::mutex
     }
 }
 
-void WSLCSession::OnContainerCreated(const std::string& ContainerId, std::int64_t TimeNano) noexcept
+void WSLCSession::OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept
 try
 {
     std::lock_guard containersLock{m_containersLock};
@@ -2450,7 +2450,7 @@ try
     {
         // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
         WI_VERIFY(m_containers.emplace(ContainerId, pendingCreate->Container).second);
-        pendingCreate->Container->RecordEvent("create", TimeNano);
+        pendingCreate->Container->RecordEvent("create", Time);
     }
     catch (...)
     {

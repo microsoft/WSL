@@ -60,7 +60,7 @@ private:
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const std::string& volumeName);
     __requires_lock_held(m_lock) void OnVolumeDeletedExclusiveLockHeld(const std::string& volumeName);
 
-    void OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::int64_t eventTimeNano);
+    void OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::int64_t eventTime);
 
     mutable wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;
