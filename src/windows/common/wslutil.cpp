@@ -1432,11 +1432,22 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
 
 wsl::windows::common::wslutil::ImageReference wsl::windows::common::wslutil::ImageReference::Parse(const std::string& input)
 {
+    auto reference = TryParse(input);
+    if (!reference.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
+    }
+
+    return std::move(reference.value());
+}
+
+std::optional<wsl::windows::common::wslutil::ImageReference> wsl::windows::common::wslutil::ImageReference::TryParse(const std::string& input)
+{
     static const auto regex = BuildImageReferenceRegex();
     std::smatch match;
     if (!std::regex_match(input, match, regex))
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
+        return std::nullopt;
     }
 
     const auto& repo = match[1];

@@ -13050,6 +13050,23 @@ class WSLCTests
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse("a:"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ImageReference::Parse(":b"); }), E_INVALIDARG);
+
+        // TryParse reports the same malformed references without throwing, so a caller listing
+        // references supplied by the daemon can skip a bad entry instead of failing.
+        VERIFY_IS_FALSE(ImageReference::TryParse("").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse(":debian:latest").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse("debian:latest@").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse("a:").has_value());
+
+        // The placeholders the daemon reports for an unnamed image are not valid references.
+        VERIFY_IS_FALSE(ImageReference::TryParse("<none>").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse("<none>:<none>").has_value());
+        VERIFY_IS_FALSE(ImageReference::TryParse("<none>@<none>").has_value());
+
+        const auto parsed = ImageReference::TryParse("ubuntu:22.04");
+        VERIFY_IS_TRUE(parsed.has_value());
+        VERIFY_ARE_EQUAL(parsed->Repository.Name, std::string{"ubuntu"});
+        VERIFY_ARE_EQUAL(parsed->Tag.value_or("<empty>"), std::string{"22.04"});
     }
 
     TEST_METHOD(RepoParsing)

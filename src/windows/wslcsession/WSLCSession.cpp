@@ -1919,19 +1919,39 @@ try
     for (const auto& e : images)
     {
         // RepoDigests format: "repo@sha256:digest". A repository can be referenced by several digests.
+        // References the daemon reports for an unnamed image are not parseable, and are skipped so that
+        // one of them cannot fail the whole listing.
         std::map<std::string, std::vector<std::string>> digestsByRepo;
         for (const auto& repoDigest : e.RepoDigests)
         {
             const auto separator = repoDigest.find('@');
-            THROW_HR_IF(E_UNEXPECTED, separator == std::string::npos || separator == 0);
-            digestsByRepo[repoDigest.substr(0, separator)].push_back(repoDigest);
+            if (separator == std::string::npos || separator == 0)
+            {
+                continue;
+            }
+
+            auto repoName = repoDigest.substr(0, separator);
+            if (!wslutil::ImageReference::TryParse(repoName).has_value())
+            {
+                continue;
+            }
+
+            digestsByRepo[std::move(repoName)].push_back(repoDigest);
         }
+
+        const auto rowsBefore = rows.size();
 
         std::set<std::string> taggedRepos;
         for (const auto& tag : e.RepoTags)
         {
             // Extract repo name from tag (format: "repo:tag") and look up its digests.
-            auto repoName = wslutil::ImageReference::Parse(tag).Repository.Name;
+            const auto reference = wslutil::ImageReference::TryParse(tag);
+            if (!reference.has_value())
+            {
+                continue;
+            }
+
+            auto repoName = reference->Repository.Name;
             const auto it = digestsByRepo.find(repoName);
             taggedRepos.insert(std::move(repoName));
 
@@ -1974,8 +1994,8 @@ try
             }
         }
 
-        // A dangling image belongs to no repository at all.
-        if (e.RepoTags.empty() && digestsByRepo.empty())
+        // An image with no reportable repository is listed as unnamed.
+        if (rows.size() == rowsBefore)
         {
             rows.push_back({&e, "<none>:<none>", std::string{}});
         }
