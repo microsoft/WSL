@@ -1031,12 +1031,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
     auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
 
-    if (!RestartPhase)
-    {
-        WaitForRestartToComplete(lock, lifecycleLock);
-    }
-
-    WaitForConflictingTransitionToComplete(lock, lifecycleLock);
+    WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, /* waitForRestart */ !RestartPhase);
 
     // A Delete() that raced a restart may have already moved the container to the Deleted state.
     THROW_HR_WITH_USER_ERROR_IF(
@@ -1180,31 +1175,28 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
 }
 
 void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
-    wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock, std::optional<TransitionKind> kind)
+    wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock, std::optional<TransitionKind> kind, bool waitForRestart)
 {
-    while (m_transition && (!kind.has_value() || m_transition->Kind != kind.value()))
+    while (true)
     {
+        // A restart spans two transitions, so waiting on the one in flight is not enough.
+        if (waitForRestart && m_restart)
+        {
+            auto restart = m_restart;
+            lock.reset();
+            lifecycleLock.reset();
+            WaitForCompletionEvent(restart->Completed.get());
+        }
+        else if (m_transition && (!kind.has_value() || m_transition->Kind != kind.value()))
         {
             auto transition = m_transition;
             lock.reset();
             lifecycleLock.reset();
             WaitForTransitionCompletion(transition);
         }
-
-        lifecycleLock = m_lifecycleLock.lock_shared();
-        lock = m_lock.lock_exclusive();
-    }
-}
-
-void WSLCContainerImpl::WaitForRestartToComplete(wil::rwlock_release_exclusive_scope_exit& lock, wil::rwlock_release_shared_scope_exit& lifecycleLock)
-{
-    while (m_restart)
-    {
+        else
         {
-            auto restart = m_restart;
-            lock.reset();
-            lifecycleLock.reset();
-            WaitForCompletionEvent(restart->Completed.get());
+            return;
         }
 
         lifecycleLock = m_lifecycleLock.lock_shared();
@@ -1335,12 +1327,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         auto lifecycleLock = m_lifecycleLock.lock_shared();
         auto lock = m_lock.lock_exclusive();
 
-        if (!RestartPhase)
-        {
-            WaitForRestartToComplete(lock, lifecycleLock);
-        }
-
-        WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop);
+        WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop, /* waitForRestart */ !RestartPhase);
 
         transition = m_transition;
         WI_ASSERT(!transition || transition->Kind == TransitionKind::Stop);
@@ -1455,7 +1442,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
         auto lock = m_lock.lock_exclusive();
-        WaitForRestartToComplete(lock, lifecycleLock);
+        WaitForConflictingTransitionToComplete(lock, lifecycleLock);
 
         wasRunning = m_state == WslcContainerStateRunning;
 
@@ -1606,7 +1593,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 
     // N.B. Unlike Start() and Stop(), this deliberately does not wait for an in-flight restart.
     // A remove that lands between the two phases takes effect, and the restart's start phase fails.
-    WaitForConflictingTransitionToComplete(lock, lifecycleLock);
+    WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, /* waitForRestart */ false);
 
     RequestDeleteExclusiveLockHeld(Flags);
     transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
