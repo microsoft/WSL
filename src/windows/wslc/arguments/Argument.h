@@ -21,7 +21,10 @@ Abstract:
 #define WSLC_CLI_ARG_SPLIT_CHAR L'='
 #define WSLC_CLI_HELP_ARG L"?"
 #define WSLC_CLI_HELP_ARG_STRING WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
-#define NO_ALIAS L""
+#define NO_ALIAS \
+    std::wstring \
+    { \
+    }
 
 using namespace wsl::windows::wslc::argument;
 
@@ -56,6 +59,14 @@ struct Argument
     // Creates an argument with optional overrides for table defaults
     static Argument Create(
         ArgType type,
+        std::optional<bool> required = std::nullopt,
+        std::optional<argument::Limit> limit = std::nullopt,
+        std::optional<std::wstring> desc = std::nullopt);
+
+    // Creates an argument with a command-specific alias and optional overrides for the remaining defaults.
+    static Argument Create(
+        ArgType type,
+        std::wstring alias,
         std::optional<bool> required = std::nullopt,
         std::optional<argument::Limit> limit = std::nullopt,
         std::optional<std::wstring> desc = std::nullopt);

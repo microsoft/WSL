@@ -28,35 +28,40 @@ using namespace std::literals;
 namespace wsl::windows::wslc {
 using namespace wsl::windows::wslc::execution;
 
-// This is the main Argument creation method, allowing overrides of the default properties of arguments.
-// The ArgType has some core characteristic, such as the Kind, Name, and Alias. If these
-// need to be changed, it is recommended to create a new ArgType in ArgumentDefinitions.h. If the argument
-// just needs a different description, it can be overridden in the desc, or if you need it to be required,
-// or to allow multiple uses within a command, then those properties can be set using the Create
-// function below inside the command. In this way all arguments default to "1" use and not required, and
-// this can only be changed in the command's GetArguments function, so the defaults are always clear and
-// consistent. Visibility can also be overridden and is defaulted to "Help".
-Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
-{
-    switch (type)
+namespace {
+    Argument CreateArgument(
+        ArgType type, std::optional<std::wstring> alias, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
     {
-#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, ArgumentKind, ConvertedType, Desc) \
+        switch (type)
+        {
+#define WSLC_ARG_CREATE_CASE(EnumName, Name, DefaultAlias, ArgumentKind, ConvertedType, Desc) \
     case ArgType::EnumName: \
         return Argument{ \
             type, \
             L##Name, \
-            Alias, \
+            alias.has_value() ? std::move(alias.value()) : std::wstring{DefaultAlias}, \
             desc.has_value() ? std::move(desc.value()) : std::wstring(Desc), \
             ArgumentKind, \
-            required.value_or(DefaultRequired), \
-            limit.value_or(DefaultLimit)};
+            required.value_or(Argument::DefaultRequired), \
+            limit.value_or(Argument::DefaultLimit)};
 
-        WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
+            WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE
 
-    default:
-        THROW_HR(E_UNEXPECTED);
+        default:
+            THROW_HR(E_UNEXPECTED);
+        }
     }
+} // namespace
+
+Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
+{
+    return CreateArgument(type, std::nullopt, std::move(required), std::move(limit), std::move(desc));
+}
+
+Argument Argument::Create(ArgType type, std::wstring alias, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
+{
+    return CreateArgument(type, std::move(alias), std::move(required), std::move(limit), std::move(desc));
 }
 
 // Retrieves the usage string of the Argument, based on its Alias and Name.

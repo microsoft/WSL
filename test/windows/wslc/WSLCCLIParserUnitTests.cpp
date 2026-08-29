@@ -669,6 +669,17 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_FALSE(ParseFlags(L"wslc -q=false", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
     }
 
+    TEST_METHOD(AliasOverride_ControlsCommandAlias)
+    {
+        const std::vector<Argument> customAlias{Argument::Create(ArgType::Quiet, std::wstring{L"x"})};
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -x", customAlias).GetValue<ArgType::Quiet>());
+        VERIFY_THROWS(ParseFlags(L"wslc -q", customAlias), ArgumentException);
+
+        const std::vector<Argument> noAlias{Argument::Create(ArgType::Quiet, NO_ALIAS)};
+        VERIFY_IS_TRUE(ParseFlags(L"wslc --quiet", noAlias).GetValue<ArgType::Quiet>());
+        VERIFY_THROWS(ParseFlags(L"wslc -q", noAlias), ArgumentException);
+    }
+
     // Docker-parity single-letter forms ("t"/"T"/"f"/"F") are honored on the alias form too.
     TEST_METHOD(Flag_AliasShortBooleanForms)
     {
