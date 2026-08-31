@@ -22,7 +22,9 @@ Abstract:
 namespace wsl::windows::wslc::services {
 struct ContainerService
 {
-    static std::wstring ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt = 0);
+    // Renders a container state with the time it last changed appended. Table output is localized;
+    // json output is invariant so its values do not vary by display language.
+    static std::wstring ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt = 0, models::FormatType format = models::FormatType::Table);
 
     // The bare state name, e.g. "running", without the relative time ContainerStateToString appends.
     static std::wstring ContainerStateName(WSLCContainerState state);
@@ -39,8 +41,10 @@ struct ContainerService
     static std::wstring FormatMounts(const std::string& mounts, bool truncate);
 
     // Renders a container status, preferring the description supplied by the runtime and falling back
-    // to a locally built one when it is unavailable.
-    static std::wstring FormatStatus(const std::string& status, WSLCContainerState state, LONGLONG stateChangedAt);
+    // to a locally built one when it is unavailable. Only the fallback varies with the format, since
+    // the runtime supplied description is already invariant.
+    static std::wstring FormatStatus(
+        const std::string& status, WSLCContainerState state, LONGLONG stateChangedAt, models::FormatType format = models::FormatType::Table);
 
     // Extracts the health status from a runtime supplied status description, which carries it as a
     // parenthesized suffix. Containers without a health check report an empty string.

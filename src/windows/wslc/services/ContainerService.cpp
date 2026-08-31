@@ -380,15 +380,19 @@ std::wstring ContainerService::LocalizedContainerStateName(WSLCContainerState st
     }
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt)
+std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt, FormatType format)
 {
-    auto stateString = LocalizedContainerStateName(state);
+    const auto invariant = format == FormatType::Json;
+    auto stateString = invariant ? ContainerStateName(state) : LocalizedContainerStateName(state);
     if (stateChangedAt == 0 || state == WSLCContainerState::WslcContainerStateInvalid)
     {
         return stateString;
     }
 
-    return std::format(L"{} {}", stateString, wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt));
+    const auto relative = invariant ? wsl::windows::common::timestamp::FormatInvariantRelativeTime(stateChangedAt)
+                                    : wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt);
+
+    return std::format(L"{} {}", stateString, relative);
 }
 
 // Reports whether a code point is printable using the same rule as Go's unicode.IsPrint, which docker relies on when
@@ -506,14 +510,14 @@ std::wstring ContainerService::FormatMounts(const std::string& mounts, bool trun
     return wsl::shared::string::Join(shortened, L',');
 }
 
-std::wstring ContainerService::FormatStatus(const std::string& status, WSLCContainerState state, LONGLONG stateChangedAt)
+std::wstring ContainerService::FormatStatus(const std::string& status, WSLCContainerState state, LONGLONG stateChangedAt, FormatType format)
 {
     if (!status.empty())
     {
         return wsl::shared::string::MultiByteToWide(status);
     }
 
-    return ContainerStateToString(state, stateChangedAt);
+    return ContainerStateToString(state, stateChangedAt, format);
 }
 
 std::string ContainerService::FormatHealthStatus(const std::string& status)

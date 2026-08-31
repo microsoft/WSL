@@ -127,8 +127,9 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 // Builds the representation of a container, shared by the table and json output so the two cannot
 // drift. Every value is emitted as a string apart from the platform object, and the id is truncated
-// unless --no-trunc is passed.
-ContainerOutputInformation ToContainerOutput(const ContainerInformation& container, bool truncate)
+// unless --no-trunc is passed. RunningFor and Status are the only fields that vary with the format:
+// docker renders them in invariant English, so json keeps that while the table is localized.
+ContainerOutputInformation ToContainerOutput(const ContainerInformation& container, bool truncate, FormatType format)
 {
     ContainerOutputInformation entry;
     entry.Command = WideToMultiByte(ContainerService::FormatCommand(container.Command, truncate));
@@ -146,11 +147,12 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
     entry.Platform.architecture = wsl::shared::Arm64 ? "arm64" : "amd64";
     entry.Platform.os = "linux";
     entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
-    entry.RunningFor = WideToMultiByte(FormatRelativeTime(container.CreatedAt));
+    entry.RunningFor = WideToMultiByte(
+        format == FormatType::Json ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
     // Container sizes are only computed when docker is passed --size, which wslc does not support.
     entry.Size = WideToMultiByte(FormatHumanReadableSize(0));
     entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
-    entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt));
+    entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt, format));
 
     return entry;
 }
@@ -583,7 +585,7 @@ void ListContainers(CLIExecutionContext& context)
     {
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToContainerOutput(container, trunc), c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToContainerOutput(container, trunc, FormatType::Json), c_jsonCompactIndent));
         }
 
         break;
@@ -616,7 +618,7 @@ void ListContainers(CLIExecutionContext& context)
         // Add each container as a row
         for (const auto& container : containers)
         {
-            const auto entry = ToContainerOutput(container, trunc);
+            const auto entry = ToContainerOutput(container, trunc, FormatType::Table);
             table.WriteRow({
                 MultiByteToWide(entry.ID),
                 MultiByteToWide(entry.Image),

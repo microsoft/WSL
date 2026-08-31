@@ -210,6 +210,30 @@ class WSLCCLIContainerCommandUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"created"}, ContainerService::FormatStatus("", WslcContainerStateCreated, 0));
     }
 
+    // The fallback is built locally, so json has to render it in invariant English rather than in the
+    // machine's display language.
+    TEST_METHOD(FormatStatus_EmptyRuntimeStatus_JsonFallbackIsInvariant)
+    {
+        const auto twoHoursAgo = static_cast<LONGLONG>(std::time(nullptr)) - (2 * 60 * 60);
+
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"exited 2 hours ago"},
+            ContainerService::FormatStatus("", WslcContainerStateExited, twoHoursAgo, models::FormatType::Json));
+        VERIFY_ARE_EQUAL(std::wstring{L"created"}, ContainerService::FormatStatus("", WslcContainerStateCreated, 0, models::FormatType::Json));
+    }
+
+    // A status supplied by the runtime is already invariant, so it is passed through unchanged for
+    // both formats.
+    TEST_METHOD(FormatStatus_RuntimeStatus_IsFormatIndependent)
+    {
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"Up 5 minutes"},
+            ContainerService::FormatStatus("Up 5 minutes", WslcContainerStateRunning, 0, models::FormatType::Json));
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"Up 5 minutes"},
+            ContainerService::FormatStatus("Up 5 minutes", WslcContainerStateRunning, 0, models::FormatType::Table));
+    }
+
     TEST_METHOD(FormatHealthStatus_Healthy_IsExtracted)
     {
         VERIFY_ARE_EQUAL(std::string{"healthy"}, ContainerService::FormatHealthStatus("Up 2 minutes (healthy)"));
