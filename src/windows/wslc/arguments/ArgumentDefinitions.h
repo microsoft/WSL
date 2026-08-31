@@ -13,11 +13,11 @@ Abstract:
 --*/
 #pragma once
 
-// Here is where base argument types are defined, with their name, default alias, kind, and default description.
-// Commands can override the alias and description while retaining the same argument type. The ArgType enum and the
-// mapping of ArgType to data type are generated from this X-Macro, so all arguments must be defined here to be used in
-// the system. The arguments defined here are the basis for all commands, but not all arguments need to be used by all
-// commands, and additional properties can be set in the command's GetArguments function with Argument::Create.
+// Here is where base argument types are defined, with their default name, default alias, kind, conversion type, and
+// default description. Commands can override the name, alias, required state, limit, and description. The ArgType enum,
+// kind, and conversion type remain fixed. The ArgType enum and the mapping of ArgType to data type are generated from
+// this X-Macro, so all arguments must be defined here to be used in the system. The arguments defined here are the basis
+// for all commands, but not all arguments need to be used by all commands.
 
 // The Kind determines the data type:
 // - Kind::Flag       -> bool

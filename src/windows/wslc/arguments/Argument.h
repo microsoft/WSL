@@ -26,6 +26,15 @@ Abstract:
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
+struct ArgumentOverrides
+{
+    std::optional<std::wstring> Name;
+    std::optional<std::wstring> Alias;
+    std::optional<bool> Required;
+    std::optional<argument::Limit> Limit;
+    std::optional<std::wstring> Desc;
+};
+
 // An argument to a command.
 struct Argument
 {
@@ -53,20 +62,8 @@ struct Argument
     Argument(Argument&&) = default;
     Argument& operator=(Argument&&) = default;
 
-    // Creates an argument with optional overrides for table defaults
-    static Argument Create(
-        ArgType type,
-        std::optional<bool> required = std::nullopt,
-        std::optional<argument::Limit> limit = std::nullopt,
-        std::optional<std::wstring> desc = std::nullopt);
-
-    // Creates an argument with a command-specific alias and optional overrides for the remaining defaults.
-    static Argument Create(
-        ArgType type,
-        std::wstring alias,
-        std::optional<bool> required = std::nullopt,
-        std::optional<argument::Limit> limit = std::nullopt,
-        std::optional<std::wstring> desc = std::nullopt);
+    // Creates an argument using its table defaults and any command-specific overrides.
+    static Argument Create(ArgType type, ArgumentOverrides overrides = {});
 
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;

@@ -69,21 +69,23 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
     }
 
-    TEST_METHOD(ArgumentCreate_AliasDefaultsAndOverrides)
+    TEST_METHOD(ArgumentCreate_DefaultsAndOverrides)
     {
-        const auto defaultAlias = Argument::Create(ArgType::Quiet);
-        VERIFY_ARE_EQUAL(std::wstring{L"q"}, defaultAlias.Alias());
+        const auto defaults = Argument::Create(ArgType::Quiet);
+        VERIFY_ARE_EQUAL(std::wstring{L"quiet"}, defaults.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"q"}, defaults.Alias());
 
-        const auto noAlias = Argument::Create(ArgType::Quiet, std::wstring{NO_ALIAS});
+        const auto noAlias = Argument::Create(ArgType::Quiet, {.Alias = NO_ALIAS});
         VERIFY_IS_TRUE(noAlias.Alias().empty());
-        VERIFY_ARE_EQUAL(defaultAlias.Description(), noAlias.Description());
+        VERIFY_ARE_EQUAL(defaults.Description(), noAlias.Description());
 
-        const auto customAlias =
-            Argument::Create(ArgType::Filter, std::wstring{L"x"}, true, Limit::Unlimited, std::wstring{L"Custom description"});
-        VERIFY_ARE_EQUAL(std::wstring{L"x"}, customAlias.Alias());
-        VERIFY_IS_TRUE(customAlias.Required());
-        VERIFY_ARE_EQUAL(Limit::Unlimited, customAlias.Limit());
-        VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, customAlias.Description());
+        const auto overrides = Argument::Create(
+            ArgType::Filter, {.Name = L"where", .Alias = L"x", .Required = true, .Limit = Limit::Unlimited, .Desc = L"Custom description"});
+        VERIFY_ARE_EQUAL(std::wstring{L"where"}, overrides.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"x"}, overrides.Alias());
+        VERIFY_IS_TRUE(overrides.Required());
+        VERIFY_ARE_EQUAL(Limit::Unlimited, overrides.Limit());
+        VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
