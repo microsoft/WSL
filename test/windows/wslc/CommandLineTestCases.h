@@ -74,7 +74,7 @@ COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
-// docker ps takes --size/-s to show per-container file sizes.
+// --size/-s shows per-container file sizes.
 COMMAND_LINE_TEST_CASE(L"container list --size", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list -s", L"list", true)
 COMMAND_LINE_TEST_CASE(L"ps --size", L"list", true)

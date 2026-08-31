@@ -245,8 +245,7 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // docker ps takes --size/-s (docker/cli cli/command/container/list.go:
-    // flags.BoolVarP(&options.size, "size", "s", false, "Display total file sizes")).
+    // --size takes -s as its short alias ("Display total file sizes").
     TEST_METHOD(ContainerListCommand_HasSizeArgumentWithDockerAlias)
     {
         const auto args = ContainerListCommand(L"container").GetArguments();
