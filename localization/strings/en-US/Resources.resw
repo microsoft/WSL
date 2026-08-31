@@ -3316,7 +3316,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_InspectSizeIgnoredWarning" xml:space="preserve">
     <value>WARNING: --size ignored for {}</value>
-    <comment>{Locked="--size"}{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}{Locked="--size "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
