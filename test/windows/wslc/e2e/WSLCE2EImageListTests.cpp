@@ -600,6 +600,105 @@ class WSLCE2EImageListTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_RepeatsIdOncePerTag)
+    {
+        // An image is listed once per tag it carries, and --quiet prints the id of every one of those
+        // rows, so a multi-tagged image emits its id once per tag instead of being collapsed to one line.
+        constexpr auto c_repository = L"wslc-e2e-quiet-tags";
+        const auto firstTag = std::format(L"{}:one", c_repository);
+        const auto secondTag = std::format(L"{}:two", c_repository);
+
+        auto cleanup = wil::scope_exit([&]() {
+            RunWslc(std::format(L"image delete --force {}", firstTag));
+            RunWslc(std::format(L"image delete --force {}", secondTag));
+        });
+
+        RunWslcAndVerify(std::format(L"image tag {} {}", DebianImage.NameAndTag(), firstTag), {.ExitCode = 0});
+        RunWslcAndVerify(std::format(L"image tag {} {}", DebianImage.NameAndTag(), secondTag), {.ExitCode = 0});
+
+        auto jsonResult = RunWslc(L"image list --format json");
+        jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto jsonRows = ParseNdjsonOutputAs<ImageOutputInformation>(jsonResult);
+
+        const auto repository = WideToMultiByte(std::wstring{c_repository});
+
+        std::string targetId;
+        size_t taggedRows = 0;
+        for (const auto& image : jsonRows)
+        {
+            if (image.Repository == repository)
+            {
+                targetId = image.ID;
+                ++taggedRows;
+            }
+        }
+
+        VERIFY_ARE_EQUAL(2u, taggedRows, L"Each tag of the repository must be listed as its own row");
+        VERIFY_ARE_NOT_EQUAL(std::string{}, targetId, L"The newly tagged repository was not listed");
+
+        size_t jsonOccurrences = 0;
+        for (const auto& image : jsonRows)
+        {
+            if (image.ID == targetId)
+            {
+                ++jsonOccurrences;
+            }
+        }
+
+        auto quietResult = RunWslc(L"image list --quiet");
+        quietResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto targetIdW = MultiByteToWide(targetId);
+        size_t quietOccurrences = 0;
+        for (const auto& line : quietResult.GetStdoutLines())
+        {
+            if (line == targetIdW)
+            {
+                ++quietOccurrences;
+            }
+        }
+
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(quietOccurrences, 2u, L"A multi-tagged image must repeat its id under --quiet");
+        VERIFY_ARE_EQUAL(jsonOccurrences, quietOccurrences, L"--quiet must emit one id per listed row");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_QuietRepeatsIdPerExpandedRow)
+    {
+        // --digests expands a row per digest, and that expansion still applies under --quiet even though
+        // the digest itself is never printed, so quiet emits exactly one id per expanded row.
+        auto jsonResult = RunWslc(L"image list --digests --format json");
+        jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto digestRows = ParseNdjsonOutputAs<ImageOutputInformation>(jsonResult);
+
+        auto quietResult = RunWslc(L"image list --digests --quiet");
+        quietResult.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto quietLines = quietResult.GetStdoutLines();
+
+        VERIFY_ARE_EQUAL(digestRows.size(), quietLines.size(), L"--quiet --digests must emit one id per expanded row");
+
+        // Multiplicity matters here, so the ids are compared as multisets rather than as sets.
+        std::multiset<std::string> expectedIds;
+        for (const auto& image : digestRows)
+        {
+            expectedIds.emplace(image.ID);
+        }
+
+        std::multiset<std::string> quietIds;
+        for (const auto& line : quietLines)
+        {
+            quietIds.emplace(WideToMultiByte(line));
+        }
+
+        VERIFY_IS_TRUE(expectedIds == quietIds, L"--quiet --digests ids must match the expanded rows exactly");
+
+        // Expanding per digest can only ever add rows relative to the default quiet listing.
+        auto plainQuietResult = RunWslc(L"image list --quiet");
+        plainQuietResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(
+            quietLines.size() >= plainQuietResult.GetStdoutLines().size(), L"--digests must not drop rows from the quiet listing");
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_ListedInHelp)
     {
         const auto result = RunWslc(L"image list --help");
