@@ -19,6 +19,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "SpecParsing.h"
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 #include <charconv>
@@ -77,7 +78,6 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 
-void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
 
 } // namespace wsl::windows::wslc::validation

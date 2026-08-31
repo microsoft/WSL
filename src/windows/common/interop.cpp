@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "interop.hpp"
+#include "HandleIO.h"
 #include "helpers.hpp"
 #include "socket.hpp"
 #include "hvsocket.hpp"
@@ -329,7 +330,7 @@ void CreateProcessVmMode(_In_ const GUID& VmId, _In_ const gsl::span<gsl::byte>&
             if (Result.Status == 0)
             {
                 // Process messages from the binfmt interpreter and wait for the process to exit.
-                LX_INIT_PROCESS_EXIT_STATUS ExitStatus;
+                LX_INIT_PROCESS_EXIT_STATUS ExitStatus{};
                 ExitStatus.Header.MessageType = LxInitMessageExitStatus;
                 ExitStatus.Header.MessageSize = sizeof(ExitStatus);
                 ExitStatus.ExitCode = ProcessInteropMessages(reinterpret_cast<HANDLE>(Sockets[3].get()), &Result);
@@ -408,78 +409,75 @@ std::string FormatCommandLine(gsl::span<gsl::byte> CommandLineData, USHORT Comma
 DWORD
 ProcessInteropMessages(_In_ HANDLE MessageHandle, _Inout_ CreateProcessResult* Result)
 {
-    OVERLAPPED Overlapped = {0};
-    const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
-    Overlapped.hEvent = OverlappedEvent.get();
-    const HANDLE WaitHandles[] = {Overlapped.hEvent, Result->Process.get()};
+    namespace io = wsl::windows::common::io;
 
-    // Read messages from the message handle. Break out of the loop if the pipe
-    // is connection is closed or the process exits.
-    //
-    // N.B. ReadFile will automatically reset the event in the overlapped
-    //      structure.
-    DWORD ExitCode = 1;
-    for (;;)
-    {
-        DWORD BytesRead;
-        LX_INIT_WINDOW_SIZE_CHANGED WindowSizeMessage;
-        bool Success = ReadFile(MessageHandle, &WindowSizeMessage, sizeof(WindowSizeMessage), &BytesRead, &Overlapped);
-        if (!Success)
-        {
-            const auto LastError = GetLastError();
-            if ((LastError == ERROR_BROKEN_PIPE) || (LastError == ERROR_HANDLE_EOF))
-            {
-                if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
+    DWORD exitCode = 1;
+    std::vector<char> pending;
+
+    static_assert(sizeof(LX_INIT_WINDOW_SIZE_CHANGED) % alignof(LX_INIT_WINDOW_SIZE_CHANGED) == 0);
+
+    auto processExit = [&] {
+        THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(Result->Process.get(), &exitCode));
+
+        // Close the pseudoconsole, this causes all pending data to be flushed.
+        Result->PseudoConsole.reset();
+    };
+
+    io::MultiHandleWait wait;
+    wait.AddHandle(
+        std::make_unique<io::ReadHandle>(
+            io::HandleWrapper{MessageHandle},
+            [&](const gsl::span<char>& input) {
+                if (input.empty())
                 {
-                    THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(Result->Process.get(), 1));
-                }
-
-                break;
-            }
-
-            THROW_LAST_ERROR_IF(LastError != ERROR_IO_PENDING);
-
-            auto CancelIo = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-                CancelIoEx(MessageHandle, &Overlapped);
-                GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, TRUE);
-            });
-
-            const DWORD WaitStatus = WaitForMultipleObjects(RTL_NUMBER_OF(WaitHandles), WaitHandles, FALSE, INFINITE);
-            if (WaitStatus == WAIT_OBJECT_0)
-            {
-                Success = GetOverlappedResult(MessageHandle, &Overlapped, &BytesRead, FALSE);
-                CancelIo.release();
-                if ((!Success) || (BytesRead == 0))
-                {
-                    if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
+                    const DWORD waitStatus = WaitForSingleObject(Result->Process.get(), 0);
+                    if (waitStatus == WAIT_OBJECT_0)
                     {
-                        THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(Result->Process.get(), 1));
+                        processExit();
+                    }
+                    else
+                    {
+                        THROW_HR_IF(E_UNEXPECTED, waitStatus != WAIT_TIMEOUT);
+                        if (WI_IsFlagClear(Result->Flags, LX_INIT_CREATE_PROCESS_RESULT_FLAG_GUI_APPLICATION))
+                        {
+                            THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(Result->Process.get(), 1));
+                        }
                     }
 
-                    break;
+                    return;
                 }
 
-                WI_ASSERT((BytesRead == sizeof(WindowSizeMessage)) && (WindowSizeMessage.Header.MessageType == LxInitMessageWindowSizeChanged));
+                std::vector<char> stitchedInput;
+                auto remaining = input;
+                if (!pending.empty())
+                {
+                    stitchedInput.reserve(pending.size() + input.size());
+                    stitchedInput.insert(stitchedInput.end(), pending.begin(), pending.end());
+                    stitchedInput.insert(stitchedInput.end(), input.begin(), input.end());
+                    pending.clear();
+                    remaining = gsl::make_span(stitchedInput);
+                }
 
-                const COORD Size{static_cast<SHORT>(WindowSizeMessage.Columns), static_cast<SHORT>(WindowSizeMessage.Rows)};
-                THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), Size));
-            }
-            else if (WaitStatus == (WAIT_OBJECT_0 + 1))
-            {
-                THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(Result->Process.get(), &ExitCode));
+                while (remaining.size() >= sizeof(LX_INIT_WINDOW_SIZE_CHANGED))
+                {
+                    const auto* message = gslhelpers::get_struct<const LX_INIT_WINDOW_SIZE_CHANGED>(remaining);
+                    THROW_HR_IF(
+                        E_UNEXPECTED,
+                        (message->Header.MessageType != LxInitMessageWindowSizeChanged) || (message->Header.MessageSize != sizeof(*message)));
 
-                // Close the pseudoconsole, this causes all pending data to be flushed.
-                Result->PseudoConsole.reset();
-                break;
-            }
-            else
-            {
-                THROW_HR(E_UNEXPECTED);
-            }
-        }
-    }
+                    const COORD size{static_cast<SHORT>(message->Columns), static_cast<SHORT>(message->Rows)};
+                    THROW_IF_FAILED(ResizePseudoConsole(Result->PseudoConsole.get(), size));
+                    remaining = remaining.subspan(sizeof(*message));
+                }
 
-    return ExitCode;
+                pending.assign(remaining.begin(), remaining.end());
+            }),
+        io::MultiHandleWait::CancelOnCompleted);
+
+    wait.AddHandle(std::make_unique<io::EventHandle>(io::HandleWrapper{Result->Process.get()}, processExit), io::MultiHandleWait::CancelOnCompleted);
+
+    wait.Run(std::nullopt);
+    return exitCode;
 }
 
 } // namespace
@@ -553,7 +551,7 @@ void wsl::windows::common::interop::WorkerThread(_In_ wil::unique_handle&& Serve
 
                         // Process messages from the binfmt interpreter and wait for the
                         // process to exit.
-                        LX_INIT_PROCESS_EXIT_STATUS ExitStatus;
+                        LX_INIT_PROCESS_EXIT_STATUS ExitStatus{};
                         ExitStatus.Header.MessageType = LxInitMessageExitStatus;
                         ExitStatus.Header.MessageSize = sizeof(ExitStatus);
                         ExitStatus.ExitCode = ProcessInteropMessages(SignalPipe.first.get(), &Result);

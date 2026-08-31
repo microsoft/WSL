@@ -30,6 +30,7 @@ cpp_quote("#endif")
 #define WSLC_MAX_VOLUME_NAME_LENGTH 255
 #define WSLC_MAX_VOLUME_DRIVER_LENGTH 255
 #define WSLC_MAX_NETWORK_NAME_LENGTH 255
+#define WSLC_MAX_IMAGE_ID_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 #define WSLC_EPHEMERAL_PORT 0
@@ -40,6 +41,7 @@ cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
 cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
+cpp_quote("#define WSLC_MAX_IMAGE_ID_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
@@ -139,11 +141,12 @@ interface IWSLCPluginNotifier : IUnknown
 typedef struct _WSLCImageInformation
 {
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
-    char Hash[256];
+    char Hash[WSLC_MAX_IMAGE_ID_LENGTH + 1];
     char Digest[256];
     LONGLONG Size; // Matches Docker's int64 image size
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
+    LONGLONG Containers; // Number of containers created from the image, or -1 if it wasn't requested
 } WSLCImageInformation;
 
 typedef struct _KeyValuePairInformation
@@ -245,6 +248,36 @@ typedef struct _WSLCTmpfsMount
     [unique] LPCSTR Options;
 } WSLCTmpfsMount;
 
+typedef enum _WSLCMountType
+{
+    WSLCMountTypeBind,
+    WSLCMountTypeVolume,
+    WSLCMountTypeTmpfs,
+} WSLCMountType;
+
+typedef enum _WSLCMountSpecFlags
+{
+    WSLCMountSpecFlagsNone = 0,
+    WSLCMountSpecFlagsTmpfsSize = 1,
+    WSLCMountSpecFlagsTmpfsMode = 2,
+    WSLCMountSpecFlagsCreateSourceIfMissing = 4,
+} WSLCMountSpecFlags;
+
+cpp_quote("#define WSLCMountSpecFlagsValid (WSLCMountSpecFlagsTmpfsSize | WSLCMountSpecFlagsTmpfsMode | WSLCMountSpecFlagsCreateSourceIfMissing)")
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCMountSpecFlags);")
+
+typedef struct _WSLCMountSpec
+{
+    WSLCMountType Type;
+    [unique, string] LPCWSTR Source;
+    [string] LPCSTR Target;
+    BOOL ReadOnly;
+    WSLCMountSpecFlags Flags;
+    LONGLONG TmpfsSizeBytes;
+    ULONG TmpfsMode;
+    [unique, string] LPCSTR TmpfsOptions;
+} WSLCMountSpec;
+
 typedef struct _WSLCUlimit
 {
     [string] LPCSTR Name;
@@ -255,6 +288,9 @@ typedef struct _WSLCUlimit
 typedef struct _WSLCNetworkConnection
 {
     [string] LPCSTR NetworkName;
+
+    // Settings for this endpoint.
+    // KVP-encoded; duplicate keys are allowed (e.g., multiple "Aliases" entries).
     [unique, size_is(SettingsCount)] const KeyValuePair* Settings;
     ULONG SettingsCount;
 } WSLCNetworkConnection;
@@ -325,6 +361,9 @@ typedef struct _WSLCContainerOptions
     LONGLONG HealthTimeoutNs;
     LONGLONG HealthStartPeriodNs;
     LONG HealthRetries;
+
+    [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
+    ULONG MountsCount;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;
@@ -334,8 +373,8 @@ typedef struct _WSLCContainerEntry
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
     WSLCContainerId Id;
-    ULONGLONG StateChangedAt;
-    ULONGLONG CreatedAt;
+    LONGLONG StateChangedAt;
+    LONGLONG CreatedAt;
     WSLCContainerState State;
 } WSLCContainerEntry;
 
@@ -525,7 +564,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
     HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] const WSLCProcessStartOptions* StartOptions, [out] IWSLCProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] LONGLONG Since, [in] LONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
@@ -608,13 +647,6 @@ typedef struct _WSLCNetworkOptions
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
-
-typedef struct _WSLCNetworkInformation
-{
-    char Name[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
-    char Id[WSLC_CONTAINER_ID_LENGTH + 1];
-    char Driver[64];
-} WSLCNetworkInformation;
 
 typedef struct _WSLCPruneContainersResults
 {
@@ -726,7 +758,7 @@ interface IWSLCSession : IUnknown
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
     HRESULT DeleteVolume([in] LPCSTR Name);
-    HRESULT ListVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
+    HRESULT ListVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] LPSTR* Output);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
@@ -736,7 +768,8 @@ interface IWSLCSession : IUnknown
     // Network management.
     HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options, [in, unique] IWarningCallback* WarningCallback);
     HRESULT DeleteNetwork([in] LPCSTR Name);
-    HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
+    // Returns a JSON array of wslc_schema::NetworkListEntry objects describing the session's networks.
+    HRESULT ListNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out] LPSTR* Output);
     HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
     HRESULT PruneNetworks([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [out, size_is(, *NetworksCount)] WSLCNetworkName** Networks, [out] ULONG* NetworksCount);
 

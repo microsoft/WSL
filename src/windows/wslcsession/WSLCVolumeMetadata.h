@@ -27,6 +27,10 @@ constexpr auto WSLCVhdVolumeDriver = "vhd";
 // Volume driver name for guest-backed volumes (passthrough to docker's built-in "local" driver).
 constexpr auto WSLCGuestVolumeDriver = "guest";
 
+// The level at which a volume exists: "local" (machine level) or "global" (cluster-wide).
+// Every WSLC volume is machine level.
+constexpr auto WSLCVolumeScope = "local";
+
 struct WSLCVolumeMetadata
 {
     std::string Driver;

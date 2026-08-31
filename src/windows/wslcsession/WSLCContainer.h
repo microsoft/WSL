@@ -86,7 +86,7 @@ public:
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         WSLCContainerState InitialState,
-        std::uint64_t CreatedAt,
+        std::int64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags);
 
@@ -101,13 +101,13 @@ public:
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
     void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
-    void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
-    void GetCreatedAt(_Out_ ULONGLONG* CreatedAt);
+    void GetStateChangedAt(_Out_ LONGLONG* StateChangedAt);
+    void GetCreatedAt(_Out_ LONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
     void GetInitProcess(_Out_ IWSLCProcess** process) const;
     void Exec(_In_ const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process);
     void Inspect(LPSTR* Output) const;
-    void Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
+    void Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail) const;
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
     void ConnectToNetwork(const WSLCNetworkConnectionOptions* Options);
@@ -123,7 +123,7 @@ public:
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::optional<std::int64_t> stateChangedAt = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -151,22 +151,58 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
 private:
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
+    enum class TransitionKind
+    {
+        Start,
+        Stop,
+        Delete
+    };
+
+    struct StateTransition
+    {
+        StateTransition(TransitionKind kind, ContainerEvent expectedEvent) : Kind(kind), ExpectedEvent(expectedEvent)
+        {
+        }
+
+        const TransitionKind Kind;
+        wil::unique_event Completed{wil::EventOptions::ManualReset};
+        std::exception_ptr Exception;
+
+        // Access under WSLCContainerImpl::m_lock.
+        ContainerEvent ExpectedEvent;
+        unique_com_disconnect Wrapper;
+    };
+
+    __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept;
+
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
+
+    // Returns with both locks held when no transition is active or the active transition matches kind.
+    void WaitForConflictingTransitionToComplete(
+        wil::rwlock_release_exclusive_scope_exit& lock,
+        wil::rwlock_release_shared_scope_exit& lifecycleLock,
+        std::optional<TransitionKind> kind = std::nullopt);
+
+    void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
+    void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
+
+    __requires_exclusive_lock_held(m_lock) void CompleteTransition(
+        const std::shared_ptr<StateTransition>& transition, std::exception_ptr exception = {}) noexcept;
 
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect OnStopped(std::optional<std::uint64_t> stopTimestamp);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::optional<std::int64_t> stopTimestamp);
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
 
-    std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLCProcessFlags flags);
+    std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::shared_socket stream, WSLCProcessFlags flags);
 
     wsl::windows::common::wslc_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
 
@@ -179,6 +215,9 @@ private:
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
 
+    // Lifecycle requests hold this shared until their transitions are published; event delivery holds it exclusively.
+    // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks m_stateGeneration instead.
+    wil::srwlock m_lifecycleLock;
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
@@ -190,26 +229,19 @@ private:
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
-    struct StopNotification
-    {
-        std::atomic<std::uint64_t> EventTime{0};
-        wil::unique_event Event{wil::EventOptions::None};
-    } m_stopNotification;
-
-    wil::unique_event m_destroyEvent{wil::EventOptions::ManualReset};
-
-    // Serializes Stop() callers and signals OnEvent that a Stop is in flight.
-    // Must be acquired before m_lock when both are needed.
-    std::mutex m_stopLock;
+    _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
     // fetched from the (stable) runtime at each use rather than cached, since a cached reference
     // would dangle across a restart. They are only valid while a VM lease is held.
     WSLCSessionRuntime& m_runtime;
-    std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
-    std::uint64_t m_createdAt{};
+    std::int64_t m_stateChangedAt{static_cast<std::int64_t>(std::time(nullptr))};
+    std::int64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
+
+    // Bumped on every state change so a thread that released m_lock can detect a state cycle, not just a difference.
+    std::uint64_t m_stateGeneration{};
     WSLCSession& m_wslcSession;
     IWSLCPluginNotifier* m_pluginNotifier;
     std::vector<ContainerPortMapping> m_mappedPorts;
@@ -248,7 +280,7 @@ public:
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
     IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
-    IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
+    IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;

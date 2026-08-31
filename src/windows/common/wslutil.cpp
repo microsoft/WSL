@@ -21,7 +21,9 @@ Abstract:
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
+#include "HandleIO.h"
 #include "MsiQuery.h"
+#include "WslInstall.h"
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
@@ -32,6 +34,21 @@ using namespace wsl::windows::common::wslutil;
 
 constexpr auto c_latestReleaseUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/latest";
 constexpr auto c_releaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases";
+
+wsl::windows::common::io::HandleWrapper COMOutputHandle::Release()
+{
+    const auto type = Type;
+    const auto handle = Handle.File;
+    Handle.File = nullptr;
+    Type = WSLCHandleTypeUnknown;
+
+    if (type == WSLCHandleTypeSocket)
+    {
+        return wsl::windows::common::io::HandleWrapper{wil::unique_socket{reinterpret_cast<SOCKET>(handle)}};
+    }
+
+    return wsl::windows::common::io::HandleWrapper{wil::unique_handle{handle}};
+}
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
 constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";
@@ -1348,10 +1365,20 @@ bool wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled()
 {
     // Note for Windows 11 22H2 and above builds: If hyper-v is installed but VMP platform isn't, HNS and vmcompute are
     // available but calls to HNS will fail if vfpext isn't installed.
-    return wsl::windows::common::helpers::IsServicePresent(L"HNS") &&
-           wsl::windows::common::helpers::IsServicePresent(L"vmcompute") &&
-           (helpers::GetWindowsVersion().BuildNumber < helpers::WindowsBuildNumbers::Nickel ||
-            wsl::windows::common::helpers::IsServicePresent(L"vfpext"));
+    if (!wsl::windows::common::helpers::IsServicePresent(L"HNS") || !wsl::windows::common::helpers::IsServicePresent(L"vmcompute") ||
+        (helpers::GetWindowsVersion().BuildNumber >= helpers::WindowsBuildNumbers::Nickel &&
+         !wsl::windows::common::helpers::IsServicePresent(L"vfpext")))
+    {
+        return false;
+    }
+
+    try
+    {
+        return WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameVmp);
+    }
+    CATCH_LOG()
+
+    return true;
 }
 
 wil::unique_handle wsl::windows::common::wslutil::OpenCallingProcess(_In_ DWORD access)

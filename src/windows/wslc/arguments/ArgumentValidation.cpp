@@ -20,6 +20,7 @@ Abstract:
 #include "Exceptions.h"
 #include "ImageService.h"
 #include "Localization.h"
+#include "MountSpecParsing.h"
 #include <algorithm>
 #include <type_traits>
 #include <utility>
@@ -30,6 +31,8 @@ using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
+
+namespace mount = wsl::windows::common::mount;
 
 namespace argument::details {
     struct RawArgMapAccess
@@ -51,7 +54,7 @@ namespace {
     template <ArgType A, typename Converter>
     void CacheConverted(ArgMap& execArgs, const std::wstring& argName, Converter&& convert)
     {
-        using value_t = typename details::ArgConvertedTypeMapping<A>::value_t;
+        using value_t = typename wsl::windows::wslc::argument::details::ArgConvertedTypeMapping<A>::value_t;
         using converted_t = decltype(convert(std::declval<const std::wstring&>(), std::declval<const std::wstring&>()));
         static_assert(
             std::is_same_v<converted_t, value_t>,
@@ -72,6 +75,11 @@ namespace {
 // validated on success.
 void Argument::Validate(ArgMap& execArgs) const
 {
+    if (execArgs.IsValidated(m_argType))
+    {
+        return;
+    }
+
     switch (m_argType)
     {
     case ArgType::BuildLabel:
@@ -92,6 +100,14 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::InspectFormat:
         CacheConverted<ArgType::InspectFormat>(execArgs, m_name, validation::GetInspectJsonIndentFromString);
+        break;
+
+    case ArgType::Pull:
+        CacheConverted<ArgType::Pull>(execArgs, m_name, validation::GetPullPolicyFromString);
+        break;
+
+    case ArgType::Progress:
+        CacheConverted<ArgType::Progress>(execArgs, m_name, validation::GetProgressModeFromString);
         break;
 
     case ArgType::Signal:
@@ -134,7 +150,17 @@ void Argument::Validate(ArgMap& execArgs) const
         if (execArgs.Contains(ArgType::HealthCmd) || execArgs.Contains(ArgType::HealthInterval) || execArgs.Contains(ArgType::HealthTimeout) ||
             execArgs.Contains(ArgType::HealthStartPeriod) || execArgs.Contains(ArgType::HealthRetries))
         {
-            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError());
+            std::vector<Argument> conflictingArguments{*this};
+            for (const auto type :
+                 {ArgType::HealthCmd, ArgType::HealthInterval, ArgType::HealthTimeout, ArgType::HealthStartPeriod, ArgType::HealthRetries})
+            {
+                if (execArgs.Contains(type))
+                {
+                    conflictingArguments.emplace_back(Argument::Create(type));
+                }
+            }
+
+            throw ArgumentException(Localization::WSLCCLI_NoHealthcheckConflictError(), std::move(conflictingArguments));
         }
         break;
 
@@ -205,7 +231,52 @@ void Argument::Validate(ArgMap& execArgs) const
         break;
 
     case ArgType::Volume:
-        validation::ValidateVolumeMount(RawArgMapAccess::GetAll<ArgType::Volume>(execArgs));
+        CacheConverted<ArgType::Volume>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerVolumeString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(ex.Reason());
+            }
+        });
+        break;
+
+    case ArgType::TMPFS:
+        CacheConverted<ArgType::TMPFS>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerTmpfsString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_InvalidTmpfsError(value, ex.Reason()));
+            }
+        });
+        break;
+
+    case ArgType::Mount:
+        CacheConverted<ArgType::Mount>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerMountString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountUnsupportedException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_UnsupportedMountError(value, ex.Reason()));
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_InvalidMountError(value, ex.Reason()));
+            }
+        });
         break;
 
     case ArgType::WorkDir:
@@ -223,19 +294,15 @@ void Argument::Validate(ArgMap& execArgs) const
 
     case ArgType::Network:
     {
-        for (const auto& value : RawArgMapAccess::GetAll<ArgType::Network>(execArgs))
-        {
-            if (value.empty() ||
-                std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+        CacheConverted<ArgType::Network>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            auto parsed = validation::ParseNetworkArgument(value, name);
+            if (IsEqual(parsed.Name, "host", true))
             {
-                throw ArgumentException(Localization::WSLCCLI_NetworkEmptyError(m_name));
+                throw ExecutionException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
             }
 
-            if (IsEqual(value, L"host", true))
-            {
-                throw ArgumentException(Localization::WSLCCLI_NetworkHostModeNotSupportedError());
-            }
-        }
+            return parsed;
+        });
         break;
     }
 
@@ -282,14 +349,6 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLCSignalFromString(value, argName);
-    }
-}
-
-void ValidateVolumeMount(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = models::VolumeMount::Parse(value);
     }
 }
 

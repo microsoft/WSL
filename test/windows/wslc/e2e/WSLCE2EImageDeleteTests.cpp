@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -26,18 +27,18 @@ class WSLCE2EImageDeleteTests
     TEST_METHOD_SETUP(MethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
-        EnsureImageIsDeleted(NoPruneTaggedImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
+        TestImageRegistry::Instance().Delete(NoPruneTaggedImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
-        EnsureImageIsDeleted(NoPruneTaggedImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
+        TestImageRegistry::Instance().Delete(NoPruneTaggedImage);
         return true;
     }
 
@@ -51,7 +52,8 @@ class WSLCE2EImageDeleteTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
     {
         auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
+        auto errorMessage =
+            FormatErrorMessage(std::format(L"No such image: {}", InvalidImage.NameAndTag()), L"WSLC_E_IMAGE_NOT_FOUND");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -64,27 +66,31 @@ class WSLCE2EImageDeleteTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UnusedImage_Success)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", DebianImage.NameAndTag())));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Deleted: sha256:"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MultipleUnusedImages_Success)
     {
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
         VerifyImageIsNotUsed(DebianImage);
         VerifyImageIsNotUsed(AlpineImage);
 
         auto result = RunWslc(std::format(L"image delete {} {}", DebianImage.Name, AlpineImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", DebianImage.NameAndTag())));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", AlpineImage.NameAndTag())));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UsedImage_Failure)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
         auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -98,18 +104,20 @@ class WSLCE2EImageDeleteTests
         auto imageId = GetHashId(inspectImage.Id);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
-        auto errorMessage = std::format(
-            L"conflict: unable to remove repository reference \"{}\" (must force) - container {} is using its referenced image "
-            L"{}\r\nError code: ERROR_SHARING_VIOLATION\r\n",
-            DebianImage.Name,
-            containerId,
-            imageId);
+        auto errorMessage = FormatErrorMessage(
+            std::format(
+                L"conflict: unable to remove repository reference \"{}\" (must force) - container {} is using its referenced "
+                L"image {}",
+                DebianImage.Name,
+                containerId,
+                imageId),
+            L"ERROR_SHARING_VIOLATION");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_DeleteForce_UsedImage_Success)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
         auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -118,15 +126,16 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete --force {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"Untagged: {}", DebianImage.NameAndTag())));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)
     {
         // Tag debian a second time, then remove via the alias with --no-prune.
         // The alias must disappear while the original tag stays resolvable.
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsDeleted(NoPruneTaggedImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().Delete(NoPruneTaggedImage);
 
         auto tagResult = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), NoPruneTaggedImage.NameAndTag()));
         tagResult.Verify({.Stderr = L"", .ExitCode = 0});

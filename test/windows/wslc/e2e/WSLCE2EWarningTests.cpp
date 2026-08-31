@@ -17,6 +17,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <WSLCProcessLauncher.h>
 
 namespace WSLCE2ETests {
@@ -32,13 +33,12 @@ class WSLCE2EWarningTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsaData));
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(AlpineImage);
         WSACleanup();
         return true;
     }

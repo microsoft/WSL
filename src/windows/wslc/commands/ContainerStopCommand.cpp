@@ -28,7 +28,7 @@ std::vector<Argument> ContainerStopCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
-        Argument::Create(ArgType::Signal),
+        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, Localization::WSLCCLI_ContainerStopSignalArgDescription()),
         Argument::Create(ArgType::Time),
     };
 }

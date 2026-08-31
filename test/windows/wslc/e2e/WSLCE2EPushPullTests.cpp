@@ -16,6 +16,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "Argument.h"
 
 namespace WSLCE2ETests {
@@ -55,8 +56,8 @@ class WSLCE2EPushPullTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_PushPull)
     {
-        const auto& debianImage = DebianTestImage();
-        EnsureImageIsLoaded(debianImage);
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         // Start a local registry without auth.
         auto session = OpenDefaultElevatedSession();
@@ -66,7 +67,7 @@ class WSLCE2EPushPullTests
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
             // Tag the image for the local registry.
-            auto registryImage = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
+            auto registryImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
 
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
@@ -95,8 +96,8 @@ class WSLCE2EPushPullTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Pull_QuietOption)
     {
-        const auto& debianImage = DebianTestImage();
-        EnsureImageIsLoaded(debianImage);
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
 
         auto session = OpenDefaultElevatedSession();
 
@@ -105,7 +106,7 @@ class WSLCE2EPushPullTests
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
             // Tag and push the image so it can be pulled back from the registry.
-            auto registryImage = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
+            auto registryImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
             RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
@@ -125,16 +126,17 @@ class WSLCE2EPushPullTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Push_NonExistentImage)
     {
         auto result = RunWslc(L"push does-not-exist:latest");
-        auto errorMessage = L"An image does not exist locally with the tag: does-not-exist\r\nError code: E_FAIL\r\n";
+        auto errorMessage = FormatErrorMessage(L"An image does not exist locally with the tag: does-not-exist", L"E_FAIL");
         result.Verify({.Stderr = errorMessage, .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Pull_NonExistentImage)
     {
         auto result = RunWslc(L"pull does-not-exist:latest");
-        auto errorMessage =
+        auto errorMessage = FormatErrorMessage(
             L"pull access denied for does-not-exist, repository does not exist or may require 'docker login': denied: requested "
-            L"access to the resource is denied\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n";
+            L"access to the resource is denied",
+            L"WSLC_E_IMAGE_NOT_FOUND");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 

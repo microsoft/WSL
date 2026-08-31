@@ -229,29 +229,60 @@ void WSLCContainerLauncher::AddUlimit(const std::string& Name, std::int64_t Soft
 
 void wsl::windows::common::WSLCContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
-    // Store a copy of the path strings to the launcher to ensure the pointers in WSLCVolume remain valid.
-    const auto& hostPath = m_hostPaths.emplace_back(HostPath);
-    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
-
-    WSLCVolume vol{};
-    vol.HostPath = hostPath.c_str();
-    vol.ContainerPath = containerPath.c_str();
-    vol.ReadOnly = ReadOnly ? TRUE : FALSE;
-
-    m_volumes.push_back(vol);
+    AddMount({
+        .MountType = WSLCMountTypeBind,
+        .Source = HostPath,
+        .Target = ContainerPath,
+        .ReadOnly = ReadOnly,
+        .BindSource = mount::BindSourcePolicy::CreateIfMissing,
+    });
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly)
 {
-    const auto& name = m_volumeNames.emplace_back(Name);
-    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
+    AddMount({
+        .MountType = WSLCMountTypeVolume,
+        .Source = wsl::shared::string::MultiByteToWide(Name),
+        .Target = ContainerPath,
+        .ReadOnly = ReadOnly,
+    });
+}
 
-    WSLCNamedVolume volume{};
-    volume.Name = name.c_str();
-    volume.ContainerPath = containerPath.c_str();
-    volume.ReadOnly = ReadOnly ? TRUE : FALSE;
+void wsl::windows::common::WSLCContainerLauncher::AddMount(const mount::Spec& Mount)
+{
+    WSLCMountSpec mount{};
+    mount.Type = Mount.MountType;
 
-    m_namedVolumes.push_back(volume);
+    if (!Mount.Source.empty())
+    {
+        mount.Source = m_mountSources.emplace_back(Mount.Source).c_str();
+    }
+
+    mount.Target = m_mountTargets.emplace_back(Mount.Target).c_str();
+    mount.ReadOnly = Mount.ReadOnly ? TRUE : FALSE;
+    if (Mount.MountType == WSLCMountTypeBind && Mount.BindSource == mount::BindSourcePolicy::CreateIfMissing)
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsCreateSourceIfMissing);
+    }
+
+    if (Mount.TmpfsSizeBytes.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsSize);
+        mount.TmpfsSizeBytes = Mount.TmpfsSizeBytes.value();
+    }
+
+    if (Mount.TmpfsMode.has_value())
+    {
+        WI_SetFlag(mount.Flags, WSLCMountSpecFlagsTmpfsMode);
+        mount.TmpfsMode = Mount.TmpfsMode.value();
+    }
+
+    if (Mount.TmpfsOptions.has_value())
+    {
+        mount.TmpfsOptions = m_mountTmpfsOptions.emplace_back(Mount.TmpfsOptions.value()).c_str();
+    }
+
+    m_mounts.push_back(mount);
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Key, const std::string& Value)
@@ -269,25 +300,31 @@ void wsl::windows::common::WSLCContainerLauncher::AddLabel(const std::string& Ke
 
 void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& ContainerPath, const std::string& Options)
 {
-    // Store a copy of the path/options strings to the launcher to ensure the pointers in WSLCTmpfsMount remain valid.
-    const auto& containerPath = m_tmpfsContainerPaths.emplace_back(ContainerPath);
-    const auto& options = m_tmpfsOptions.emplace_back(Options);
-
-    WSLCTmpfsMount tmpfs{};
-    tmpfs.Destination = containerPath.c_str();
-    tmpfs.Options = options.c_str();
-
-    m_tmpfsMounts.push_back(tmpfs);
+    AddMount({
+        .MountType = WSLCMountTypeTmpfs,
+        .Target = ContainerPath,
+        .TmpfsOptions = Options,
+    });
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name)
 {
-    m_additionalNetworks.push_back(Name);
+    AddAdditionalNetwork(Name, {});
+}
+
+void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases)
+{
+    m_additionalNetworks.push_back({.Name = Name, .Aliases = Aliases});
 }
 
 void wsl::windows::common::WSLCContainerLauncher::AddPrimaryNetworkAlias(const std::string& Alias)
 {
     m_primaryNetworkAliases.push_back(Alias);
+}
+
+void wsl::windows::common::WSLCContainerLauncher::SetPrimaryNetworkIpAddress(std::string&& Address)
+{
+    m_primaryNetworkIpAddress = std::move(Address);
 }
 
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(
@@ -407,41 +444,53 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
         options.InitProcessOptions.CurrentDirectory = m_workingDirectory.c_str();
     }
 
-    options.VolumesCount = static_cast<ULONG>(m_volumes.size());
-    options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
-
-    options.NamedVolumesCount = static_cast<ULONG>(m_namedVolumes.size());
-    options.NamedVolumes = m_namedVolumes.size() > 0 ? m_namedVolumes.data() : nullptr;
+    options.MountsCount = static_cast<ULONG>(m_mounts.size());
+    options.Mounts = m_mounts.size() > 0 ? m_mounts.data() : nullptr;
 
     options.LabelsCount = static_cast<ULONG>(m_labels.size());
     options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;
-
-    options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
-    options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
     options.ContainerNetwork.NetworkMode = m_networkMode.c_str();
 
     // Each additional network becomes an entry in NetworkingConfig.EndpointsConfig.
     std::vector<WSLCNetworkConnection> connections;
     connections.reserve(m_additionalNetworks.size());
+    std::vector<std::vector<KeyValuePair>> connectionSettings;
+    connectionSettings.reserve(m_additionalNetworks.size());
     for (const auto& e : m_additionalNetworks)
     {
-        connections.push_back({.NetworkName = e.c_str()});
+        auto& settings = connectionSettings.emplace_back();
+        settings.reserve(e.Aliases.size());
+        for (const auto& alias : e.Aliases)
+        {
+            settings.push_back({.Key = "Aliases", .Value = alias.c_str()});
+        }
+
+        connections.push_back({
+            .NetworkName = e.Name.c_str(),
+            .Settings = settings.empty() ? nullptr : settings.data(),
+            .SettingsCount = static_cast<ULONG>(settings.size()),
+        });
     }
 
     options.ContainerNetwork.Networks = connections.empty() ? nullptr : connections.data();
     options.ContainerNetwork.NetworksCount = static_cast<ULONG>(connections.size());
 
-    // Aliases for the primary endpoint.
-    std::vector<KeyValuePair> aliasKvps;
-    aliasKvps.reserve(m_primaryNetworkAliases.size());
+    // Settings for the primary endpoint.
+    std::vector<KeyValuePair> primarySettings;
+    primarySettings.reserve(m_primaryNetworkAliases.size() + (m_primaryNetworkIpAddress.has_value() ? 1 : 0));
     for (const auto& alias : m_primaryNetworkAliases)
     {
-        aliasKvps.push_back({.Key = "Aliases", .Value = alias.c_str()});
+        primarySettings.push_back({.Key = "Aliases", .Value = alias.c_str()});
     }
 
-    options.ContainerNetwork.Settings = aliasKvps.empty() ? nullptr : aliasKvps.data();
-    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(aliasKvps.size());
+    if (m_primaryNetworkIpAddress.has_value())
+    {
+        primarySettings.push_back({.Key = "IPAddress", .Value = m_primaryNetworkIpAddress->c_str()});
+    }
+
+    options.ContainerNetwork.Settings = primarySettings.empty() ? nullptr : primarySettings.data();
+    options.ContainerNetwork.SettingsCount = static_cast<ULONG>(primarySettings.size());
 
     options.MemoryBytes = m_memoryBytes;
     options.NanoCpus = m_nanoCpus;

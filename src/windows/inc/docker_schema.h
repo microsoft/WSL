@@ -22,6 +22,24 @@ namespace wsl::windows::common::docker_schema {
 
 using wsl::shared::EmptyObject;
 
+// The daemon formats timestamps that were never set as the zero value of Go's time.Time rather than
+// omitting them, so this value means "unset" instead of an actual point in time.
+inline constexpr std::string_view c_unsetTimestamp = "0001-01-01T00:00:00Z";
+
+// Reads a value, treating both a missing key and an explicit null as absent. The daemon reports some
+// empty maps and objects as null, which the default deserializer rejects.
+template <typename T>
+T ValueOrNull(const nlohmann::json& json, const char* key, T defaultValue = T{})
+{
+    const auto entry = json.find(key);
+    if (entry == json.end() || entry->is_null())
+    {
+        return defaultValue;
+    }
+
+    return entry->get<T>();
+}
+
 struct CreatedContainer
 {
     std::string Id;
@@ -127,8 +145,37 @@ struct IPAM
 {
     std::string Driver;
     std::optional<std::vector<IPAMConfig>> Config;
+    std::map<std::string, std::string> Options;
+};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAM, Driver, Config);
+inline void to_json(nlohmann::json& j, const IPAM& ipam)
+{
+    j = nlohmann::json{{"Driver", ipam.Driver}, {"Config", ipam.Config}, {"Options", ipam.Options}};
+}
+
+inline void from_json(const nlohmann::json& j, IPAM& ipam)
+{
+    ipam.Driver = ValueOrNull<std::string>(j, "Driver");
+    ipam.Config = ValueOrNull<std::optional<std::vector<IPAMConfig>>>(j, "Config");
+    ipam.Options = ValueOrNull<std::map<std::string, std::string>>(j, "Options");
+}
+
+struct NetworkConfigFrom
+{
+    std::string Network;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkConfigFrom, Network);
+};
+
+struct NetworkContainer
+{
+    std::string Name;
+    std::string EndpointID;
+    std::string MacAddress;
+    std::string IPv4Address;
+    std::string IPv6Address;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkContainer, Name, EndpointID, MacAddress, IPv4Address, IPv6Address);
 };
 
 struct CreateNetworkResponse
@@ -158,16 +205,45 @@ struct Network
 {
     std::string Id;
     std::string Name;
+    std::string Created;
     std::string Driver;
     std::string Scope;
-    bool Internal{};
+    bool EnableIPv4{true};
     bool EnableIPv6{};
+    bool Internal{};
+    bool Attachable{};
+    bool Ingress{};
+    bool ConfigOnly{};
+    NetworkConfigFrom ConfigFrom;
     IPAM IPAM;
-    std::optional<std::map<std::string, std::string>> Options;
+    std::map<std::string, std::string> Options;
     std::map<std::string, std::string> Labels;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, EnableIPv6, IPAM, Options, Labels);
+    std::map<std::string, NetworkContainer> Containers;
+    nlohmann::json Status = nlohmann::json::object();
 };
+
+inline void from_json(const nlohmann::json& j, Network& network)
+{
+    const Network defaults{};
+
+    network.Id = ValueOrNull<std::string>(j, "Id");
+    network.Name = ValueOrNull<std::string>(j, "Name");
+    network.Created = ValueOrNull<std::string>(j, "Created");
+    network.Driver = ValueOrNull<std::string>(j, "Driver");
+    network.Scope = ValueOrNull<std::string>(j, "Scope");
+    network.EnableIPv4 = ValueOrNull<bool>(j, "EnableIPv4", defaults.EnableIPv4);
+    network.EnableIPv6 = ValueOrNull<bool>(j, "EnableIPv6");
+    network.Internal = ValueOrNull<bool>(j, "Internal");
+    network.Attachable = ValueOrNull<bool>(j, "Attachable");
+    network.Ingress = ValueOrNull<bool>(j, "Ingress");
+    network.ConfigOnly = ValueOrNull<bool>(j, "ConfigOnly");
+    network.ConfigFrom = ValueOrNull<NetworkConfigFrom>(j, "ConfigFrom");
+    network.IPAM = ValueOrNull<docker_schema::IPAM>(j, "IPAM");
+    network.Options = ValueOrNull<std::map<std::string, std::string>>(j, "Options");
+    network.Labels = ValueOrNull<std::map<std::string, std::string>>(j, "Labels");
+    network.Containers = ValueOrNull<std::map<std::string, NetworkContainer>>(j, "Containers");
+    network.Status = ValueOrNull<nlohmann::json>(j, "Status", defaults.Status);
+}
 
 struct EndpointIPAMConfig
 {
@@ -241,6 +317,14 @@ inline void to_json(nlohmann::json& j, const ContainerNetworkRequest& v)
     }
 }
 
+struct MountTmpfsOptions
+{
+    std::int64_t SizeBytes{};
+    std::uint32_t Mode{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(MountTmpfsOptions, SizeBytes, Mode);
+};
+
 struct Mount
 {
     std::string Name;
@@ -248,8 +332,9 @@ struct Mount
     std::string Target;
     std::string Type;
     bool ReadOnly{};
+    std::optional<MountTmpfsOptions> TmpfsOptions;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly, TmpfsOptions);
 };
 
 struct DeviceMapping
@@ -440,11 +525,12 @@ struct ContainerConfig
 struct InspectMount
 {
     std::string Type;
+    std::string Name;
     std::string Source;
     std::string Destination;
     bool RW{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, RW);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Name, Source, Destination, RW);
 };
 
 struct InspectContainer
@@ -456,9 +542,10 @@ struct InspectContainer
     ContainerInspectState State;
     ContainerConfig Config;
     HostConfig HostConfig;
+    std::vector<InspectMount> Mounts;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings);
 };
 
 struct InspectExec
@@ -688,6 +775,7 @@ struct ContainerInfo
     std::string Id;
     std::vector<std::string> Names;
     std::string Image;
+    std::string ImageID;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
     std::vector<Mount> Mounts;
@@ -696,7 +784,7 @@ struct ContainerInfo
     HostConfig HostConfig;
     NetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, ImageID, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
 };
 
 struct BuildKitVertex
@@ -704,9 +792,11 @@ struct BuildKitVertex
     std::string digest;
     std::string name;
     std::string started;
+    std::string completed;
     std::string error;
+    bool cached{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, completed, error, cached);
 };
 
 struct BuildKitStatus

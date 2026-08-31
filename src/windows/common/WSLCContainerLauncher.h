@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #pragma once
+#include "MountSpecParsing.h"
 #include "WSLCProcessLauncher.h"
 #include "docker_schema.h"
 #include "wslc_schema.h"
@@ -59,11 +60,14 @@ public:
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly);
+    void AddMount(const mount::Spec& Mount);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol = IPPROTO_TCP, const std::optional<std::string>& BindingAddress = {});
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
     void AddAdditionalNetwork(const std::string& Name);
+    void AddAdditionalNetwork(const std::string& Name, const std::vector<std::string>& Aliases);
     void AddPrimaryNetworkAlias(const std::string& Alias);
+    void SetPrimaryNetworkIpAddress(std::string&& Address);
 
     std::pair<HRESULT, std::optional<RunningWSLCContainer>> CreateNoThrow(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
     RunningWSLCContainer Create(IWSLCSession& Session, IWarningCallback* WarningCallback = nullptr);
@@ -99,14 +103,19 @@ public:
     using WSLCProcessLauncher::SetWorkingDirectory;
 
 private:
+    struct NetworkConnection
+    {
+        std::string Name;
+        std::vector<std::string> Aliases;
+    };
+
     std::string m_image;
     std::string m_name;
     std::vector<WSLCPortMapping> m_ports;
-    std::vector<WSLCVolume> m_volumes;
-    std::vector<WSLCNamedVolume> m_namedVolumes;
-    std::deque<std::wstring> m_hostPaths;
-    std::deque<std::string> m_volumeNames;
-    std::deque<std::string> m_containerPaths;
+    std::vector<WSLCMountSpec> m_mounts;
+    std::deque<std::wstring> m_mountSources;
+    std::deque<std::string> m_mountTargets;
+    std::deque<std::string> m_mountTmpfsOptions;
     std::string m_networkMode;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
@@ -123,14 +132,12 @@ private:
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
-    std::vector<std::string> m_additionalNetworks;
+    std::vector<NetworkConnection> m_additionalNetworks;
     std::vector<std::string> m_primaryNetworkAliases;
+    std::optional<std::string> m_primaryNetworkIpAddress;
     std::vector<WSLCLabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
-    std::vector<WSLCTmpfsMount> m_tmpfsMounts;
-    std::deque<std::string> m_tmpfsContainerPaths;
-    std::deque<std::string> m_tmpfsOptions;
     std::int64_t m_memoryBytes = 0;
     std::int64_t m_nanoCpus = 0;
     std::vector<WSLCUlimit> m_ulimits;

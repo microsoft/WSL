@@ -308,6 +308,9 @@ y "wsl.exe --install &lt;Distro&gt;" para instalar.</value>
   <data name="MessageConversionStart" xml:space="preserve">
     <value>Conversión en curso. Esta operación puede tardar unos minutos.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>Compactación en curso, esto puede tardar unos minutos.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>La distribución ya es la versión solicitada.</value>
   </data>
@@ -400,58 +403,58 @@ Uso:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Todos los derechos reservados.
-Para obtener información de privacidad sobre este producto, visite https://aka.ms/privacy.
+    <value>Copyright (c) Microsoft Corporation. Todos los derechos reservados.
+Para obtener información de privacidad sobre este producto, visita https://aka.ms/privacy.
 
-Uso: wsl.exe [Argumento] [Opciones...] [Línea de comandos]
+Uso: wsl.exe [Argumento] [Opciones...] [CommandLine]
 
 Argumentos para ejecutar archivos binarios de Linux:
 
     Si no se proporciona ninguna línea de comandos, wsl.exe inicia el shell predeterminado.
 
     --exec, -e &lt;CommandLine&gt;
-        Ejecute el comando especificado sin usar el shell de Linux predeterminado.
+        Ejecuta el comando especificado sin usar el shell de Linux predeterminado.
 
     --shell-type &lt;standard|login|none&gt;
-        Ejecute el comando especificado con el tipo de shell proporcionado.
+        Ejecuta el comando especificado con el tipo de shell proporcionado.
 
     --
         Pasa la línea de comandos restante tal cual.
 
 Opciones:
     --cd &lt;Directory&gt;
-        Establece el directorio especificado como directorio de trabajo actual.
-        Si se usa ~, se usará la ruta de acceso principal del usuario de Linux. Si la ruta de
-        acceso comienza con un carácter /, se interpretará como una ruta de acceso absoluta de Linux.
+        Establece el directorio especificado como el directorio de trabajo actual.
+        Si se usa ~, se usará la ruta de acceso principal del usuario de Linux. Si la ruta de acceso comienza
+        con un carácter /, se interpretará como una ruta de acceso absoluta de Linux.
         De lo contrario, el valor debe ser una ruta de acceso absoluta de Windows.
 
     --distribution, -d &lt;DistroName&gt;
-        Ejecute la distribución especificada.
+        Ejecuta la distribución especificada.
 
     --distribution-id &lt;DistroGuid&gt;
-        Ejecute el id. de distribución especificado.
+        Ejecuta el id. de la distribución especificada.
 
     --user, -u &lt;UserName&gt;
-        Ejecutar como el usuario especificado.
+        Ejecuta como el usuario especificado.
 
     --system
         Inicia un shell para la distribución del sistema.
 
-Argumentos para administrar Subsistema de Windows para Linux:
+Argumentos para administrar el Subsistema de Windows para Linux:
 
     --help
-    Mostrar información de uso.
+        Muestra información de uso.
 
     --debug-shell
-        Abra un shell de depuración WSL2 con fines de diagnóstico.
+        Abre un shell de depuración WSL2 con fines de diagnóstico.
 
-    --install [Distribución] [Opciones...]
-        Instale una distribución de Subsistema de Windows para Linux.
+    --install [Distro] [Options...]
+        Instala una distribución de Subsistema de Windows para Linux.
         Para obtener una lista de distribuciones válidas, use 'wsl.exe --list --online'.
 
         Opciones:
             --enable-wsl1
-                Habilitar compatibilidad con WSL1.
+                Habilita la compatibilidad con WSL1.
 
             --fixed-vhd
                 Crea un disco de tamaño fijo para almacenar la distribución.
@@ -469,19 +472,19 @@ Argumentos para administrar Subsistema de Windows para Linux:
                 Establece el nombre de la distribución.
 
             --no-distribution
-                Solo instalar los componentes opcionales necesarios, no instala una distribución.
+                Solo se instalan los componentes opcionales necesarios, no se instala una distribución.
 
             --no-launch, -n
-                No inicies la distribución después de la instalación.
+                No inicia la distribución después de la instalación.
 
             --version &lt;Version&gt;
-                Especifica la versión que se va a usar para la nueva distribución.
+                Especificar la versión que se va a usar para la nueva distribución.
 
             --vhd-size &lt;MemoryString&gt;
                 Especifica el tamaño del disco para almacenar la distribución.
 
             --web-download
-                Descarga la distribución desde Internet en lugar de la Microsoft Store.
+                Descarga la distribución desde Internet en lugar de la Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
         Cambia las opciones específicas de distribución.
@@ -491,7 +494,7 @@ Argumentos para administrar Subsistema de Windows para Linux:
                 Mueve la distribución a una nueva ubicación.
 
             --set-sparse, -s &lt;true|false&gt;
-                Establece el VHD de distribución en disperso, lo que permite recuperar automáticamente el espacio en disco.
+                Establece el VHD de la distribución para que sea disperso, lo que permite que el espacio en disco se recupere automáticamente.
 
             --set-default-user &lt;Username&gt;
                 Establece el usuario predeterminado de la distribución.
@@ -499,64 +502,67 @@ Argumentos para administrar Subsistema de Windows para Linux:
             --resize &lt;MemoryString&gt;
                 Cambia el tamaño del disco de la distribución al tamaño especificado.
 
+            --compact
+                Compactar el archivo VHDX de una distribución de WSL 2.
+
     --mount &lt;Disk&gt;
-        Conecta y monta un disco físico o virtual en todas las distribuciones de WSL 2.
+        Conectar y montar un disco físico o virtual en todas las distribuciones de WSL 2.
 
         Opciones:
             --vhd
                 Especifica que &lt;Disk&gt; hace referencia a un disco duro virtual.
 
             --bare
-                Conecta el disco a WSL2, pero no lo montes.
+                Conectar el disco a WSL2, pero no montarlo.
 
             --name &lt;Name&gt;
                 Monta el disco con un nombre personalizado para el punto de montaje.
 
-            --type &lt;Tipo&gt;
-                Sistema de archivos que se va a usar al montar un disco. Si no se especifica, el valor predeterminado es ext4.
+            --type &lt;Type&gt;
+                Sistema de archivos que se va a usar al montar un disco; si no se especifica, el valor predeterminado es ext4.
 
             --options &lt;Options&gt;
                 Opciones de montaje adicionales.
 
             --partition &lt;Index&gt;
-                Índice de la partición que se va a montar. Si no se especifica, el valor predeterminado es todo el disco.
+                Índice de la partición que se va a montar; si no se especifica, el valor predeterminado es todo el disco.
 
     --set-default-version &lt;Version&gt;
         Cambia la versión de instalación predeterminada para las nuevas distribuciones.
 
     --shutdown
-        Finaliza inmediatamente todas las distribuciones en ejecución y la máquina virtual
-        de la utilidad ligera WSL 2.
+        Finaliza inmediatamente todas las distribuciones en ejecución y la
+        máquina virtual de utilidad ligera WSL 2.
 
         Opciones:
-             --force
+            --force
                 Finaliza la máquina virtual WSL 2 incluso si hay una operación en curso. Puede provocar la pérdida de datos.
 
     --status
-        Muestra el estado de Subsistema de Windows para Linux.
+        Mostrar el estado del Subsistema de Windows para Linux.
 
     --unmount [Disk]
         Desmonta y desasocia un disco de todas las distribuciones de WSL2.
-        Desmonta y desasocia todos los discos si se llama sin argumento.
+        Desmontar y desasociar todos los discos si se llama sin argumento.
 
-        --uninstall
-            Desinstala el paquete de Subsistema de Windows para Linux de este equipo.
+    --uninstall
+        Desinstala el paquete de Subsistema de Windows para Linux de este equipo.
 
-        --update
-            Actualizar el paquete del Subsistema de Windows para Linux.
+    --update
+        Actualiza el paquete de Subsistema de Windows para Linux.
 
         Opciones:
             --pre-release
-                 Descargar una versión preliminar si está disponible.
+                Descarga una versión preliminar si está disponible.
 
-            --version, -v
-                Mostrar información de versión.
+    --version, -v
+        Muestra información de la versión.
 
-Argumentos para administrar distribuciones en el Subsistema de Windows para Linux:
+Argumentos para administrar distribuciones en Subsistema de Windows para Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         Exporta la distribución a un archivo tar.
-        El nombre de archivo puede ser - para stdout.
+        El nombre de archivo puede ser: para stdout.
 
         Opciones:
             --format &lt;Format&gt;
@@ -564,7 +570,7 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
         Importa el archivo tar especificado como una nueva distribución.
-        El nombre de archivo puede ser - para stdin.
+        El nombre de archivo puede ser para stdin.
 
         Opciones:
             --version &lt;Version&gt;
@@ -583,29 +589,29 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
 
         Opciones:
             --all
-                Enumera todas las distribuciones, incluidas las distribuciones que se están
-                instalando o desinstalando actualmente.
+                Enumera todas las distribuciones, incluidas las distribuciones que
+                actualmente se están instalando o desinstalando.
 
             --running
                 Enumera solo las distribuciones que se están ejecutando actualmente.
 
             --quiet, -q
-                Mostrar solo nombres de distribución.
+                Muestra solo los nombres de distribución.
 
             --verbose, -v
                 Muestra información detallada sobre todas las distribuciones.
 
             --online, -o
-                Muestra una lista de distribuciones disponibles para instalar con 'wsl.exe --install'.
+                Muestra una lista de las distribuciones disponibles para instalar con 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
         Establece la distribución como predeterminada.
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Cambia la versión de la distribución especificada.
+        Cambiar la versión de la distribución especificada.
 
     --terminate, -t &lt;Distro&gt;
-        Finaliza la distribución especificada.
+        Finalizar la distribución especificada.
 
     --unregister &lt;Distro&gt;
         Anula el registro de la distribución y elimina el sistema de archivos raíz.</value>
@@ -617,7 +623,8 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -959,9 +966,13 @@ Revirtiendo a las redes NAT.</value>
     <value>No se pudo iniciar el proceso de retransmisión localhost. Error: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+  <data name="MessageVirtualMachinePlatformRequiredForNetworking" xml:space="preserve">
     <value>Error al iniciar las redes virtuales. Instale el componente opcional Plataforma de máquina virtual ejecutando: wsl.exe --install --no-distribution</value>
     <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>La plataforma de máquina virtual no está habilitada. WSL 2 puede que no funcione correctamente. Para habilitarlo, ejecute: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="WSL 2"}{Locked="wsl.exe"}{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
     <value>No se pudo configurar la red (networkingMode {}), revirtiendo a networkingMode {}.</value>
@@ -1004,8 +1015,8 @@ Revirtiendo a las redes NAT.</value>
     <value>La directiva de equipo bloquea el registro de imágenes de contenedor "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>La creación de imágenes de contenedor está bloqueada porque la directiva de equipo ha configurado una lista de permitidos del registro de contenedor. Las compilaciones de imágenes pueden extraer imágenes base de registros arbitrarios y no se pueden restringir de forma confiable a la lista de permitidos.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>La directiva de lista de permitidos del registro de contenedor no es válida. Compruebe que los valores de WSLContainerRegistryAllowlist en Software\Policies\WSL estén configurados correctamente.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>Ejecute "wsl.exe --set-version {} 2" para actualizar a WSL2.</value>
@@ -1066,6 +1077,10 @@ Revirtiendo a las redes NAT.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>No se pudo completar la operación porque el VHD está actualmente en uso. Para forzar que WSL deje de usar: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>La compactación solo se admite en archivos .vhdx.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>{} no es un booleano válido, &lt;true|false&gt;</value>
@@ -1160,8 +1175,9 @@ Esta solicitud agotará el tiempo de espera en 60 segundos.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Código de error: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Código de error: {}
+Si este error fue inesperado, considere la posibilidad de buscar problemas existentes o presentar un nuevo problema en https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Documento JSON no válido. Error de análisis: {}</value>
@@ -1992,13 +2008,13 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Número de milisegundos que una VM está inactiva antes de apagarse.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>Mantenga WSL en ejecución</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
     <value>Evitar que las distribuciones en ejecución y la máquina virtual WSL que las hospeda se apaguen automáticamente después de que hayan estado inactivas.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>Mantenga WSL en ejecución.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Evitar que las distribuciones en ejecución y la máquina virtual WSL que las hospeda se apaguen automáticamente después de que hayan estado inactivas.</value>
@@ -2013,16 +2029,16 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Número de milisegundos que una VM está inactiva antes de apagarse.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Tiempo de espera de inactividad de la distribución</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
     <value>Número de milisegundos que una distribución está inactiva antes de que finalice.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Restablecer tiempo de espera</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Tiempo de espera de inactividad de la distribución</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Número de milisegundos que una distribución está inactiva antes de que finalice.</value>
@@ -2199,11 +2215,15 @@ Uso:
     <value>No se proporcionó el argumento requerido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>No se proporcionó la opción necesaria: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Muestra la ayuda sobre el comando seleccionado</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Se proporcionaron varios argumentos mutuamente excluyentes: '{}'</value>
+    <value>Se proporcionaron varias opciones mutuamente excluyentes: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2239,7 +2259,11 @@ Uso:
     <value>Desactivar la salida de color.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Para más información sobre un comando específico, pásalo el argumento de ayuda.</value>
+    <value>Para obtener más información sobre un comando específico, páselo a la opción de ayuda.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>Ejecute '{} --help' para obtener más información.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Comandos:</value>
@@ -2256,8 +2280,14 @@ Uso:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Argumentos:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Opciones relacionadas:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Argumentos relacionados:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>No se reconoció el nombre del argumento para el comando actual: '{}'</value>
+    <value>No se reconoció el nombre de opción para el comando actual: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2279,35 +2309,35 @@ Uso:
     <value>Id. de contenedor</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Falta el valor del argumento: '{}'</value>
+    <value>Falta el valor de opción: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>No se reconoció el alias del argumento para el comando actual: '{}'</value>
+    <value>No se reconoció el alias de opción para el comando actual: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Especificador de argumento no válido: '{}'</value>
+     <value>Especificador de opción no válido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>No se encontró el alias de la marca adyacente: '{}'</value>
+     <value>No se encontró el alias de opción adyacente: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>El alias adyacente no es una marca: '{}'</value>
+     <value>El alias de opción adyacente no es una marca: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Especificador de argumento no válido: '{}'</value>
+     <value>Especificador de opción no válido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>El argumento de marca no puede contener el valor adyacente: '{}'</value>
+     <value>La opción no puede contener un valor adyacente: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Valor booleano no válido para el argumento de marca: '{}'. Se esperaba true, false, 1 o 0.</value>
+     <value>Valor booleano no válido para la opción: '{}'. Se esperaba true, false, 1, 0, t o f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2315,7 +2345,7 @@ Uso:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Falta el nombre del argumento en: '{}'</value>
+     <value>Falta el nombre de opción en: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2327,7 +2357,7 @@ Uso:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Los argumentos de alias con un valor deben ir al final de la cadena de alias: '{}'</value>
+     <value>Las opciones de alias con un valor deben ser las últimas en la cadena de alias: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2470,12 +2500,28 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>No se pueden especificar alias de red cuando se solicitan varias redes. Use un único argumento --network .</value>
+    <value>No se pueden especificar alias de red cuando se solicitan varias redes. Use una única opción --network .</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Una dirección IP requiere una red definida por el usuario. Use --network para especificar uno.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>No se puede especificar una dirección IP cuando se solicitan varias redes. Use una única opción --network .</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>No se pudo crear el volumen '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBindSourcePathNotFound" xml:space="preserve">
+    <value>La ruta de acceso de origen de enlace no existe: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBindSourcePathError" xml:space="preserve">
+    <value>No se pudo obtener acceso a la ruta de acceso de origen de enlace "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
     <value>Se han montado demasiados volúmenes (límite: {}). Reinicie la sesión para montar más volúmenes. Esto se solucionará en una versión futura.</value>
@@ -2628,10 +2674,11 @@ Ejemplo: tar -cf - archivos | wslc container cp - CONTAINER:/path</value>
     <value>Muestra información detallada sobre un contenedor.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Cierra los contenedores.</value>
+    <value>Detener uno o varios contenedores en ejecución.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Cierra los contenedores.</value>
+    <value>Elimina uno o varios contenedores en ejecución mediante el envío de SIGKILL de forma predeterminada, o la señal especificada con --signal.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Enumera los contenedores.</value>
@@ -2686,6 +2733,10 @@ Ejemplo: tar -cf - archivos | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Detiene los contenedores.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Señal que se va a enviar (valor predeterminado: STOPSIGNAL configurado en el contenedor, o SIGTERM si no se configura ninguno)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Administra imágenes.</value>
@@ -2951,7 +3002,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Valor de argumento {} no válido: '{}'. Se esperaba un número positivo de CPU (por ejemplo, 0.5, 1, 2)</value>
+    <value>Valor de opción {} no válido: '{}'. Se esperaba un número positivo de CPU (por ejemplo, 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2979,8 +3030,98 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Filtrar salida en función de las condiciones proporcionadas</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Argumento "{}" no válido para '-f, marca --filter': formato incorrecto del filtro (se esperaba nombre=valor)</value>
+    <value>Valor "{}" no válido para la opción '-f, --filter': formato incorrecto del filtro (se esperaba nombre=valor)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+  <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
+    <value>Argumento no válido "{}" para la opción '--mount': {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTmpfsError" xml:space="preserve">
+    <value>Argumento no válido "{}" para la opción '--tmpfs': {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--tmpfs'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedMountError" xml:space="preserve">
+    <value>El argumento "{}" para la opción "--mount' usa una característica no admitida: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DuplicateMountDestinationError" xml:space="preserve">
+    <value>Punto de montaje duplicado: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountMalformedCsvError" xml:space="preserve">
+    <value>La entrada CSV tiene un formato incorrecto.</value>
+    <comment>{Locked="CSV"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
+    <value>El campo '{}' debe ser un par clave=valor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountUnexpectedKeyError" xml:space="preserve">
+    <value>La clave '{}' es inesperada en '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountInvalidValueError" xml:space="preserve">
+    <value>El valor para '{}' no es válido: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountInvalidBindRecursiveValueError" xml:space="preserve">
+    <value>El valor de "{}" no es válido: "{}". Los valores válidos son "enabled", "disabled", "writable" y "readonly".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
+    <value>El tipo de montaje es obligatorio.</value>
+  </data>
+  <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
+    <value>Las opciones que coinciden con "{}" no se pueden usar con el tipo de montaje "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
+    <value>La opción "{}" requiere la opción "readonly".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
+    <value>La opción "bind-recursive=readonly" requiere la opción "bind-propagation=rprivate".</value>
+    <comment>{Locked="bind-recursive=readonly"}{Locked="bind-propagation=rprivate"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
+    <value>No se admite el tipo de montaje "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
+    <value>No se admite la opción "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
+    <value>El destino de montaje es obligatorio.</value>
+  </data>
+  <data name="WSLCCLI_MountTargetAbsoluteError" xml:space="preserve">
+    <value>La ruta de acceso de destino de montaje debe ser absoluta.</value>
+  </data>
+  <data name="WSLCCLI_MountTmpfsOptionsTypeError" xml:space="preserve">
+    <value>Las opciones de tmpfs solo se admiten para montajes de tmpfs.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTmpfsSizeNegativeError" xml:space="preserve">
+    <value>El tamaño de tmpfs no puede ser negativo.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountSourceRequiredError" xml:space="preserve">
+    <value>El origen de montaje es obligatorio.</value>
+  </data>
+  <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
+    <value>La ruta de acceso de origen de bind debe ser absoluta.</value>
+    <comment>{Locked="bind"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
+    <value>El origen del volumen debe ser un volumen con nombre válido.</value>
+  </data>
+  <data name="WSLCCLI_MountTmpfsSourceUnsupportedError" xml:space="preserve">
+    <value>La opción de origen no se admite para los montajes de tmpfs.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeUnsupportedGenericError" xml:space="preserve">
+    <value>No se admite el tipo de montaje.</value>
+  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Seguimiento de la salida del registro</value>
   </data>
@@ -3049,6 +3190,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Límite de memoria (por ejemplo, 512M, 1G)</value>
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountArgDescription" xml:space="preserve">
+    <value>Adjuntar un montaje de sistema de archivos al contenedor</value>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Nombre de host de contenedor</value>
   </data>
@@ -3064,6 +3208,14 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Valor {} no válido: el nombre de red no puede estar vacío ni contener espacios en blanco</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Valor {} no válido: el nombre de red solo se puede especificar una vez</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Valor {} no válido: opción de red no admitida "{}"</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>no se admiten redes en modo host</value>
@@ -3141,8 +3293,12 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Ruta de almacenamiento de sesión</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>Ruta de acceso al directorio de almacenamiento de sesión</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Señal para enviar</value>
+    <value>Señal que se enviará al contenedor (valor predeterminado: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Referencia de imagen actual o existente en formato nombre-de-imagen[:etiqueta]</value>
@@ -3185,7 +3341,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se produce un error si el volumen no existe</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>Quitar volúmenes anónimos asociados al contenedor</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Directorio de trabajo dentro del contenedor</value>
@@ -3196,6 +3352,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Escribir el id. de contenedor en la ruta de acceso proporcionada</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Escribir el id. de imagen en la ruta de acceso proporcionada</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Dirección IP del servidor de nombres DNS en resolv.conf</value>
@@ -3224,11 +3383,11 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Tipo de progreso (formato: none|ansi) (valor predeterminado: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>Establecer el tipo de salida de progreso (auto, tty, plain, quiet) (valor predeterminado: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Directiva de extracción de imágenes (always|missing|never) (default:never)</value>
+    <value>Directiva de extracción de imágenes (always|missing|never) (valor predeterminado: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3243,7 +3402,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Valor de argumento {} no válido: '{}'. Se esperaba &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (use -1 para un número ilimitado)</value>
+    <value>Valor de opción {} no válido: '{}'. Se esperaba &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (use -1 para un número ilimitado)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3263,6 +3422,14 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Valor {} no válido: {} no es un tipo de formato reconocido. Los tipos de formato admitidos son: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Valor {} no válido: {} no es una directiva de extracción reconocida. Las directivas de extracción admitidas son: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Valor {} no válido: {} no es un tipo de progreso reconocido. Los tipos de progreso admitidos son: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Valor {} no válido: {} no es un tipo de inspección reconocido. Los tipos de inspección admitidos son: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3272,11 +3439,11 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Valor del argumento {} no válido: {}</value>
+    <value>Valor de opción {} no válido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Valor de argumento {} no válido: '{}'. Se esperaba una marca de tiempo de época Unix o una fecha y hora RFC3339 (por ejemplo, 2024-01-15T10:30:00Z)</value>
+    <value>Valor de opción {} no válido: '{}'. Se esperaba una marca de tiempo de época Unix o una fecha y hora RFC3339 (por ejemplo, 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3284,11 +3451,11 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Valor de argumento {} no válido: '{}'. Se esperaba un tamaño de memoria (por ejemplo, 256M, 1G)</value>
+    <value>Valor de opción {} no válido: '{}'. Se esperaba un tamaño de memoria (por ejemplo, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Valor de argumento {} no válido "{}". Se esperaba una duración (por ejemplo, 30s, 1m30s)</value>
+    <value>Valor de opción {} no válido: '{}'. Se esperaba una duración (por ejemplo, 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3378,7 +3545,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Nombre de red</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Muestra solo los nombres de las redes</value>
+    <value>Mostrar solo los identificadores de la red</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Quita todas las redes sin usar.</value>
@@ -3386,9 +3553,8 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Quita todas las redes no usadas. Una red se considera sin usar cuando ningún contenedor hace referencia a ella.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Eliminado: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Redes eliminadas:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Conectar un contenedor a una red</value>
@@ -3443,9 +3609,8 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Quite todos los volúmenes no usados, no solo los anónimos.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Eliminado: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Volúmenes eliminados:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Espacio total reclamado: {}</value>
@@ -3465,10 +3630,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Muestra solo los nombres de los volúmenes</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>No se puede escribir la imagen en el terminal. Usa la marca -o o bien redirige stdout.</value>
+    <value>No se puede escribir la imagen en el terminal. Use la opción -o o redirija stdout.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>No se puede exportar el contenedor al terminal. Use la marca -o, o bien, redirija stdout.</value>
+    <value>No se puede exportar el contenedor al terminal. Use la opción -o o redirija stdout.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Formato esperado: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
@@ -3545,6 +3710,50 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
+    <value>Hace menos de un segundo</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
+    <value>Hace 1 segundo</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
+    <value>hace {} segundos</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
+    <value>Hace aproximadamente un minuto</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
+    <value>hace {} minutos</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
+    <value>Hace aproximadamente una hora</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
+    <value>hace {} horas</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
+    <value>hace {} días</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
+    <value>hace {} semanas</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
+    <value>hace {} meses</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
+    <value>hace {} años</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Advertencia: valor no válido para la configuración “{}” en {}:{}.</value>

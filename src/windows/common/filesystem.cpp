@@ -774,6 +774,35 @@ bool wsl::windows::common::filesystem::FileExists(_In_ LPCWSTR Path)
     return (Attributes != INVALID_FILE_ATTRIBUTES);
 }
 
+std::filesystem::path wsl::windows::common::filesystem::GetCanonicalPath(const std::filesystem::path& Path)
+{
+    std::error_code error;
+    auto canonicalPath = GetCanonicalPath(Path, error);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "GetCanonicalPath(%ls)", Path.c_str());
+
+    return canonicalPath;
+}
+
+std::filesystem::path wsl::windows::common::filesystem::GetCanonicalPath(const std::filesystem::path& Path, std::error_code& Error)
+{
+    // absolute() is applied first because weakly_canonical() does not resolve a relative path
+    // against the current directory on its own. Its result is checked before canonicalizing because
+    // weakly_canonical() clears Error on success, which would otherwise mask an absolute() failure.
+    const auto absolutePath = std::filesystem::absolute(Path, Error);
+    if (Error)
+    {
+        return {};
+    }
+
+    auto canonicalPath = std::filesystem::weakly_canonical(absolutePath, Error);
+    if (Error)
+    {
+        return {};
+    }
+
+    return canonicalPath;
+}
+
 std::filesystem::path wsl::windows::common::filesystem::GetFullPath(_In_ LPCWSTR Path)
 {
     DWORD Attributes = GetFileAttributesW(Path);

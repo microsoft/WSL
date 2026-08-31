@@ -25,6 +25,7 @@ Abstract:
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
+using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VmPortAllocation;
 using wsl::windows::service::wslc::VMPortMapping;
@@ -364,7 +365,7 @@ void WSLCVirtualMachine::Initialize()
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs);
 
     const auto modulesDevice = GetVhdDevicePath(1);
-    Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
+    MountModules(m_initChannel, modulesDevice.c_str());
 
     // Discover the per-VM guest capabilities (currently the hv_pci swiotlb pool) and forward them
     // to the service before virtiofs shares or Consomme networking devices are created.
@@ -463,15 +464,15 @@ void WSLCVirtualMachine::ConfigureNetworking()
     // Call back to the service to configure the networking engine.
     auto gnsHandle = process->GetStdHandle(gnsChannelFd);
 
-    wil::unique_handle dnsHandle;
+    HandleWrapper dnsHandle;
     HANDLE dnsSocketHandle = nullptr;
     if (enableDnsTunneling)
     {
         dnsHandle = process->GetStdHandle(dnsChannelFd);
-        dnsSocketHandle = dnsHandle.get();
+        dnsSocketHandle = dnsHandle.Get();
     }
 
-    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsHandle.get(), enableDnsTunneling ? &dnsSocketHandle : nullptr));
+    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsHandle.Get(), enableDnsTunneling ? &dnsSocketHandle : nullptr));
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
@@ -929,7 +930,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     std::map<ULONG, TypedHandle> stdHandles;
     for (auto& [fd, handle] : sockets)
     {
-        stdHandles.emplace(fd, TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(handle.release())}, WSLCHandleTypeSocket});
+        stdHandles.emplace(fd, TypedHandle{std::move(handle), WSLCHandleTypeSocket});
     }
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
@@ -980,6 +981,18 @@ void WSLCVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LP
         TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
         TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
+
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+}
+
+void WSLCVirtualMachine::MountModules(shared::SocketChannel& Channel, LPCSTR Source)
+{
+    wsl::shared::MessageWriter<WSLC_MOUNT_MODULES> message;
+    message.WriteString(message->SourceIndex, Source);
+
+    const auto& response = Channel.Transaction<WSLC_MOUNT_MODULES>(message.Span());
+
+    WSL_LOG("WSLCMountModules", TraceLoggingValue(Source, "Source"), TraceLoggingValue(response.Result, "Result"));
 
     THROW_HR_IF(E_FAIL, response.Result != 0);
 }

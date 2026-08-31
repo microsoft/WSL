@@ -539,7 +539,7 @@
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
                     <File Id="kernel" Source="${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/kernel"/>
-                    <File Id="modules.vhd" Source="${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/modules.vhd"/>
+                    <File Id="artifacts.vhd" Source="${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/artifacts.vhd"/>
                 <?endif?>
             </Component>
         </DirectoryRef>

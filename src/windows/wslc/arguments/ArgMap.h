@@ -117,6 +117,11 @@ public:
         return m_validated.count(type);
     }
 
+    bool IsValidated(ArgType type) const
+    {
+        return m_validatedTypes.count(type) != 0;
+    }
+
     // Drops `type`'s memoized validation state (converted cache and validated record) so it never
     // outlives the raw data.
     void InvalidateValidated(ArgType type)
@@ -128,6 +133,11 @@ public:
     // Records `type` as validated for its current raw values so reads skip re-validation.
     void MarkValidated(ArgType type)
     {
+        if (IsValidated(type))
+        {
+            return;
+        }
+
         ThrowIfImmutable(type, "mark the argument as validated");
         m_validatedTypes.insert(type);
     }
@@ -231,7 +241,7 @@ private:
     // demand, and its errors reported, exactly like a command-line value.
     void EnsureValidated(ArgType type)
     {
-        if (m_validatedTypes.count(type) != 0)
+        if (IsValidated(type))
         {
             return;
         }

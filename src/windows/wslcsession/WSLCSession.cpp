@@ -30,6 +30,7 @@ using io::MultiHandleWait;
 using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -41,6 +42,7 @@ constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
+constexpr uint32_t c_progressPrecision = 4;
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
 // session's IdleTimeoutSec setting is 0/unset). This avoids thrashing the VM (repeated
@@ -640,7 +642,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "discard", 0);
     m_runtime.SetStorageMounted(true);
 
     // Configure swap on a separate ephemeral VHD.
@@ -1022,6 +1024,8 @@ try
 
     auto mountPath = mountInVm(Options->ContextPath, TRUE);
 
+    // Progress is requested as JSON so it can be parsed into the formatted progress messages sent to the
+    // client. The raw JSON is a docker implementation detail and is never forwarded.
     std::vector<std::string> buildArgs{"/usr/bin/docker", "buildx", "build", "--builder", "default", "--progress=rawjson"};
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
@@ -1246,6 +1250,7 @@ try
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
+    std::set<std::string> reportedCached;
     std::set<std::string> reportedErrors;
     std::map<std::string, std::string> digestToStageName;
     bool needsNewline = false; // true when the last log chunk didn't end with \n
@@ -1278,6 +1283,23 @@ try
         }
 
         return {};
+    };
+
+    // Returns the leading step token from a BuildKit vertex name, e.g. "[2/3]" from "[2/3] RUN make".
+    // Falls back to the full name when there is no bracketed prefix.
+    auto getStepToken = [](const std::string& name) -> std::string {
+        if (name.empty() || name[0] != '[')
+        {
+            return name;
+        }
+
+        auto close = name.find(']');
+        if (close == std::string::npos)
+        {
+            return name;
+        }
+
+        return name.substr(0, close + 1);
     };
 
     auto logPrefix = [](const std::string& name) -> std::string {
@@ -1345,6 +1367,16 @@ try
                 reportProgress(vertex.name + "\n");
             }
 
+            if (vertex.cached && reportedCached.insert(vertex.digest).second)
+            {
+                auto stepToken = getStepToken(vertex.name);
+                if (!stepToken.empty())
+                {
+                    flushLine();
+                    reportProgress(stepToken + " CACHED\n");
+                }
+            }
+
             if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
             {
                 flushLine();
@@ -1401,8 +1433,8 @@ try
             {
                 auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
                 auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
-                auto current = wsl::shared::string::FormatBytes(currentBytes);
-                auto total = wsl::shared::string::FormatBytes(totalBytes);
+                auto current = FormatHumanReadableSize(currentBytes, c_progressPrecision);
+                auto total = FormatHumanReadableSize(totalBytes, c_progressPrecision);
                 reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)
@@ -1413,8 +1445,7 @@ try
         }
     };
 
-    // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
-    // failure).
+    // Docker writes progress to stderr and the final image ID to stdout on success (empty on failure).
     //
     // For dest=- the exporter tarball is written to stdout, so it is relayed to the client handle as the
     // build runs. RelayHandle is an overlapped handle, so a slow client only marks the relay pending and
@@ -1810,6 +1841,7 @@ try
 
     bool all = false;
     bool digests = false;
+    bool containerCounts = false;
     std::map<std::string, std::vector<std::string>> filters;
 
     if (Options != nullptr)
@@ -1822,6 +1854,7 @@ try
 
         all = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsAll);
         digests = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDigests);
+        containerCounts = WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsContainerCounts);
 
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
@@ -1830,12 +1863,45 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
 
+    // The container count is gathered under the container lock alongside the image list so that no
+    // container can be created or removed in between, which would report counts for a set of images
+    // that no longer matches the listing.
+    std::unique_lock<std::mutex> containersLock;
+    if (containerCounts)
+    {
+        containersLock = std::unique_lock{m_containersLock};
+    }
+
     std::vector<docker_schema::Image> images;
     try
     {
         images = m_runtime.Docker().ListImages(all, digests, filters);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
+
+    // Stopped containers are included, matching docker.
+    std::map<std::string, LONGLONG> containersByImage;
+    if (containerCounts)
+    {
+        try
+        {
+            for (const auto& container : m_runtime.Docker().ListContainers(true))
+            {
+                containersByImage[container.ImageID]++;
+            }
+        }
+        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+    }
+
+    const auto containersForImage = [&](const std::string& id) {
+        if (!containerCounts)
+        {
+            return -1LL;
+        }
+
+        const auto it = containersByImage.find(id);
+        return it == containersByImage.end() ? 0LL : it->second;
+    };
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate(images.begin(), images.end(), size_t{0}, [](auto sum, const auto& e) {
@@ -1877,6 +1943,7 @@ try
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
             output[index].Size = e.Size;
             output[index].Created = e.Created;
+            output[index].Containers = containersForImage(e.Id);
             index++;
         }
         else
@@ -1903,6 +1970,7 @@ try
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
                 output[index].Size = e.Size;
                 output[index].Created = e.Created;
+                output[index].Containers = containersForImage(e.Id);
                 index++;
             }
         }
@@ -2709,16 +2777,14 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeInformation** Volumes, ULONG* Count)
+HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Volumes);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
-    *Volumes = nullptr;
-    *Count = 0;
+    *Output = nullptr;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
@@ -2727,16 +2793,9 @@ try
 
     auto volumeList = m_runtime.Volumes().ListVolumes(std::move(filters));
 
-    if (volumeList.empty())
-    {
-        return S_OK;
-    }
+    std::string json = wsl::shared::ToJson(volumeList);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
-    auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(volumeList.size());
-    memcpy(output.get(), volumeList.data(), volumeList.size() * sizeof(WSLCVolumeInformation));
-
-    *Count = static_cast<ULONG>(volumeList.size());
-    *Volumes = output.release();
     return S_OK;
 }
 CATCH_RETURN();
@@ -2918,10 +2977,7 @@ try
     entry.Internal = full.Internal;
     entry.EnableIPv6 = full.EnableIPv6;
     entry.Labels = full.Labels;
-    if (full.Options)
-    {
-        entry.Options = *full.Options;
-    }
+    entry.Options = full.Options;
     entry.IPAM.Driver = full.IPAM.Driver;
     if (full.IPAM.Config)
     {
@@ -2981,38 +3037,49 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Networks);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
-    *Networks = nullptr;
-    *Count = 0;
+    *Output = nullptr;
+
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
     auto lock = AcquireLease();
-    std::lock_guard networksLock(m_networksLock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    if (m_networks.empty())
+    std::vector<docker_schema::Network> dockerNetworks;
+    try
     {
-        return S_OK;
+        dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+
+    std::vector<wslc_schema::NetworkListEntry> networks;
+    networks.reserve(dockerNetworks.size());
+    for (const auto& network : dockerNetworks)
+    {
+        wslc_schema::NetworkListEntry entry;
+        entry.Id = network.Id;
+        entry.Name = network.Name;
+        entry.Driver = network.Driver;
+        entry.Scope = network.Scope;
+        entry.Created = network.Created;
+        entry.EnableIPv4 = network.EnableIPv4;
+        entry.EnableIPv6 = network.EnableIPv6;
+        entry.Internal = network.Internal;
+        entry.Labels = network.Labels;
+        entry.Labels.erase(WSLCNetworkManagedLabel);
+
+        networks.push_back(std::move(entry));
     }
 
-    auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
-
-    ULONG index = 0;
-    for (const auto& [name, entry] : m_networks)
-    {
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
-        index++;
-    }
-
-    *Networks = output.release();
-    *Count = index;
+    std::string json = wsl::shared::ToJson(networks);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
     return S_OK;
 }
@@ -3032,31 +3099,44 @@ try
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     auto lock = AcquireLease();
-    std::lock_guard networksLock(m_networksLock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    auto it = m_networks.find(name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
-
-    const auto& entry = it->second;
-
-    wslc_schema::Network result;
-    result.Id = entry.Id;
-    result.Name = name;
-    result.Driver = entry.Driver;
-    result.Scope = entry.Scope;
-    result.Internal = entry.Internal;
-    result.EnableIPv6 = entry.EnableIPv6;
-    result.Labels = entry.Labels;
-    if (!entry.Options.empty())
+    docker_schema::Network network;
+    try
     {
-        result.Options = entry.Options;
+        network = m_runtime.Docker().InspectNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", name.c_str());
     }
 
-    result.IPAM.Driver = entry.IPAM.Driver;
-    if (entry.IPAM.Config)
+    wslc_schema::Network result;
+    result.Id = network.Id;
+    result.Name = network.Name;
+    result.Created = network.Created;
+    result.Driver = network.Driver;
+    result.Scope = network.Scope;
+    result.EnableIPv4 = network.EnableIPv4;
+    result.EnableIPv6 = network.EnableIPv6;
+    result.Internal = network.Internal;
+    result.Attachable = network.Attachable;
+    result.Ingress = network.Ingress;
+    result.ConfigOnly = network.ConfigOnly;
+    result.ConfigFrom.Network = network.ConfigFrom.Network;
+    result.Options = network.Options;
+    result.Labels = network.Labels;
+    result.Labels.erase(WSLCNetworkManagedLabel);
+    result.Status = network.Status;
+
+    result.IPAM.Driver = network.IPAM.Driver;
+    result.IPAM.Options = network.IPAM.Options;
+    if (network.IPAM.Config)
     {
         auto& configs = result.IPAM.Config.emplace();
-        for (const auto& cfg : *entry.IPAM.Config)
+        for (const auto& cfg : *network.IPAM.Config)
         {
             wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
@@ -3064,6 +3144,17 @@ try
             inspectCfg.IPRange = cfg.IPRange;
             configs.push_back(std::move(inspectCfg));
         }
+    }
+
+    for (const auto& [id, container] : network.Containers)
+    {
+        wslc_schema::NetworkContainer inspectContainer;
+        inspectContainer.Name = container.Name;
+        inspectContainer.EndpointID = container.EndpointID;
+        inspectContainer.MacAddress = container.MacAddress;
+        inspectContainer.IPv4Address = container.IPv4Address;
+        inspectContainer.IPv6Address = container.IPv6Address;
+        result.Containers.emplace(id, std::move(inspectContainer));
     }
 
     std::string json = wsl::shared::ToJson(result);
@@ -3843,10 +3934,7 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Internal = network.Internal;
             entry.EnableIPv6 = network.EnableIPv6;
             entry.Labels = network.Labels;
-            if (network.Options)
-            {
-                entry.Options = *network.Options;
-            }
+            entry.Options = network.Options;
             entry.IPAM.Driver = network.IPAM.Driver;
             if (network.IPAM.Config)
             {

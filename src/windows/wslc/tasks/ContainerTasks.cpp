@@ -19,47 +19,40 @@ Abstract:
 #include "ContainerService.h"
 #include "ContainerTasks.h"
 #include "ImageModel.h"
+#include "MountSpecParsing.h"
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
 #include <wil/result_macros.h>
+#include <filesystem.hpp>
 #include <wslc_schema.h>
 #include <filesystem>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
+using wsl::windows::common::string::FormatHumanReadableSize;
+using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
 
-std::string FormatBytes(uint64_t bytes)
-{
-    constexpr uint64_t c_kib = 1024;
-    constexpr uint64_t c_mib = 1024 * c_kib;
-    constexpr uint64_t c_gib = 1024 * c_mib;
+// Docker reports memory in binary units and network and block IO in decimal units.
+constexpr uint32_t c_statsMemoryPrecision = 4;
+constexpr uint32_t c_statsIoPrecision = 3;
 
-    if (bytes >= c_gib)
-    {
-        return std::format("{:.2f} GiB", static_cast<double>(bytes) / static_cast<double>(c_gib));
-    }
-    else if (bytes >= c_mib)
-    {
-        return std::format("{:.2f} MiB", static_cast<double>(bytes) / static_cast<double>(c_mib));
-    }
-    else if (bytes >= c_kib)
-    {
-        return std::format("{:.2f} KiB", static_cast<double>(bytes) / static_cast<double>(c_kib));
-    }
-    else
-    {
-        // Bytes are always whole numbers, so decimal places are intentionally omitted here.
-        // This matches the behaviour of `docker stats`.
-        return std::format("{} B", bytes);
-    }
+std::string FormatStatsMemory(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsMemoryPrecision, StorageSizeUnit::Binary));
+}
+
+std::string FormatStatsIo(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
@@ -124,10 +117,10 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
         {"ID", stats.id},
         {"Name", containerName},
         {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
-        {"MemUsage", std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit))},
+        {"MemUsage", std::format("{} / {}", FormatStatsMemory(stats.memory_stats.usage), FormatStatsMemory(stats.memory_stats.limit))},
         {"MemPerc", std::format("{:.2f}%", memPercent)},
-        {"NetIO", std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes))},
-        {"BlockIO", std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes))},
+        {"NetIO", std::format("{} / {}", FormatStatsIo(netRxBytes), FormatStatsIo(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatStatsIo(blkReadBytes), FormatStatsIo(blkWriteBytes))},
         {"PIDs", stats.pids_stats.current},
     };
 }
@@ -236,11 +229,7 @@ void KillContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
-    WSLCSignal signal = WSLCSignalSIGKILL;
-    if (context.Args.Contains(ArgType::Signal))
-    {
-        signal = context.Args.GetValue<ArgType::Signal>();
-    }
+    const auto signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGKILL);
 
     for (const auto& id : containerIds)
     {
@@ -389,7 +378,7 @@ void ContainerCp(CLIExecutionContext& context)
 
         // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
         std::error_code canonicalError;
-        auto absTarget = std::filesystem::weakly_canonical(std::filesystem::absolute(target), canonicalError);
+        auto absTarget = wsl::windows::common::filesystem::GetCanonicalPath(target, canonicalError);
         if (canonicalError)
         {
             absTarget = std::filesystem::absolute(target); // Fall back to absolute if canonicalization fails.
@@ -598,7 +587,7 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
-                ContainerService::FormatRelativeTime(container.CreatedAt),
+                FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
                 ContainerService::FormatPorts(container.State, container.Ports),
             });
@@ -642,6 +631,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 {
     ContainerOptions options;
 
+    if (context.Args.Contains(ArgType::Pull))
+    {
+        options.Pull = context.Args.GetValue<ArgType::Pull>();
+    }
+
     if (context.Args.Contains(ArgType::CIDFile))
     {
         options.CidFile = context.Args.GetValue<ArgType::CIDFile>();
@@ -676,11 +670,13 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAllValues<ArgType::Volume>();
-        options.Volumes.reserve(options.Volumes.size() + volumes.size());
-        for (const auto& volume : volumes)
-        {
-            options.Volumes.emplace_back(volume);
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(volumes.begin()), std::make_move_iterator(volumes.end()));
+    }
+
+    if (context.Args.Contains(ArgType::Mount))
+    {
+        auto mounts = context.Args.GetAllValues<ArgType::Mount>();
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(mounts.begin()), std::make_move_iterator(mounts.end()));
     }
 
     options.Remove = context.Args.GetValue<ArgType::Remove>();
@@ -819,9 +815,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     {
         auto networks = context.Args.GetAllValues<ArgType::Network>();
         options.Networks.reserve(options.Networks.size() + networks.size());
-        for (const auto& value : networks)
+        for (auto& parsed : networks)
         {
-            options.Networks.emplace_back(WideToMultiByte(value));
+            auto& network = options.Networks.emplace_back();
+            network.Name = std::move(parsed.Name);
+            network.Aliases = std::move(parsed.Aliases);
         }
     }
 
@@ -835,6 +833,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::IpAddress))
+    {
+        options.IpAddress = WideToMultiByte(context.Args.GetValue<ArgType::IpAddress>());
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.GetValue<ArgType::User>());
@@ -843,11 +846,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::TMPFS))
     {
         auto tmpfs = context.Args.GetAllValues<ArgType::TMPFS>();
-        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
-        for (const auto& value : tmpfs)
-        {
-            options.Tmpfs.emplace_back(WideToMultiByte(value));
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(tmpfs.begin()), std::make_move_iterator(tmpfs.end()));
     }
 
     for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
@@ -1017,10 +1016,9 @@ void StopContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
-    if (context.Args.Contains(ArgType::Signal))
-    {
-        options.Signal = context.Args.GetValue<ArgType::Signal>();
-    }
+
+    // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
+    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
 
     if (context.Args.Contains(ArgType::Time))
     {
@@ -1051,13 +1049,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
     // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
     // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
-    ULONGLONG since = 0;
+    LONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
         since = context.Args.GetValue<ArgType::Since>();
     }
 
-    ULONGLONG until = 0;
+    LONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
         until = context.Args.GetValue<ArgType::Until>();
@@ -1073,13 +1071,18 @@ void PruneContainers(CLIExecutionContext& context)
 
     auto result = ContainerService::Prune(session);
 
-    for (const auto& containerId : result.PrunedContainers)
+    if (!result.PrunedContainers.empty())
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneDeletedHeader());
+        for (const auto& containerId : result.PrunedContainers)
+        {
+            context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    context.Terminal.Output(L"\n");
     context.Terminal.Output(
-        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task

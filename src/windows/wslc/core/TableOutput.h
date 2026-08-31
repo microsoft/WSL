@@ -385,7 +385,7 @@ private:
         // For plain cells, wrap the text directly.
         if (cell.sequences.empty())
         {
-            auto chunks = details::WrapText(cell.fmt, col.MaxLength);
+            auto chunks = wsl::windows::wslc::details::WrapText(cell.fmt, col.MaxLength);
             std::vector<FormattedCell> result;
             result.reserve(chunks.size());
             for (auto& chunk : chunks)
@@ -416,7 +416,7 @@ private:
             }
         }
 
-        auto chunks = details::WrapText(visibleText, col.MaxLength);
+        auto chunks = wsl::windows::wslc::details::WrapText(visibleText, col.MaxLength);
         std::vector<FormattedCell> result;
         result.reserve(chunks.size());
         for (auto& chunk : chunks)

@@ -16,13 +16,11 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
     return CancelEvent.get();
 }
 
-// This method should be idempotent.
-void CLIExecutionContext::ApplyGlobalOptions()
+void CLIExecutionContext::ApplyGlobalEnvironmentOptions()
 {
-    if (GlobalArgs.GetValue<ArgType::NoColor>())
-    {
-        Terminal.SetNoColor(true);
-    }
+    // NoColor is environment-only and resolved before any output. Freezing it keeps the terminal
+    // color state consistent for the entire invocation.
+    Terminal.SetNoColor(GlobalArgs.GetValue<ArgType::NoColor>());
 }
 
 } // namespace wsl::windows::wslc::execution

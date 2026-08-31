@@ -50,7 +50,7 @@ class InstallerTests
 
         WEX::Common::String MsixPackagePath;
         WEX::TestExecution::RuntimeParameters::TryGetValue(L"Package", MsixPackagePath);
-        m_msixPackagePath = std::filesystem::weakly_canonical(static_cast<std::wstring>(MsixPackagePath)).wstring();
+        m_msixPackagePath = wsl::windows::common::filesystem::GetCanonicalPath(static_cast<std::wstring>(MsixPackagePath)).wstring();
         VERIFY_IS_FALSE(m_msixPackagePath.empty());
 
         for (const auto& e : m_packageManager.FindPackages(wsl::windows::common::wslutil::c_msixPackageFamilyName))
@@ -61,7 +61,7 @@ class InstallerTests
 
 #ifdef WSL_DEV_THIN_MSI_PACKAGE
 
-        m_msiPath = std::filesystem::weakly_canonical(WSL_DEV_THIN_MSI_PACKAGE).wstring();
+        m_msiPath = wsl::windows::common::filesystem::GetCanonicalPath(WSL_DEV_THIN_MSI_PACKAGE).wstring();
 
 #else
 
@@ -175,7 +175,12 @@ class InstallerTests
 
     static void CallMsiExec(const std::wstring& Args)
     {
-        VERIFY_ARE_EQUAL(0L, RunMsiExec(Args));
+        auto exitCode = RunMsiExec(Args);
+        if (exitCode != ERROR_SUCCESS && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED)
+        {
+            LogError("msiexec failed with exit code %lu", exitCode);
+            VERIFY_FAIL();
+        }
     }
 
     std::wstring GetMsiProductCode() const
@@ -383,12 +388,12 @@ class InstallerTests
 
         if (auto found = L"wsl." + version + arch + L".msi"; PathFileExists(found.c_str()))
         {
-            installerFile = std::filesystem::weakly_canonical(found);
+            installerFile = wsl::windows::common::filesystem::GetCanonicalPath(found);
             cleanup.release();
         }
         else if (auto found = L"Microsoft.WSL_" + version + L".0_x64_ARM64.msixbundle"; PathFileExists(found.c_str()))
         {
-            installerFile = std::filesystem::weakly_canonical(found);
+            installerFile = wsl::windows::common::filesystem::GetCanonicalPath(found);
             cleanup.release();
         }
         else
@@ -716,10 +721,10 @@ class InstallerTests
         // Validate that calling wsl.exe triggers the install.
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"echo ok", -1, nulDevice.get());
         VERIFY_ARE_EQUAL(
-            L"\r\nAnother application has exclusive access to the file 'C:\\Program Files\\WSL\\wsl.exe'.  Please shut down all "
-            L"other applications, then click Retry.\r\n"
-            L"Update failed (exit code: 1603).\r\n"
-            L"Error code: Wsl/CallMsi/Install/ERROR_INSTALL_FAILURE\r\n",
+            FormatErrorMessage(
+                L"\r\nAnother application has exclusive access to the file 'C:\\Program Files\\WSL\\wsl.exe'.  Please shut "
+                L"down all other applications, then click Retry.\r\nUpdate failed (exit code: 1603).",
+                L"Wsl/CallMsi/Install/ERROR_INSTALL_FAILURE"),
             output);
     }
 
@@ -751,7 +756,7 @@ class InstallerTests
     TEST_METHOD(MsiUpgradeFailureRestoresFiles)
     {
 #ifdef WSL_OFFICIAL_BUILD
-        Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
+        WEX::Logging::Log::Comment(L"TestSkipped: This test case requires the test-only WslTestForceInstallFailure CA");
         return;
 #else
         // End-to-end rollback test: install an older version, then attempt a major

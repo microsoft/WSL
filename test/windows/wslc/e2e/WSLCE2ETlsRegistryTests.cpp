@@ -19,6 +19,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <wslutil.h>
 #include <ncrypt.h>
 
@@ -223,7 +224,7 @@ class WSLCE2ETlsRegistryTests
 
             auto cleanup = wil::scope_exit([&] { EnsureSessionIsTerminated(L"wslc-tls-untrusted"); });
 
-            EnsureImageIsLoaded(image, session.Name());
+            TestImageRegistry::Instance().EnsureLoaded(image, session.Name());
 
             auto [registry, address] = StartLocalRegistry(session.Session(), "", "", c_registryPort, certDir.wstring());
             VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_registryPort), address);
@@ -248,7 +249,7 @@ class WSLCE2ETlsRegistryTests
 
             auto cleanup = wil::scope_exit([&] { EnsureSessionIsTerminated(L"wslc-tls-trusted"); });
 
-            EnsureImageIsLoaded(image, session.Name());
+            TestImageRegistry::Instance().EnsureLoaded(image, session.Name());
 
             auto [registry, address] = StartLocalRegistry(session.Session(), "", "", c_registryPort, certDir.wstring());
             VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_registryPort), address);

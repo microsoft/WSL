@@ -20,8 +20,10 @@ Abstract:
 #include "ArgumentParser.h"
 #include "Terminal.h"
 
+#include <initializer_list>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,6 +32,13 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
+
+enum class HelpOutput
+{
+    Full,
+    Command,
+    Argument,
+};
 
 // The executable name shown in usage/help output, set from argv[0] at startup.
 extern std::wstring s_ExecutableName;
@@ -101,7 +110,11 @@ struct Command
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
 
-    void OutputHelp(Terminal& terminal, const CommandException* exception = nullptr) const;
+    void OutputHelp(
+        Terminal& terminal,
+        HelpOutput output = HelpOutput::Full,
+        const CommandException* exception = nullptr,
+        std::span<const Argument> relevantArguments = {}) const;
 
     std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
 
@@ -146,6 +159,8 @@ protected:
     // arguments are validated on demand if needed.
     virtual void ValidateArgumentsInternal(ArgMap& source) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
+
+    std::vector<Argument> GetArgumentsForHelp(std::initializer_list<ArgType> types) const;
 
 private:
     std::wstring_view m_name;

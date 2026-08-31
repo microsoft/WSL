@@ -26,6 +26,7 @@ set(SOURCES
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
+    MountSpecParsing.cpp
     NatNetworking.cpp
     notifications.cpp
     Redirector.cpp
@@ -36,6 +37,7 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    timestamp.cpp
     VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
@@ -111,6 +113,7 @@ set(HEADERS
     LxssPort.h
     LxssSecurity.h
     LxssServerPort.h
+    MountSpecParsing.h
     NatNetworking.h
     notifications.h
     precomp.h
@@ -123,6 +126,7 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    timestamp.hpp
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h

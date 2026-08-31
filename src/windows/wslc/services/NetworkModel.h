@@ -57,4 +57,20 @@ struct PruneNetworksResult
     std::vector<std::string> PrunedNetworks;
 };
 
+// The shape emitted by "network list --format json"; every value is reported as a string.
+struct NetworkOutputInformation
+{
+    std::string CreatedAt;
+    std::string Driver;
+    std::string ID;
+    std::string IPv4;
+    std::string IPv6;
+    std::string Internal;
+    std::string Labels;
+    std::string Name;
+    std::string Scope;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkOutputInformation, CreatedAt, Driver, ID, IPv4, IPv6, Internal, Labels, Name, Scope);
+};
+
 } // namespace wsl::windows::wslc::models

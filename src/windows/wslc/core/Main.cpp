@@ -92,7 +92,7 @@ try
     // throw can't reroute through the colored-help error path.
     auto envDefs = command->GetGlobalsAndEnvArguments();
     ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
-    context.ApplyGlobalOptions();
+    context.ApplyGlobalEnvironmentOptions();
 
     // Past this point, environment variable options are in effect.
 
@@ -119,9 +119,8 @@ try
             /*stopOnUnknown*/ true,
             /*overridableDefaults*/ envDefs);
         command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
-        context.ApplyGlobalOptions();
 
-        // Past this point, global options are in effect.
+        // Past this point, global option parsing and validation are complete.
 
         // Pass 2 - Subcommand and leaf command resolution.
         std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
@@ -135,10 +134,19 @@ try
         command->ValidateArguments(context.Args);
         command->Execute(context);
     }
+    catch (const ArgumentException& ae)
+    {
+        command->OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        return 1;
+    }
     catch (const CommandException& ce)
     {
-        // Input failure: show help alongside the error so the user can correct it.
-        command->OutputHelp(context.Terminal, &ce);
+        command->OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        return 1;
+    }
+    catch (const ExecutionException& ee)
+    {
+        context.Terminal.Error(L"{}\n", ee.Message());
         return 1;
     }
     catch (...)

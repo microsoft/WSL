@@ -89,6 +89,9 @@ public:
     HRESULT
     ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ ULONG64 NewSize) const;
 
+    HRESULT
+    CompactDistribution(_In_ LPCGUID DistroGuid) const;
+
     void SetDefaultDistribution(_In_ LPCGUID DistroGuid) const;
 
     HRESULT

@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,7 +26,7 @@ class WSLCE2EContainerRemoveTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         BuildAnonymousVolumeImage();
         return true;
     }
@@ -35,8 +36,7 @@ class WSLCE2EContainerRemoveTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureVolumeDoesNotExist(TestVolumeName);
-        EnsureImageIsDeleted(AnonymousVolumeImage);
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(AnonymousVolumeImage);
         return true;
     }
 
@@ -62,7 +62,8 @@ class WSLCE2EContainerRemoveTests
         auto result = RunWslc(std::format(L"container remove {}", WslcContainerName));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+             .Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 
@@ -163,12 +164,10 @@ class WSLCE2EContainerRemoveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Volumes_RemovesAnonymousVolume)
     {
-        const auto volumesBefore = ListVolumeNames();
-
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, AnonymousVolumeImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto anonymousVolume = GetNewAnonymousVolumeName(volumesBefore);
+        const auto anonymousVolume = GetAnonymousVolumeName(WslcContainerName);
         VerifyVolumeIsListed(anonymousVolume);
 
         result = RunWslc(std::format(L"container remove --volumes {}", WslcContainerName));
@@ -180,12 +179,10 @@ class WSLCE2EContainerRemoveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Remove_WithoutVolumes_KeepsAnonymousVolume)
     {
-        const auto volumesBefore = ListVolumeNames();
-
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, AnonymousVolumeImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto anonymousVolume = GetNewAnonymousVolumeName(volumesBefore);
+        const auto anonymousVolume = GetAnonymousVolumeName(WslcContainerName);
         auto cleanup = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(anonymousVolume); });
         VerifyVolumeIsListed(anonymousVolume);
 
@@ -213,15 +210,13 @@ class WSLCE2EContainerRemoveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Volumes_Force_RunningContainer)
     {
-        const auto volumesBefore = ListVolumeNames();
-
         auto result =
             RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, AnonymousVolumeImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
-        const auto anonymousVolume = GetNewAnonymousVolumeName(volumesBefore);
+        const auto anonymousVolume = GetAnonymousVolumeName(WslcContainerName);
         VerifyVolumeIsListed(anonymousVolume);
         VerifyContainerIsListed(containerId, L"running");
 
@@ -249,32 +244,22 @@ private:
         result.Verify({.ExitCode = 0});
     }
 
-    static std::vector<std::wstring> ListVolumeNames()
+    static std::wstring GetAnonymousVolumeName(const std::wstring& containerName)
     {
-        auto result = RunWslc(L"volume list --quiet");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        return result.GetStdoutLines();
-    }
+        const auto inspect = InspectContainer(containerName);
+        const auto mount = std::ranges::find_if(inspect.Mounts, [](const auto& entry) { return entry.Type == "volume"; });
 
-    // A before/after diff is the only option: `volume list` has no --filter and reports no labels.
-    static std::wstring GetNewAnonymousVolumeName(const std::vector<std::wstring>& before)
-    {
-        std::vector<std::wstring> added;
-        for (const auto& name : ListVolumeNames())
-        {
-            if (std::find(before.begin(), before.end(), name) == before.end())
-            {
-                added.push_back(name);
-            }
-        }
+        VERIFY_IS_TRUE(mount != inspect.Mounts.end(), L"Container inspect did not return the anonymous volume mount");
+        VERIFY_IS_FALSE(mount->Name.empty(), L"Container inspect returned an empty anonymous volume name");
+        VERIFY_IS_TRUE(mount->Source.empty(), L"Anonymous volume source must be empty");
+        VERIFY_ARE_EQUAL(mount->Destination, "/data");
 
-        VERIFY_ARE_EQUAL(static_cast<size_t>(1), added.size());
-
+        const auto volumeName = wsl::shared::string::MultiByteToWide(mount->Name);
+        const auto volumeLabels = InspectVolume(volumeName).Labels;
         VERIFY_IS_TRUE(
-            InspectVolume(added.front()).Labels.contains("com.docker.volume.anonymous"),
-            L"The volume created by the container is not an anonymous volume");
-
-        return added.front();
+            volumeLabels.has_value() && volumeLabels->contains("com.docker.volume.anonymous"),
+            L"The volume returned by container inspect is not anonymous");
+        return volumeName;
     }
 
     const std::wstring WslcContainerName = L"wslc-test-container";

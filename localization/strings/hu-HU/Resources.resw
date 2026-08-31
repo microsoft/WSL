@@ -302,6 +302,9 @@ A 'wsl.exe --list --online' parancs használatával listázhatja az elérhető d
   <data name="MessageConversionStart" xml:space="preserve">
     <value>A konvertálás folyamatban van, ez eltarthat néhány percig.</value>
   </data>
+  <data name="MessageCompactionStart" xml:space="preserve">
+    <value>A tömörítés folyamatban van, ez eltarthat néhány percig.</value>
+  </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
     <value>A disztribúció már a kért verzióval rendelkezik.</value>
   </data>
@@ -394,7 +397,7 @@ Használat:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Szerzői jog (c) Microsoft Corporation. Minden jog fenntartva.
+    <value>Copyright (C) Microsoft Corporation. Minden jog fenntartva.
 További információ a termékről: https://aka.ms/privacy.
 
 Használat: wsl.exe [Argumentum] [Kapcsolók...] [Parancssor]
@@ -443,7 +446,7 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
         WSL-disztribúció telepítése.
         Az érvényes disztribúciók listája a 'wsl.exe --list --online' paranccsal jeleníthető meg.
 
-        Kapcsolók:
+        Beállítások:
             --enable-wsl1
                 A WSL1-támogatás engedélyezése.
 
@@ -459,16 +462,16 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
             --location &lt;Hely&gt;
                 A disztribúció telepítési útvonalának beállítása.
 
-            --name &lt;Név&gt;
+            --name &lt;Name&gt;
                 A disztribúció nevének beállítása.
 
             --no-distribution
                 Csak a szükséges választható összetevők telepítése, a disztribúció telepítésének mellőzése.
 
             --no-launch, -n
-                A disztribúció telepítés utáni elindításának mellőzése.
+                Telepítés után ne indítsa el a disztribúciót.
 
-            --version &lt;Verzió&gt;
+            --version &lt;Version&gt;
                 Az új disztribúcióhoz használandó verzió megadása.
 
             --vhd-size &lt;MemoriaSztring&gt;
@@ -480,7 +483,7 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
     --manage &lt;Disztribúció&gt; &lt;Kapcsolók...&gt;
         A disztribúcióspecifikus beállítások módosítása.
 
-        Kapcsolók:
+        Beállítások:
             --move &lt;Hely&gt;
                 A disztribúció áthelyezése egy új helyre.
 
@@ -493,89 +496,92 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
             --resize &lt;MemoriaSztring&gt;
                 A disztribúció lemezének átméretezése a megadott méretre.
 
-    --mount &lt;Lemez&gt;
+            --compact
+                WSL 2-disztribúció VHDX-fájljának tömörítése.
+
+    --mount &lt;Disk&gt;
         Fizikai vagy virtuális lemez hozzárendelése és csatlakoztatása az összes WSL 2-disztribúcióban.
 
-        Kapcsolók:
+        Beállítások:
             --vhd
-                Annak megadása, hogy a &lt;Lemez&gt; virtuális merevlemezre vonatkozik.
+                Megadja, hogy a &lt;Lemez&gt; virtuális merevlemezre hivatkozik.
 
             --bare
                 A lemezt WSL2-höz való hozzárendelése csatlakoztatás nélkül.
 
-            --name &lt;Név&gt;
-                A lemez csatlakoztatása egyéni csatlakoztatásipont-név használatával.
+            --name &lt;Name&gt;
+                A lemez csatlakoztatása a egyéni csatlakoztatásipont-név használatával.
 
-            --type &lt;Típus&gt;
+            --type &lt;Type&gt;
                 Lemez csatlakoztatásához használandó fájlrendszer. Ha nincs megadva, az alapértelmezett érték az ext4.
 
-            --options &lt;Kapcsolók&gt;
-                További csatlakoztatási lehetőségek.
+            --options &lt;Options&gt;
+                További felcsatolási lehetőségek.
 
             --partition &lt;Index&gt;
-                A csatlakoztatni kívánt partíció indexe. Ha nincs megadva, az alapértelmezett érték a teljes lemez.
+                A felcsatolni kívánt partíció indexe, ha nincs megadva alapértelmezett érték a teljes lemezre.
 
-    --set-default-version &lt;Verzió&gt;
+    --set-default-version &lt;Version&gt;
         Az új disztribúciók alapértelmezett telepítési verziójának módosítása.
 
     --shutdown
-        Az összes futó disztribúció és a WSL 2
-        egyszerűsített segédprogram virtuális gépének azonnali leállítása.
+        Azonnal leállítja az összes futó disztribúciót és a WSL 2
+        egyszerűsített segédprogram virtuális gépet.
 
-        Kapcsolók:
+        Beállítások:
             --force
                 A WSL 2 virtuális gép leállítása még akkor is, ha egy művelet folyamatban van. Adatvesztést okozhat.
 
     --status
         A Linuxos Windows-alrendszer állapotának megjelenítése.
 
-    --unmount [Lemez]
-        Lemez leválasztása és és a hozzárendelés megszüntetése a WSL2 összes disztribúciójára vonatkozóan.
-        Az összes lemez leválasztása és a hozzárendelésük megszüntetése, ha a meghívás argumentum nélkül történik.
+    --unmount [Disk]
+        Lemez lecsatolása és leválasztása a WSL2 összes disztribúciójáról.
+        Lecsatolja és leválasztja az összes lemezt, ha argumentum nélkül hívják meg.
 
     --uninstall
-        A Linuxos Windows-alrendszer csomag eltávolítása erről a gépről.
+        Eltávolítja a Linuxos Windows-alrendszer csomagot erről a gépről.
 
     --update
-        0A Linuxos Windows-alrendszer csomagjának frissítése.
+        A Linuxos Windows-alrendszer csomagjának frissítése.
 
-        Kapcsolók:
+        Beállítások:
             --pre-release
-                Előzetes verzió letöltése, ha elérhető.
+                Ha elérhető, töltsön le egy előzetes verziót.
 
     --version, -v
         Verzióinformációk megjelenítése.
 
-A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló argumentumok:
+A Linuxos Windows-alrendszer-beli disztribúciók kezelésére szolgáló argumentumok:
 
-    --export &lt;Disztribúció&gt; &lt;Fájlnév&gt; [Kapcsolók]
-        A disztribúció exportálása .tar fájlba.
-        A fájlnév stdout esetén kötőjel (-) is lehet.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        A disztribúciót exportálja tar kiterjesztésű fájlba.
+        A fájlnév a következő lehet: stdout.
 
-        Kapcsolók:
+        Beállítások:
             --format &lt;Formátum&gt;
                 Az exportálási formátum megadása. Támogatott értékek: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Disztribúció&gt; &lt;TelepítésiHely&gt; &lt;Fájlnév&gt; [Kapcsolók]
-        A megadott .tar fájl importálása új disztribúcióként.
-        A fájlnév stdin esetén kötőjel (-) is lehet.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        A megadott, tar kiterjesztésű fájl importálása új disztribúcióként.
+        A fájlnév a következő lehet: stdin.
 
-        Kapcsolók:
-            --version &lt;Verzió&gt;
+        Beállítások:
+            --version &lt;Version&gt;
                 Az új disztribúcióhoz használandó verzió megadása.
 
             --vhd
                 Azt adja meg, hogy a megadott fájl .vhd vagy .vhdx fájl, nem .tar fájl.
                 Ez a művelet másolatot készít a VHD-fájlról a megadott telepítési helyen.
 
-    --import-in-place &lt;Disztribúció&gt; &lt;Fájlnév&gt;
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         A megadott VHD-fájl importálása új disztribúcióként.
         Ezt a virtuális merevlemezt az ext4 fájlrendszertípussal kell formázni.
 
-    --list, -l [Kapcsolók]
+    --list, -l [Options]
         A disztribúciók listázása.
 
-        Kapcsolók:
+        Beállítások:
             --all
                 Az összes disztribúciót listázza, beleértve a
                 jelenleg telepítés vagy eltávolítás alatt állókat is.
@@ -590,18 +596,18 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
                 Az összes disztribúció részletes adatainak megjelenítése.
 
             --online, -o
-                A 'wsl.exe --install' paranccsal telepíthető elérhető disztribúciók listájának megjelenítése.
+                Megjeleníti a 'wsl.exe --install' paranccsal telepíthető, elérhető disztribúciók listáját.
 
-    --set-default, -s &lt;Disztribúció&gt;
-        A disztribúció beállítása alapértelmezettként.
+    --set-default, -s &lt;Distro&gt;
+        Az adott disztribúció beállítása alapértelmezettként.
 
-    --set-version &lt;Disztribúció&gt; &lt;Verzió&gt;
+    --set-version &lt;Distro&gt; &lt;Version&gt;
         A megadott disztribúció verziójának módosítása.
 
-    --terminate, -t &lt;Disztribúció&gt;
-        A megadott disztribúció leállítása.
+    --terminate, -t &lt;Distro&gt;
+        Leállítja a megadott disztribúciót.
 
-    --unregister &lt;Disztribúció&gt;
+    --unregister &lt;Distro&gt;
         A disztribúció regisztrációjának megszüntetése és a gyökérszintű fájlrendszer törlése.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
@@ -611,7 +617,8 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -953,9 +960,13 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>Nem sikerült elindítani a localhost továbbítófolyamatot. Hiba: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+  <data name="MessageVirtualMachinePlatformRequiredForNetworking" xml:space="preserve">
     <value>Nem sikerült elindítani a virtuális hálózatot – telepítse a nem kötelező virtuálisgép-platform összetevőt a következő futtatásával: wsl.exe --install --no-distribution</value>
     <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>A virtuálisgép-platform nincs engedélyezve. WSL 2 nem biztos, hogy megfelelően működik. Az engedélyezéshez futtassa a következőt: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="WSL 2"}{Locked="wsl.exe"}{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
     <value>Nem sikerült konfigurálni a hálózatot (networkingMode {}), visszatérés a networkingMode {} módba.</value>
@@ -998,8 +1009,8 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>A(z) '{}' tárolólemezkép-regisztrációs adatbázis a számítógép-házirend miatt le van tiltva.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImageBuildBlockedByPolicy" xml:space="preserve">
-    <value>A tárolólemezképek építése le van tiltva, mert a számítógép-házirend egy tárolóregisztrációs adatbázisra vonatkozó engedélyezési listát konfigurált. A lemezkép-építések tetszőleges regisztrációs adatbázisokból hívhatnak le alap-lemezképeket, és nem korlátozhatók megbízhatóan az engedélyezési listára.</value>
+  <data name="MessageRegistryAllowlistPolicyInvalid" xml:space="preserve">
+    <value>A tárolóregisztrációs adatbázis engedélyezési listára vonatkozó házirend érvénytelen. Ellenőrizze, hogy a Software\Policies\WSL alatti WSLContainerRegistryAllowlist értékek megfelelően vannak-e konfigurálva.</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>A WSL2-re való frissítéshez futtassa a wsl.exe --set-version {} 2 parancsot.</value>
@@ -1060,6 +1071,10 @@ Visszaállás NAT-hálózatkezelésre.</value>
   <data name="MessageVhdInUse" xml:space="preserve">
     <value>A művelet nem fejeződhetett be, mert a VHD jelenleg használatban van. A WSL leállításának kényszerítéséhez használja ezt: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated. {Locked="VHD"}"VHD" (Virtual Hard Disk) is a technical format name and should not be translated.</comment>
+  </data>
+  <data name="MessageCompactVhdNotSupported" xml:space="preserve">
+    <value>A tömörítés csak .vhdx fájlok esetén támogatott.</value>
+    <comment>{Locked=".vhdx"}Command line arguments, file names and string inserts should not be translated.</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
     <value>A(z) {} nem érvényes logikai érték, &lt;true|false&gt;</value>
@@ -1154,8 +1169,9 @@ Ez a kérés 60 másodpercen belül túllépi az időkorlátot.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Hibakód: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Hibakód: {}
+Ha ez a hiba váratlanul jelentkezett, kérjük, keressen rá a meglévő problémák között, vagy nyisson egy új problémát a https://github.com/microsoft/WSL/issues oldalon.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Érvénytelen JSON-dokumentum. Elemzési hiba: {}</value>
@@ -1986,16 +2002,16 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
     <value>A virtuális gép üresjárati ideje ezredmásodpercben a leállítás előtt.</value>
   </data>
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
-    <value>Keep WSL running</value>
+    <value>Hagyja futni a WSL-t</value>
   </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Hagyja futni a disztribúciókat és az őket üzemeltető WSL virtuális gépet, hogy ne álljanak le automatikusan, miután egy ideig inaktívak voltak.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Keep WSL running.</value>
+    <value>Hagyja futni a WSL-t.</value>
   </data>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
+    <value>Hagyja futni a disztribúciókat és az őket üzemeltető WSL virtuális gépet, hogy ne álljanak le automatikusan, miután egy ideig inaktívak voltak.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Időtúllépés alaphelyzetbe állítása</value>
@@ -2007,19 +2023,19 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
     <value>A virtuális gép üresjárati ideje ezredmásodpercben a leállítás előtt.</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Header" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Disztribúció üresjárati időkorlátja</value>
   </data>
   <data name="Settings_InstanceIdleTimeout.Description" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>A disztribúció üresjárati ideje ezredmásodpercben, mielőtt leállna.</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutResetButton.Content" xml:space="preserve">
-    <value>Reset timeout</value>
+    <value>Időtúllépés alaphelyzetbe állítása</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Distribution idle timeout</value>
+    <value>Disztribúció üresjárati időkorlátja</value>
   </data>
   <data name="Settings_InstanceIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>The number of milliseconds that a distribution is idle, before it is terminated.</value>
+    <value>A disztribúció üresjárati ideje ezredmásodpercben, mielőtt leállna.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
     <value>Módosítások alkalmazása</value>
@@ -2193,11 +2209,15 @@ Usage:
     <value>Egy kötelező argumentum nincs megadva: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
+    <value>Nincs megadva szükséges opció: „{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>A kiválasztott parancs súgójának megjelenítése</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Több egymást kölcsönösen kizáró argumentum van megadva: {}</value>
+    <value>Több egymást kölcsönösen kizáró opció van megadva: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -2233,7 +2253,11 @@ Usage:
     <value>Színkimenet letiltása.</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Ha további információra van szüksége egy adott parancsról, adja meg hozzá a súgó argumentumát.</value>
+    <value>Ha további információra van szüksége egy adott parancsról, adja meg hozzá a súgó opciónál.</value>
+  </data>
+  <data name="WSLCCLI_RunHelpForMoreInformation" xml:space="preserve">
+    <value>További információért futtassa a '{} --help' parancsot.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingCommands" xml:space="preserve">
     <value>Parancsok:</value>
@@ -2250,8 +2274,14 @@ Usage:
   <data name="WSLCCLI_HeadingArguments" xml:space="preserve">
     <value>Paraméterek:</value>
   </data>
+  <data name="WSLCCLI_HeadingRelatedOptions" xml:space="preserve">
+    <value>Kapcsolódó opciók:</value>
+  </data>
+  <data name="WSLCCLI_HeadingRelatedArguments" xml:space="preserve">
+    <value>Kapcsolódó argumentumok:</value>
+  </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Az aktuális parancs argumentumának neve nem ismerhető fel: {}</value>
+    <value>Az aktuális parancs opciójának neve nem ismerhető fel: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2273,35 +2303,35 @@ Usage:
     <value>Tárolóazonosító</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Hiányzó argumentumérték: {}</value>
+    <value>Hiányzó opcióérték: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Az aktuális parancs argumentumának aliasa nem ismerhető fel: {}</value>
+    <value>Az aktuális parancs beállítás aliasa nem ismerhető fel: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Érvénytelen argumentummegadás: {}</value>
+     <value>Érvénytelen beállításmegadás: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>A szomszédossági jelölő aliasa nem található: {}</value>
+     <value>A közvetlenül kapcsolt opció aliasa nem található: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>A szomszédossági alias nem jelölő: {}</value>
+     <value>A közvetlenül kapcsolt opció aliasa nem jelölő: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Érvénytelen argumentummegadás: {}</value>
+     <value>Érvénytelen beállításmegadás: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>A jelölő argumentum nem tartalmazhat szomszédos értéket: {}</value>
+     <value>Az opció nem tartalmazhat közvetlenül csatolt értéket: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagInvalidBooleanError" xml:space="preserve">
-     <value>Érvénytelen logikai érték a jelzőargumentumhoz: {}. A várt érték igaz, hamis, 1 vagy 0.</value>
+     <value>Érvénytelen logikai érték az opcióhoz: „{}”. A várt értékek: true, false, 1, 0, t vagy f.</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
@@ -2309,7 +2339,7 @@ Usage:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Hiányzik az argumentum neve a következő helyen: {}</value>
+     <value>Hiányzó opciónév a következőnél: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2321,7 +2351,7 @@ Usage:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Az értékekkel rendelkező alias-argumentumoknak az aliaslánc végén kell szerepelniük: {}</value>
+     <value>Az értékekkel rendelkező aliasopcióknak az aliaslánc végén kell szerepelniük: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2464,12 +2494,28 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcAliasAmbiguousWithMultipleNetworks" xml:space="preserve">
-    <value>Hálózati aliasok nem adhatók meg, ha több hálózatra van szükség. Használjon egyetlen --network argumentumot.</value>
+    <value>Hálózati aliasok nem adhatók meg, ha több hálózatra van szükség. Használjon egyetlen --network opciót.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>Az IP-címhez felhasználó által meghatározott hálózat szükséges. A --network használatával adhat meg egyet.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>Egy IP-cím nem adható meg, ha több hálózatra van szükség. Használjon egyetlen --network opciót.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nem sikerült létrehozni a(z) „{}” kötetet: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBindSourcePathNotFound" xml:space="preserve">
+    <value>A kötési forrás elérési útja nem létezik: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBindSourcePathError" xml:space="preserve">
+    <value>Nem sikerült elérni a kötési forrás {} elérési útját: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcTooManyVirtioFsShares" xml:space="preserve">
     <value>Túl sok kötet lett csatlakoztatva (korlát: {}). További kötetek csatlakoztatásához indítsa újra a munkamenetet. Ezt egy jövőbeli kiadásban javítjuk.</value>
@@ -2622,10 +2668,11 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Tároló részletes adatainak megjelenítése.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Tárolók leállítása.</value>
+    <value>Egy vagy több futó tároló leállítása.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Leállítja a tárolókat.</value>
+    <value>Leállít egy vagy több futó tárolót azzal, hogy alapértelmezés szerint SIGKILL jelzést küld, vagy a --signal. kapcsolóval megadott jelzést.</value>
+    <comment>{Locked="--signal."}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
     <value>Tárolók listázása.</value>
@@ -2680,6 +2727,10 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
     <value>Leállítja a tárolókat.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
+    <value>Küldendő jel (alapértelmezés: a tárolóhoz konfigurált STOPSIGNAL, vagy SIGTERM, ha nincs konfigurálva)</value>
+    <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Képek kezelése.</value>
@@ -2945,7 +2996,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="0.5"}{Locked="1"}{Locked="2.5"}Command line argument example values should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidCpusError" xml:space="preserve">
-    <value>Érvénytelen {} argumentumérték: "{}". A rendszer pozitív számú processzort várt (például 0.5, 1, 2)</value>
+    <value>Érvénytelen {} beállításérték: "{}". A rendszer pozitív számú processzort várt (például 0.5, 1, 2)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="0.5"}{Locked="1"}{Locked="2"}</comment>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
@@ -2973,8 +3024,98 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Kimenet szűrése a megadott feltételek alapján</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Érvénytelen „{}” argumentum a '-f, --filter' kapcsolóhoz: hibás szűrőformátum (elvárt: name=value)</value>
+    <value>Érvénytelen „{}” érték a '-f, --filter' opcióhoz: hibás szűrőformátum (expected name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+  <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
+    <value>Invalid argument "{}" for '--mount' option: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidTmpfsError" xml:space="preserve">
+    <value>Invalid argument "{}" for '--tmpfs' option: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--tmpfs'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UnsupportedMountError" xml:space="preserve">
+    <value>Argument "{}" for '--mount' option uses an unsupported feature: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DuplicateMountDestinationError" xml:space="preserve">
+    <value>Duplikált csatlakozási pont: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountMalformedCsvError" xml:space="preserve">
+    <value>A CSV-bemenet helytelen formátumú.</value>
+    <comment>{Locked="CSV"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountFieldKeyValueRequiredError" xml:space="preserve">
+    <value>A(z) {} mezőnek kulcs=érték párnak kell lennie.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountUnexpectedKeyError" xml:space="preserve">
+    <value>A(z) {} kulcs váratlan a következőben: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountInvalidValueError" xml:space="preserve">
+    <value>A(z) {} értéke érvénytelen: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountInvalidBindRecursiveValueError" xml:space="preserve">
+    <value>A(z) {} értéke érvénytelen: {}. Az érvényes értékek: "enabled", "disabled", "writable" és "readonly".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeRequiredError" xml:space="preserve">
+    <value>A csatolási típus megadása kötelező.</value>
+  </data>
+  <data name="WSLCCLI_MountOptionFamilyMismatchError" xml:space="preserve">
+    <value>A(z) {} típusnak megfelelő beállítások nem használhatók a(z) {} csatlakoztatási típussal.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountOptionRequiresReadonlyError" xml:space="preserve">
+    <value>A(z) {} beállításhoz a „readonly” beállítás szükséges.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountBindRecursiveReadonlyRequiresPropagationError" xml:space="preserve">
+    <value>Az 'bind-recursive=readonly' beállításhoz szükséges a 'bind-propagation=rprivate' beállítás.</value>
+    <comment>{Locked="bind-recursive=readonly"}{Locked="bind-propagation=rprivate"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeUnsupportedError" xml:space="preserve">
+    <value>A(z) {} csatlakoztatási típus nem támogatott.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountOptionUnsupportedError" xml:space="preserve">
+    <value>A(z) {} beállítás nem támogatott.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTargetRequiredError" xml:space="preserve">
+    <value>A csatlakoztatási cél megadása kötelező.</value>
+  </data>
+  <data name="WSLCCLI_MountTargetAbsoluteError" xml:space="preserve">
+    <value>A csatolási cél elérési útjának abszolútnak kell lennie.</value>
+  </data>
+  <data name="WSLCCLI_MountTmpfsOptionsTypeError" xml:space="preserve">
+    <value>A tmpfs beállítások csak tmpfs csatolásokhoz támogatottak.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTmpfsSizeNegativeError" xml:space="preserve">
+    <value>A tmpfs mérete nem lehet negatív.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountSourceRequiredError" xml:space="preserve">
+    <value>A csatolási forrás megadása kötelező.</value>
+  </data>
+  <data name="WSLCCLI_MountBindSourceAbsoluteError" xml:space="preserve">
+    <value>A bind forrás elérési útjának abszolútnak kell lennie.</value>
+    <comment>{Locked="bind"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountVolumeSourceInvalidError" xml:space="preserve">
+    <value>A kötet forrásának érvényes névvel ellátott kötetnek kell lennie.</value>
+  </data>
+  <data name="WSLCCLI_MountTmpfsSourceUnsupportedError" xml:space="preserve">
+    <value>A forrásbeállítás tmpfs-csatlakoztatások esetén nem támogatott.</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MountTypeUnsupportedGenericError" xml:space="preserve">
+    <value>A csatlakoztatási típus nem támogatott.</value>
+  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Naplókimenet követése</value>
   </data>
@@ -2983,7 +3124,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
-    <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
+    <value>Kimeneti formázás (json egysoros kimenet esetén) (alapértelmezett: tagolt JSON)</value>
     <comment>{Locked="json"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
@@ -3043,6 +3184,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Memóriakorlát (pl. 512MB, 1GB)</value>
     <comment>{Locked="512M"}{Locked="1G"}Command line argument example values should not be translated</comment>
   </data>
+  <data name="WSLCCLI_MountArgDescription" xml:space="preserve">
+    <value>Csatoljon egy fájlrendszer-csatolást a tárolóhoz</value>
+  </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
     <value>Tároló gazdagépének neve</value>
   </data>
@@ -3058,6 +3202,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_NetworkEmptyError" xml:space="preserve">
     <value>Érvénytelen {} érték: a hálózatnév nem lehet üres vagy szóköz</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkDuplicateNameError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a hálózatnevet csak egyszer lehet megadni</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_NetworkUnsupportedOptionError" xml:space="preserve">
+    <value>Érvénytelen {} érték: nem támogatott hálózati beállítás: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkHostModeNotSupportedError" xml:space="preserve">
     <value>a gazdagép módú hálózatkezelés nem támogatott</value>
@@ -3135,8 +3287,12 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Munkamenet-tároló útvonala</value>
   </data>
+  <data name="WSLCCLI_StoragePathArgDescription" xml:space="preserve">
+    <value>A munkamenet-tároló könyvtár elérési útja</value>
+  </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Küldendő jelzés</value>
+    <value>A tárolónak küldendő jelzés (alapértelmezés: SIGKILL)</value>
+    <comment>{Locked="SIGKILL"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Jelenlegi vagy meglévő lemezkép-hivatkozás image-name[:tag] formátumban</value>
@@ -3179,7 +3335,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Ne jelezzen hibát, ha a kötet nem létezik</value>
   </data>
   <data name="WSLCCLI_RemoveVolumesArgDescription" xml:space="preserve">
-    <value>Remove anonymous volumes associated with the container</value>
+    <value>Távolítsa el a tárolóhoz társított névtelen köteteket</value>
   </data>
   <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
     <value>Munkakönyvtár a tárolón belül</value>
@@ -3190,6 +3346,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Írja a tárolóazonosítót a megadott elérési útba</value>
+  </data>
+  <data name="WSLCCLI_IidFileArgDescription" xml:space="preserve">
+    <value>Írja a képazonosítót a megadott elérési útra</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>A DNS-névkiszolgáló IP-címe a resolv.conf fájlban</value>
@@ -3218,11 +3377,11 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Folyamat típusa (formátum: none|ansi) (alapértelmezett: ansi)</value>
-    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+    <value>A folyamatkimenet típusa (auto, tty, plain, quiet) (alapértelmezett: auto)</value>
+    <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Kép lekérési szabályzata (always|missing|never) (default:never)</value>
+    <value>Lemezképlekérési házirend (always|missing|never) (alapértelmezett: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
@@ -3237,7 +3396,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidUlimitError" xml:space="preserve">
-    <value>Érvénytelen {} argumentumérték: "{}". Várt &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (korlátlan használatra használja a -1)</value>
+    <value>Érvénytelen {} beállításérték: "{}". Várt &lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;] (korlátlan használatra használja a -1)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="-1"}{Locked="&lt;name&gt;=&lt;soft&gt;[:&lt;hard&gt;]"}</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
@@ -3257,6 +3416,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Érvénytelen {} érték: a(z) {} formátumtípus ismeretlen. A támogatott formátumtípusok a következők: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidPullPolicyError" xml:space="preserve">
+    <value>Érvénytelen {} érték: {} nem egy felismert lekérési házirend. A támogatott lekérési házirendek: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a(z) {} nem felismerhető folyamattípus. A támogatott folyamattípusok a következők: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Érvénytelen {} érték: a(z) {} nem felismerhető vizsgálati típus. A támogatott vizsgálati típusok a következők: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3266,11 +3433,11 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Érvénytelen {} argumentumérték: {}</value>
+    <value>Érvénytelen {} opcióérték: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidTimestampArgumentError" xml:space="preserve">
-    <value>Érvénytelen {} argumentumérték: {}. Unix epoch időbélyeget vagy RFC3339 dátum-időt vártunk (például 2024-01-15T10:30:00Z)</value>
+    <value>Érvénytelen {} opcióérték: „{}”. Unix epoch időbélyeget vagy RFC3339 dátum-időt vártunk (például 2024-01-15T10:30:00Z)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="2024-01-15T10:30:00Z"}{Locked="RFC3339"}</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
@@ -3278,11 +3445,11 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Érvénytelen {} argumentumérték: "{}". A rendszer memóriaméretet várt (például 256M, 1G)</value>
+    <value>Érvénytelen {} opcióérték: „{}”. Memóriaméretet vártunk (pl. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_InvalidDurationError" xml:space="preserve">
-    <value>Érvénytelen {} argumentumérték: {}. A várt időtartam (pl. 30s, 1m30s)</value>
+    <value>Érvénytelen {} opcióérték: „{}”. A várt időtartam (pl. 30s, 1m30s)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="30s"}{Locked="1m30s"}</comment>
   </data>
   <data name="WSLCCLI_NoHealthcheckConflictError" xml:space="preserve">
@@ -3372,7 +3539,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Hálózat neve</value>
   </data>
   <data name="WSLCCLI_NetworkListQuietArgDesc" xml:space="preserve">
-    <value>Csak a hálózatneveket adja ki</value>
+    <value>Csak a hálózati azonosítókat jelenítse meg</value>
   </data>
   <data name="WSLCCLI_NetworkPruneDesc" xml:space="preserve">
     <value>Távolítsa el az összes nem használt hálózatot.</value>
@@ -3380,9 +3547,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Eltávolítja az összes nem használt hálózatot. Egy hálózat akkor tekinthető nem használtnak, ha egyetlen tároló sem hivatkozik rá.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Törölve: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Törölt hálózatok:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Tároló csatlakoztatása hálózathoz</value>
@@ -3437,9 +3603,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Távolítsa el az összes nem használt kötetet, ne csak a névteleneket.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Törölve: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Törölt kötetek:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Teljes felszabadított terület: {}</value>
@@ -3459,10 +3624,10 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Csak a kötetneveket adja ki</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>A rendszerkép nem írható a terminálba. Használja az -o jelzőt vagy irányítsa át a stdout-ot.</value>
+    <value>A rendszerkép nem írható a terminálba. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
   <data name="WSLCCLI_ContainerExportStdoutIsTerminalError" xml:space="preserve">
-    <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o jelzőt vagy irányítsa át a stdout-ot.</value>
+    <value>Nem lehet a tárolót a terminálba exportálni. Használja az -o opciót, vagy irányítsa át a stdout-ot.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
     <value>Várt formátum: &lt;gazdaelérési út | elnevezett kötet&gt;:&lt;tároló elérési útja&gt;[:mód]</value>
@@ -3539,6 +3704,50 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
+    <value>Kevesebb mint egy másodperce</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
+    <value>1 másodperce</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
+    <value>{} másodperce</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
+    <value>Körülbelül egy perce</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
+    <value>{} perce</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
+    <value>Körülbelül egy órája</value>
+    <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
+    <value>{} órája</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
+    <value>{} napja</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
+    <value>{} hete</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
+    <value>{} hónapja</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
+  </data>
+  <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
+    <value>{} éve</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
     <value>Figyelmeztetés: Érvénytelen a(z) '{}' beállítás értéke a következőben: {}:{}.</value>

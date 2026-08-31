@@ -31,6 +31,11 @@ Abstract:
 
 namespace wsl::windows::wslc {
 
+// Fallback width for progress displays when the console width can't be queried. This
+// value already includes the autowrap guard (visible width minus one) so a wrapped line
+// can't corrupt cursor-based rendering.
+inline constexpr int c_fallbackConsoleWidth = 79;
+
 namespace terminal_detail {
 
     // SFINAE: excludes Sequence-derived types so the overload below wins for them.

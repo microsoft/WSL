@@ -375,7 +375,7 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
     uint64_t CallId, pid_t Pid, int Arch, int SysCallNumber, const gsl::span<unsigned long long>& Arguments)
 {
     auto ParseSocket = [&](int Socket, size_t AddressPtr, size_t AddressLength) -> std::optional<BindCall> {
-        if (AddressLength < sizeof(sockaddr))
+        if (AddressLength < sizeof(sockaddr) || AddressLength > sizeof(sockaddr_storage))
         {
             return {{{}, {}, CallId}}; // Invalid sockaddr. Let it go through.
         }

@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <wslc_schema.h>
 
 namespace WSLCE2ETests {
@@ -26,14 +27,13 @@ class WSLCE2EImageInspectTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(BuiltExposeImage);
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(BuiltExposeImage);
         return true;
     }
 

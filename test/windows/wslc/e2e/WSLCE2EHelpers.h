@@ -57,6 +57,38 @@ namespace VT {
     }
 } // namespace VT
 
+// The shape emitted by "network list --format json"; every value is reported as a string.
+struct NetworkListOutput
+{
+    std::string CreatedAt;
+    std::string Driver;
+    std::string ID;
+    std::string IPv4;
+    std::string IPv6;
+    std::string Internal;
+    std::string Labels;
+    std::string Name;
+    std::string Scope;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListOutput, CreatedAt, Driver, ID, IPv4, IPv6, Internal, Labels, Name, Scope);
+};
+
+struct VolumeListOutput
+{
+    std::string Availability;
+    std::string Driver;
+    std::string Group;
+    std::string Labels;
+    std::string Links;
+    std::string Mountpoint;
+    std::string Name;
+    std::string Scope;
+    std::string Size;
+    std::string Status;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeListOutput, Availability, Driver, Group, Labels, Links, Mountpoint, Name, Scope, Size, Status);
+};
+
 struct TestImage
 {
     std::wstring Name;
@@ -70,6 +102,7 @@ struct TestImage
 
 const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
+const TestImage& HelloWorldTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
@@ -125,8 +158,6 @@ wsl::windows::common::wslc_schema::Network InspectNetwork(const std::wstring& ne
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
-void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
-void EnsureImageIsDeleted(const TestImage& image);
 void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureNoUntaggedImages();

@@ -238,7 +238,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 #ifdef WSL_KERNEL_MODULES_PATH
     auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
 #else
-    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
+    auto kernelModulesPath = basePath / L"tools" / L"artifacts.vhd";
 #endif
 
     // Get root VHD path

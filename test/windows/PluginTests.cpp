@@ -89,7 +89,7 @@ class PluginTests
         return true;
     }
 
-    void ConfigurePlugin(PluginTestType testCase) const
+    void ConfigurePlugin(PluginTestType testCase, LPCWSTR mountFolder = L"") const
     {
         StopWslService();
         if (!DeleteFile(logFile.c_str()))
@@ -100,6 +100,7 @@ class PluginTests
         const auto testKey = OpenTestRegistryKey(KEY_SET_VALUE);
         WriteDword(testKey.get(), nullptr, c_testType, static_cast<DWORD>(testCase));
         WriteString(testKey.get(), nullptr, c_logFile, logFile.c_str());
+        WriteString(testKey.get(), nullptr, c_mountFolder, mountFolder);
 
         const auto lxssKey =
             CreateKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_SET_VALUE, nullptr, 0);
@@ -108,7 +109,7 @@ class PluginTests
         RestartWslService();
     }
 
-    static void StartWsl(int expectedExitCode, LPCWSTR ExpectedOutput = nullptr)
+    static void StartWsl(int expectedExitCode, const std::wstring& expectedOutput = {})
     {
         auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", expectedExitCode);
         if (expectedExitCode == 0)
@@ -117,7 +118,7 @@ class PluginTests
         }
         else
         {
-            VERIFY_ARE_EQUAL(output, ExpectedOutput);
+            VERIFY_ARE_EQUAL(output, expectedOutput);
         }
     }
 
@@ -169,6 +170,62 @@ class PluginTests
 
         ConfigurePlugin(PluginTestType::Success);
         StartWsl(0);
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(MountFolderAccess)
+    {
+        const auto testFolder = std::filesystem::current_path() / "deny-write";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        const auto user = wil::get_token_information<TOKEN_USER>();
+        EXPLICIT_ACCESSW access{};
+        access.grfAccessPermissions = FILE_ADD_FILE;
+        access.grfAccessMode = DENY_ACCESS;
+        access.grfInheritance = NO_INHERITANCE;
+        access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        access.Trustee.ptstrName = static_cast<LPWSTR>(user->User.Sid);
+
+        PACL acl = nullptr;
+        wil::unique_hlocal descriptor;
+        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+            testFolder.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
+
+        wsl::windows::common::security::unique_acl newAcl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, acl, &newAcl));
+        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+            const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
+
+        const auto testFile = testFolder / L"plugin-test.txt";
+        wil::unique_hfile deniedFile{CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(!deniedFile);
+        VERIFY_ARE_EQUAL(GetLastError(), ERROR_ACCESS_DENIED);
+
+        auto resetAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            wsl::windows::common::security::unique_acl restoredAcl;
+            access.grfAccessPermissions = 0;
+            access.grfAccessMode = REVOKE_ACCESS;
+
+            THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, acl, &restoredAcl));
+
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, restoredAcl.get(), nullptr));
+        });
+
+        ConfigurePlugin(PluginTestType::MountFolderAccess, testFolder.c_str());
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=25
+                VM created (settings->CustomConfigurationFlags=0)
+                /bin/sh: line 1: /test-plugin-access/plugin-test.txt: Permission denied
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+                VM Stopping)";
+
+        StartWsl(0);
+        VERIFY_IS_FALSE(std::filesystem::exists(testFile));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -242,8 +299,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::Success);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_ACCESSDENIED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_ACCESSDENIED"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -317,8 +375,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::PluginRequiresUpdate);
         StartWsl(
             -1,
-            L"The plugin 'TestPlugin' requires a newer version of WSL. Please run: wsl.exe --update\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/WSL_E_PLUGIN_REQUIRES_UPDATE\r\n");
+            FormatErrorMessage(
+                L"The plugin 'TestPlugin' requires a newer version of WSL. Please run: wsl.exe --update",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/WSL_E_PLUGIN_REQUIRES_UPDATE"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -356,8 +415,8 @@ class PluginTests
         ConfigurePlugin(PluginTestType::FailToLoad);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'", L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -383,8 +442,8 @@ class PluginTests
         ConfigurePlugin(PluginTestType::FailToStartVm);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'", L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -403,13 +462,15 @@ class PluginTests
 
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
 
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -438,12 +499,11 @@ class PluginTests
             OnDistroStarted: E_UNEXPECTED
             VM Stopping)";
 
-        constexpr auto ExpectedError =
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/Plugin/E_UNEXPECTED\r\n";
-
         ConfigurePlugin(PluginTestType::FailToStartDistro);
-        StartWsl(-1, ExpectedError);
+        StartWsl(
+            -1,
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'", L"Wsl/Service/CreateInstance/Plugin/E_UNEXPECTED"));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -473,8 +533,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::ErrorMessageStartVm);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartVm plugin error message'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_FAIL\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartVm plugin error message'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_FAIL"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -491,9 +552,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::ErrorMessageStartDistro);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartDistro plugin error message'\r\nError "
-            L"code: "
-            L"Wsl/Service/CreateInstance/Plugin/E_FAIL\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartDistro plugin error message'",
+                L"Wsl/Service/CreateInstance/Plugin/E_FAIL"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -669,7 +730,7 @@ class PluginTests
             WSLCMountFolder(relative): {}
             Test completed
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
-            WSLC Container started, session=*, id=*, name=wslc-plugin-container, image=debian:latest, state=*
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-container, image=debian:latest, state=*
             WSLC Container stopping, session=*, id=*
             WSLC Image deleted, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-test, id=*)",
@@ -723,6 +784,7 @@ class PluginTests
             WSLC Image created, session=*, id=sha256:*, name=wslc-registry:latest
             WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
             WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Container stopping, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
 
         ValidateLogFile(ExpectedOutput);
@@ -948,7 +1010,8 @@ class PluginTests
         ConfigurePlugin(PluginTestType::ErrorMessageStartDistro);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/TRUST_E_NOSIGNATURE\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/TRUST_E_NOSIGNATURE"));
     }
 };

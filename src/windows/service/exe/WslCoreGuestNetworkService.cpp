@@ -92,6 +92,7 @@ void wsl::core::networking::GuestNetworkService::CreateGuestNetworkService(
         TraceLoggingHResult(result, "result"),
         TraceLoggingValue(error.is_valid() ? error.get() : L"null", "errorString"));
     THROW_IF_FAILED_MSG(result, "%ls", error.get());
+    m_id = VmId;
 
     m_guestNetworkServiceCallback = windows::common::hcs::RegisterGuestNetworkServiceCallback(m_service, Callback, CallbackContext);
     SetGuestNetworkServiceState(hns::GuestNetworkServiceState::Bootstrapping);

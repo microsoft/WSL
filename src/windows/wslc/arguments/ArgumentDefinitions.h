@@ -63,8 +63,8 @@ _(File,             "file",                 L"f",             Kind::Value,      
 _(Filter,           "filter",               L"f",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_FilterArgDescription()) \
 _(Follow,           "follow",               L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_FollowArgDescription()) \
 _(Timestamps,       "timestamps",           L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TimestampsArgDescription()) \
-_(Since,            "since",                NO_ALIAS,         Kind::Value,      ULONGLONG,    Localization::WSLCCLI_SinceArgDescription()) \
-_(Until,            "until",                NO_ALIAS,         Kind::Value,      ULONGLONG,    Localization::WSLCCLI_UntilArgDescription()) \
+_(Since,            "since",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_SinceArgDescription()) \
+_(Until,            "until",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_UntilArgDescription()) \
 _(Format,           "format",               NO_ALIAS,         Kind::Value,      FormatType,   Localization::WSLCCLI_FormatArgDescription()) \
 _(ForwardArgs,      "arguments",            NO_ALIAS,         Kind::Forward,    NoConversion, Localization::WSLCCLI_ForwardArgsDescription()) \
 _(Gateway,          "gateway",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkGatewayArgDescription()) \
@@ -94,8 +94,9 @@ _(Latest,           "latest",               L"l",             Kind::Flag,       
 _(Link,             "link",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_LinkArgDescription()) \
 _(LinkLocalIp,      "link-local-ip",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_LinkLocalIpArgDescription()) \
 _(Memory,           "memory",               L"m",             Kind::Value,      int64_t,      Localization::WSLCCLI_MemoryArgDescription()) \
-_(Name,             "name",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NameArgDescription()) \
-_(Network,          "network",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkArgDescription()) \
+_(Mount,            "mount",               NO_ALIAS,         Kind::Value,      ParsedMount,  Localization::WSLCCLI_MountArgDescription()) \
+_(Name,             "name",                NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NameArgDescription()) \
+_(Network,          "network",              NO_ALIAS,         Kind::Value,      ParsedNetworkArgument, Localization::WSLCCLI_NetworkArgDescription()) \
 _(NetworkAlias,     "network-alias",        NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_NetworkAliasArgDescription()) \
 _(NetworkName,      "network-name",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_NetworkNameArgDescription()) \
 /*_(NoDNS,            "no-dns",               NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NoDNSArgDescription())*/ \
@@ -110,10 +111,10 @@ _(Output,           "output",               L"o",             Kind::Value,      
 _(Password,         "password",             L"p",             Kind::Value,      NoConversion, Localization::WSLCCLI_LoginPasswordArgDescription()) \
 _(PasswordStdin,    "password-stdin",       NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_LoginPasswordStdinArgDescription()) \
 _(Path,             "path",                 NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_PathArgDescription()) \
-/*_(Progress,         "progress",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_ProgressArgDescription())*/ \
+_(Progress,         "progress",             NO_ALIAS,         Kind::Value,      ProgressMode, Localization::WSLCCLI_ProgressArgDescription()) \
 _(Publish,          "publish",              L"p",             Kind::Value,      NoConversion, Localization::WSLCCLI_PublishArgDescription()) \
 _(PublishAll,       "publish-all",          L"P",             Kind::Flag,       NoConversion, Localization::WSLCCLI_PublishAllArgDescription()) \
-/*_(Pull,             "pull",                 NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_PullArgDescription())*/ \
+_(Pull,             "pull",                 NO_ALIAS,         Kind::Value,      PullPolicy,   Localization::WSLCCLI_PullArgDescription()) \
 _(Quiet,            "quiet",                L"q",             Kind::Flag,       NoConversion, Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,           "rm",                   NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,           "scheme",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SchemeArgDescription())*/ \
@@ -131,7 +132,7 @@ _(Tail,             "tail",                 L"n",             Kind::Value,      
 _(Tag,              "tag",                  L"t",             Kind::Value,      NoConversion, Localization::WSLCCLI_TagArgDescription()) \
 _(Target,           "target",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,             "time",                 L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
-_(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_TMPFSArgDescription()) \
+_(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      ParsedMount,  Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,              "tty",                  L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,             "type",                 L"t",             Kind::Value,      InspectType,  Localization::WSLCCLI_TypeArgDescription()) \
 _(Ulimit,           "ulimit",               NO_ALIAS,         Kind::Value,      UlimitValue,  Localization::WSLCCLI_UlimitArgDescription()) \
@@ -140,7 +141,7 @@ _(Username,         "username",             L"u",             Kind::Value,      
 _(Verbose,          "verbose",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_VerboseArgDescription()) \
 _(Version,          "version",              L"v",             Kind::Flag,       NoConversion, Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,          "virtualization",       NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_VirtualArgDescription())*/ \
-_(Volume,           "volume",               L"v",             Kind::Value,      NoConversion, Localization::WSLCCLI_VolumeArgDescription()) \
+_(Volume,           "volume",               L"v",             Kind::Value,      ParsedMount,  Localization::WSLCCLI_VolumeArgDescription()) \
 _(VolumeName,       "volume-name",          NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_VolumeNameArgDescription()) \
 _(Volumes,          "volumes",              L"v",             Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveVolumesArgDescription()) \
 _(WorkDir,          "workdir",              L"w",             Kind::Value,      NoConversion, Localization::WSLCCLI_WorkingDirArgDescription()) \

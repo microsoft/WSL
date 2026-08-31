@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısına izin ver</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Bu ilke, bu makinede WSL kapsayıcısının kullanılıp kullanılamayacağını denetler. Bu özellik etkinleştirildiğinde veya yapılandırılmadığında, kullanıcılar ve Windows uygulamaları WSL aracılığıyla Linux kapsayıcılarını çalıştırabilir. Devre dışı bırakıldığında, WSL kapsayıcısı tüm kullanıcılar için engellenir ve Windows uygulamaları Linux kapsayıcılarını çalıştıramaz. Uyarı: Bu ayarı 'Disabled' olarak belirlemek, Linux kapsayıcılarına bağlı Windows uygulamalarının çalışmamasına neden olabilir.</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Ayrıcalıklı WSL kapsayıcılarına izin ver</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Bu ilke, WSL kapsayıcılarının bu makinede ayrıcalıklı modda çalışıp çalışamayacağını denetler. Etkinleştirildiğinde veya yapılandırılmadığında, kullanıcılar ve Windows uygulamaları ayrıcalıklı kapsayıcıları başlatabilir. 'Disabled ayarlandığında, ayrıcalıklı bir kapsayıcı başlatma istekleri tüm kullanıcılar ve Windows uygulamaları için reddedilir. Ayrıcalıklı kapsayıcılar, kapsayıcı ana bilgisayarından yükseltilmiş Linux yetenekleriyle ve azaltılmış yalıtımla çalışır.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL kapsayıcısı kayıt defterleri için izin listesi</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Etkinleştirildiğinde, WSL kapsayıcısının yalnızca burada listelenen kayıt defterlerinden görüntü çekmesine izin verilir. Bu, hem WSL kapsayıcı CLI'sini hem de WSL kapsayıcı API'sini kullanan tüm uygulamaları etkiler.</string>
     </stringTable>

@@ -92,6 +92,16 @@ wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUA
     return disk;
 }
 
+void wsl::core::filesystem::CompactVhd(_In_ LPCWSTR Path)
+{
+    auto diskHandle = OpenVhd(Path, VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
+
+    COMPACT_VIRTUAL_DISK_PARAMETERS compact{};
+    compact.Version = COMPACT_VIRTUAL_DISK_VERSION_1;
+
+    THROW_IF_WIN32_ERROR(CompactVirtualDisk(diskHandle.get(), COMPACT_VIRTUAL_DISK_FLAG_NONE, &compact, nullptr));
+}
+
 void wsl::core::filesystem::ResizeExistingVhd(_In_ HANDLE diskHandle, _In_ ULONGLONG maximumSize, _In_ RESIZE_VIRTUAL_DISK_FLAG resizeFlag)
 {
     RESIZE_VIRTUAL_DISK_PARAMETERS resize{};

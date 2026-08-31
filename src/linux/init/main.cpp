@@ -1474,7 +1474,6 @@ Return Value:
 
 --*/
 
-try
 {
     std::vector<std::string> Variables;
     auto AddEnvironmentVariable = [&Variables](const char* Name, const char* Value) {
@@ -1500,7 +1499,7 @@ try
     {
         THROW_LAST_ERROR_IF(TEMP_FAILURE_RETRY(dup2(SocketFd, LX_INIT_UTILITY_VM_INIT_SOCKET_FD)) < 0);
 
-        close(SocketFd);
+        THROW_LAST_ERROR_IF(SetCloseOnExec(SocketFd, true));
         SocketFd = LX_INIT_UTILITY_VM_INIT_SOCKET_FD;
     }
     else
@@ -1659,11 +1658,6 @@ try
 
     execle(LX_INIT_PATH, LX_INIT_PATH, nullptr, Environment.data());
     LOG_ERROR("execle({}) failed {}", LX_INIT_PATH, errno);
-    _exit(1);
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
     _exit(1);
 }
 
@@ -2170,7 +2164,9 @@ Return Value:
 
 try
 {
-    wil::unique_fd InitFd{open(Target, (O_CREAT | O_WRONLY | O_TRUNC), 0755)};
+    THROW_LAST_ERROR_IF(unlink(Target) < 0 && errno != ENOENT);
+
+    wil::unique_fd InitFd{open(Target, (O_CREAT | O_EXCL | O_WRONLY), 0755)};
     THROW_LAST_ERROR_IF(!InitFd);
 
     THROW_LAST_ERROR_IF(mount(LX_INIT_PATH, Target, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);
@@ -2381,6 +2377,7 @@ void ProcessLaunchInitMessage(
     }
     catch (...)
     {
+        LOG_CAUGHT_EXCEPTION();
         ReportStatus(wil::ResultFromCaughtException());
         _exit(1);
     }
@@ -2549,6 +2546,21 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
 
     Result = -1;
     auto ReportStatus = wil::scope_exit([&Channel, &Result, MessageType = Message->Header.MessageType]() {
+        wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
+
+        if (MessageType != LxMiniInitMessageExport && Result == 0)
+        {
+            PostProcessImportedDistribution(message, DISTRO_PATH);
+        }
+
+        sync();
+
+        if (umount(DISTRO_PATH) < 0)
+        {
+            LOG_ERROR("umount({}) failed, {}", DISTRO_PATH, errno);
+            Result = -1;
+        }
+
         if (MessageType == LxMiniInitMessageExport)
         {
             if (UtilWriteBuffer(Channel.Socket(), &Result, sizeof(Result)) < 0)
@@ -2558,13 +2570,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
         }
         else
         {
-            wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
             message->Result = Result;
-            if (Result == 0)
-            {
-                PostProcessImportedDistribution(message, DISTRO_PATH);
-            }
-
             Channel.SendMessage<LX_MINI_INIT_IMPORT_RESULT>(message.Span());
         }
     });
@@ -2812,7 +2818,7 @@ Return Value:
 --*/
 try
 {
-    LX_MINI_INIT_MOUNT_RESULT_MESSAGE Message;
+    LX_MINI_INIT_MOUNT_RESULT_MESSAGE Message{};
     Message.Header.MessageSize = sizeof(Message);
     Message.Header.MessageType = LxMiniInitMessageMountStatus;
     Message.Result = Result;
@@ -2941,6 +2947,59 @@ try
             }
 
             THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str()) < 0);
+
+            ResponseCode = 0;
+        });
+
+    return (ChildPid < 0) ? -1 : 0;
+}
+CATCH_RETURN_ERRNO();
+
+int ProcessTrimDistributionMessage(gsl::span<gsl::byte> Buffer)
+try
+{
+    auto* Message = gslhelpers::try_get_struct<LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE>(Buffer);
+
+    if (!Message)
+    {
+        LOG_ERROR("Unexpected message size {}", Buffer.size());
+        return -1;
+    }
+
+    wil::unique_fd SocketFd{UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true)};
+    if (!SocketFd)
+    {
+        return -1;
+    }
+
+    const int ChildPid = UtilCreateChildProcess(
+        "TrimDistribution", [Message, Channel = wsl::shared::SocketChannel{std::move(SocketFd), "TrimDistribution"}]() mutable {
+            int ResponseCode = -1;
+            auto ReportStatus = wil::scope_exit([&]() {
+                LX_MINI_INIT_TRIM_DISTRIBUTION_RESPONSE ResponseMessage{};
+                ResponseMessage.ResponseCode = ResponseCode;
+                ResponseMessage.Header.MessageType = LxMiniInitMessageTrimDistributionResponse;
+                ResponseMessage.Header.MessageSize = sizeof(ResponseMessage);
+
+                Channel.SendMessage(ResponseMessage);
+            });
+
+            const auto DevicePath = GetLunDevicePath(Message->ScsiLun);
+
+            //
+            // Run a full offline filesystem check and discard the free blocks so the host can reclaim
+            // them when the VHD is compacted. This mirrors the offline e2fsck used by
+            // ResizeDistribution: it runs on the detached device without mounting it, and '-E discard'
+            // issues the same block-discard requests that 'fstrim' would on a mounted filesystem.
+            //
+            // This is best-effort: a failure here must not prevent compaction, so the child logs the
+            // error but still reports success.
+            //
+            const auto CommandLine = std::format("/usr/sbin/e2fsck -f -y -E discard '{}'", DevicePath);
+            if (UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0)
+            {
+                LOG_WARNING("Failed to trim {}", DevicePath.c_str());
+            }
 
             ResponseCode = 0;
         });
@@ -3161,7 +3220,10 @@ try
         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
         //      directory must be writable for tools like depmod to work.
         //
-
+        // N.B. The artifacts VHD nests the modules under <release>/modules.
+        //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
+        //      layout when the nested modules directory is not present.
+        //
         if (EarlyConfig->KernelModulesDeviceId != UINT_MAX)
         {
             THROW_LAST_ERROR_IF(
@@ -3170,9 +3232,33 @@ try
 
             utsname UnameBuffer{};
             THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+            const std::string Release{UnameBuffer.release};
 
-            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, UnameBuffer.release);
-            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), KERNEL_MODULES_VHD_PATH, (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
+            const std::string ArtifactsBase = std::format("{}/{}", KERNEL_MODULES_VHD_PATH, Release);
+            const std::string NestedModules = ArtifactsBase + "/modules";
+
+            std::error_code Error{};
+            const bool NestedLayout = std::filesystem::is_directory(NestedModules, Error);
+            const std::string ModulesLower = NestedLayout ? NestedModules : std::string{KERNEL_MODULES_VHD_PATH};
+            const bool LegacyLayout = !NestedLayout && std::filesystem::is_regular_file(ModulesLower + "/modules.dep", Error);
+
+            //
+            // A valid artifacts VHD nests the tree under <release>/modules; a legacy module-only VHD
+            // places it at the root.
+            //
+            if (LegacyLayout)
+            {
+                LOG_WARNING(
+                    "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
+                    "removed in a future version");
+            }
+            else if (!NestedLayout)
+            {
+                LOG_WARNING("kernel modules VHD does not contain modules for {}", Release);
+            }
+
+            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, Release);
+            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), ModulesLower.c_str(), (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
 
             const std::string KernelModulesList = wsl::shared::string::FromSpan(Buffer, EarlyConfig->KernelModulesListOffset);
             for (const auto& Module : wsl::shared::string::Split(KernelModulesList, ','))
@@ -3318,6 +3404,13 @@ try
     {
 
         ProcessResizeDistributionMessage(Buffer);
+        return 0;
+    }
+
+    case LxMiniInitMessageTrimDistribution:
+    {
+
+        ProcessTrimDistributionMessage(Buffer);
         return 0;
     }
 

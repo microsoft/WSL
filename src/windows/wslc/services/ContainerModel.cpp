@@ -13,6 +13,7 @@ Abstract:
 
 #include "precomp.h"
 #include "ContainerModel.h"
+#include <unordered_set>
 
 namespace wsl::windows::wslc::models {
 
@@ -155,89 +156,28 @@ void PublishPort::Validate() const
 // Source: https://github.com/moby/moby/blob/master/volume/validate.go
 bool VolumeMount::IsValidNamedVolumeName(const std::wstring& name)
 {
-    static const std::wregex namedVolumeRegex(LR"(^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,}$)");
-    return std::regex_match(name, namedVolumeRegex);
+    return mount::IsValidNamedVolumeName(name);
 }
 
 VolumeMount VolumeMount::Parse(const std::wstring& value)
 {
-    auto lastColon = value.rfind(':');
-    if (lastColon == std::wstring::npos)
+    mount::Spec mountSpec;
+    try
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeInvalidSpec(value, Localization::WSLCCLI_VolumeFormatUsage()));
+        mountSpec = mount::ParseDockerVolumeString(value);
+        mount::ValidateMountSpec(mountSpec);
+    }
+    catch (const mount::MountException& ex)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, ex.Reason());
     }
 
-    VolumeMount vm;
-    auto splitColon = lastColon;
-    const auto lastToken = value.substr(lastColon + 1);
-    if (IsValidMode(lastToken))
-    {
-        vm.m_isReadOnlyMode = IsReadOnlyMode(lastToken);
-        if (lastColon == 0)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeInvalidSpec(value, Localization::WSLCCLI_VolumeFormatUsage()));
-        }
-
-        splitColon = value.rfind(':', lastColon - 1);
-        if (splitColon == std::wstring::npos)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeInvalidSpec(value, Localization::WSLCCLI_VolumeFormatUsage()));
-        }
-
-        vm.m_containerPath = WideToMultiByte(value.substr(splitColon + 1, lastColon - splitColon - 1));
-    }
-    else
-    {
-        vm.m_containerPath = WideToMultiByte(lastToken);
-    }
-
-    if (vm.m_containerPath.empty())
-    {
-        THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG, Localization::WSLCCLI_VolumeContainerPathEmpty(value, Localization::WSLCCLI_VolumeFormatUsage()));
-    }
-
-    if (vm.m_containerPath[0] != '/')
-    {
-        THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG, Localization::WSLCCLI_VolumeContainerPathNotAbsolute(value, Localization::WSLCCLI_VolumeFormatUsage()));
-    }
-
-    const auto rawHostPath = value.substr(0, splitColon);
-    if (rawHostPath.empty())
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathEmpty(value, Localization::WSLCCLI_VolumeFormatUsage()));
-    }
-
-    // This is where we need to check if the user is referencing a named volume.
-    // This can be either an existing named volume or a new named volume that will be created.
-    if (VolumeMount::IsValidNamedVolumeName(rawHostPath))
-    {
-        vm.m_isNamedVolume = true;
-        vm.m_host = rawHostPath;
-    }
-    else
-    {
-        // Not a named volume, so it must be a path.
-        // Use wil::GetFullPathNameW to resolve relative paths against the CWD.
-        std::wstring resolvedHostPath;
-        const auto hr = wil::GetFullPathNameW(rawHostPath.c_str(), resolvedHostPath);
-        if (FAILED(hr))
-        {
-            THROW_HR_WITH_USER_ERROR(hr, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
-        }
-
-        // GetFileAttributesW validates the resolved path syntax without requiring existence.
-        // ERROR_INVALID_NAME indicates illegal characters in the path (e.g. ":" as a component).
-        if (GetFileAttributesW(resolvedHostPath.c_str()) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_INVALID_NAME)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
-        }
-
-        vm.m_host = std::move(resolvedHostPath);
-    }
-
-    return vm;
+    VolumeMount volume;
+    volume.m_host = std::move(mountSpec.Source);
+    volume.m_containerPath = std::move(mountSpec.Target);
+    volume.m_isReadOnlyMode = mountSpec.ReadOnly;
+    volume.m_isNamedVolume = mountSpec.MountType == WSLCMountTypeVolume;
+    return volume;
 }
 
 std::optional<std::wstring> EnvironmentVariable::Parse(const std::wstring& entry)
@@ -316,21 +256,6 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(const std::wstring& fil
     }
 
     return envVars;
-}
-
-TmpfsMount TmpfsMount::Parse(const std::string& value)
-{
-    TmpfsMount result{};
-    auto colonPos = value.find(':');
-    if (colonPos == std::string::npos)
-    {
-        result.m_containerPath = value;
-        return result;
-    }
-
-    result.m_containerPath = value.substr(0, colonPos);
-    result.m_options = value.substr(colonPos + 1);
-    return result;
 }
 
 CidFile::CidFile(const std::optional<std::wstring>& path)

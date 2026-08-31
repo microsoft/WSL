@@ -76,6 +76,7 @@ try
     // Initialize COM
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wsl::windows::common::wslutil::CoInitializeSecurity();
+    auto cleanupWinrt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { winrt::clear_factory_cache(); });
 
     // Register the class factory (single-use: one factory per process)
     auto factory = winrt::make<WSLCSessionFactoryClassFactory>();
