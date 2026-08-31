@@ -24,6 +24,16 @@ using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::common::string;
 
+namespace {
+    // The table header is always the first stdout line. Scoping column assertions to it keeps them from
+    // matching container names, image names or IDs in the data rows that happen to contain the title.
+    bool HeaderHasColumn(const WSLCExecutionResult& result, const std::wstring& column)
+    {
+        const auto lines = result.GetStdoutLines();
+        return !lines.empty() && lines.front().find(column) != std::wstring::npos;
+    }
+} // namespace
+
 class WSLCE2EContainerListTests
 {
     WSLC_TEST_CLASS(WSLCE2EContainerListTests)
@@ -167,7 +177,7 @@ class WSLCE2EContainerListTests
         // Without --size the SIZE column is absent.
         result = RunWslc(L"container list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"SIZE"));
+        VERIFY_IS_FALSE(HeaderHasColumn(result, Localization::WSLCCLI_TableHeaderSize()));
 
         const auto findContainerLine = [&](const WSLCExecutionResult& listResult) {
             std::optional<std::wstring> line;
@@ -186,7 +196,7 @@ class WSLCE2EContainerListTests
         // --size appends a SIZE column reporting the writable layer and the virtual total.
         result = RunWslc(L"container list --size");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"SIZE"));
+        VERIFY_IS_TRUE(HeaderHasColumn(result, Localization::WSLCCLI_TableHeaderSize()));
 
         auto sizedLine = findContainerLine(result);
         VERIFY_IS_TRUE(sizedLine.has_value());
@@ -195,7 +205,7 @@ class WSLCE2EContainerListTests
         // -s is the docker alias and produces the same column.
         auto aliasResult = RunWslc(L"container list -s");
         aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(aliasResult.StdoutContainsSubstring(L"SIZE"));
+        VERIFY_IS_TRUE(HeaderHasColumn(aliasResult, Localization::WSLCCLI_TableHeaderSize()));
 
         auto aliasLine = findContainerLine(aliasResult);
         VERIFY_IS_TRUE(aliasLine.has_value());
@@ -204,7 +214,7 @@ class WSLCE2EContainerListTests
         // ps is an alias of list and accepts the option too.
         auto psResult = RunWslc(L"ps --size");
         psResult.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(psResult.StdoutContainsSubstring(L"SIZE"));
+        VERIFY_IS_TRUE(HeaderHasColumn(psResult, Localization::WSLCCLI_TableHeaderSize()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption_QuietStillOutputsIdsOnly)
@@ -220,7 +230,7 @@ class WSLCE2EContainerListTests
         result = RunWslc(L"container list --all --quiet --size");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
-        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"SIZE"));
+        VERIFY_IS_FALSE(HeaderHasColumn(result, Localization::WSLCCLI_TableHeaderSize()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption_ListedInHelp)
