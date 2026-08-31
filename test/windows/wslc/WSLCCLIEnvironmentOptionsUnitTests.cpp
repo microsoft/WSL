@@ -121,6 +121,17 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_FALSE(target.Contains(ArgType::Session));
     }
 
+    TEST_METHOD(ApplyEnvironmentOptions_SessionEmptyValue_DoesNotSetValue)
+    {
+        m_session->Set(L"");
+
+        RootCommand root;
+        ArgMap target;
+        ApplyEnvironmentOptions(target, root.GetGlobalsAndEnvArguments());
+
+        VERIFY_IS_FALSE(target.Contains(ArgType::Session));
+    }
+
     TEST_METHOD(ApplyEnvironmentOptions_CliSessionOverridesEnvironmentSession)
     {
         m_session->Set(L"env-session");

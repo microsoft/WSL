@@ -36,13 +36,26 @@ try
                 continue;
             }
 
+            if (value->empty() && !binding.AcceptsEmptyValue)
+            {
+                continue;
+            }
+
             if (arg.Kind() == Kind::Flag)
             {
                 target.Add(arg.Type(), true);
             }
             else if (arg.Kind() == Kind::Value)
             {
-                target.Add(arg.Type(), std::move(*value));
+                target.Add(arg.Type(), *value);
+            }
+
+            if (binding.LogWhenSet)
+            {
+                WSL_LOG(
+                    "WSLCEnvironmentOptionSet",
+                    TraceLoggingValue(binding.Name, "EnvironmentVariable"),
+                    TraceLoggingValue(value->c_str(), "Value"));
             }
 
             break;
