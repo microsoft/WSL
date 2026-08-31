@@ -16,6 +16,7 @@ Abstract:
 
 #include <optional>
 #include <string>
+#include <utility>
 
 #define WSLC_CLI_ARG_ID_CHAR L'-'
 #define WSLC_CLI_ARG_ID_STRING L"-"
@@ -47,13 +48,13 @@ struct Argument
     // Full constructor with all parameters
     Argument(
         ArgType argType,
-        const std::wstring& name,
-        const std::wstring& alias,
-        const std::wstring& desc,
+        std::wstring name,
+        std::wstring alias,
+        std::wstring desc,
         argument::Kind kind = DefaultKind,
         bool required = DefaultRequired,
         argument::Limit limit = DefaultLimit) :
-        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_limit(limit)
+        m_argType(argType), m_name(std::move(name)), m_desc(std::move(desc)), m_alias(std::move(alias)), m_required(required), m_type(kind), m_limit(limit)
     {
     }
 
