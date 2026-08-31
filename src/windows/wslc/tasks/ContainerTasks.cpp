@@ -55,8 +55,10 @@ std::string FormatStatsIo(uint64_t Bytes)
     return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
-// Formats the SIZE column: the writable layer on its own, and the total including the
-// read-only image layers in parentheses when the daemon reported one.
+// The ps SIZE column: the writable layer on its own, and the total including the read-only image
+// layers in parentheses. The suffix is guarded on 'SizeRootFs > 0', so a zero total renders as the
+// writable size alone; the daemon reports zero both when the size was not requested and when there
+// is no parent layer to measure.
 std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs)
 {
     const auto writable = FormatHumanReadableSize(static_cast<uint64_t>(std::max<LONGLONG>(SizeRw, 0)), c_statsIoPrecision);
