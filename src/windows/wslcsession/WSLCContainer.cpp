@@ -1333,7 +1333,9 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         auto lifecycleLock = m_lifecycleLock.lock_shared();
         auto lock = m_lock.lock_exclusive();
 
-        WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop, /* waitForRestart */ !RestartPhase);
+        // Kill is the escape hatch when a restart's stop phase is stuck, so it must not wait on the very
+        // restart it is meant to unblock.
+        WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop, /* waitForRestart */ !RestartPhase && !Kill);
 
         transition = m_transition;
         WI_ASSERT(!transition || transition->Kind == TransitionKind::Stop);
