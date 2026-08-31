@@ -311,10 +311,36 @@ std::string wsl::windows::common::timestamp::Rfc3339ToUtcDisplayTime(std::string
     return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
 }
 
-std::wstring wsl::windows::common::timestamp::FormatElapsedSeconds(LONGLONG elapsedSeconds)
+namespace {
+
+enum class ElapsedUnit
+{
+    LessThanASecond,
+    OneSecond,
+    Seconds,
+    AboutAMinute,
+    Minutes,
+    AboutAnHour,
+    Hours,
+    Days,
+    Weeks,
+    Months,
+    Years,
+};
+
+struct ElapsedDuration
+{
+    ElapsedUnit Unit;
+    LONGLONG Count;
+};
+
+} // namespace
+
+// Buckets an elapsed duration using the thresholds docker applies in go-units HumanDuration. The
+// localized and invariant renderings share this so the two can only differ in wording.
+static ElapsedDuration ClassifyElapsedSeconds(LONGLONG elapsedSeconds)
 {
     using namespace std::chrono_literals;
-    using wsl::shared::Localization;
 
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
@@ -325,51 +351,117 @@ std::wstring wsl::windows::common::timestamp::FormatElapsedSeconds(LONGLONG elap
 
     if (elapsed < 1)
     {
-        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
+        return {ElapsedUnit::LessThanASecond, 0};
     }
     else if (elapsed == 1)
     {
-        return Localization::WSLCCLI_RelativeTimeOneSecond();
+        return {ElapsedUnit::OneSecond, 1};
     }
     else if (elapsed < SecondsPerMinute)
     {
-        return Localization::WSLCCLI_RelativeTimeSeconds(elapsed);
+        return {ElapsedUnit::Seconds, elapsed};
     }
 
     const auto minutes = elapsed / SecondsPerMinute;
     if (minutes == 1)
     {
-        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
+        return {ElapsedUnit::AboutAMinute, 1};
     }
     else if (minutes < MinutesPerHour)
     {
-        return Localization::WSLCCLI_RelativeTimeMinutes(minutes);
+        return {ElapsedUnit::Minutes, minutes};
     }
 
     // Rounded to the nearest hour rather than truncated.
     const auto hours = (elapsed + (SecondsPerHour / 2)) / SecondsPerHour;
     if (hours == 1)
     {
-        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
+        return {ElapsedUnit::AboutAnHour, 1};
     }
     else if (hours < HoursPerDay * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeHours(hours);
+        return {ElapsedUnit::Hours, hours};
     }
     else if (hours < HoursPerDay * 7 * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeDays(hours / HoursPerDay);
+        return {ElapsedUnit::Days, hours / HoursPerDay};
     }
     else if (hours < HoursPerDay * 30 * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeWeeks(hours / HoursPerDay / 7);
+        return {ElapsedUnit::Weeks, hours / HoursPerDay / 7};
     }
     else if (hours < HoursPerDay * 365 * 2)
     {
-        return Localization::WSLCCLI_RelativeTimeMonths(hours / HoursPerDay / 30);
+        return {ElapsedUnit::Months, hours / HoursPerDay / 30};
     }
 
-    return Localization::WSLCCLI_RelativeTimeYears(elapsed / SecondsPerHour / HoursPerDay / 365);
+    return {ElapsedUnit::Years, elapsed / SecondsPerHour / HoursPerDay / 365};
+}
+
+std::wstring wsl::windows::common::timestamp::FormatElapsedSeconds(LONGLONG elapsedSeconds)
+{
+    using wsl::shared::Localization;
+
+    const auto [unit, count] = ClassifyElapsedSeconds(elapsedSeconds);
+    switch (unit)
+    {
+    case ElapsedUnit::LessThanASecond:
+        return Localization::WSLCCLI_RelativeTimeLessThanASecond();
+    case ElapsedUnit::OneSecond:
+        return Localization::WSLCCLI_RelativeTimeOneSecond();
+    case ElapsedUnit::Seconds:
+        return Localization::WSLCCLI_RelativeTimeSeconds(count);
+    case ElapsedUnit::AboutAMinute:
+        return Localization::WSLCCLI_RelativeTimeAboutAMinute();
+    case ElapsedUnit::Minutes:
+        return Localization::WSLCCLI_RelativeTimeMinutes(count);
+    case ElapsedUnit::AboutAnHour:
+        return Localization::WSLCCLI_RelativeTimeAboutAnHour();
+    case ElapsedUnit::Hours:
+        return Localization::WSLCCLI_RelativeTimeHours(count);
+    case ElapsedUnit::Days:
+        return Localization::WSLCCLI_RelativeTimeDays(count);
+    case ElapsedUnit::Weeks:
+        return Localization::WSLCCLI_RelativeTimeWeeks(count);
+    case ElapsedUnit::Months:
+        return Localization::WSLCCLI_RelativeTimeMonths(count);
+    case ElapsedUnit::Years:
+        return Localization::WSLCCLI_RelativeTimeYears(count);
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+}
+
+std::wstring wsl::windows::common::timestamp::FormatInvariantElapsedSeconds(LONGLONG elapsedSeconds)
+{
+    const auto [unit, count] = ClassifyElapsedSeconds(elapsedSeconds);
+    switch (unit)
+    {
+    case ElapsedUnit::LessThanASecond:
+        return L"Less than a second ago";
+    case ElapsedUnit::OneSecond:
+        return L"1 second ago";
+    case ElapsedUnit::Seconds:
+        return std::format(L"{} seconds ago", count);
+    case ElapsedUnit::AboutAMinute:
+        return L"About a minute ago";
+    case ElapsedUnit::Minutes:
+        return std::format(L"{} minutes ago", count);
+    case ElapsedUnit::AboutAnHour:
+        return L"About an hour ago";
+    case ElapsedUnit::Hours:
+        return std::format(L"{} hours ago", count);
+    case ElapsedUnit::Days:
+        return std::format(L"{} days ago", count);
+    case ElapsedUnit::Weeks:
+        return std::format(L"{} weeks ago", count);
+    case ElapsedUnit::Months:
+        return std::format(L"{} months ago", count);
+    case ElapsedUnit::Years:
+        return std::format(L"{} years ago", count);
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
 }
 
 std::wstring wsl::windows::common::timestamp::FormatRelativeTime(LONGLONG timestamp)
@@ -380,4 +472,14 @@ std::wstring wsl::windows::common::timestamp::FormatRelativeTime(LONGLONG timest
     }
 
     return FormatElapsedSeconds(static_cast<LONGLONG>(std::time(nullptr)) - timestamp);
+}
+
+std::wstring wsl::windows::common::timestamp::FormatInvariantRelativeTime(LONGLONG timestamp)
+{
+    if (timestamp == 0)
+    {
+        return {};
+    }
+
+    return FormatInvariantElapsedSeconds(static_cast<LONGLONG>(std::time(nullptr)) - timestamp);
 }
