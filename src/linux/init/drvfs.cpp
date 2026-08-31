@@ -235,7 +235,7 @@ Return Value:
     }
 }
 
-std::pair<std::string, std::string> ConvertDrvfsMountOptionsToPlan9(std::string_view Options, const wsl::linux::WslDistributionConfig& Config)
+std::pair<std::string, std::string> ConvertDrvfsMountOptionsToPlan9(std::string_view Options, const wsl::linux::WslDistributionConfig& Config, bool PropagateHostReadOnlyOption)
 
 /*++
 
@@ -247,6 +247,10 @@ Routine Description:
 Arguments:
 
     Options - Supplies the DrvFs mount options.
+
+    Config - Supplies the distribution configuration.
+
+    PropagateHostReadOnlyOption - Supplies whether the read-only option should be propagated to the host share.
 
 Return Value:
 
@@ -264,7 +268,11 @@ Return Value:
         auto Option = UtilStringNextToken(Options, ",");
         if (Option == "ro")
         {
-            Plan9Options += ";ro";
+            if (PropagateHostReadOnlyOption)
+            {
+                Plan9Options += ";ro";
+            }
+
             StandardOptions += "ro,";
         }
         else if (
@@ -666,7 +674,7 @@ try
     //
 
     std::string MountOptions = "cache=mmap,";
-    auto ParsedOptions = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config);
+    auto ParsedOptions = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config, false);
     Plan9Options += ParsedOptions.first;
     MountOptions += ParsedOptions.second;
 
@@ -732,7 +740,7 @@ try
     //      behavior when creating virtiofs shares on the host.
     //
 
-    auto [Plan9Options, MountOptions] = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config);
+    auto [Plan9Options, MountOptions] = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config, true);
 
     //
     // Construct a request to add a virtiofs share.
