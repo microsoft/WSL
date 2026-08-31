@@ -29,16 +29,12 @@ namespace wsl::windows::wslc {
 using namespace wsl::windows::wslc::execution;
 
 namespace {
-    using OptionalBool = std::optional<bool>;
-    using OptionalLimit = std::optional<argument::Limit>;
-    using OptionalString = std::optional<std::wstring>;
-
     struct ArgumentOverrides
     {
-        OptionalString Alias;
-        OptionalBool Required;
-        OptionalLimit Limit;
-        OptionalString Description;
+        std::optional<std::wstring> Alias;
+        std::optional<bool> Required;
+        std::optional<argument::Limit> Limit;
+        std::optional<std::wstring> Description;
     };
 
     Argument CreateArgument(ArgType type, ArgumentOverrides overrides)
@@ -65,12 +61,12 @@ namespace {
     }
 } // namespace
 
-Argument Argument::Create(ArgType type, OptionalBool required, OptionalLimit limit, OptionalString desc)
+Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
 {
     return CreateArgument(type, {.Required = std::move(required), .Limit = std::move(limit), .Description = std::move(desc)});
 }
 
-Argument Argument::Create(ArgType type, std::wstring alias, OptionalBool required, OptionalLimit limit, OptionalString desc)
+Argument Argument::Create(ArgType type, std::wstring alias, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
 {
     return CreateArgument(
         type,
