@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "ArgMap.h"
 
+#include <optional>
 #include <string>
 
 #define WSLC_CLI_ARG_ID_CHAR L'-'
