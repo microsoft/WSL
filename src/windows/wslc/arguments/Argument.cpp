@@ -30,6 +30,8 @@ using namespace wsl::windows::wslc::execution;
 
 Argument Argument::Create(ArgType type, ArgumentOverrides overrides)
 {
+    WI_ASSERT(!overrides.Name.has_value() || overrides.Name->size() >= 2);
+
     switch (type)
     {
 #define WSLC_ARG_CREATE_CASE(EnumName, DefaultName, DefaultAlias, ArgumentKind, ConvertedType, DefaultDesc) \
