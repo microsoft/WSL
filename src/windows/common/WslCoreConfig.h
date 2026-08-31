@@ -32,9 +32,8 @@ Abstract:
         T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
         T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
         T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
-        T_VALUE(c, EphemeralPortRangeSize), \
-        T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
-        T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
+        T_VALUE(c, EphemeralPortRangeSize), T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), \
+        T_VALUE(c, SwiotlbSizeBytes), T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
 
 namespace wsl::core {
 constexpr auto ToString(ConfigKeyPresence key)
