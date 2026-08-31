@@ -88,7 +88,6 @@ std::vector<Argument> RootCommand::GetEnvArguments() const
 {
     return {
         Argument::Create(ArgType::NoColor),
-        Argument::Create(ArgType::Session),
     };
 }
 

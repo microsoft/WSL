@@ -105,8 +105,9 @@ class WSLCCLIEnvironmentOptionsUnitTests
     {
         m_session->Set(L"env-session");
 
+        RootCommand root;
         ArgMap target;
-        ApplyEnvironmentOptions(target, SessionDefs());
+        ApplyEnvironmentOptions(target, root.GetGlobalsAndEnvArguments());
 
         VERIFY_IS_TRUE(target.Contains(ArgType::Session));
         VERIFY_ARE_EQUAL(std::wstring(L"env-session"), target.GetValue<ArgType::Session>());
