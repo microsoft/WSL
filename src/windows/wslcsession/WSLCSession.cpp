@@ -1903,7 +1903,7 @@ try
         return it == containersByImage.end() ? 0LL : it->second;
     };
 
-    // Rows are grouped the way docker's image formatter groups them: an image is reported once per
+    // Rows are grouped by repository: an image is reported once per
     // repository it belongs to, tagged repositories emit one row per tag, and when digests are
     // requested each of those rows is repeated once per digest of that repository. A repository that
     // is only referenced by digest is reported with no tag, and an image with neither tags nor
@@ -1949,7 +1949,7 @@ try
             const auto it = digestsByRepo.find(repoName);
             taggedRepos.insert(std::move(repoName));
 
-            // The digest is only reported when it was requested, matching docker.
+            // The digest is only reported when it was requested.
             if (it == digestsByRepo.end() || !digests)
             {
                 rows.push_back({&e, tag, std::string{}});

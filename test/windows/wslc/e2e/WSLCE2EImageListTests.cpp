@@ -479,7 +479,7 @@ class WSLCE2EImageListTests
         const auto lines = result.GetStdoutLines();
         VERIFY_IS_FALSE(lines.empty());
 
-        // Matches docker's `--digests` table: REPOSITORY TAG DIGEST IMAGE ID CREATED SIZE.
+        // The `--digests` table: REPOSITORY TAG DIGEST IMAGE ID CREATED SIZE.
         const auto& header = lines[0];
         const auto tag = header.find(L"TAG");
         const auto digest = header.find(L"DIGEST");
@@ -514,11 +514,11 @@ class WSLCE2EImageListTests
 
         const auto debian = wsl::shared::string::WideToMultiByte(DebianImage.Name);
 
-        // Matches docker: the digest is only reported when --digests is passed. json output does
-        // not imply it, because docker gates on the flag or an explicit {{.Digest}} in the format.
+        // The digest is only reported when --digests is passed. json output does
+        // not imply it, because reporting is gated on the flag or an explicit {{.Digest}} in the format.
         VERIFY_ARE_EQUAL(std::string{c_none}, digestFor(L"image list --format json", debian));
 
-        // The test images are loaded from a tarball, so like docker they carry no repo digest and
+        // The test images are loaded from a tarball, so they carry no repo digest and
         // report "<none>" even when digests are requested. Anything reported must be a bare digest.
         const auto digest = digestFor(L"image list --digests --format json", debian);
         VERIFY_ARE_NOT_EQUAL(std::string{}, digest, L"Debian image was missing from `image list --digests --format json`");
@@ -556,7 +556,7 @@ class WSLCE2EImageListTests
 
         const auto digestRows = ParseNdjsonOutputAs<ImageOutputInformation>(result);
 
-        // Matches docker's formatter: a tag carrying several digests is emitted once per digest, so
+        // A tag carrying several digests is emitted once per digest, so
         // rows stay unique per repository, tag and digest while the image ID repeats across them.
         std::map<std::pair<std::string, std::string>, std::string> idByRepoTag;
         std::set<std::tuple<std::string, std::string, std::string>> seen;
@@ -590,7 +590,7 @@ class WSLCE2EImageListTests
         const auto result = RunWslc(L"image list --digests --quiet");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Matches docker: --quiet wins, so no digest or header is emitted.
+        // --quiet wins, so no digest or header is emitted.
         VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"DIGEST"));
         VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"sha256:"));
 

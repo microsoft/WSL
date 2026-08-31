@@ -41,7 +41,7 @@ class WSLCCLIImageDigestUnitTests
         return true;
     }
 
-    // Test: A repo digest is reduced to the digest docker displays.
+    // Test: A repo digest is reduced to the digest that is displayed.
     TEST_METHOD(DigestFromRepoDigest_StripsRepositoryPrefix)
     {
         constexpr std::string_view digest = "sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b";

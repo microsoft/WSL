@@ -228,7 +228,7 @@ void ListImages(CLIExecutionContext& context)
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
         constexpr ColumnWidthConfig c_imageId{.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink};
 
-        // Matches docker: DIGEST sits between TAG and IMAGE ID. The column is always declared, and is
+        // The DIGEST column sits between TAG and IMAGE ID. The column is always declared, and is
         // left empty and hidden unless --digests was passed.
         constexpr size_t c_digestColumn = 2;
         const bool digests = context.Args.GetValue<ArgType::Digests>();

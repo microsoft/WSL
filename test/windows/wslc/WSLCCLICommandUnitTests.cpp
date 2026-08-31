@@ -149,7 +149,7 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // Test: Verify image list exposes --digests with no short alias, matching docker
+    // Test: Verify image list exposes --digests with no short alias
     TEST_METHOD(ImageListCommand_HasDigestsArgument)
     {
         const std::pair<std::wstring, std::vector<Argument>> spellings[] = {
