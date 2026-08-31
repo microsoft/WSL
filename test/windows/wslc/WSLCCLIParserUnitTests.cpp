@@ -675,7 +675,7 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_TRUE(ParseFlags(L"wslc -x", customAlias).GetValue<ArgType::Quiet>());
         VERIFY_THROWS(ParseFlags(L"wslc -q", customAlias), ArgumentException);
 
-        const std::vector<Argument> noAlias{Argument::Create(ArgType::Quiet, NO_ALIAS)};
+        const std::vector<Argument> noAlias{Argument::Create(ArgType::Quiet, std::wstring{NO_ALIAS})};
         VERIFY_IS_TRUE(ParseFlags(L"wslc --quiet", noAlias).GetValue<ArgType::Quiet>());
         VERIFY_THROWS(ParseFlags(L"wslc -q", noAlias), ArgumentException);
     }

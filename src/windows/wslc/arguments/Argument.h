@@ -21,10 +21,7 @@ Abstract:
 #define WSLC_CLI_ARG_SPLIT_CHAR L'='
 #define WSLC_CLI_HELP_ARG L"?"
 #define WSLC_CLI_HELP_ARG_STRING WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
-#define NO_ALIAS \
-    std::wstring \
-    { \
-    }
+#define NO_ALIAS L""
 
 using namespace wsl::windows::wslc::argument;
 

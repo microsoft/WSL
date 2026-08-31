@@ -29,8 +29,19 @@ namespace wsl::windows::wslc {
 using namespace wsl::windows::wslc::execution;
 
 namespace {
-    Argument CreateArgument(
-        ArgType type, std::optional<std::wstring> alias, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
+    using OptionalBool = std::optional<bool>;
+    using OptionalLimit = std::optional<argument::Limit>;
+    using OptionalString = std::optional<std::wstring>;
+
+    struct ArgumentOverrides
+    {
+        OptionalString Alias;
+        OptionalBool Required;
+        OptionalLimit Limit;
+        OptionalString Description;
+    };
+
+    Argument CreateArgument(ArgType type, ArgumentOverrides overrides)
     {
         switch (type)
         {
@@ -39,11 +50,11 @@ namespace {
         return Argument{ \
             type, \
             L##Name, \
-            alias.has_value() ? std::move(alias.value()) : std::wstring{DefaultAlias}, \
-            desc.has_value() ? std::move(desc.value()) : std::wstring(Desc), \
+            overrides.Alias.has_value() ? std::move(overrides.Alias.value()) : std::wstring{DefaultAlias}, \
+            overrides.Description.has_value() ? std::move(overrides.Description.value()) : std::wstring(Desc), \
             ArgumentKind, \
-            required.value_or(Argument::DefaultRequired), \
-            limit.value_or(Argument::DefaultLimit)};
+            overrides.Required.value_or(Argument::DefaultRequired), \
+            overrides.Limit.value_or(Argument::DefaultLimit)};
 
             WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE
@@ -54,14 +65,21 @@ namespace {
     }
 } // namespace
 
-Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
+Argument Argument::Create(ArgType type, OptionalBool required, OptionalLimit limit, OptionalString desc)
 {
-    return CreateArgument(type, std::nullopt, std::move(required), std::move(limit), std::move(desc));
+    return CreateArgument(type, {.Required = std::move(required), .Limit = std::move(limit), .Description = std::move(desc)});
 }
 
-Argument Argument::Create(ArgType type, std::wstring alias, std::optional<bool> required, std::optional<argument::Limit> limit, std::optional<std::wstring> desc)
+Argument Argument::Create(ArgType type, std::wstring alias, OptionalBool required, OptionalLimit limit, OptionalString desc)
 {
-    return CreateArgument(type, std::move(alias), std::move(required), std::move(limit), std::move(desc));
+    return CreateArgument(
+        type,
+        {
+            .Alias = std::move(alias),
+            .Required = std::move(required),
+            .Limit = std::move(limit),
+            .Description = std::move(desc),
+        });
 }
 
 // Retrieves the usage string of the Argument, based on its Alias and Name.

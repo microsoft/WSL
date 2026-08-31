@@ -74,7 +74,7 @@ class WSLCCLIArgumentUnitTests
         const auto defaultAlias = Argument::Create(ArgType::Quiet);
         VERIFY_ARE_EQUAL(std::wstring{L"q"}, defaultAlias.Alias());
 
-        const auto noAlias = Argument::Create(ArgType::Quiet, NO_ALIAS);
+        const auto noAlias = Argument::Create(ArgType::Quiet, std::wstring{NO_ALIAS});
         VERIFY_IS_TRUE(noAlias.Alias().empty());
         VERIFY_ARE_EQUAL(defaultAlias.Description(), noAlias.Description());
 
