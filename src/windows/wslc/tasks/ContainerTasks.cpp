@@ -55,9 +55,8 @@ std::string FormatStatsIo(uint64_t Bytes)
     return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
-// Matches docker's ps SIZE column: the writable layer on its own, and the total including the
+// Formats the SIZE column: the writable layer on its own, and the total including the
 // read-only image layers in parentheses when the daemon reported one.
-// (docker/cli cli/command/formatter/container.go, ContainerContext.Size).
 std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs)
 {
     const auto writable = FormatHumanReadableSize(static_cast<uint64_t>(std::max<LONGLONG>(SizeRw, 0)), c_statsIoPrecision);

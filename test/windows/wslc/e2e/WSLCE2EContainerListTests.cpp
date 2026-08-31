@@ -202,7 +202,7 @@ class WSLCE2EContainerListTests
         VERIFY_IS_TRUE(sizedLine.has_value());
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, sizedLine->find(L"(virtual "));
 
-        // -s is the docker alias and produces the same column.
+        // -s is the short alias and produces the same column.
         auto aliasResult = RunWslc(L"container list -s");
         aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(HeaderHasColumn(aliasResult, Localization::WSLCCLI_TableHeaderSize()));
@@ -226,7 +226,7 @@ class WSLCE2EContainerListTests
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
-        // --quiet wins over --size, exactly as docker does.
+        // --quiet wins over --size.
         result = RunWslc(L"container list --all --quiet --size");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));

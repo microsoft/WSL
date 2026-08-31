@@ -245,27 +245,6 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // docker ps takes --size/-s (docker/cli cli/command/container/list.go:
-    // flags.BoolVarP(&options.size, "size", "s", false, "Display total file sizes")).
-    TEST_METHOD(ContainerListCommand_HasSizeArgumentWithDockerAlias)
-    {
-        const auto args = ContainerListCommand(L"container").GetArguments();
-
-        bool found = false;
-        for (const auto& arg : args)
-        {
-            if (arg.Type() == argument::ArgType::Size)
-            {
-                found = true;
-                VERIFY_ARE_EQUAL(std::wstring(L"size"), arg.Name());
-                VERIFY_ARE_EQUAL(std::wstring(L"s"), arg.Alias());
-                VERIFY_IS_TRUE(arg.Kind() == argument::Kind::Flag);
-            }
-        }
-
-        VERIFY_IS_TRUE(found, L"container list does not register --size");
-    }
-
     // Walk every command in the root tree and verify no argument collisions.
     TEST_METHOD(AllCommands_NoAmbiguousArgumentNamesOrAliases)
     {
