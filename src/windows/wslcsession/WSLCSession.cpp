@@ -2318,9 +2318,8 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
     try
     {
         std::unique_lock containersLock{m_containersLock};
-        std::unique_lock networksLock{m_networksLock};
-
         WaitForConflictingCreateToComplete(containersLock);
+        std::unique_lock networksLock{m_networksLock};
 
         // Generate a unique container name if the user didn't provide one.
         std::string containerName;

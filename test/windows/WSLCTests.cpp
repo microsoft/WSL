@@ -6931,7 +6931,7 @@ class WSLCTests
         const LONGLONG until = now() + 1;
         std::vector<wsl::windows::common::wslc_schema::Event> lifecycleEvents;
 
-        // The container's create, start, kill then stop events are reported in order, each carrying
+        // The container's create, start, kill, stop, then destroy events are reported in order, each carrying
         // the container's 64-hex id as the actor.
         {
             WSLCFilter filter{"container", id.c_str()};
@@ -6943,11 +6943,11 @@ class WSLCTests
 
             // The whole lifecycle falls inside the requested window.
             VERIFY_IS_TRUE(lifecycleEvents[0].time >= since);
-            VERIFY_IS_TRUE(lifecycleEvents[4].time <= until);
+            VERIFY_IS_TRUE(lifecycleEvents[4].time < until);
         }
 
         // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
-        // the container filter, returns exactly that one event out of the four recorded above.
+        // the container filter, returns exactly that one event out of the five recorded above.
         auto verifyEventFilter = [&](const char* action) {
             WSLCFilter filters[]{{"container", id.c_str()}, {"event", action}};
             wil::com_ptr<IWSLCEventStream> stream;
@@ -6960,6 +6960,7 @@ class WSLCTests
         verifyEventFilter("start");
         verifyEventFilter("kill");
         verifyEventFilter("stop");
+        verifyEventFilter("destroy");
 
         // Image events are not recorded yet, so a 'type=image' filter excludes the container's
         // events and leaves the stream empty.

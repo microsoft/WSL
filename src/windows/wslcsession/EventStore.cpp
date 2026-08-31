@@ -197,7 +197,7 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         // ordering key, so an event past Until cannot prove that every later event is also past it.
         SequenceNumber.value()++;
 
-        if (Until.has_value() && eventTime > Until.value())
+        if (Until.has_value() && eventTime >= Until.value())
         {
             continue;
         }

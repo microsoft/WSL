@@ -28,7 +28,7 @@ public:
     Microsoft::WRL::ComPtr<IWSLCEventStream> CreateStream(
         Microsoft::WRL::ComPtr<WSLCSession> Session, int64_t SinceTime, int64_t UntilTime, std::map<std::string, std::vector<std::string>> Filters);
 
-    // Returns the next event at or after SequenceNumber that falls within [Since, Until] and matches
+    // Returns the next event at or after SequenceNumber that falls within [Since, Until) and matches
     // Filters, advancing SequenceNumber past it. A nullopt SequenceNumber starts a fresh reader at the
     // oldest buffered event (no gap is reported). If the reader has since fallen behind the ring,
     // resyncs SequenceNumber to the oldest buffered event and throws WSLC_E_EVENTS_LOST. Returns
@@ -45,8 +45,8 @@ private:
     void Append(wsl::windows::common::wslc_schema::Event Event);
 
     // Blocks until the event at SequenceNumber is buffered, its slot is evicted, or the session
-    // terminates. Returns false only when Until (Unix seconds) elapsed with no event ready. Throws
-    // E_ABORT if the session terminated while waiting.
+    // terminates. Returns false only when Until elapsed with no event ready. Throws E_ABORT if the
+    // session terminated while waiting.
     bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until);
 
     std::optional<wsl::windows::common::wslc_schema::Event> GetLockHeld(uint64_t SequenceNumber);
