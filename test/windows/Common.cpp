@@ -1647,7 +1647,8 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
 
     if (Default.ephemeralPortRangeSize.has_value())
     {
-        newConfig += L"\n[experimental]\nephemeralPortRangeSize=" + std::to_wstring(*Default.ephemeralPortRangeSize) + L"\n[wsl2]\n";
+        newConfig +=
+            L"\n[experimental]\nephemeralPortRangeSize=" + std::to_wstring(*Default.ephemeralPortRangeSize) + L"\n[wsl2]\n";
     }
 
     if (Default.virtioFsAggregateShares.has_value())

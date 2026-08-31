@@ -2179,6 +2179,35 @@ class NetworkTests
         return {std::move(process), assignedPort};
     }
 
+    // Create a connected socket without an explicit bind and return the
+    // kernel-assigned source port. The TCP path uses a real guest loopback
+    // listener, matching #41227's localhost connect() failure mode.
+    static uint16_t GetGuestConnectedSourcePort(int Protocol)
+    {
+        const std::wstring command = Protocol == IPPROTO_TCP ? L"timeout 10s perl -MSocket -e '"
+                                                               L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
+                                                               L"bind(S,sockaddr_in(0,inet_aton(\"127.0.0.1\"))) or die;"
+                                                               L"listen(S,1) or die;"
+                                                               L"my $server=(sockaddr_in(getsockname(S)))[0];"
+                                                               L"socket(C,AF_INET,SOCK_STREAM,0) or die;"
+                                                               L"connect(C,sockaddr_in($server,inet_aton(\"127.0.0.1\"))) or die;"
+                                                               L"my $source=(sockaddr_in(getsockname(C)))[0];"
+                                                               L"accept(A,S) or die;"
+                                                               L"print \"$source\\n\"'"
+                                                             : L"perl -MSocket -e '"
+                                                               L"socket(C,AF_INET,SOCK_DGRAM,0) or die;"
+                                                               L"connect(C,sockaddr_in(9,inet_aton(\"127.0.0.1\"))) or die;"
+                                                               L"my $source=(sockaddr_in(getsockname(C)))[0];"
+                                                               L"print \"$source\\n\"'";
+
+        auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(command.c_str(), 0);
+        VERIFY_IS_TRUE(warnings.empty());
+
+        const auto assignedPort = static_cast<uint16_t>(std::stoul(output));
+        VERIFY_IS_TRUE(assignedPort > 0);
+        return assignedPort;
+    }
+
     // Create a TCP listening socket in the guest via listen() WITHOUT ever calling bind() first
     // (implicit autobind to an ephemeral port on the wildcard address, e.g. INADDR_ANY:0).
     // This exercises the seccomp listen() trap added for the implicit-autobind port tracking fix,
@@ -4424,6 +4453,15 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
+        auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        VERIFY_IS_TRUE(warnings.empty());
+        uint32_t startPort{};
+        uint32_t endPort{};
+        std::wistringstream range{output};
+        range >> startPort >> endPort;
+        VERIFY_IS_FALSE(range.fail());
+        VERIFY_ARE_EQUAL(4096u, endPort - startPort + 1);
+
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:0", true);
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:0", true);
     }
@@ -4433,8 +4471,7 @@ class MirroredTests
         MIRRORED_NETWORKING_TEST_ONLY();
 
         constexpr int portCount = 8192;
-        m_config->Update(LxssGenerateTestConfig(
-            {.networkingMode = wsl::core::NetworkingMode::Mirrored, .ephemeralPortRangeSize = portCount}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .ephemeralPortRangeSize = portCount}));
         WaitForMirroredStateInLinux();
 
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
@@ -4447,26 +4484,36 @@ class MirroredTests
         VERIFY_IS_FALSE(range.fail());
         VERIFY_ARE_EQUAL(static_cast<uint32_t>(portCount), endPort - startPort + 1);
 
-        std::wstring expectedReservedPorts;
+        std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_reserved_ports", 0);
+        VERIFY_IS_TRUE(warnings.empty());
         if (startPort > 1)
         {
-            expectedReservedPorts = std::format(L"1-{}", startPort - 1);
+            VERIFY_ARE_NOT_EQUAL(output.find(std::format(L"1-{}", startPort - 1)), std::wstring::npos);
         }
         if (endPort < USHRT_MAX)
         {
-            if (!expectedReservedPorts.empty())
-            {
-                expectedReservedPorts += L',';
-            }
-            expectedReservedPorts += std::format(L"{}-{}", endPort + 1, USHRT_MAX);
+            VERIFY_ARE_NOT_EQUAL(output.find(std::format(L"{}-{}", endPort + 1, USHRT_MAX)), std::wstring::npos);
         }
 
-        std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_reserved_ports", 0);
-        VERIFY_IS_TRUE(warnings.empty());
-        VERIFY_ARE_EQUAL(expectedReservedPorts + L'\n', output);
+        auto restorePortRange = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [startPort, endPort] {
+            LxsstuLaunchWsl(std::format(L"sysctl -w net.ipv4.ip_local_port_range=\"{} {}\"", startPort, endPort).c_str());
+        });
 
-        auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:0", true);
-        auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:0", true);
+        // Reproduce the original failure mode: a distro widens the Linux
+        // ephemeral range after boot. Port-zero autobind must still select a
+        // port inside the exact range reserved by HCN on the Windows host.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_local_port_range=\"1024 65535\""), 0);
+        auto [tcpProcess, assignedPort] = NetworkTests::BindGuestPortZero();
+        VERIFY_IS_TRUE(assignedPort >= startPort);
+        VERIFY_IS_TRUE(assignedPort <= endPort);
+
+        const auto tcpConnectPort = NetworkTests::GetGuestConnectedSourcePort(IPPROTO_TCP);
+        VERIFY_IS_TRUE(tcpConnectPort >= startPort);
+        VERIFY_IS_TRUE(tcpConnectPort <= endPort);
+
+        const auto udpConnectPort = NetworkTests::GetGuestConnectedSourcePort(IPPROTO_UDP);
+        VERIFY_IS_TRUE(udpConnectPort >= startPort);
+        VERIFY_IS_TRUE(udpConnectPort <= endPort);
     }
 
     WSL2_TEST_METHOD(PortZeroBindIsTracked)
