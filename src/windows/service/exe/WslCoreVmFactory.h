@@ -4,7 +4,7 @@
 
 #include "IWslCoreVmFactory.h"
 
-class HcsWslCoreVmFactory final : public IWslCoreVmFactory
+class WslCoreVmFactory final : public IWslCoreVmFactory
 {
 public:
     std::unique_ptr<IWslCoreVm> Create(

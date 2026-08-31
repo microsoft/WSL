@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "HcsWslCoreVmFactory.h"
+#include "WslCoreVmFactory.h"
 #include "LxssSecurity.h"
 #include "LxssUserSessionFactory.h"
 #include "PluginManager.h"
@@ -229,7 +229,7 @@ std::weak_ptr<LxssUserSessionImpl> CreateInstanceForCurrentUser()
         if (!userSession)
         {
             userSession.reset(
-                new LxssUserSessionImpl(tokenInfo->User.Sid, sessionId, g_pluginManager, std::make_unique<HcsWslCoreVmFactory>()));
+                new LxssUserSessionImpl(tokenInfo->User.Sid, sessionId, g_pluginManager, std::make_unique<WslCoreVmFactory>()));
             g_sessions->emplace_back(userSession);
         }
     }
