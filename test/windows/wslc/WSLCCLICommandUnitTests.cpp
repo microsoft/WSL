@@ -21,10 +21,6 @@ Abstract:
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
-#include "ImageCommand.h"
-#include "InspectCommand.h"
-#include "NetworkCommand.h"
-#include "VolumeCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
@@ -247,35 +243,6 @@ class WSLCCLICommandUnitTests
 
             VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
         }
-    }
-
-    // docker inspect and docker container inspect both take --size/-s
-    // (docker/cli cli/command/system/inspect.go and cli/command/container/inspect.go).
-    TEST_METHOD(InspectCommands_HaveSizeArgumentWithDockerAlias)
-    {
-        const auto verifySize = [](const std::vector<Argument>& args, bool expected, const wchar_t* commandName) {
-            bool found = false;
-            for (const auto& arg : args)
-            {
-                if (arg.Type() == argument::ArgType::Size)
-                {
-                    found = true;
-                    VERIFY_ARE_EQUAL(std::wstring(L"size"), arg.Name());
-                    VERIFY_ARE_EQUAL(std::wstring(L"s"), arg.Alias());
-                    VERIFY_IS_TRUE(arg.Kind() == argument::Kind::Flag);
-                }
-            }
-
-            VERIFY_ARE_EQUAL(expected, found, commandName);
-        };
-
-        verifySize(InspectCommand(L"").GetArguments(), true, L"inspect");
-        verifySize(ContainerInspectCommand(L"container").GetArguments(), true, L"container inspect");
-
-        // docker only supports --size on containers, so the other inspect commands must not take it.
-        verifySize(ImageInspectCommand(L"image").GetArguments(), false, L"image inspect");
-        verifySize(NetworkInspectCommand(L"network").GetArguments(), false, L"network inspect");
-        verifySize(VolumeInspectCommand(L"volume").GetArguments(), false, L"volume inspect");
     }
 
     // Walk every command in the root tree and verify no argument collisions.

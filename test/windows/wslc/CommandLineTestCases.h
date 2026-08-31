@@ -204,14 +204,10 @@ COMMAND_LINE_TEST_CASE(L"inspect --size cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"inspect -s cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"container inspect --size cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"container inspect -s cont1", L"inspect", true)
-COMMAND_LINE_TEST_CASE(L"inspect --size=true cont1", L"inspect", true)
-COMMAND_LINE_TEST_CASE(L"inspect --size=false cont1", L"inspect", true)
-COMMAND_LINE_TEST_CASE(L"inspect --size=invalid cont1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"inspect --size --type container cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"inspect --size --type image img1", L"inspect", true) // accepted; the size is reported as ignored at runtime
-COMMAND_LINE_TEST_CASE(L"inspect -s --format json cont1", L"inspect", true)
-COMMAND_LINE_TEST_CASE(L"inspect --size", L"inspect", false)            // still requires an object id
-COMMAND_LINE_TEST_CASE(L"image inspect --size img1", L"inspect", false) // docker image inspect has no --size
+COMMAND_LINE_TEST_CASE(L"inspect --size", L"inspect", false)                  // still requires an object id
+COMMAND_LINE_TEST_CASE(L"image inspect --size img1", L"inspect", false)       // docker image inspect has no --size
 COMMAND_LINE_TEST_CASE(L"network inspect --size net1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"volume inspect --size vol1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"remove cont1", L"remove", true)

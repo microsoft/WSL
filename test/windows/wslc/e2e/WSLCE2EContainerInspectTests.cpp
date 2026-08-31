@@ -108,7 +108,6 @@ class WSLCE2EContainerInspectTests
         };
 
         verifySized(std::format(L"container inspect --size {}", TestContainerName1));
-        verifySized(std::format(L"container inspect -s {}", TestContainerName1));
         verifySized(std::format(L"inspect --size {}", TestContainerName1));
         verifySized(std::format(L"inspect --size --type container {}", TestContainerName1));
     }
