@@ -20,7 +20,6 @@ Abstract:
 #include "filesystem.hpp"
 #include "LxssHttpProxy.h"
 #include "IWslCoreVm.h"
-#include "IWslCoreVmFactory.h"
 #include "PluginManager.h"
 #include "Lifetime.h"
 #include "DistributionRegistration.h"
@@ -316,11 +315,7 @@ private:
 class LxssUserSessionImpl : public std::enable_shared_from_this<LxssUserSessionImpl>
 {
 public:
-    LxssUserSessionImpl(
-        _In_ PSID userSid,
-        _In_ DWORD sessionId,
-        _Inout_ wsl::windows::service::PluginManager& pluginManager,
-        _In_ std::unique_ptr<IWslCoreVmFactory> VmFactory);
+    LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager);
     virtual ~LxssUserSessionImpl();
     LxssUserSessionImpl(const LxssUserSessionImpl&) = delete;
     LxssUserSessionImpl& operator=(const LxssUserSessionImpl&) = delete;
@@ -829,8 +824,6 @@ private:
     /// <summary>
     /// The running utility vm for WSL2 distributions.
     ///
-    std::unique_ptr<IWslCoreVmFactory> m_vmFactory;
-
     _Guarded_by_(m_instanceLock) std::unique_ptr<IWslCoreVm> m_utilityVm;
 
     std::atomic<GUID> m_vmId{GUID_NULL};

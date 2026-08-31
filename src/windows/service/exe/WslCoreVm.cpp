@@ -162,6 +162,13 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
     return newInstance;
 }
 
+void WslCoreVm::ForceTerminate(_In_ const GUID& VmId)
+{
+    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+    auto computeSystem = wsl::windows::common::hcs::OpenComputeSystem(vmId.c_str(), GENERIC_ALL);
+    wsl::windows::common::hcs::TerminateComputeSystem(computeSystem.get());
+}
+
 void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken)
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });

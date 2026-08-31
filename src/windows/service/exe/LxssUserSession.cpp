@@ -21,6 +21,7 @@ Abstract:
 #include "WslInstall.h"
 #include "WslCoreFilesystem.h"
 #include "WslCoreInstance.h"
+#include "WslCoreVm.h"
 #include "WslCoreVmDiskState.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
@@ -571,15 +572,9 @@ try
 }
 CATCH_RETURN()
 
-LxssUserSessionImpl::LxssUserSessionImpl(
-    _In_ PSID userSid,
-    _In_ DWORD sessionId,
-    _Inout_ wsl::windows::service::PluginManager& pluginManager,
-    _In_ std::unique_ptr<IWslCoreVmFactory> VmFactory) :
+LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager) :
     m_sessionId(sessionId), m_pluginManager(pluginManager)
 {
-    THROW_HR_IF(E_INVALIDARG, !VmFactory);
-    m_vmFactory = std::move(VmFactory);
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
     try
@@ -2215,7 +2210,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
             {
                 m_suppressVmTerminationCallback.store(true);
 
-                auto result = wil::ResultFromException([&]() { m_vmFactory->ForceTerminate(vmId); });
+                auto result = wil::ResultFromException([&]() { WslCoreVm::ForceTerminate(vmId); });
 
                 WSL_LOG("ForceTerminateVm", TraceLoggingValue(result, "Result"));
             }
@@ -2987,7 +2982,7 @@ void LxssUserSessionImpl::_CreateVm()
         };
 
         // Create the utility VM and register for callbacks.
-        m_utilityVm = m_vmFactory->Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
+        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
         if (m_httpProxyStateTracker)
         {

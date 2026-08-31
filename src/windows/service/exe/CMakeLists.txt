@@ -11,7 +11,6 @@ set(SOURCES
     BridgedNetworking.cpp
     GnsRpcServer.cpp
     GuestTelemetryLogger.cpp
-    WslCoreVmFactory.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
     LxssCreateProcess.cpp
@@ -42,10 +41,8 @@ set(HEADERS
     BridgedNetworking.h
     GnsRpcServer.h
     GuestTelemetryLogger.h
-    WslCoreVmFactory.h
     IMirroredNetworkManager.h
     IWslCoreVm.h
-    IWslCoreVmFactory.h
     Lifetime.h
     LxssConsoleManager.h
     LxssCreateProcess.h

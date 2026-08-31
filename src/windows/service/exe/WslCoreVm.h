@@ -49,6 +49,8 @@ public:
     static std::unique_ptr<WslCoreVm> Create(
         _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs);
 
+    static void ForceTerminate(_In_ const GUID& VmId);
+
     ~WslCoreVm() noexcept override;
 
     wil::unique_socket AcceptConnection(_In_ DWORD ReceiveTimeout = 0, _In_ const std::source_location& Location = std::source_location::current()) const;
