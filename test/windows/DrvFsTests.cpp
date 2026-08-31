@@ -529,10 +529,9 @@ public:
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs -o ro,umask=222 '{}' '{}'", testDir.string(), mountPoint)), 0);
 
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -n -o VFS-OPTIONS '{}'", mountPoint));
-        VERIFY_IS_TRUE(out.starts_with(L"ro"));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"findmnt -rn -M '{}' -O ro", mountPoint)), 0);
 
-        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/marker'", mountPoint));
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/marker'", mountPoint));
         VERIFY_ARE_EQUAL(wsl::shared::string::MultiByteToWide(expected), out);
 
         VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"touch '{}/write-test'", mountPoint)), 0);
