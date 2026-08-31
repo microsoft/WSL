@@ -164,9 +164,8 @@ struct InspectContainer
         InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
 };
 
-// Serializes a container inspect document, dropping the size fields when the daemon was not asked
-// to compute them. Docker only emits SizeRw and SizeRootFs when `inspect --size` is used, so the
-// keys are omitted entirely rather than reported as null.
+// Serializes a container inspect document. SizeRw and SizeRootFs are only populated when the
+// daemon was asked to compute them, so the keys are omitted entirely when they have no value.
 inline nlohmann::json ToInspectJson(const InspectContainer& container)
 {
     nlohmann::json document = container;

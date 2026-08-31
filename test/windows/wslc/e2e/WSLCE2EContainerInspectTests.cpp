@@ -84,7 +84,7 @@ class WSLCE2EContainerInspectTests
         auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Without --size the document must not carry the size fields, matching docker.
+        // Without --size the document must not carry the size fields.
         auto plain = RunWslc(std::format(L"container inspect {}", TestContainerName1));
         plain.Verify({.Stderr = L"", .ExitCode = 0});
         auto plainDocument = nlohmann::json::parse(WideToMultiByte(plain.Stdout.value()));

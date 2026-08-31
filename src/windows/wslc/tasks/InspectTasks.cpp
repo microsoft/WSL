@@ -84,7 +84,7 @@ void Inspect(CLIExecutionContext& context)
 
     const bool size = context.Args.GetValue<ArgType::Size>();
 
-    // Only containers carry file size information; docker warns and continues for everything else.
+    // Only containers carry file size information; every other type warns and continues.
     const auto warnSizeIgnored = [&](const wchar_t* objectType) {
         if (size)
         {

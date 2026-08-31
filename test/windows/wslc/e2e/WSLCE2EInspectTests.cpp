@@ -72,8 +72,7 @@ class WSLCE2EInspectTests
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_SizeIgnoredForNonContainerTypes)
     {
-        // docker prints a warning and inspects the object anyway when --size is used on something
-        // that has no file sizes.
+        // --size on an object with no file sizes warns and inspects the object anyway.
         auto result = RunWslc(std::format(L"inspect --size {}", DebianImage.NameAndTag()));
         result.Verify({.ExitCode = 0});
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"WARNING: --size ignored for image"));
