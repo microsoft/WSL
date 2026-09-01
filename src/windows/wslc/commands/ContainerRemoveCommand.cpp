@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerRemoveCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
+        Argument::Create(ArgType::ContainerId, {.Required = true, .Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Force),
         Argument::Create(ArgType::Volumes),
     };
