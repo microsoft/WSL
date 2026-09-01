@@ -1276,13 +1276,16 @@ class UnitTests
         VERIFY_ARE_EQUAL(
             out, FormatErrorMessage(L"Importing the distribution failed.", L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED"));
 
-        // lxcore.sys can close the stderr pipe before bsdtar's final newline is delivered.
-        if (err.ends_with(L'\n'))
+        constexpr auto expectedError = L"bsdtar: Error opening archive: Unrecognized archive format\n";
+        if (LxsstuVmMode())
         {
-            err.pop_back();
+            VERIFY_ARE_EQUAL(err, expectedError);
         }
-
-        VERIFY_ARE_EQUAL(err, L"bsdtar: Error opening archive: Unrecognized archive format");
+        else
+        {
+            // lxcore.sys can close the stderr pipe before bsdtar has finished writing.
+            VERIFY_IS_TRUE(std::wstring_view{expectedError}.starts_with(err));
+        }
     }
 
     TEST_METHOD(AppxDistroDeletion)
