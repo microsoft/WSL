@@ -1471,6 +1471,8 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
         m_restart = restart;
     }
 
+    // N.B. Nothing between here and restartCleanup below may throw — nothing clears m_restart until it
+    // is armed, and it must follow failureCleanup so it runs first (see the N.B. on OnFailedRestart).
     auto failureCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { OnFailedRestart(); });
 
     {
