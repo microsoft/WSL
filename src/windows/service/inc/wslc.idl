@@ -372,9 +372,17 @@ typedef struct _WSLCContainerEntry
 {
     char Name[WSLC_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
+    // The runtime imposes no bound on these values, so they are allocated by the callee and freed
+    // by the caller. Any of them may be null when the container reports no value.
+    [string] LPSTR Command;
+    [string] LPSTR Status;
+    [string] LPSTR Labels;
+    [string] LPSTR Networks;
+    [string] LPSTR Mounts;
     WSLCContainerId Id;
     LONGLONG StateChangedAt;
     LONGLONG CreatedAt;
+    ULONG LocalVolumes;
     WSLCContainerState State;
 } WSLCContainerEntry;
 

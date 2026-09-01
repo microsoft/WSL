@@ -14,7 +14,9 @@ Abstract:
 #pragma once
 #include "ArgMap.h"
 
+#include <optional>
 #include <string>
+#include <utility>
 
 #define WSLC_CLI_ARG_ID_CHAR L'-'
 #define WSLC_CLI_ARG_ID_STRING L"-"
@@ -26,6 +28,15 @@ Abstract:
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
+struct ArgumentOverrides
+{
+    std::optional<std::wstring> Name;
+    std::optional<std::wstring> Alias;
+    std::optional<bool> Required;
+    std::optional<argument::Limit> Limit;
+    std::optional<std::wstring> Desc;
+};
+
 // An argument to a command.
 struct Argument
 {
@@ -37,13 +48,13 @@ struct Argument
     // Full constructor with all parameters
     Argument(
         ArgType argType,
-        const std::wstring& name,
-        const std::wstring& alias,
-        const std::wstring& desc,
+        std::wstring name,
+        std::wstring alias,
+        std::wstring desc,
         argument::Kind kind = DefaultKind,
         bool required = DefaultRequired,
         argument::Limit limit = DefaultLimit) :
-        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_limit(limit)
+        m_argType(argType), m_name(std::move(name)), m_desc(std::move(desc)), m_alias(std::move(alias)), m_required(required), m_type(kind), m_limit(limit)
     {
     }
 
@@ -53,12 +64,8 @@ struct Argument
     Argument(Argument&&) = default;
     Argument& operator=(Argument&&) = default;
 
-    // Creates an argument with optional overrides for table defaults
-    static Argument Create(
-        ArgType type,
-        std::optional<bool> required = std::nullopt,
-        std::optional<argument::Limit> limit = std::nullopt,
-        std::optional<std::wstring> desc = std::nullopt);
+    // Creates an argument using its table defaults and any command-specific overrides.
+    static Argument Create(ArgType type, ArgumentOverrides overrides = {});
 
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;

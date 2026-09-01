@@ -58,7 +58,7 @@ class WSLCCLIExecutionUnitTests
     {
         RootCommand command;
         ArgMap args;
-        const std::vector<Argument> definitions{Argument::Create(ArgType::Password, true)};
+        const std::vector<Argument> definitions{Argument::Create(ArgType::Password, {.Required = true})};
 
         try
         {
