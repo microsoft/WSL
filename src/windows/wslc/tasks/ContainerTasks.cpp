@@ -577,7 +577,6 @@ void ListContainers(CLIExecutionContext& context)
     case FormatType::Table:
     {
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
-        const bool showSize = context.Args.GetValue<ArgType::Size>();
         using enum ColumnOverflow;
 
         const auto idConfig = trunc ? ColumnWidthConfig{.MaxWidth = 12, .Overflow = Shrink} : ColumnWidthConfig{};
@@ -585,58 +584,38 @@ void ListContainers(CLIExecutionContext& context)
         const auto imageConfig = trunc ? ColumnWidthConfig{.MaxWidth = 20, .Overflow = Shrink} : ColumnWidthConfig{};
         const auto shrinkConfig = trunc ? ColumnWidthConfig{.Overflow = Shrink} : ColumnWidthConfig{};
 
-        const auto writeTable = [&]<size_t FieldCount>(std::array<ColumnDefinition, FieldCount>&& columns) {
-            wsl::windows::wslc::TableOutput<FieldCount> table(context.Terminal, std::move(columns), containers.size());
+        // SIZE trails the other columns. It is always declared, and is left empty and hidden unless
+        // --size was passed.
+        constexpr size_t c_sizeColumn = 6;
+        const bool showSize = context.Args.GetValue<ArgType::Size>();
 
-            for (const auto& container : containers)
-            {
-                std::array<FormattedCell, FieldCount> row{
-                    MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
-                    MultiByteToWide(container.Name),
-                    MultiByteToWide(container.Image),
-                    FormatRelativeTime(container.CreatedAt),
-                    ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
-                    ContainerService::FormatPorts(container.State, container.Ports),
-                };
-
-                if constexpr (FieldCount == 7)
-                {
-                    row[6] = FormatContainerSize(container.SizeRw, container.SizeRootFs);
-                }
-
-                table.WriteRow(std::move(row));
-            }
-
-            table.Complete();
-        };
-
-        std::array<ColumnDefinition, 6> columns{
+        std::array<ColumnDefinition, 7> columns{
             ColumnDefinition{Localization::WSLCCLI_TableHeaderContainerId(), idConfig},
             ColumnDefinition{Localization::WSLCCLI_TableHeaderName(), nameConfig},
             ColumnDefinition{Localization::WSLCCLI_TableHeaderImage(), imageConfig},
             ColumnDefinition{Localization::WSLCCLI_TableHeaderCreated(), shrinkConfig},
             ColumnDefinition{Localization::WSLCCLI_TableHeaderStatus(), shrinkConfig},
             ColumnDefinition{Localization::WSLCCLI_TableHeaderPorts(), shrinkConfig},
+            ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), shrinkConfig},
         };
 
-        if (showSize)
-        {
-            std::array<ColumnDefinition, 7> sizedColumns{
-                std::move(columns[0]),
-                std::move(columns[1]),
-                std::move(columns[2]),
-                std::move(columns[3]),
-                std::move(columns[4]),
-                std::move(columns[5]),
-                ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), shrinkConfig},
-            };
+        wsl::windows::wslc::TableOutput<7> table(context.Terminal, std::move(columns), containers.size());
+        table.SetColumnHidden(c_sizeColumn, !showSize);
 
-            writeTable.template operator()<7>(std::move(sizedColumns));
-        }
-        else
+        for (const auto& container : containers)
         {
-            writeTable.template operator()<6>(std::move(columns));
+            table.WriteRow({
+                MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
+                MultiByteToWide(container.Name),
+                MultiByteToWide(container.Image),
+                FormatRelativeTime(container.CreatedAt),
+                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
+                ContainerService::FormatPorts(container.State, container.Ports),
+                showSize ? FormatContainerSize(container.SizeRw, container.SizeRootFs) : std::wstring{},
+            });
         }
+
+        table.Complete();
 
         break;
     }
