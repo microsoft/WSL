@@ -6924,6 +6924,55 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr), RPC_E_DISCONNECTED);
         }
 
+        // Ports and mounts survive a restart: they are held across both phases rather than released and re-acquired.
+        {
+            const auto hostFolder = std::filesystem::current_path() / "test-restart-volume";
+            std::filesystem::create_directories(hostFolder);
+            VERIFY_IS_TRUE((std::ofstream(hostFolder / "marker.txt") << "restart-marker").good());
+            auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                std::error_code ec;
+                std::filesystem::remove_all(hostFolder, ec);
+            });
+
+            constexpr uint16_t hostPort = 1252;
+            const std::string containerPort = "8000/tcp";
+            const std::string volumePath = "/data";
+            const auto markerUrl = std::format(L"http://127.0.0.1:{}/marker.txt", hostPort);
+
+            WSLCContainerLauncher launcher(
+                "python:3.12-alpine",
+                "test-restart-ports-volumes",
+                {"python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", "--directory", volumePath},
+                {"PYTHONUNBUFFERED=1"},
+                "bridge");
+            launcher.AddPort(hostPort, 8000, AF_INET);
+            launcher.AddVolume(hostFolder.wstring(), volumePath, true);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
+            ExpectHttpResponse(markerUrl.c_str(), 200);
+
+            // A start phase that re-reserved the host port would collide with the container's own reservation.
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            VERIFY_ARE_EQUAL(initProcess.Wait(), WSLCSignalSIGKILL + 128);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            const auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.Ports.contains(containerPort));
+            VERIFY_ARE_EQUAL(inspect.Ports.at(containerPort).size(), 1u);
+            VERIFY_ARE_EQUAL(std::to_string(hostPort), inspect.Ports.at(containerPort)[0].HostPort);
+
+            VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1u);
+            VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, volumePath);
+            VERIFY_IS_FALSE(inspect.Mounts[0].ReadWrite);
+            VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "bind");
+
+            // The restarted init has to bind again before the held relay has anything to forward to.
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { ExpectHttpResponse(markerUrl.c_str(), 200); }, std::chrono::milliseconds(500), std::chrono::seconds(30));
+        }
+
         // An init that ignores SIGTERM keeps the restart's stop phase in flight until the timeout expires,
         // which is what gives the requests below a window to land in the middle of a restart.
         const std::vector<std::string> ignoreStopSignal = {
