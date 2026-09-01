@@ -36,6 +36,10 @@ std::optional<uint64_t> ParseStorageSize(std::wstring_view String, StorageSizeUn
 // 119856765 -> "120MB" at precision 3, "119.9MB" at precision 4.
 std::wstring FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision = 3, StorageSizeUnit Unit = StorageSizeUnit::Decimal);
 
+// Precision used when reporting the space reclaimed by prune, so that container, image and volume
+// prune agree on a single decimal place.
+inline constexpr uint32_t c_reclaimedSpacePrecision = 4;
+
 std::vector<std::string> InitializeStringSet(_In_count_(BufferSize) LPCSTR Buffer, _In_ SIZE_T BufferSize);
 
 bool IsPathComponentEqual(const std::wstring_view String1, const std::wstring_view String2);
@@ -63,6 +67,12 @@ std::string WideToMultiByte(_In_ std::wstring_view Source);
 
 std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
 std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
+
+// Shortens a value so it occupies at most MaxDisplayWidth terminal columns, appending an ellipsis when
+// characters are dropped. East Asian wide and fullwidth code points occupy two columns, so fewer of them
+// fit than narrow ones, and a code point is never split. This matches docker's formatter.Ellipsis
+// (cli/command/formatter/displayutils.go), including its handling of widths of one and below.
+std::wstring Ellipsis(_In_ std::wstring_view Value, _In_ size_t MaxDisplayWidth);
 
 // Template implementation for TruncateId to avoid code duplication.
 // Algorithm inspired from Moby for consistency in presentation of shortened IDs.
