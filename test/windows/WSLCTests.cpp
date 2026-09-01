@@ -4981,6 +4981,10 @@ class WSLCTests
         VERIFY_ARE_EQUAL(recoveredContainer->Start(WSLCContainerStartFlagsNone, nullptr, nullptr), WSLC_E_VOLUME_NOT_AVAILABLE);
         ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(volumeName));
 
+        // The container is not running, so the restart is only its start phase and is refused the same way.
+        VERIFY_ARE_EQUAL(recoveredContainer->Restart(WSLCSignalSIGTERM, 0, nullptr), WSLC_E_VOLUME_NOT_AVAILABLE);
+        ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(volumeName));
+
         // Inspecting the volume reports the failure via an "Error" entry in its status.
         {
             wil::unique_cotaskmem_ansistring inspectOutput;
