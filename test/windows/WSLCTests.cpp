@@ -6941,7 +6941,7 @@ class WSLCTests
             std::thread restartThread(
                 [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
 
-            auto joinThread = wil::scope_exit([&]() { restartThread.join(); });
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
 
             WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
 
@@ -6961,19 +6961,24 @@ class WSLCTests
             std::thread restartThread(
                 [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
 
-            auto joinThread = wil::scope_exit([&]() { restartThread.join(); });
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
             auto restartFuture = restartResult.get_future();
 
             WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
 
             // The gap between the two phases is short, so poll for it: until the container has exited, every
             // delete is turned away by the ordinary running-container guard rather than by the restart.
-            HRESULT deleteResult = WSLC_E_CONTAINER_IS_RUNNING;
-            while (deleteResult == WSLC_E_CONTAINER_IS_RUNNING &&
-                   restartFuture.wait_for(std::chrono::milliseconds(10)) != std::future_status::ready)
-            {
-                deleteResult = container.Get().Delete(WSLCDeleteFlagsNone);
-            }
+            const auto deleteResult = wsl::shared::retry::RetryWithTimeout<HRESULT>(
+                [&]() {
+                    const auto result = container.Get().Delete(WSLCDeleteFlagsNone);
+                    THROW_HR_IF(
+                        WSLC_E_CONTAINER_IS_RUNNING,
+                        result == WSLC_E_CONTAINER_IS_RUNNING &&
+                            restartFuture.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready);
+                    return result;
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(30));
 
             const auto restartHr = restartFuture.get();
 
@@ -7000,7 +7005,7 @@ class WSLCTests
             std::thread restartThread(
                 [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
 
-            auto joinThread = wil::scope_exit([&]() { restartThread.join(); });
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
 
             WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
 
