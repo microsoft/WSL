@@ -1493,9 +1493,10 @@ void WSLCContainerImpl::OnFailedRestart() noexcept
 {
     try
     {
+        std::shared_ptr<StateTransition> transition;
+
         {
-            // N.B. m_lifecycleLock is not needed here: nothing below publishes a transition, and the state
-            // read is already ordered against OnEvent() by m_lock.
+            auto lifecycleLock = m_lifecycleLock.lock_shared();
             auto lock = m_lock.lock_exclusive();
 
             // The start phase waits for the start event after Docker has accepted the start, so it can throw
@@ -1515,9 +1516,15 @@ void WSLCContainerImpl::OnFailedRestart() noexcept
             {
                 return;
             }
+
+            // N.B. A Start() released by restartCleanup is already queued on m_lock, so the removal is
+            // requested in the same scope as the checks above rather than through Delete(), which would
+            // let that Start() bring the container back up before the force delete lands.
+            RequestDeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
+            transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
         }
 
-        Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
+        AttachToTransition(transition);
     }
     CATCH_LOG()
 }
