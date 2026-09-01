@@ -1112,7 +1112,7 @@ void PruneContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
 
     // Filter values are parsed and cached during argument validation.
-    auto filters = context.Args.GetAllValues<ArgType::PruneFilter>();
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
     auto result = ContainerService::Prune(session, filters);
 

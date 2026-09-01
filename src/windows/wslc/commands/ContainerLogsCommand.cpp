@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerLogsCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true),
+        Argument::Create(ArgType::ContainerId, {.Required = true}),
         Argument::Create(ArgType::Follow),
         Argument::Create(ArgType::Tail),
         Argument::Create(ArgType::Timestamps),

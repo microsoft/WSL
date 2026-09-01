@@ -212,11 +212,6 @@ void Argument::Validate(ArgMap& execArgs) const
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseFilter(value); });
         break;
 
-    case ArgType::PruneFilter:
-        CacheConverted<ArgType::PruneFilter>(
-            execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseFilter(value); });
-        break;
-
     case ArgType::Label:
         CacheConverted<ArgType::Label>(
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseLabel(value); });

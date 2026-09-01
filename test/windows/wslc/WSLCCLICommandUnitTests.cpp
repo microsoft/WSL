@@ -121,13 +121,10 @@ class WSLCCLICommandUnitTests
             VERIFY_ARE_EQUAL(std::wstring{L"force"}, force->Name());
             VERIFY_ARE_EQUAL(std::wstring{L"f"}, force->Alias());
 
-            const auto* filter = find(ArgType::PruneFilter);
+            const auto* filter = find(ArgType::Filter);
             VERIFY_IS_NOT_NULL(filter);
             VERIFY_ARE_EQUAL(std::wstring{L"filter"}, filter->Name());
             VERIFY_ARE_EQUAL(std::wstring{L""}, filter->Alias());
-
-            // The aliased list-command filter must never be registered alongside --force.
-            VERIFY_IS_NULL(find(ArgType::Filter));
         };
 
         verifyPruneArguments(ContainerPruneCommand(L"container").GetArguments(), L"container prune");
@@ -365,6 +362,13 @@ class WSLCCLICommandUnitTests
 
                 // Check name collision between distinct ArgTypes.
                 const auto& name = arg.Name();
+                if (name.size() < 2)
+                {
+                    VERIFY_FAIL(
+                        std::format(L"Command '{}' uses invalid long-form name '--{}' for ArgType '{}'", commandFullName, name, ArgTypeName(arg.Type()))
+                            .c_str());
+                }
+
                 auto [nameIt, nameInserted] = seenNames.emplace(name, arg.Type());
                 if (!nameInserted)
                 {

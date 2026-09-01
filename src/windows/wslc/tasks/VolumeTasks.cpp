@@ -248,7 +248,7 @@ void PruneVolumes(CLIExecutionContext& context)
     const bool all = context.Args.GetValue<ArgType::All>();
 
     // Filter values are parsed and cached during argument validation.
-    auto filters = context.Args.GetAllValues<ArgType::PruneFilter>();
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
     auto result = VolumeService::Prune(context.Terminal, session, all, filters);
 
