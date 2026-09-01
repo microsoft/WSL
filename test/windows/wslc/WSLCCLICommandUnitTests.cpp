@@ -246,8 +246,8 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // `docker push` exposes --all-tags with the -a short alias.
-    TEST_METHOD(ImagePushCommand_HasAllTagsArgumentWithDockerAlias)
+    // --all-tags is exposed with the -a short alias.
+    TEST_METHOD(ImagePushCommand_HasAllTagsArgumentWithAlias)
     {
         auto cmd = ImagePushCommand(L"image");
 

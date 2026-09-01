@@ -297,15 +297,14 @@ void PushImage(CLIExecutionContext& context)
 
     const auto reference = ImageReference::Parse(image);
 
-    // Match `docker push`: --all-tags pushes every tag in the repository, so a reference that already names one is
-    // rejected instead of being silently ignored.
+    // --all-tags pushes every tag in the repository, so a reference that already names one is rejected instead of
+    // being silently ignored.
     if (allTags && reference.Format != EnumReferenceFormatNone)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
     }
 
-    // Match `docker push`: for a name-only reference the tag defaults to "latest", and the client reports this on
-    // stdout before contacting the registry.
+    // For a name-only reference the tag defaults to "latest", reported on stdout before contacting the registry.
     if (!allTags && reference.Format == EnumReferenceFormatNone)
     {
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
