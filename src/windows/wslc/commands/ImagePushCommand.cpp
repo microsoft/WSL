@@ -27,8 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImagePushCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true),
-        Argument::Create(ArgType::Quiet, std::nullopt, std::nullopt, Localization::WSLCCLI_ImagePushQuietArgDescription()),
+        Argument::Create(ArgType::ImageId, {.Required = true}),
+        Argument::Create(ArgType::Quiet, {.Desc = Localization::WSLCCLI_ImagePushQuietArgDescription()}),
     };
 }
 

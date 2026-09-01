@@ -56,7 +56,7 @@
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->此原則會控制是否可在此電腦上使用 WSL 容器。啟用或未設定時，使用者和 Windows 應用程式可以透過 WSL 執行 Linux 容器。設定為停用時，系統會針對所有使用者封鎖 WSL 容器，且 Windows 應用程式無法執行 Linux 容器。警告: 將此設定為「Disabled」可能會中斷依賴 Linux 容器的 Windows 應用程式。</string>
 
         <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->允許授權的 WSL 容器</string>
-        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->此原則控制 WSL 容器是否可以在此電腦上以特殊權限模式執行。已啟用或未設定時，使用者和 Windows 應用程式可以啟動特殊權限容器。設定為「Disabled」時，系統會拒絕所有使用者和 Windows 應用程式啟動特殊權限容器的要求。特殊權限容器會以提升的 Linux 功能執行，並減少與容器主機的隔離。</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->此原則控制 WSL 容器是否可以在此電腦上以特殊權限模式執行。已啟用或未設定時，使用者和 Windows 應用程式可以啟動特殊權限容器。設定為 [Disabled] 時，系統會拒絕為所有使用者和 Windows 應用程式啟動特殊權限容器的要求。特殊權限容器會以提升的 Linux 功能執行，並減少與容器主機的隔離。</string>
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL 容器登錄的允許清單</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->啟用時，只允許 WSL 容器從此處列出的登錄提取映像。這會影響 WSL 容器 CLI 以及所有使用 WSL 容器 API 的應用程式。</string>

@@ -5,6 +5,7 @@
 #include "string.hpp"
 
 using wsl::windows::common::string::c_reclaimedSpacePrecision;
+using wsl::windows::common::string::Ellipsis;
 using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::common::string::ParseStorageSize;
 using wsl::windows::common::string::StorageSizeUnit;
@@ -266,6 +267,59 @@ class StringUnitTests
         {
             VERIFY_ARE_EQUAL(expected, FormatHumanReadableSize(bytes, c_reclaimedSpacePrecision));
         }
+    }
+
+    // Docker shortens display values with formatter.Ellipsis, which measures terminal columns rather than
+    // characters so East Asian wide and fullwidth code points count double.
+    TEST_METHOD(Ellipsis_NarrowCharacters_AreCountedAsOneColumn)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L""}, Ellipsis(L"", 20));
+        VERIFY_ARE_EQUAL(std::wstring{L"sleep 3600"}, Ellipsis(L"sleep 3600", 20));
+        VERIFY_ARE_EQUAL(std::wstring{L"12345678901234567890"}, Ellipsis(L"12345678901234567890", 20));
+        VERIFY_ARE_EQUAL(std::wstring{L"1234567890123456789\u2026"}, Ellipsis(L"123456789012345678901", 20));
+        VERIFY_ARE_EQUAL(std::wstring(19, L'\u00E0') + L"\u2026", Ellipsis(std::wstring(21, L'\u00E0'), 20));
+    }
+
+    TEST_METHOD(Ellipsis_WideCharacters_AreCountedAsTwoColumns)
+    {
+        // Ten wide characters fill the twenty columns exactly, so an eleventh forces the value to be shortened
+        // to the nine characters that leave room for the ellipsis.
+        VERIFY_ARE_EQUAL(std::wstring(10, L'\u65E5'), Ellipsis(std::wstring(10, L'\u65E5'), 20));
+        VERIFY_ARE_EQUAL(std::wstring(9, L'\u65E5') + L"\u2026", Ellipsis(std::wstring(11, L'\u65E5'), 20));
+        VERIFY_ARE_EQUAL(std::wstring(9, L'\uFF21') + L"\u2026", Ellipsis(std::wstring(11, L'\uFF21'), 20));
+        VERIFY_ARE_EQUAL(std::wstring{L"ab"} + std::wstring(8, L'\u65E5') + L"\u2026", Ellipsis(L"ab" + std::wstring(10, L'\u65E5'), 20));
+    }
+
+    TEST_METHOD(Ellipsis_SurrogatePairs_AreNotSplit)
+    {
+        // Emoji are wide and encoded as surrogate pairs, so both the column count and the code unit boundary
+        // have to be honored.
+        const std::wstring emoji{L"\U0001F600"};
+        std::wstring ten;
+        for (size_t index = 0; index < 10; ++index)
+        {
+            ten += emoji;
+        }
+
+        VERIFY_ARE_EQUAL(ten, Ellipsis(ten, 20));
+        VERIFY_ARE_EQUAL(ten.substr(0, 18) + L"\u2026", Ellipsis(ten + emoji, 20));
+    }
+
+    TEST_METHOD(Ellipsis_SmallWidths_MatchDocker)
+    {
+        VERIFY_ARE_EQUAL(std::wstring{L""}, Ellipsis(L"abc", 0));
+
+        // A width of one has no room for both content and an ellipsis, so the leading code point is kept even
+        // when it is wider than the limit.
+        VERIFY_ARE_EQUAL(std::wstring{L"a"}, Ellipsis(L"abc", 1));
+        VERIFY_ARE_EQUAL(std::wstring{L"\u65E5"}, Ellipsis(L"\u65E5\u65E5", 1));
+        VERIFY_ARE_EQUAL(std::wstring{L"\U0001F600"}, Ellipsis(L"\U0001F600\U0001F600", 1));
+
+        // A leading wide character leaves no room for the ellipsis at a width of two, and docker returns the
+        // value untouched in that case.
+        VERIFY_ARE_EQUAL(std::wstring{L"\u65E5\u65E5"}, Ellipsis(L"\u65E5\u65E5", 2));
+        VERIFY_ARE_EQUAL(std::wstring{L"a\u2026"}, Ellipsis(L"abc", 2));
+        VERIFY_ARE_EQUAL(std::wstring{L"\u65E5\u2026"}, Ellipsis(L"\u65E5\u65E5", 3));
     }
 
     TEST_METHOD(StorageSize_BytesToTextRoundTrips)
