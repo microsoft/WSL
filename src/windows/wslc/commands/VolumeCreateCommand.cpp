@@ -29,8 +29,8 @@ std::vector<Argument> VolumeCreateCommand::GetArguments() const
     return {
         Argument::Create(ArgType::VolumeName),
         Argument::Create(ArgType::Driver),
-        Argument::Create(ArgType::Options, false, Limit::Unlimited),
-        Argument::Create(ArgType::Label, false, Limit::Unlimited),
+        Argument::Create(ArgType::Options, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Label, {.Limit = Limit::Unlimited}),
     };
 }
 

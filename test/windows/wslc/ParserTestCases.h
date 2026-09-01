@@ -56,21 +56,21 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
     {
     case ArgumentSet::Run:
         return {
-            Argument::Create(ArgType::ImageId, true),  // Required positional argument
-            Argument::Create(ArgType::Command, false), // Optional positional argument
-            Argument::Create(ArgType::ForwardArgs, false),
+            Argument::Create(ArgType::ImageId, {.Required = true}), // Required positional argument
+            Argument::Create(ArgType::Command),                     // Optional positional argument
+            Argument::Create(ArgType::ForwardArgs),
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Interactive),
             Argument::Create(ArgType::Verbose),
             Argument::Create(ArgType::Remove),
             Argument::Create(ArgType::Signal),
             Argument::Create(ArgType::Time),
-            Argument::Create(ArgType::Publish, false, Limit::Unlimited), // Not required, unlimited.
+            Argument::Create(ArgType::Publish, {.Limit = Limit::Unlimited}), // Not required, unlimited.
         };
 
     case ArgumentSet::List:
         return {
-            Argument::Create(ArgType::ContainerId, false, Limit::Unlimited), // Optional positional
+            Argument::Create(ArgType::ContainerId, {.Limit = Limit::Unlimited}), // Optional positional
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Verbose),
         };
@@ -79,17 +79,17 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
         // Mirrors ImageBuildCommand::GetArguments() so the parser tests exercise the
         // real `wslc build` option set (notably the --progress value option).
         return {
-            Argument::Create(ArgType::Path, true), // Required positional (build context path)
-            Argument::Create(ArgType::BuildArg, false, Limit::Unlimited),
+            Argument::Create(ArgType::Path, {.Required = true}), // Required positional (build context path)
+            Argument::Create(ArgType::BuildArg, {.Limit = Limit::Unlimited}),
             Argument::Create(ArgType::BuildPull),
             Argument::Create(ArgType::BuildTarget),
             Argument::Create(ArgType::File),
-            Argument::Create(ArgType::Label, false, Limit::Unlimited),
+            Argument::Create(ArgType::Label, {.Limit = Limit::Unlimited}),
             Argument::Create(ArgType::NoCache),
             Argument::Create(ArgType::Output),
             Argument::Create(ArgType::Progress),
-            Argument::Create(ArgType::Secret, false, Limit::Unlimited),
-            Argument::Create(ArgType::Tag, false, Limit::Unlimited),
+            Argument::Create(ArgType::Secret, {.Limit = Limit::Unlimited}),
+            Argument::Create(ArgType::Tag, {.Limit = Limit::Unlimited}),
             Argument::Create(ArgType::Verbose),
             Argument::Create(ArgType::Help),
         };
