@@ -267,7 +267,7 @@ void PullImage(CLIExecutionContext& context)
 
     const auto reference = ImageReference::Parse(image);
 
-    // Match `docker pull`: --all-tags pulls every tag in the repository, so a reference that already names one is
+    // --all-tags pulls every tag in the repository, so a reference that already names one is
     // rejected instead of being silently ignored.
     if (allTags && reference.Format != EnumReferenceFormatNone)
     {
@@ -292,7 +292,7 @@ void PullImage(CLIExecutionContext& context)
     IProgressCallback* progress = callback ? &*callback : nullptr;
     services::ImageService::Pull(context.Terminal, session, image, progress, allTags);
 
-    // Match `docker pull`: always print the resolved canonical image reference as the final line. With --all-tags no
+    // Always print the resolved canonical image reference as the final line. With --all-tags no
     // single tag was resolved, so only the repository is printed.
     const auto resolved = allTags ? reference.Repository.GetCanonical() : reference.GetCanonical();
     context.Terminal.Output(L"{}\n", MultiByteToWide(resolved));

@@ -246,8 +246,8 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // `docker pull` exposes --all-tags with the -a short alias.
-    TEST_METHOD(ImagePullCommand_HasAllTagsArgumentWithDockerAlias)
+    // --all-tags is exposed with the -a short alias.
+    TEST_METHOD(ImagePullCommand_HasAllTagsArgumentWithAlias)
     {
         auto cmd = ImagePullCommand(L"image");
 
