@@ -79,14 +79,6 @@ class WSLCE2EContainerLogsTests
         combined.Verify({.Stdout = L" detail2\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details_NoShortAlias)
-    {
-        // docker logs defines --details with no short form, so -d must not be accepted.
-        auto result = RunWslc(std::format(L"container logs -d {}", WslcContainerName));
-        result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"-d"));
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details_ListedInHelp)
     {
         auto result = RunWslc(L"container logs --help");

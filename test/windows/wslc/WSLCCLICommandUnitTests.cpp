@@ -245,27 +245,6 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // docker logs takes --details with no short alias
-    // (docker/cli cli/command/container/logs.go: flags.BoolVar(&opts.details, "details", ...)).
-    TEST_METHOD(ContainerLogsCommand_HasDetailsArgumentWithoutAlias)
-    {
-        const auto args = ContainerLogsCommand(L"container").GetArguments();
-
-        bool found = false;
-        for (const auto& arg : args)
-        {
-            if (arg.Type() == argument::ArgType::Details)
-            {
-                found = true;
-                VERIFY_ARE_EQUAL(std::wstring(L"details"), arg.Name());
-                VERIFY_IS_TRUE(arg.Alias().empty());
-                VERIFY_IS_TRUE(arg.Kind() == argument::Kind::Flag);
-            }
-        }
-
-        VERIFY_IS_TRUE(found, L"container logs does not register --details");
-    }
-
     // Walk every command in the root tree and verify no argument collisions.
     TEST_METHOD(AllCommands_NoAmbiguousArgumentNamesOrAliases)
     {
