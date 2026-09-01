@@ -1243,6 +1243,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
 }
 
 void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t Time, std::optional<int> ExitCode) noexcept
+try
 {
     auto attributes = StripInternalLabels(m_labels);
     attributes["name"] = m_name;
@@ -1255,6 +1256,7 @@ void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t Time, std
 
     m_eventStore.Record("container", std::move(Action), m_id, std::move(attributes), Time);
 }
+CATCH_LOG()
 
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept
 {
