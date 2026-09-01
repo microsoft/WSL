@@ -667,7 +667,7 @@ class WSLCCLIParserUnitTests
     // adjoined form. The inspect family depends on this for docker's `-f json`.
     TEST_METHOD(Value_AliasCarriesValue)
     {
-        std::vector<Argument> defs = {Argument::Create(ArgType::InspectFormat), Argument::Create(ArgType::ObjectId, false, Limit::Unlimited)};
+        std::vector<Argument> defs = {Argument::Create(ArgType::InspectFormat), Argument::Create(ArgType::ObjectId, {.Limit = Limit::Unlimited})};
 
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f json cont1", defs).GetValue<ArgType::InspectFormat>());
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f=json cont1", defs).GetValue<ArgType::InspectFormat>());
