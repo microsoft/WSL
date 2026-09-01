@@ -27,8 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> VolumePruneCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::All, std::nullopt, std::nullopt, Localization::WSLCCLI_VolumePruneAllArgDescription()),
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::All, {.Desc = Localization::WSLCCLI_VolumePruneAllArgDescription()}),
+        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
     };
 }
 
