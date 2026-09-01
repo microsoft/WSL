@@ -52,7 +52,7 @@ try
 
             if (binding.LogWhenSet)
             {
-                WSL_LOG(
+                WSL_LOG_DEBUG(
                     "WSLCEnvironmentOptionSet",
                     TraceLoggingValue(binding.Name, "EnvironmentVariable"),
                     TraceLoggingValue(value->c_str(), "Value"));
