@@ -260,7 +260,7 @@ private:
     // True between a successful StartPhase() and the release of the container's ports and mounts. A
     // restart leaves this set across the two phases, which is what tells the start phase they are still
     // held and must not be re-acquired.
-    _Guarded_by_(m_lock) bool m_runtimeResourcesHeld {};
+    _Guarded_by_(m_lock) bool m_runtimeResourcesHeld = false;
 
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore

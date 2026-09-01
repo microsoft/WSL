@@ -1337,6 +1337,10 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         // restart it is meant to unblock.
         WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop, /* waitForRestart */ !RestartPhase && !Kill);
 
+        // A Delete() that raced a restart may have already moved the container to the Deleted state.
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_CONTAINER_MARKED_FOR_REMOVAL, Localization::MessageWslcContainerMarkedForRemoval(m_id), m_state == WslcContainerStateDeleted);
+
         transition = m_transition;
         WI_ASSERT(!transition || transition->Kind == TransitionKind::Stop);
 
@@ -1401,6 +1405,14 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                 // HTTP 304 is returned when the container is already stopped.
                 if (Kill || e.StatusCode() != 304)
                 {
+                    lock = m_lock.lock_exclusive();
+
+                    // A force delete can win the locks released above, so the container may be gone rather than stuck.
+                    THROW_HR_WITH_USER_ERROR_IF(
+                        WSLC_E_CONTAINER_MARKED_FOR_REMOVAL,
+                        Localization::MessageWslcContainerMarkedForRemoval(m_id),
+                        m_state == WslcContainerStateDeleted || (m_transition && m_transition->ExpectedEvent == ContainerEvent::Destroy));
+
                     THROW_DOCKER_USER_ERROR_MSG(e, "Failed to %hs container '%hs'", Kill ? "kill" : "stop", m_id.c_str());
                 }
             }
