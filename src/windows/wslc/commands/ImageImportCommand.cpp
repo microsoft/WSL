@@ -32,7 +32,7 @@ std::vector<ArgType> ImageImportCommand::GetUnsupportedArguments() const
 std::vector<Argument> ImageImportCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImportFile, true),
+        Argument::Create(ArgType::ImportFile, {.Required = true}),
         Argument::Create(ArgType::ImageId),
         Argument::Create(ArgType::NoTrunc),
     };

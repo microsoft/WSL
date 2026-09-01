@@ -421,7 +421,7 @@ class WSLCCLIParserUnitTests
 
         // Pass 2: full mode with the subcommand's argument set.
         std::vector<Argument> subDefs = {
-            Argument::Create(ArgType::ImageId, true),
+            Argument::Create(ArgType::ImageId, {.Required = true}),
             Argument::Create(ArgType::Signal),
         };
         ArgMap subArgs;
@@ -618,7 +618,8 @@ class WSLCCLIParserUnitTests
     // Unlimited value args are exempt from last-wins: every CLI occurrence accumulates.
     TEST_METHOD(UnlimitedValueOnCli_Accumulates)
     {
-        ArgMap args = ParseFlags(L"wslc --publish 80:80 --publish 443:443", {Argument::Create(ArgType::Publish, false, Limit::Unlimited)});
+        ArgMap args =
+            ParseFlags(L"wslc --publish 80:80 --publish 443:443", {Argument::Create(ArgType::Publish, {.Limit = Limit::Unlimited})});
 
         VERIFY_ARE_EQUAL(2u, args.Count(ArgType::Publish));
     }
@@ -713,7 +714,8 @@ class WSLCCLIParserUnitTests
     TEST_METHOD(Flag_SpaceSeparatedValue_StaysPositional)
     {
         ArgMap args = ParseFlags(
-            L"wslc --verbose true", {Argument::Create(ArgType::Verbose), Argument::Create(ArgType::ContainerId, false, Limit::Unlimited)});
+            L"wslc --verbose true",
+            {Argument::Create(ArgType::Verbose), Argument::Create(ArgType::ContainerId, {.Limit = Limit::Unlimited})});
 
         VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
         VERIFY_IS_TRUE(args.GetValue<ArgType::Verbose>());
@@ -725,7 +727,10 @@ class WSLCCLIParserUnitTests
     // adjoined form. The inspect family depends on this for docker's `-f json`.
     TEST_METHOD(Value_AliasCarriesValue)
     {
-        std::vector<Argument> defs = {Argument::Create(ArgType::InspectFormat), Argument::Create(ArgType::ObjectId, false, Limit::Unlimited)};
+        std::vector<Argument> defs = {
+            Argument::Create(ArgType::InspectFormat),
+            Argument::Create(ArgType::ObjectId, {.Limit = Limit::Unlimited}),
+        };
 
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f json cont1", defs).GetValue<ArgType::InspectFormat>());
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f=json cont1", defs).GetValue<ArgType::InspectFormat>());
@@ -742,6 +747,25 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_TRUE(ParseFlags(L"wslc -q", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
         VERIFY_IS_TRUE(ParseFlags(L"wslc -q=true", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
         VERIFY_IS_FALSE(ParseFlags(L"wslc -q=false", {Argument::Create(ArgType::Quiet)}).GetValue<ArgType::Quiet>());
+    }
+
+    TEST_METHOD(AliasOverride_ControlsCommandAlias)
+    {
+        const std::vector<Argument> customAlias{Argument::Create(ArgType::Quiet, {.Alias = L"x"})};
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -x", customAlias).GetValue<ArgType::Quiet>());
+        VERIFY_THROWS(ParseFlags(L"wslc -q", customAlias), ArgumentException);
+
+        const std::vector<Argument> noAlias{Argument::Create(ArgType::Quiet, {.Alias = NO_ALIAS})};
+        VERIFY_IS_TRUE(ParseFlags(L"wslc --quiet", noAlias).GetValue<ArgType::Quiet>());
+        VERIFY_THROWS(ParseFlags(L"wslc -q", noAlias), ArgumentException);
+    }
+
+    TEST_METHOD(NameOverride_ControlsCommandName)
+    {
+        const std::vector<Argument> definitions{Argument::Create(ArgType::Quiet, {.Name = L"silent"})};
+        VERIFY_IS_TRUE(ParseFlags(L"wslc --silent", definitions).GetValue<ArgType::Quiet>());
+        VERIFY_IS_TRUE(ParseFlags(L"wslc -q", definitions).GetValue<ArgType::Quiet>());
+        VERIFY_THROWS(ParseFlags(L"wslc --quiet", definitions), ArgumentException);
     }
 
     // Docker-parity single-letter forms ("t"/"T"/"f"/"F") are honored on the alias form too.

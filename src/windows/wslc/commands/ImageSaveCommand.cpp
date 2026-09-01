@@ -32,7 +32,7 @@ std::vector<ArgType> ImageSaveCommand::GetUnsupportedArguments() const
 std::vector<Argument> ImageSaveCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true, Limit::Unlimited),
+        Argument::Create(ArgType::ImageId, {.Required = true, .Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Output),
     };
 }

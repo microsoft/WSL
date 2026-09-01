@@ -371,6 +371,13 @@ class WSLCCLICommandUnitTests
 
                 // Check name collision between distinct ArgTypes.
                 const auto& name = arg.Name();
+                if (name.size() < 2)
+                {
+                    VERIFY_FAIL(
+                        std::format(L"Command '{}' uses invalid long-form name '--{}' for ArgType '{}'", commandFullName, name, ArgTypeName(arg.Type()))
+                            .c_str());
+                }
+
                 auto [nameIt, nameInserted] = seenNames.emplace(name, arg.Type());
                 if (!nameInserted)
                 {

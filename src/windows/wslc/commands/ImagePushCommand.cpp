@@ -32,7 +32,7 @@ std::vector<ArgType> ImagePushCommand::GetUnsupportedArguments() const
 std::vector<Argument> ImagePushCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true),
+        Argument::Create(ArgType::ImageId, {.Required = true}),
     };
 }
 

@@ -55,7 +55,7 @@ public:
         return {
             Argument::Create(ArgType::StopTimeout),
             Argument::Create(ArgType::Quiet),
-            Argument::Create(ArgType::Env, false, Limit::Unlimited),
+            Argument::Create(ArgType::Env, {.Limit = Limit::Unlimited}),
         };
     }
 
@@ -304,6 +304,25 @@ class WSLCCLIArgumentUnitTests
             VERIFY_IS_TRUE(help.find(L"--platform", argumentName + 1) == std::wstring::npos);
             VERIFY_IS_TRUE(help.find(wsl::shared::Localization::WSLCCLI_HeadingRelatedOptions()) == std::wstring::npos);
         }
+    }
+
+    TEST_METHOD(ArgumentCreate_DefaultsAndOverrides)
+    {
+        const auto defaults = Argument::Create(ArgType::Quiet);
+        VERIFY_ARE_EQUAL(std::wstring{L"quiet"}, defaults.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"q"}, defaults.Alias());
+
+        const auto noAlias = Argument::Create(ArgType::Quiet, {.Alias = NO_ALIAS});
+        VERIFY_IS_TRUE(noAlias.Alias().empty());
+        VERIFY_ARE_EQUAL(defaults.Description(), noAlias.Description());
+
+        const auto overrides = Argument::Create(
+            ArgType::Filter, {.Name = L"where", .Alias = L"x", .Required = true, .Limit = Limit::Unlimited, .Desc = L"Custom description"});
+        VERIFY_ARE_EQUAL(std::wstring{L"where"}, overrides.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"x"}, overrides.Alias());
+        VERIFY_IS_TRUE(overrides.Required());
+        VERIFY_ARE_EQUAL(Limit::Unlimited, overrides.Limit());
+        VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values

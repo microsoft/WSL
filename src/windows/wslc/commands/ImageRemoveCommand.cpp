@@ -33,7 +33,7 @@ std::vector<ArgType> ImageRemoveCommand::GetUnsupportedArguments() const
 std::vector<Argument> ImageRemoveCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true, Limit::Unlimited),
+        Argument::Create(ArgType::ImageId, {.Required = true, .Limit = Limit::Unlimited}),
         Argument::Create(ArgType::ImageForce),
         Argument::Create(ArgType::NoPrune),
     };
