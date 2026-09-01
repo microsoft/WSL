@@ -381,5 +381,6 @@ namespace Microsoft.WSL.Containers
         ContainerDisabled = 0x8004060C,
         RegistryBlockedByPolicy = 0x8004060D,
         VolumeNotAvailable = 0x8004060E,
+        ContainerDeleted = 0x80040611,
     };
 }

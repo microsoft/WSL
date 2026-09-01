@@ -7057,7 +7057,7 @@ class WSLCTests
 
             if (SUCCEEDED(deleteResult))
             {
-                VERIFY_ARE_EQUAL(restartHr, WSLC_E_CONTAINER_MARKED_FOR_REMOVAL);
+                VERIFY_ARE_EQUAL(restartHr, WSLC_E_CONTAINER_DELETED);
             }
             else
             {
@@ -7084,7 +7084,7 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
             container.SetDeleteOnClose(false);
-            VERIFY_ARE_EQUAL(restartResult.get_future().get(), WSLC_E_CONTAINER_MARKED_FOR_REMOVAL);
+            VERIFY_ARE_EQUAL(restartResult.get_future().get(), WSLC_E_CONTAINER_DELETED);
         }
 
         // A restart issued during a restart waits for both of the first one's phases, so the two pairs
