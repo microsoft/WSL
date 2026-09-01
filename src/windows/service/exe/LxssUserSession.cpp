@@ -3510,7 +3510,8 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
             if (Message.TerminalProfileIndex != 0)
             {
                 const auto terminalProfileSpan = Span.subspan(Message.TerminalProfileIndex, Message.TerminalProfileSize);
-                const std::string_view terminalProfile(reinterpret_cast<const char*>(terminalProfileSpan.data()), terminalProfileSpan.size());
+                const std::string_view terminalProfile(
+                    reinterpret_cast<const char*>(terminalProfileSpan.data()), terminalProfileSpan.size());
                 _CreateTerminalProfile(terminalProfile, iconPath, Configuration, Registration);
             }
             else
