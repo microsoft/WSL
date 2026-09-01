@@ -13,12 +13,11 @@ Abstract:
 --*/
 #pragma once
 
-// Here is where base argument types are defined, with their name, alias, kind, and default description.
-// The description can be overridden by commands if a particular command needs a different description but otherwise the
-// same argument type definition. The ArgType enum and the mapping of ArgType to data type are generated from this X-Macro, so all
-// arguments must be defined here to be used in the system. The arguments defined here are the basis for all commands,
-// but not all arguments need to be used by all commands, and additional properties of the arguments can be set in the command's
-// GetArguments function when creating the Argument with Argument::Create.
+// Here is where base argument types are defined, with their default name, default alias, kind, conversion type, and
+// default description. Commands can override the name, alias, required state, limit, and description. The ArgType enum,
+// kind, and conversion type remain fixed. The ArgType enum and the mapping of ArgType to data type are generated from
+// this X-Macro, so all arguments must be defined here to be used in the system. The arguments defined here are the basis
+// for all commands, but not all arguments need to be used by all commands.
 
 // The Kind determines the data type:
 // - Kind::Flag       -> bool
@@ -82,7 +81,7 @@ _(ImageId,          "image",                NO_ALIAS,         Kind::Positional, 
 _(ImportFile,       "file",                 NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ImportFileArgDescription()) \
 _(IidFile,          "iidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IidFileArgDescription()) \
 _(Input,            "input",                L"i",             Kind::Value,      NoConversion, Localization::WSLCCLI_InputArgDescription()) \
-_(InspectFormat,    "format",               NO_ALIAS,         Kind::Value,      JsonIndent,   Localization::WSLCCLI_InspectFormatArgDescription()) \
+_(InspectFormat,    "format",               L"f",             Kind::Value,      JsonIndent,   Localization::WSLCCLI_InspectFormatArgDescription()) \
 _(Interactive,      "interactive",          L"i",             Kind::Flag,       NoConversion, Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Internal,         "internal",             NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_NetworkInternalArgDescription()) \
 _(IpAddress,        "ip",                   NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_IpAddressArgDescription()) \
