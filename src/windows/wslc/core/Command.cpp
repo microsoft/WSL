@@ -19,6 +19,7 @@ Abstract:
 #include "TableOutput.h"
 
 #include <algorithm>
+#include <typeinfo>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
@@ -28,6 +29,112 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 
 std::wstring s_ExecutableName = L"wslc";
+
+namespace {
+    std::vector<std::wstring> WrapAliases(std::span<const std::wstring> aliases, std::optional<size_t> consoleWidth, size_t indent)
+    {
+        std::vector<std::wstring> lines;
+        std::wstring line(indent, L' ');
+
+        for (size_t i = 0; i < aliases.size(); ++i)
+        {
+            std::wstring token = aliases[i];
+            if (i + 1 < aliases.size())
+            {
+                token += L',';
+            }
+
+            const bool hasAlias = line.size() > indent;
+            const size_t requiredWidth = token.size() + (hasAlias ? 1 : 0);
+            if (hasAlias && consoleWidth.has_value() && line.size() + requiredWidth > *consoleWidth)
+            {
+                lines.emplace_back(std::move(line));
+                line.assign(indent, L' ');
+            }
+            else if (hasAlias)
+            {
+                line += L' ';
+            }
+
+            line += token;
+        }
+
+        if (line.size() > indent)
+        {
+            lines.emplace_back(std::move(line));
+        }
+
+        return lines;
+    }
+
+    std::wstring FormatCommandInvocation(const Command& command, std::wstring_view name)
+    {
+        std::wstring commandChain = command.FullName();
+        const auto firstSplit = commandChain.find_first_of(Command::ParentSplitChar);
+        if (firstSplit == std::wstring::npos)
+        {
+            return s_ExecutableName;
+        }
+
+        commandChain = commandChain.substr(firstSplit + 1);
+        const auto lastSplit = commandChain.find_last_of(Command::ParentSplitChar);
+        commandChain.replace(lastSplit == std::wstring::npos ? 0 : lastSplit + 1, std::wstring::npos, name);
+        std::ranges::replace(commandChain, Command::ParentSplitChar, L' ');
+
+        std::wstring invocation = s_ExecutableName;
+        invocation += L' ';
+        invocation += commandChain;
+        return invocation;
+    }
+
+    void AddCommandInvocations(const Command& command, std::vector<std::wstring>& invocations)
+    {
+        const auto addInvocation = [&](std::wstring_view name) {
+            auto invocation = FormatCommandInvocation(command, name);
+            if (std::ranges::find(invocations, invocation) == invocations.end())
+            {
+                invocations.emplace_back(std::move(invocation));
+            }
+        };
+
+        addInvocation(command.Name());
+        for (const auto alias : command.Aliases())
+        {
+            addInvocation(alias);
+        }
+    }
+
+    void FindCommandInvocations(const Command& target, const Command& parent, std::vector<std::wstring>& invocations)
+    {
+        for (const auto& command : parent.GetCommands())
+        {
+            if (typeid(target) == typeid(*command))
+            {
+                AddCommandInvocations(*command, invocations);
+            }
+
+            FindCommandInvocations(target, *command, invocations);
+        }
+    }
+
+    std::vector<std::wstring> GetCommandInvocations(const Command& command)
+    {
+        std::vector<std::wstring> invocations;
+        FindCommandInvocations(command, RootCommand(), invocations);
+
+        if (invocations.empty())
+        {
+            AddCommandInvocations(command, invocations);
+        }
+
+        if (invocations.size() == 1)
+        {
+            invocations.clear();
+        }
+
+        return invocations;
+    }
+} // namespace
 
 Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
     m_name(name), m_aliases(std::move(aliases))
@@ -96,7 +203,11 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         }
     }
 
-    auto commandAliases = Aliases();
+    std::vector<std::wstring> commandAliases;
+    if (fullHelp)
+    {
+        commandAliases = GetCommandInvocations(*this);
+    }
     auto commands = GetCommands();
     auto arguments = GetAllArguments();
     std::vector<Argument> helpArguments;
@@ -253,17 +364,17 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     {
         terminal.Write(helpLevel, L"{}{}{}\n", HelpHeadingEmphasis, Localization::WSLCCLI_HeadingAliases(), Format::Default);
 
-        std::wstring aliasLine;
-        for (size_t i = 0; i < commandAliases.size(); ++i)
+        std::optional<size_t> consoleWidth;
+        if (const auto width = terminal.GetConsoleWidth(helpLevel); width.has_value() && *width > 0)
         {
-            if (i != 0)
-            {
-                aliasLine += L", ";
-            }
-            aliasLine += commandAliases[i];
+            consoleWidth = static_cast<size_t>(*width);
         }
 
-        terminal.Write(helpLevel, L"{}{}\n\n", std::wstring(c_helpRowIndent, L' '), aliasLine);
+        for (const auto& line : WrapAliases(commandAliases, consoleWidth, c_helpRowIndent))
+        {
+            terminal.Write(helpLevel, L"{}\n", line);
+        }
+        terminal.Write(helpLevel, L"\n");
     }
 
     // Col0: name/command

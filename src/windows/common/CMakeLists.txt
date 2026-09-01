@@ -130,6 +130,7 @@ set(HEADERS
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
+    WSLCContainerEntry.h
     ConsommeNetworking.h
     WSLCProcessLauncher.h
     WslClient.h

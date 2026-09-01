@@ -140,6 +140,39 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
     };
 }
 
+// Builds the representation of a container, shared by the table and json output so the two cannot
+// drift. Every value is emitted as a string apart from the platform object, and the id is truncated
+// unless --no-trunc is passed. RunningFor and Status are the only fields that vary with the format:
+// docker renders them in invariant English, so json keeps that while the table is localized.
+ContainerOutputInformation ToContainerOutput(const ContainerInformation& container, bool truncate, FormatType format)
+{
+    ContainerOutputInformation entry;
+    entry.Command = WideToMultiByte(ContainerService::FormatCommand(container.Command, truncate));
+    entry.CreatedAt = EpochToLocalDisplayTime(container.CreatedAt);
+    // The runtime reports health as a suffix on the status description, which is the only place it is
+    // exposed by the listing API.
+    entry.HealthStatus = ContainerService::FormatHealthStatus(container.Status);
+    entry.ID = truncate ? TruncateId(container.Id) : container.Id;
+    entry.Image = container.Image;
+    entry.Labels = container.Labels;
+    entry.LocalVolumes = std::to_string(container.LocalVolumes);
+    entry.Mounts = WideToMultiByte(ContainerService::FormatMounts(container.Mounts, truncate));
+    entry.Names = container.Name;
+    entry.Networks = container.Networks;
+    entry.Platform.architecture = wsl::shared::Arm64 ? "arm64" : "amd64";
+    entry.Platform.os = "linux";
+    entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
+    entry.RunningFor = WideToMultiByte(
+        format == FormatType::Json ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
+    // The daemon only computes container sizes when the listing request asks for them, so this is a
+    // formatted zero unless --size was passed.
+    entry.Size = WideToMultiByte(FormatContainerSize(container.SizeRw, container.SizeRootFs));
+    entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
+    entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt, format));
+
+    return entry;
+}
+
 } // namespace
 
 namespace wsl::windows::wslc::task {
@@ -553,15 +586,17 @@ void ListContainers(CLIExecutionContext& context)
     if (context.Args.GetValue<ArgType::Quiet>())
     {
         // Print only the container ids
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(container.Id));
+            context.Terminal.Output(L"{}\n", MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id));
         }
 
         return;
     }
 
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
@@ -569,49 +604,57 @@ void ListContainers(CLIExecutionContext& context)
     {
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(container, c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToContainerOutput(container, trunc, FormatType::Json), c_jsonCompactIndent));
         }
 
         break;
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
-
-        const auto idConfig = trunc ? ColumnWidthConfig{.MaxWidth = 12, .Overflow = Shrink} : ColumnWidthConfig{};
-        const auto nameConfig = trunc ? ColumnWidthConfig{.MaxWidth = 20, .Overflow = Shrink} : ColumnWidthConfig{};
-        const auto imageConfig = trunc ? ColumnWidthConfig{.MaxWidth = 20, .Overflow = Shrink} : ColumnWidthConfig{};
-        const auto shrinkConfig = trunc ? ColumnWidthConfig{.Overflow = Shrink} : ColumnWidthConfig{};
 
         // SIZE trails the other columns. It is always declared, and is left empty and hidden unless
         // --size was passed.
-        constexpr size_t c_sizeColumn = 6;
+        constexpr size_t c_sizeColumn = 7;
         const bool showSize = context.Args.GetValue<ArgType::Size>();
 
-        std::array<ColumnDefinition, 7> columns{
-            ColumnDefinition{Localization::WSLCCLI_TableHeaderContainerId(), idConfig},
-            ColumnDefinition{Localization::WSLCCLI_TableHeaderName(), nameConfig},
-            ColumnDefinition{Localization::WSLCCLI_TableHeaderImage(), imageConfig},
-            ColumnDefinition{Localization::WSLCCLI_TableHeaderCreated(), shrinkConfig},
-            ColumnDefinition{Localization::WSLCCLI_TableHeaderStatus(), shrinkConfig},
-            ColumnDefinition{Localization::WSLCCLI_TableHeaderPorts(), shrinkConfig},
-            ColumnDefinition{Localization::WSLCCLI_TableHeaderSize(), shrinkConfig},
-        };
+        // Create table with or without column limits based on --no-trunc flag
+        auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
+                                 context.Terminal,
+                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderCommand(), {.Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderSize(), {.Overflow = Shrink}}}},
+                                 containers.size())
+                           : wsl::windows::wslc::TableOutput<8>(
+                                 context.Terminal,
+                                 {Localization::WSLCCLI_TableHeaderContainerId(),
+                                  Localization::WSLCCLI_TableHeaderImage(),
+                                  Localization::WSLCCLI_TableHeaderCommand(),
+                                  Localization::WSLCCLI_TableHeaderCreated(),
+                                  Localization::WSLCCLI_TableHeaderStatus(),
+                                  Localization::WSLCCLI_TableHeaderPorts(),
+                                  Localization::WSLCCLI_TableHeaderNames(),
+                                  Localization::WSLCCLI_TableHeaderSize()});
 
-        wsl::windows::wslc::TableOutput<7> table(context.Terminal, std::move(columns), containers.size());
         table.SetColumnHidden(c_sizeColumn, !showSize);
 
         for (const auto& container : containers)
         {
+            const auto entry = ToContainerOutput(container, trunc, FormatType::Table);
             table.WriteRow({
-                MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
-                MultiByteToWide(container.Name),
-                MultiByteToWide(container.Image),
-                FormatRelativeTime(container.CreatedAt),
-                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
-                ContainerService::FormatPorts(container.State, container.Ports),
-                showSize ? FormatContainerSize(container.SizeRw, container.SizeRootFs) : std::wstring{},
+                MultiByteToWide(entry.ID),
+                MultiByteToWide(entry.Image),
+                MultiByteToWide(entry.Command),
+                MultiByteToWide(entry.RunningFor),
+                MultiByteToWide(entry.Status),
+                MultiByteToWide(entry.Ports),
+                MultiByteToWide(entry.Names),
+                showSize ? MultiByteToWide(entry.Size) : std::wstring{},
             });
         }
 
