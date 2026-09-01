@@ -38,8 +38,6 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
-constexpr uint32_t c_reclaimedSpacePrecision = 4;
-
 namespace {
 
     class DECLSPEC_UUID("91EF98A7-99A8-41C2-893C-43CDFB7DB69F") WSLCImageLoadCallback
@@ -75,7 +73,7 @@ namespace {
     };
 
     // Placeholder for values that are unavailable. wslc does not track image digests or layer sharing.
-    constexpr std::string_view c_notAvailable = "N/A";
+    constexpr std::string_view c_imageNotAvailable = "N/A";
 
     // Builds the representation of an image, shared by the table and json output so the two cannot
     // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,
@@ -83,17 +81,17 @@ namespace {
     ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
     {
         ImageOutputInformation entry;
-        entry.Containers = image.Containers < 0 ? std::string{c_notAvailable} : std::to_string(image.Containers);
+        entry.Containers = image.Containers < 0 ? std::string{c_imageNotAvailable} : std::to_string(image.Containers);
 
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
         entry.CreatedSince = WideToMultiByte(FormatRelativeTime(image.Created));
         entry.Digest = c_none;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
-        entry.SharedSize = c_notAvailable;
+        entry.SharedSize = c_imageNotAvailable;
         entry.Size = WideToMultiByte(FormatHumanReadableSize(static_cast<uint64_t>(std::max<int64_t>(image.Size, 0))));
         entry.Tag = image.Tag.value_or(std::string{c_none});
-        entry.UniqueSize = c_notAvailable;
+        entry.UniqueSize = c_imageNotAvailable;
 
         return entry;
     }

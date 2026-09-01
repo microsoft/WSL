@@ -661,6 +661,21 @@ class WSLCCLIParserUnitTests
         VERIFY_ARE_EQUAL(std::wstring(L"true"), args.GetValue<ArgType::ContainerId>());
     }
 
+    // A value argument's alias carries its value exactly like the long name, including the
+    // adjoined form. The inspect family depends on this for docker's `-f json`.
+    TEST_METHOD(Value_AliasCarriesValue)
+    {
+        std::vector<Argument> defs = {Argument::Create(ArgType::InspectFormat), Argument::Create(ArgType::ObjectId, false, Limit::Unlimited)};
+
+        VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f json cont1", defs).GetValue<ArgType::InspectFormat>());
+        VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f=json cont1", defs).GetValue<ArgType::InspectFormat>());
+
+        // The positional still lands where it belongs once the alias has taken its value.
+        auto args = ParseFlags(L"wslc -f json cont1", defs);
+        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::ObjectId));
+        VERIFY_ARE_EQUAL(std::wstring(L"cont1"), args.GetValue<ArgType::ObjectId>());
+    }
+
     // Alias forms honor adjoined booleans just like the long name.
     TEST_METHOD(Flag_AliasAdjoinedBoolean)
     {

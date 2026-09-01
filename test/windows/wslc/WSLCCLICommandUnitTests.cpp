@@ -22,6 +22,7 @@ Abstract:
 #include "RootCommand.h"
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
+#include "InspectCommand.h"
 #include "NetworkCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
@@ -295,6 +296,26 @@ class WSLCCLICommandUnitTests
 
             VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
         }
+    }
+
+    // Every command in the inspect family exposes docker's `-f` alias for --format
+    // (docker/cli cli/command/system/inspect.go: flags.StringVarP(&opts.format, "format", "f", ...)).
+    TEST_METHOD(InspectCommands_FormatArgumentHasDockerAlias)
+    {
+        const auto VerifyFormatAlias = [](const Command& command) {
+            const auto args = command.GetArguments();
+            const auto found = std::ranges::find_if(args, [](const auto& arg) { return arg.Type() == ArgType::InspectFormat; });
+
+            VERIFY_IS_TRUE(found != args.end(), std::format(L"Command '{}' does not register --format", command.FullName()).c_str());
+            VERIFY_ARE_EQUAL(std::wstring(L"format"), found->Name());
+            VERIFY_ARE_EQUAL(std::wstring(L"f"), found->Alias());
+        };
+
+        VerifyFormatAlias(InspectCommand(L""));
+        VerifyFormatAlias(ContainerInspectCommand(L"container"));
+        VerifyFormatAlias(ImageInspectCommand(L"image"));
+        VerifyFormatAlias(NetworkInspectCommand(L"network"));
+        VerifyFormatAlias(VolumeInspectCommand(L"volume"));
     }
 
     // Walk every command in the root tree and verify no argument collisions.
