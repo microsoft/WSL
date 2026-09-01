@@ -389,8 +389,8 @@ class WSLCE2EContainerCpTests
             THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
         }
 
-        // docker cp takes -q/--quiet to suppress copy progress. wslc emits no copy progress, so the
-        // flag is accepted and a quiet copy behaves exactly like an unflagged one.
+        // wslc emits no copy progress, so -q is accepted and a quiet copy behaves exactly like an
+        // unflagged one.
         const auto uploadResult = RunWslc(std::format(L"container cp -q {} {}:/tmp/", localFile.wstring(), WslcContainerName));
         uploadResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 

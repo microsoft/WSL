@@ -246,8 +246,7 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // docker exposes -q/--quiet on load, push and cp; wslc must register the same spelling on each
-    // (docker/cli cli/command/image/load.go, image/push.go and container/cp.go).
+    // load, push and cp must all register -q/--quiet with the same spelling.
     TEST_METHOD(QuietParityCommands_RegisterQuietArgument)
     {
         const auto VerifyQuietArgument = [](const Command& command) {

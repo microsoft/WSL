@@ -101,8 +101,6 @@ class WSLCE2EImageSaveTests
 
         TestImageRegistry::Instance().Delete(DebianImage);
 
-        // docker's `load -q` only suppresses per-layer progress; moby writes the "Loaded image:"
-        // line to the output stream unconditionally (daemon/internal/image/tarexport/load.go).
         // wslc surfaces no layer progress, so a quiet load is byte-identical to a plain one and the
         // "Loaded image:" line must still appear.
         auto quietResult = RunWslc(std::format(L"image load --quiet --input \"{}\"", SavedArchivePath.wstring()));

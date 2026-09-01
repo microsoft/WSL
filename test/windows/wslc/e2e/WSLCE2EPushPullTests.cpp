@@ -137,7 +137,7 @@ class WSLCE2EPushPullTests
             auto registryImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
-            // Quiet push (Docker parity): progress is suppressed and stdout is exactly the resolved
+            // Quiet push: progress is suppressed and stdout is exactly the resolved
             // canonical reference. The registry image is already fully-qualified, so it equals the
             // printed reference. GetStdoutOneLine() also asserts there is exactly one output line,
             // proving progress was suppressed.
