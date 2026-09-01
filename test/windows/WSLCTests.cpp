@@ -6999,6 +6999,26 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
         }
 
+        // A kill issued during a restart deliberately does not wait for it: it is what unblocks a stop phase
+        // that an init like this one would otherwise keep in flight for the whole timeout.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-kill", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VERIFY_SUCCEEDED(restartResult.get_future().get());
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        }
+
         // A delete issued during a restart deliberately does not wait for it, matching docker: whichever of
         // the delete and the restart's start phase lands first wins, and the other one fails.
         {
@@ -7041,6 +7061,26 @@ class WSLCTests
                 VERIFY_ARE_EQUAL(deleteResult, WSLC_E_CONTAINER_IS_RUNNING);
                 VERIFY_SUCCEEDED(restartHr);
             }
+        }
+
+        // A force delete is not turned away by the running-container guard, so unlike the delete above it does
+        // not have to wait for the gap between the phases: it lands while the stop phase is still in flight.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-force-delete", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+            container.SetDeleteOnClose(false);
+            VERIFY_ARE_EQUAL(restartResult.get_future().get(), WSLC_E_CONTAINER_MARKED_FOR_REMOVAL);
         }
 
         // A restart issued during a restart waits for both of the first one's phases, so the two pairs
