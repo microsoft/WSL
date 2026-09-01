@@ -566,6 +566,12 @@ void ListContainers(CLIExecutionContext& context)
 
     if (context.Args.GetValue<ArgType::Quiet>())
     {
+        // Quiet wins over an explicit format, so report that the format was dropped.
+        if (context.Args.Contains(ArgType::Format))
+        {
+            context.Terminal.Warn(L"{}\n", Localization::WSLCCLI_FormatIgnoredWithQuietWarning());
+        }
+
         // Print only the container ids
         bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         for (const auto& container : containers)

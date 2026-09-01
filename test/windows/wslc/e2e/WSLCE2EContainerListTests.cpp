@@ -187,6 +187,28 @@ class WSLCE2EContainerListTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_QuietWithFormatWarnsAndIgnoresFormat)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        const auto truncatedId = wsl::shared::string::MultiByteToWide(TruncateId(WideToMultiByte(containerId)));
+
+        // The format is ignored rather than rejected, so ids are still printed and the exit code is success.
+        result = RunWslc(L"container list --all --quiet --format json");
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_FormatIgnoredWithQuietWarning()));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(truncatedId));
+
+        // The warning is only for the combination, so an explicit format on its own stays silent.
+        result = RunWslc(L"container list --all --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
     {
         const auto result = RunWslc(L"container list --format invalid");

@@ -3137,6 +3137,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Output formatting (json or table) (Default: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_FormatIgnoredWithQuietWarning" xml:space="preserve">
+    <value>WARNING: Ignoring custom format, because both --format and --quiet are set.</value>
+    <comment>{Locked="--format "}{Locked="--quiet "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InspectFormatArgDescription" xml:space="preserve">
     <value>Output formatting (json for single-line output) (Default: indented JSON)</value>
     <comment>{Locked="json"}Command line arguments should not be translated</comment>
