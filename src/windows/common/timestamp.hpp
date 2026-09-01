@@ -49,8 +49,16 @@ std::string Rfc3339ToUtcDisplayTime(std::string_view timestamp);
 // or "3 weeks". Negative values are treated as zero.
 std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
 
+// The invariant English form of FormatElapsedSeconds, matching the strings docker produces through
+// go-units HumanDuration. Machine readable output uses this so its values do not vary by display
+// language.
+std::wstring FormatInvariantElapsedSeconds(LONGLONG elapsedSeconds);
+
 // Renders how long ago a timestamp given in seconds since the unix epoch occurred. A timestamp of
 // zero means "unset" and returns an empty string.
 std::wstring FormatRelativeTime(LONGLONG timestamp);
+
+// The invariant English form of FormatRelativeTime.
+std::wstring FormatInvariantRelativeTime(LONGLONG timestamp);
 
 } // namespace wsl::windows::common::timestamp
