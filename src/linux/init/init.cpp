@@ -381,7 +381,6 @@ ExecStop=-/bin/mount --make-rslave {})",
         // Only create the wslg unit if both enabled in wsl.conf, and if the wslg folder actually exists.
         if (enableGuiApps && access("/mnt/wslg/runtime-dir", F_OK) == 0)
         {
-
             // Note: It's not possible to use a mount unit because systemd will not mount /tmp/.X11-unix
             // if /proc/mount says it's already mounted.
 
