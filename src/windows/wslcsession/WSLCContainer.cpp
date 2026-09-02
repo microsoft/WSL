@@ -54,7 +54,6 @@ using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
 using wsl::windows::service::wslc::WSLCExecutionContext;
-using wsl::windows::service::wslc::WSLCPortMapping;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 using wsl::windows::service::wslc::WSLCVolumeMount;
@@ -138,7 +137,7 @@ std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
 // TODO: Remove once the port relay can allocate ephemeral ports.
 uint16_t AllocateEphemeralPort(int family, const char* address)
 {
-    wil::unique_socket sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
+    wil::unique_socket sock(::socket(family, SOCK_STREAM, IPPROTO_TCP));
     THROW_LAST_ERROR_IF(!sock);
 
     SOCKADDR_INET addr{};
@@ -806,9 +805,9 @@ unique_com_disconnect::~unique_com_disconnect() noexcept
     }
 }
 
-WSLCPortMapping ContainerPortMapping::Serialize() const
+wsl::windows::service::wslc::WSLCPortMapping ContainerPortMapping::Serialize() const
 {
-    return WSLCPortMapping{
+    return wsl::windows::service::wslc::WSLCPortMapping{
         .HostPort = VmMapping.HostPort(),
         .VmPort = VmMapping.VmPort ? VmMapping.VmPort->Port() : ContainerPort,
         .ContainerPort = ContainerPort,
@@ -949,7 +948,7 @@ const std::string& WSLCContainerImpl::Name() const noexcept
     return m_name;
 }
 
-std::vector<WSLCPortMapping> WSLCContainerImpl::GetPorts() const
+std::vector<wsl::windows::service::wslc::WSLCPortMapping> WSLCContainerImpl::GetPorts() const
 {
     auto lock = m_lock.lock_shared();
     if (m_state != WslcContainerStateRunning)
@@ -957,7 +956,7 @@ std::vector<WSLCPortMapping> WSLCContainerImpl::GetPorts() const
         return {};
     }
 
-    std::vector<WSLCPortMapping> result;
+    std::vector<wsl::windows::service::wslc::WSLCPortMapping> result;
     result.reserve(m_mappedPorts.size());
     for (const auto& port : m_mappedPorts)
     {

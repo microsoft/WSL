@@ -33,6 +33,8 @@ using namespace WEX::TestExecution;
 
 namespace WSLCCLIParserUnitTests {
 
+using Argument = wsl::windows::wslc::Argument;
+
 class WSLCCLIParserUnitTests
 {
     WSLC_TEST_CLASS(WSLCCLIParserUnitTests)
