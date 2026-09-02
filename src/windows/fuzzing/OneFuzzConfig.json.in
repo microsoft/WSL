@@ -1,0 +1,6 @@
+{
+  "ConfigVersion": 3,
+  "Entries": [
+${ONEFUZZ_ENTRIES}
+  ]
+}
