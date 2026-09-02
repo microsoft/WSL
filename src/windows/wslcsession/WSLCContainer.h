@@ -188,8 +188,8 @@ private:
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
-    // Returns with both locks held when no restart is in flight and no transition is active, or the
-    // active transition matches kind. Both conditions are re-checked every time the locks come back.
+    // Returns with both locks held when no transition is active (or it matches kind) and, if waitForRestart,
+    // no restart is in flight either. Both conditions are re-checked every time the locks come back.
     void WaitForConflictingTransitionToComplete(
         wil::rwlock_release_exclusive_scope_exit& lock,
         wil::rwlock_release_shared_scope_exit& lifecycleLock,
