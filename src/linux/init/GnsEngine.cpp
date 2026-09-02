@@ -593,8 +593,9 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
             manager.ResetLoopbackRoutes();
         }
 
-        // EnableIpv4ArpFilter does not need to be called per interface as each interface gets mirrored
-        // It could be global if we had a single global Init message
+        // EnableIpv4ArpFilter and EnableTcpMtuProbing are global (not per-interface) settings, so they
+        // do not need to be called per interface. They are called here as each interface gets mirrored.
+        // They could be global if we had a single global Init message
         // If there are more global init requirements in the future, we should consider a new global message
         GNS_LOG_INFO("LxGnsMessageInitialIpConfigurationNotification: Enabling IPv4 arp_filter");
         manager.EnableIpv4ArpFilter();

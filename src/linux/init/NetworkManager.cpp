@@ -553,8 +553,9 @@ void NetworkManager::EnableIpv4ArpFilter()
 void NetworkManager::EnableTcpMtuProbing()
 {
     // Sets /proc/sys/net/ipv4/tcp_mtu_probing to 2 (always enabled). This matches Windows, which has
-    // TCP PMTU black hole detection enabled by default. Note: a VPN/tunnel can advertise a bigger MTU
+    // PMTU black hole detection enabled by default. Note: a VPN/tunnel can advertise a bigger MTU
     // than the physical adapters support, so the guest probes and converges on a working TCP MSS on its own.
+    // tcp_mtu_probing is a global TCP setting that applies to both IPv4 and IPv6, so no separate v6 call is needed.
     constexpr char c_alwaysEnabledSetting[] = "2\n";
     ModifyNetSetting(AF_INET, "tcp_mtu_probing", c_alwaysEnabledSetting, strlen(c_alwaysEnabledSetting));
 }
