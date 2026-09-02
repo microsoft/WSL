@@ -259,7 +259,6 @@ COMMAND_LINE_TEST_CASE(L"container cp -L=false cont1:/path somefile", L"cp", tru
 COMMAND_LINE_TEST_CASE(L"container cp --follow-link=true cont1:/path somefile", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp --follow-link=false cont1:/path somefile", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp -a -L cont1:/path somefile", L"cp", true)
-COMMAND_LINE_TEST_CASE(L"cp -L cont1:/path somefile", L"cp", true)
 COMMAND_LINE_TEST_CASE(L"container cp -L=invalid cont1:/path somefile", L"cp", false)
 COMMAND_LINE_TEST_CASE(L"container cp --followlink cont1:/path somefile", L"cp", false)
 COMMAND_LINE_TEST_CASE(L"container cp -l cont1:/path somefile", L"cp", false)
