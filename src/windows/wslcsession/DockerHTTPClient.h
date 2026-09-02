@@ -146,7 +146,8 @@ public:
     std::unique_ptr<HTTPRequestContext> PutArchive(const std::string& ContainerID, const std::string& Path, std::optional<uint64_t> ContentLength);
     std::tuple<uint32_t, wil::unique_socket, bool> GetArchive(const std::string& ContainerID, const std::string& Path);
 
-    // Reads the X-Docker-Container-Path-Stat header for a container path. Returns nullopt if the path does not exist.
+    // Reads the X-Docker-Container-Path-Stat header for a container path. Returns nullopt if the path does not
+    // exist or the response carries no stat header. Any other failure status throws.
     std::optional<common::docker_schema::ContainerPathStat> StatArchivePath(const std::string& ContainerID, const std::string& Path);
     common::docker_schema::PruneContainerResult PruneContainers(const std::map<std::string, std::vector<std::string>>& filters = {});
 

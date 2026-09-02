@@ -64,12 +64,12 @@ struct ContainerPathStat
     std::string mtime;
     std::string linkTarget;
 
-    // Go encodes os.FileMode in the mode field; ModeSymlink is bit 27.
-    static constexpr uint32_t ModeSymlink = 1u << 27;
+    // Go encodes os.FileMode in the mode field; the symlink bit is 27.
+    static constexpr uint32_t c_modeSymlink = 1u << 27;
 
     bool IsSymlink() const
     {
-        return (mode & ModeSymlink) != 0;
+        return (mode & c_modeSymlink) != 0;
     }
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPathStat, name, size, mode, mtime, linkTarget);

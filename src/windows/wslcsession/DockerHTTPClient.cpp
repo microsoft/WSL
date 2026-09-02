@@ -443,9 +443,14 @@ std::optional<docker_schema::ContainerPathStat> DockerHTTPClient::StatArchivePat
     auto [response, socket] = SendRequest(verb::get, url, {}, {});
     socket.reset();
 
-    if (response.result_int() != 200)
+    if (response.result_int() == 404)
     {
         return std::nullopt;
+    }
+
+    if (response.result_int() != 200)
+    {
+        throw DockerHTTPException(std::move(response), verb::get, url.Get(), "", "");
     }
 
     const auto header = response["X-Docker-Container-Path-Stat"];
