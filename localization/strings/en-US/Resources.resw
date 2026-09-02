@@ -3283,7 +3283,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_PullAllTagsWithTagError" xml:space="preserve">
     <value>tag can't be used with --all-tags/-a</value>
-    <comment>{Locked="-a"}{Locked="--all-tags"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
     <value>Using default tag: {}</value>
