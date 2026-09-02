@@ -2115,20 +2115,20 @@ try
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
+
+    // Omitting the tag makes the daemon push every tag in the repository. A reference that names a
+    // tag or digest is rejected rather than silently ignored.
+    RETURN_HR_IF(E_INVALIDARG, AllTags && tagOrDigest.has_value());
+
+    if (!AllTags && !tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
     EnforceRegistryAllowlist(repo);
 
     auto lock = AcquireLease();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
-
-    // Omitting the tag makes the daemon push every tag in the repository.
-    if (AllTags)
-    {
-        tagOrDigest.reset();
-    }
-    else if (!tagOrDigest.has_value())
-    {
-        tagOrDigest = "latest";
-    }
 
     auto requestContext = m_runtime.Docker().PushImage(repo.Name, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
