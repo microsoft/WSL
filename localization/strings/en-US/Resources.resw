@@ -2985,7 +2985,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>tag can't be used with --all-tags/-a</value>
-    <comment>{Locked="--all-tags"}{Locked="-a"}Command line arguments should not be translated</comment>
+    <comment>{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
     <value>Archive mode (accepted for Docker CLI compatibility)</value>
