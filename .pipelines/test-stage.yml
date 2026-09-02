@@ -11,12 +11,39 @@ parameters:
     type: string
     default: ''
 
-  - name: versions
+  - name: test_suites
     type: object
     default:
-      - wsl1
-      - wsl2
-      - wslc
+      - id: wsl1
+        display_name: WSL1 tests
+        map: wsl1
+        run_on_rs_prerelease: true
+        run_on_other_images: true
+      - id: wsl2
+        display_name: WSL2 tests
+        map: wsl2
+        run_on_rs_prerelease: false
+        run_on_other_images: true
+      - id: wsl2_unit
+        display_name: WSL2 unit tests
+        map: wsl2-unit
+        run_on_rs_prerelease: true
+        run_on_other_images: false
+      - id: wsl2_e2e_1
+        display_name: WSL2 E2E shard 1
+        map: wsl2-e2e-1
+        run_on_rs_prerelease: true
+        run_on_other_images: false
+      - id: wsl2_e2e_2
+        display_name: WSL2 E2E shard 2
+        map: wsl2-e2e-2
+        run_on_rs_prerelease: true
+        run_on_other_images: false
+      - id: wslc
+        display_name: WSLC tests
+        map: wslc
+        run_on_rs_prerelease: true
+        run_on_other_images: true
 
   - name: test_images
     type: object
@@ -40,14 +67,16 @@ stages:
   ${{ else }}:
     dependsOn: [build_x64]
   jobs:
-      - ${{ each version in parameters.versions }}:
+      - ${{ each suite in parameters.test_suites }}:
         - ${{ each image in parameters.test_images }}:
           - template: test-job.yml@self
             parameters:
               branch: "${{ image.name }}"
-              version: ${{ version }}
+              test: "${{ suite.id }}"
+              testDisplayName: "${{ suite.display_name }}"
+              testMap: "${{ suite.map }}"
               image: "${{ image.image }}"
               # Skip the WSLC suite on Server images: it triggers a Hyper-V VMBus
               # PowerOff hang during VM teardown that times out the job.
-              run: ${{ and(or(not(parameters.rs_prerelease_only), eq(image.name, 'rs_prerelease')), or(ne(version, 'wslc'), ne(image.server, true))) }}
+              run: ${{ and(or(not(parameters.rs_prerelease_only), eq(image.name, 'rs_prerelease')), or(and(eq(image.name, 'rs_prerelease'), suite.run_on_rs_prerelease), and(ne(image.name, 'rs_prerelease'), suite.run_on_other_images)), or(ne(suite.id, 'wslc'), ne(image.server, true))) }}
               pool: "${{ parameters.pool }}"
