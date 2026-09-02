@@ -101,7 +101,7 @@ class WSLCE2EImageSaveTests
 
         TestImageRegistry::Instance().Delete(DebianImage);
 
-        // wslc surfaces no layer progress, so a quiet load is byte-identical to a plain one and the
+        // wslc surfaces no layer progress, so --quiet only suppresses a progress display; the
         // "Loaded image:" line must still appear.
         auto quietResult = RunWslc(std::format(L"image load --quiet --input \"{}\"", SavedArchivePath.wstring()));
         quietResult.Verify({.Stderr = L"", .ExitCode = 0});

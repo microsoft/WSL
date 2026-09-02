@@ -2629,7 +2629,7 @@ Usage: wslc container cp [OPTIONS] SOURCE DEST
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
   <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
-    <value>Suppress progress output during copy. Progress output is automatically suppressed if no terminal is attached</value>
+    <value>Suppress progress output during copy</value>
   </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Invalid destination format. Expected CONTAINER:PATH</value>

@@ -131,7 +131,7 @@ class WSLCE2EPushPullTests
         auto session = OpenDefaultElevatedSession();
 
         {
-            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15005);
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15006);
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
             auto registryImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
