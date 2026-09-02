@@ -12,7 +12,6 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include <set>
 #include "windows/Common.h"
 #include "ImageModel.h"
 #include "WSLCExecutor.h"
@@ -474,23 +473,7 @@ class WSLCE2EImageListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_All_IsSupersetOfDefault)
     {
-        const auto collectIds = [](const std::wstring& command) {
-            auto result = RunWslc(command);
-            result.Verify({.Stderr = L"", .ExitCode = 0});
-
-            std::set<std::wstring> ids;
-            for (const auto& line : result.GetStdoutLines())
-            {
-                if (!line.empty())
-                {
-                    ids.insert(line);
-                }
-            }
-
-            return ids;
-        };
-
-        const auto defaultIds = collectIds(L"image list --quiet --no-trunc");
+        const auto defaultIds = RunWslcAndGetStdoutLineSet(L"image list --quiet --no-trunc");
         VERIFY_IS_FALSE(defaultIds.empty(), L"Expected the loaded test images in `image list --quiet` output");
 
         // --all may surface intermediate images the default listing hides, but it must never drop
@@ -499,7 +482,7 @@ class WSLCE2EImageListTests
              {L"image list --all --quiet --no-trunc", L"image list -a --quiet --no-trunc", L"images --all --quiet --no-trunc"})
         {
             WEX::Logging::Log::Comment((std::wstring{L"Verifying --all superset for: "} + spelling).c_str());
-            const auto allIds = collectIds(spelling);
+            const auto allIds = RunWslcAndGetStdoutLineSet(spelling);
 
             for (const auto& id : defaultIds)
             {
