@@ -2407,7 +2407,6 @@ void WSLCSession::WaitForPendingCreateCompletion(const std::shared_ptr<PendingCo
     auto io = CreateIOContext();
     io.AddHandle(std::make_unique<io::EventHandle>(PendingCreate->Completed.get()));
 
-    std::exception_ptr timeoutException;
     try
     {
         io.Run(c_containerCreateEventTimeout);
@@ -2419,41 +2418,13 @@ void WSLCSession::WaitForPendingCreateCompletion(const std::shared_ptr<PendingCo
             throw;
         }
 
-        timeoutException = std::current_exception();
-    }
-
-    if (timeoutException)
-    {
-        bool ownsTimeout = false;
+        // Fail this create rather than leaving m_pendingCreate set, which would wedge every later one.
+        // Any container docker did manage to create is left behind; the same broken event stream makes
+        // deleting it unreliable, and a late create event is ignored once m_pendingCreate is cleared.
+        std::lock_guard containersLock{m_containersLock};
+        if (m_pendingCreate == PendingCreate)
         {
-            std::lock_guard containersLock{m_containersLock};
-            if (m_pendingCreate == PendingCreate && !PendingCreate->TimedOut)
-            {
-                PendingCreate->TimedOut = true;
-                ownsTimeout = true;
-            }
-        }
-
-        if (ownsTimeout)
-        {
-            try
-            {
-                m_runtime.Docker().DeleteContainer(PendingCreate->Container->ID(), true, true);
-            }
-            CATCH_LOG_MSG(
-                "Failed to delete container '%hs' after waiting for its Docker create event timed out",
-                PendingCreate->Container->ID().c_str());
-
-            std::lock_guard containersLock{m_containersLock};
-            if (m_pendingCreate == PendingCreate)
-            {
-                CompletePendingCreate(PendingCreate, std::move(timeoutException));
-            }
-        }
-        else
-        {
-            // Another waiter either observed the create event or owns timeout cleanup.
-            io.Run({});
+            CompletePendingCreate(PendingCreate, std::current_exception());
         }
     }
 
@@ -2488,7 +2459,7 @@ try
     std::lock_guard containersLock{m_containersLock};
 
     // Containers created behind our back (BuildKit, for instance) have no pending create to match.
-    if (!m_pendingCreate || m_pendingCreate->TimedOut || m_pendingCreate->Container->ID() != ContainerId)
+    if (!m_pendingCreate || m_pendingCreate->Container->ID() != ContainerId)
     {
         return;
     }

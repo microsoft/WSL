@@ -7050,7 +7050,9 @@ class WSLCTests
 
         WSLCFilter filters[]{{"container", id.c_str()}, {"event", "kill"}};
         wil::com_ptr<IWSLCEventStream> stream;
-        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 30;
+
+        // The window doubles as a hang guard, so it must comfortably outlast the waits below.
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 120;
         VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, filters, ARRAYSIZE(filters), &stream));
 
         wil::unique_cotaskmem_ansistring firstEventJson;

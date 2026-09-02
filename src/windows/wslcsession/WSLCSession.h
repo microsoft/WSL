@@ -333,7 +333,6 @@ private:
         wil::unique_event Completed{wil::EventOptions::ManualReset};
         std::shared_ptr<WSLCContainerImpl> Container;
         std::exception_ptr Exception;
-        bool TimedOut{};
     };
 
     __requires_lock_held(m_containersLock) std::shared_ptr<PendingContainerCreate> StartPendingCreate(std::shared_ptr<WSLCContainerImpl> Container);
