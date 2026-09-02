@@ -33,8 +33,9 @@ namespace {
         return !lines.empty() && lines.front().find(column) != std::wstring::npos;
     }
 
-    // The SIZE cell is the writable layer followed by the total in parentheses. Only the text the
-    // localized pattern places between the two sizes is fixed, so assertions key off that.
+    // The SIZE cell is the writable layer and the total, joined by fixed text from the localized
+    // pattern. Only that separator is stable enough to assert on, and translations may emit the two
+    // sizes in either order, so it is taken from between whichever placeholder lands first.
     std::wstring VirtualSizeSeparator()
     {
         constexpr auto writablePlaceholder = L"<writable>";
@@ -46,10 +47,11 @@ namespace {
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, writablePosition);
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, totalPosition);
 
-        const auto begin = writablePosition + wcslen(writablePlaceholder);
-        VERIFY_IS_TRUE(begin <= totalPosition);
+        const auto writableFirst = writablePosition < totalPosition;
+        const auto begin = writableFirst ? writablePosition + wcslen(writablePlaceholder) : totalPosition + wcslen(totalPlaceholder);
+        const auto end = writableFirst ? totalPosition : writablePosition;
 
-        return pattern.substr(begin, totalPosition - begin);
+        return pattern.substr(begin, end - begin);
     }
 } // namespace
 
