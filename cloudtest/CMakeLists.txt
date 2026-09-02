@@ -116,10 +116,16 @@ set(WSL2_E2E_2_FILTER "${NON_WSLC_FILTER} AND NOT ${WSL2_UNIT_CLASSES} AND NOT $
 
 foreach(image ${CLOUDTEST_IMAGES})
     add_test_group("${image}" "1" "wsl1" "${NON_WSLC_FILTER}" INCLUDE_UNIT_TESTS INCLUDE_TEST_PACKAGES)
-    add_test_group("${image}" "2" "wsl2" "${NON_WSLC_FILTER}" INCLUDE_UNIT_TESTS INCLUDE_TEST_PACKAGES)
     add_test_group("${image}" "2" "wsl2-unit" "${WSL2_UNIT_FILTER}" INCLUDE_UNIT_TESTS)
     add_test_group("${image}" "2" "wsl2-e2e-1" "${WSL2_E2E_1_FILTER}" INCLUDE_UNIT_TESTS)
-    add_test_group("${image}" "2" "wsl2-e2e-2" "${WSL2_E2E_2_FILTER}" INCLUDE_UNIT_TESTS INCLUDE_TEST_PACKAGES)
+    add_test_group(
+        "${image}"
+        "2"
+        "wsl2-e2e-2"
+        "${WSL2_E2E_2_FILTER}"
+        INCLUDE_UNIT_TESTS
+        INCLUDE_TEST_DATA
+        INCLUDE_TEST_PACKAGES)
     if (NOT "${image}" IN_LIST CLOUDTEST_SERVER_IMAGES)
         add_test_group("${image}" "2" "wslc" "@TestCategory='WSLC'" INCLUDE_TEST_DATA)
     endif()
