@@ -41,11 +41,15 @@ namespace {
         constexpr auto totalPlaceholder = L"<total>";
 
         const auto pattern = Localization::WSLCCLI_ContainerSizeWithVirtual(writablePlaceholder, totalPlaceholder);
-        const auto begin = pattern.find(writablePlaceholder) + wcslen(writablePlaceholder);
-        const auto end = pattern.find(totalPlaceholder);
-        VERIFY_IS_TRUE(begin < end && end != std::wstring::npos);
+        const auto writablePosition = pattern.find(writablePlaceholder);
+        const auto totalPosition = pattern.find(totalPlaceholder);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, writablePosition);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, totalPosition);
 
-        return pattern.substr(begin, end - begin);
+        const auto begin = writablePosition + wcslen(writablePlaceholder);
+        VERIFY_IS_TRUE(begin <= totalPosition);
+
+        return pattern.substr(begin, totalPosition - begin);
     }
 } // namespace
 
