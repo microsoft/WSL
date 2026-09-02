@@ -292,8 +292,17 @@ void PushImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
+    auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
+
+    const auto reference = ImageReference::Parse(image);
+
+    // A name-only reference resolves to the "latest" tag. Pinning it here keeps the operation scoped to that one
+    // tag; a reference carrying no tag reaches the registry as a request to push every tag in the repository.
+    if (reference.Format == EnumReferenceFormatNone)
+    {
+        image += ":latest";
+    }
 
     std::optional<ImageProgressCallback> callback;
     if (!quiet)
@@ -306,7 +315,7 @@ void PushImage(CLIExecutionContext& context)
 
     if (quiet)
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(ImageReference::Parse(image).GetCanonical()));
+        context.Terminal.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
     }
 }
 

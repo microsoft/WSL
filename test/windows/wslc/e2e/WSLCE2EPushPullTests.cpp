@@ -152,6 +152,41 @@ class WSLCE2EPushPullTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Push_NameOnlyPushesLatestOnly)
+    {
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
+
+        auto session = OpenDefaultElevatedSession();
+
+        {
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15007);
+            auto registryAddressW = string::MultiByteToWide(registryAddress);
+
+            // Two tags in one repository, so a push that resolved to the whole repository instead of a single tag
+            // would be observable.
+            auto latestImage = TagImageForRegistry(testImage.NameAndTag(), registryAddressW);
+            auto repository = latestImage.substr(0, latestImage.rfind(L':'));
+            auto otherImage = std::format(L"{}:other", repository);
+
+            RunWslcAndVerify(std::format(L"image tag {} {}", latestImage, otherImage), {.ExitCode = 0});
+
+            auto tagCleanup = wil::scope_exit([&]() {
+                RunWslc(std::format(L"image delete --force {}", otherImage));
+                RunWslc(std::format(L"image delete --force {}", latestImage));
+            });
+
+            // A name-only reference resolves to the "latest" tag, which quiet mode reports as the canonical reference.
+            auto result = RunWslc(std::format(L"push --quiet {}", repository));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_ARE_EQUAL(latestImage, result.GetStdoutOneLine());
+
+            // Only "latest" reached the registry, so the second tag cannot be pulled back once the local copy is gone.
+            RunWslcAndVerify(std::format(L"image delete --force {}", otherImage), {.ExitCode = 0});
+            RunWslc(std::format(L"pull {}", otherImage)).Verify({.ExitCode = 1});
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Push_QuietOption_FailurePrintsNoReference)
     {
         // The canonical reference is only printed once the push has succeeded, so a failed quiet
