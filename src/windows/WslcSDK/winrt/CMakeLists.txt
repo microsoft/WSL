@@ -57,10 +57,13 @@ add_dependencies(wslcsdkwinrt wslcsdkwinrtidl)
 
 set(MODULE_G_CPP ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/module.g.cpp)
 target_sources(wslcsdkwinrt PRIVATE ${MODULE_G_CPP})
+# The generated module mixes classic COM and C++/WinRT headers, so sharing a
+# translation unit with a projection source makes IUnknown ambiguous.
 set_source_files_properties(
     ${MODULE_G_CPP}
     PROPERTIES
-    GENERATED TRUE)
+    GENERATED TRUE
+    SKIP_UNITY_BUILD_INCLUSION ON)
 
 target_precompile_headers(wslcsdkwinrt PRIVATE precomp.h)
 target_include_directories(wslcsdkwinrt PRIVATE

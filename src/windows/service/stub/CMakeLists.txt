@@ -15,3 +15,7 @@ add_library(wslserviceproxystub SHARED ${SOURCES})
 add_dependencies(wslserviceproxystub wslserviceidl)
 target_link_libraries(wslserviceproxystub ${COMMON_LINK_LIBRARIES})
 set_target_properties(wslserviceproxystub PROPERTIES FOLDER windows)
+
+# MIDL generated proxy files each define their own MIDL_TYPE_FORMAT_STRING and
+# related symbols, so they can't share a translation unit.
+set_target_properties(wslserviceproxystub PROPERTIES UNITY_BUILD OFF)

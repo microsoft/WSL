@@ -2485,6 +2485,10 @@ Usage:
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:/tmp/.X11-unix/X0 < /dev/null"), 0L);
 
+            // Validate that distro-provided tmpfiles rules cannot modify the read-only X11 mount.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/tmpfiles.d/x11.conf"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemd-tmpfiles --create --boot x11.conf"), 0L);
+
             // Validate the runtime dir exists and the wayland-0 socket is in the expected location.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep XDG_RUNTIME_DIR="), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d $XDG_RUNTIME_DIR"), 0L);
@@ -2498,6 +2502,7 @@ Usage:
             auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"echo ok");
             VERIFY_ARE_EQUAL(L"ok\n", output);
             VERIFY_ARE_EQUAL(L"", warnings);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/tmpfiles.d/x11.conf"), 0L);
 
             // Validate that WSLg-related environment variables are not present.
             //
