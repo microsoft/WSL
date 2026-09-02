@@ -598,6 +598,9 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
         // If there are more global init requirements in the future, we should consider a new global message
         GNS_LOG_INFO("LxGnsMessageInitialIpConfigurationNotification: Enabling IPv4 arp_filter");
         manager.EnableIpv4ArpFilter();
+
+        GNS_LOG_INFO("LxGnsMessageInitialIpConfigurationNotification: Enabling TCP MTU probing");
+        manager.EnableTcpMtuProbing();
         break;
     }
     case LxGnsMessageSetupIpv6:

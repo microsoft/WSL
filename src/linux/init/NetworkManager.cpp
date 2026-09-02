@@ -501,6 +501,14 @@ void NetworkManager::ModifyNetSetting(int addressFamily, const char* settingName
     Syscall(write, fd.get(), settingValue, settingValueLen);
 }
 
+void NetworkManager::ModifyNetSetting(int addressFamily, const char* settingName, const char* settingValue, size_t settingValueLen)
+{
+    const std::filesystem::path settingFilePath =
+        std::format("/proc/sys/net/{}/{}", ((addressFamily == AF_INET) ? "ipv4" : "ipv6"), settingName);
+    wil::unique_fd fd(Syscall(open, settingFilePath.c_str(), (O_WRONLY | O_CLOEXEC)));
+    Syscall(write, fd.get(), settingValue, settingValueLen);
+}
+
 void NetworkManager::DisableRouterDiscovery()
 {
     ModifyNetSetting(AF_INET6, "accept_ra", "all", c_disableSetting, strlen(c_disableSetting));
@@ -540,6 +548,15 @@ void NetworkManager::EnableIpv4ArpFilter()
     // duplicate which causes the host fail DAD, and DHCP immediately requests a new address (this will just continue in a loop)
     ModifyNetSetting(AF_INET, "arp_filter", "all", c_enableSetting, strlen(c_enableSetting));
     ModifyNetSetting(AF_INET, "arp_filter", "default", c_enableSetting, strlen(c_enableSetting));
+}
+
+void NetworkManager::EnableTcpMtuProbing()
+{
+    // Sets /proc/sys/net/ipv4/tcp_mtu_probing to 2 (always enabled). This matches Windows, which has
+    // TCP PMTU black hole detection enabled by default. Note: a VPN/tunnel can advertise a bigger MTU
+    // than the physical adapters support, so the guest probes and converges on a working TCP MSS on its own.
+    constexpr char c_alwaysEnabledSetting[] = "2\n";
+    ModifyNetSetting(AF_INET, "tcp_mtu_probing", c_alwaysEnabledSetting, strlen(c_alwaysEnabledSetting));
 }
 
 wsl::shared::conncheck::ConnCheckResult NetworkManager::SendConnectRequest(const char* remoteAddress)

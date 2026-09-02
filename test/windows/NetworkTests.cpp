@@ -4917,6 +4917,7 @@ class MirroredTests
             {L"/proc/sys/net/ipv6/conf/default/use_tempaddr", L"0\n"},
             {L"/proc/sys/net/ipv4/conf/all/arp_filter", L"1\n"},
             {L"/proc/sys/net/ipv4/conf/all/rp_filter", L"0\n"},
+            {L"/proc/sys/net/ipv4/tcp_mtu_probing", L"2\n"},
         };
 
         settings.push_back({L"/proc/sys/net/ipv4/conf/" + NetworkTests::GetGelNicDeviceName() + L"/rp_filter", L"0\n"});
