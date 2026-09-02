@@ -58,8 +58,8 @@ std::string FormatStatsIo(uint64_t Bytes)
 // The ps SIZE column: the writable layer on its own, and the total including the read-only image
 // layers in parentheses. The suffix is guarded on 'SizeRootFs > 0', so a zero total renders as the
 // writable size alone; the daemon reports zero both when the size was not requested and when there
-// is no parent layer to measure.
-std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs)
+// is no parent layer to measure. The table is localized while json keeps the invariant form.
+std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs, FormatType format)
 {
     const auto writable = FormatHumanReadableSize(static_cast<uint64_t>(std::max<LONGLONG>(SizeRw, 0)), c_statsIoPrecision);
     if (SizeRootFs <= 0)
@@ -67,7 +67,13 @@ std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs)
         return writable;
     }
 
-    return std::format(L"{} (virtual {})", writable, FormatHumanReadableSize(static_cast<uint64_t>(SizeRootFs), c_statsIoPrecision));
+    const auto total = FormatHumanReadableSize(static_cast<uint64_t>(SizeRootFs), c_statsIoPrecision);
+    if (format == FormatType::Json)
+    {
+        return std::format(L"{} (virtual {})", writable, total);
+    }
+
+    return Localization::WSLCCLI_ContainerSizeWithVirtual(writable, total);
 }
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
@@ -142,8 +148,8 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 // Builds the representation of a container, shared by the table and json output so the two cannot
 // drift. Every value is emitted as a string apart from the platform object, and the id is truncated
-// unless --no-trunc is passed. RunningFor and Status are the only fields that vary with the format:
-// docker renders them in invariant English, so json keeps that while the table is localized.
+// unless --no-trunc is passed. RunningFor, Size and Status are the only fields that vary with the
+// format: docker renders them in invariant English, so json keeps that while the table is localized.
 ContainerOutputInformation ToContainerOutput(const ContainerInformation& container, bool truncate, FormatType format)
 {
     ContainerOutputInformation entry;
@@ -166,7 +172,7 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
         format == FormatType::Json ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
     // The daemon only computes container sizes when the listing request asks for them, so this is a
     // formatted zero unless --size was passed.
-    entry.Size = WideToMultiByte(FormatContainerSize(container.SizeRw, container.SizeRootFs));
+    entry.Size = WideToMultiByte(FormatContainerSize(container.SizeRw, container.SizeRootFs, format));
     entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
     entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt, format));
 

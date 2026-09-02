@@ -32,6 +32,21 @@ namespace {
         const auto lines = result.GetStdoutLines();
         return !lines.empty() && lines.front().find(column) != std::wstring::npos;
     }
+
+    // The SIZE cell is the writable layer followed by the total in parentheses. Only the text the
+    // localized pattern places between the two sizes is fixed, so assertions key off that.
+    std::wstring VirtualSizeSeparator()
+    {
+        constexpr auto writablePlaceholder = L"<writable>";
+        constexpr auto totalPlaceholder = L"<total>";
+
+        const auto pattern = Localization::WSLCCLI_ContainerSizeWithVirtual(writablePlaceholder, totalPlaceholder);
+        const auto begin = pattern.find(writablePlaceholder) + wcslen(writablePlaceholder);
+        const auto end = pattern.find(totalPlaceholder);
+        VERIFY_IS_TRUE(begin < end && end != std::wstring::npos);
+
+        return pattern.substr(begin, end - begin);
+    }
 } // namespace
 
 class WSLCE2EContainerListTests
@@ -232,7 +247,7 @@ class WSLCE2EContainerListTests
 
         auto sizedLine = findContainerLine(result);
         VERIFY_IS_TRUE(sizedLine.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, sizedLine->find(L"(virtual "));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, sizedLine->find(VirtualSizeSeparator()));
 
         // -s is the short alias and produces the same column.
         auto aliasResult = RunWslc(L"container list -s");
@@ -241,7 +256,7 @@ class WSLCE2EContainerListTests
 
         auto aliasLine = findContainerLine(aliasResult);
         VERIFY_IS_TRUE(aliasLine.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, aliasLine->find(L"(virtual "));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, aliasLine->find(VirtualSizeSeparator()));
 
         // ps is an alias of list and accepts the option too.
         auto psResult = RunWslc(L"ps --size");
