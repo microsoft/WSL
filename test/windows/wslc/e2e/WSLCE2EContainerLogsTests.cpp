@@ -84,7 +84,7 @@ class WSLCE2EContainerLogsTests
         auto result = RunWslc(L"container logs --help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--details"));
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Show extra details provided to logs"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(wsl::shared::Localization::WSLCCLI_DetailsArgDescription()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Timestamps)
