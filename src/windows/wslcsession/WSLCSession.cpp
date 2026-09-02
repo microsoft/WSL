@@ -44,6 +44,7 @@ constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 constexpr uint32_t c_progressPrecision = 4;
+constexpr auto c_containerCreateEventTimeout = std::chrono::seconds{60};
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
 // session's IdleTimeoutSec setting is 0/unset). This avoids thrashing the VM (repeated
@@ -2405,7 +2406,56 @@ void WSLCSession::WaitForPendingCreateCompletion(const std::shared_ptr<PendingCo
 {
     auto io = CreateIOContext();
     io.AddHandle(std::make_unique<io::EventHandle>(PendingCreate->Completed.get()));
-    io.Run({});
+
+    std::exception_ptr timeoutException;
+    try
+    {
+        io.Run(c_containerCreateEventTimeout);
+    }
+    catch (...)
+    {
+        if (wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_TIMEOUT))
+        {
+            throw;
+        }
+
+        timeoutException = std::current_exception();
+    }
+
+    if (timeoutException)
+    {
+        bool ownsTimeout = false;
+        {
+            std::lock_guard containersLock{m_containersLock};
+            if (m_pendingCreate == PendingCreate && !PendingCreate->TimedOut)
+            {
+                PendingCreate->TimedOut = true;
+                ownsTimeout = true;
+            }
+        }
+
+        if (ownsTimeout)
+        {
+            try
+            {
+                m_runtime.Docker().DeleteContainer(PendingCreate->Container->ID(), true, true);
+            }
+            CATCH_LOG_MSG(
+                "Failed to delete container '%hs' after waiting for its Docker create event timed out",
+                PendingCreate->Container->ID().c_str());
+
+            std::lock_guard containersLock{m_containersLock};
+            if (m_pendingCreate == PendingCreate)
+            {
+                CompletePendingCreate(PendingCreate, std::move(timeoutException));
+            }
+        }
+        else
+        {
+            // Another waiter either observed the create event or owns timeout cleanup.
+            io.Run({});
+        }
+    }
 
     WI_ASSERT(PendingCreate->Completed.is_signaled());
 }
@@ -2438,7 +2488,7 @@ try
     std::lock_guard containersLock{m_containersLock};
 
     // Containers created behind our back (BuildKit, for instance) have no pending create to match.
-    if (!m_pendingCreate || m_pendingCreate->Container->ID() != ContainerId)
+    if (!m_pendingCreate || m_pendingCreate->TimedOut || m_pendingCreate->Container->ID() != ContainerId)
     {
         return;
     }

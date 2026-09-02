@@ -5,7 +5,6 @@
 #include "WSLCSession.h"
 #include "WSLCExecutionContext.h"
 #include <chrono>
-#include "wslc_schema.h"
 
 using wsl::shared::Localization;
 
@@ -20,7 +19,9 @@ namespace {
             return std::nullopt;
         }
 
-        return std::chrono::sys_seconds{std::chrono::seconds{TimeSeconds}};
+        // Waiting on a bound converts it to the system clock's 100ns ticks, which a far-future second would overflow.
+        constexpr auto c_maxBound = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::time_point::max());
+        return std::min(std::chrono::sys_seconds{std::chrono::seconds{TimeSeconds}}, c_maxBound);
     }
 
 } // namespace
@@ -193,13 +194,14 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
         const auto event = GetLockHeld(SequenceNumber.value()).value();
         const std::chrono::sys_seconds eventTime{std::chrono::seconds{event.time}};
 
-        // Advance in delivery order before applying the time window. Docker timestamps are not an
-        // ordering key, so an event past Until cannot prove that every later event is also past it.
+        // Advance in delivery order before applying the time window.
         SequenceNumber.value()++;
 
+        // Events are appended in non-decreasing timestamp order (see Append()), so once we reach the
+        // exclusive Until bound, the stream is finished.
         if (Until.has_value() && eventTime >= Until.value())
         {
-            continue;
+            return std::nullopt;
         }
 
         // Return the event if it falls within the since-bound and matches the caller's filters;
@@ -242,6 +244,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, EventJson);
     *EventJson = nullptr;
 
+    std::lock_guard lock(m_lock);
     const auto event = m_store->Get(m_nextSequenceNumber, m_since, m_until, m_filters);
     if (!event.has_value())
     {

@@ -81,7 +81,8 @@ private:
     std::optional<std::chrono::sys_seconds> m_until;
     std::map<std::string, std::vector<std::string>> m_filters;
 
-    std::optional<uint64_t> m_nextSequenceNumber;
+    std::mutex m_lock;
+    _Guarded_by_(m_lock) std::optional<uint64_t> m_nextSequenceNumber;
 };
 
 } // namespace wsl::windows::service::wslc

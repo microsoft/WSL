@@ -6963,6 +6963,15 @@ class WSLCTests
         verifyEventFilter("stop");
         verifyEventFilter("destroy");
 
+        // Values sharing a filter key are OR'd.
+        {
+            WSLCFilter filters[]{{"container", id.c_str()}, {"event", "create"}, {"event", "destroy"}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
+
+            verifyEvents(drain(stream.get()), id, {"create", "destroy"});
+        }
+
         // Image events are not recorded yet, so a 'type=image' filter excludes the container's
         // events and leaves the stream empty.
         {
@@ -6990,6 +6999,126 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(EventStreamReportsLostEvents)
+    {
+        // One more than the store's ring capacity, so the reader's next slot is guaranteed evicted.
+        constexpr size_t c_signalsToEvictReader = 257;
+
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-stream-overrun", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        WSLCFilter filter{"container", id.c_str()};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, 0, &filter, 1, &stream));
+
+        // Read one event to place the reader's cursor inside the ring.
+        wil::unique_cotaskmem_ansistring eventJson;
+        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        const auto firstEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
+        VERIFY_ARE_EQUAL("create", firstEvent.Action);
+        VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
+
+        // Docker emits a 'kill' event per signal. SIGWINCH is ignored by an unhandling init process, so the
+        // container keeps running and each signal costs only one event.
+        for (size_t i = 0; i < c_signalsToEvictReader; ++i)
+        {
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGWINCH));
+        }
+
+        // Stopping waits for the 'die' event, which Docker delivers after every preceding 'kill'. Without this
+        // barrier the reader could be checked before the ring has overrun it.
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+
+        VERIFY_ARE_EQUAL(WSLC_E_EVENTS_LOST, stream->GetNext(&eventJson));
+
+        // Reporting the gap resyncs the reader, so it resumes from the oldest event still buffered.
+        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        const auto resumedEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
+        VERIFY_ARE_EQUAL("kill", resumedEvent.Action);
+        VERIFY_ARE_EQUAL(id, resumedEvent.Actor.ID);
+    }
+
+    WSLC_TEST_METHOD(EventStreamSerializesConcurrentReaders)
+    {
+        constexpr auto c_containerName = "wslc-test-concurrent-event-readers";
+
+        WSLCContainerLauncher launcher("debian:latest", c_containerName, {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        WSLCFilter filters[]{{"container", id.c_str()}, {"event", "kill"}};
+        wil::com_ptr<IWSLCEventStream> stream;
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 30;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, filters, ARRAYSIZE(filters), &stream));
+
+        wil::unique_cotaskmem_ansistring firstEventJson;
+        wil::unique_cotaskmem_ansistring secondEventJson;
+        HRESULT firstResult{};
+        HRESULT secondResult{};
+        wil::unique_event firstReaderStarted{wil::EventOptions::ManualReset};
+        wil::unique_event secondReaderStarted{wil::EventOptions::ManualReset};
+        std::thread firstReader;
+        std::thread secondReader;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGWINCH));
+            LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGWINCH));
+
+            if (firstReader.joinable())
+            {
+                firstReader.join();
+            }
+
+            if (secondReader.joinable())
+            {
+                secondReader.join();
+            }
+        });
+
+        firstReader = std::thread([&]() {
+            firstReaderStarted.SetEvent();
+            firstResult = stream->GetNext(&firstEventJson);
+        });
+        VERIFY_IS_TRUE(firstReaderStarted.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(firstReader.native_handle(), 100));
+
+        secondReader = std::thread([&]() {
+            secondReaderStarted.SetEvent();
+            secondResult = stream->GetNext(&secondEventJson);
+        });
+        VERIFY_IS_TRUE(secondReaderStarted.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(secondReader.native_handle(), 100));
+
+        HANDLE readers[]{firstReader.native_handle(), secondReader.native_handle()};
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGWINCH));
+
+        const DWORD completedReader = WaitForMultipleObjects(ARRAYSIZE(readers), readers, FALSE, 30 * 1000);
+        VERIFY_IS_TRUE(completedReader == WAIT_OBJECT_0 || completedReader == WAIT_OBJECT_0 + 1);
+
+        // One event completes exactly one call; the other stays serialized until another event arrives.
+        const DWORD pendingReader = completedReader == WAIT_OBJECT_0 ? 1 : 0;
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[pendingReader], 100));
+
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGWINCH));
+        VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForMultipleObjects(ARRAYSIZE(readers), readers, TRUE, 30 * 1000));
+
+        firstReader.join();
+        secondReader.join();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(firstResult);
+        VERIFY_SUCCEEDED(secondResult);
+
+        const auto firstEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(firstEventJson.get());
+        const auto secondEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(secondEventJson.get());
+        VERIFY_ARE_EQUAL("kill", firstEvent.Action);
+        VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
+        VERIFY_ARE_EQUAL("kill", secondEvent.Action);
+        VERIFY_ARE_EQUAL(id, secondEvent.Actor.ID);
+    }
+
     WSLC_TEST_METHOD(EventStreamSessionTerminationAbortsReader)
     {
         WSLCFilter filter{"type", "container"};
@@ -7010,7 +7139,8 @@ class WSLCTests
         auto restore = ResetTestSession();
 
         // Termination wakes the parked reader; it must finish quickly and report E_ABORT.
-        VERIFY_ARE_EQUAL(std::future_status::ready, future.wait_for(10s));
+        FAIL_FAST_IF_MSG(
+            future.wait_for(10s) != std::future_status::ready, "event stream reader did not abort after session termination");
         VERIFY_ARE_EQUAL(E_ABORT, future.get());
     }
 
