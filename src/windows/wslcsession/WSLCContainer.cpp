@@ -1469,76 +1469,71 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
         m_restart = restart;
     }
 
-    // N.B. Nothing between here and restartCleanup below may throw — nothing clears m_restart until it
-    // is armed, and it must follow failureCleanup so it runs first (see the N.B. on OnFailedRestart).
-    auto failureCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { OnFailedRestart(); });
+    // N.B. Nothing between here and the cleanup below may throw — nothing clears m_restart until it is armed.
+    bool succeeded = false;
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, restart, &succeeded]() {
+        // N.B. Signalled last so a waiter cannot observe the restart as complete before the failure
+        // cleanup below has published its delete.
+        auto release = wil::scope_exit([&restart]() { restart->Completed.SetEvent(); });
 
-    {
-        auto restartCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, restart]() {
-            {
-                auto lock = m_lock.lock_exclusive();
-
-                // CommitState() clears this once the start phase lands, so a later restart may already own it.
-                if (m_restart == restart)
-                {
-                    m_restart.reset();
-                }
-            }
-
-            restart->Completed.SetEvent();
-        });
-
-        if (wasRunning)
-        {
-            StopPhase(Signal, TimeoutSeconds, /* Kill */ false, /* RestartPhase */ true);
-        }
-
-        StartPhase(WSLCContainerStartFlagsNone, nullptr, /* RestartPhase */ true);
-    }
-
-    failureCleanup.release();
-}
-
-// N.B. Runs after the restart transaction has been released, so the delete below is no longer
-// suppressed by OnStopped().
-void WSLCContainerImpl::OnFailedRestart() noexcept
-{
-    try
-    {
         std::shared_ptr<StateTransition> transition;
 
         {
             auto lifecycleLock = m_lifecycleLock.lock_shared();
             auto lock = m_lock.lock_exclusive();
 
-            // The start phase waits for the start event after Docker has accepted the start, so it can throw
-            // on a container that is coming up. Leave that container alone; it still owns its resources.
-            if (m_transition || m_state == WslcContainerStateRunning)
+            // CommitState() clears this once the start phase lands, so a later restart may already own it.
+            if (m_restart == restart)
             {
-                return;
+                m_restart.reset();
             }
 
-            // The stop phase held these back for a start phase that never landed.
-            if (m_runtimeResourcesHeld)
+            if (!succeeded)
             {
-                ReleaseRuntimeResources();
+                transition = OnFailedRestartExclusiveLockHeld();
             }
-
-            if (WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm) || m_state != WslcContainerStateExited)
-            {
-                return;
-            }
-
-            // N.B. A Start() released by restartCleanup is already queued on m_lock, so the removal is
-            // requested in the same scope as the checks above rather than through Delete(), which would
-            // let that Start() bring the container back up before the force delete lands.
-            RequestDeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
-            transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
         }
 
-        AttachToTransition(transition);
+        if (transition)
+        {
+            AttachToTransition(transition);
+        }
+    });
+
+    if (wasRunning)
+    {
+        StopPhase(Signal, TimeoutSeconds, /* Kill */ false, /* RestartPhase */ true);
     }
-    CATCH_LOG()
+
+    StartPhase(WSLCContainerStartFlagsNone, nullptr, /* RestartPhase */ true);
+    succeeded = true;
+}
+
+// N.B. Runs with m_restart already cleared, so the delete below is no longer suppressed by OnStopped().
+__requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateTransition> WSLCContainerImpl::OnFailedRestartExclusiveLockHeld()
+{
+    // The start phase waits for the start event after Docker has accepted the start, so it can throw
+    // on a container that is coming up. Leave that container alone; it still owns its resources.
+    if (m_transition || m_state == WslcContainerStateRunning)
+    {
+        return nullptr;
+    }
+
+    // The stop phase held these back for a start phase that never landed.
+    if (m_runtimeResourcesHeld)
+    {
+        ReleaseRuntimeResources();
+    }
+
+    if (WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm) || m_state != WslcContainerStateExited)
+    {
+        return nullptr;
+    }
+
+    // N.B. Requested here rather than through Delete() so the removal shares the scope that clears
+    // m_restart, which is what stops a released Start() from bringing the container back up first.
+    RequestDeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
+    return StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::optional<std::int64_t> stopTimestamp)

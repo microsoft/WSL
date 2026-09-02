@@ -202,8 +202,8 @@ private:
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
-    // performs the auto-delete OnStopped() deferred.
-    void OnFailedRestart() noexcept;
+    // requests the auto-delete OnStopped() deferred, returning that delete's transition.
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld();
 
     void WaitForCompletionEvent(HANDLE Event) const;
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
