@@ -14,6 +14,7 @@ Abstract:
 #include "RootCommand.h"
 
 // Include all commands that parent to the root.
+#include "ClusterCommand.h"
 #include "ContainerCommand.h"
 #include "DeveloperClusterCommand.h"
 #include "ImageCommand.h"
@@ -32,6 +33,7 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
+    commands.push_back(std::make_unique<ClusterCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<DeveloperClusterCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));

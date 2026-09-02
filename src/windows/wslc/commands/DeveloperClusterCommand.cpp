@@ -212,7 +212,7 @@ namespace {
         }
     }
 
-    std::wstring BuildCommandLine(const std::vector<std::wstring>& arguments)
+    std::wstring BuildAksEdgeCommandLine(const std::vector<std::wstring>& arguments)
     {
         std::vector<std::wstring_view> views;
         views.reserve(arguments.size());
@@ -228,7 +228,7 @@ namespace {
     {
         const auto executable = ResolveAksEdge(context.Args);
         arguments.insert(arguments.begin(), executable);
-        const auto commandLine = BuildCommandLine(arguments);
+        const auto commandLine = BuildAksEdgeCommandLine(arguments);
 
         wil::unique_handle job{CreateJobObjectW(nullptr, nullptr)};
         THROW_LAST_ERROR_IF(!job);

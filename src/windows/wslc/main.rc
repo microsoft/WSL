@@ -23,5 +23,7 @@ Abstract:
 #define VER_FILESUBTYPE VFT2_UNKNOWN
 #define VER_FILEDESCRIPTION_STR "Windows Subsystem for Linux Container CLI"
 ID_ICON ICON PRELOAD DISCARDABLE "..\..\..\Images\wsl.ico"
+IDR_AKSARC_DEPLOY_SCRIPT RCDATA "scripts\\setup-aks-arc-deploy.sh"
+IDR_AKSARC_GPU_SCRIPT RCDATA "scripts\\enable-gpu-wsl.sh"
 
 #include <common.ver>
