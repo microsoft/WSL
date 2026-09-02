@@ -3499,6 +3499,144 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkCommandDesc" xml:space="preserve">
     <value>Manage networks.</value>
   </data>
+  <data name="WSLCCLI_DeveloperClusterCommandDesc" xml:space="preserve">
+    <value>Manage standalone developer clusters on WSL.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterCommandLongDesc" xml:space="preserve">
+    <value>Create, inspect, and delete local single-node Kubernetes clusters through the Edge Core SDK.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterCreateDesc" xml:space="preserve">
+    <value>Create a standalone developer cluster.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterCreateLongDesc" xml:space="preserve">
+    <value>Creates a dedicated WSL guest, installs the standalone BMAgent, and brings up a single-node Kubernetes cluster.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDeleteDesc" xml:space="preserve">
+    <value>Delete the cluster and its WSL guest.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDeleteLongDesc" xml:space="preserve">
+    <value>Cleans the Kubernetes node, destroys the dedicated WSL guest, and removes the cluster from the host kubeconfig.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterStatusDesc" xml:space="preserve">
+    <value>Show guest and BMAgent availability.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterStatusLongDesc" xml:space="preserve">
+    <value>Reports whether the local guest exists and runs and whether its standalone BMAgent is reachable.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterKubeconfigDesc" xml:space="preserve">
+    <value>Retrieve or merge the cluster kubeconfig.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterKubeconfigLongDesc" xml:space="preserve">
+    <value>Retrieves a host-usable administrator kubeconfig and can save or merge it into another kubeconfig.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDiagnosticsDesc" xml:space="preserve">
+    <value>Collect a cluster support bundle.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDiagnosticsLongDesc" xml:space="preserve">
+    <value>Collects BMAgent, Kubernetes, and node logs from the guest into a host tarball.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterVersionsDesc" xml:space="preserve">
+    <value>List available Kubernetes versions.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterVersionsLongDesc" xml:space="preserve">
+    <value>Lists the Kubernetes versions accepted by the installed Edge Core SDK.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDistributionsDesc" xml:space="preserve">
+    <value>List available Kubernetes distributions.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDistributionsLongDesc" xml:space="preserve">
+    <value>Lists Kubernetes distributions and their supported CNI configurations.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterCnisDesc" xml:space="preserve">
+    <value>List available pod-network CNIs.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterCnisLongDesc" xml:space="preserve">
+    <value>Lists the pod-network CNIs accepted by the installed Edge Core SDK.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperAksEdgePathArgDescription" xml:space="preserve">
+    <value>Path to aksedge.exe; overrides AKSEDGE_BIN and automatic discovery</value>
+  </data>
+  <data name="WSLCCLI_DeveloperAgentDebArgDescription" xml:space="preserve">
+    <value>Path to the standalone BMAgent Debian package</value>
+  </data>
+  <data name="WSLCCLI_DeveloperAgentRepoArgDescription" xml:space="preserve">
+    <value>APT source line for the repository serving the BMAgent package</value>
+  </data>
+  <data name="WSLCCLI_DeveloperApiPortArgDescription" xml:space="preserve">
+    <value>Kubernetes API server port (default: 6443)</value>
+  </data>
+  <data name="WSLCCLI_DeveloperCniArgDescription" xml:space="preserve">
+    <value>Pod-network CNI, such as cilium or none</value>
+  </data>
+  <data name="WSLCCLI_DeveloperDiagnosticsOutputArgDescription" xml:space="preserve">
+    <value>Host file or existing directory for the diagnostics bundle</value>
+  </data>
+  <data name="WSLCCLI_DeveloperDiagnosticsSinceArgDescription" xml:space="preserve">
+    <value>Limit logs to a recent duration, such as 2h</value>
+  </data>
+  <data name="WSLCCLI_DeveloperDistributionArgDescription" xml:space="preserve">
+    <value>Kubernetes distribution: K8s or K3s</value>
+  </data>
+  <data name="WSLCCLI_DeveloperDistroArgDescription" xml:space="preserve">
+    <value>Name of the dedicated WSL distro</value>
+  </data>
+  <data name="WSLCCLI_DeveloperEnableGpuArgDescription" xml:space="preserve">
+    <value>Enable GPU support after cluster creation</value>
+  </data>
+  <data name="WSLCCLI_DeveloperGpuVendorArgDescription" xml:space="preserve">
+    <value>GPU vendor override, such as nvidia</value>
+  </data>
+  <data name="WSLCCLI_DeveloperHostNameArgDescription" xml:space="preserve">
+    <value>Host name reported to the standalone BMAgent</value>
+  </data>
+  <data name="WSLCCLI_DeveloperKubeconfigOutputArgDescription" xml:space="preserve">
+    <value>Write a standalone kubeconfig to this host file</value>
+  </data>
+  <data name="WSLCCLI_DeveloperKubernetesVersionArgDescription" xml:space="preserve">
+    <value>Kubernetes package version from the SDK catalog</value>
+  </data>
+  <data name="WSLCCLI_DeveloperMergeArgDescription" xml:space="preserve">
+    <value>Merge the kubeconfig into $KUBECONFIG or ~/.kube/config</value>
+  </data>
+  <data name="WSLCCLI_DeveloperMergeIntoArgDescription" xml:space="preserve">
+    <value>Merge the kubeconfig into this specific host file</value>
+  </data>
+  <data name="WSLCCLI_DeveloperNameArgDescription" xml:space="preserve">
+    <value>Developer cluster name</value>
+  </data>
+  <data name="WSLCCLI_DeveloperNetworkArgDescription" xml:space="preserve">
+    <value>Guest network override</value>
+  </data>
+  <data name="WSLCCLI_DeveloperNodeIpArgDescription" xml:space="preserve">
+    <value>Node management IP; defaults to the guest IP</value>
+  </data>
+  <data name="WSLCCLI_DeveloperNodeNameArgDescription" xml:space="preserve">
+    <value>Kubernetes node name; defaults to the host name</value>
+  </data>
+  <data name="WSLCCLI_DeveloperPodCidrArgDescription" xml:space="preserve">
+    <value>Pod CIDR (default: 10.244.0.0/16)</value>
+  </data>
+  <data name="WSLCCLI_DeveloperPruneKubeconfigFileArgDescription" xml:space="preserve">
+    <value>Also prune cluster entries from this specific kubeconfig file</value>
+  </data>
+  <data name="WSLCCLI_DeveloperRedactArgDescription" xml:space="preserve">
+    <value>Omit node IP addresses and network details from diagnostics</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterAksEdgeNotFound" xml:space="preserve">
+    <value>Could not find aksedge.exe. Install it beside wslc.exe, set AKSEDGE_BIN, add it to PATH, or use --aksedge-path.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterAgentNotFound" xml:space="preserve">
+    <value>Could not find the standalone BMAgent package. Install aks-bmagent.deb beside wslc.exe, set AKSEDGE_AGENT_DEB, or specify --agent-deb or --agent-repo.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterMergeConflict" xml:space="preserve">
+    <value>Options --merge and --merge-into cannot be used together.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterAgentConflict" xml:space="preserve">
+    <value>Options --agent-deb and --agent-repo cannot be used together.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterCancelCleanup" xml:space="preserve">
+    <value>Cancellation requested. Waiting briefly for aksedge to clean up the current operation.</value>
+  </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
     <value>Manage the lifecycle of WSL networks, including creating, inspecting, listing, and deleting them.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>

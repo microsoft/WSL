@@ -21,6 +21,7 @@ Abstract:
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
+#include "DeveloperClusterCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
@@ -65,6 +66,47 @@ class WSLCCLICommandUnitTests
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
         }
+    }
+
+    TEST_METHOD(RootCommand_ContainsDeveloperClusterCommand)
+    {
+        const auto commands = RootCommand().GetCommands();
+        const auto found = std::ranges::find_if(
+            commands, [](const auto& command) { return command->Name() == DeveloperClusterCommand::CommandName; });
+        VERIFY_IS_TRUE(found != commands.end());
+    }
+
+    TEST_METHOD(DeveloperClusterCommand_HasCompleteFlow)
+    {
+        const auto commands = DeveloperClusterCommand(L"wslc").GetCommands();
+        const std::vector<std::wstring_view> expected{
+            L"create", L"delete", L"status", L"kubeconfig", L"diagnostics", L"versions", L"distributions", L"cnis"};
+        VERIFY_ARE_EQUAL(expected.size(), commands.size());
+        for (size_t index = 0; index < expected.size(); ++index)
+        {
+            VERIFY_ARE_EQUAL(expected[index], commands[index]->Name());
+        }
+    }
+
+    TEST_METHOD(DeveloperClusterCreate_HasStandaloneOptions)
+    {
+        auto parent = DeveloperClusterCommand(L"wslc");
+        auto commands = parent.GetCommands();
+        const auto arguments = commands.front()->GetArguments();
+        const auto hasType = [&](ArgType type) {
+            return std::ranges::any_of(arguments, [&](const auto& argument) { return argument.Type() == type; });
+        };
+
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperAgentDeb));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperAgentRepo));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperDistribution));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperCni));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperEnableGpu));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperKubernetesVersion));
+        const auto name =
+            std::ranges::find_if(arguments, [](const auto& argument) { return argument.Type() == ArgType::DeveloperName; });
+        VERIFY_IS_TRUE(name != arguments.end());
+        VERIFY_IS_TRUE(name->Required());
     }
 
     // Test: Verify SystemCommand has subcommands
