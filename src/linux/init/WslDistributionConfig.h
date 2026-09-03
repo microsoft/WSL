@@ -97,6 +97,7 @@ struct WslDistributionConfig
     wsl::shared::SocketChannel Plan9ControlChannel;
     std::optional<pid_t> InitPid;
     std::optional<std::string> CgroupPath;
+    wil::unique_fd CgroupNamespace;
 };
 
 } // namespace wsl::linux

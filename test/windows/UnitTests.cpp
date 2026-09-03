@@ -434,6 +434,20 @@ class UnitTests
         }
     }
 
+    static std::wstring GetWslInitPid()
+    {
+        auto [pid, _] = LxsstuLaunchWslAndCaptureOutput(
+            L"/bin/sh -c \"for pid in \\$(cat /proc/1/task/1/children); do "
+            L"case \\$(cat /proc/\\$pid/comm 2>/dev/null) in init-systemd*) echo \\$pid; break;; esac; done\"");
+        while (!pid.empty() && (pid.back() == L'\n' || pid.back() == L'\r'))
+        {
+            pid.pop_back();
+        }
+
+        VERIFY_IS_FALSE(pid.empty());
+        return pid;
+    }
+
     WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
     {
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
@@ -442,8 +456,9 @@ class UnitTests
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
             [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
-        // Kill the WSL init process
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
+        // Kill the WSL init process without relying on an incidental PID allocation.
+        const auto wslInitPid = GetWslInitPid();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"kill -9 {}", wslInitPid)), 0L);
 
         // Wait for the distro to exit.
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
@@ -7928,6 +7943,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             systemdCleanup2.emplace(EnableSystemd("", secondDistroName));
         }
 
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/bin/sh -c \"nohup sleep infinity >/dev/null 2>&1 &\""), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/sh -c \"nohup sleep infinity >/dev/null 2>&1 &\"", secondDistroName)), 0L);
+
         auto getCgroup = [](LPCWSTR distro) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} cat -e /proc/self/cgroup", distro));
             return out;
@@ -7939,30 +7957,87 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         LogInfo("test_distro cgroup: %ls", cgroup1.c_str());
         LogInfo("%ls cgroup: %ls", secondDistroName, cgroup2.c_str());
 
-        const std::wstring prefix = L"0::/wsl-user/distro-";
-        VERIFY_IS_TRUE(cgroup1.starts_with(prefix));
-        VERIFY_IS_TRUE(cgroup2.starts_with(prefix));
-        VERIFY_ARE_NOT_EQUAL(cgroup1, cgroup2);
+        auto getCgroupNamespace = [](LPCWSTR distro) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} readlink /proc/self/ns/cgroup", distro));
+            return out;
+        };
 
-        // Terminate both distros -- this should trigger cleanup of their per-distro cgroups.
+        const auto cgroupNamespace1 = getCgroupNamespace(LXSS_DISTRO_NAME_TEST_L);
+        const auto cgroupNamespace2 = getCgroupNamespace(secondDistroName);
+        LogInfo("test_distro cgroup namespace: %ls", cgroupNamespace1.c_str());
+        LogInfo("%ls cgroup namespace: %ls", secondDistroName, cgroupNamespace2.c_str());
+        VERIFY_ARE_NOT_EQUAL(cgroupNamespace1, cgroupNamespace2);
+
+        const auto systemDistroArguments = std::format(L"-d {} --system ", LXSS_DISTRO_NAME_TEST_L);
+        auto [systemDistroCgroup, _] = LxsstuLaunchWslAndCaptureOutput(systemDistroArguments + L"cat -e /proc/self/cgroup");
+        auto [systemDistroCgroupNamespace, __] =
+            LxsstuLaunchWslAndCaptureOutput(systemDistroArguments + L"readlink /proc/self/ns/cgroup");
+        auto [systemDistroCgroupRoot, ___] =
+            LxsstuLaunchWslAndCaptureOutput(systemDistroArguments + L"findmnt -n -o FSROOT /sys/fs/cgroup");
+        LogInfo("system distro cgroup: %ls", systemDistroCgroup.c_str());
+        LogInfo("system distro cgroup namespace: %ls", systemDistroCgroupNamespace.c_str());
+        VERIFY_ARE_EQUAL(systemDistroCgroup, cgroup1);
+        VERIFY_ARE_EQUAL(systemDistroCgroupNamespace, cgroupNamespace1);
+        VERIFY_ARE_EQUAL(systemDistroCgroupRoot, std::wstring(L"/\n"));
+
+        auto getOutput = [](const std::wstring& command) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command);
+            return out;
+        };
+
+        if (systemd)
+        {
+            VERIFY_ARE_EQUAL(cgroup1, std::wstring(L"0::/non-systemd$\n"));
+            VERIFY_ARE_EQUAL(cgroup2, std::wstring(L"0::/non-systemd$\n"));
+
+            const auto systemdCgroup = getOutput(L"cat /proc/1/cgroup");
+            VERIFY_ARE_EQUAL(systemdCgroup, std::wstring(L"0::/init.scope\n"));
+
+            const auto systemdCgroupNamespace = getOutput(L"readlink /proc/1/ns/cgroup");
+            VERIFY_ARE_EQUAL(systemdCgroupNamespace, cgroupNamespace1);
+
+            const auto cgroupRoot = getOutput(L"findmnt -n -o FSROOT /sys/fs/cgroup");
+            VERIFY_ARE_EQUAL(cgroupRoot, std::wstring(L"/\n"));
+
+            const auto rootProcesses = getOutput(L"cat /sys/fs/cgroup/cgroup.procs");
+            VERIFY_ARE_EQUAL(rootProcesses, std::wstring{});
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"grep -qw cpu /sys/fs/cgroup/cgroup.subtree_control"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"grep -qw memory /sys/fs/cgroup/cgroup.subtree_control"), 0L);
+
+            const auto wslInitPid = GetWslInitPid();
+            const auto wslInitName = getOutput(std::format(L"cat /proc/{}/comm", wslInitPid));
+            VERIFY_IS_TRUE(wslInitName.starts_with(L"init-systemd"));
+
+            const auto wslInitCgroup = getOutput(std::format(L"cat /proc/{}/cgroup", wslInitPid));
+            VERIFY_ARE_EQUAL(wslInitCgroup, std::wstring(L"0::/../..\n"));
+
+            const auto wslInitCgroupNamespace = getOutput(std::format(L"readlink /proc/{}/ns/cgroup", wslInitPid));
+            VERIFY_ARE_NOT_EQUAL(wslInitCgroupNamespace, systemdCgroupNamespace);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /sys/fs/cgroup/user.slice"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /sys/fs/cgroup/wsl-user"), 0L);
+        }
+        else
+        {
+            VERIFY_ARE_EQUAL(cgroup1, std::wstring(L"0::/$\n"));
+            VERIFY_ARE_EQUAL(cgroup2, std::wstring(L"0::/$\n"));
+
+            const auto distroInitCgroup = getOutput(L"cat /proc/1/cgroup");
+            VERIFY_ARE_EQUAL(distroInitCgroup, std::wstring(L"0::/../..\n"));
+
+            const auto distroInitCgroupNamespace = getOutput(L"readlink /proc/1/ns/cgroup");
+            VERIFY_ARE_NOT_EQUAL(distroInitCgroupNamespace, cgroupNamespace1);
+
+            const auto cgroupRoot = getOutput(L"findmnt -n -o FSROOT /sys/fs/cgroup");
+            VERIFY_ARE_EQUAL(cgroupRoot, std::wstring(L"/\n"));
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /sys/fs/cgroup/wsl-user"), 0L);
+        }
+
+        // Terminate both distros.
         TerminateDistribution(LXSS_DISTRO_NAME_TEST_L);
         TerminateDistribution(secondDistroName);
-
-        // Re-start the default test_distro and confirm that exactly one distro-<pid> cgroup remains:
-        // the one belonging to the distro we just started to perform the check.  The stale cgroups of
-        // the two terminated distros must have been removed.
-        //
-        // N.B. Mini_init cleans up per-distro cgroups asynchronously from its SIGCHLD reaper after
-        // wsl --terminate returns. On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
-        // can still be in flight when this check runs, so retry until cleanup completes.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                auto [out2, _] =
-                    LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
-                THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
-            },
-            std::chrono::seconds(1),
-            std::chrono::seconds(30)));
     }
 
     WSL2_TEST_METHOD(IsolatedCgroupLayout)

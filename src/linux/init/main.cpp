@@ -63,6 +63,7 @@ Abstract:
 #include "binfmt.h"
 #include "address.h"
 #include "SocketChannel.h"
+#include "WslDistributionConfig.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
 #define BINFMT_REGISTER_STRING BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"
@@ -128,6 +129,8 @@ void CreateSwap(unsigned int Lun);
 
 int CreateTempDirectory(const char* ParentPath, std::string& Path);
 
+wil::unique_fd CreateDistroCgroupNamespace(const std::string& CgroupPath);
+
 int DetachScsiDisk(unsigned int Lun);
 
 int EjectScsi(unsigned int Lun);
@@ -163,7 +166,8 @@ void LaunchInit(
     const char* InstallPath = nullptr,
     const char* UserProfile = nullptr,
     std::optional<pid_t> DistroInitPid = {},
-    const char* DistroCgroupPath = nullptr);
+    const char* DistroCgroupPath = nullptr,
+    int DistroCgroupNamespaceFd = -1);
 
 void LaunchSystemDistro(
     int SocketFd,
@@ -175,7 +179,8 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    const char* DistroCgroupPath);
+    const char* DistroCgroupPath,
+    int DistroCgroupNamespaceFd);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
 
@@ -1427,7 +1432,8 @@ void LaunchInit(
     const char* InstallPath,
     const char* UserProfile,
     std::optional<pid_t> DistroInitPid,
-    const char* DistroCgroupPath)
+    const char* DistroCgroupPath,
+    int DistroCgroupNamespaceFd)
 
 /*++
 
@@ -1467,6 +1473,8 @@ Arguments:
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
     DistroCgroupPath - Supplies the cgroup path of this distribution.
+
+    DistroCgroupNamespaceFd - Supplies the cgroup namespace shared by the user and system distros.
 
 Return Value:
 
@@ -1575,6 +1583,12 @@ Return Value:
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
     AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_PATH, DistroCgroupPath);
 
+    if (DistroCgroupNamespaceFd >= 0)
+    {
+        THROW_LAST_ERROR_IF(SetCloseOnExec(DistroCgroupNamespaceFd, false));
+        AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD, std::to_string(DistroCgroupNamespaceFd).c_str());
+    }
+
     if (DistroInitPid.has_value())
     {
         AddEnvironmentVariable(LX_WSL2_DISTRO_INIT_PID, std::to_string(static_cast<int>(DistroInitPid.value())).c_str());
@@ -1671,7 +1685,8 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    const char* DistroCgroupPath)
+    const char* DistroCgroupPath,
+    int DistroCgroupNamespaceFd)
 
 /*++
 
@@ -1710,6 +1725,8 @@ Arguments:
 
     DistroCgroupPath - Supplies the cgroup path of this distribution.
 
+    DistroCgroupNamespaceFd - Supplies the cgroup namespace shared by the user and system distros.
+
 Return Value:
 
     None. This method does not return.
@@ -1728,7 +1745,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupPath);
+    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupPath, DistroCgroupNamespaceFd);
     _exit(1);
 }
 catch (...)
@@ -2242,12 +2259,36 @@ void ProcessLaunchInitMessage(
 
         bool bootInit = false;
         bool enableGuiApps = Config.EnableGuiApps;
+        auto cgroupVersion = wsl::linux::WslDistributionConfig::CGroupVersion::v2;
         {
             wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
             if (File)
             {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit), ConfigKey("general.guiApplications", enableGuiApps)};
+                std::vector<ConfigKey> ConfigKeys = {
+                    ConfigKey("boot.systemd", bootInit),
+                    ConfigKey("general.guiApplications", enableGuiApps),
+                    ConfigKey(
+                        "automount.cgroups",
+                        {{"v1", wsl::linux::WslDistributionConfig::CGroupVersion::v1}, {"v2", wsl::linux::WslDistributionConfig::CGroupVersion::v2}},
+                        cgroupVersion,
+                        nullptr)};
                 ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            }
+        }
+
+        if (cgroupVersion == wsl::linux::WslDistributionConfig::CGroupVersion::v1)
+        {
+            const auto CommandLine = UtilReadFileContent(PROCFS_PATH "/cmdline");
+            constexpr std::string_view c_cgroupNoV1Option = "cgroup_no_v1=";
+            const auto Position = CommandLine.find(c_cgroupNoV1Option);
+            if (Position != std::string::npos)
+            {
+                auto Controllers = std::string_view{CommandLine}.substr(Position + c_cgroupNoV1Option.size());
+                Controllers = Controllers.substr(0, Controllers.find_first_of(" \n"));
+                if (Controllers == "all")
+                {
+                    cgroupVersion = wsl::linux::WslDistributionConfig::CGroupVersion::v2;
+                }
             }
         }
 
@@ -2262,7 +2303,6 @@ void ProcessLaunchInitMessage(
 
             auto cleanup = wil::scope_exit([&]() {
                 rmdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str());
-                rmdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str());
                 rmdir(DistroCgroupPath.c_str());
                 DistroCgroupPath.clear();
             });
@@ -2273,14 +2313,18 @@ void ProcessLaunchInitMessage(
 
                 if (bootInit)
                 {
-                    THROW_LAST_ERROR_IF(UtilEnableAllCgroupControllers(DistroCgroupPath) < 0);
-                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
                     THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
                 }
 
                 cleanup.release();
             }
             CATCH_LOG();
+        }
+
+        wil::unique_fd DistroCgroupNamespace;
+        if (!DistroCgroupPath.empty() && cgroupVersion == wsl::linux::WslDistributionConfig::CGroupVersion::v2)
+        {
+            DistroCgroupNamespace = CreateDistroCgroupNamespace(DistroCgroupPath);
         }
 
         //
@@ -2350,7 +2394,8 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
                         ChildPid,
-                        DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
+                        DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str(),
+                        DistroCgroupNamespace.get());
                 }
             }
 
@@ -2373,7 +2418,8 @@ void ProcessLaunchInitMessage(
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
             wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
             std::nullopt,
-            DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
+            DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str(),
+            DistroCgroupNamespace.get());
     }
     catch (...)
     {
@@ -3924,6 +3970,49 @@ Return Value:
     LOG_INFO("WSL user cgroup cpu.max={} (nproc={}, reserved={}us)", userCpuMax, nproc, c_systemReservedCpuMicros);
 }
 
+wil::unique_fd CreateDistroCgroupNamespace(const std::string& CgroupPath)
+{
+    wil::unique_fd OriginalCgroupNamespace{open(PROCFS_PATH "/self/ns/cgroup", O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!OriginalCgroupNamespace);
+
+    wil::unique_fd OriginalCgroup{open(CGROUP_MOUNTPOINT "/cgroup.procs", O_WRONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!OriginalCgroup);
+
+    bool RestoreNamespace = false;
+    bool RestoreCgroup = false;
+    auto RestoreOriginalState = wil::scope_exit([&]() {
+        if (RestoreNamespace && setns(OriginalCgroupNamespace.get(), CLONE_NEWCGROUP) < 0)
+        {
+            LOG_ERROR("Failed to restore cgroup namespace {}", errno);
+            return;
+        }
+
+        if (RestoreCgroup && UtilWriteStringView(OriginalCgroup.get(), "0") != 1)
+        {
+            LOG_ERROR("Failed to restore cgroup {}", errno);
+        }
+    });
+
+    THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CgroupPath, "cgroup namespace") < 0);
+    RestoreCgroup = true;
+
+    THROW_LAST_ERROR_IF(unshare(CLONE_NEWCGROUP) < 0);
+    RestoreNamespace = true;
+
+    wil::unique_fd CgroupNamespace{open(PROCFS_PATH "/self/ns/cgroup", O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!CgroupNamespace);
+
+    THROW_LAST_ERROR_IF(setns(OriginalCgroupNamespace.get(), CLONE_NEWCGROUP) < 0);
+    RestoreNamespace = false;
+    THROW_LAST_ERROR_IF(UtilWriteStringView(OriginalCgroup.get(), "0") != 1);
+    RestoreCgroup = false;
+    RestoreOriginalState.release();
+
+    wil::unique_fd InheritedCgroupNamespace{fcntl(CgroupNamespace.get(), F_DUPFD_CLOEXEC, LX_INIT_UTILITY_VM_INIT_SOCKET_FD + 1)};
+    THROW_LAST_ERROR_IF(!InheritedCgroupNamespace);
+    return InheritedCgroupNamespace;
+}
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -4131,7 +4220,7 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, "nsdelegate") < 0)
     {
         Result = -1;
         LOG_ERROR("Failed to mount cgroup2: {}", errno);
