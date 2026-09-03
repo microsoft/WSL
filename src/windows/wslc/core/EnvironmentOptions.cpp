@@ -43,11 +43,11 @@ try
 
             if (arg.Kind() == Kind::Flag)
             {
-                target.Add(arg.Type(), true);
+                target.Add(arg.Type(), true, argument::ArgumentValueSource::Environment);
             }
             else if (arg.Kind() == Kind::Value)
             {
-                target.Add(arg.Type(), *value);
+                target.Add(arg.Type(), *value, argument::ArgumentValueSource::Environment);
             }
 
             if (binding.LogWhenSet)

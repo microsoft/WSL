@@ -111,6 +111,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
 
         VERIFY_IS_TRUE(target.Contains(ArgType::Session));
         VERIFY_ARE_EQUAL(std::wstring(L"env-session"), target.GetValue<ArgType::Session>());
+        VERIFY_ARE_EQUAL(ArgumentValueSource::Environment, target.GetSource(ArgType::Session));
     }
 
     TEST_METHOD(ApplyEnvironmentOptions_SessionAbsent_DoesNotSetValue)
@@ -119,6 +120,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         ApplyEnvironmentOptions(target, SessionDefs());
 
         VERIFY_IS_FALSE(target.Contains(ArgType::Session));
+        VERIFY_ARE_EQUAL(ArgumentValueSource::Default, target.GetSource(ArgType::Session));
     }
 
     TEST_METHOD(ApplyEnvironmentOptions_SessionEmptyValue_DoesNotSetValue)
@@ -130,6 +132,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         ApplyEnvironmentOptions(target, root.GetGlobalsAndEnvArguments());
 
         VERIFY_IS_FALSE(target.Contains(ArgType::Session));
+        VERIFY_ARE_EQUAL(ArgumentValueSource::Default, target.GetSource(ArgType::Session));
     }
 
     TEST_METHOD(ApplyEnvironmentOptions_CliSessionOverridesEnvironmentSession)
@@ -152,6 +155,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
 
         VERIFY_ARE_EQUAL(1U, target.Count(ArgType::Session));
         VERIFY_ARE_EQUAL(std::wstring(L"cli-session"), target.GetValue<ArgType::Session>());
+        VERIFY_ARE_EQUAL(ArgumentValueSource::CommandLine, target.GetSource(ArgType::Session));
     }
 
     // Env-derived defaults are lowest precedence and must not overwrite.
@@ -166,6 +170,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
 
         VERIFY_ARE_EQUAL(1U, target.Count(ArgType::NoColor));
         VERIFY_IS_FALSE(target.GetValue<ArgType::NoColor>());
+        VERIFY_ARE_EQUAL(ArgumentValueSource::CommandLine, target.GetSource(ArgType::NoColor));
     }
 
     // Bindings outside definedArgs are ignored even if the env var is set.

@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "Exceptions.h"
 #include "SessionService.h"
 #include "SessionTasks.h"
 #include "TableOutput.h"
@@ -38,7 +39,20 @@ void OpenSessionIfSpecified(CLIExecutionContext& context)
     if (context.GlobalArgs.Contains(ArgType::Session))
     {
         const auto& sessionName = context.GlobalArgs.GetValue<ArgType::Session>();
-        context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
+        try
+        {
+            context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
+        }
+        catch (const wil::ResultException& ex)
+        {
+            if (ex.GetErrorCode() == WSLC_E_SESSION_NOT_FOUND &&
+                context.GlobalArgs.GetSource(ArgType::Session) == argument::ArgumentValueSource::Environment)
+            {
+                throw ExecutionException(Localization::MessageWslcEnvironmentSessionNotFound(sessionName));
+            }
+
+            throw;
+        }
     }
 }
 
