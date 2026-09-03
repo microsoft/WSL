@@ -16,10 +16,11 @@ namespace wil {
 #define FAIL_FAST() raise(SIGABRT);
 #define FAIL_FAST_CAUGHT_EXCEPTION() FAIL_FAST()
 #define FAIL_FAST_IF(condition) \
-    do { \
+    do \
+    { \
         if ((condition)) \
         { \
-            FAIL_FAST() \
+            FAIL_FAST(); \
         } \
     } while ((void)0, 0)
 
@@ -652,7 +653,8 @@ using integral_from_enum = typename details::variable_size_mapping<T>::type;
 #define WI_ASSERT(condition) assert(condition)
 
 #define EMIT_USER_WARNING(Warning) \
-    do { \
+    do \
+    { \
         if (::wil::ScopedWarningsCollector::CanCollectWarning()) \
         { \
             ::wil::ScopedWarningsCollector::CollectWarning(Warning); \
