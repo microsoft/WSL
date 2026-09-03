@@ -276,7 +276,8 @@ class WSLCE2EContainerListTests
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = result.GetStdoutOneLine();
+        // --quiet truncates ids unless --no-trunc is also passed.
+        const auto containerId = TruncateId(result.GetStdoutOneLine());
         VERIFY_IS_FALSE(containerId.empty());
 
         // --quiet wins over --size.
