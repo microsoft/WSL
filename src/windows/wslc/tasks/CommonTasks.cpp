@@ -16,7 +16,6 @@ Abstract:
 #include "CommonTasks.h"
 #include "Exceptions.h"
 
-using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc::task {
