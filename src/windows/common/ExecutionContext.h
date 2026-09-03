@@ -35,7 +35,7 @@ namespace wsl::windows::common {
         { \
             THROW_HR_WITH_USER_ERROR(Result, Message); \
         } \
-    } while (false)
+    } while (false);
 
 #define EMIT_USER_WARNING(Warning) \
     do \
@@ -44,7 +44,7 @@ namespace wsl::windows::common {
         { \
             context->EmitUserWarning(Warning); \
         } \
-    } while (false)
+    } while (false);
 
 /* List of ExecutionContext that can be passed to ExecutionContext().
  * Note: ExecutionContext makes the assumption that the parent context always has
