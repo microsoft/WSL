@@ -27,6 +27,7 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include <nlohmann/json.hpp>
 
+using namespace std::chrono;
 using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
 using wsl::windows::common::ClientRunningWSLCProcess;
@@ -7108,6 +7109,294 @@ class WSLCTests
             VERIFY_SUCCEEDED(restartResult.get_future().get());
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
         }
+    }
+
+    WSLC_TEST_METHOD(EventStream)
+    {
+        constexpr auto c_containerName = "wslc-test-events";
+        constexpr auto c_imageName = "debian:latest";
+        constexpr auto c_labelKey = "event-label";
+        constexpr auto c_labelValue = "event-value";
+        const auto expectedExitCode = std::to_string(128 + WSLCSignalSIGKILL);
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        // Drains a bounded event stream to completion (GetNext returns WSLC_E_EVENT_STREAM_FINISHED
+        // once the until-time has passed and the backlog is exhausted), parsing each event's JSON.
+        auto drain = [](IWSLCEventStream* stream) {
+            std::vector<wsl::windows::common::wslc_schema::Event> events;
+
+            wil::unique_cotaskmem_ansistring eventJson;
+            HRESULT result;
+            while (SUCCEEDED(result = stream->GetNext(&eventJson)))
+            {
+                events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
+            }
+
+            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, result);
+            return events;
+        };
+
+        // Verifies the given events match the expected actions in order for a given actor.
+        auto verifyEvents = [&](const std::vector<wsl::windows::common::wslc_schema::Event>& events,
+                                const std::string& actorId,
+                                const std::vector<std::string>& expectedActions) {
+            VERIFY_ARE_EQUAL(events.size(), expectedActions.size());
+
+            for (size_t i = 0; i < expectedActions.size(); ++i)
+            {
+                const auto& action = expectedActions[i];
+                const auto& event = events[i];
+
+                VERIFY_ARE_EQUAL(action, event.Action);
+                VERIFY_ARE_EQUAL(actorId, event.Actor.ID);
+                VERIFY_ARE_EQUAL(c_containerName, event.Actor.Attributes.at("name"));
+                VERIFY_ARE_EQUAL(c_imageName, event.Actor.Attributes.at("image"));
+                VERIFY_ARE_EQUAL(c_labelValue, event.Actor.Attributes.at(c_labelKey));
+                VERIFY_IS_FALSE(event.Actor.Attributes.contains("com.microsoft.wsl.container.metadata"));
+
+                if (action == "stop")
+                {
+                    VERIFY_ARE_EQUAL(expectedExitCode, event.Actor.Attributes.at("exitCode"));
+                }
+                else
+                {
+                    VERIFY_IS_FALSE(event.Actor.Attributes.contains("exitCode"));
+                }
+            }
+        };
+
+        // Run a container through its create/start/kill/stop lifecycle inside a bounded time window.
+        const LONGLONG since = now();
+        std::string id;
+        {
+            WSLCContainerLauncher launcher(c_imageName, c_containerName, {"sleep", "99999"});
+            launcher.AddLabel(c_labelKey, c_labelValue);
+            auto container = launcher.Launch(*m_defaultSession);
+            id = container.Id();
+
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            // Kill (rather than Stop) so Docker emits a 'kill' event ahead of the 'die' that stops it.
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+        }
+
+        const LONGLONG until = now() + 1;
+        std::vector<wsl::windows::common::wslc_schema::Event> lifecycleEvents;
+
+        // The container's create, start, kill, stop, then destroy events are reported in order, each carrying
+        // the container's 64-hex id as the actor.
+        {
+            WSLCFilter filter{"container", id.c_str()};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+            lifecycleEvents = drain(stream.get());
+            verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "stop", "destroy"});
+
+            // The whole lifecycle falls inside the requested window.
+            VERIFY_IS_TRUE(lifecycleEvents[0].time >= since);
+            VERIFY_IS_TRUE(lifecycleEvents[4].time < until);
+        }
+
+        // Each lifecycle action is independently selectable: an 'event=<action>' filter, AND'd with
+        // the container filter, returns exactly that one event out of the five recorded above.
+        auto verifyEventFilter = [&](const char* action) {
+            WSLCFilter filters[]{{"container", id.c_str()}, {"event", action}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
+
+            verifyEvents(drain(stream.get()), id, {action});
+        };
+
+        verifyEventFilter("create");
+        verifyEventFilter("start");
+        verifyEventFilter("kill");
+        verifyEventFilter("stop");
+        verifyEventFilter("destroy");
+
+        // Values sharing a filter key are OR'd.
+        {
+            WSLCFilter filters[]{{"container", id.c_str()}, {"event", "create"}, {"event", "destroy"}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
+
+            verifyEvents(drain(stream.get()), id, {"create", "destroy"});
+        }
+
+        // Image events are not recorded yet, so a 'type=image' filter excludes the container's
+        // events and leaves the stream empty.
+        {
+            WSLCFilter filter{"type", "image"};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+            VERIFY_IS_TRUE(drain(stream.get()).empty());
+        }
+
+        // An unmatched container id yields an empty stream, and GetNext validates its out-pointer.
+        {
+            WSLCFilter filter{"container", "0000000000000000000000000000000000000000000000000000000000000000"};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+            VERIFY_IS_TRUE(drain(stream.get()).empty());
+        }
+
+        // A since-time later than a non-zero until-time describes a backwards window and is rejected.
+        {
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(since + 1, since, nullptr, 0, &stream));
+            ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcEventsInvalidTimeWindow(since + 1, since));
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamReportsLostEvents)
+    {
+        // One more than the store's ring capacity, so the reader's next slot is guaranteed evicted.
+        constexpr size_t c_signalsToEvictReader = 257;
+
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-stream-overrun", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        WSLCFilter filter{"container", id.c_str()};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, 0, &filter, 1, &stream));
+
+        // Read one event to place the reader's cursor inside the ring.
+        wil::unique_cotaskmem_ansistring eventJson;
+        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        const auto firstEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
+        VERIFY_ARE_EQUAL("create", firstEvent.Action);
+        VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
+
+        // Docker emits a 'kill' event per signal. SIGWINCH is ignored by an unhandling init process, so the
+        // container keeps running and each signal costs only one event.
+        for (size_t i = 0; i < c_signalsToEvictReader; ++i)
+        {
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGWINCH));
+        }
+
+        // Stopping waits for the 'die' event, which Docker delivers after every preceding 'kill'. Without this
+        // barrier the reader could be checked before the ring has overrun it.
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+
+        VERIFY_ARE_EQUAL(WSLC_E_EVENTS_LOST, stream->GetNext(&eventJson));
+
+        // Reporting the gap resyncs the reader, so it resumes from the oldest event still buffered.
+        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        const auto resumedEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
+        VERIFY_ARE_EQUAL("kill", resumedEvent.Action);
+        VERIFY_ARE_EQUAL(id, resumedEvent.Actor.ID);
+    }
+
+    WSLC_TEST_METHOD(EventStreamSerializesConcurrentReaders)
+    {
+        constexpr auto c_containerName = "wslc-test-concurrent-event-readers";
+
+        WSLCContainerLauncher launcher("debian:latest", c_containerName, {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        WSLCFilter filters[]{{"container", id.c_str()}, {"event", "kill"}};
+        wil::com_ptr<IWSLCEventStream> stream;
+
+        // The window doubles as a hang guard, so it must comfortably outlast the waits below.
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 120;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, filters, ARRAYSIZE(filters), &stream));
+
+        wil::unique_cotaskmem_ansistring firstEventJson;
+        wil::unique_cotaskmem_ansistring secondEventJson;
+        HRESULT firstResult{};
+        HRESULT secondResult{};
+        wil::unique_event firstReaderStarted{wil::EventOptions::ManualReset};
+        wil::unique_event secondReaderStarted{wil::EventOptions::ManualReset};
+        std::thread firstReader;
+        std::thread secondReader;
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGWINCH));
+            LOG_IF_FAILED(container.Get().Kill(WSLCSignalSIGWINCH));
+
+            if (firstReader.joinable())
+            {
+                firstReader.join();
+            }
+
+            if (secondReader.joinable())
+            {
+                secondReader.join();
+            }
+        });
+
+        firstReader = std::thread([&]() {
+            firstReaderStarted.SetEvent();
+            firstResult = stream->GetNext(&firstEventJson);
+        });
+        VERIFY_IS_TRUE(firstReaderStarted.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(firstReader.native_handle(), 100));
+
+        secondReader = std::thread([&]() {
+            secondReaderStarted.SetEvent();
+            secondResult = stream->GetNext(&secondEventJson);
+        });
+        VERIFY_IS_TRUE(secondReaderStarted.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(secondReader.native_handle(), 100));
+
+        HANDLE readers[]{firstReader.native_handle(), secondReader.native_handle()};
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGWINCH));
+
+        const DWORD completedReader = WaitForMultipleObjects(ARRAYSIZE(readers), readers, FALSE, 30 * 1000);
+        VERIFY_IS_TRUE(completedReader == WAIT_OBJECT_0 || completedReader == WAIT_OBJECT_0 + 1);
+
+        // One event completes exactly one call; the other stays serialized until another event arrives.
+        const DWORD pendingReader = completedReader == WAIT_OBJECT_0 ? 1 : 0;
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readers[pendingReader], 100));
+
+        VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGWINCH));
+        VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForMultipleObjects(ARRAYSIZE(readers), readers, TRUE, 30 * 1000));
+
+        firstReader.join();
+        secondReader.join();
+        cleanup.release();
+
+        VERIFY_SUCCEEDED(firstResult);
+        VERIFY_SUCCEEDED(secondResult);
+
+        const auto firstEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(firstEventJson.get());
+        const auto secondEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(secondEventJson.get());
+        VERIFY_ARE_EQUAL("kill", firstEvent.Action);
+        VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
+        VERIFY_ARE_EQUAL("kill", secondEvent.Action);
+        VERIFY_ARE_EQUAL(id, secondEvent.Actor.ID);
+    }
+
+    WSLC_TEST_METHOD(EventStreamSessionTerminationAbortsReader)
+    {
+        WSLCFilter filter{"type", "container"};
+        const LONGLONG since = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 0, &filter, 1, &stream));
+
+        std::promise<HRESULT> getNextResult;
+        std::thread readerThread([&]() {
+            wil::unique_cotaskmem_ansistring eventJson;
+            getNextResult.set_value(stream->GetNext(&eventJson));
+        });
+        auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { readerThread.join(); });
+
+        auto future = getNextResult.get_future();
+
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        auto restore = ResetTestSession();
+
+        // Termination wakes the parked reader; it must finish quickly and report E_ABORT.
+        FAIL_FAST_IF_MSG(
+            future.wait_for(10s) != std::future_status::ready, "event stream reader did not abort after session termination");
+        VERIFY_ARE_EQUAL(E_ABORT, future.get());
     }
 
     WSLC_TEST_METHOD(OpenContainer)

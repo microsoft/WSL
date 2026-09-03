@@ -474,6 +474,21 @@ WSLCContainerState DockerStateToWSLCState(ContainerState state)
     }
 }
 
+std::string WSLCStateToEventAction(WSLCContainerState state)
+{
+    switch (state)
+    {
+    case WslcContainerStateRunning:
+        return "start";
+    case WslcContainerStateExited:
+        return "stop";
+    case WslcContainerStateDeleted:
+        return "destroy";
+    default:
+        WI_ASSERT(false);
+        return "unknown";
+    }
+}
 std::string CleanContainerName(const std::string& name)
 {
     // Docker container names have a leading '/', strip it.
@@ -814,6 +829,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
+    EventStore& eventStore,
     WSLCContainerState InitialState,
     std::int64_t CreatedAt,
     WSLCProcessFlags InitProcessFlags,
@@ -832,6 +848,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, std::move(onDeleted))),
     m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
         m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))),
+    m_eventStore(eventStore),
     m_state(InitialState),
     m_createdAt(CreatedAt),
     m_initProcessFlags(InitProcessFlags),
@@ -1257,11 +1274,33 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CompleteTransitio
     transition->Completed.SetEvent();
 }
 
+void WSLCContainerImpl::RecordEvent(std::string&& Action, std::int64_t Time, std::optional<int> ExitCode) noexcept
+try
+{
+    auto attributes = StripInternalLabels(m_labels);
+    attributes["name"] = m_name;
+    attributes["image"] = m_image;
+
+    if (ExitCode.has_value())
+    {
+        attributes["exitCode"] = std::to_string(ExitCode.value());
+    }
+
+    m_eventStore.Record("container", std::move(Action), m_id, std::move(attributes), Time);
+}
+CATCH_LOG()
+
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept
 {
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
     std::shared_ptr<StateTransition> transition;
+
+    if (event == ContainerEvent::Kill)
+    {
+        RecordEvent("kill", eventTime);
+        return;
+    }
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_exclusive();
@@ -1536,7 +1575,7 @@ __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateT
     return StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::optional<std::int64_t> stopTimestamp)
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::int64_t stopTime)
 {
     auto transition = m_transition;
 
@@ -1572,7 +1611,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     // Ignore duplicate or late Stop events so they do not overwrite an already committed state.
     if (m_state == WslcContainerStateRunning)
     {
-        CommitState(WslcContainerStateExited, stopTimestamp);
+        CommitState(WslcContainerStateExited, stopTime, exitCode);
     }
 
     std::exception_ptr transitionException;
@@ -2196,11 +2235,11 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCSessionRuntime& runtime,
     IWSLCPluginNotifier* pluginNotifier,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
-    std::function<void(const WSLCContainerImpl*)>&& OnDeleted)
+    std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
+    EventStore& eventStore)
 {
     auto& virtualMachine = runtime.Vm();
     auto& DockerClient = runtime.Docker();
-    auto& EventTracker = runtime.Events();
     const auto mounts = ConvertAndValidateMounts(containerOptions);
 
     common::docker_schema::CreateContainer request;
@@ -2634,11 +2673,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             name.c_str());
     }
 
-    // Wait for the container create event to be delivered on the Docker event stream so that
-    // any events for objects created for the container (e.g. volumes) are delivered before we return
-    // from this function.
-    EventTracker.WaitForObjectCreated(result.Id);
-
     // Collect the names of referenced docker named volumes so Start() can verify
     // they are available before running the container.
     std::vector<std::string> namedVolumes;
@@ -2657,6 +2691,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     auto mergedLabels = StripInternalLabels(std::move(inspectData.Config.Labels));
+    const auto createdAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created);
 
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
@@ -2671,8 +2706,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(mappedPorts),
         std::move(mergedLabels),
         std::move(OnDeleted),
+        eventStore,
         WslcContainerStateCreated,
-        wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.Created),
+        createdAt,
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
@@ -2687,7 +2723,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     WSLCSession& wslcSession,
     WSLCSessionRuntime& runtime,
     IWSLCPluginNotifier* pluginNotifier,
-    std::function<void(const WSLCContainerImpl*)>&& OnDeleted)
+    std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
+    EventStore& eventStore)
 {
     auto& virtualMachine = runtime.Vm();
     auto& DockerClient = runtime.Docker();
@@ -2759,6 +2796,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
+        eventStore,
         DockerStateToWSLCState(dockerContainer.State),
         dockerContainer.Created,
         metadata.InitProcessFlags,
@@ -3067,7 +3105,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
-__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerState State, std::optional<std::int64_t> stateChangedAt) noexcept
+__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
@@ -3080,7 +3118,9 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
 
     m_state = State;
     m_stateGeneration++;
-    m_stateChangedAt = stateChangedAt.value_or(static_cast<std::int64_t>(std::time(nullptr)));
+    m_stateChangedAt = Time;
+
+    RecordEvent(WSLCStateToEventAction(State), Time, ExitCode);
 
     if (State == WslcContainerStateRunning)
     {
