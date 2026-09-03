@@ -1659,7 +1659,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
 
-    // N.B. Unlike Start() and Stop(), this deliberately does not wait for an in-flight restart.
+    // N.B. Unlike Start() and Stop(), this deliberately does not stand down for an in-flight restart.
     // A remove that lands between the two phases takes effect, and the restart's start phase fails.
     WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, false);
 
