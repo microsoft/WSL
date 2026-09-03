@@ -1021,7 +1021,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
 {
-    StartPhase(Flags, StartOptions, /* RestartPhase */ false);
+    StartPhase(Flags, StartOptions, false);
 }
 
 void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase)
@@ -1320,7 +1320,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
-    StopPhase(Signal, TimeoutSeconds, Kill, /* RestartPhase */ false);
+    StopPhase(Signal, TimeoutSeconds, Kill, false);
 }
 
 void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase)
@@ -1502,10 +1502,10 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
 
     if (wasRunning)
     {
-        StopPhase(Signal, TimeoutSeconds, /* Kill */ false, /* RestartPhase */ true);
+        StopPhase(Signal, TimeoutSeconds, false, true);
     }
 
-    StartPhase(WSLCContainerStartFlagsNone, nullptr, /* RestartPhase */ true);
+    StartPhase(WSLCContainerStartFlagsNone, nullptr, true);
     succeeded = true;
 }
 
@@ -1661,7 +1661,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 
     // N.B. Unlike Start() and Stop(), this deliberately does not wait for an in-flight restart.
     // A remove that lands between the two phases takes effect, and the restart's start phase fails.
-    WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, /* waitForRestart */ false);
+    WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, false);
 
     RequestDeleteExclusiveLockHeld(Flags);
     transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
