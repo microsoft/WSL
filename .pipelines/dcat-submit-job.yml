@@ -93,6 +93,7 @@ jobs:
                   throw "No CAB file path found in $submissionFile."
               }
 
+              Write-Host $updated
               Set-Content -LiteralPath $submissionFile -Value $updated -NoNewline
             displayName: Stage ${{ platform }} content and rewrite submission path
 
