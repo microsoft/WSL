@@ -37,13 +37,11 @@ enum class PluginTestType
     InitPidIsDifferent,
     FailToRegisterUnregisterDistro,
     RunDistroCommand,
-    GetUsername,
-    MountFolderAccess
+    GetUsername
 };
 
 constexpr auto c_testType = L"TestType";
 constexpr auto c_logFile = L"LogFile";
-constexpr auto c_mountFolder = L"MountFolder";
 
 inline wil::unique_hkey OpenTestRegistryKey(REGSAM AccessMask)
 {
