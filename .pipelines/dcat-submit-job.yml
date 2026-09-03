@@ -85,7 +85,7 @@ jobs:
               # The submission metadata embeds the absolute CAB path from the agent that generated it,
               # which isn't valid on this agent. Rewrite it to the CAB file staged above.
               $submissionFile = '$(dcatSubmissionPath)\submit-${{ parameters.distributionIntent }}-${{ platform }}.json'
-              $stagedPath = (Join-Path '$(dcatContentPath)' $cabs[0].Name) -replace '\\', '\\\\'
+              $stagedPath = (Join-Path '$(dcatContentPath)' $cabs[0].Name) -replace '\\', '\\'
 
               $content = Get-Content -LiteralPath $submissionFile -Raw
               $updated = $content -replace '("FilePath":\s*)"[^"]*\.cab"', "`$1""$stagedPath"""
