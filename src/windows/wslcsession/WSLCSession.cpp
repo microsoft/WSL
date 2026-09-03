@@ -24,6 +24,7 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
+#include "WSLCContainerEntry.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -37,11 +38,8 @@ using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
-constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
-constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
-constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 constexpr uint32_t c_progressPrecision = 4;
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
@@ -576,7 +574,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     if (Settings.StoragePath == nullptr)
     {
         // If no storage path is specified, use a tmpfs for convenience.
-        m_runtime.Vm().Mount("", c_containerdStorage, "tmpfs", "", 0);
+        m_runtime.Vm().Mount("", wsl::windows::wslc::ContainerdStorageMountPoint, "tmpfs", "", 0);
         m_runtime.SetStorageMounted(true);
         return;
     }
@@ -642,7 +640,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "discard", 0);
+    m_runtime.Vm().Mount(diskDevice.c_str(), wsl::windows::wslc::ContainerdStorageMountPoint, "ext4", "discard", 0);
     m_runtime.SetStorageMounted(true);
 
     // Configure swap on a separate ephemeral VHD.
@@ -2548,6 +2546,13 @@ try
     // if some IDs returned by Docker aren't in m_containers (e.g. created externally), but in the
     // common case the two should match.
     auto output = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(dockerContainers.size());
+    auto freeStrings = wil::scope_exit([&] {
+        for (size_t i = 0; i < dockerContainers.size(); ++i)
+        {
+            wsl::windows::common::wslc::FreeContainerEntryStrings(&output[i]);
+        }
+    });
+
     std::vector<WSLCContainerPortMapping> allPorts;
 
     size_t index = 0;
@@ -2563,6 +2568,47 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
+
+        // Commands and status descriptions have no bound imposed by the runtime, so they are
+        // allocated rather than copied into a fixed buffer.
+        output[index].Command = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(dockerContainer.Command.c_str()).release();
+        output[index].Status = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(dockerContainer.Status.c_str()).release();
+
+        // Labels, networks and mounts are reported the way the docker CLI renders them: a comma
+        // separated list. Like the command and status above they are unbounded.
+        std::vector<std::string> labels;
+        for (const auto& [key, value] : dockerContainer.Labels)
+        {
+            labels.push_back(std::format("{}={}", key, value));
+        }
+
+        std::vector<std::string> networks;
+        for (const auto& [name, _] : dockerContainer.NetworkSettings.Networks)
+        {
+            networks.push_back(name);
+        }
+
+        std::vector<std::string> mounts;
+        ULONG localVolumes = 0;
+        for (const auto& mount : dockerContainer.Mounts)
+        {
+            // Named volumes report a name, bind mounts only report the host path.
+            mounts.push_back(mount.Name.empty() ? mount.Source : mount.Name);
+            if (mount.Type == "volume")
+            {
+                localVolumes++;
+            }
+        }
+
+        const auto joinedLabels = wsl::shared::string::Join(labels, ',');
+        const auto joinedNetworks = wsl::shared::string::Join(networks, ',');
+        const auto joinedMounts = wsl::shared::string::Join(mounts, ',');
+
+        output[index].Labels = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedLabels.c_str()).release();
+        output[index].Networks = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedNetworks.c_str()).release();
+        output[index].Mounts = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedMounts.c_str()).release();
+        output[index].LocalVolumes = localVolumes;
+
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
@@ -2583,13 +2629,21 @@ try
         index++;
     }
 
+    // Finish every allocation before transferring ownership so nothing can throw once the caller
+    // owns the results.
+    wil::unique_cotaskmem_ptr<WSLCContainerPortMapping[]> portsOutput;
+    if (!allPorts.empty())
+    {
+        portsOutput = wil::make_unique_cotaskmem<WSLCContainerPortMapping[]>(allPorts.size());
+        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLCContainerPortMapping));
+    }
+
+    freeStrings.release();
     *Count = static_cast<ULONG>(index);
     *Containers = output.release();
 
-    if (!allPorts.empty())
+    if (portsOutput)
     {
-        auto portsOutput = wil::make_unique_cotaskmem<WSLCContainerPortMapping[]>(allPorts.size());
-        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLCContainerPortMapping));
         *PortsCount = static_cast<ULONG>(allPorts.size());
         *Ports = portsOutput.release();
     }
