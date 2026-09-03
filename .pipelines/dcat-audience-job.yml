@@ -23,6 +23,9 @@ parameters:
   - name: isProduction
     type: boolean
 
+  - name: dcat
+    type: object
+
 jobs:
   - job: ${{ parameters.name }}
     displayName: ${{ parameters.displayName }}
@@ -47,11 +50,11 @@ jobs:
           - task: dcat-publishing@1
             displayName: Add ${{ parameters.audience }} audience (${{ platform }})
             inputs:
-              serviceConnectionId: $(dcatServiceConnection)
-              tenantId: $(dcatTenantId)
-              clientId: $(dcatClientId)
-              environment: $(dcatEnvironment)
+              serviceConnectionId: ${{ parameters.dcat.serviceConnection }}
+              tenantId: ${{ parameters.dcat.tenantId }}
+              clientId: ${{ parameters.dcat.clientId }}
+              environment: ${{ parameters.dcat.environment }}
               action: add
-              publisher: $(dcatPublisher)
+              publisher: ${{ parameters.dcat.publisher }}
               metadataFile: $(dcatSubmissionPath)\add-audience-${{ parameters.audience }}-${{ platform }}.json
               pollingEnabled: false

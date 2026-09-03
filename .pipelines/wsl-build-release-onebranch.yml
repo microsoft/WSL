@@ -75,6 +75,11 @@ extends:
       parameters:
         rs_prerelease_only: false
 
+    - template: github-release-stage.yml@self
+      parameters:
+        publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
+        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+
     - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self
           parameters:

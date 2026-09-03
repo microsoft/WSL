@@ -22,6 +22,9 @@ parameters:
   - name: isProduction
     type: boolean
 
+  - name: dcat
+    type: object
+
 jobs:
   - job: ${{ parameters.name }}
     displayName: ${{ parameters.displayName }}
@@ -57,29 +60,51 @@ jobs:
     steps:
       - checkout: none
 
-      # TODO: Rewrite without script. Try to hide the JSON property paths
       - pwsh: |
-          New-Item -ItemType Directory -Path '$(dcatContentPath)' -Force | Out-Null
-          Copy-Item '$(Pipeline.Workspace)\drop_x64\bundle\wsl.$(fileVersion).x64.cab' '$(dcatContentPath)'
-          Copy-Item '$(Pipeline.Workspace)\drop_arm64\bundle\wsl.$(fileVersion).arm64.cab' '$(dcatContentPath)'
-
-          # The submission metadata embeds the absolute CAB path from the agent that generated it, which
-          # means nothing on this agent. Rewrite it to point at the content we just staged.
-          & '$(Pipeline.Workspace)\s\wsl-release-scripts\scripts\Dcat\Update-DcatSubmission.ps1' `
-              -SubmissionFolderPath '$(dcatSubmissionPath)' `
-              -ContentFolderPath '$(dcatContentPath)'
-        displayName: Stage content and rewrite submission paths
+          # Surface the version actually being published, wherever it came from, as the run name.
+          $anyCab = Get-ChildItem -Path '$(Pipeline.Workspace)' -Recurse -Filter '*.cab' | Select-Object -First 1
+          if (-not $anyCab) {
+              throw 'No CAB file found in downloaded artifacts.'
+          }
+          if ($anyCab.Name -notmatch '^wsl\.(?<version>[\d.]+)\.(x64|arm64)\.cab$') {
+              throw "Unrecognized CAB file name '$($anyCab.Name)'."
+          }
+          Write-Host "##vso[build.updatebuildnumber]$($Matches.version)"
+        displayName: Determine published version
 
       - ${{ each platform in parameters.platforms }}:
+          - pwsh: |
+              New-Item -ItemType Directory -Path '$(dcatContentPath)' -Force | Out-Null
+
+              $cabs = @(Get-ChildItem -Path '$(Pipeline.Workspace)\drop_${{ platform }}\bundle' -Filter '*.cab')
+              if ($cabs.Count -ne 1) {
+                  throw "Expected exactly one ${{ platform }} CAB file, found $($cabs.Count)."
+              }
+              Copy-Item $cabs[0].FullName '$(dcatContentPath)'
+
+              # The submission metadata embeds the absolute CAB path from the agent that generated it,
+              # which isn't valid on this agent. Rewrite it to the CAB file staged above.
+              $submissionFile = '$(dcatSubmissionPath)\submit-${{ parameters.distributionIntent }}-${{ platform }}.json'
+              $stagedPath = (Join-Path '$(dcatContentPath)' $cabs[0].Name) -replace '\\', '\\\\'
+
+              $content = Get-Content -LiteralPath $submissionFile -Raw
+              $updated = $content -replace '("FilePath":\s*)"[^"]*\.cab"', "`$1""$stagedPath"""
+              if ($updated -eq $content) {
+                  throw "No CAB file path found in $submissionFile."
+              }
+
+              Set-Content -LiteralPath $submissionFile -Value $updated -NoNewline
+            displayName: Stage ${{ platform }} content and rewrite submission path
+
           - task: dcat-publishing@1
             displayName: Submit ${{ parameters.distributionIntent }} content (${{ platform }})
             inputs:
-              serviceConnectionId: $(dcatServiceConnection)
-              tenantId: $(dcatTenantId)
-              clientId: $(dcatClientId)
-              environment: $(dcatEnvironment)
+              serviceConnectionId: ${{ parameters.dcat.serviceConnection }}
+              tenantId: ${{ parameters.dcat.tenantId }}
+              clientId: ${{ parameters.dcat.clientId }}
+              environment: ${{ parameters.dcat.environment }}
               action: submit
-              publisher: $(dcatPublisher)
+              publisher: ${{ parameters.dcat.publisher }}
               contentPath: $(dcatContentPath)
               metadataFile: $(dcatSubmissionPath)\submit-${{ parameters.distributionIntent }}-${{ platform }}.json
               pollingEnabled: true

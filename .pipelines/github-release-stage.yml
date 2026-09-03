@@ -3,37 +3,38 @@
 # has to review the notes and publish it by hand.
 
 parameters:
-  - name: isProduction
+  - name: publishPackage
     type: boolean
+    default: false
+
+  - name: packageVersion
+    type: string
+    default: ''
 
 stages:
   - stage: github_release
     displayName: GitHub release
-    trigger: manual
-    dependsOn: []
+    dependsOn: [test, package]
     jobs:
       - job: github_release
         displayName: Create GitHub release
+        dependsOn: [] # The stage handles this dependency
+
+        pool:
+          type: windows
 
         variables:
-          dropPath: $(Pipeline.Workspace)\package
-
-        templateContext:
-          type: releaseJob
-          isProduction: ${{ parameters.isProduction }}
-          inputs:
-            - input: pipelineArtifact
-              pipeline: releaseBuild
-              artifactName: drop_wsl_package
-              targetPath: $(Pipeline.Workspace)\package
-              itemPattern: |
-                bundle/*.msi
-                bundle/*.msixbundle
-                nuget/*.nupkg
+          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+          ob_artifactBaseName: 'drop_wsl'
+          ob_artifactSuffix: '_github_release'
+          ob_sdl_checkcflags_enabled: false
 
         steps:
-          # TODO: Publish the script as an artifact so that this release pipeline doesn't check out anything
-          - checkout: none
+          - task: DownloadPipelineArtifact@2
+            displayName: Download package artifact
+            inputs:
+              artifact: drop_wsl_package
+              path: drop
 
           - task: PipAuthenticate@1
             displayName: 'Pip Authenticate'
@@ -49,12 +50,12 @@ stages:
 
           - powershell: |
               pip install --user -r tools/devops/requirements.txt
-              python tools/devops/create-release.py '$(packageVersion)' `
-                  "$(dropPath)\bundle\Microsoft.WSL_$(fileVersion)_x64_ARM64.msixbundle" `
-                  "$(dropPath)\bundle\wsl.$(fileVersion).arm64.msi" `
-                  "$(dropPath)\bundle\wsl.$(fileVersion).x64.msi" `
-                  "$(dropPath)\nuget\Microsoft.WSL.Containers.$(packageVersion).nupkg" `
-                  --no-fetch --github-token "$env:token" --publish --auto-release-notes
+              python tools/devops/create-release.py '${{ parameters.packageVersion }}' `
+                  "drop\bundle\Microsoft.WSL_${{ parameters.packageVersion }}.0_x64_ARM64.msixbundle" `
+                  "drop\bundle\wsl.${{ parameters.packageVersion }}.0.arm64.msi" `
+                  "drop\bundle\wsl.${{ parameters.packageVersion }}.0.x64.msi" `
+                  "drop\nuget\Microsoft.WSL.Containers.${{ parameters.packageVersion }}.nupkg" `
+                  --no-fetch --github-token "$env:token" ${{ iif(parameters.publishPackage, '--publish --auto-release-notes', '--use-current-ref') }}
             displayName: Create GitHub release
             env:
               token: $(GithubReleaseToken)

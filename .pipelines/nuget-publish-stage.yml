@@ -33,9 +33,9 @@ stages:
 
           - ${{ each package in parameters.packages }}:
               - task: NuGetCommand@2
-                displayName: Push ${{ package }}.$(packageVersion).nupkg
+                displayName: Push ${{ package }}
                 inputs:
                   command: push
-                  packagesToPush: $(nugetPath)\${{ package }}.$(packageVersion).nupkg
+                  packagesToPush: $(nugetPath)\${{ package }}.*.nupkg
                   nuGetFeedType: external
                   publishFeedCredentials: wsl-nuget-publish
