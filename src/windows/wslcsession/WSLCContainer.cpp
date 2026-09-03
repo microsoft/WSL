@@ -1030,7 +1030,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
     auto lifecycleLock = m_lifecycleLock.lock_shared();
     auto lock = m_lock.lock_exclusive();
 
-    WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, /* waitForRestart */ !RestartPhase);
+    WaitForConflictingTransitionToComplete(lock, lifecycleLock, std::nullopt, !RestartPhase);
 
     // A Delete() that raced a restart may have already moved the container to the Deleted state.
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_DELETED, Localization::MessageWslcContainerDeleted(m_id), m_state == WslcContainerStateDeleted);
@@ -1334,7 +1334,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         // Kill is the escape hatch when a restart's stop phase is stuck, so it must not wait on the very
         // restart it is meant to unblock. Landing between the phases finds the container exited, which is
         // turned away below like any other kill of a stopped container.
-        WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop, /* waitForRestart */ !RestartPhase && !Kill);
+        WaitForConflictingTransitionToComplete(lock, lifecycleLock, TransitionKind::Stop, !RestartPhase && !Kill);
 
         // A Delete() that raced a restart may have already moved the container to the Deleted state.
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_DELETED, Localization::MessageWslcContainerDeleted(m_id), m_state == WslcContainerStateDeleted);
