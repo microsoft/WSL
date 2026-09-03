@@ -24,6 +24,7 @@ Abstract:
 #include "WSLCNetworkMetadata.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
+#include "EventStore.h"
 #include "IORelay.h"
 #include <atomic>
 #include <list>
@@ -113,6 +114,15 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
+
+    // Event streaming. Opens a stream object that yields matching events one at a time via
+    // IWSLCEventStream::GetNext.
+    IFACEMETHOD(GetEvents)(
+        _In_ LONGLONG SinceTime,
+        _In_ LONGLONG UntilTime,
+        _In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
+        _In_ ULONG FiltersCount,
+        _Outptr_ IWSLCEventStream** Stream) override;
 
     // Image management.
     IFACEMETHOD(PullImage)(
@@ -262,11 +272,6 @@ public:
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
 
-    HANDLE SessionTerminatingEvent() const noexcept
-    {
-        return m_sessionTerminatingEvent.get();
-    }
-
     ULONG Id() const noexcept
     {
         return m_id;
@@ -318,6 +323,30 @@ private:
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
 
     void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
+
+    // A create RPC hands the container off to the Docker event stream thread here and waits, so the
+    // container is committed and its create event recorded from that thread. Recording it from the RPC
+    // thread instead would let another container's event be recorded first and regress the event
+    // stream's timestamps.
+    struct PendingContainerCreate
+    {
+        wil::unique_event Completed{wil::EventOptions::ManualReset};
+        std::shared_ptr<WSLCContainerImpl> Container;
+        std::exception_ptr Exception;
+    };
+
+    __requires_lock_held(m_containersLock) std::shared_ptr<PendingContainerCreate> StartPendingCreate(std::shared_ptr<WSLCContainerImpl> Container);
+
+    __requires_lock_held(m_containersLock) void CompletePendingCreate(
+        const std::shared_ptr<PendingContainerCreate>& PendingCreate, std::exception_ptr Exception) noexcept;
+
+    void WaitForPendingCreateCompletion(const std::shared_ptr<PendingContainerCreate>& PendingCreate);
+
+    // Returns with the lock held once no create is in flight. Only one fits: the slot is unkeyed,
+    // because the container ID isn't known until Docker assigns it.
+    void WaitForConflictingCreateToComplete(std::unique_lock<std::mutex>& ContainersLock);
+
+    void OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept;
 
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
@@ -387,6 +416,14 @@ private:
     std::atomic<bool> m_terminating{false};
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
+
+    // Bounded in-memory ring of recent lifecycle events, shared by all event-stream subscribers.
+    EventStore m_eventStore;
+
+    __guarded_by(m_containersLock) std::shared_ptr<PendingContainerCreate> m_pendingCreate;
+
+    // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.
+    DockerEventTracker::EventTrackingReference m_containerEventTracking;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
