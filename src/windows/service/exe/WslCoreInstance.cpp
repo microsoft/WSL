@@ -21,6 +21,7 @@ WslCoreInstance::WslCoreInstance(
     _In_ wil::unique_socket& SystemDistroSocket,
     _In_ const GUID& InstanceId,
     _In_ const GUID& RuntimeId,
+    _In_ const LxssCreateProcess::ConnectToGuestCallback& ConnectToGuest,
     _In_ const LXSS_DISTRO_CONFIGURATION& Configuration,
     _In_ ULONG DefaultUid,
     _In_ ULONG64 ClientLifetimeId,
@@ -37,13 +38,16 @@ WslCoreInstance::WslCoreInstance(
     m_configuration(Configuration),
     m_defaultUid(DefaultUid),
     m_initializeDrvFs(DrvFsCallback),
+    m_connectToGuest(ConnectToGuest),
     m_ntClientLifetimeId(ClientLifetimeId),
     m_redirectorConnectionTargets{m_configuration.Name},
     m_socketTimeout(SocketTimeout),
     m_jobObject(JobObject)
 {
+    THROW_HR_IF(E_INVALIDARG, !m_connectToGuest);
+
     // Establish a communication channel with the init daemon.
-    m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
+    m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_connectToGuest, m_socketTimeout);
 
     // Read a message from the init daemon. This will let us know if anything failed during startup.
     // The watcher is disarmed as soon as the receive returns so its reported duration reflects
@@ -127,6 +131,7 @@ WslCoreInstance::WslCoreInstance(
                 empty,
                 WSL2_SYSTEM_DISTRO_GUID,
                 RuntimeId,
+                m_connectToGuest,
                 systemDistroConfig,
                 LX_UID_ROOT,
                 ClientLifetimeId,
@@ -239,7 +244,7 @@ void WslCoreInstance::CreateLxProcess(
 
     for (auto& socket : sockets)
     {
-        socket = wsl::windows::common::hvsocket::Connect(m_runtimeId, port);
+        socket = m_connectToGuest(port, m_destroyingEvent.get());
     }
 
     *InstanceId = m_runtimeId;
@@ -434,7 +439,7 @@ void WslCoreInstance::Initialize()
     {
         try
         {
-            const wil::unique_socket socket{wsl::windows::common::hvsocket::Connect(m_runtimeId, response.InteropPort)};
+            const wil::unique_socket socket{m_connectToGuest(response.InteropPort, m_destroyingEvent.get())};
             wil::unique_handle info{wsl::windows::common::helpers::LaunchInteropServer(
                 nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_runtimeId, m_userToken.get(), m_jobObject)};
         }
@@ -545,13 +550,19 @@ wil::unique_socket WslCoreInstance::CreateLinuxProcess(_In_ LPCSTR Path, _In_ LP
 {
     std::lock_guard lock(m_lock);
 
-    return LxssCreateProcess::CreateLinuxProcess(Path, Arguments, m_runtimeId, m_initChannel->GetChannel(), nullptr, m_socketTimeout);
+    return LxssCreateProcess::CreateLinuxProcess(
+        Path, Arguments, m_connectToGuest, m_initChannel->GetChannel(), m_destroyingEvent.get(), m_socketTimeout);
 }
 
-WslCoreInstance::WslCorePort::WslCorePort(_In_ SOCKET Socket, _In_ const GUID& RuntimeId, DWORD SocketTimeout) :
-    m_channel(wil::unique_socket{Socket}, "WslCorePort"), m_runtimeId(RuntimeId), m_socketTimeout(SocketTimeout)
+WslCoreInstance::WslCorePort::WslCorePort(
+    _In_ SOCKET Socket,
+    _In_ const LxssCreateProcess::ConnectToGuestCallback& ConnectToGuest,
+    _In_ DWORD SocketTimeout) :
+    m_channel(wil::unique_socket{Socket}, "WslCorePort"), m_connectToGuest(ConnectToGuest), m_socketTimeout(SocketTimeout)
 
 {
+    THROW_HR_IF(E_INVALIDARG, !m_connectToGuest);
+
     // N.B. The class takes ownership of the socket.
 }
 
@@ -563,8 +574,8 @@ std::shared_ptr<LxssPort> WslCoreInstance::WslCorePort::CreateSessionLeader(_In_
     LX_INIT_CREATE_SESSION message{{LxInitMessageCreateSession, sizeof(message)}};
     const auto& response = m_channel.Transaction(message, nullptr, m_socketTimeout);
 
-    wil::unique_socket socket = wsl::windows::common::hvsocket::Connect(m_runtimeId, response.Port);
-    return std::make_shared<WslCorePort>(socket.release(), m_runtimeId, m_socketTimeout);
+    wil::unique_socket socket = m_connectToGuest(response.Port, nullptr);
+    return std::make_shared<WslCorePort>(socket.release(), m_connectToGuest, m_socketTimeout);
 }
 
 void WslCoreInstance::WslCorePort::DisconnectConsole(_In_ HANDLE)

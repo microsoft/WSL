@@ -25,6 +25,7 @@ Abstract:
 #include "WslCoreFirewallSupport.h"
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
+#include "VirtioFsShareRequest.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -88,6 +89,13 @@ bool IsBackingVolumeMounted(_In_ HANDLE File)
 {
     DWORD bytesReturned{};
     return DeviceIoControl(File, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &bytesReturned, nullptr);
+}
+
+LxssCreateProcess::ConnectToGuestCallback CreateHvsocketConnector(_In_ const GUID& VmId)
+{
+    return [VmId](ULONG Port, HANDLE ExitHandle) {
+        return wsl::windows::common::hvsocket::Connect(VmId, Port, ExitHandle);
+    };
 }
 } // namespace
 
@@ -1314,6 +1322,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     WI_SetFlagIf(featureFlags, LxInitFeatureVirtIoFs, m_vmConfig.EnableVirtioFs);
     WI_SetFlagIf(featureFlags, LxInitFeatureDnsTunneling, m_vmConfig.EnableDnsTunneling);
 
+    const auto connectToGuest = CreateHvsocketConnector(m_runtimeId);
+
     // Create an instance, this takes ownership of the sockets.
     auto instance = std::make_shared<WslCoreInstance>(
         m_userToken.get(),
@@ -1321,6 +1331,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         systemDistroSocket,
         InstanceId,
         m_runtimeId,
+        connectToGuest,
         localConfig,
         DefaultUid,
         ClientLifetimeId,
@@ -2103,9 +2114,10 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
 wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments)
 {
     auto lock = m_lock.lock_exclusive();
+    const auto connectToGuest = CreateHvsocketConnector(m_runtimeId);
 
     return LxssCreateProcess::CreateLinuxProcess(
-        Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
+        Path, Arguments, connectToGuest, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
 }
 
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
@@ -2728,77 +2740,25 @@ CATCH_LOG()
 
 std::vector<char> WslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request)
 {
-    const auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(Request);
-    THROW_HR_IF(E_UNEXPECTED, !header);
-
-    WSL_LOG("VirtiofsMessageRequest", TraceLoggingValue(header->PrettyPrint().c_str(), "Content"));
-
-    auto buildResponse = [header](const std::wstring& tag, const std::wstring& childName, const std::wstring& source, HRESULT result) {
-        // Respond to the guest with the tag that should be used to mount the device.
-        wsl::shared::MessageWriter<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE> response(LxInitMessageAddVirtioFsDeviceResponse);
-        response->Result = SUCCEEDED(result) ? 0 : EINVAL; // TODO: Improved HRESULT -> errno mapping.
-        response.WriteString(response->TagOffset, tag);
-        response.WriteString(response->ChildNameOffset, childName);
-        response.WriteString(response->SourceOffset, source);
-
-        // Echo the request's transaction id and mark the message as the first (and only) reply.
-        response->Header.TransactionId = header->TransactionId;
-        response->Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::FIRST_REPLY);
-
-        WSL_LOG("VirtiofsMessageResponse", TraceLoggingValue(response->PrettyPrint().c_str(), "Content"));
-
-        const auto span = response.Span();
-        return std::vector<char>(reinterpret_cast<const char*>(span.data()), reinterpret_cast<const char*>(span.data()) + span.size());
-    };
-
-    if (header->MessageType == LxInitMessageAddVirtioFsDevice)
-    {
-        std::wstring tag;
-        std::wstring childName;
-        std::wstring source;
-        const auto result = wil::ResultFromException([&]() {
-            const auto* addShare = gslhelpers::try_get_struct<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(Request);
-            THROW_HR_IF(E_UNEXPECTED, !addShare);
-
-            const auto path = wsl::shared::string::FromSpan(Request, addShare->PathOffset);
-            const auto pathWide = wsl::shared::string::MultiByteToWide(path);
-            const auto options = wsl::shared::string::FromSpan(Request, addShare->OptionsOffset);
-            const auto optionsWide = wsl::shared::string::MultiByteToWide(options);
-
-            // Acquire the lock and attempt to add the device.
+    return wsl::windows::service::ProcessVirtioFsShareRequest(
+        Request,
+        [this](bool Admin, const std::wstring& Path, const std::wstring& Options) {
             auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-            std::tie(tag, childName, source) = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
-        });
-
-        return buildResponse(tag, childName, source, result);
-    }
-    else if (header->MessageType == LxInitMessageRemountVirtioFsDevice)
-    {
-        std::wstring newTag;
-        std::wstring childName;
-        std::wstring source;
-        const auto result = wil::ResultFromException([&]() {
-            const auto* remountShare = gslhelpers::try_get_struct<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE>(Request);
-            THROW_HR_IF(E_UNEXPECTED, !remountShare);
-
-            const std::string tag = wsl::shared::string::FromSpan(Request, remountShare->TagOffset);
-            const auto tagWide = wsl::shared::string::MultiByteToWide(tag);
+            auto [tag, childName, source] = AddVirtioFsShare(Admin, Path.c_str(), Options.c_str());
+            return wsl::windows::service::VirtioFsShareResult{
+                std::move(tag), std::move(childName), std::move(source)};
+        },
+        [this](const std::wstring& Tag, bool Admin) {
             auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-            const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
-            THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
+            const auto foundShare = FindVirtioFsShare(Tag.c_str(), !Admin);
+            THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", Tag.c_str());
 
-            std::tie(newTag, childName, source) =
-                AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
-
+            auto [newTag, childName, source] =
+                AddVirtioFsShare(Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
             WI_ASSERT(source == foundShare->Path);
+            return wsl::windows::service::VirtioFsShareResult{
+                std::move(newTag), std::move(childName), std::move(source)};
         });
-
-        return buildResponse(newTag, childName, source, result);
-    }
-    else
-    {
-        THROW_HR_MSG(E_UNEXPECTED, "Unexpected MessageType %d", header->MessageType);
-    }
 }
 
 std::string WslCoreVm::s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex)

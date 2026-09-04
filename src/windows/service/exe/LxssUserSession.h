@@ -824,9 +824,17 @@ private:
     /// <summary>
     /// The running utility vm for WSL2 distributions.
     ///
+    enum class VmBackend
+    {
+        None,
+        Hcs,
+        OpenVmm
+    };
+
     _Guarded_by_(m_instanceLock) std::unique_ptr<IWslCoreVm> m_utilityVm;
 
     std::atomic<GUID> m_vmId{GUID_NULL};
+    std::atomic<VmBackend> m_vmBackend{VmBackend::None};
 
     /// <summary>
     /// True when the VM termination callback should not perform session cleanup.

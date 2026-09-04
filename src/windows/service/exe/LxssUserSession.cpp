@@ -24,6 +24,11 @@ Abstract:
 #include "WslCoreVm.h"
 #include "WslCoreVmDiskState.h"
 #include "resource.h"
+
+#if WSL_INCLUDE_OPENVMM
+#include "OpenVmmWslCoreVm.h"
+#endif
+
 #include <winrt\Windows.ApplicationModel.Background.h>
 #include <nlohmann\json.hpp>
 
@@ -2206,11 +2211,28 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
 
         auto forceTerminate = [this]() {
             auto vmId = m_vmId.load();
-            if (!IsEqualGUID(vmId, GUID_NULL))
+            const auto backend = m_vmBackend.load();
+            if (!IsEqualGUID(vmId, GUID_NULL) && backend != VmBackend::None)
             {
                 m_suppressVmTerminationCallback.store(true);
 
-                auto result = wil::ResultFromException([&]() { WslCoreVm::ForceTerminate(vmId); });
+                auto result = wil::ResultFromException([&]() {
+                    if (backend == VmBackend::Hcs)
+                    {
+                        WslCoreVm::ForceTerminate(vmId);
+                    }
+#if WSL_INCLUDE_OPENVMM
+                    else
+                    {
+                        OpenVmmWslCoreVm::ForceTerminate(vmId);
+                    }
+#else
+                    else
+                    {
+                        THROW_HR_WITH_USER_ERROR(E_NOTIMPL, wsl::shared::Localization::MessageOpenVmmNotIncluded());
+                    }
+#endif
+                });
 
                 WSL_LOG("ForceTerminateVm", TraceLoggingValue(result, "Result"));
             }
@@ -2974,7 +2996,13 @@ void LxssUserSessionImpl::_CreateVm()
         GUID vmId{};
         THROW_IF_FAILED(CoCreateGuid(&vmId));
 
+        const auto backend = config.EnableOpenVmm ? VmBackend::OpenVmm : VmBackend::Hcs;
+        m_vmBackend.store(backend);
         m_vmId.store(vmId);
+        auto resetVmStateOnFailure = wil::scope_exit([&] {
+            m_vmId.store(GUID_NULL);
+            m_vmBackend.store(VmBackend::None);
+        });
 
         const auto weakSession = weak_from_this();
         auto initializeDrvFs = [weakSession, vmId](HANDLE userToken) noexcept {
@@ -2982,7 +3010,19 @@ void LxssUserSessionImpl::_CreateVm()
         };
 
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
+        if (backend == VmBackend::Hcs)
+        {
+            m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
+        }
+        else
+        {
+    #if WSL_INCLUDE_OPENVMM
+            m_utilityVm = OpenVmmWslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
+    #else
+            THROW_HR_WITH_USER_ERROR(E_NOTIMPL, wsl::shared::Localization::MessageOpenVmmNotIncluded());
+    #endif
+        }
+        resetVmStateOnFailure.release();
 
         if (m_httpProxyStateTracker)
         {
@@ -4034,6 +4074,7 @@ void LxssUserSessionImpl::_VmTerminate()
 
     m_utilityVm.reset();
     m_vmId.store(GUID_NULL);
+    m_vmBackend.store(VmBackend::None);
 
     // Reset the user's token since its lifetime is tied to the VM.
     m_userToken.reset();
