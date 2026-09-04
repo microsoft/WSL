@@ -162,6 +162,33 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName2);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_ContinuesAfterFailure)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName2);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId1 = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId1.empty());
+
+        result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId2 = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId2.empty());
+
+        // A container that cannot be removed is reported without skipping the ones after it
+        result = RunWslc(std::format(L"container remove {} {} {}", containerId1, InvalidContainerName, containerId2));
+        result.Verify(
+            {.Stdout = std::format(L"{}\r\n{}\r\n", containerId1, containerId2),
+             .Stderr = FormatErrorMessage(
+                 std::format(L"Container '{}' not found.", InvalidContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
+             .ExitCode = 1});
+
+        VerifyContainerIsNotListed(containerId1);
+        VerifyContainerIsNotListed(containerId2);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Volumes_RemovesAnonymousVolume)
     {
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, AnonymousVolumeImage.NameAndTag()));
@@ -264,6 +291,7 @@ private:
 
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
+    const std::wstring InvalidContainerName = L"wslc-nonexistent-container-for-remove";
     const std::wstring TestVolumeName = L"wslc-e2e-container-remove-volume";
     const TestImage& DebianImage = DebianTestImage();
 

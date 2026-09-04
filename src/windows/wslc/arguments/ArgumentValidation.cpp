@@ -188,6 +188,12 @@ void Argument::Validate(ArgMap& execArgs) const
         });
         break;
 
+    case ArgType::Timeout:
+        CacheConverted<ArgType::Timeout>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<LONG>(value, name);
+        });
+        break;
+
     case ArgType::Secret:
         CacheConverted<ArgType::Secret>(
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseSecretSpec(value); });
