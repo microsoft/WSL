@@ -3026,7 +3026,7 @@ Return Value:
 --*/
 try
 {
-    LX_MINI_INIT_MOUNT_RESULT_MESSAGE Message;
+    LX_MINI_INIT_MOUNT_RESULT_MESSAGE Message{};
     Message.Header.MessageSize = sizeof(Message);
     Message.Header.MessageType = LxMiniInitMessageMountStatus;
     Message.Result = Result;
