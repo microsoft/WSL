@@ -4799,6 +4799,49 @@ VERSION_ID="Invalid|Format"
         TerminateDistribution();
     }
 
+    WSL2_TEST_METHOD(ModernOOBETermination)
+    {
+        constexpr DWORD oobeDurationSeconds = 30;
+        constexpr DWORD waiterObservationTimeout = 1000;
+        constexpr DWORD terminationTimeout = 10000;
+        constexpr DWORD cleanupTimeout = 45000;
+
+        const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
+        const auto testDistroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
+        VERIFY_IS_TRUE(testDistroId.has_value());
+        const auto testDistroIdString = wsl::shared::string::GuidToString<wchar_t>(testDistroId.value());
+
+        DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
+        distributionconf.SetContent(
+            std::format(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE_STARTED; sleep {}'\n", oobeDurationSeconds).c_str());
+
+        RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
+        TerminateDistribution();
+
+        auto [oobeOutputRead, oobeOutputWrite] = CreateSubprocessPipe(false, true);
+        wsl::windows::common::SubProcess oobeProcessBuilder(
+            nullptr, LxssGenerateWslCommandLine(L"-d " LXSS_DISTRO_NAME_TEST_L).c_str());
+        oobeProcessBuilder.SetStdHandles(nullptr, oobeOutputWrite.get(), oobeOutputWrite.get());
+        const auto oobeProcess = oobeProcessBuilder.Start();
+        oobeOutputWrite.reset();
+
+        PartialHandleRead oobeOutput(oobeOutputRead.get());
+        oobeOutput.Expect("OOBE_STARTED\n");
+
+        wsl::windows::common::SubProcess waitingProcessBuilder(
+            nullptr, LxssGenerateWslCommandLine(L"-d " LXSS_DISTRO_NAME_TEST_L L" true").c_str());
+        const auto waitingProcess = waitingProcessBuilder.Start();
+        const DWORD waitingResult = WaitForSingleObject(waitingProcess.get(), waiterObservationTimeout);
+
+        wsl::windows::common::SubProcess terminationProcessBuilder(
+            nullptr, LxssGenerateWslCommandLine(L"--terminate " LXSS_DISTRO_NAME_TEST_L).c_str());
+        VERIFY_ARE_EQUAL(terminationProcessBuilder.Run(terminationTimeout), 0u);
+
+        VERIFY_ARE_EQUAL(waitingResult, WAIT_TIMEOUT);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(waitingProcess.get(), cleanupTimeout), WAIT_OBJECT_0);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(oobeProcess.get(), cleanupTimeout), WAIT_OBJECT_0);
+    }
+
     static void ValidateDistributionStarts(LPCWSTR Name)
     {
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo -n OK", Name));
