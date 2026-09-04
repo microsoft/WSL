@@ -227,7 +227,7 @@ void WslCoreInstance::CreateLxProcess(
     ULONG port;
     {
         auto sessionLock = sessionLeader->Lock();
-        port = sessionLeader->GetChannel().Transaction<LX_INIT_CREATE_PROCESS_UTILITY_VM>(messageSpan).Result;
+        port = sessionLeader->GetChannel().Transaction<LX_INIT_CREATE_PROCESS_UTILITY_VM>(messageSpan, nullptr, m_socketTimeout).Result;
     }
 
     // Connect to the port specified by the session leader.
@@ -356,7 +356,7 @@ void WslCoreInstance::UpdateTimezone()
         wsl::windows::common::helpers::GenerateTimezoneUpdateMessage(wsl::windows::common::helpers::GetLinuxTimezone(m_userToken.get()));
 
     auto lock = m_initChannel->Lock();
-    auto transaction = m_initChannel->GetChannel().StartTransaction();
+    auto transaction = m_initChannel->GetChannel().StartTransaction(m_socketTimeout);
     transaction.Send<LX_INIT_TIMEZONE_INFORMATION>(gsl::make_span(message));
 }
 
@@ -403,7 +403,7 @@ void WslCoreInstance::Initialize()
     auto config = wsl::windows::common::helpers::GenerateConfigurationMessage(
         m_configuration.Name, fixedDrives, m_defaultUid, timezone, {}, m_featureFlags, drvfsMount);
 
-    auto transaction = m_initChannel->GetChannel().StartTransaction();
+    auto transaction = m_initChannel->GetChannel().StartTransaction(m_socketTimeout);
     transaction.Send<LX_INIT_CONFIGURATION_INFORMATION>(gsl::span(config));
 
     // Init replies with information about the distribution.
