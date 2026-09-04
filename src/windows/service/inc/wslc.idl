@@ -652,6 +652,7 @@ typedef struct _WSLCNetworkOptions
     [unique] LPCSTR Subnet;
     [unique] LPCSTR Gateway;
     [unique] LPCSTR IpRange;
+    BOOL EnableIPv6;
 } WSLCNetworkOptions;
 
 typedef char WSLCNetworkName[WSLC_MAX_NETWORK_NAME_LENGTH + 1];

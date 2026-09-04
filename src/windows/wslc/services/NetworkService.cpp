@@ -52,6 +52,7 @@ void NetworkService::Create(Terminal& terminal, models::Session& session, const 
     options.LabelsCount = static_cast<ULONG>(labels.size());
 
     options.Internal = createOptions.Internal ? TRUE : FALSE;
+    options.EnableIPv6 = createOptions.EnableIPv6 ? TRUE : FALSE;
     if (createOptions.Subnet.has_value())
     {
         options.Subnet = createOptions.Subnet->c_str();

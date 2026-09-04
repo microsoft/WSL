@@ -3560,6 +3560,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
     <value>Restrict external access to the network</value>
   </data>
+  <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
+    <value>Enable IPv6 networking</value>
+    <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
     <value>Subnet in CIDR format that represents a network segment</value>
     <comment>{Locked="CIDR"}Command line arguments, file names and string inserts should not be translated</comment>
