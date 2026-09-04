@@ -1396,38 +1396,31 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             std::optional<HRESULT> hr{};
             switch (trackedRoute.SyncStatus)
             {
+            // Use ModifyRequestType::Add rather than ModifyRequestType::Update for PendingUpdate.
+            // An Update in GNS uses NLM_F_REPLACE and replaces by
+            // (destination prefix, tos, metric) key alone and would silently overwrite a same-key route
+            // belonging to a *different* interface (e.g. another interface's default at the same metric).
+            // An ModifyRequestType::Add plumbs a new route or leaves an existing one in place (EEXIST is ignored),
+            // which is the desired behavior for PendingUpdate.
+            //
+            // The route synchronization logic never attempts an in-place update of a route. Whenever
+            // a route change occurs on the host (ProcessRouteChange), we mark for removal the routes that are known
+            // to have been synced in Linux but are no longer part of the latest set of host routes, we do not
+            // do a diff of the route properties to determine if an in-place update is needed.
             case PendingAdd:
+            case PendingUpdate:
                 hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
-                if (FAILED(hr.value()))
-                {
-                    // try to update it instead if it already exists
-                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Update);
-                }
                 break;
 
             case Synced:
                 if (refreshAllRoutes)
                 {
-                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Update);
-                    if (FAILED(hr.value()))
-                    {
-                        // try to add it
-                        hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
-                    }
+                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
                     if (FAILED(hr.value()))
                     {
                         trackedRoute.SyncStatus = PendingUpdate;
                         trackedRoute.SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
                     }
-                }
-                break;
-
-            case PendingUpdate:
-                hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Update);
-                if (FAILED(hr.value()))
-                {
-                    // try to add it
-                    hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
                 }
                 break;
 
