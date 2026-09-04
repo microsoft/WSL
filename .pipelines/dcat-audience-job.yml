@@ -46,9 +46,12 @@ jobs:
     steps:
       - checkout: none
 
+      - pwsh: echo "Dummy step for testing structure"
+
       - ${{ each platform in parameters.platforms }}:
           - task: dcat-publishing@1
             displayName: Add ${{ parameters.audience }} audience (${{ platform }})
+            enabled: false
             inputs:
               serviceConnectionId: ${{ parameters.dcat.serviceConnection }}
               tenantId: ${{ parameters.dcat.tenantId }}

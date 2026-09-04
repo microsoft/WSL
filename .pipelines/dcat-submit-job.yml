@@ -97,8 +97,11 @@ jobs:
               Set-Content -LiteralPath $submissionFile -Value $updated -NoNewline
             displayName: Stage ${{ platform }} content and rewrite submission path
 
+          - pwsh: echo "Dummy step for testing"
+
           - task: dcat-publishing@1
             displayName: Submit ${{ parameters.distributionIntent }} content (${{ platform }})
+            enabled: false
             inputs:
               serviceConnectionId: ${{ parameters.dcat.serviceConnection }}
               tenantId: ${{ parameters.dcat.tenantId }}
