@@ -122,6 +122,7 @@ _(Session,          "session",              NO_ALIAS,         Kind::Value,      
 _(ShmSize,          "shm-size",             NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_ShmSizeArgDescription()) \
 _(StoragePath,      "storage-path",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_StoragePathArgDescription()) \
 _(Signal,           "signal",               L"s",             Kind::Value,      WSLCSignal,   Localization::WSLCCLI_SignalArgDescription()) \
+_(Size,             "size",                 L"s",             Kind::Flag,       NoConversion, Localization::WSLCCLI_SizeArgDescription()) \
 _(Source,           "source",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_SourceArgDescription()) \
 _(StopSignal,       "stop-signal",          NO_ALIAS,         Kind::Value,      WSLCSignal,   Localization::WSLCCLI_StopSignalArgDescription()) \
 _(StopTimeout,      "stop-timeout",         NO_ALIAS,         Kind::Value,      int,          Localization::WSLCCLI_StopTimeoutArgDescription()) \

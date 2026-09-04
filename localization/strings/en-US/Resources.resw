@@ -3352,6 +3352,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Current or existing image reference in the image-name[:tag] format</value>
   </data>
+  <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
+    <value>Display total file sizes</value>
+  </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
   </data>
@@ -3748,6 +3751,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
     <value>PORTS</value>
   </data>
+  <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
+    <value>SIZE</value>
+  </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
@@ -3785,6 +3791,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
     <value>invalid</value>
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
+    <value>{} (virtual {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>Less than a second ago</value>

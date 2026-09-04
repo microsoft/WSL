@@ -692,7 +692,7 @@ void ContainerService::Delete(Session& session, const std::string& id, bool forc
 }
 
 std::vector<ContainerInformation> ContainerService::List(
-    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters)
+    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters, bool size)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -703,6 +703,7 @@ std::vector<ContainerInformation> ContainerService::List(
 
     WSLCListContainersOptions options{};
     options.Flags = all ? WSLCListContainersFlagsAll : WSLCListContainersFlagsNone;
+    WI_SetFlagIf(options.Flags, WSLCListContainersFlagsSize, size);
     options.Limit = limit;
     options.Filters = filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
@@ -729,6 +730,8 @@ std::vector<ContainerInformation> ContainerService::List(
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
+        entry.SizeRw = current.SizeRw;
+        entry.SizeRootFs = current.SizeRootFs;
 
         for (const auto& port : ports)
         {

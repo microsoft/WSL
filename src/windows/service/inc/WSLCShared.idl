@@ -231,9 +231,10 @@ typedef enum _WSLCListContainersFlags
 {
     WSLCListContainersFlagsNone = 0,
     WSLCListContainersFlagsAll = 1,
+    WSLCListContainersFlagsSize = 2,
 } WSLCListContainersFlags;
 
-cpp_quote("#define WSLCListContainersFlagsValid (WSLCListContainersFlagsAll)")
+cpp_quote("#define WSLCListContainersFlagsValid (WSLCListContainersFlagsAll | WSLCListContainersFlagsSize)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListContainersFlags);")
 

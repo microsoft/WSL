@@ -57,7 +57,7 @@ struct ContainerService
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force, bool deleteVolumes = false);
     static std::vector<models::ContainerInformation> List(
-        models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {});
+        models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {}, bool size = false);
 
     static int Exec(Terminal& terminal, models::Session& session, const std::string& id, models::ContainerOptions options);
     static void Export(models::Session& session, const std::string& id, const std::wstring& outputPath);

@@ -2618,6 +2618,7 @@ try
     *PortsCount = 0;
 
     bool all = false;
+    bool size = false;
     int limit = -1;
     std::map<std::string, std::vector<std::string>> filters;
 
@@ -2630,6 +2631,7 @@ try
             Options->Flags);
 
         all = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsAll);
+        size = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsSize);
         limit = static_cast<int>(Options->Limit);
 
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
@@ -2641,7 +2643,7 @@ try
     std::vector<docker_schema::ContainerInfo> dockerContainers;
     try
     {
-        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters);
+        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters, size);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
 
@@ -2720,6 +2722,8 @@ try
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
+        output[index].SizeRw = dockerContainer.SizeRw;
+        output[index].SizeRootFs = dockerContainer.SizeRootFs;
 
         for (const auto& port : e->GetPorts())
         {

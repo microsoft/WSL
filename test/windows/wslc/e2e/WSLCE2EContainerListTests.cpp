@@ -24,6 +24,37 @@ using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::common::string;
 
+namespace {
+    // The table header is always the first stdout line. Scoping column assertions to it keeps them from
+    // matching container names, image names or IDs in the data rows that happen to contain the title.
+    bool HeaderHasColumn(const WSLCExecutionResult& result, const std::wstring& column)
+    {
+        const auto lines = result.GetStdoutLines();
+        return !lines.empty() && lines.front().find(column) != std::wstring::npos;
+    }
+
+    // The SIZE cell is the writable layer and the total, joined by fixed text from the localized
+    // pattern. Only that separator is stable enough to assert on, and translations may emit the two
+    // sizes in either order, so it is taken from between whichever placeholder lands first.
+    std::wstring VirtualSizeSeparator()
+    {
+        constexpr auto writablePlaceholder = L"<writable>";
+        constexpr auto totalPlaceholder = L"<total>";
+
+        const auto pattern = Localization::WSLCCLI_ContainerSizeWithVirtual(writablePlaceholder, totalPlaceholder);
+        const auto writablePosition = pattern.find(writablePlaceholder);
+        const auto totalPosition = pattern.find(totalPlaceholder);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, writablePosition);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, totalPosition);
+
+        const auto writableFirst = writablePosition < totalPosition;
+        const auto begin = writableFirst ? writablePosition + wcslen(writablePlaceholder) : totalPosition + wcslen(totalPlaceholder);
+        const auto end = writableFirst ? totalPosition : writablePosition;
+
+        return pattern.substr(begin, end - begin);
+    }
+} // namespace
+
 class WSLCE2EContainerListTests
 {
     WSLC_TEST_CLASS(WSLCE2EContainerListTests)
@@ -185,6 +216,83 @@ class WSLCE2EContainerListTests
         result = RunWslc(L"container list --all --quiet --no-trunc");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = TruncateId(result.GetStdoutOneLine());
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Without --size the SIZE column is absent.
+        result = RunWslc(L"container list");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(HeaderHasColumn(result, Localization::WSLCCLI_TableHeaderSize()));
+
+        const auto findContainerLine = [&](const WSLCExecutionResult& listResult) {
+            std::optional<std::wstring> line;
+            for (const auto& candidate : listResult.GetStdoutLines())
+            {
+                if (candidate.find(containerId) != std::wstring::npos)
+                {
+                    line = candidate;
+                    break;
+                }
+            }
+
+            return line;
+        };
+
+        // --size appends a SIZE column reporting the writable layer and the virtual total.
+        result = RunWslc(L"container list --size");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(HeaderHasColumn(result, Localization::WSLCCLI_TableHeaderSize()));
+
+        auto sizedLine = findContainerLine(result);
+        VERIFY_IS_TRUE(sizedLine.has_value());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, sizedLine->find(VirtualSizeSeparator()));
+
+        // -s is the short alias and produces the same column.
+        auto aliasResult = RunWslc(L"container list -s");
+        aliasResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(HeaderHasColumn(aliasResult, Localization::WSLCCLI_TableHeaderSize()));
+
+        auto aliasLine = findContainerLine(aliasResult);
+        VERIFY_IS_TRUE(aliasLine.has_value());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, aliasLine->find(VirtualSizeSeparator()));
+
+        // ps is an alias of list and accepts the option too.
+        auto psResult = RunWslc(L"ps --size");
+        psResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(HeaderHasColumn(psResult, Localization::WSLCCLI_TableHeaderSize()));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption_QuietStillOutputsIdsOnly)
+    {
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        // --quiet truncates ids unless --no-trunc is also passed.
+        const auto containerId = TruncateId(result.GetStdoutOneLine());
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // --quiet wins over --size.
+        result = RunWslc(L"container list --all --quiet --size");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
+        VERIFY_IS_FALSE(HeaderHasColumn(result, Localization::WSLCCLI_TableHeaderSize()));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_SizeOption_ListedInHelp)
+    {
+        auto result = RunWslc(L"container list --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
