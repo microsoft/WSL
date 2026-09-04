@@ -2118,7 +2118,7 @@ try
 
     // Omitting the tag makes the daemon push every tag in the repository. A reference that names a
     // tag or digest is rejected rather than silently ignored.
-    RETURN_HR_IF(E_INVALIDARG, AllTags && tagOrDigest.has_value());
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError(), AllTags && tagOrDigest.has_value());
 
     if (!AllTags && !tagOrDigest.has_value())
     {
