@@ -4758,8 +4758,9 @@ VERSION_ID="Invalid|Format"
                 // DrvFs mounts created before OOBE should be refreshed to use the new default user.
                 validateOutput(
                     std::format(
-                        L"bash -c 'path=$(wslpath -u \"{}\") && test \"$(stat -c %u:%g /mnt/c)\" = \"$(id -u):$(id -g)\" && "
-                        L"touch \"$path/probe\" && chmod 0644 \"$path/probe\"'",
+                        L"bash -c 'path=$(wslpath -u \"{}\") && mountpoint=$(findmnt -n -o TARGET -T \"$path\") && "
+                        L"test \"$(stat -c %u:%g \"$mountpoint\")\" = \"$(id -u):$(id -g)\" && touch \"$path/probe\" && "
+                        L"chmod 0644 \"$path/probe\"'",
                         drvFsTestPath.wstring())
                         .c_str(),
                     L"");
