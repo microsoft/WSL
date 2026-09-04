@@ -46,11 +46,12 @@ using unique_socket = wil::unique_fd;
 
 enum class ConnCheckStatus
 {
-    InProgress,
-    Success,
-    FailureGetAddrInfo,
-    FailureConfig,
-    FailureSocketConnect,
+    InProgress = 0,
+    Success = 1,
+    FailureGetAddrInfo = 2,
+    FailureConfig = 3,
+    FailureSocketConnect = 4,
+    NoRecordsForFamily = 5,
 };
 
 struct ConnCheckResult
@@ -114,8 +115,15 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_NUMERICSERV;
         auto status = getaddrinfo(hostname, port, &hints, &servinfo);
-        if (status != 0)
+
+        if (status != 0) 
         {
+            if (status == EAI_NODATA || status == EAI_NONAME) 
+            {
+                *connCheckStatus = ConnCheckStatus::NoRecordsForFamily;
+                return unique_socket{}; 
+            }
+
             throw std::runtime_error(std::format("CheckConnection: getaddrinfo() failed: {}", status));
         }
 
