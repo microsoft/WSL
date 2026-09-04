@@ -575,6 +575,7 @@ struct TestConfigDefaults
     std::optional<std::wstring> systemDistro;
     std::optional<bool> sparse;
     std::optional<bool> hostAddressLoopback;
+    std::optional<int> ephemeralPortRangeSize;
     int crashDumpCount = 100;
     std::optional<std::wstring> CrashDumpFolder;
     std::optional<bool> isolateDistroCgroup;
