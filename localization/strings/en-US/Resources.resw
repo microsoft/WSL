@@ -2769,6 +2769,9 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Imports the contents of a tarball to create a filesystem image. Optionally tag the image with a repository and tag name.</value>
   </data>
+  <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
+    <value>Show all images (default hides intermediate images).</value>
+  </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>List images.</value>
   </data>

@@ -18,6 +18,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "VTSupport.h"
+#include <set>
 
 namespace WSLCE2ETests {
 
@@ -135,6 +136,10 @@ WSLCExecutionResult RunWslcAndRedirectToFile(
 WSLCExecutionResult RunWslcWithStdinFile(
     const std::wstring& commandLine, const std::filesystem::path& stdinFilePath, ElevationType elevationType = ElevationType::Elevated);
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType = ElevationType::Elevated);
+
+// Runs a command expected to succeed without stderr output and returns its non-empty stdout lines as
+// a set, so two listings can be compared without depending on ordering or duplicates.
+std::set<std::wstring> RunWslcAndGetStdoutLineSet(const std::wstring& cmd, ElevationType elevationType = ElevationType::Elevated);
 
 WSLCInteractiveSession RunWslcInteractive(
     const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated, std::optional<PseudoConsole> pseudoConsole = std::nullopt);

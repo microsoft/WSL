@@ -184,7 +184,7 @@ void GetImages(CLIExecutionContext& context)
     const bool containerCounts =
         context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
 
-    auto images = ImageService::List(session, filters, containerCounts);
+    auto images = ImageService::List(session, filters, containerCounts, context.Args.GetValue<ArgType::All>());
     context.Data.Add<Data::Images>(std::move(images));
 }
 

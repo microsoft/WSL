@@ -152,6 +152,26 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    // Test: Verify image list exposes --all/-a on both the subcommand and root 'images' spelling
+    TEST_METHOD(ImageListCommand_HasAllArgument)
+    {
+        const std::pair<std::wstring, std::vector<Argument>> spellings[] = {
+            {L"image list", ImageListCommand(L"image").GetArguments()}, {L"images", ImageListCommand(L"wslc", true).GetArguments()}};
+
+        for (const auto& [label, args] : spellings)
+        {
+            LogComment(L"Verifying --all for: " + label);
+
+            auto itr = std::find_if(args.begin(), args.end(), [](const Argument& arg) { return arg.Type() == ArgType::All; });
+
+            VERIFY_IS_TRUE(itr != args.end());
+            VERIFY_ARE_EQUAL(std::wstring{L"all"}, itr->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L"a"}, itr->Alias());
+            VERIFY_ARE_EQUAL(Kind::Flag, itr->Kind());
+            VERIFY_IS_FALSE(itr->Required());
+        }
+    }
+
     // Test: Verify VersionCommand has the correct name
     TEST_METHOD(VersionCommand_HasCorrectName)
     {
