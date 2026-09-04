@@ -42,6 +42,8 @@ enum class Data : size_t
     Volumes,
     Networks,
     NetworkEndpointOptions,
+    ConfirmWarning,
+    ConfirmMessage,
 
     Max
 };
@@ -59,6 +61,8 @@ namespace details {
     DEFINE_DATA_MAPPING(Volumes, std::vector<wsl::windows::common::wslc_schema::VolumeListEntry>);
     DEFINE_DATA_MAPPING(Networks, std::vector<wsl::windows::common::wslc_schema::NetworkListEntry>);
     DEFINE_DATA_MAPPING(NetworkEndpointOptions, wsl::windows::wslc::models::NetworkEndpointOptions);
+    DEFINE_DATA_MAPPING(ConfirmWarning, std::wstring);
+    DEFINE_DATA_MAPPING(ConfirmMessage, std::wstring);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

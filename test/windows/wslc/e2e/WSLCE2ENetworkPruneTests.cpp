@@ -53,7 +53,7 @@ class WSLCE2ENetworkPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_NoNetworks)
     {
         // Prune when no unused networks exist should succeed without reporting any of our test networks.
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_FALSE(result.StdoutContainsLine(TestNetworkName));
@@ -67,7 +67,7 @@ class WSLCE2ENetworkPruneTests
 
         auto cleanup = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(TestNetworkName); });
 
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto output = result.GetStdoutLines();
@@ -91,7 +91,7 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName2);
         });
 
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(TestNetworkName));
@@ -116,7 +116,7 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName);
         });
 
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_FALSE(result.StdoutContainsLine(TestNetworkName), L"Network in use by a running container must not be pruned");
@@ -132,7 +132,7 @@ class WSLCE2ENetworkPruneTests
         auto cleanup = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(TestNetworkName); });
 
         // A label filter that does not match the network should preserve it.
-        const auto filteredPrune = RunWslc(L"network prune --filter label=wslc.test.never=present");
+        const auto filteredPrune = RunWslc(L"network prune --force --filter label=wslc.test.never=present");
         filteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_FALSE(
             filteredPrune.StdoutContainsLine(TestNetworkName), L"Filtered prune should not have deleted the non-matching network");
@@ -140,7 +140,7 @@ class WSLCE2ENetworkPruneTests
 
         // A subsequent unfiltered prune should still remove it, proving the filter
         // was the reason it survived.
-        const auto unfilteredPrune = RunWslc(L"network prune");
+        const auto unfilteredPrune = RunWslc(L"network prune --force");
         unfilteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(unfilteredPrune.StdoutContainsLine(TestNetworkName));
         VerifyNetworkIsNotListed(TestNetworkName);
@@ -158,7 +158,7 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName2);
         });
 
-        const auto result = RunWslc(L"network prune --filter label=wslc.test.prune=keep");
+        const auto result = RunWslc(L"network prune --force --filter label=wslc.test.prune=keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(TestNetworkName));
@@ -180,7 +180,7 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName2);
         });
 
-        const auto result = RunWslc(L"network prune --filter label!=wslc.test.keep");
+        const auto result = RunWslc(L"network prune --force --filter label!=wslc.test.keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(TestNetworkName2));
@@ -200,7 +200,7 @@ class WSLCE2ENetworkPruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_Filter_InvalidKey)
     {
-        const auto result = RunWslc(L"network prune --filter color=red");
+        const auto result = RunWslc(L"network prune --force --filter color=red");
         result.Verify({.Stdout = L"", .ExitCode = 1});
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"invalid filter 'color'\r\nError code: E_INVALIDARG"));
     }

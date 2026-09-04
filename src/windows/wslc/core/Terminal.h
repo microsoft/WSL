@@ -139,6 +139,12 @@ struct Terminal
         return PromptForLine(Level::Output, label, mask);
     }
 
+    // Prompts for confirmation by writing message followed by " [y/N] ", then reading one line.
+    // Returns true only when the answer is "y" (case-insensitive, surrounding ASCII whitespace
+    // ignored); every other answer, including end of input, declines. Declining at end of input is
+    // what lets a non-interactive prune abort instead of blocking.
+    bool Confirm(std::wstring_view message);
+
     bool IsVTEnabled(Level level) const noexcept;
 
     bool IsColorEnabled(Level level) const noexcept;

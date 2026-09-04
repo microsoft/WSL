@@ -352,16 +352,6 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     }
 }
 
-// Validates that each --filter argument is in the form "key=value". Rejects entries without an '=';
-// the runtime validates the key and value for specific objects.
-void ValidateFilter(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = ParseFilter(value);
-    }
-}
-
 void ValidateTimestamp(const std::vector<std::wstring>& values, const std::wstring& argName)
 {
     for (const auto& value : values)

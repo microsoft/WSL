@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "AsyncExecution.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerModel.h"
 #include "ContainerService.h"
 #include "ContainerTasks.h"
@@ -1103,10 +1104,17 @@ void ViewContainerLogs(CLIExecutionContext& context)
 
 void PruneContainers(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(Localization::WSLCCLI_ContainerPruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
-    auto result = ContainerService::Prune(session);
+    // Filter values are parsed and cached during argument validation.
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
+
+    auto result = ContainerService::Prune(session, filters);
 
     if (!result.PrunedContainers.empty())
     {

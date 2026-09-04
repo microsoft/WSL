@@ -870,10 +870,18 @@ wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Sess
     return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
 }
 
-PruneContainersResult ContainerService::Prune(Session& session)
+PruneContainersResult ContainerService::Prune(Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
     PruneResult result;
-    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, &result.result));
+    THROW_IF_FAILED(session.Get()->PruneContainers(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &result.result));
 
     PruneContainersResult pruneResult;
     pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;

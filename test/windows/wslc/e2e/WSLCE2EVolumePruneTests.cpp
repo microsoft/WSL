@@ -53,7 +53,7 @@ class WSLCE2EVolumePruneTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_NoVolumes)
     {
         // Prune when no volumes exist should succeed and report a reclaimed-space line.
-        const auto result = RunWslc(L"volume prune");
+        const auto result = RunWslc(L"volume prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // The deleted-volume block, and the blank line that follows it, are only written when
@@ -68,7 +68,7 @@ class WSLCE2EVolumePruneTests
 
         auto cleanup = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(TestVolumeName); });
 
-        const auto result = RunWslc(L"volume prune");
+        const auto result = RunWslc(L"volume prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto output = result.GetStdoutLines();
@@ -85,7 +85,7 @@ class WSLCE2EVolumePruneTests
 
         auto cleanup = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(TestVolumeName); });
 
-        const auto result = RunWslc(L"volume prune --all");
+        const auto result = RunWslc(L"volume prune --force --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto output = result.GetStdoutLines();
@@ -110,7 +110,7 @@ class WSLCE2EVolumePruneTests
             EnsureVolumeDoesNotExist(TestVolumeName2);
         });
 
-        const auto result = RunWslc(L"volume prune --all");
+        const auto result = RunWslc(L"volume prune --force --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"Deleted Volumes:"));
@@ -136,7 +136,7 @@ class WSLCE2EVolumePruneTests
             EnsureVolumeDoesNotExist(TestVolumeName);
         });
 
-        const auto result = RunWslc(L"volume prune --all");
+        const auto result = RunWslc(L"volume prune --force --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_FALSE(result.StdoutContainsLine(TestVolumeName), L"Volume in use by a running container must not be pruned");
@@ -152,7 +152,7 @@ class WSLCE2EVolumePruneTests
         auto cleanup = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(TestVolumeName); });
 
         // A label filter that does not match the volume should preserve it
-        const auto filteredPrune = RunWslc(L"volume prune --all --filter label=wslc.test.never=present");
+        const auto filteredPrune = RunWslc(L"volume prune --force --all --filter label=wslc.test.never=present");
         filteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_FALSE(
             filteredPrune.StdoutContainsLine(TestVolumeName), L"Filtered prune should not have deleted the non-matching volume");
@@ -160,7 +160,7 @@ class WSLCE2EVolumePruneTests
 
         // Subsequent unfiltered prune --all should still remove it, proving
         // the filter was the reason it survived.
-        const auto unfilteredPrune = RunWslc(L"volume prune --all");
+        const auto unfilteredPrune = RunWslc(L"volume prune --force --all");
         unfilteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(unfilteredPrune.StdoutContainsLine(TestVolumeName));
         VerifyVolumeIsNotListed(TestVolumeName);
@@ -178,7 +178,7 @@ class WSLCE2EVolumePruneTests
             EnsureVolumeDoesNotExist(TestVolumeName2);
         });
 
-        const auto result = RunWslc(L"volume prune --all --filter label=wslc.test.prune=keep");
+        const auto result = RunWslc(L"volume prune --force --all --filter label=wslc.test.prune=keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(TestVolumeName));
@@ -200,7 +200,7 @@ class WSLCE2EVolumePruneTests
             EnsureVolumeDoesNotExist(TestVolumeName2);
         });
 
-        const auto result = RunWslc(L"volume prune --all --filter label!=wslc.test.keep");
+        const auto result = RunWslc(L"volume prune --force --all --filter label!=wslc.test.keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(TestVolumeName2));
@@ -220,7 +220,7 @@ class WSLCE2EVolumePruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Prune_Filter_InvalidKey)
     {
-        const auto result = RunWslc(L"volume prune --filter color=red");
+        const auto result = RunWslc(L"volume prune --force --filter color=red");
         result.Verify({.Stdout = L"", .ExitCode = 1});
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"invalid filter 'color'\r\nError code: E_INVALIDARG"));
     }
