@@ -1013,7 +1013,8 @@ try
                 LOG_ERROR("execl() failed, {}", errno);
             },
             {},
-            Config.CgroupPath);
+            Config.CgroupPath,
+            Config.CgroupNamespace.get());
     }
 
     return 0;
@@ -2766,6 +2767,21 @@ try
     else if (Result == 0)
     {
         Unlock.reset();
+
+        if (Config.CgroupPath.has_value())
+        {
+            const auto CgroupResult = UtilMoveSelfToDistroCgroup(Config.CgroupPath.value(), "login");
+            if (Config.CgroupNamespace && CgroupResult < 0)
+            {
+                _exit(1);
+            }
+        }
+
+        if (Config.CgroupNamespace && UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "login") < 0)
+        {
+            _exit(1);
+        }
+
         _exit(execl("/bin/login", "/bin/login", "-f", Username, nullptr));
     }
 
