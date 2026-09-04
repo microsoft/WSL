@@ -53,9 +53,10 @@ static bool TryInspectImage(wsl::windows::wslc::models::Session& session, const 
     return TryInspect([&]() { result = services::ImageService::Inspect(session, image); }, WSLC_E_IMAGE_NOT_FOUND);
 }
 
-static bool TryInspectContainer(wsl::windows::wslc::models::Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& result)
+static bool TryInspectContainer(
+    wsl::windows::wslc::models::Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& result, bool size)
 {
-    return TryInspect([&]() { result = services::ContainerService::Inspect(session, containerId); }, WSLC_E_CONTAINER_NOT_FOUND);
+    return TryInspect([&]() { result = services::ContainerService::Inspect(session, containerId, size); }, WSLC_E_CONTAINER_NOT_FOUND);
 }
 
 static bool TryInspectNetwork(wsl::windows::wslc::models::Session& session, const std::string& networkName, std::optional<wslc_schema::Network>& result)
@@ -81,6 +82,16 @@ void Inspect(CLIExecutionContext& context)
         type = context.Args.GetValue<ArgType::Type>();
     }
 
+    const bool size = context.Args.GetValue<ArgType::Size>();
+
+    // Only containers carry file size information; every other type warns and continues.
+    const auto warnSizeIgnored = [&](const wchar_t* objectType) {
+        if (size)
+        {
+            context.Terminal.Error(L"{}\n", Localization::WSLCCLI_InspectSizeIgnoredWarning(objectType));
+        }
+    };
+
     for (const auto& objectId : objectIds)
     {
         auto id = WideToMultiByte(objectId);
@@ -89,20 +100,23 @@ void Inspect(CLIExecutionContext& context)
         std::optional<wslc_schema::Network> network;
         std::optional<wslc_schema::InspectVolume> volume;
 
-        if (WI_IsFlagSet(type, InspectType::Container) && TryInspectContainer(session, id, container))
+        if (WI_IsFlagSet(type, InspectType::Container) && TryInspectContainer(session, id, container, size))
         {
-            array.push_back(std::move(*container));
+            array.push_back(wslc_schema::ToInspectJson(*container));
         }
         else if (WI_IsFlagSet(type, InspectType::Image) && TryInspectImage(session, id, image))
         {
+            warnSizeIgnored(L"image");
             array.push_back(std::move(*image));
         }
         else if (WI_IsFlagSet(type, InspectType::Network) && TryInspectNetwork(session, id, network))
         {
+            warnSizeIgnored(L"network");
             array.push_back(std::move(*network));
         }
         else if (WI_IsFlagSet(type, InspectType::Volume) && TryInspectVolume(session, id, volume))
         {
+            warnSizeIgnored(L"volume");
             array.push_back(std::move(*volume));
         }
         else

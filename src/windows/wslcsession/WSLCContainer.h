@@ -109,7 +109,7 @@ public:
     void GetState(_Out_ WSLCContainerState* State);
     void GetInitProcess(_Out_ IWSLCProcess** process) const;
     void Exec(_In_ const WSLCProcessOptions* Options, const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process);
-    void Inspect(LPSTR* Output) const;
+    void Inspect(BOOL Size, LPSTR* Output) const;
     void Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail) const;
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
@@ -241,7 +241,7 @@ private:
     // keeping the session's VM alive across idle teardown.
     __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
 
-    __requires_shared_lock_held(m_lock) std::string InspectLockHeld() const;
+    __requires_shared_lock_held(m_lock) std::string InspectLockHeld(bool Size = false) const;
 
     // Lifecycle requests hold this shared until their transitions are published; event delivery holds it exclusively.
     // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks m_stateGeneration instead.
@@ -320,7 +320,7 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;
     IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ const WSLCProcessStartOptions* StartOptions, _In_opt_ IWarningCallback* WarningCallback) override;
-    IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
+    IFACEMETHOD(Inspect)(_In_ BOOL Size, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
@@ -333,6 +333,7 @@ public:
     IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
+    IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

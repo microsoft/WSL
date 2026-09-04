@@ -79,6 +79,51 @@ class WSLCE2EContainerInspectTests
         VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_SizeOption)
+    {
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Without --size the document must not carry the size fields.
+        auto plain = RunWslc(std::format(L"container inspect {}", TestContainerName1));
+        plain.Verify({.Stderr = L"", .ExitCode = 0});
+        auto plainDocument = nlohmann::json::parse(WideToMultiByte(plain.Stdout.value()));
+        VERIFY_ARE_EQUAL(1u, plainDocument.size());
+        VERIFY_IS_FALSE(plainDocument[0].contains("SizeRw"));
+        VERIFY_IS_FALSE(plainDocument[0].contains("SizeRootFs"));
+
+        const auto verifySized = [&](const std::wstring& command) {
+            auto result = RunWslc(command);
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            auto document = nlohmann::json::parse(WideToMultiByte(result.Stdout.value()));
+            VERIFY_ARE_EQUAL(1u, document.size());
+            VERIFY_IS_TRUE(document[0].contains("SizeRw"));
+            VERIFY_IS_TRUE(document[0].contains("SizeRootFs"));
+            VERIFY_IS_TRUE(document[0]["SizeRw"].is_number());
+            VERIFY_IS_TRUE(document[0]["SizeRootFs"].is_number());
+
+            // The image layers always account for more than nothing.
+            VERIFY_IS_GREATER_THAN(document[0]["SizeRootFs"].get<int64_t>(), static_cast<int64_t>(0));
+        };
+
+        verifySized(std::format(L"container inspect --size {}", TestContainerName1));
+        verifySized(std::format(L"inspect --size {}", TestContainerName1));
+        verifySized(std::format(L"inspect --size --type container {}", TestContainerName1));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_SizeOption_ListedInHelp)
+    {
+        auto result = RunWslc(L"container inspect --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes if the type is container"));
+
+        result = RunWslc(L"inspect --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_FormatJson_IsSingleLine)
     {
         auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));

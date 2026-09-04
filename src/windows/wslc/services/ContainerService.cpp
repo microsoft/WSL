@@ -776,13 +776,13 @@ int ContainerService::Exec(Terminal& terminal, Session& session, const std::stri
     return ConsoleService::AttachToCurrentConsole(terminal, console, processLauncher.Launch(*container));
 }
 
-InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
+InspectContainer ContainerService::Inspect(Session& session, const std::string& id, bool size)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     wil::unique_cotaskmem_ansistring output;
-    THROW_IF_FAILED(container->Inspect(&output));
+    THROW_IF_FAILED(container->Inspect(size ? TRUE : FALSE, &output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
