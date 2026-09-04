@@ -24,6 +24,7 @@ namespace wsl::windows::service::wslc {
 
 struct ComposeContainerDefinition
 {
+    std::string ServiceName;
     std::string Name;
     std::string Image;
     std::vector<std::string> Command;
@@ -53,7 +54,7 @@ struct ComposeSpec
     std::vector<ComposeContainerDefinition> Containers;
     std::string ProjectName;
 
-    static ComposeSpec Parse(const std::filesystem::path& Path);
+    static ComposeSpec Parse(const std::filesystem::path& Path, std::string_view Content);
 };
 
 } // namespace wsl::windows::service::wslc

@@ -48,6 +48,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& Context) const override;
 };
 
+struct ComposeListCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"list";
+    ComposeListCommand(const std::wstring& Parent) : Command(CommandName, {L"ls"}, Parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& Context) const override;
+};
+
 struct ComposeUpCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"up";

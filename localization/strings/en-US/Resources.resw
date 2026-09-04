@@ -2592,6 +2592,13 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ComposeCreateLongDesc" xml:space="preserve">
     <value>Create the containers declared by a compose file.</value>
   </data>
+  <data name="WSLCCLI_ComposeListDesc" xml:space="preserve">
+    <value>List running compose projects.</value>
+  </data>
+  <data name="WSLCCLI_ComposeListLongDesc" xml:space="preserve">
+    <value>List compose projects managed by WSLC.</value>
+    <comment>{Locked="WSLC"}Product names should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ComposeUpDesc" xml:space="preserve">
     <value>Start and attach to a compose session.</value>
   </data>
