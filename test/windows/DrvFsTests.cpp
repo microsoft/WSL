@@ -509,33 +509,54 @@ public:
 
     static void DrvfsMountReadOnly()
     {
-        constexpr auto mountPoint = L"/tmp/drvfs-read-only-test";
         const auto testDir = std::filesystem::current_path() / "drvfs-read-only-test";
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(std::format(L"umount '{}'", mountPoint));
-            LxsstuLaunchWsl(std::format(L"rmdir '{}'", mountPoint));
-
             std::error_code ec;
             std::filesystem::remove_all(testDir, ec);
         });
 
-        std::filesystem::create_directories(testDir);
-        constexpr auto expected = "read-only mount marker";
+        struct TestCase
         {
-            std::ofstream markerFile(testDir / "marker");
-            markerFile << expected;
+            std::wstring_view Options;
+            bool ReadOnly;
+        };
+
+        constexpr TestCase testCases[] = {
+            {L"ro,umask=222", true},
+            {L"ro,rw", false},
+            {L"rw,ro", true},
+        };
+
+        for (size_t index = 0; index < std::size(testCases); ++index)
+        {
+            const auto& testCase = testCases[index];
+            const auto sourceDir = testDir / std::to_string(index);
+            const auto mountPoint = std::format(L"/tmp/drvfs-read-only-test-{}", index);
+            auto unmountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"umount '{}'", mountPoint));
+                LxsstuLaunchWsl(std::format(L"rmdir '{}'", mountPoint));
+            });
+
+            std::filesystem::create_directories(sourceDir);
+            constexpr auto expected = "read-only mount marker";
+            {
+                std::ofstream markerFile(sourceDir / "marker");
+                markerFile << expected;
+            }
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"mount -t drvfs -o '{}' '{}' '{}'", testCase.Options, sourceDir.string(), mountPoint)), 0);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"findmnt -rn -M '{}' -O {}", mountPoint, testCase.ReadOnly ? L"ro" : L"rw")), 0);
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/marker'", mountPoint));
+            VERIFY_ARE_EQUAL(wsl::shared::string::MultiByteToWide(expected), out);
+
+            const auto writeResult = LxsstuLaunchWsl(std::format(L"touch '{}/write-test'", mountPoint));
+            VERIFY_ARE_EQUAL(testCase.ReadOnly, writeResult != 0);
+            VERIFY_ARE_EQUAL(!testCase.ReadOnly, std::filesystem::exists(sourceDir / "write-test"));
         }
-
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir -p '{}'", mountPoint)), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mount -t drvfs -o ro,umask=222 '{}' '{}'", testDir.string(), mountPoint)), 0);
-
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"findmnt -rn -M '{}' -O ro", mountPoint)), 0);
-
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/marker'", mountPoint));
-        VERIFY_ARE_EQUAL(wsl::shared::string::MultiByteToWide(expected), out);
-
-        VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(std::format(L"touch '{}/write-test'", mountPoint)), 0);
-        VERIFY_IS_FALSE(std::filesystem::exists(testDir / "write-test"));
     }
 
     // DrvFsTests Private Methods

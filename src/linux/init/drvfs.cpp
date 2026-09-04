@@ -235,7 +235,7 @@ Return Value:
     }
 }
 
-std::pair<std::string, std::string> ConvertDrvfsMountOptionsToPlan9(std::string_view Options, const wsl::linux::WslDistributionConfig& Config, bool PropagateHostReadOnlyOption)
+std::pair<std::string, std::string> ConvertDrvfsMountOptionsToPlan9(std::string_view Options, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -249,8 +249,6 @@ Arguments:
     Options - Supplies the DrvFs mount options.
 
     Config - Supplies the distribution configuration.
-
-    PropagateHostReadOnlyOption - Supplies whether the read-only option should be propagated to the host share.
 
 Return Value:
 
@@ -266,17 +264,7 @@ Return Value:
     while (!Options.empty())
     {
         auto Option = UtilStringNextToken(Options, ",");
-        if (Option == "ro")
-        {
-            if (PropagateHostReadOnlyOption)
-            {
-                Plan9Options += ";ro";
-            }
-
-            StandardOptions += "ro,";
-        }
-        else if (
-            (Option == "metadata") || (StartsWith(Option, PLAN9_CASE_OPTION)) || (StartsWith(Option, "uid=")) ||
+        if ((Option == "metadata") || (StartsWith(Option, PLAN9_CASE_OPTION)) || (StartsWith(Option, "uid=")) ||
             (StartsWith(Option, "gid=")) || (StartsWith(Option, "umask=")) || (StartsWith(Option, "dmask=")) ||
             (StartsWith(Option, "fmask=")) || (StartsWith(Option, PLAN9_SYMLINK_ROOT_OPTION)))
         {
@@ -674,7 +662,7 @@ try
     //
 
     std::string MountOptions = "cache=mmap,";
-    auto ParsedOptions = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config, false);
+    auto ParsedOptions = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config);
     Plan9Options += ParsedOptions.first;
     MountOptions += ParsedOptions.second;
 
@@ -740,7 +728,12 @@ try
     //      behavior when creating virtiofs shares on the host.
     //
 
-    auto [Plan9Options, MountOptions] = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config, true);
+    auto [Plan9Options, MountOptions] = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config);
+    const auto ParsedOptions = mountutil::MountParseFlags(MountOptions);
+    if ((ParsedOptions.MountFlags & MS_RDONLY) != 0)
+    {
+        Plan9Options += ";ro";
+    }
 
     //
     // Construct a request to add a virtiofs share.
