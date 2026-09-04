@@ -99,6 +99,7 @@ public:
     void Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
     void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
+    void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
@@ -181,6 +182,13 @@ private:
         unique_com_disconnect Wrapper;
     };
 
+    // Restart() runs a stop phase followed by a start phase. This marks the pair as one transaction so
+    // that Start() and Stop() cannot land in between.
+    struct RestartTransaction
+    {
+        wil::unique_event Completed{wil::EventOptions::ManualReset};
+    };
+
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
@@ -188,12 +196,24 @@ private:
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
-    // Returns with both locks held when no transition is active or the active transition matches kind.
+    // Returns with both locks held when no transition is active (or it matches kind) and, if waitForRestart,
+    // no restart is in flight either. Both conditions are re-checked every time the locks come back.
     void WaitForConflictingTransitionToComplete(
         wil::rwlock_release_exclusive_scope_exit& lock,
         wil::rwlock_release_shared_scope_exit& lifecycleLock,
-        std::optional<TransitionKind> kind = std::nullopt);
+        std::optional<TransitionKind> kind = std::nullopt,
+        bool waitForRestart = true);
 
+    // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
+    // restart they are part of.
+    void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
+    void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+
+    // Undoes what the phases left half-done: releases the resources the stop phase held back and
+    // requests the auto-delete OnStopped() deferred, returning that delete's transition.
+    __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld();
+
+    void WaitForCompletionEvent(HANDLE Event) const;
     void WaitForTransitionCompletion(const std::shared_ptr<StateTransition>& transition) const;
     void AttachToTransition(const std::shared_ptr<StateTransition>& transition) const;
 
@@ -239,6 +259,17 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
+    // Non-null from before Restart()'s stop phase until its start phase commits Running. Start() and
+    // Stop() stand down for that window, and OnStopped() keeps the container's runtime resources mapped
+    // and skips the auto-delete of an --rm container. Delete() does not stand down: a remove that lands
+    // between the two phases takes effect, and the restart's start phase fails.
+    _Guarded_by_(m_lock) std::shared_ptr<RestartTransaction> m_restart;
+
+    // True between a successful StartPhase() and the release of the container's ports and mounts. A
+    // restart leaves this set across the two phases, which is what tells the start phase they are still
+    // held and must not be re-acquired.
+    _Guarded_by_(m_lock) bool m_runtimeResourcesHeld = false;
+
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
     // fetched from the (stable) runtime at each use rather than cached, since a cached reference
@@ -279,6 +310,7 @@ public:
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
+    IFACEMETHOD(Restart)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;

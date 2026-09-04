@@ -4983,6 +4983,10 @@ class WSLCTests
         VERIFY_ARE_EQUAL(recoveredContainer->Start(WSLCContainerStartFlagsNone, nullptr, nullptr), WSLC_E_VOLUME_NOT_AVAILABLE);
         ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(volumeName));
 
+        // The container is not running, so the restart is only its start phase and is refused the same way.
+        VERIFY_ARE_EQUAL(recoveredContainer->Restart(WSLCSignalSIGTERM, 0, nullptr), WSLC_E_VOLUME_NOT_AVAILABLE);
+        ValidateCOMErrorMessageContains(wsl::shared::string::MultiByteToWide(volumeName));
+
         // Inspecting the volume reports the failure via an "Error" entry in its status.
         {
             wil::unique_cotaskmem_ansistring inspectOutput;
@@ -6855,6 +6859,255 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "test-stop-start-invalid-flags", {"echo", "OK"});
             auto container = launcher.Create(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.Get().Start(static_cast<WSLCContainerStartFlags>(0x2), nullptr, nullptr), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerRestart)
+    {
+        // A running container is stopped and started again, replacing its init process.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-running", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            auto initProcess = container.GetInitProcess();
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+
+            VERIFY_ARE_EQUAL(initProcess.Wait(), WSLCSignalSIGKILL + 128);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        }
+
+        // A created container has no stop phase.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-created", {"sleep", "99999"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        }
+
+        // An exited container is started again.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-exited", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+
+            auto restartedProcess = container.GetInitProcess();
+            VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
+
+            COMOutputHandle stdoutLogs{};
+            COMOutputHandle stderrLogs{};
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, &stdoutLogs, &stderrLogs, 0, 0, 0));
+            ValidateHandleOutput(stdoutLogs.Get(), "OK\nOK\n");
+        }
+
+        // Restarting a container with the autorm flag set must not auto-delete it, but a later stop must.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-autorm", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsRm | WSLCContainerFlagsInit);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_DEFAULT, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr), RPC_E_DISCONNECTED);
+        }
+
+        // Validate that deleted containers can't be restarted.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-deleted", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+
+            VERIFY_ARE_EQUAL(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr), RPC_E_DISCONNECTED);
+        }
+
+        // Ports and mounts survive a restart: they are held across both phases rather than released and re-acquired.
+        {
+            const auto hostFolder = std::filesystem::current_path() / "test-restart-volume";
+            std::filesystem::create_directories(hostFolder);
+            VERIFY_IS_TRUE((std::ofstream(hostFolder / "marker.txt") << "restart-marker").good());
+            auto folderCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                std::error_code ec;
+                std::filesystem::remove_all(hostFolder, ec);
+            });
+
+            constexpr uint16_t hostPort = 1252;
+            const std::string containerPort = "8000/tcp";
+            const std::string volumePath = "/data";
+            const auto markerUrl = std::format(L"http://127.0.0.1:{}/marker.txt", hostPort);
+
+            WSLCContainerLauncher launcher(
+                "python:3.12-alpine",
+                "test-restart-ports-volumes",
+                {"python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", "--directory", volumePath},
+                {"PYTHONUNBUFFERED=1"},
+                "bridge");
+            launcher.AddPort(hostPort, 8000, AF_INET);
+            launcher.AddVolume(hostFolder.wstring(), volumePath, true);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
+            ExpectHttpResponse(markerUrl.c_str(), 200);
+
+            // A start phase that re-reserved the host port would collide with the container's own reservation.
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            VERIFY_ARE_EQUAL(initProcess.Wait(), WSLCSignalSIGKILL + 128);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+            const auto inspect = container.Inspect();
+            VERIFY_IS_TRUE(inspect.Ports.contains(containerPort));
+            VERIFY_ARE_EQUAL(inspect.Ports.at(containerPort).size(), 1u);
+            VERIFY_ARE_EQUAL(std::to_string(hostPort), inspect.Ports.at(containerPort)[0].HostPort);
+
+            VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1u);
+            VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, volumePath);
+            VERIFY_IS_FALSE(inspect.Mounts[0].ReadWrite);
+            VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "bind");
+
+            // The restarted init has to bind again before the held relay has anything to forward to.
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { ExpectHttpResponse(markerUrl.c_str(), 200); }, std::chrono::milliseconds(500), std::chrono::seconds(30));
+        }
+
+        // An init that ignores SIGTERM keeps the restart's stop phase in flight until the timeout expires,
+        // which is what gives the requests below a window to land in the middle of a restart.
+        const std::vector<std::string> ignoreStopSignal = {
+            "/bin/sh", "-c", "trap 'echo stopping' TERM; while true; do sleep 1; done"};
+        const std::string stopSignalMarker = "stopping";
+        constexpr LONG stopTimeoutSeconds = 10;
+
+        // A stop issued during a restart waits for both phases, so it can't be lost in between them.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-stop", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(restartResult.get_future().get());
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+        }
+
+        // A kill issued during a restart deliberately does not wait for it: it is what unblocks a stop phase
+        // that an init like this one would otherwise keep in flight for the whole timeout.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-kill", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VERIFY_SUCCEEDED(restartResult.get_future().get());
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        }
+
+        // A delete issued during a restart deliberately does not wait for it, matching docker: whichever of
+        // the delete and the restart's start phase lands first wins, and the other one fails.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-delete", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
+            auto restartFuture = restartResult.get_future();
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            // The gap between the two phases is short, so poll for it: until the container has exited, every
+            // delete is turned away by the ordinary running-container guard rather than by the restart.
+            const auto deleteResult = wsl::shared::retry::RetryWithTimeout<HRESULT>(
+                [&]() {
+                    const auto result = container.Get().Delete(WSLCDeleteFlagsNone);
+                    THROW_HR_IF(
+                        WSLC_E_CONTAINER_IS_RUNNING,
+                        result == WSLC_E_CONTAINER_IS_RUNNING &&
+                            restartFuture.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready);
+                    return result;
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(30));
+
+            const auto restartHr = restartFuture.get();
+
+            if (SUCCEEDED(deleteResult))
+            {
+                VERIFY_ARE_EQUAL(restartHr, WSLC_E_CONTAINER_DELETED);
+            }
+            else
+            {
+                // The start phase closed the gap first, so the container was running again by the last attempt.
+                VERIFY_ARE_EQUAL(deleteResult, WSLC_E_CONTAINER_IS_RUNNING);
+                VERIFY_SUCCEEDED(restartHr);
+            }
+        }
+
+        // A force delete is not turned away by the running-container guard, so unlike the delete above it does
+        // not have to wait for the gap between the phases: it lands while the stop phase is still in flight.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-force-delete", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
+            container.SetDeleteOnClose(false);
+            VERIFY_ARE_EQUAL(restartResult.get_future().get(), WSLC_E_CONTAINER_DELETED);
+        }
+
+        // A restart issued during a restart waits for both of the first one's phases, so the two pairs
+        // cannot interleave and the container is left running.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-restart-race-restart", ignoreStopSignal);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            std::promise<HRESULT> restartResult;
+            std::thread restartThread(
+                [&]() { restartResult.set_value(container.Get().Restart(WSLCSignalSIGTERM, stopTimeoutSeconds, nullptr)); });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { restartThread.join(); });
+
+            WaitForOutput(initProcess.GetStdHandle(1), stopSignalMarker);
+
+            // The first restart is still in its stop phase, so this one only returns once that pair is done.
+            VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+            VERIFY_SUCCEEDED(restartResult.get_future().get());
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
         }
     }
 
