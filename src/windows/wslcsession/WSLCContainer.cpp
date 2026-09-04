@@ -2716,6 +2716,33 @@ std::string WSLCContainerImpl::InspectLockHeld() const
     return wsl::shared::ToJson(wslcInspect);
 }
 
+void WSLCContainerImpl::ResolveArchiveSymlink(LPCSTR SrcPath, LPSTR* Target) const
+{
+    auto lock = m_lock.lock_shared();
+
+    *Target = nullptr;
+
+    const auto stat = m_runtime.Docker().StatArchivePath(m_id, SrcPath);
+    if (!stat.has_value() || !stat->IsSymlink() || stat->linkTarget.empty())
+    {
+        return;
+    }
+
+    // Container paths are POSIX. A relative link target is resolved against the directory holding the link.
+    std::string resolved = stat->linkTarget;
+    if (resolved.front() != '/')
+    {
+        const std::string source(SrcPath);
+        const auto separator = source.find_last_of('/');
+        if (separator != std::string::npos)
+        {
+            resolved = source.substr(0, separator + 1) + resolved;
+        }
+    }
+
+    *Target = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(resolved.c_str()).release();
+}
+
 void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail) const
 {
     auto lock = m_lock.lock_shared();
@@ -3220,6 +3247,22 @@ try
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::ResolveArchiveSymlink(LPCSTR SrcPath, LPSTR* Target)
+try
+{
+    WSLCExecutionContext context(&m_session);
+
+    RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
+    RETURN_HR_IF(E_POINTER, Target == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
+
+    *Target = nullptr;
+
+    auto vmLease = m_session.Runtime().AcquireVmLease();
+    return CallImpl(&WSLCContainerImpl::ResolveArchiveSymlink, SrcPath, Target);
 }
 CATCH_RETURN();
 

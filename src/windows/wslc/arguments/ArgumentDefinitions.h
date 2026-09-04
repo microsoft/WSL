@@ -61,6 +61,7 @@ _(EnvFile,          "env-file",             NO_ALIAS,         Kind::Value,      
 _(File,             "file",                 L"f",             Kind::Value,      NoConversion, Localization::WSLCCLI_FileArgDescription()) \
 _(Filter,           "filter",               L"f",             Kind::Value,      KeyValuePair, Localization::WSLCCLI_FilterArgDescription()) \
 _(Follow,           "follow",               L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_FollowArgDescription()) \
+_(FollowLink,       "follow-link",          L"L",             Kind::Flag,       NoConversion, Localization::WSLCCLI_FollowLinkArgDescription()) \
 _(Timestamps,       "timestamps",           L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TimestampsArgDescription()) \
 _(Since,            "since",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_SinceArgDescription()) \
 _(Until,            "until",                NO_ALIAS,         Kind::Value,      LONGLONG,     Localization::WSLCCLI_UntilArgDescription()) \

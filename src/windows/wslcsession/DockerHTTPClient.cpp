@@ -433,6 +433,36 @@ std::tuple<uint32_t, wil::unique_socket, bool> DockerHTTPClient::GetArchive(cons
     return {response.result_int(), std::move(socket), response.chunked()};
 }
 
+std::optional<docker_schema::ContainerPathStat> DockerHTTPClient::StatArchivePath(const std::string& ContainerID, const std::string& Path)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    // The engine reports the stat in a response header, so the archive body is never read and the connection is
+    // dropped as soon as the header has been parsed.
+    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+    socket.reset();
+
+    if (response.result_int() == 404)
+    {
+        return std::nullopt;
+    }
+
+    if (response.result_int() != 200)
+    {
+        throw DockerHTTPException(std::move(response), verb::get, url.Get(), "", "");
+    }
+
+    const auto header = response["X-Docker-Container-Path-Stat"];
+    if (header.empty())
+    {
+        return std::nullopt;
+    }
+
+    const auto decoded = wslutil::Base64Decode(std::string(header));
+    return wsl::shared::FromJson<docker_schema::ContainerPathStat>(decoded.c_str());
+}
+
 docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
 {
     return Transaction<docker_schema::CreateVolume>(verb::post, URL::Create("/volumes/create"), Request);

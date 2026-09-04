@@ -64,6 +64,9 @@ struct ContainerService
     static void Export(models::Session& session, const std::string& id, HANDLE outputHandle);
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
     static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle);
+
+    // Returns the target of a symbolic link inside the container, or nullopt if the path is not a symbolic link.
+    static std::optional<std::string> ResolveContainerSymlink(models::Session& session, const std::string& id, const std::string& srcPath);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
     static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);

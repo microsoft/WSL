@@ -3170,6 +3170,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Follow log output</value>
   </data>
+  <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
+    <value>Always follow symlinks in SRC_PATH</value>
+    <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Output formatting (json or table) (Default: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>

@@ -582,6 +582,10 @@ interface IWSLCContainer : IUnknown
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
     HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
     HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] WSLCHandle OutHandle);
+
+    // Resolves a path inside the container to the target of its symbolic link. Sets *Target to NULL when the path
+    // does not exist or is not a symbolic link.
+    HRESULT ResolveArchiveSymlink([in, string] LPCSTR SrcPath, [out] LPSTR* Target);
 }
 
 typedef struct _WSLCDeletedImageInformation

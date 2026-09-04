@@ -103,6 +103,7 @@ public:
     void Export(WSLCHandle TarHandle) const;
     void UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULONGLONG ContentSize) const;
     void DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const;
+    void ResolveArchiveSymlink(LPCSTR SrcPath, LPSTR* Target) const;
     void GetStateChangedAt(_Out_ LONGLONG* StateChangedAt);
     void GetCreatedAt(_Out_ LONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
@@ -284,6 +285,7 @@ public:
     IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
     IFACEMETHOD(UploadArchive)(_In_ WSLCHandle TarHandle, _In_ LPCSTR DestPath, _In_ ULONGLONG ContentSize) override;
     IFACEMETHOD(DownloadArchive)(_In_ LPCSTR SrcPath, _In_ WSLCHandle OutHandle) override;
+    IFACEMETHOD(ResolveArchiveSymlink)(_In_ LPCSTR SrcPath, _Out_ LPSTR* Target) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ const WSLCProcessStartOptions* StartOptions, _Out_ IWSLCProcess** Process) override;

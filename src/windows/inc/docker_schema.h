@@ -55,6 +55,26 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+// Payload of the X-Docker-Container-Path-Stat response header on /containers/{id}/archive.
+struct ContainerPathStat
+{
+    std::string name;
+    int64_t size{};
+    uint32_t mode{};
+    std::string mtime;
+    std::string linkTarget;
+
+    // Go encodes os.FileMode in the mode field; the symlink bit is 27.
+    static constexpr uint32_t c_modeSymlink = 1u << 27;
+
+    bool IsSymlink() const
+    {
+        return (mode & c_modeSymlink) != 0;
+    }
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPathStat, name, size, mode, mtime, linkTarget);
+};
+
 struct ImageLoadResult
 {
     std::optional<std::string> stream;
