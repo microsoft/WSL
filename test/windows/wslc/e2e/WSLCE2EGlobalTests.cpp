@@ -625,11 +625,39 @@ class WSLCE2EGlobalTests
         result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
         result.Verify({.ExitCode = 0});
 
+        // Verify the environment variable targets the same custom session.
+        {
+            ScopedEnvVariable sessionEnvironmentVariable(L"WSLC_SESSION", session.Name());
+            result = RunWslc(L"container list --no-trunc --all");
+        }
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(containerName));
+
         // Verify container exists in the custom session
         VerifyContainerIsListed(containerName, L"created", session.Name());
 
         // Verify container does not exist in the default CLI session.
         VerifyContainerIsNotListed(containerName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Session_TargetingFromEnvironment_NotFound)
+    {
+        constexpr auto sessionName = L"INVALID_ENVIRONMENT_SESSION_NAME";
+        ScopedEnvVariable sessionEnvironmentVariable(L"WSLC_SESSION", sessionName);
+
+        const auto result = RunWslc(L"container list");
+        result.Verify({
+            .Stdout = L"",
+            .Stderr = Localization::MessageWslcEnvironmentSessionNotFound(sessionName) + L"\r\n",
+            .ExitCode = 1,
+        });
+
+        const auto overridden = RunWslc(L"--session INVALID_COMMAND_LINE_SESSION_NAME container list");
+        overridden.Verify({
+            .Stdout = L"",
+            .Stderr = FormatErrorMessage(L"Session not found: 'INVALID_COMMAND_LINE_SESSION_NAME'", L"WSLC_E_SESSION_NOT_FOUND"),
+            .ExitCode = 1,
+        });
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_Shell)

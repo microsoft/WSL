@@ -284,7 +284,7 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(Kind::Value, globals[0].Kind());
     }
 
-    // RootCommand exposes NoColor as the sole env-eligible global option.
+    // RootCommand exposes NoColor as the sole environment-only option.
     TEST_METHOD(RootCommand_EnvArguments_OnlyNoColor)
     {
         auto root = RootCommand();

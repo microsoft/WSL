@@ -17,6 +17,7 @@ Abstract:
 #include "ArgumentTypes.h"
 #include "EnumVariantMap.h"
 #include <any>
+#include <array>
 #include <map>
 #include <set>
 #include <type_traits>
@@ -26,6 +27,15 @@ Abstract:
 namespace wsl::windows::wslc::argument {
 
 struct ArgMap;
+
+// Identifies where an argument's effective value originated. Default represents
+// an argument with no stored value whose consumer uses its fallback value.
+enum class ArgumentValueSource
+{
+    Default,
+    CommandLine,
+    Environment,
+};
 
 namespace details {
     struct RawArgMapAccess;
@@ -77,16 +87,52 @@ public:
     ArgMap& operator=(const ArgMap&) = delete;
     ArgMap& operator=(ArgMap&&) = delete;
 
-    using Base::Add;
     using Base::Contains;
     using Base::Count;
     using Base::GetCount;
     using Base::GetKeys;
     using Base::IsMatchingType;
-    using Base::Remove;
 
     template <ArgType E>
     using value_t = typename details::ArgValueTraits<E>::value_t;
+
+    template <ArgType E>
+    void Add(typename Base::template mapping_t<E>&& value, ArgumentValueSource source = ArgumentValueSource::CommandLine)
+    {
+        constexpr auto index = static_cast<size_t>(E);
+        static_assert(index < static_cast<size_t>(ArgType::Max));
+        Base::template Add<E>(std::move(value));
+        m_valueSources[index] = source;
+    }
+
+    template <ArgType E>
+    void Add(const typename Base::template mapping_t<E>& value, ArgumentValueSource source = ArgumentValueSource::CommandLine)
+    {
+        constexpr auto index = static_cast<size_t>(E);
+        static_assert(index < static_cast<size_t>(ArgType::Max));
+        Base::template Add<E>(value);
+        m_valueSources[index] = source;
+    }
+
+    template <typename V>
+    void Add(ArgType type, V&& value, ArgumentValueSource source = ArgumentValueSource::CommandLine)
+    {
+        const auto index = SourceIndex(type);
+        Base::Add(type, std::forward<V>(value));
+        m_valueSources[index] = source;
+    }
+
+    void Remove(ArgType type)
+    {
+        const auto index = SourceIndex(type);
+        Base::Remove(type);
+        m_valueSources[index] = ArgumentValueSource::Default;
+    }
+
+    ArgumentValueSource GetSource(ArgType type) const
+    {
+        return m_valueSources[SourceIndex(type)];
+    }
 
     // Validated-value cache. Argument validation converts raw strings into typed values and caches
     // them here so execution reuses them without re-parsing. The store is type-erased (std::any keyed
@@ -235,6 +281,13 @@ public:
     }
 
 private:
+    static size_t SourceIndex(ArgType type)
+    {
+        const auto index = static_cast<size_t>(type);
+        THROW_HR_IF(E_INVALIDARG, index >= static_cast<size_t>(ArgType::Max));
+        return index;
+    }
+
     // Validates `type` against its current raw values unless already recorded as validated. The
     // record is set by a completed validation and cleared by the map-action callback on any raw
     // Add/Remove, so an argument added or overwritten after the up-front pass is validated on
@@ -338,6 +391,7 @@ private:
 
     std::multimap<ArgType, std::any> m_validated;
     std::map<ArgType, std::any> m_resolvedDefaults;
+    std::array<ArgumentValueSource, static_cast<size_t>(ArgType::Max)> m_valueSources{};
 
     // ArgTypes validated against their current raw values. Distinct from m_validated (only converted
     // arguments populate that), so validate-only arguments are covered too. Cleared per type by
