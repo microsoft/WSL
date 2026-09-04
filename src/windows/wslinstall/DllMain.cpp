@@ -76,8 +76,7 @@ void TrustPackageCertificate(LPCWSTR Path)
 #endif
 
 winrt::Windows::Management::Deployment::DeploymentResult WaitForDeploymentOperation(
-    const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Management::Deployment::DeploymentResult, winrt::Windows::Management::Deployment::DeploymentProgress>& operation,
-    const std::source_location& source = std::source_location::current())
+    const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Management::Deployment::DeploymentResult, winrt::Windows::Management::Deployment::DeploymentProgress>& operation)
 {
     // IAsyncOperation::get() installs a completion delegate whose implementation resides in this DLL. The operation can retain
     // that delegate after get() returns, allowing its final Release() to call into the DLL after MSI unloads it.
@@ -89,12 +88,6 @@ winrt::Windows::Management::Deployment::DeploymentResult WaitForDeploymentOperat
     {
         Sleep(10);
         status = operation.Status();
-    }
-
-    if (status == winrt::Windows::Foundation::AsyncStatus::Error)
-    {
-        const auto error = operation.ErrorCode();
-        THROW_HR_MSG(error, "Source: %hs() - %hs:%lu", source.function_name(), source.file_name(), source.line());
     }
 
     if (status == winrt::Windows::Foundation::AsyncStatus::Canceled)
@@ -109,8 +102,14 @@ void ThrowIfOperationError(
     const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Management::Deployment::DeploymentResult, winrt::Windows::Management::Deployment::DeploymentProgress>& operation,
     const std::source_location& source = std::source_location::current())
 {
-    const auto result = WaitForDeploymentOperation(operation, source);
-    THROW_IF_FAILED_MSG(result.ExtendedErrorCode(), "%ls", result.ErrorText().c_str());
+    const auto result = WaitForDeploymentOperation(operation);
+    THROW_IF_FAILED_MSG(
+        result.ExtendedErrorCode(),
+        "%ls Source: %hs() - %hs:%u",
+        result.ErrorText().c_str(),
+        source.function_name(),
+        source.file_name(),
+        static_cast<unsigned int>(source.line()));
 }
 
 std::wstring GetMsiProperty(MSIHANDLE install, LPCWSTR name)
