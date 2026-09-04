@@ -314,7 +314,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 for (;;)
                 {
-                    if ((pollDescriptors[0].fd == -1) || (pollDescriptors[1].fd == -1))
+                    if ((pollDescriptors[0].fd == -1) && (pollDescriptors[1].fd == -1))
                     {
                         return;
                     }
@@ -324,7 +324,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                     bytesRead = 0;
                     for (int Index = 0; Index < COUNT_OF(pollDescriptors); Index += 1)
                     {
-                        if (pollDescriptors[Index].revents & POLLIN)
+                        if (pollDescriptors[Index].revents & (POLLIN | POLLERR | POLLHUP))
                         {
                             bytesRead = UtilReadBuffer(pollDescriptors[Index].fd, buffer);
                             if (bytesRead == 0)
@@ -516,7 +516,8 @@ int RunPortTracker(int Argc, char** Argv)
         }
 
         auto& ifRequest = *reinterpret_cast<ifreq*>(ifreqMemory->data());
-        memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
+        memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName) - 1);
+        request.InterfaceName[sizeof(request.InterfaceName) - 1] = '\0';
         request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
         const auto& reply = hvSocketChannel->Transaction(request);
 
