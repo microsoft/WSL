@@ -4679,11 +4679,14 @@ VERSION_ID="Invalid|Format"
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
         distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
 
-        constexpr auto drvFsTestPath = L"C:\\oobe-drvfs-test";
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto drvFsTestPath = std::filesystem::temp_directory_path() /
+                                   std::format(L"wsl-oobe-drvfs-test-{}", wsl::shared::string::GuidToString<wchar_t>(runId));
         std::filesystem::create_directory(drvFsTestPath);
         auto cleanupDrvFsTestPath = wil::scope_exit([&]() {
-            DeleteFileW(std::format(L"{}\\probe", drvFsTestPath).c_str());
-            RemoveDirectoryW(drvFsTestPath);
+            std::error_code ignored;
+            std::filesystem::remove_all(drvFsTestPath, ignored);
         });
 
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
@@ -4754,8 +4757,11 @@ VERSION_ID="Invalid|Format"
             {
                 // DrvFs mounts created before OOBE should be refreshed to use the new default user.
                 validateOutput(
-                    L"bash -c 'test \"$(stat -c %u:%g /mnt/c)\" = \"$(id -u):$(id -g)\" && touch /mnt/c/oobe-drvfs-test/probe && "
-                    L"chmod 0644 /mnt/c/oobe-drvfs-test/probe'",
+                    std::format(
+                        L"bash -c 'path=$(wslpath -u \"{}\") && test \"$(stat -c %u:%g /mnt/c)\" = \"$(id -u):$(id -g)\" && "
+                        L"touch \"$path/probe\" && chmod 0644 \"$path/probe\"'",
+                        drvFsTestPath.wstring())
+                        .c_str(),
                     L"");
             }
 
