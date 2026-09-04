@@ -23,6 +23,7 @@ Abstract:
 #include "ExecutionContext.h"
 #include "HandleIO.h"
 #include "MsiQuery.h"
+#include <Dbghelp.h>
 #include "WslInstall.h"
 
 using winrt::Windows::Foundation::Uri;
@@ -297,6 +298,8 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
 
 #undef X
 
+DEFINE_ENUM_FLAG_OPERATORS(MINIDUMP_TYPE);
+
 wil::unique_hlocal_string GetWinInetErrorString(HRESULT error)
 {
     const wil::unique_hmodule library{LoadLibrary(L"WinInet.dll")};
@@ -342,12 +345,99 @@ constexpr unsigned long EndianSwap(unsigned long value)
     return gsl::narrow_cast<unsigned long>(EndianSwap(gsl::narrow_cast<uint32_t>(value)));
 }
 
+constexpr bool IsCrashException(DWORD exceptionCode)
+{
+    switch (exceptionCode)
+    {
+    case EXCEPTION_ACCESS_VIOLATION:
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+    case EXCEPTION_IN_PAGE_ERROR:
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+    case EXCEPTION_INT_OVERFLOW:
+    case EXCEPTION_INVALID_DISPOSITION:
+    case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+    case EXCEPTION_PRIV_INSTRUCTION:
+    case EXCEPTION_STACK_OVERFLOW:
+    case 0x40000015: // EXCEPTION_FATAL_APP_EXIT
+    case 0xC0000374: // EXCEPTION_HEAP_CORRUPT
+    case 0xC0000409: // EXCEPTION_STACK_BUFFER_OVERRUN
+    case 0xC0000602: // EXCEPTION_FAIL_FAST
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 constexpr GUID EndianSwap(GUID value)
 {
     value.Data1 = EndianSwap(value.Data1);
     value.Data2 = EndianSwap(value.Data2);
     value.Data3 = EndianSwap(value.Data3);
     return value;
+}
+
+static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
+{
+    if (!IsCrashException(exception->ExceptionRecord->ExceptionCode))
+    {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    try
+    {
+        static std::atomic<bool> handlingException = false;
+        if (handlingException.exchange(true))
+        {
+            return EXCEPTION_CONTINUE_SEARCH; // Don't keep trying if we crash during exception handling.
+        }
+
+        auto resetFlag = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { handlingException.store(false); });
+
+        // Collect a crash dump if enabled.
+        auto image = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>()).filename();
+
+        auto lxssKey = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
+        auto crashFolder = wsl::windows::common::registry::ReadOptionalString(lxssKey.get(), nullptr, c_crashFolderKeyName);
+
+        std::optional<std::filesystem::path> dumpPath;
+        if (crashFolder.has_value())
+        {
+            dumpPath = std::filesystem::path(crashFolder.value()) / std::format(L"{}.{}.dmp", image.native(), GetCurrentProcessId());
+        }
+
+        WSL_LOG(
+            "ProcessCrash",
+            TraceLoggingValue(image.c_str(), "Process"),
+            TraceLoggingValue(dumpPath.has_value() ? dumpPath->native().c_str() : L"<none>", "DumpPath"));
+
+        if (!dumpPath.has_value())
+        {
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+
+        auto dumpFile = wil::create_new_file(dumpPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ);
+        THROW_LAST_ERROR_IF(!dumpFile);
+
+        MINIDUMP_EXCEPTION_INFORMATION exceptionInfo{};
+        exceptionInfo.ThreadId = GetCurrentThreadId();
+        exceptionInfo.ExceptionPointers = exception;
+
+        THROW_IF_WIN32_BOOL_FALSE(MiniDumpWriteDump(
+            GetCurrentProcess(),
+            GetCurrentProcessId(),
+            dumpFile.get(),
+            MiniDumpWithDataSegs | MiniDumpWithFullMemory | MiniDumpWithProcessThreadData | MiniDumpWithHandleData |
+                MiniDumpWithPrivateReadWriteMemory | MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo |
+                MiniDumpWithThreadInfo | MiniDumpWithTokenInformation | MiniDumpWithPrivateWriteCopyMemory | MiniDumpWithCodeSegs,
+            &exceptionInfo,
+            nullptr,
+            nullptr));
+    }
+    CATCH_LOG();
+
+    return EXCEPTION_CONTINUE_SEARCH;
 }
 
 std::regex BuildImageReferenceRegex()
@@ -388,6 +478,14 @@ void wsl::windows::common::wslutil::CoInitializeSecurity()
 {
     THROW_IF_FAILED(CoInitializeSecurity(
         nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_STATIC_CLOAKING, 0));
+}
+
+void wsl::windows::common::wslutil::ConfigureCrashHandler()
+{
+    if constexpr (!wsl::shared::OfficialBuild)
+    {
+        AddVectoredExceptionHandler(1, OnException);
+    }
 }
 
 void wsl::windows::common::wslutil::ConfigureCrt()

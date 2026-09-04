@@ -1845,6 +1845,8 @@ int WslMain(_In_ std::wstring_view commandLine)
 
 int wsl::windows::common::WslClient::Main(_In_ LPCWSTR commandLine)
 {
+    wsl::windows::common::wslutil::ConfigureCrashHandler();
+
     wsl::windows::common::EnableContextualizedErrors(false);
 
     // Note WslTraceLoggingUninitialize() is a no-op if WslTraceLoggingInitialize was not called.
