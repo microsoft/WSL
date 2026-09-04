@@ -150,6 +150,7 @@ public:
     IFACEMETHOD(PushImage)(
         _In_ LPCSTR Image,
         _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;

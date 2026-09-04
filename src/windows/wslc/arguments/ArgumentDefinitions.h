@@ -35,6 +35,7 @@ Abstract:
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(All,              "all",                  L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AllArgDescription()) \
+_(AllTags,          "all-tags",             L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AllTagsArgDescription()) \
 _(Archive,          "archive",              L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ArchiveArgDescription()) \
 _(Attach,           "attach",               L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,         "build-arg",            NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildArgDescription()) \
