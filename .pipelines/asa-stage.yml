@@ -1,0 +1,59 @@
+# Attack Surface Analyzer (ASA) install-diff stage.
+#
+# Runs the ASA install-diff on a clean CloudTest VM (the same harness used by the
+# nightly TAEF tests). The VM installs the freshly built wsl.msi and uses ASA to
+# verify the installer does not weaken the OS security configuration. Findings are
+# triaged against tools/devops/asa-expected-findings.json (staged into the build
+# drop under testbin\devops). The ASA SARIF and the net-new report are written to
+# the CloudTest logging directory and uploaded with the test results.
+#
+# Introduced as NON-GATING: the runbook is generated with -FailOnNewFindings:$false
+# (cloudtest/CMakeLists.txt ASA_FAIL_ON_NEW). Once the allowlist is confirmed
+# stable, flip ASA_FAIL_ON_NEW to "$true" in cloudtest/CMakeLists.txt to make it a
+# hard gate.
+
+parameters:
+  - name: pool
+    type: string
+    default: ''
+
+  # Client image whose generated ASA group is run. Must match the image passed to
+  # add_asa_group() in cloudtest/CMakeLists.txt.
+  - name: image
+    type: string
+    default: 'wsl-test-image-win11-23h2-ent-2024-11-18'
+
+stages:
+  - stage: asa
+    displayName: "Attack Surface Analyzer"
+    dependsOn: [build_x64]
+    jobs:
+      - job: asa_install_diff
+        displayName: "ASA install-diff (x64)"
+        dependsOn: []
+        variables:
+          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+          ob_artifactBaseName: 'drop_wsl'
+          ob_artifactSuffix: '_asa'
+        timeoutInMinutes: 180
+        cancelTimeoutInMinutes: 240
+        ${{ if eq(parameters.pool, '') }}:
+          pool: {'type': 'cloudtestagentless'}
+        ${{ else }}:
+          pool: ${{ parameters.pool }}
+        steps:
+          - task: CloudTestServerBuildTask@2
+            inputs:
+              DisplayName: "ASA install-diff (x64)"
+              connectedServiceName: "CloudTest-PROD"
+              cloudTestTenant: "wsl"
+              testMapLocation: 'testbin\x64\cloudtest\asa-${{ parameters.image }}\TestMap.xml'
+              pipelineArtifactName: "drop_wsl_build"
+              pipelineArtifactBuildUrl: '$(System.TaskDefinitionsUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)'
+              buildDropArtifactName: ""
+              timeoutInMinutes: 180
+              sessionTimeout: 180
+              cancelTimeoutInMinutes: 240
+              TestTimeout: "0.02:00:00"
+              parserProperties: "worker:VsTestVersion=V150;session:HoldTrigger=Failure;VstsTestResultAttachmentUploadBehavior=Always"
+              notificationSubscribers: $(Build.RequestedForEmail)
