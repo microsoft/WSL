@@ -152,6 +152,26 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    // Test: Verify image list exposes --digests with no short alias
+    TEST_METHOD(ImageListCommand_HasDigestsArgument)
+    {
+        const std::pair<std::wstring, std::vector<Argument>> spellings[] = {
+            {L"image list", ImageListCommand(L"image").GetArguments()}, {L"images", ImageListCommand(L"wslc", true).GetArguments()}};
+
+        for (const auto& [label, args] : spellings)
+        {
+            LogComment(L"Verifying --digests for: " + label);
+
+            auto itr = std::find_if(args.begin(), args.end(), [](const Argument& arg) { return arg.Type() == ArgType::Digests; });
+
+            VERIFY_IS_TRUE(itr != args.end());
+            VERIFY_ARE_EQUAL(std::wstring{L"digests"}, itr->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L""}, itr->Alias());
+            VERIFY_ARE_EQUAL(Kind::Flag, itr->Kind());
+            VERIFY_IS_FALSE(itr->Required());
+        }
+    }
+
     // Test: Verify VersionCommand has the correct name
     TEST_METHOD(VersionCommand_HasCorrectName)
     {

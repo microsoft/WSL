@@ -209,6 +209,26 @@ struct TableOutput
     {
         m_showHeader = showHeader;
     }
+
+    // Omits columns whose cells are empty in every data row, header included, instead of rendering
+    // them at header width. Lets a table be declared with its full set of potential columns and shed
+    // the ones the caller left unpopulated. A table with no data rows has no emptiness to infer, so
+    // it renders every column; use SetColumnHidden() to omit one there.
+    void SetDropEmptyColumns(bool dropEmptyColumns)
+    {
+        m_dropEmptyColumns = dropEmptyColumns;
+    }
+
+    // Omits a column regardless of its contents, header included. Unlike SetDropEmptyColumns(),
+    // this applies to a table with no data rows, where emptiness cannot be inferred.
+    void SetColumnHidden(size_t columnIndex, bool hidden)
+    {
+        if (columnIndex < FieldCount)
+        {
+            m_columns[columnIndex].Hidden = hidden;
+        }
+    }
+
     // Sets spaces prepended to every row. Does not affect column width calculations.
     void SetRowIndent(size_t spaces)
     {
@@ -286,6 +306,7 @@ private:
         size_t MaxLength = 0;
         size_t ConfiguredMaxLength = 0; // Max length from configuration
         bool SpaceAfter = true;
+        bool Hidden = false;
         ColumnOverflow Overflow = ColumnOverflow::Truncate;
     };
 
@@ -431,10 +452,25 @@ private:
     {
         for (size_t i = 0; i < FieldCount; ++i)
         {
-            m_columns[i].MaxLength = m_columns[i].MinLength;
+            m_columns[i].MaxLength = m_columns[i].Hidden ? 0 : m_columns[i].MinLength;
+
+            if (!m_columns[i].MaxLength)
+            {
+                m_columns[i].SpaceAfter = false;
+            }
         }
 
         m_columns[FieldCount - 1].SpaceAfter = false;
+
+        // Disable SpaceAfter on columns that are followed only by omitted columns.
+        for (size_t i = FieldCount - 1; i > 0; --i)
+        {
+            if (m_columns[i].MaxLength)
+            {
+                break;
+            }
+            m_columns[i - 1].SpaceAfter = false;
+        }
 
         line_t headerLine;
         for (size_t i = 0; i < FieldCount; ++i)
@@ -478,9 +514,20 @@ private:
         // Apply MinLength so empty columns still render at least as wide as their header.
         for (size_t i = 0; i < FieldCount; ++i)
         {
-            if (m_columns[i].MaxLength || !m_dropEmptyColumns)
+            if (m_columns[i].Hidden)
+            {
+                m_columns[i].MaxLength = 0;
+            }
+            else if (m_columns[i].MaxLength || !m_dropEmptyColumns)
             {
                 m_columns[i].MaxLength = std::max(m_columns[i].MaxLength, m_columns[i].MinLength);
+            }
+
+            // An omitted column emits neither a value nor padding, so it must not reserve any
+            // width during sizing.
+            if (!m_columns[i].MaxLength)
+            {
+                m_columns[i].SpaceAfter = false;
             }
         }
 

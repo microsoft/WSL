@@ -3056,6 +3056,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
     <value>Run container in detached mode</value>
   </data>
+  <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
+    <value>Show image digests</value>
+  </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Specifies the container init process executable</value>
   </data>

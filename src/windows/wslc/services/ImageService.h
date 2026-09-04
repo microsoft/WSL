@@ -67,7 +67,8 @@ public:
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(
         wsl::windows::wslc::models::Session& session,
         const std::vector<std::pair<std::string, std::string>>& filters = {},
-        bool containerCounts = false);
+        bool containerCounts = false,
+        bool digests = false);
     static void Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback = nullptr);
     static std::string Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);
     static std::vector<wsl::windows::wslc::models::DeletedImageEntry> Delete(
