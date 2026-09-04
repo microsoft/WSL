@@ -828,7 +828,7 @@ void ContainerService::CopyFromContainer(Session& session, const std::string& id
     THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
@@ -839,6 +839,7 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
     WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
+    WI_SetFlagIf(flags, WSLCLogsFlagsDetails, details);
 
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 

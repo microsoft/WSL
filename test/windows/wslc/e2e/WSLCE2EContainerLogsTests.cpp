@@ -57,6 +57,36 @@ class WSLCE2EContainerLogsTests
         result.Verify({.Stdout = L"line1\nline2\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --name {} {} sh -c \"echo detail1 && echo detail2\"", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"detail1\ndetail2\n", .Stderr = L"", .ExitCode = 0});
+
+        auto plain = RunWslc(std::format(L"container logs {}", WslcContainerName));
+        plain.Verify({.Stdout = L"detail1\ndetail2\n", .Stderr = L"", .ExitCode = 0});
+
+        // --details prefixes each line with the serialized log driver attributes followed by a
+        // separator space. The daemon appends that separator unconditionally, so a container with
+        // no attributes still gains a single leading space per line. This is the only output
+        // difference observable here, and therefore the only proof the flag reached the daemon.
+        auto details = RunWslc(std::format(L"container logs --details {}", WslcContainerName));
+        details.Verify({.Stdout = L" detail1\n detail2\n", .Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_NOT_EQUAL(plain.Stdout.value(), details.Stdout.value());
+
+        // --details composes with the other log options.
+        auto combined = RunWslc(std::format(L"container logs --details --tail 1 {}", WslcContainerName));
+        combined.Verify({.Stdout = L" detail2\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Details_ListedInHelp)
+    {
+        auto result = RunWslc(L"container logs --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--details"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(wsl::shared::Localization::WSLCCLI_DetailsArgDescription()));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Timestamps)
     {
         // Run a container that outputs a line

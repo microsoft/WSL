@@ -312,6 +312,12 @@ COMMAND_LINE_TEST_CASE(L"container logs --since 2024-02-31T10:30:00Z cont1", L"l
 COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00.Z cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --since 2024-01-15T10:30:00+0530 cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --follow --timestamps --since 100 --tail 5 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --details cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"logs --details cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --details=true cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --details=false cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --details=invalid cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --details --timestamps --tail 5 cont1", L"logs", true)
 
 // Image command
 COMMAND_LINE_TEST_CASE(L"image build C:\\context", L"build", true)
