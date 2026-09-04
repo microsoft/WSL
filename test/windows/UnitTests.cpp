@@ -32,6 +32,7 @@ Abstract:
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
 #include "retryshared.h"
+#include "relay.hpp"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -8044,6 +8045,50 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
 
         VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
+    }
+
+    TEST_METHOD(BidirectionalRelayContinuesAfterHalfClose)
+    {
+        auto [leftPeer, leftRelay] = MakeSocketPair();
+        auto [rightPeer, rightRelay] = MakeSocketPair();
+
+        constexpr DWORD timeout = 5000;
+        THROW_LAST_ERROR_IF(
+            setsockopt(leftPeer.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+        THROW_LAST_ERROR_IF(
+            setsockopt(rightPeer.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+
+        HRESULT relayResult = S_OK;
+        std::thread relayThread([&]() {
+            relayResult = wil::ResultFromException(
+                [&]() { wsl::windows::common::relay::SocketRelay(leftRelay.get(), rightRelay.get(), 0x20000); });
+        });
+
+        auto cleanup = wil::scope_exit([&]() {
+            leftPeer.reset();
+            leftRelay.reset();
+            rightPeer.reset();
+            rightRelay.reset();
+            if (relayThread.joinable())
+            {
+                relayThread.join();
+            }
+        });
+
+        // Closing the left-to-right direction must propagate EOF without stopping the opposite direction.
+        VERIFY_ARE_EQUAL(shutdown(leftPeer.get(), SD_SEND), 0);
+        char byte{};
+        VERIFY_ARE_EQUAL(recv(rightPeer.get(), &byte, sizeof(byte), 0), 0);
+
+        constexpr std::string_view response = "response-after-half-close";
+        WriteSocket(rightPeer.get(), response.data(), response.size());
+        VERIFY_ARE_EQUAL(shutdown(rightPeer.get(), SD_SEND), 0);
+
+        VERIFY_ARE_EQUAL(ReadToString(leftPeer.get()), response);
+
+        relayThread.join();
+        VERIFY_ARE_EQUAL(relayResult, S_OK);
+        cleanup.release();
     }
 
 }; // namespace UnitTests

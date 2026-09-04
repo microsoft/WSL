@@ -2037,11 +2037,12 @@ class NetworkTests
         return listenSocket;
     }
 
-    static std::tuple<unique_kill_process, bool, wil::unique_handle> BindGuestPortHelper(std::wstring_view BindSpec)
+    static std::tuple<unique_kill_process, bool, wil::unique_handle> BindGuestPortHelper(
+        std::wstring_view BindSpec, std::wstring_view ConnectSpec = L"STDOUT")
     {
         auto [stdErrRead, stdErrWrite] = CreateSubprocessPipe(false, true);
         auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
-        const std::wstring wslCmd = L"socat -dd " + std::wstring(BindSpec) + L" STDOUT";
+        const std::wstring wslCmd = L"socat -dd " + std::wstring(BindSpec) + L" " + std::wstring(ConnectSpec);
         auto cmd = LxssGenerateWslCommandLine(wslCmd.data());
 
         auto process = LxsstuStartProcess(cmd.data(), nullptr, stdOutWrite.get(), stdErrWrite.get());
@@ -2090,9 +2091,10 @@ class NetworkTests
         return std::tuple(std::move(process), success, std::move(stdOutRead));
     }
 
-    static std::tuple<unique_kill_process, wil::unique_handle> BindGuestPort(std::wstring_view BindSpec, bool ExpectSuccess)
+    static std::tuple<unique_kill_process, wil::unique_handle> BindGuestPort(
+        std::wstring_view BindSpec, bool ExpectSuccess, std::wstring_view ConnectSpec = L"STDOUT")
     {
-        auto [process, success, read] = BindGuestPortHelper(BindSpec);
+        auto [process, success, read] = BindGuestPortHelper(BindSpec, ConnectSpec);
 
         VERIFY_ARE_EQUAL(ExpectSuccess, success);
 
@@ -2659,6 +2661,24 @@ class NetworkTests
         }
     }
 
+    static wil::unique_socket ConnectToLocalhostRelay(ADDRESS_FAMILY addressFamily, unsigned short port)
+    {
+        wil::unique_socket hostSocket;
+        SOCKADDR_INET address{};
+        address.si_family = addressFamily;
+        INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&address));
+        SS_PORT(&address) = htons(port);
+
+        auto connectToRelay = [&]() {
+            hostSocket.reset(socket(addressFamily, SOCK_STREAM, IPPROTO_TCP));
+            THROW_HR_IF(E_ABORT, !hostSocket);
+            THROW_HR_IF(E_FAIL, connect(hostSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR);
+        };
+
+        wsl::shared::retry::RetryWithTimeout<void>(connectToRelay, std::chrono::seconds(1), std::chrono::minutes(1));
+        return hostSocket;
+    }
+
     WSL2_TEST_METHOD(NatLocalhostRelay)
     {
         WslKeepAlive keepAlive;
@@ -2674,6 +2694,118 @@ class NetworkTests
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /proc/net/tcp6"), 1L);
         ValidateLocalhostRelayTraffic(AF_INET);
+    }
+
+    WSL2_TEST_METHOD(NatLocalhostRelayHalfClose)
+    {
+        WslKeepAlive keepAlive;
+
+        constexpr auto scriptPath = L"/tmp/wsl-relay-half-close";
+        DistroFileChange script(scriptPath, false);
+        script.SetContent(L"#!/bin/sh\ninput=$(cat)\nprintf '%s' \"$input\"\n");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"chmod +x {}", scriptPath)), 0L);
+
+        auto [guestProcess, _] = BindGuestPort(L"TCP4-LISTEN:1235,bind=127.0.0.1", true, std::format(L"EXEC:{}", scriptPath));
+        auto hostSocket = ConnectToLocalhostRelay(AF_INET, 1235);
+
+        constexpr DWORD timeout = 10'000;
+        VERIFY_ARE_NOT_EQUAL(
+            setsockopt(hostSocket.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)), SOCKET_ERROR);
+
+        constexpr std::string_view payload = "response-after-host-half-close";
+        WriteSocket(hostSocket.get(), payload.data(), payload.size());
+        VERIFY_ARE_EQUAL(shutdown(hostSocket.get(), SD_SEND), 0);
+        VERIFY_ARE_EQUAL(ReadToString(hostSocket.get()), payload);
+    }
+
+    WSL2_TEST_METHOD(NatLocalhostRelayFullDuplex)
+    {
+        WslKeepAlive keepAlive;
+
+        constexpr auto scriptPath = L"/tmp/wsl-relay-full-duplex";
+        constexpr auto sendSignalPath = L"/tmp/wsl-relay-full-duplex-send";
+        constexpr auto drainSignalPath = L"/tmp/wsl-relay-full-duplex-drain";
+        DistroFileChange script(scriptPath, false);
+        script.SetContent(std::format(
+                              L"#!/bin/sh\n"
+                              L"while [ ! -e {0} ]; do sleep 0.1; done\n"
+                              L"printf 'response-while-forward-blocked'\n"
+                              L"while [ ! -e {1} ]; do sleep 0.1; done\n"
+                              L"cat >/dev/null\n",
+                              sendSignalPath,
+                              drainSignalPath)
+                              .c_str());
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"chmod +x {}", scriptPath)), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"rm -f {} {}", sendSignalPath, drainSignalPath)), 0L);
+        auto cleanupSignals = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"rm -f {} {}", sendSignalPath, drainSignalPath)); });
+
+        auto [guestProcess, _] = BindGuestPort(L"TCP4-LISTEN:1236,bind=127.0.0.1", true, std::format(L"EXEC:{}", scriptPath));
+        auto hostSocket = ConnectToLocalhostRelay(AF_INET, 1236);
+
+        constexpr DWORD timeout = 10'000;
+        constexpr int socketBufferSize = 16 * 1024;
+        VERIFY_ARE_NOT_EQUAL(
+            setsockopt(hostSocket.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)), SOCKET_ERROR);
+        VERIFY_ARE_NOT_EQUAL(
+            setsockopt(hostSocket.get(), SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)), SOCKET_ERROR);
+        VERIFY_ARE_NOT_EQUAL(
+            setsockopt(hostSocket.get(), SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&socketBufferSize), sizeof(socketBufferSize)),
+            SOCKET_ERROR);
+        VERIFY_ARE_NOT_EQUAL(
+            setsockopt(hostSocket.get(), SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char*>(&socketBufferSize), sizeof(socketBufferSize)),
+            SOCKET_ERROR);
+
+        // The guest does not read from the connection until drainSignalPath exists. Fill the host-to-guest path
+        // until it applies backpressure, then trigger a guest-to-host write and verify that it progresses independently.
+        u_long nonBlocking = 1;
+        VERIFY_ARE_EQUAL(ioctlsocket(hostSocket.get(), FIONBIO, &nonBlocking), 0);
+
+        const std::string payload(64 * 1024, 'x');
+        bool sendBlocked = false;
+        const auto sendDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (std::chrono::steady_clock::now() < sendDeadline)
+        {
+            const auto bytesSent = send(hostSocket.get(), payload.data(), static_cast<int>(payload.size()), 0);
+            if (bytesSent > 0)
+            {
+                continue;
+            }
+
+            const auto error = WSAGetLastError();
+            THROW_HR_IF(HRESULT_FROM_WIN32(error), error != WSAEWOULDBLOCK);
+            sendBlocked = true;
+            break;
+        }
+        VERIFY_IS_TRUE(sendBlocked);
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"touch {}", sendSignalPath)), 0L);
+
+        constexpr std::string_view response = "response-while-forward-blocked";
+        std::string received;
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                std::array<char, 64> receiveBuffer{};
+                const auto bytesReceived = recv(hostSocket.get(), receiveBuffer.data(), static_cast<int>(receiveBuffer.size()), 0);
+                if (bytesReceived == SOCKET_ERROR)
+                {
+                    const auto error = WSAGetLastError();
+                    THROW_HR_IF(HRESULT_FROM_WIN32(error), error != WSAEWOULDBLOCK);
+                }
+                else
+                {
+                    THROW_HR_IF(E_UNEXPECTED, bytesReceived == 0);
+                    received.append(receiveBuffer.data(), static_cast<size_t>(bytesReceived));
+                }
+
+                THROW_HR_IF(E_PENDING, received.size() < response.size());
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(10));
+        VERIFY_ARE_EQUAL(received, response);
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"touch {}", drainSignalPath)), 0L);
+        VERIFY_ARE_EQUAL(shutdown(hostSocket.get(), SD_SEND), 0);
     }
 
     static void TestNonRootNamespaceEphemeralBind()

@@ -8,6 +8,7 @@ using wsl::windows::common::io::AcceptHandle;
 using wsl::windows::common::io::BufferWrapper;
 using wsl::windows::common::io::DockerIORelayHandle;
 using wsl::windows::common::io::EventHandle;
+using wsl::windows::common::io::HalfCloseRelayHandle;
 using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::common::io::HTTPChunkBasedReadHandle;
 using wsl::windows::common::io::InitializeFileOffset;
@@ -299,8 +300,8 @@ HANDLE EventHandle::GetHandle() const
 
 // ReadHandle
 
-ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
-    Handle(std::move(MovedHandle)), OnRead(OnRead), Offset(InitializeFileOffset(Handle.Get()))
+ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead, size_t BufferSize) :
+    Handle(std::move(MovedHandle)), OnRead(std::move(OnRead)), Buffer(BufferSize), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
 }
@@ -1637,6 +1638,23 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
     {
         // If no handle is active, expect a header.
         ProcessNextHeader();
+    }
+}
+
+// HalfCloseRelayHandle
+
+HalfCloseRelayHandle::HalfCloseRelayHandle(HandleWrapper&& Input, SOCKET OutputSocket, size_t BufferSize) :
+    RelayHandle(std::move(Input), HandleWrapper{OutputSocket}, BufferSize), m_shutdownSocket(OutputSocket)
+{
+}
+
+void HalfCloseRelayHandle::Schedule()
+{
+    RelayHandle::Schedule();
+    if (State == IOHandleStatus::Completed && !m_shutdownDone)
+    {
+        m_shutdownDone = true;
+        LOG_LAST_ERROR_IF(shutdown(m_shutdownSocket, SD_SEND) == SOCKET_ERROR);
     }
 }
 

@@ -1,8 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "common.h"
 #include <memory>
+#include <array>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 #include <iostream>
 
@@ -228,127 +230,478 @@ int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
 
     return result;
 }
+
+enum class RelayEndpoint : uint64_t
+{
+    HvSocket = 0,
+    TcpSocket = 1
+};
+
+constexpr uint64_t c_listenerEventKey = 0;
+constexpr uint64_t c_relayEndpointBit = uint64_t{1} << 63;
+constexpr uint64_t c_connectionIdMask = ~c_relayEndpointBit;
+
+uint64_t RelayEventKey(uint64_t connectionId, RelayEndpoint endpoint)
+{
+    WI_ASSERT(connectionId <= c_connectionIdMask);
+    return connectionId | (endpoint == RelayEndpoint::TcpSocket ? c_relayEndpointBit : 0);
+}
+
+void SetNonBlocking(int fd)
+{
+    const int flags = fcntl(fd, F_GETFL, 0);
+    THROW_LAST_ERROR_IF(flags < 0);
+    THROW_LAST_ERROR_IF(fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0);
+}
+
+class RelayConnection
+{
+public:
+    RelayConnection(int epollFd, uint64_t connectionId, wil::unique_fd&& relaySocket) :
+        m_epollFd(epollFd), m_connectionId(connectionId), m_relaySocket(std::move(relaySocket))
+    {
+        SetNonBlocking(m_relaySocket.get());
+        AddToEpoll(RelayEndpoint::HvSocket, EPOLLIN | EPOLLRDHUP);
+    }
+
+    bool Done() const noexcept
+    {
+        return m_done;
+    }
+
+    void Stop() noexcept
+    {
+        m_done = true;
+    }
+
+    void HandleEvent(RelayEndpoint endpoint, uint32_t events)
+    {
+        if (m_done)
+        {
+            return;
+        }
+
+        if (m_state == State::ReadingMessage)
+        {
+            WI_ASSERT(endpoint == RelayEndpoint::HvSocket);
+            ReadMessage();
+            if (m_state == State::ReadingMessage || m_done)
+            {
+                return;
+            }
+        }
+
+        if (m_state == State::Connecting && endpoint == RelayEndpoint::TcpSocket && (events & (EPOLLOUT | EPOLLERR | EPOLLHUP)))
+        {
+            CompleteConnect();
+        }
+
+        if (m_state == State::Connecting || m_state == State::Relaying)
+        {
+            auto& writeDirection = DirectionForDestination(endpoint);
+            if (!writeDirection.Empty() && (events & (EPOLLOUT | EPOLLERR | EPOLLHUP)))
+            {
+                Write(writeDirection);
+            }
+
+            auto& readDirection = DirectionForSource(endpoint);
+            if (!readDirection.SourceEof && readDirection.Empty() && (events & (EPOLLIN | EPOLLRDHUP | EPOLLHUP)))
+            {
+                Read(readDirection);
+            }
+
+            if (events & EPOLLERR)
+            {
+                int socketError{};
+                socklen_t socketErrorSize = sizeof(socketError);
+                THROW_LAST_ERROR_IF(getsockopt(Fd(endpoint), SOL_SOCKET, SO_ERROR, &socketError, &socketErrorSize) < 0);
+                if (socketError != 0)
+                {
+                    THROW_ERRNO(socketError);
+                }
+            }
+
+            HalfCloseIfDrained(m_relayToTcp);
+            HalfCloseIfDrained(m_tcpToRelay);
+            m_done = m_relayToTcp.DestinationShutdown && m_tcpToRelay.DestinationShutdown;
+
+            if (!m_done)
+            {
+                UpdateInterests();
+            }
+        }
+    }
+
+private:
+    enum class State
+    {
+        ReadingMessage,
+        Connecting,
+        Relaying
+    };
+
+    struct Direction
+    {
+        Direction(RelayEndpoint source, RelayEndpoint destination, size_t bufferSize = 0) :
+            Source(source), Destination(destination), Buffer(bufferSize)
+        {
+        }
+
+        bool Empty() const noexcept
+        {
+            return Size == 0;
+        }
+
+        RelayEndpoint Source;
+        RelayEndpoint Destination;
+        std::vector<gsl::byte> Buffer;
+        size_t Offset{};
+        size_t Size{};
+        bool SourceEof{};
+        bool DestinationShutdown{};
+    };
+
+    int Fd(RelayEndpoint endpoint) const noexcept
+    {
+        return endpoint == RelayEndpoint::HvSocket ? m_relaySocket.get() : m_tcpSocket.get();
+    }
+
+    Direction& DirectionForSource(RelayEndpoint endpoint)
+    {
+        return endpoint == RelayEndpoint::HvSocket ? m_relayToTcp : m_tcpToRelay;
+    }
+
+    Direction& DirectionForDestination(RelayEndpoint endpoint)
+    {
+        return endpoint == RelayEndpoint::HvSocket ? m_tcpToRelay : m_relayToTcp;
+    }
+
+    uint32_t EventsFor(RelayEndpoint endpoint) const
+    {
+        if (m_state == State::ReadingMessage)
+        {
+            return EPOLLIN | EPOLLRDHUP;
+        }
+
+        if (m_state == State::Connecting && endpoint == RelayEndpoint::TcpSocket)
+        {
+            return EPOLLOUT | EPOLLRDHUP;
+        }
+
+        uint32_t events{};
+        const auto& readDirection = endpoint == RelayEndpoint::HvSocket ? m_relayToTcp : m_tcpToRelay;
+        if (!readDirection.SourceEof && readDirection.Empty())
+        {
+            events |= EPOLLIN | EPOLLRDHUP;
+        }
+
+        const auto& writeDirection = endpoint == RelayEndpoint::HvSocket ? m_tcpToRelay : m_relayToTcp;
+        if (!writeDirection.Empty())
+        {
+            events |= EPOLLOUT;
+        }
+
+        return events;
+    }
+
+    void AddToEpoll(RelayEndpoint endpoint, uint32_t events)
+    {
+        epoll_event event{};
+        event.events = events;
+        event.data.u64 = RelayEventKey(m_connectionId, endpoint);
+        THROW_LAST_ERROR_IF(epoll_ctl(m_epollFd, EPOLL_CTL_ADD, Fd(endpoint), &event) < 0);
+
+        if (endpoint == RelayEndpoint::HvSocket)
+        {
+            m_relayEvents = events;
+        }
+        else
+        {
+            m_tcpEvents = events;
+        }
+    }
+
+    void UpdateInterest(RelayEndpoint endpoint, uint32_t events)
+    {
+        auto& currentEvents = endpoint == RelayEndpoint::HvSocket ? m_relayEvents : m_tcpEvents;
+        if (currentEvents == events)
+        {
+            return;
+        }
+
+        if (events == 0)
+        {
+            THROW_LAST_ERROR_IF(epoll_ctl(m_epollFd, EPOLL_CTL_DEL, Fd(endpoint), nullptr) < 0);
+            currentEvents = 0;
+            return;
+        }
+
+        epoll_event event{};
+        event.events = events;
+        event.data.u64 = RelayEventKey(m_connectionId, endpoint);
+        const int operation = currentEvents == 0 ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+        THROW_LAST_ERROR_IF(epoll_ctl(m_epollFd, operation, Fd(endpoint), &event) < 0);
+        currentEvents = events;
+    }
+
+    void UpdateInterests()
+    {
+        UpdateInterest(RelayEndpoint::HvSocket, EventsFor(RelayEndpoint::HvSocket));
+        if (m_tcpSocket)
+        {
+            UpdateInterest(RelayEndpoint::TcpSocket, EventsFor(RelayEndpoint::TcpSocket));
+        }
+    }
+
+    void ReadMessage()
+    {
+        while (m_messageBytes < sizeof(m_message))
+        {
+            auto* destination = reinterpret_cast<char*>(&m_message) + m_messageBytes;
+            const auto bytesRead = TEMP_FAILURE_RETRY(read(m_relaySocket.get(), destination, sizeof(m_message) - m_messageBytes));
+            if (bytesRead > 0)
+            {
+                m_messageBytes += static_cast<size_t>(bytesRead);
+                continue;
+            }
+
+            if (bytesRead == 0)
+            {
+                m_done = true;
+                return;
+            }
+
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                return;
+            }
+
+            THROW_LAST_ERROR();
+        }
+
+        THROW_ERRNO_IF(
+            EINVAL,
+            m_message.Header.MessageType != LxInitMessageStartSocketRelay || m_message.Header.MessageSize != sizeof(m_message) ||
+                m_message.BufferSize == 0);
+
+        const auto bufferSize = static_cast<size_t>(m_message.BufferSize);
+        m_relayToTcp = Direction(RelayEndpoint::HvSocket, RelayEndpoint::TcpSocket, bufferSize);
+        m_tcpToRelay = Direction(RelayEndpoint::TcpSocket, RelayEndpoint::HvSocket, bufferSize);
+
+        sockaddr* socketAddress{};
+        socklen_t socketAddressSize{};
+        sockaddr_in ipv4Address{};
+        sockaddr_in6 ipv6Address{};
+
+        if (m_message.Family == AF_INET)
+        {
+            ipv4Address.sin_family = AF_INET;
+            ipv4Address.sin_port = htons(m_message.Port);
+            ipv4Address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            socketAddress = reinterpret_cast<sockaddr*>(&ipv4Address);
+            socketAddressSize = sizeof(ipv4Address);
+        }
+        else if (m_message.Family == AF_INET6)
+        {
+            ipv6Address.sin6_family = AF_INET6;
+            ipv6Address.sin6_port = htons(m_message.Port);
+            ipv6Address.sin6_addr = IN6ADDR_LOOPBACK_INIT;
+            socketAddress = reinterpret_cast<sockaddr*>(&ipv6Address);
+            socketAddressSize = sizeof(ipv6Address);
+        }
+        else
+        {
+            THROW_ERRNO(EINVAL);
+        }
+
+        m_tcpSocket.reset(socket(socketAddress->sa_family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP));
+        THROW_LAST_ERROR_IF(!m_tcpSocket);
+
+        const int result = connect(m_tcpSocket.get(), socketAddress, socketAddressSize);
+        if (result < 0 && errno != EINPROGRESS)
+        {
+            const int error = errno;
+            LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", m_message.Port, m_message.Family, error);
+            THROW_ERRNO(error);
+        }
+
+        m_state = result == 0 ? State::Relaying : State::Connecting;
+        AddToEpoll(RelayEndpoint::TcpSocket, EventsFor(RelayEndpoint::TcpSocket));
+        UpdateInterest(RelayEndpoint::HvSocket, EventsFor(RelayEndpoint::HvSocket));
+    }
+
+    void CompleteConnect()
+    {
+        int socketError{};
+        socklen_t socketErrorSize = sizeof(socketError);
+        THROW_LAST_ERROR_IF(getsockopt(m_tcpSocket.get(), SOL_SOCKET, SO_ERROR, &socketError, &socketErrorSize) < 0);
+        if (socketError != 0)
+        {
+            LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", m_message.Port, m_message.Family, socketError);
+            THROW_ERRNO(socketError);
+        }
+
+        m_state = State::Relaying;
+        UpdateInterests();
+    }
+
+    void Read(Direction& direction)
+    {
+        WI_ASSERT(direction.Empty());
+        const auto bytesRead = TEMP_FAILURE_RETRY(read(Fd(direction.Source), direction.Buffer.data(), direction.Buffer.size()));
+        if (bytesRead > 0)
+        {
+            direction.Offset = 0;
+            direction.Size = static_cast<size_t>(bytesRead);
+        }
+        else if (bytesRead == 0)
+        {
+            direction.SourceEof = true;
+        }
+        else if (errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            THROW_LAST_ERROR();
+        }
+    }
+
+    void Write(Direction& direction)
+    {
+        WI_ASSERT(!direction.Empty());
+        const auto bytesWritten =
+            TEMP_FAILURE_RETRY(send(Fd(direction.Destination), direction.Buffer.data() + direction.Offset, direction.Size, MSG_NOSIGNAL));
+        if (bytesWritten > 0)
+        {
+            direction.Offset += static_cast<size_t>(bytesWritten);
+            direction.Size -= static_cast<size_t>(bytesWritten);
+            if (direction.Empty())
+            {
+                direction.Offset = 0;
+            }
+        }
+        else if (bytesWritten == 0)
+        {
+            THROW_ERRNO(EPIPE);
+        }
+        else if (bytesWritten < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            THROW_LAST_ERROR();
+        }
+    }
+
+    void HalfCloseIfDrained(Direction& direction)
+    {
+        if (m_state != State::Relaying || !direction.SourceEof || !direction.Empty() || direction.DestinationShutdown)
+        {
+            return;
+        }
+
+        if (shutdown(Fd(direction.Destination), SHUT_WR) < 0)
+        {
+            LOG_ERROR("shutdown({}) failed, {}", Fd(direction.Destination), errno);
+        }
+
+        direction.DestinationShutdown = true;
+    }
+
+    int m_epollFd;
+    uint64_t m_connectionId;
+    wil::unique_fd m_relaySocket;
+    wil::unique_fd m_tcpSocket;
+    State m_state = State::ReadingMessage;
+    LX_INIT_START_SOCKET_RELAY m_message{};
+    size_t m_messageBytes{};
+    Direction m_relayToTcp{RelayEndpoint::HvSocket, RelayEndpoint::TcpSocket};
+    Direction m_tcpToRelay{RelayEndpoint::TcpSocket, RelayEndpoint::HvSocket};
+    uint32_t m_relayEvents{};
+    uint32_t m_tcpEvents{};
+    bool m_done{};
+};
 } // namespace
 
 void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 {
-    pollfd pollDescriptors[] = {{listenSocket, POLLIN}};
+    SetNonBlocking(listenSocket);
+
+    wil::unique_fd epollFd{epoll_create1(EPOLL_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!epollFd);
+
+    epoll_event listenerEvent{};
+    listenerEvent.events = EPOLLIN;
+    listenerEvent.data.u64 = c_listenerEventKey;
+    THROW_LAST_ERROR_IF(epoll_ctl(epollFd.get(), EPOLL_CTL_ADD, listenSocket, &listenerEvent) < 0);
+
+    std::unordered_map<uint64_t, std::unique_ptr<RelayConnection>> connections;
+    uint64_t nextConnectionId = 1;
+    std::array<epoll_event, 64> events{};
+
     for (;;)
     {
-        int result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
-        if (result < 0)
+        const int eventCount = TEMP_FAILURE_RETRY(epoll_wait(epollFd.get(), events.data(), static_cast<int>(events.size()), -1));
+        THROW_LAST_ERROR_IF(eventCount < 0);
+
+        for (int index = 0; index < eventCount; ++index)
         {
-            LOG_ERROR("poll failed {}", errno);
-            return;
-        }
-
-        if ((pollDescriptors[0].revents & POLLIN) == 0)
-        {
-            LOG_ERROR("unexpected revents {:x}", pollDescriptors[0].revents);
-            return;
-        }
-
-        // Accept a connection and start a relay worker thread.
-        wil::unique_fd relaySocket{UtilAcceptVsock(listenSocket, hvSocketAddress)};
-        THROW_LAST_ERROR_IF(!relaySocket);
-
-        std::thread([relaySocket = std::move(relaySocket)]() {
-            try
+            const auto eventKey = events[index].data.u64;
+            if (eventKey == c_listenerEventKey)
             {
-                // Read a message to determine which TCP port to connect to.
-                std::vector<gsl::byte> buffer(sizeof(LX_INIT_START_SOCKET_RELAY));
-                auto bytesRead = UtilReadBuffer(relaySocket.get(), buffer);
-                if (bytesRead == 0)
-                {
-                    return;
-                }
-
-                auto* message = gslhelpers::try_get_struct<LX_INIT_START_SOCKET_RELAY>(gsl::make_span(buffer.data(), bytesRead));
-                THROW_ERRNO_IF(EINVAL, !message || (message->Header.MessageType != LxInitMessageStartSocketRelay));
-
-                // Connect to the actual socket address and set up a relay.
-                //
-                // N.B. During the time setting up the relay the server may have
-                //      stopped listening.
-                sockaddr* socketAddress;
-                int socketAddressSize;
-                sockaddr_in sockaddrIn{};
-                sockaddr_in6 sockaddrIn6{};
-
-                if (message->Family == AF_INET)
-                {
-                    sockaddrIn.sin_family = AF_INET;
-                    sockaddrIn.sin_port = htons(message->Port);
-                    sockaddrIn.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-                    socketAddress = reinterpret_cast<sockaddr*>(&sockaddrIn);
-                    socketAddressSize = sizeof(sockaddrIn);
-                }
-                else if (message->Family == AF_INET6)
-                {
-                    sockaddrIn6.sin6_family = AF_INET6;
-                    sockaddrIn6.sin6_port = htons(message->Port);
-                    sockaddrIn6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
-                    socketAddress = reinterpret_cast<sockaddr*>(&sockaddrIn6);
-                    socketAddressSize = sizeof(sockaddrIn6);
-                }
-                else
-                {
-                    THROW_ERRNO(EINVAL);
-                }
-
-                wil::unique_fd tcpSocket{socket(socketAddress->sa_family, SOCK_STREAM, IPPROTO_TCP)};
-                THROW_LAST_ERROR_IF(!tcpSocket);
-
-                if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
-                {
-                    LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", message->Port, message->Family, errno);
-                    return;
-                }
-
-                // Resize the buffer to be the requested size.
-                buffer.resize(message->BufferSize);
-
-                // Begin relaying data.
-                int outFd[2] = {tcpSocket.get(), relaySocket.get()};
-                pollfd pollDescriptors[] = {{relaySocket.get(), POLLIN}, {tcpSocket.get(), POLLIN}};
-
                 for (;;)
                 {
-                    if ((pollDescriptors[0].fd == -1) || (pollDescriptors[1].fd == -1))
+                    sockaddr_vm peerAddress = hvSocketAddress;
+                    socklen_t peerAddressSize = sizeof(peerAddress);
+                    wil::unique_fd relaySocket{accept4(
+                        listenSocket, reinterpret_cast<sockaddr*>(&peerAddress), &peerAddressSize, SOCK_NONBLOCK | SOCK_CLOEXEC)};
+                    if (!relaySocket)
                     {
-                        return;
-                    }
-
-                    THROW_LAST_ERROR_IF(poll(pollDescriptors, COUNT_OF(pollDescriptors), -1) < 0);
-
-                    bytesRead = 0;
-                    for (int Index = 0; Index < COUNT_OF(pollDescriptors); Index += 1)
-                    {
-                        if (pollDescriptors[Index].revents & POLLIN)
+                        const int error = errno;
+                        if (error == EAGAIN || error == EWOULDBLOCK)
                         {
-                            bytesRead = UtilReadBuffer(pollDescriptors[Index].fd, buffer);
-                            if (bytesRead == 0)
-                            {
-                                pollDescriptors[Index].fd = -1;
-                                shutdown(outFd[Index], SHUT_WR);
-                            }
-                            else if (bytesRead < 0)
-                            {
-                                return;
-                            }
-                            else if (UtilWriteBuffer(outFd[Index], buffer.data(), bytesRead) < 0)
-                            {
-                                return;
-                            }
+                            break;
                         }
-                    }
-                }
-            }
-            CATCH_LOG()
-        }).detach();
-    }
 
-    return;
+                        if (error == EINTR || error == ECONNABORTED || error == EPROTO)
+                        {
+                            continue;
+                        }
+
+                        LOG_ERROR("accept4 failed, {}", error);
+                        THROW_ERRNO(error);
+                    }
+
+                    THROW_ERRNO_IF(EOVERFLOW, nextConnectionId > c_connectionIdMask);
+                    const auto connectionId = nextConnectionId++;
+                    try
+                    {
+                        connections.emplace(connectionId, std::make_unique<RelayConnection>(epollFd.get(), connectionId, std::move(relaySocket)));
+                    }
+                    CATCH_LOG();
+                }
+
+                continue;
+            }
+
+            const auto connectionId = eventKey & c_connectionIdMask;
+            const auto endpoint = (eventKey & c_relayEndpointBit) ? RelayEndpoint::TcpSocket : RelayEndpoint::HvSocket;
+            const auto connection = connections.find(connectionId);
+            if (connection == connections.end())
+            {
+                continue;
+            }
+
+            try
+            {
+                connection->second->HandleEvent(endpoint, events[index].events);
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+                connection->second->Stop();
+            }
+        }
+
+        // Closing the uniquely owned sockets removes their epoll registrations after the final fd reference is closed.
+        // Defer erasure until the full batch is processed because events already returned by epoll_wait() remain cached here.
+        std::erase_if(connections, [](const auto& entry) { return entry.second->Done(); });
+    }
 }
 
 // Create a thread to monitor for connections to relay.
