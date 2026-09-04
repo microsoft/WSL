@@ -381,6 +381,63 @@ class WSLCE2EContainerCpTests
         VERIFY_ARE_EQUAL(L"local-file-content\n", execResult.Stdout.value());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalToContainer_FollowLinkCopiesTarget)
+    {
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        runResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto targetFile = std::filesystem::current_path() / L"wslc-cp-followlink-target.txt";
+        auto linkFile = std::filesystem::current_path() / L"wslc-cp-followlink-link.txt";
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code ec;
+            std::filesystem::remove(linkFile, ec);
+            std::filesystem::remove(targetFile, ec);
+        });
+
+        {
+            wil::unique_hfile file(CreateFileW(targetFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!file);
+            const std::string content = "follow-link-local\n";
+            DWORD written = 0;
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+        }
+
+        // Creating a symlink requires Administrator privileges, which the E2E tests already run with.
+        THROW_LAST_ERROR_IF(!CreateSymbolicLinkW(linkFile.c_str(), targetFile.c_str(), 0));
+
+        // --follow-link archives what the link points at, so the target's name and contents land in the container.
+        const auto cpResult = RunWslc(std::format(L"container cp --follow-link {} {}:/tmp/", linkFile.wstring(), WslcContainerName));
+        cpResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        const auto catResult = RunWslc(std::format(L"container exec {} cat /tmp/wslc-cp-followlink-target.txt", WslcContainerName));
+        catResult.Verify({.Stdout = L"follow-link-local\n", .ExitCode = 0});
+
+        // The link's own name is never used as the destination when the link is followed.
+        const auto lookupCommand =
+            std::format(L"container exec {} sh -c \"test -e /tmp/wslc-cp-followlink-link.txt && echo present || echo absent\"", WslcContainerName);
+        const auto lookupResult = RunWslc(lookupCommand);
+        lookupResult.Verify({.Stdout = L"absent\n", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalToContainer_FollowLinkSourceNotFound)
+    {
+        auto danglingLink = std::filesystem::current_path() / L"wslc-cp-dangling-link.txt";
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code ec;
+            std::filesystem::remove(danglingLink, ec);
+        });
+
+        THROW_LAST_ERROR_IF(!CreateSymbolicLinkW(danglingLink.c_str(), L"wslc-cp-missing-target.txt", 0));
+
+        // A link pointing at a missing file has no source to archive, so the copy fails.
+        const auto result = RunWslc(std::format(L"container cp --follow-link {} {}:/tmp/", danglingLink.wstring(), WslcContainerName));
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value());
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_ARE_NOT_EQUAL(0u, result.Stderr.value().size());
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Cp_LocalFileNotFound)
     {
         // Copying a nonexistent local file should fail.
