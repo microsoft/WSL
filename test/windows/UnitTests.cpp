@@ -4689,6 +4689,16 @@ VERSION_ID="Invalid|Format"
         DistroFileChange distributionconf(L"/etc/wsl-distribution.conf", false);
         distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\n");
 
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto drvFsTestPath = std::filesystem::temp_directory_path() /
+                                   std::format(L"wsl-oobe-drvfs-test-{}", wsl::shared::string::GuidToString<wchar_t>(runId));
+        std::filesystem::create_directory(drvFsTestPath);
+        auto cleanupDrvFsTestPath = wil::scope_exit([&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(drvFsTestPath, ignored);
+        });
+
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
         const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
@@ -4752,6 +4762,19 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            if (LxsstuVmMode())
+            {
+                // DrvFs mounts created before OOBE should be refreshed to use the new default user.
+                validateOutput(
+                    std::format(
+                        L"bash -c 'path=$(wslpath -u \"{}\") && mountpoint=$(findmnt -n -o TARGET -T \"$path\") && "
+                        L"test \"$(stat -c %u:%g \"$mountpoint\")\" = \"$(id -u):$(id -g)\" && touch \"$path/probe\" && "
+                        L"chmod 0644 \"$path/probe\"'",
+                        drvFsTestPath.wstring())
+                        .c_str(),
+                    L"");
+            }
 
             // New file should be created with the correct uid.
             const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
