@@ -3017,6 +3017,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Show all regardless of state.</value>
   </data>
+  <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
+    <value>Download all tagged images in the repository</value>
+  </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
     <value>Archive mode (accepted for Docker CLI compatibility)</value>
     <comment>{Locked="Docker"}</comment>
@@ -3314,6 +3317,10 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Suppress verbose output</value>
+  </data>
+  <data name="WSLCCLI_PullAllTagsWithTagError" xml:space="preserve">
+    <value>tag can't be used with --all-tags/-a</value>
+    <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullUsingDefaultTag" xml:space="preserve">
     <value>Using default tag: {}</value>

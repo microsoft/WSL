@@ -379,12 +379,12 @@ std::vector<wsl::windows::wslc::models::DeletedImageEntry> ImageService::Delete(
     return result;
 }
 
-void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
     WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, &warningCallback));
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)

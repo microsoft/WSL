@@ -263,11 +263,20 @@ void PullImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
+    const bool allTags = context.Args.GetValue<ArgType::AllTags>();
+
+    const auto reference = ImageReference::Parse(image);
+
+    // --all-tags pulls every tag in the repository, so a reference that already names one is
+    // rejected instead of being silently ignored.
+    if (allTags && reference.Format != EnumReferenceFormatNone)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_PullAllTagsWithTagError());
+    }
 
     // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
     // the client reports this on stdout before contacting the registry.
-    const auto reference = ImageReference::Parse(image);
-    if (!quiet && reference.Format == EnumReferenceFormatNone)
+    if (!quiet && !allTags && reference.Format == EnumReferenceFormatNone)
     {
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
     }
@@ -281,10 +290,12 @@ void PullImage(CLIExecutionContext& context)
     }
 
     IProgressCallback* progress = callback ? &*callback : nullptr;
-    services::ImageService::Pull(context.Terminal, session, image, progress);
+    services::ImageService::Pull(context.Terminal, session, image, progress, allTags);
 
-    // Match `docker pull`: always print the resolved canonical image reference as the final line.
-    context.Terminal.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
+    // Always print the resolved canonical image reference as the final line. With --all-tags no
+    // single tag was resolved, so only the repository is printed.
+    const auto resolved = allTags ? reference.Repository.GetCanonical() : reference.GetCanonical();
+    context.Terminal.Output(L"{}\n", MultiByteToWide(resolved));
 }
 
 void PushImage(CLIExecutionContext& context)

@@ -715,7 +715,7 @@ class WSLCTests
             auto image = PushImageToRegistry("hello-world:latest", registryAddress, BuildRegistryAuthHeader("", ""));
             ExpectImagePresent(*m_defaultSession, image.c_str(), false);
 
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), nullptr, FALSE, nullptr, nullptr));
             auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsForce).first); });
 
             // Verify that the image is in the list of images.
@@ -734,7 +734,7 @@ class WSLCTests
                 L"pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
                 L"access to the resource is denied";
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, FALSE, nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
             ValidateCOMErrorMessage(expectedError.c_str());
         }
 
@@ -746,7 +746,7 @@ class WSLCTests
                 ResetTestSession(); // Reopen the test session since the session was terminated.
             });
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("hello-world:linux", nullptr, FALSE, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 
@@ -761,7 +761,7 @@ class WSLCTests
             auto registryImage = PushImageToRegistry(sourceImage, registryAddress, auth);
             ExpectImagePresent(*m_defaultSession, registryImage.c_str(), false);
 
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(registryImage.c_str(), nullptr, FALSE, nullptr, nullptr));
 
             auto cleanup =
                 wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsForce).first); });
@@ -779,7 +779,7 @@ class WSLCTests
         SKIP_TEST_UNSTABLE();
 
         auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, FALSE, nullptr, nullptr));
 
             auto cleanup = wil::scope_exit(
                 [&]() { LOG_IF_FAILED(DeleteImageNoThrow(ExpectedTag.value_or(Image), WSLCDeleteImageFlagsForce).first); });
@@ -828,7 +828,7 @@ class WSLCTests
             settings.MemoryMb = 1024;
             auto session = CreateSession(settings);
 
-            VERIFY_ARE_EQUAL(session->PullImage("pytorch/pytorch", nullptr, nullptr, nullptr), E_FAIL);
+            VERIFY_ARE_EQUAL(session->PullImage("pytorch/pytorch", nullptr, FALSE, nullptr, nullptr), E_FAIL);
 
             ValidateCOMErrorMessageContains(L"no space left on device");
         }
@@ -876,11 +876,11 @@ class WSLCTests
         auto image = PushImageToRegistry("hello-world:latest", registryAddress, xRegistryAuth);
 
         // Pulling without credentials should fail.
-        VERIFY_ARE_EQUAL(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr, nullptr), E_FAIL);
+        VERIFY_ARE_EQUAL(m_defaultSession->PullImage(image.c_str(), nullptr, FALSE, nullptr, nullptr), E_FAIL);
         ValidateCOMErrorMessageContains(L"no basic auth credentials");
 
         // Pulling with credentials should succeed.
-        VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), xRegistryAuth.c_str(), nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), xRegistryAuth.c_str(), FALSE, nullptr, nullptr));
         ExpectImagePresent(*m_defaultSession, image.c_str());
     }
 
@@ -12474,7 +12474,7 @@ class WSLCTests
         expectInvalidArg(longName);
 
         auto expectInvalidPull = [&](const char* name) {
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, FALSE, nullptr, nullptr), E_INVALIDARG);
 
             auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
             VERIFY_IS_TRUE(comError.has_value());

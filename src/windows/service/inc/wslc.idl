@@ -733,7 +733,7 @@ interface IWSLCSession : IUnknown
         [out] IWSLCEventStream** Stream);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in] BOOL AllTags, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT LoadImage([in] WSLCHandle ImageHandle, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [in, unique] IImageLoadCallback* LoadCallback);
     HRESULT ImportImage([in] WSLCHandle ImageHandle, [in, unique] LPCSTR ImageName, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [out] LPSTR* ImageId);

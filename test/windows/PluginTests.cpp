@@ -717,7 +717,7 @@ class PluginTests
             VERIFY_SUCCEEDED(session->DeleteImage(&deleteOpts, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
             // Pull the image back — this should trigger the ImageCreated plugin callback.
-            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, FALSE, nullptr, nullptr));
         }
 
         constexpr auto ExpectedOutput =
