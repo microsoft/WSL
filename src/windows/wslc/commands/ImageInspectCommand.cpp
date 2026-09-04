@@ -25,6 +25,11 @@ using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 // Image Inspect Command
+std::vector<ArgType> ImageInspectCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImageInspectCommand::GetArguments() const
 {
     return {

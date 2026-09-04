@@ -73,12 +73,19 @@ struct Command
     {
         return m_aliases;
     }
-
     virtual std::vector<std::unique_ptr<Command>> GetCommands() const
     {
         return {};
     }
     virtual std::vector<Argument> GetArguments() const
+    {
+        return {};
+    }
+    virtual std::vector<ArgType> GetUnsupportedArguments() const
+    {
+        return {};
+    }
+    virtual std::vector<ArgumentDeprecation> GetArgumentDeprecations() const
     {
         return {};
     }
@@ -133,11 +140,13 @@ struct Command
         std::vector<Argument> definedArgs,
         bool optionsOnly = false,
         bool stopOnUnknown = false,
-        const std::vector<Argument>& overridableDefaults = {}) const;
+        const std::vector<Argument>& overridableDefaults = {},
+        std::vector<ArgumentDeprecation> deprecations = {},
+        std::vector<ArgType> unsupportedArguments = {}) const;
 
     void ParseArguments(Invocation& inv, ArgMap& target) const
     {
-        ParseArguments(inv, target, GetAllArguments());
+        ParseArguments(inv, target, GetAllArguments(), false, false, {}, GetArgumentDeprecations(), GetUnsupportedArguments());
     }
 
     void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
@@ -146,6 +155,8 @@ struct Command
     {
         ValidateArguments(source, GetAllArguments(), true);
     }
+
+    void OutputDeprecatedArgumentWarnings(Terminal& terminal, const ArgMap& source) const;
 
     virtual void Execute(CLIExecutionContext& context) const;
 

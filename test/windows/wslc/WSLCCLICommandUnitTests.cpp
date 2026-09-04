@@ -13,17 +13,18 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <array>
 #include <unordered_map>
 #include <unordered_set>
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
 #include "Command.h"
-#include "RootCommand.h"
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
 #include "InspectCommand.h"
 #include "NetworkCommand.h"
+#include "RootCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
@@ -68,6 +69,45 @@ class WSLCCLICommandUnitTests
         for (const auto& subcmd : subcommands)
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
+        }
+    }
+
+    TEST_METHOD(DockerPlatformCommands_DeclarePlatformUnsupported)
+    {
+        ContainerCreateCommand containerCreate{L"container"};
+        ContainerRunCommand containerRun{L"container"};
+        ImageBuildCommand imageBuild{L"image"};
+        ImageImportCommand imageImport{L"image"};
+        ImageInspectCommand imageInspect{L"image"};
+        ImageLoadCommand imageLoad{L"image"};
+        ImagePullCommand imagePull{L"image"};
+        ImagePushCommand imagePush{L"image"};
+        ImageRemoveCommand imageRemove{L"image"};
+        ImageSaveCommand imageSave{L"image"};
+
+        const std::array<const Command*, 10> commands{
+            &containerCreate,
+            &containerRun,
+            &imageBuild,
+            &imageImport,
+            &imageInspect,
+            &imageLoad,
+            &imagePull,
+            &imagePush,
+            &imageRemove,
+            &imageSave,
+        };
+
+        for (const auto command : commands)
+        {
+            LogComment(L"Checking " + command->FullName());
+            const auto unsupportedArguments = command->GetUnsupportedArguments();
+            VERIFY_ARE_EQUAL(1u, unsupportedArguments.size());
+            VERIFY_ARE_EQUAL(ArgType::Platform, unsupportedArguments.front());
+
+            const auto arguments = command->GetArguments();
+            const auto platform = std::ranges::find(arguments, ArgType::Platform, &Argument::Type);
+            VERIFY_IS_TRUE(platform == arguments.end());
         }
     }
 
@@ -371,11 +411,26 @@ class WSLCCLICommandUnitTests
             VERIFY_IS_NOT_NULL(current.get());
 
             const std::wstring commandFullName(current->FullName());
+            auto arguments = current->GetAllArguments();
+            const auto deprecations = current->GetArgumentDeprecations();
+            const auto unsupportedArguments = current->GetUnsupportedArguments();
+            Invocation invocation{std::vector<std::wstring>{}};
+            ArgMap args;
+            VERIFY_NO_THROW(ParseArgumentsStateMachine(invocation, args, arguments, false, false, {}, deprecations, unsupportedArguments));
+
+            for (const auto& deprecation : deprecations)
+            {
+                arguments.emplace_back(Argument::Create(deprecation.DeprecatedType()));
+            }
+            for (const auto type : unsupportedArguments)
+            {
+                arguments.emplace_back(Argument::Create(type));
+            }
+
             std::unordered_set<size_t> seenTypes;
             std::unordered_map<std::wstring, argument::ArgType> seenNames;
             std::unordered_map<std::wstring, argument::ArgType> seenAliases;
-
-            for (const auto& arg : current->GetAllArguments())
+            for (const auto& arg : arguments)
             {
                 // Check for duplicate ArgType registration.
                 if (!seenTypes.emplace(static_cast<size_t>(arg.Type())).second)

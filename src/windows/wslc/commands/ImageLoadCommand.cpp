@@ -24,6 +24,11 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Load Command
+std::vector<ArgType> ImageLoadCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImageLoadCommand::GetArguments() const
 {
     return {

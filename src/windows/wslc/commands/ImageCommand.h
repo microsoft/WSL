@@ -40,6 +40,7 @@ struct ImageBuildCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -84,6 +85,7 @@ struct ImageLoadCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -100,6 +102,7 @@ struct ImageImportCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -125,6 +128,7 @@ struct ImageRemoveCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -140,6 +144,7 @@ struct ImageInspectCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -155,6 +160,7 @@ struct ImagePullCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -170,6 +176,7 @@ struct ImagePushCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -185,6 +192,7 @@ struct ImageSaveCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
+    std::vector<ArgType> GetUnsupportedArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 

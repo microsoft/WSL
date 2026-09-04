@@ -49,6 +49,66 @@ class WSLCCLIParserUnitTests
         return true;
     }
 
+    TEST_METHOD(UnsupportedNamedOption_ThrowsSpecificException)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --platform linux/amd64");
+        ArgMap args;
+        ParseArgumentsStateMachine stateMachine{inv, args, {}, false, false, {}, {}, {ArgType::Platform}};
+
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform") &&
+                   exception.Arguments().empty();
+        });
+        VERIFY_IS_FALSE(args.Contains(ArgType::Platform));
+    }
+
+    TEST_METHOD(UnsupportedAliasOption_ThrowsSpecificException)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc -f");
+        ArgMap args;
+        ParseArgumentsStateMachine stateMachine{inv, args, {}, false, false, {}, {}, {ArgType::Force}};
+
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--force") &&
+                   exception.Arguments().empty();
+        });
+        VERIFY_IS_FALSE(args.Contains(ArgType::Force));
+    }
+
+    TEST_METHOD(UnsupportedArgument_RequiresNamedOption)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc");
+        ArgMap args;
+
+        VERIFY_THROWS_SPECIFIC(
+            ParseArgumentsStateMachine(inv, args, {}, false, false, {}, {}, {ArgType::ContainerId}),
+            wil::ResultException,
+            [](const wil::ResultException& exception) { return exception.GetErrorCode() == E_INVALIDARG; });
+    }
+
+    TEST_METHOD(DeprecatedMapping_RequiresDeclaredReplacement)
+    {
+        auto inv = CreateInvocationFromCommandLine(L"wslc --time 10");
+        ArgMap args;
+
+        VERIFY_THROWS_SPECIFIC(
+            ParseArgumentsStateMachine(inv, args, {Argument::Create(ArgType::Help)}, false, false, {}, {{ArgType::Time, ArgType::StopTimeout}}),
+            wil::ResultException,
+            [](const wil::ResultException& exception) { return exception.GetErrorCode() == E_INVALIDARG; });
+    }
+
+    TEST_METHOD(DeprecatedMapping_RequiresCompatibleKinds)
+    {
+        auto inv = CreateInvocationFromCommandLine(L"wslc --force");
+        ArgMap args;
+
+        VERIFY_THROWS_SPECIFIC(
+            ParseArgumentsStateMachine(
+                inv, args, {Argument::Create(ArgType::StopTimeout)}, false, false, {}, {{ArgType::Force, ArgType::StopTimeout}}),
+            wil::ResultException,
+            [](const wil::ResultException& exception) { return exception.GetErrorCode() == E_INVALIDARG; });
+    }
+
     TEST_METHOD(ParserTest_ParserCases)
     {
         std::vector<ParserTestCase> testCases = {
@@ -669,7 +729,10 @@ class WSLCCLIParserUnitTests
     // adjoined form. The inspect family depends on this for docker's `-f json`.
     TEST_METHOD(Value_AliasCarriesValue)
     {
-        std::vector<Argument> defs = {Argument::Create(ArgType::InspectFormat), Argument::Create(ArgType::ObjectId, {.Limit = Limit::Unlimited})};
+        std::vector<Argument> defs = {
+            Argument::Create(ArgType::InspectFormat),
+            Argument::Create(ArgType::ObjectId, {.Limit = Limit::Unlimited}),
+        };
 
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f json cont1", defs).GetValue<ArgType::InspectFormat>());
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f=json cont1", defs).GetValue<ArgType::InspectFormat>());
