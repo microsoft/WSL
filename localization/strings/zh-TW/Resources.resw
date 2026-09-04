@@ -2377,6 +2377,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>無效名稱: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcEventsInvalidTimeWindow" xml:space="preserve">
+    <value>`since` 時間 ({}) 不能晚於 `until` 時間 ({})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="`since`"}{Locked="`until`"}</comment>
+  </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>路徑不是絕對路徑: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2906,6 +2910,39 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
     <value>系統層級管理命令。</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoDesc" xml:space="preserve">
+    <value>Display system information.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoLongDesc" xml:space="preserve">
+    <value>顯示 wslc 用戶端和工作階段管理員服務的版本資訊，以及使用中工作階段的清單。</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
+    <value>Client:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>WSL 版本：{}
+Kernel 版本：{}
+Direct3D 版本：{}
+DXCore 版本：{}
+Windows 版本：{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
+    <value>Server:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoSettingsFile" xml:space="preserve">
+    <value>Settings file: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessionManagerVersion" xml:space="preserve">
+    <value>Session manager version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessions" xml:space="preserve">
+    <value>Sessions: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>為影像加上標籤。</value>
@@ -3695,6 +3732,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
     <value>名稱</value>
   </data>
+  <data name="WSLCCLI_TableHeaderNames" xml:space="preserve">
+    <value>名稱</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCommand" xml:space="preserve">
+    <value>命令</value>
+  </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>影像</value>
   </data>
@@ -3724,6 +3767,26 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
+    <value>已建立</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateRunning" xml:space="preserve">
+    <value>執行中</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateStopped" xml:space="preserve">
+    <value>已停止</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateExited" xml:space="preserve">
+    <value>已結束</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
+    <value>無效</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>不到一秒前</value>

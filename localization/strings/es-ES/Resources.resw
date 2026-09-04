@@ -2377,6 +2377,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>Nombre no válido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcEventsInvalidTimeWindow" xml:space="preserve">
+    <value>`since` time ({}) cannot be after `until` time ({})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="`since`"}{Locked="`until`"}</comment>
+  </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>La ruta de acceso no es absoluta: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2906,6 +2910,39 @@ Ejemplo: tar -cf - archivos | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
     <value>Comandos de administración de nivel de sistema.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoDesc" xml:space="preserve">
+    <value>Display system information.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoLongDesc" xml:space="preserve">
+    <value>Muestra información de versión para el cliente wslc y el servicio de administrador de sesión, junto con la lista de sesiones activas.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
+    <value>Client:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>Versión de WSL: {}
+Versión del kernel: {}
+Versión de Direct3D: {}
+Versión DXCore: {}
+Versión de Windows: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
+    <value>Server:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoSettingsFile" xml:space="preserve">
+    <value>Settings file: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessionManagerVersion" xml:space="preserve">
+    <value>Session manager version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessions" xml:space="preserve">
+    <value>Sessions: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Etiquetar una imagen.</value>
@@ -3695,6 +3732,12 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
     <value>NOMBRE</value>
   </data>
+  <data name="WSLCCLI_TableHeaderNames" xml:space="preserve">
+    <value>NOMBRES</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCommand" xml:space="preserve">
+    <value>COMANDO</value>
+  </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>IMAGEN</value>
   </data>
@@ -3724,6 +3767,26 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
+    <value>creó</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateRunning" xml:space="preserve">
+    <value>correr</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateStopped" xml:space="preserve">
+    <value>detenido</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateExited" xml:space="preserve">
+    <value>finalizado</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
+    <value>no válido</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>Hace menos de un segundo</value>

@@ -2371,6 +2371,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Ugyldigt navn: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcEventsInvalidTimeWindow" xml:space="preserve">
+    <value>`since`-tid ({}) kan ikke være efter `until`-tid ({})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="`since`"}{Locked="`until`"}</comment>
+  </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Stien er ikke absolut: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2900,6 +2904,39 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
     <value>Administrationskommandoer på systemniveau.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoDesc" xml:space="preserve">
+    <value>Vis systemoplysninger.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoLongDesc" xml:space="preserve">
+    <value>Viser versionsoplysninger for wslc-klienten og tjenesten Sessionsstyring sammen med listen over aktive sessioner.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
+    <value>Klient:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>WSL version: {}
+Kernel version: {}
+Direct3D version: {}
+DXCore version: {}
+Windows version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
+    <value>Server:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoSettingsFile" xml:space="preserve">
+    <value>Indstillingsfil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessionManagerVersion" xml:space="preserve">
+    <value>Version af sessionsstyring: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessions" xml:space="preserve">
+    <value>Sessioner: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Marker et billede.</value>
@@ -3689,6 +3726,12 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
     <value>NAVN</value>
   </data>
+  <data name="WSLCCLI_TableHeaderNames" xml:space="preserve">
+    <value>NAVNE</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCommand" xml:space="preserve">
+    <value>KOMMANDO</value>
+  </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>BILLEDE</value>
   </data>
@@ -3718,6 +3761,26 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
+    <value>oprettet</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateRunning" xml:space="preserve">
+    <value>kører</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateStopped" xml:space="preserve">
+    <value>stoppet</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateExited" xml:space="preserve">
+    <value>Afsluttet</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
+    <value>ugyldig</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>For mindre end et sekund siden</value>
