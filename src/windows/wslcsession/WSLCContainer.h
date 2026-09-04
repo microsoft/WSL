@@ -35,6 +35,7 @@ class WSLCContainer;
 class WSLCSession;
 class WSLCSessionRuntime;
 class WSLCVolumes;
+class EventStore;
 
 class unique_com_disconnect
 {
@@ -85,6 +86,7 @@ public:
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
+        EventStore& eventStore,
         WSLCContainerState InitialState,
         std::int64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
@@ -123,7 +125,7 @@ public:
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
 
-    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::optional<std::int64_t> stateChangedAt = std::nullopt) noexcept;
+    __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -141,14 +143,20 @@ public:
         WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
+        EventStore& eventStore);
 
     static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
         WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
+        std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
+        EventStore& eventStore);
+
+    // Appends an event for this container to the session's event stream. Must be called from the Docker
+    // event stream thread so that recorded events keep Docker's delivery order.
+    void RecordEvent(std::string&& Action, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
 
 private:
     enum class TransitionKind
@@ -197,7 +205,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::optional<std::int64_t> stopTimestamp);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime);
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -252,6 +260,7 @@ private:
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
     DockerEventTracker::EventTrackingReference m_containerEvents;
+    EventStore& m_eventStore;
     std::string m_networkMode;
 
     // Held (non-empty) exactly while the container is Running so the session's VM stays alive even

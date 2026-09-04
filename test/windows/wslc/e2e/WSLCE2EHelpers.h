@@ -23,6 +23,8 @@ Abstract:
 
 namespace WSLCE2ETests {
 
+namespace string = wsl::shared::string;
+
 // VT sequence constants and helpers for TTY testing.
 // Sequences are sourced from wsl::windows::common::vt (VTSupport.h).
 namespace VT {
@@ -155,7 +157,7 @@ wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::
 wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
 wsl::windows::common::wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName);
 wsl::windows::common::wslc_schema::Network InspectNetwork(const std::wstring& networkName);
-std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
+std::vector<wsl::windows::wslc::models::ContainerOutputInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void DeleteImagesWithRepositoryPrefix(const std::wstring& repositoryPrefix);

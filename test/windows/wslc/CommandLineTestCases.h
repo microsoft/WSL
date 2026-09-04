@@ -36,6 +36,18 @@ COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", false) // --ses
 
 // System command tests
 COMMAND_LINE_TEST_CASE(L"system -?", L"system", true)
+COMMAND_LINE_TEST_CASE(L"system info", L"info", true)
+COMMAND_LINE_TEST_CASE(L"info", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --help", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --format json", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --format table", L"info", true)
+COMMAND_LINE_TEST_CASE(L"info --format json", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --format invalid", L"info", false)
+COMMAND_LINE_TEST_CASE(L"system info --notanarg", L"info", false)
+COMMAND_LINE_TEST_CASE(L"system info extraarg", L"info", false)
+COMMAND_LINE_TEST_CASE(L"info --format invalid", L"info", false)
+COMMAND_LINE_TEST_CASE(L"info --notanarg", L"info", false)
+COMMAND_LINE_TEST_CASE(L"info extraarg", L"info", false)
 COMMAND_LINE_TEST_CASE(L"system session list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --verbose --help", L"list", true)
@@ -199,6 +211,16 @@ COMMAND_LINE_TEST_CASE(L"inspect --format badformat cont1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"container inspect --format json cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"container inspect --format table cont1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"container inspect --format badformat cont1", L"inspect", false)
+// The inspect family aliases -f to --format, matching `docker inspect -f`. The alias accepts the
+// same values as the long name and rejects the same ones.
+COMMAND_LINE_TEST_CASE(L"inspect -f json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"inspect -f=json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"inspect -f table cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"inspect -f badformat cont1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"inspect -f", L"inspect", false) // Missing value for -f
+COMMAND_LINE_TEST_CASE(L"inspect --type container -f json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"container inspect -f json cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"container inspect -f table cont1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"remove cont1", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"container remove cont1 cont2", L"remove", true)
 COMMAND_LINE_TEST_CASE(L"rm cont1", L"remove", true)
@@ -336,6 +358,12 @@ COMMAND_LINE_TEST_CASE(L"network inspect --format badformat net1", L"inspect", f
 COMMAND_LINE_TEST_CASE(L"volume inspect --format json vol1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"volume inspect --format table vol1", L"inspect", false)
 COMMAND_LINE_TEST_CASE(L"volume inspect --format badformat vol1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"image inspect -f json img1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"image inspect -f table img1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"network inspect -f json net1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"network inspect -f table net1", L"inspect", false)
+COMMAND_LINE_TEST_CASE(L"volume inspect -f json vol1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"volume inspect -f table vol1", L"inspect", false)
 
 // Version command tests
 COMMAND_LINE_TEST_CASE(L"version", L"version", true)

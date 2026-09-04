@@ -199,6 +199,17 @@ endif ()
 if (NOT WSL_UNITY_BATCH_SIZE MATCHES "^[0-9]+$")
     message(FATAL_ERROR "WSL_UNITY_BATCH_SIZE must be a non-negative integer: got '${WSL_UNITY_BATCH_SIZE}'")
 endif ()
+
+# Applies to every target created below. Targets that can't be unified opt out
+# individually with UNITY_BUILD OFF.
+# N.B. This is set after the FetchContent dependencies are made available so that
+# third party targets keep building file by file.
+if (WSL_UNITY_BATCH_SIZE GREATER 0)
+    set(CMAKE_UNITY_BUILD ON)
+    set(CMAKE_UNITY_BUILD_MODE BATCH)
+    set(CMAKE_UNITY_BUILD_BATCH_SIZE ${WSL_UNITY_BATCH_SIZE})
+    message(STATUS "Unity build enabled with a batch size of ${WSL_UNITY_BATCH_SIZE}")
+endif ()
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)

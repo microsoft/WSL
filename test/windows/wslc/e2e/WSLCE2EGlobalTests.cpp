@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
 #include "WSLCSessionDefaults.h"
+#include "WSLCUserSettings.h"
 #include "Argument.h"
 
 using namespace WEX::Logging;
@@ -39,6 +40,19 @@ namespace {
         THROW_IF_WIN32_BOOL_FALSE(GetUserNameW(username, &usernameLen));
 
         return std::format(L"{}-{}", baseName, username);
+    }
+
+    // TableOutput sizes each column to its widest row, so a session leaving re-pads the survivors.
+    // Comparing leading ID tokens rather than whole rendered lines keeps comparisons padding-independent.
+    std::vector<std::wstring> GetLeadingTokens(const std::vector<std::wstring>& lines)
+    {
+        std::vector<std::wstring> tokens;
+        for (const auto& line : lines)
+        {
+            tokens.emplace_back(line.substr(0, line.find(L' ')));
+        }
+
+        return tokens;
     }
 
 } // namespace
@@ -185,6 +199,98 @@ class WSLCE2EGlobalTests
     {
         // Explicit table format matches the default plain-text output.
         RunWslcAndVerify(L"version --format table", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand)
+    {
+        auto result = RunWslc(L"system info");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+
+        const auto& output = result.Stdout.value();
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoClientHeader()) != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(std::format(L"{}", WSL_PACKAGE_VERSION)) != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoServerHeader()) != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoSessionManagerVersion(GetExpectedManagerVersion())) != std::wstring::npos);
+
+        const auto settingsFilePath = wsl::windows::wslc::settings::User().SettingsFilePath().wstring();
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoSettingsFile(settingsFilePath)) != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_InvalidFormatOption)
+    {
+        const auto result = RunWslc(L"system info --format invalid");
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_FormatJson)
+    {
+        auto result = RunWslc(L"system info --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto root = VerifyCompactJsonOutput(result);
+
+        const auto& client = root.at("Client");
+        VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, client.at("Version").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{KERNEL_VERSION}, client.at("KernelVersion").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{DIRECT3D_VERSION}, client.at("Direct3DVersion").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{DXCORE_VERSION}, client.at("DxCoreVersion").get<std::string>());
+        VERIFY_IS_FALSE(client.at("WindowsVersion").get<std::string>().empty());
+        VERIFY_IS_FALSE(client.at("SettingsFile").get<std::string>().empty());
+
+        // WSLg and MSRDC aren't relevant to wslc.
+        VERIFY_IS_FALSE(client.contains("WslgVersion"));
+        VERIFY_IS_FALSE(client.contains("MsrdcVersion"));
+
+        const auto& server = root.at("Server");
+        VERIFY_ARE_EQUAL(
+            wsl::shared::string::WideToMultiByte(GetExpectedManagerVersion()), server.at("SessionManagerVersion").get<std::string>());
+
+        const auto& sessions = server.at("Sessions");
+        VERIFY_IS_TRUE(sessions.is_array());
+        for (const auto& session : sessions)
+        {
+            VERIFY_ARE_EQUAL(3u, session.size());
+            VERIFY_IS_TRUE(session.contains("ID"));
+            VERIFY_IS_FALSE(session.contains("Id"));
+            VERIFY_IS_TRUE(session.contains("CreatorPid"));
+            VERIFY_IS_TRUE(session.contains("Name"));
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_RootAlias)
+    {
+        auto systemResult = RunWslc(L"system info --format json");
+        systemResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto rootResult = RunWslc(L"info --format json");
+        rootResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // The server section can change between invocations; the client section cannot.
+        VERIFY_ARE_EQUAL(
+            VerifyCompactJsonOutput(systemResult).at("Client").dump(), VerifyCompactJsonOutput(rootResult).at("Client").dump());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_DoesNotCreateSession)
+    {
+        auto before = RunWslc(L"system session list");
+        before.Verify({.Stderr = L"", .ExitCode = 0});
+
+        RunWslcAndVerify(L"system info --format json", {.Stderr = L"", .ExitCode = 0});
+
+        auto after = RunWslc(L"system session list");
+        after.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // An idle session can terminate between the two snapshots, so only assert that none appeared.
+        const auto beforeIds = GetLeadingTokens(before.GetStdoutLines());
+        for (const auto& id : GetLeadingTokens(after.GetStdoutLines()))
+        {
+            VERIFY_IS_TRUE(
+                std::find(beforeIds.begin(), beforeIds.end(), id) != beforeIds.end(),
+                std::format(L"'system info' must not create a session, but session '{}' appeared", id).c_str());
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_DefaultElevated)
@@ -686,6 +792,12 @@ private:
     std::wstring GetVersionMessage() const
     {
         return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
+    }
+
+    // The session manager reports only the first three version components.
+    std::wstring GetExpectedManagerVersion() const
+    {
+        return std::format(L"{}.{}.{}", WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION);
     }
 };
 } // namespace WSLCE2ETests

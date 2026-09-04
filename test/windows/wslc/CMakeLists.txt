@@ -12,11 +12,10 @@ file(GLOB_RECURSE WSLC_TEST_HEADERS CONFIGURE_DEPENDS
 # This ensures they're compiled into the main test binary.
 target_sources(wsltests PRIVATE ${WSLC_TEST_SOURCES} ${WSLC_TEST_HEADERS})
 
-# Ensure the file uses the precompiled header from the parent target.
-set_source_files_properties(${WSLC_TEST_SOURCES}
-    PROPERTIES
-    COMPILE_FLAGS "/Yuprecomp.h"
-)
+# N.B. These sources are compiled into wsltests, which is defined in the parent
+# directory. Source file properties are scoped to the directory that sets them,
+# so they would be ignored here. The precompiled header comes from the target
+# instead, via target_precompile_headers(wsltests REUSE_FROM common).
 
 # Add include directories needed for WSLC tests.
 target_include_directories(wsltests PRIVATE

@@ -348,4 +348,22 @@ struct VolumeListEntry
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeListEntry, Name, Driver, Mountpoint, Scope, Labels);
 };
 
+struct EventActor
+{
+    std::string ID;
+    std::map<std::string, std::string> Attributes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EventActor, ID, Attributes);
+};
+
+struct Event
+{
+    std::string Type;
+    std::string Action;
+    EventActor Actor;
+    std::int64_t time{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Event, Type, Action, Actor, time);
+};
+
 } // namespace wsl::windows::common::wslc_schema

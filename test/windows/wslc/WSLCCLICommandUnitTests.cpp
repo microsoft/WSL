@@ -21,9 +21,13 @@ Abstract:
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
+#include "ImageCommand.h"
+#include "InspectCommand.h"
+#include "NetworkCommand.h"
 #include "SessionCommand.h"
 #include "SystemCommand.h"
 #include "VersionCommand.h"
+#include "VolumeCommand.h"
 #include "EnvironmentOptions.h"
 
 using namespace wsl::windows::wslc;
@@ -198,6 +202,76 @@ class WSLCCLICommandUnitTests
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
     }
 
+    // Test: Verify SystemInfoCommand has the correct name
+    TEST_METHOD(SystemInfoCommand_HasCorrectName)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+        VERIFY_ARE_EQUAL(std::wstring_view(L"info"), cmd.Name());
+    }
+
+    // Test: Verify SystemInfoCommand has no subcommands
+    TEST_METHOD(SystemInfoCommand_HasNoSubcommands)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+        VERIFY_ARE_EQUAL(0u, cmd.GetCommands().size());
+    }
+
+    // Test: Verify SystemInfoCommand exposes the --format argument (plus the auto-added --help)
+    TEST_METHOD(SystemInfoCommand_HasFormatArgument)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+
+        auto args = cmd.GetArguments();
+        VERIFY_ARE_EQUAL(1u, args.size());
+
+        const auto& format = args[0];
+        VERIFY_ARE_EQUAL(ArgType::Format, format.Type());
+        VERIFY_ARE_EQUAL(Kind::Value, format.Kind());
+        VERIFY_IS_FALSE(format.Required());
+
+        // GetAllArguments also includes the auto-added --help.
+        VERIFY_ARE_EQUAL(2u, cmd.GetAllArguments().size());
+    }
+
+    // Test: Verify SystemCommand contains SystemInfoCommand as a subcommand
+    TEST_METHOD(SystemCommand_ContainsSystemInfoCommand)
+    {
+        auto cmd = SystemCommand(L"system");
+        auto subcommands = cmd.GetCommands();
+
+        bool found = false;
+        for (const auto& subcmd : subcommands)
+        {
+            if (subcmd->Name() == SystemInfoCommand::CommandName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"SystemCommand should contain SystemInfoCommand");
+    }
+
+    // SystemInfoCommand is registered twice so that both `wslc system info` and the
+    // `wslc info` alias resolve; this pins the second registration.
+    TEST_METHOD(RootCommand_ContainsSystemInfoCommand)
+    {
+        auto root = RootCommand();
+        auto subcommands = root.GetCommands();
+
+        bool found = false;
+        for (const auto& subcmd : subcommands)
+        {
+            if (subcmd->Name() == SystemInfoCommand::CommandName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"RootCommand should contain SystemInfoCommand");
+    }
+
     // RootCommand exposes Session as the sole CLI global option. The override
     // is the entry point for future globals; the test pins the current shape.
     TEST_METHOD(RootCommand_GlobalArguments_OnlySession)
@@ -243,6 +317,26 @@ class WSLCCLICommandUnitTests
 
             VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
         }
+    }
+
+    // Every command in the inspect family exposes docker's `-f` alias for --format
+    // (docker/cli cli/command/system/inspect.go: flags.StringVarP(&opts.format, "format", "f", ...)).
+    TEST_METHOD(InspectCommands_FormatArgumentHasDockerAlias)
+    {
+        const auto VerifyFormatAlias = [](const Command& command) {
+            const auto args = command.GetArguments();
+            const auto found = std::ranges::find_if(args, [](const auto& arg) { return arg.Type() == ArgType::InspectFormat; });
+
+            VERIFY_IS_TRUE(found != args.end(), std::format(L"Command '{}' does not register --format", command.FullName()).c_str());
+            VERIFY_ARE_EQUAL(std::wstring(L"format"), found->Name());
+            VERIFY_ARE_EQUAL(std::wstring(L"f"), found->Alias());
+        };
+
+        VerifyFormatAlias(InspectCommand(L""));
+        VerifyFormatAlias(ContainerInspectCommand(L"container"));
+        VerifyFormatAlias(ImageInspectCommand(L"image"));
+        VerifyFormatAlias(NetworkInspectCommand(L"network"));
+        VerifyFormatAlias(VolumeInspectCommand(L"volume"));
     }
 
     // Walk every command in the root tree and verify no argument collisions.
@@ -292,6 +386,13 @@ class WSLCCLICommandUnitTests
 
                 // Check name collision between distinct ArgTypes.
                 const auto& name = arg.Name();
+                if (name.size() < 2)
+                {
+                    VERIFY_FAIL(
+                        std::format(L"Command '{}' uses invalid long-form name '--{}' for ArgType '{}'", commandFullName, name, ArgTypeName(arg.Type()))
+                            .c_str());
+                }
+
                 auto [nameIt, nameInserted] = seenNames.emplace(name, arg.Type());
                 if (!nameInserted)
                 {
