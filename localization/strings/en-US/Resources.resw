@@ -311,6 +311,10 @@ and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
   <data name="MessageVmModeNotSupported" xml:space="preserve">
     <value>The Legacy distribution does not support WSL 2.</value>
   </data>
+  <data name="MessageOpenVmmNotIncluded" xml:space="preserve">
+    <value>The OpenVMM WSL backend is not available in this build.</value>
+    <comment>{Locked="OpenVMM"}{Locked="WSL"} Product names should not be translated.</comment>
+  </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 is unable to start since virtualization is not enabled on this machine.
 Please ensure the "Virtual Machine Platform" optional component is enabled and virtualization is turned on in your computer's firmware settings.

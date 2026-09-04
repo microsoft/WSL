@@ -30,6 +30,13 @@ foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
 endforeach()
 
+if (INCLUDE_OPENVMM)
+    list(APPEND BINARIES_DEPENDENCIES "${OPENVMM_EXE_PATH}")
+    set(OPENVMM_WIX_FILE "                <File Id=\"openvmm.exe\" Source=\"${OPENVMM_EXE_PATH}\" />")
+else()
+    set(OPENVMM_WIX_FILE "")
+endif()
+
 set(LINUX_BINARIES init;initrd.img)
 foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")

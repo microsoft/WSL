@@ -41,7 +41,8 @@ public:
         bool EnableDebugConsole,
         const std::wstring& Com1PipeName,
         bool EnableEarlyBootConsole,
-        wil::unique_handle&& OutputHandle);
+        wil::unique_handle&& OutputHandle,
+        _In_opt_ PSECURITY_DESCRIPTOR SecurityDescriptor = nullptr);
 
 private:
     enum InputSource
@@ -52,11 +53,12 @@ private:
 
     DmesgCollector(GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle = {});
 
-    void Start(bool EnableEarlyBootConsole);
+    void Start(bool EnableEarlyBootConsole, _In_opt_ PSECURITY_DESCRIPTOR SecurityDescriptor);
 
     void Run();
 
-    static std::pair<std::wstring, wil::unique_hfile> CreateConsolePipe();
+    static std::pair<std::wstring, wil::unique_hfile> CreateConsolePipe(
+        _In_opt_ PSECURITY_DESCRIPTOR SecurityDescriptor);
 
     void ProcessInput(InputSource Source, const gsl::span<char>& Input);
 

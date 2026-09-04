@@ -41,6 +41,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 # BUNDLE_ONLY mode: skip all source builds; only configure the msixbundle target and nuspec files.
 # Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
 option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
+option(INCLUDE_OPENVMM "Include the OpenVMM WSL backend" OFF)
+set(GRPC_INSTALL_DIR "" CACHE PATH "Path to the staged gRPC installation for the target architecture and configuration")
 if (BUNDLE_ONLY)
     if (NOT PACKAGE_VERSION)
         message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
@@ -168,14 +170,54 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
 endif()
 
+if (NOT WSL_DEVICEHOST_BIN OR INCLUDE_OPENVMM)
+    find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
+endif()
+
 if (WSL_DEVICEHOST_BIN)
     set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICEHOST_BIN}/WslDeviceHost.idl")
     set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICEHOST_BIN}/wsldevicehost.dll")
     set(WSL_DEVICE_HOST_VERSION "9.0.0-localbuild")
 else()
-    find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
     set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/idl/WslDeviceHost.idl")
     set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll")
+endif()
+
+if (INCLUDE_OPENVMM)
+    if (NOT GRPC_INSTALL_DIR)
+        message(FATAL_ERROR "GRPC_INSTALL_DIR is required when INCLUDE_OPENVMM is enabled")
+    endif()
+
+    set(
+        OPENVMM_EXE_PATH
+        "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe"
+        CACHE FILEPATH "Path to openvmm.exe")
+    set(
+        OPENVMM_PDB_PATH
+        "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.pdb"
+        CACHE FILEPATH "Path to openvmm.pdb")
+    set(
+        OPENVMM_PROTO_PATH
+        "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto"
+        CACHE FILEPATH "Path to the OpenVMM vmservice proto")
+
+    set(OPENVMM_REQUIRED_FILES
+        "${OPENVMM_EXE_PATH}"
+        "${OPENVMM_PDB_PATH}"
+        "${OPENVMM_PROTO_PATH}"
+        "${GRPC_INSTALL_DIR}/bin/protoc.exe"
+        "${GRPC_INSTALL_DIR}/bin/grpc_cpp_plugin.exe"
+        "${GRPC_INSTALL_DIR}/include/grpcpp/grpcpp.h"
+        "${GRPC_INSTALL_DIR}/include/google/protobuf/message.h"
+        "${GRPC_INSTALL_DIR}/lib/grpc.lib"
+        "${GRPC_INSTALL_DIR}/lib/grpc++.lib"
+        "${GRPC_INSTALL_DIR}/lib/libprotobuf.lib")
+
+    foreach(required_file IN LISTS OPENVMM_REQUIRED_FILES)
+        if (NOT EXISTS "${required_file}")
+            message(FATAL_ERROR "OpenVMM build dependency not found: ${required_file}")
+        endif()
+    endforeach()
 endif()
 
 # Optional target configuration
@@ -263,6 +305,14 @@ file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
 # needs linking into bin for symbol publishing.
 if (NOT WSL_DEVICEHOST_BIN)
     file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
+endif()
+
+if (INCLUDE_OPENVMM)
+    file(CREATE_LINK ${OPENVMM_EXE_PATH} ${BIN}/openvmm.exe COPY_ON_ERROR)
+    file(CREATE_LINK ${OPENVMM_PDB_PATH} ${BIN}/openvmm.pdb COPY_ON_ERROR)
+else()
+    file(REMOVE ${BIN}/openvmm.exe)
+    file(REMOVE ${BIN}/openvmm.pdb)
 endif()
 
 if (${SKIP_PACKAGE_SIGNING})

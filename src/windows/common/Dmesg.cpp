@@ -43,20 +43,36 @@ DmesgCollector::~DmesgCollector()
 }
 
 std::shared_ptr<DmesgCollector> DmesgCollector::Create(
-    GUID VmId, HANDLE ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, bool EnableEarlyBootConsole, wil::unique_handle&& OutputHandle)
+    GUID VmId,
+    HANDLE ExitEvent,
+    bool EnableTelemetry,
+    bool EnableDebugConsole,
+    const std::wstring& Com1PipeName,
+    bool EnableEarlyBootConsole,
+    wil::unique_handle&& OutputHandle,
+    _In_opt_ PSECURITY_DESCRIPTOR SecurityDescriptor)
 {
     auto dmesgCollector = std::shared_ptr<DmesgCollector>(
         new DmesgCollector(VmId, ExitEvent, EnableTelemetry, EnableDebugConsole, Com1PipeName, std::move(OutputHandle)));
 
-    dmesgCollector->Start(EnableEarlyBootConsole);
+    dmesgCollector->Start(EnableEarlyBootConsole, SecurityDescriptor);
     return dmesgCollector;
 }
 
-std::pair<std::wstring, wil::unique_hfile> DmesgCollector::CreateConsolePipe()
+std::pair<std::wstring, wil::unique_hfile> DmesgCollector::CreateConsolePipe(
+    _In_opt_ PSECURITY_DESCRIPTOR SecurityDescriptor)
 {
     std::wstring pipeName = wsl::windows::common::helpers::GetUniquePipeName();
+    SECURITY_ATTRIBUTES securityAttributes{sizeof(securityAttributes), SecurityDescriptor, FALSE};
     wil::unique_hfile pipe(CreateNamedPipeW(
-        pipeName.c_str(), (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr));
+        pipeName.c_str(),
+        (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED),
+        (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT),
+        1,
+        LX_RELAY_BUFFER_SIZE,
+        LX_RELAY_BUFFER_SIZE,
+        0,
+        SecurityDescriptor ? &securityAttributes : nullptr));
 
     THROW_LAST_ERROR_IF(!pipe);
 
@@ -195,8 +211,9 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
     }
 }
 
-void DmesgCollector::Start(bool EnableEarlyBootConsole)
+void DmesgCollector::Start(bool EnableEarlyBootConsole, _In_opt_ PSECURITY_DESCRIPTOR SecurityDescriptor)
 {
+    SECURITY_ATTRIBUTES securityAttributes{sizeof(securityAttributes), SecurityDescriptor, FALSE};
     if (!m_com1PipeName.empty())
     {
         // Check if the named pipe has already been created
@@ -213,7 +230,7 @@ void DmesgCollector::Start(bool EnableEarlyBootConsole)
                 LX_RELAY_BUFFER_SIZE,
                 LX_RELAY_BUFFER_SIZE,
                 0,
-                nullptr));
+                SecurityDescriptor ? &securityAttributes : nullptr));
 
             if (m_com1Pipe)
             {
@@ -226,10 +243,10 @@ void DmesgCollector::Start(bool EnableEarlyBootConsole)
 
     if (EnableEarlyBootConsole)
     {
-        std::tie(m_earlyConsoleName, m_earlyConsolePipe) = CreateConsolePipe();
+        std::tie(m_earlyConsoleName, m_earlyConsolePipe) = CreateConsolePipe(SecurityDescriptor);
     }
 
-    std::tie(m_virtioConsoleName, m_virtioConsolePipe) = CreateConsolePipe();
+    std::tie(m_virtioConsoleName, m_virtioConsolePipe) = CreateConsolePipe(SecurityDescriptor);
 
     m_thread = std::thread([this]() { Run(); });
 }

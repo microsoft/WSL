@@ -25,7 +25,7 @@ Abstract:
         T_VALUE(c, EnableDebugShell), T_VALUE(c, EnableDhcp), T_VALUE(c, EnableDnsProxy), T_VALUE(c, EnableDnsTunneling), \
         T_VALUE(c, EnableGpuSupport), T_VALUE(c, EnableGuiApps), T_VALUE(c, EnableHardwarePerformanceCounters), \
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
-        T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
+        T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableOpenVmm), T_VALUE(c, EnableSafeMode), \
         T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
         T_VALUE(c, EnableVirtioFsAggregateShares), T_ENUM(c, FirewallConfigPresence), T_VALUE(c, IsolateDistroCgroup), \
         T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), T_STRING(c, KernelModulesList), \
@@ -295,6 +295,7 @@ namespace ConfigSetting {
         static constexpr auto SetVersionDebug = "experimental.setVersionDebug";
         static constexpr auto Swiotlb = "experimental.swiotlb";
         static constexpr auto VirtioFsAggregateShares = "experimental.virtioFsAggregateShares";
+        static constexpr auto OpenVmm = "experimental.openVmm";
 
     } // namespace Experimental
 } // namespace ConfigSetting
@@ -384,6 +385,7 @@ struct Config
     int MaxCrashDumpCount = 10;
     UINT64 SwiotlbSizeBytes = 0;
     bool IsolateDistroCgroup = true;
+    bool EnableOpenVmm = false;
 
     // Temporary config value to help root cause the truncated archive errors in SetVersion()
     bool SetVersionDebug = false;
