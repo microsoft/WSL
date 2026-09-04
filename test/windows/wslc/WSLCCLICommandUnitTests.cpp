@@ -252,7 +252,7 @@ class WSLCCLICommandUnitTests
     // load, push and cp must all register -q/--quiet with the same spelling.
     TEST_METHOD(QuietParityCommands_RegisterQuietArgument)
     {
-        const auto VerifyQuietArgument = [](const Command& command) {
+        const auto verifyQuietArgument = [](const Command& command) {
             const auto args = command.GetArguments();
             const auto found = std::ranges::find_if(args, [](const auto& arg) { return arg.Type() == ArgType::Quiet; });
 
@@ -262,16 +262,16 @@ class WSLCCLICommandUnitTests
             VERIFY_ARE_EQUAL(Kind::Flag, found->Kind());
         };
 
-        VerifyQuietArgument(ImageLoadCommand(L"image"));
-        VerifyQuietArgument(ImagePushCommand(L"image"));
-        VerifyQuietArgument(ContainerCpCommand(L"container"));
+        verifyQuietArgument(ImageLoadCommand(L"image"));
+        verifyQuietArgument(ImagePushCommand(L"image"));
+        verifyQuietArgument(ContainerCpCommand(L"container"));
     }
 
     // Every command in the inspect family exposes docker's `-f` alias for --format
     // (docker/cli cli/command/system/inspect.go: flags.StringVarP(&opts.format, "format", "f", ...)).
     TEST_METHOD(InspectCommands_FormatArgumentHasDockerAlias)
     {
-        const auto VerifyFormatAlias = [](const Command& command) {
+        const auto verifyFormatAlias = [](const Command& command) {
             const auto args = command.GetArguments();
             const auto found = std::ranges::find_if(args, [](const auto& arg) { return arg.Type() == ArgType::InspectFormat; });
 
@@ -280,11 +280,11 @@ class WSLCCLICommandUnitTests
             VERIFY_ARE_EQUAL(std::wstring(L"f"), found->Alias());
         };
 
-        VerifyFormatAlias(InspectCommand(L""));
-        VerifyFormatAlias(ContainerInspectCommand(L"container"));
-        VerifyFormatAlias(ImageInspectCommand(L"image"));
-        VerifyFormatAlias(NetworkInspectCommand(L"network"));
-        VerifyFormatAlias(VolumeInspectCommand(L"volume"));
+        verifyFormatAlias(InspectCommand(L""));
+        verifyFormatAlias(ContainerInspectCommand(L"container"));
+        verifyFormatAlias(ImageInspectCommand(L"image"));
+        verifyFormatAlias(NetworkInspectCommand(L"network"));
+        verifyFormatAlias(VolumeInspectCommand(L"volume"));
     }
 
     // Walk every command in the root tree and verify no argument collisions.
