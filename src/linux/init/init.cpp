@@ -654,6 +654,17 @@ try
             }
         }
 
+        if ((OobeResult == 0) && (defaultUidPresent == ConfigKeyPresence::Present) && (defaultUid >= 0) && UtilIsUtilityVm())
+        {
+            for (const auto Admin : {false, true})
+            {
+                if (ConfigRefreshDrvFsOwner(defaultUid, Admin, Config) < 0)
+                {
+                    LOG_ERROR("Failed to refresh the {} DrvFs mount namespace after OOBE", Admin ? "elevated" : "non-elevated");
+                }
+            }
+        }
+
         LX_INIT_OOBE_RESULT result{};
         result.Header.MessageType = LxInitOobeResult;
         result.Header.MessageSize = sizeof(result);

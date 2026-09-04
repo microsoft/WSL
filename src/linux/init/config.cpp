@@ -242,6 +242,13 @@ const INIT_STARTUP_ANY LxssStartupWsl[] = {
 
 int g_ElevatedMountNamespace = -1;
 int g_NonElevatedMountNamespace = -1;
+static std::bitset<32> g_ElevatedAutomountedDrvFsVolumes;
+static std::bitset<32> g_NonElevatedAutomountedDrvFsVolumes;
+
+static std::bitset<32>& ConfigGetAutomountedDrvFsVolumes(bool Admin)
+{
+    return Admin ? g_ElevatedAutomountedDrvFsVolumes : g_NonElevatedAutomountedDrvFsVolumes;
+}
 
 //
 // Boot state bookkeeping.
@@ -2069,6 +2076,10 @@ try
         {
             EMIT_USER_WARNING(wsl::shared::Localization::MessageDrvfsMountFailed(Source));
         }
+        else if (Admin.has_value())
+        {
+            ConfigGetAutomountedDrvFsVolumes(Admin.value()).set(Index);
+        }
     }
 }
 CATCH_LOG()
@@ -2206,6 +2217,93 @@ Return Value:
     return Result;
 }
 
+int ConfigRefreshDrvFsOwner(uid_t OwnerUid, bool Admin, const wsl::linux::WslDistributionConfig& Config)
+
+/*++
+
+Routine Description:
+
+    This routine remounts automatically mounted DrvFs volumes in an existing mount namespace with a new owner.
+
+Arguments:
+
+    OwnerUid - Supplies the new owner uid to use.
+
+    Admin - Supplies a boolean indicating which mount namespace to update.
+
+    Config - Supplies the distribution configuration.
+
+Return Value:
+
+    0 on success, -1 on failure.
+
+--*/
+
+try
+{
+    const auto TargetNamespace = Admin ? g_ElevatedMountNamespace : g_NonElevatedMountNamespace;
+    auto& AutomountedVolumes = ConfigGetAutomountedDrvFsVolumes(Admin);
+    if (!Config.AutoMount || TargetNamespace == -1 || AutomountedVolumes.none())
+    {
+        return 0;
+    }
+
+    wil::unique_fd OriginalNamespace{UtilOpenMountNamespace()};
+    if (!OriginalNamespace)
+    {
+        return -1;
+    }
+
+    auto RestoreNamespace = wil::scope_exit([&]() {
+        if (setns(OriginalNamespace.get(), CLONE_NEWNS) < 0)
+        {
+            LOG_ERROR("restoring mount namespace failed {}", errno);
+        }
+    });
+
+    if (setns(TargetNamespace, CLONE_NEWNS) < 0)
+    {
+        LOG_ERROR("setns failed {}", errno);
+        return -1;
+    }
+
+    const auto MountedVolumes = ConfigGetMountedDrvFsVolumes();
+    auto VolumesToRemount = AutomountedVolumes;
+    AutomountedVolumes.reset();
+    int Result = 0;
+    for (size_t Index = 0; Index < VolumesToRemount.size(); Index += 1)
+    {
+        if (!VolumesToRemount[Index])
+        {
+            continue;
+        }
+
+        const auto Target = std::format("{}{:c}", Config.DrvFsPrefix, 'a' + Index);
+        if (!MountedVolumes.contains(std::make_pair(static_cast<unsigned int>(Index), Target)))
+        {
+            VolumesToRemount.reset(Index);
+            continue;
+        }
+
+        if (umount2(Target.c_str(), MNT_DETACH) < 0)
+        {
+            LOG_ERROR("umount2({}) failed {}", Target, errno);
+            AutomountedVolumes.set(Index);
+            VolumesToRemount.reset(Index);
+            Result = -1;
+        }
+    }
+
+    ConfigMountDrvFsVolumes(VolumesToRemount.to_ulong(), OwnerUid, Admin, Config);
+    if ((VolumesToRemount & ~AutomountedVolumes).any())
+    {
+        Result = -1;
+    }
+
+    return Result;
+}
+CATCH_RETURN_ERRNO()
+
 int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::Transaction& Transaction, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
@@ -2319,6 +2417,10 @@ try
     {
         return -1;
     }
+
+    const auto SourceAutomountedVolumes = ConfigGetAutomountedDrvFsVolumes(!Message->Admin);
+    auto& DestinationAutomountedVolumes = ConfigGetAutomountedDrvFsVolumes(Message->Admin);
+    DestinationAutomountedVolumes.reset();
 
     if (Message->Admin)
     {
@@ -2493,6 +2595,16 @@ try
     if (Config.AutoMount)
     {
         ConfigMountDrvFsVolumes(volumesToMount.to_ulong(), Message->DefaultOwnerUid, Message->Admin, Config);
+    }
+
+    const auto MountedVolumes = ConfigGetMountedDrvFsVolumes();
+    for (size_t Index = 0; Index < SourceAutomountedVolumes.size(); Index += 1)
+    {
+        const auto Target = std::format("{}{:c}", Config.DrvFsPrefix, 'a' + Index);
+        if (SourceAutomountedVolumes[Index] && MountedVolumes.contains(std::make_pair(static_cast<unsigned int>(Index), Target)))
+        {
+            DestinationAutomountedVolumes.set(Index);
+        }
     }
 
     return 0;
