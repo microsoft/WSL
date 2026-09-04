@@ -59,6 +59,7 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.IReference<Windows.Foundation.TimeSpan> Timeout;
         VhdOptions VhdRequirements;
         Boolean EnableGpu;
+        Boolean EnableNestedVirtualization;
     };
 
     runtimeclass Session : Windows.Foundation.IClosable

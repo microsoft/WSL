@@ -467,6 +467,29 @@ class PolicyTest
         VERIFY_ARE_EQUAL(expected, stderrText);
     }
 
+    WSLC_TEST_METHOD(WSLContainerNestedVirtualizationDisabled)
+    {
+        auto revert = SetPolicy(c_allowWSLContainerNestedVirtualization, 0);
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"wslc-policy-nested-virtualization";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.MaximumStorageSizeMb = 20 * 1024;
+        settings.FeatureFlags = WslcFeatureFlagsNestedVirtualization;
+
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY),
+            sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
+        ValidateCOMErrorMessage(wsl::shared::Localization::MessageWSLContainerNestedVirtualizationDisabled());
+    }
+
     // Verifies the WSLContainerRegistryAllowlist denies image pulls from registries not in the
     // allowlist.
     WSLC_TEST_METHOD(RegistryAllowlistDenies)
