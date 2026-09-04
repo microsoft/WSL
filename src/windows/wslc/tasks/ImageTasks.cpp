@@ -292,10 +292,31 @@ void PushImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.GetValue<ArgType::ImageId>();
+    auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
+    const bool quiet = context.Args.GetValue<ArgType::Quiet>();
 
-    ImageProgressCallback callback(context.Terminal, Terminal::Level::Output);
-    services::ImageService::Push(context.Terminal, session, WideToMultiByte(imageId), &callback);
+    const auto reference = ImageReference::Parse(image);
+
+    // A name-only reference resolves to the "latest" tag. Pinning it here keeps the operation scoped to that one
+    // tag; a reference carrying no tag reaches the registry as a request to push every tag in the repository.
+    if (reference.Format == EnumReferenceFormatNone)
+    {
+        image += ":latest";
+    }
+
+    std::optional<ImageProgressCallback> callback;
+    if (!quiet)
+    {
+        callback.emplace(context.Terminal, Terminal::Level::Output);
+    }
+
+    IProgressCallback* progress = callback ? &*callback : nullptr;
+    services::ImageService::Push(context.Terminal, session, image, progress);
+
+    if (quiet)
+    {
+        context.Terminal.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
+    }
 }
 
 void DeleteImage(CLIExecutionContext& context)
