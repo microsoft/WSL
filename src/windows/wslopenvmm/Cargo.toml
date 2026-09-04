@@ -1,0 +1,24 @@
+# Copyright (C) Microsoft Corporation. All rights reserved.
+
+[package]
+name = "wslopenvmm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hyper-util = { version = "0.1", features = ["tokio"] }
+parking_lot = "0.12"
+prost = "0.14"
+prost-types = "0.14"
+tonic = "0.14"
+tonic-prost = "0.14"
+tokio = { version = "1", features = ["net", "rt", "time"] }
+tower = "0.5"
+windows = { version = "0.62", features = ["Win32_Foundation"] }
+
+[build-dependencies]
+protoc-bin-vendored = "3"
+tonic-prost-build = "0.14"

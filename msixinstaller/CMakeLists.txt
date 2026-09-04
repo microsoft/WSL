@@ -1,5 +1,10 @@
 if (NOT BUNDLE_ONLY)
     set(DEPENDENCIES "wsl.exe;wslinstaller.exe;wslinstallerproxystub.dll")
+    set(MSIXINSTALLER_DEPENDENCIES "wsl;wslinstaller;msipackage;wslinstallerproxystub")
+    if (DEFINED INCLUDE_OPENVMM)
+        list(APPEND DEPENDENCIES wslopenvmm.dll)
+        list(APPEND MSIXINSTALLER_DEPENDENCIES wslopenvmm)
+    endif()
 
     # Don't include the MSI if building a thin package.
     if (NOT "${WSL_BUILD_THIN_PACKAGE}")
@@ -10,7 +15,7 @@ if (NOT BUNDLE_ONLY)
                     "${DEPENDENCIES}"
                     "${CMAKE_CURRENT_LIST_DIR}/AppxManifest.in"
                     "${BIN}/installer.msix"
-                    "wsl;wslinstaller;msipackage;wslinstallerproxystub")
+                    "${MSIXINSTALLER_DEPENDENCIES}")
 endif()
 
 set(ARM64_BUNDLE_PATH ${CMAKE_SOURCE_DIR}/bin/arm64/${CMAKE_BUILD_TYPE}/installer.msix)
