@@ -346,7 +346,7 @@ class WSLCCLICommandUnitTests
             const auto unsupportedArguments = current->GetUnsupportedArguments();
             Invocation invocation{std::vector<std::wstring>{}};
             ArgMap args;
-            ParseArgumentsStateMachine stateMachine{invocation, args, arguments, false, false, {}, deprecations, unsupportedArguments};
+            VERIFY_NO_THROW(ParseArgumentsStateMachine(invocation, args, arguments, false, false, {}, deprecations, unsupportedArguments));
 
             for (const auto& deprecation : deprecations)
             {
