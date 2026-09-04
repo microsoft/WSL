@@ -24,6 +24,11 @@ Abstract:
 #include "WslCoreVm.h"
 #include "WslCoreVmDiskState.h"
 #include "resource.h"
+
+#if WSL_INCLUDE_OPENVMM
+#include "OpenVmmWslCoreVm.h"
+#endif
+
 #include <winrt\Windows.ApplicationModel.Background.h>
 #include <nlohmann\json.hpp>
 
@@ -2982,11 +2987,24 @@ void LxssUserSessionImpl::_CreateVm()
 
         // Create the utility VM and register for callbacks.
         auto clearForceTerminateOnFailure = wil::scope_exit([&]() { m_forceTerminate.store(nullptr); });
-        m_utilityVm = WslCoreVm::Create(
-            m_userToken, std::move(config), vmId, std::move(initializeDrvFs), [this](IWslCoreVm::ForceTerminateCallback terminate) {
-                THROW_HR_IF(E_INVALIDARG, !terminate);
-                m_forceTerminate.store(std::make_shared<const IWslCoreVm::ForceTerminateCallback>(std::move(terminate)));
-            });
+        auto publishForceTerminate = [this](IWslCoreVm::ForceTerminateCallback terminate) {
+            THROW_HR_IF(E_INVALIDARG, !terminate);
+            m_forceTerminate.store(std::make_shared<const IWslCoreVm::ForceTerminateCallback>(std::move(terminate)));
+        };
+        if (!config.EnableOpenVmm)
+        {
+            m_utilityVm =
+                WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs), publishForceTerminate);
+        }
+        else
+        {
+    #if WSL_INCLUDE_OPENVMM
+            m_utilityVm =
+                OpenVmmWslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs), publishForceTerminate);
+    #else
+            THROW_HR_WITH_USER_ERROR(E_NOTIMPL, wsl::shared::Localization::MessageOpenVmmNotIncluded());
+    #endif
+        }
         clearForceTerminateOnFailure.release();
 
         if (m_httpProxyStateTracker)
