@@ -451,12 +451,6 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         }
     }
 
-    if (EnableVirtio9p)
-    {
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageConfigVirtio9pDisabled());
-        EnableVirtio9p = false;
-    }
-
     // Compute a default swiotlb config only when a virtio device that requires bounce buffers is present.
     // N.B. Must run after policy overrides so networking/fs modes reflect final values.
     if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
