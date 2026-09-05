@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "ComposeModel.h"
 #include "SessionModel.h"
 #include "Terminal.h"
 
@@ -21,14 +22,12 @@ namespace wsl::windows::wslc::services {
 
 struct ComposeService
 {
-    static void Create(models::Session& Session, const std::wstring& Path);
-    static int Up(Terminal& Terminal, models::Session& Session, const std::wstring& Path);
-    static void Start(models::Session& Session, const std::wstring& Path);
-    static int Attach(Terminal& Terminal, models::Session& Session, const std::wstring& Path);
-    static void Stop(models::Session& Session, const std::wstring& Path, ULONG Timeout);
-
-private:
-    static wil::com_ptr<IWSLCComposeSession> Open(models::Session& Session, const std::wstring& Path);
+    static std::vector<models::ComposeProjectInformation> List(models::Session& Session, bool All);
+    static void Create(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent);
+    static int Up(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent);
+    static void Start(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent);
+    static int Attach(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent);
+    static void Stop(Terminal& Terminal, models::Session& Session, const std::wstring& Path, ULONG Timeout, HANDLE CancelEvent);
 };
 
 } // namespace wsl::windows::wslc::services

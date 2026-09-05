@@ -14,9 +14,9 @@ Abstract:
 
 #pragma once
 
+#include "ComposeReconciler.h"
 #include "wslc.h"
 #include "WSLCCompat.h"
-#include "WSLCComposeSession.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
 #include "WSLCIdleState.h"
@@ -34,6 +34,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class WSLCSession;
+class WSLCComposeOperation;
 class ServiceContainerLauncher;
 
 class UserHandle
@@ -86,11 +87,12 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
     // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
     // teardown) for the duration of a container deletion.
     friend class WSLCContainer;
-    friend class WSLCComposeSession;
+    friend class ComposeReconciler;
+    friend class WSLCComposeOperation;
     friend class ServiceContainerLauncher;
 
 public:
-    WSLCSession() : m_runtime(*this)
+    WSLCSession() : m_runtime(*this), m_composeReconciler(*this)
     {
     }
 
@@ -159,7 +161,9 @@ public:
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
-    IFACEMETHOD(CreateComposeSession)(_In_ LPCWSTR Path, _Out_ IWSLCComposeSession** ComposeSession) override;
+    IFACEMETHOD(BeginComposeOperation)(
+        _In_ const WSLCComposeOperationRequest* Request, _In_opt_ IComposeProgressCallback* ProgressCallback, _Out_ IComposeOperation** Operation) override;
+    IFACEMETHOD(ListComposeProjects)(_In_ const WSLCComposeProjectListOptions* Options, _Out_ WSLCComposeProjectSummary** Projects, _Out_ ULONG* Count) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
         _Out_ WSLCContainerEntry** Containers,
@@ -351,7 +355,7 @@ private:
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& Spec);
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& Spec, HANDLE CancelEvent);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
@@ -364,6 +368,7 @@ private:
     DWORD m_vmFactoryGitCookie{};
 
     WSLCSessionRuntime m_runtime;
+    ComposeReconciler m_composeReconciler;
     std::wstring m_displayName;
     std::wstring m_creatorProcessName;
     std::filesystem::path m_storageVhdPath;
@@ -374,8 +379,6 @@ private:
     // WSLCVolumes has its own internal srwlock and does not require the runtime lock.
     std::mutex m_containersLock;
     std::unordered_map<std::string, std::shared_ptr<WSLCContainerImpl>> m_containers;
-    std::mutex m_composeSessionsLock;
-    std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<WSLCComposeSession>> m_composeSessions;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::shared_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};

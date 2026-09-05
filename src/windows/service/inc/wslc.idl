@@ -35,6 +35,8 @@ cpp_quote("#endif")
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 #define WSLC_EPHEMERAL_PORT 0
 #define WSLC_MAX_SAVE_IMAGES_COUNT 256
+#define WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH 255
+#define WSLC_COMPOSE_SCHEMA_VERSION 1
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
@@ -46,6 +48,8 @@ cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
 cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
+cpp_quote("#define WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH 255")
+cpp_quote("#define WSLC_COMPOSE_SCHEMA_VERSION 1")
 cpp_quote("#define WSLC_STOP_TIMEOUT_DEFAULT LONG_MIN") // Pass to Stop() to use the default container stop timeout
 cpp_quote("#define WSLC_STOP_TIMEOUT_NONE -1") // Wait forever for the container to stop.
 
@@ -577,18 +581,230 @@ interface IWSLCContainer : IUnknown
     HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] WSLCHandle OutHandle);
 }
 
+typedef enum _WSLCComposeAction
+{
+    WSLCComposeActionValidate,
+    WSLCComposeActionCreate,
+    WSLCComposeActionUp,
+    WSLCComposeActionStart,
+    WSLCComposeActionAttach,
+    WSLCComposeActionStop,
+} WSLCComposeAction;
+
+typedef enum _WSLCComposeProjectType
+{
+    WSLCComposeProjectTypeDocuments,
+    WSLCComposeProjectTypeProjectKey,
+} WSLCComposeProjectType;
+
+typedef struct _WSLCComposeDocument
+{
+    [string] LPCWSTR SourcePath;
+    [string] LPCWSTR BaseDirectory;
+    [unique, size_is(ContentSize)] const byte* Content;
+    ULONG ContentSize;
+} WSLCComposeDocument;
+
+typedef struct _WSLCComposeDocuments
+{
+    ULONG SchemaVersion;
+    [string] LPCWSTR WorkingDirectory;
+    [string] LPCWSTR ProjectDirectory;
+    [unique, string] LPCSTR ExplicitProjectName;
+    [unique, size_is(DocumentCount)] const WSLCComposeDocument* Documents;
+    ULONG DocumentCount;
+} WSLCComposeDocuments;
+
+typedef struct _WSLCComposeProject
+{
+    WSLCComposeProjectType Type;
+
+    [switch_type(WSLCComposeProjectType), switch_is(Type)]
+    union
+    {
+        [case(WSLCComposeProjectTypeDocuments)]
+        [unique] const WSLCComposeDocuments* Documents;
+        [case(WSLCComposeProjectTypeProjectKey)]
+        [unique, string] LPCSTR ProjectKey;
+        [default];
+    } Value;
+} WSLCComposeProject;
+
+typedef struct _WSLCComposeProjectSelection
+{
+    WSLCStringArray Profiles;
+    WSLCStringArray Services;
+    BOOL IncludeDependencies;
+} WSLCComposeProjectSelection;
+
+typedef enum _WSLCComposeActionOptionsType
+{
+    WSLCComposeActionOptionsTypeNone,
+    WSLCComposeActionOptionsTypeStop,
+} WSLCComposeActionOptionsType;
+
+typedef struct _WSLCComposeStopOptions
+{
+    ULONG TimeoutSeconds;
+} WSLCComposeStopOptions;
+
+typedef struct _WSLCComposeActionOptions
+{
+    WSLCComposeActionOptionsType Type;
+
+    [switch_type(WSLCComposeActionOptionsType), switch_is(Type)]
+    union
+    {
+        [case(WSLCComposeActionOptionsTypeNone)]
+        ULONG Reserved;
+        [case(WSLCComposeActionOptionsTypeStop)]
+        WSLCComposeStopOptions Stop;
+        [default];
+    } Value;
+} WSLCComposeActionOptions;
+
+typedef struct _WSLCComposeOperationRequest
+{
+    ULONG SchemaVersion;
+    WSLCComposeAction Action;
+    WSLCComposeProject Project;
+    WSLCComposeProjectSelection Selection;
+    WSLCComposeActionOptions ActionOptions;
+} WSLCComposeOperationRequest;
+
+typedef enum _WSLCComposeProgressEventKind
+{
+    WSLCComposeProgressEventKindStatus,
+    WSLCComposeProgressEventKindProgress,
+    WSLCComposeProgressEventKindDiagnostic,
+} WSLCComposeProgressEventKind;
+
+typedef enum _WSLCComposeStatus
+{
+    WSLCComposeStatusValidating,
+    WSLCComposeStatusPlanning,
+    WSLCComposeStatusExecuting,
+    WSLCComposeStatusSucceeded,
+    WSLCComposeStatusFailed,
+    WSLCComposeStatusCancelled,
+} WSLCComposeStatus;
+
+typedef enum _WSLCComposeDiagnosticSeverity
+{
+    WSLCComposeDiagnosticSeverityInfo,
+    WSLCComposeDiagnosticSeverityWarning,
+    WSLCComposeDiagnosticSeverityError,
+} WSLCComposeDiagnosticSeverity;
+
+typedef struct _WSLCComposeStatusEvent
+{
+    WSLCComposeStatus Status;
+    [unique, string] LPCSTR ResourceKey;
+} WSLCComposeStatusEvent;
+
+typedef struct _WSLCComposeResourceProgressEvent
+{
+    [string] LPCSTR Operation;
+    [unique, string] LPCSTR ResourceKey;
+    ULONGLONG Current;
+    ULONGLONG Total;
+    [unique, string] LPCSTR Unit;
+} WSLCComposeResourceProgressEvent;
+
+typedef struct _WSLCComposeDiagnosticEvent
+{
+    WSLCComposeDiagnosticSeverity Severity;
+    [string] LPCSTR Code;
+    WSLCStringArray Arguments;
+    [unique, string] LPCWSTR PropertyPath;
+    [unique, string] LPCWSTR SourcePath;
+    ULONG Line;
+    ULONG Column;
+} WSLCComposeDiagnosticEvent;
+
+typedef struct _WSLCComposeProgressEvent
+{
+    ULONG SchemaVersion;
+    ULONGLONG SequenceNumber;
+    WSLCComposeProgressEventKind Kind;
+
+    [switch_type(WSLCComposeProgressEventKind), switch_is(Kind)]
+    union
+    {
+        [case(WSLCComposeProgressEventKindStatus)]
+        WSLCComposeStatusEvent Status;
+        [case(WSLCComposeProgressEventKindProgress)]
+        WSLCComposeResourceProgressEvent Progress;
+        [case(WSLCComposeProgressEventKindDiagnostic)]
+        WSLCComposeDiagnosticEvent Diagnostic;
+        [default];
+    } Value;
+} WSLCComposeProgressEvent;
+
+typedef struct _WSLCComposeStreams
+{
+    BOOL Tty;
+    WSLCHandle Stdin;
+    WSLCHandle Stdout;
+    WSLCHandle Stderr;
+} WSLCComposeStreams;
+
 [
-    uuid(96DFF26B-422A-44F3-B675-23DA2BA32C77),
+    uuid(308809E7-2EB6-4A48-99D9-C959054FDDA9),
     pointer_default(unique),
     object
 ]
-interface IWSLCComposeSession : IUnknown
+interface IComposeProgressCallback : IUnknown
 {
-    HRESULT GetConfigPath([out] LPWSTR* Path);
-    HRESULT ListContainers([out, size_is(, *Count)] WSLCContainerEntry** Containers, [out] ULONG* Count);
-    HRESULT Start();
-    HRESULT Attach();
-    HRESULT Stop([in] ULONG Timeout);
+    HRESULT OnProgress([in] const WSLCComposeProgressEvent* Event);
+    HRESULT OnStreamsReady([in] const WSLCComposeStreams* Streams);
+}
+
+typedef enum _WSLCComposeOperationStatus
+{
+    WSLCComposeOperationStatusSucceeded,
+    WSLCComposeOperationStatusFailed,
+    WSLCComposeOperationStatusCancelled,
+} WSLCComposeOperationStatus;
+
+typedef char WSLCComposeProjectKey[WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH + 1];
+
+typedef struct _WSLCComposeOperationResult
+{
+    ULONG SchemaVersion;
+    WSLCComposeOperationStatus Status;
+    HRESULT Result;
+    WSLCComposeProjectKey ProjectKey;
+    [unique, size_is(AffectedContainersCount)] WSLCContainerEntry* AffectedContainers;
+    ULONG AffectedContainersCount;
+} WSLCComposeOperationResult;
+
+typedef struct _WSLCComposeProjectListOptions
+{
+    ULONG SchemaVersion;
+    BOOL All;
+} WSLCComposeProjectListOptions;
+
+typedef struct _WSLCComposeProjectSummary
+{
+    ULONG SchemaVersion;
+    WSLCComposeProjectKey ProjectKey;
+    ULONG CreatedContainersCount;
+    ULONG RunningContainersCount;
+    ULONG ExitedContainersCount;
+    ULONG OtherContainersCount;
+} WSLCComposeProjectSummary;
+
+[
+    uuid(A1CB6BE6-B11D-44D5-A92E-EA3B6ECD74A6),
+    pointer_default(unique),
+    object
+]
+interface IComposeOperation : IUnknown
+{
+    HRESULT GetCompletionEvent([out, system_handle(sh_event)] HANDLE* Event);
+    HRESULT Cancel();
+    HRESULT GetResult([out] WSLCComposeOperationResult* Result);
 }
 
 typedef struct _WSLCDeletedImageInformation
@@ -803,7 +1019,14 @@ interface IWSLCSession : IUnknown
     // it (or the client exiting) lets the VM idle-terminate again.
     HRESULT BeginContainerOperation([out] IUnknown** Operation);
 
-    HRESULT CreateComposeSession([in] LPCWSTR Path, [out] IWSLCComposeSession** ComposeSession);
+    HRESULT BeginComposeOperation(
+        [in] const WSLCComposeOperationRequest* Request,
+        [in, unique] IComposeProgressCallback* ProgressCallback,
+        [out] IComposeOperation** Operation);
+    HRESULT ListComposeProjects(
+        [in] const WSLCComposeProjectListOptions* Options,
+        [out, size_is(, *Count)] WSLCComposeProjectSummary** Projects,
+        [out] ULONG* Count);
 }
 
 //

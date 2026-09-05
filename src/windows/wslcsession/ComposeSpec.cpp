@@ -213,9 +213,39 @@ namespace {
         };
     }
 
-    ComposeSpec ParseComposeFile(const std::filesystem::path& Path)
+    ComposeSpec ParseComposeFile(const std::filesystem::path& Path, std::string_view Content)
     {
-        const auto root = YAML::LoadFile(Path.string());
+        const auto root = YAML::Load(std::string{Content});
+        if (!root.IsMap())
+        {
+            ThrowInvalidComposeFile(Path, L"the file must contain a map");
+        }
+
+        for (const auto& property : root)
+        {
+            if (!property.first.IsScalar())
+            {
+                ThrowInvalidComposeFile(Path, L"each top-level property name must be a string");
+            }
+
+            const auto key = property.first.as<std::string>();
+            if (key == "version")
+            {
+                if (!property.second.IsScalar())
+                {
+                    ThrowInvalidComposeFile(Path, L"the top-level 'version' property must be a scalar value");
+                }
+
+                continue;
+            }
+
+            if (key != "services")
+            {
+                ThrowInvalidComposeFile(
+                    Path, std::format(L"the top-level '{}' property is not supported", wsl::shared::string::MultiByteToWide(key)));
+            }
+        }
+
         const auto services = root["services"];
         if (!services || !services.IsMap() || services.size() == 0)
         {
@@ -223,7 +253,6 @@ namespace {
         }
 
         ComposeSpec spec;
-        spec.ProjectName = Path.stem().string(); // TODO: Implement this properly.
 
         spec.Containers.reserve(services.size());
         for (const auto& service : services)
@@ -254,8 +283,8 @@ namespace {
             }
 
             const auto nameNode = settings["name"] ? settings["name"] : settings["container_name"];
-            const auto name = nameNode ? nameNode.as<std::string>() : serviceName;
-            if (name.empty())
+            const auto name = nameNode ? nameNode.as<std::string>() : std::string{};
+            if (nameNode && name.empty())
             {
                 ThrowInvalidComposeFile(
                     Path, std::format(L"the '{}' service has an empty name", wsl::shared::string::MultiByteToWide(serviceName)));
@@ -269,6 +298,7 @@ namespace {
             }
 
             ComposeContainerDefinition definition{
+                .ServiceName = serviceName,
                 .Name = name,
                 .Image = imageName,
                 .Environment = ParseComposeEnvironment(Path, serviceName, settings["environment"]),
@@ -345,11 +375,11 @@ namespace {
 
 } // namespace
 
-ComposeSpec ComposeSpec::Parse(const std::filesystem::path& Path)
+ComposeSpec ComposeSpec::Parse(const std::filesystem::path& Path, std::string_view Content)
 {
     try
     {
-        return ParseComposeFile(Path);
+        return ParseComposeFile(Path, Content);
     }
     catch (const YAML::Exception& exception)
     {
