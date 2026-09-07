@@ -30,7 +30,8 @@ enum class ContainerEvent
     Stop,
     Exit,
     Destroy,
-    ExecDied
+    ExecDied,
+    Kill
 };
 
 enum class VolumeEvent
@@ -64,6 +65,7 @@ public:
 
     using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::int64_t)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
+    using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t Time)>;
 
     explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
@@ -76,13 +78,16 @@ public:
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept;
-    void UnregisterCallback(size_t Id) noexcept;
 
-    void WaitForObjectCreated(const std::string& ObjectId);
+    // Invoked for every container create event, after the per-container state callbacks. Unlike those,
+    // this isn't keyed by container id, because the id isn't known until Docker assigns it.
+    EventTrackingReference RegisterContainerCreate(ContainerCreateCallback&& Callback) noexcept;
+    void UnregisterCallback(size_t Id) noexcept;
 
 private:
     void OnEvent(const std::string_view& event);
     void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
+    void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime);
     void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
 
     // Callbacks are invoked without holding m_lock so that a callback can register or unregister callbacks, and so
@@ -125,8 +130,19 @@ private:
         const VolumeEventCallback Callback;
     };
 
+    struct ContainerCreateCallbackEntry : CallbackRegistration
+    {
+        ContainerCreateCallbackEntry(size_t Id, ContainerCreateCallback&& Callback) :
+            CallbackRegistration(Id), Callback(std::move(Callback))
+        {
+        }
+
+        const ContainerCreateCallback Callback;
+    };
+
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
+    _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> m_containerCreateCallbacks;
 
     // Invokes a snapshot of callbacks taken under m_lock, skipping registrations that have since been unregistered.
     template <typename TCallback, typename TInvoke>
@@ -141,9 +157,6 @@ private:
             }
         }
     }
-
-    _Guarded_by_(m_lock) std::unordered_set<std::string> m_createdObjects;
-    _Guarded_by_(m_lock) wil::unique_event m_objectCreated { wil::EventOptions::ManualReset };
 
     WSLCSession& m_session;
     std::mutex m_lock;
