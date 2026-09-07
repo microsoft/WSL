@@ -13,6 +13,12 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
 {
     WI_ASSERT(!CancelEvent);
     CancelEvent.create(wil::EventOptions::ManualReset);
+    m_cancelEventHandle.store(CancelEvent.get());
+    if (CancellationCount.load() >= 1)
+    {
+        THROW_LAST_ERROR_IF(!SetEvent(CancelEvent.get()));
+    }
+
     return CancelEvent.get();
 }
 
@@ -21,19 +27,27 @@ HANDLE CLIExecutionContext::CreateForceCancelEvent()
     WI_ASSERT(CancelEvent);
     WI_ASSERT(!ForceCancelEvent);
     ForceCancelEvent.create(wil::EventOptions::ManualReset);
+    m_forceCancelEventHandle.store(ForceCancelEvent.get());
+    if (CancellationCount.load() >= 2)
+    {
+        THROW_LAST_ERROR_IF(!SetEvent(ForceCancelEvent.get()));
+    }
+
     return ForceCancelEvent.get();
 }
 
 bool CLIExecutionContext::RecordCancellationRequest() noexcept
 {
-    const auto cancellationCount = CancellationCount.fetch_add(1, std::memory_order_relaxed) + 1;
+    const auto cancellationCount = CancellationCount.fetch_add(1) + 1;
     if (cancellationCount == 1)
     {
-        return CancelEvent && SetEvent(CancelEvent.get());
+        const auto cancelEvent = m_cancelEventHandle.load();
+        return !cancelEvent || SetEvent(cancelEvent);
     }
     if (cancellationCount == 2)
     {
-        return ForceCancelEvent && SetEvent(ForceCancelEvent.get());
+        const auto forceCancelEvent = m_forceCancelEventHandle.load();
+        return !forceCancelEvent || SetEvent(forceCancelEvent);
     }
 
     return false;

@@ -178,20 +178,20 @@ services:
 
         VERIFY_IS_TRUE(std::filesystem::remove_all(projectDirectory) > 0);
 
-        result = RunWslc(std::format(L"compose start {}", LifecycleProjectName));
+        result = RunWslc(std::format(L"compose start {}", LifecycleProjectArgument));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VerifyProjectStatus(LifecycleProjectName, L"running(1)");
 
-        auto projectAttach = RunWslcInteractive(std::format(L"compose attach {}", LifecycleProjectName));
+        auto projectAttach = RunWslcInteractive(std::format(L"compose attach {}", LifecycleProjectArgument));
         VERIFY_IS_TRUE(projectAttach.IsRunning());
         projectAttach.ExpectStdout("compose-lifecycle\n");
 
-        result = RunWslc(std::format(L"compose stop {}", LifecycleProjectName));
+        result = RunWslc(std::format(L"compose stop {}", LifecycleProjectArgument));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VERIFY_ARE_EQUAL(0, projectAttach.Wait());
         VerifyProjectStatus(LifecycleProjectName, L"exited(1)");
 
-        result = RunWslc(std::format(L"compose rm {}", LifecycleProjectName));
+        result = RunWslc(std::format(L"compose rm {}", LifecycleProjectArgument));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VerifyProjectAbsent(LifecycleProjectName);
     }
@@ -243,6 +243,7 @@ private:
     inline static const std::wstring UnsupportedProjectName = L"unsupported-compose-list";
     inline static const std::wstring UnsupportedContainerName = L"wslc-compose-list-unsupported";
     inline static const std::wstring LifecycleProjectName = L"wslc-e2e-compose-lifecycle";
+    inline static const std::wstring LifecycleProjectArgument = L"WSLC-E2E-COMPOSE-LIFECYCLE";
     inline static const std::wstring LifecycleContainerName = L"wslc-compose-lifecycle-owned";
 };
 

@@ -68,7 +68,8 @@ namespace {
             return ComposeProjectReference{std::move(path)};
         }
 
-        const auto projectKey = wsl::shared::string::WideToMultiByte(value.wstring());
+        const auto projectKey =
+            wsl::shared::string::WideToMultiByte(wsl::shared::string::AsciiToLower(std::wstring_view{value.native()}));
         const auto projects = ComposeService::List(session, true);
         if (std::ranges::find(projects, projectKey, &models::ComposeProjectInformation::Name) != projects.end())
         {

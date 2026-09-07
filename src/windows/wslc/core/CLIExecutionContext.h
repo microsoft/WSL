@@ -58,6 +58,10 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Applies and freezes environment-only global options before command-line parsing reports errors.
     void ApplyGlobalEnvironmentOptions();
+
+private:
+    std::atomic<HANDLE> m_cancelEventHandle{};
+    std::atomic<HANDLE> m_forceCancelEventHandle{};
 };
 
 } // namespace wsl::windows::wslc::execution
