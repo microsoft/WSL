@@ -145,7 +145,7 @@ using namespace std::chrono_literals;
 class WslKeepAlive
 {
 public:
-    WslKeepAlive(HANDLE Token = nullptr);
+    WslKeepAlive(HANDLE Token = nullptr, const std::wstring& DistroName = {});
 
     ~WslKeepAlive();
 
@@ -166,6 +166,7 @@ private:
     std::thread m_thread;
     std::optional<std::promise<void>> m_running;
     HANDLE m_token = nullptr;
+    std::wstring m_distroName;
 };
 
 //
