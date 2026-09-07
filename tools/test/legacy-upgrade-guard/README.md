@@ -46,6 +46,11 @@ mechanism; it does not validate the compiled updater or its deployment timing.
   after reboot; system.vhd, modules.vhd and kernel all remained present.
 * The standalone MSVC contract tests pass. Omitting activation suppression
   makes them fail; restoring it makes them pass again.
+* An elevated real-SCM probe in the disposable Windows VM also passed normal
+  activation suppression and restored a manual-start test service (3 -> 3).
+  Terminating the probe without stack unwinding left its test service disabled
+  (3 -> 4). This confirms the crash-recovery defect; it is not merely a
+  hypothetical risk. The disposable services were deleted after both checks.
 * One run in each condition is not a deterministic reproduction rate. The
   script disables activation before MSIX deployment, earlier than the C++
   prototype. The full WSL build and compiled-updater VM test are not complete.
@@ -65,3 +70,10 @@ mechanism; it does not validate the compiled updater or its deployment timing.
 
 Do not deploy this prototype to the host or claim #41529 fixed on these unit
 tests alone.
+
+`scm-probe` is an explicit VM-only diagnostic target, excluded from CTest. Create
+a uniquely named disposable service with prefix `WslGuardProbe-`, then run
+`scm-probe <service-name> normal` or `scm-probe <service-name> crash`. The latter
+deliberately exits with 99 via TerminateProcess. Inspect the service start type
+from a separate process and delete the test service afterward. Never substitute
+WSLService or another real service.
