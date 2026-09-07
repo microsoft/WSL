@@ -23,6 +23,8 @@ namespace wsl::windows::wslc::services {
 
 namespace {
 
+    constexpr ULONG c_defaultStopTimeoutSeconds = 10;
+
     std::string FormatProjectStatus(const WSLCComposeProjectSummary& Project)
     {
         std::string result;
@@ -56,10 +58,38 @@ namespace {
             projectDirectory = baseDirectory;
             workingDirectory = std::filesystem::current_path();
 
-            std::ifstream stream{sourcePath, std::ios::binary};
+            std::ifstream stream{sourcePath, std::ios::binary | std::ios::ate};
             THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), !stream, "Failed to open compose document %ls", sourcePath.c_str());
-            content.assign(std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{});
-            THROW_HR_IF(E_INVALIDARG, content.empty() || content.size() > ULONG_MAX);
+
+            const auto documentSize = stream.tellg();
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
+                documentSize < 0,
+                "Failed to determine compose document size: %ls",
+                sourcePath.c_str());
+            THROW_HR_IF(E_INVALIDARG, documentSize == 0);
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
+                static_cast<uint64_t>(documentSize) > ULONG_MAX,
+                "Compose document exceeds the maximum transport size: %ls",
+                sourcePath.c_str());
+
+            content.resize(static_cast<size_t>(documentSize));
+            stream.seekg(0, std::ios::beg);
+            stream.read(content.data(), static_cast<std::streamsize>(content.size()));
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
+                stream.gcount() != static_cast<std::streamsize>(content.size()),
+                "Failed to read compose document: %ls",
+                sourcePath.c_str());
+
+            char extraByte{};
+            stream.read(&extraByte, 1);
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
+                stream.gcount() != 0,
+                "Compose document changed while it was being read: %ls",
+                sourcePath.c_str());
 
             document.SourcePath = sourcePath.c_str();
             document.BaseDirectory = baseDirectory.c_str();
@@ -217,6 +247,23 @@ void ComposeService::Create(Terminal& Terminal, models::Session& Session, const 
 
 int ComposeService::Up(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent)
 {
+    auto stopOnCancellation = wil::scope_exit([&]() {
+        LOG_IF_FAILED(wil::ResultFromException([&]() {
+            if (CancelEvent == nullptr)
+            {
+                return;
+            }
+
+            const auto waitResult = WaitForSingleObject(CancelEvent, 0);
+            THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+            THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_OBJECT_0 && waitResult != WAIT_TIMEOUT);
+            if (waitResult == WAIT_OBJECT_0)
+            {
+                Execute(Terminal, Session, Path, WSLCComposeActionStop, nullptr, c_defaultStopTimeoutSeconds);
+            }
+        }));
+    });
+
     auto result = Execute(Terminal, Session, Path, WSLCComposeActionUp, CancelEvent);
     return AttachContainers(Session, result, CancelEvent);
 }

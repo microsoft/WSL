@@ -7,8 +7,6 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    constexpr ULONG c_maxComposeDocumentSize = 16 * 1024 * 1024;
-
     std::string NormalizeProjectName(std::string_view Name)
     {
         std::string result{Name};
@@ -37,7 +35,7 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& Documents, cons
     const auto& document = Documents.Documents.front();
     THROW_HR_IF(E_INVALIDARG, document.SourcePath.empty());
     THROW_HR_IF(E_INVALIDARG, document.BaseDirectory.empty());
-    THROW_HR_IF(E_INVALIDARG, document.Content.empty() || document.Content.size() > c_maxComposeDocumentSize);
+    THROW_HR_IF(E_INVALIDARG, document.Content.empty());
 
     std::string content(reinterpret_cast<const char*>(document.Content.data()), document.Content.size());
     THROW_HR_IF(E_INVALIDARG, content.find('\0') != std::string::npos);

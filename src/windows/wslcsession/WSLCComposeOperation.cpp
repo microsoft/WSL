@@ -6,12 +6,6 @@
 
 namespace wsl::windows::service::wslc {
 
-namespace {
-
-    constexpr size_t c_maxComposeDocumentSize = 16 * 1024 * 1024;
-
-} // namespace
-
 WSLCComposeOperation::~WSLCComposeOperation()
 {
     if (m_cancelEvent)
@@ -168,7 +162,7 @@ WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCCom
             const auto& document = source.Documents[index];
             THROW_HR_IF_NULL(E_POINTER, document.SourcePath);
             THROW_HR_IF_NULL(E_POINTER, document.BaseDirectory);
-            THROW_HR_IF(E_INVALIDARG, document.ContentSize == 0 || document.ContentSize > c_maxComposeDocumentSize);
+            THROW_HR_IF(E_INVALIDARG, document.ContentSize == 0);
             THROW_HR_IF_NULL(E_POINTER, document.Content);
 
             ComposeDocument captured{
@@ -218,6 +212,14 @@ void WSLCComposeOperation::Run() noexcept
     auto signalCompletion = wil::scope_exit([&]() { m_completionEvent.SetEvent(); });
 
     wil::com_ptr<IComposeProgressCallback> progressCallback;
+    auto revokeProgressCallback = wil::scope_exit([&]() {
+        if (m_progressCallbackGitCookie != 0)
+        {
+            LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(m_progressCallbackGitCookie));
+            m_progressCallbackGitCookie = 0;
+        }
+    });
+
     ComposeExecutionResult executionResult;
     const HRESULT result = wil::ResultFromException([&]() {
         if (m_progressCallbackGitCookie != 0)
@@ -275,7 +277,6 @@ ComposeExecutionResult WSLCComposeOperation::RunOperation(IComposeProgressCallba
 
     auto result = m_session->m_composeReconciler.Execute(
         m_request.Action, desiredProject ? &*desiredProject : nullptr, projectKey, m_request.ActionOptions, m_cancelEvent.get());
-    CheckCancelled();
     ReportStatus(ProgressCallback, WSLCComposeStatusSucceeded);
     return result;
 }

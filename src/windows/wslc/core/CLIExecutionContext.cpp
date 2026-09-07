@@ -16,6 +16,12 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
     return CancelEvent.get();
 }
 
+bool CLIExecutionContext::RecordCancellationRequest() noexcept
+{
+    const auto cancellationCount = CancellationCount.fetch_add(1, std::memory_order_relaxed) + 1;
+    return cancellationCount == 1 && CancelEvent && SetEvent(CancelEvent.get());
+}
+
 void CLIExecutionContext::ApplyGlobalEnvironmentOptions()
 {
     // NoColor is environment-only and resolved before any output. Freezing it keeps the terminal

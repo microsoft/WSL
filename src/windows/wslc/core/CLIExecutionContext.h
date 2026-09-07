@@ -15,6 +15,7 @@ Abstract:
 #include "ArgMap.h"
 #include "ExecutionContextData.h"
 #include "Terminal.h"
+#include <atomic>
 #include <optional>
 
 namespace wsl::windows::wslc::execution {
@@ -48,7 +49,10 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     // Event signaled when the user presses Ctrl-C.
     wil::unique_event CancelEvent;
 
+    std::atomic_ulong CancellationCount{};
+
     HANDLE CreateCancelEvent();
+    bool RecordCancellationRequest() noexcept;
 
     // Applies and freezes environment-only global options before command-line parsing reports errors.
     void ApplyGlobalEnvironmentOptions();

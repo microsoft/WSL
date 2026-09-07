@@ -355,6 +355,7 @@ private:
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> DiscoverComposeContainers(std::string_view ProjectKey);
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& Spec, HANDLE CancelEvent);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);

@@ -2416,10 +2416,94 @@ try
 }
 CATCH_RETURN();
 
+std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverComposeContainers(std::string_view ProjectKey)
+{
+    const std::string projectKey{ProjectKey};
+    auto lease = AcquireLease();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+
+    const std::map<std::string, std::vector<std::string>> filters{
+        {"label",
+         {
+             std::format("{}={}", compose::label::c_managed, compose::label::c_managedValue),
+             std::format("{}={}", compose::label::c_project, projectKey),
+         }},
+    };
+
+    std::vector<docker_schema::ContainerInfo> dockerContainers;
+    try
+    {
+        dockerContainers = m_runtime.Docker().ListContainers(true, -1, filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to discover compose project containers");
+
+    struct ComposeContainer
+    {
+        std::string ResourceKey;
+        Microsoft::WRL::ComPtr<IWSLCContainer> Container;
+    };
+
+    std::vector<ComposeContainer> composeContainers;
+    composeContainers.reserve(dockerContainers.size());
+
+    std::lock_guard containersLock{m_containersLock};
+    std::erase_if(m_containers, [](const auto& entry) { return entry.second->State() == WslcContainerStateDeleted; });
+    for (const auto& dockerContainer : dockerContainers)
+    {
+        const auto metadataVersion = dockerContainer.Labels.find(compose::label::c_metadataVersion);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            metadataVersion == dockerContainer.Labels.end() || metadataVersion->second != compose::label::c_metadataVersionValue,
+            "WSLC Compose project '%hs' contains container '%hs' with an unsupported metadata version",
+            projectKey.c_str(),
+            dockerContainer.Id.c_str());
+
+        const auto service = dockerContainer.Labels.find(compose::label::c_service);
+        const auto containerNumber = dockerContainer.Labels.find(compose::label::c_containerNumber);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
+            service == dockerContainer.Labels.end() || service->second.empty() ||
+                containerNumber == dockerContainer.Labels.end() || containerNumber->second.empty(),
+            "WSLC Compose project '%hs' contains container '%hs' with incomplete resource identity",
+            projectKey.c_str(),
+            dockerContainer.Id.c_str());
+
+        auto existing = m_containers.find(dockerContainer.Id);
+        if (existing == m_containers.end())
+        {
+            auto container = WSLCContainerImpl::Open(
+                dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1));
+            existing = m_containers.emplace(container->ID(), std::move(container)).first;
+        }
+
+        Microsoft::WRL::ComPtr<IWSLCContainer> container;
+        existing->second->CopyTo(&container);
+        composeContainers.emplace_back(std::format("{}:{}", service->second, containerNumber->second), std::move(container));
+    }
+
+    std::ranges::sort(composeContainers, {}, &ComposeContainer::ResourceKey);
+    const auto duplicate = std::ranges::adjacent_find(composeContainers, {}, &ComposeContainer::ResourceKey);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
+        duplicate != composeContainers.end(),
+        "WSLC Compose project '%hs' contains duplicate resource identity '%hs'",
+        projectKey.c_str(),
+        duplicate == composeContainers.end() ? "" : duplicate->ResourceKey.c_str());
+
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> result;
+    result.reserve(composeContainers.size());
+    std::ranges::transform(composeContainers, std::back_inserter(result), [](auto& entry) { return std::move(entry.Container); });
+    return result;
+}
+
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& Spec, HANDLE CancelEvent)
 {
     const auto checkCancelled = [&]() {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), WaitForSingleObject(CancelEvent, 0) == WAIT_OBJECT_0);
+        THROW_HR_IF_NULL(E_POINTER, CancelEvent);
+        const auto waitResult = WaitForSingleObject(CancelEvent, 0);
+        THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_CANCELLED), waitResult == WAIT_OBJECT_0);
+        THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_TIMEOUT);
     };
 
     checkCancelled();
@@ -2511,7 +2595,6 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
         containers.emplace_back(std::move(container));
     }
 
-    checkCancelled();
     cleanup.release();
 
     return containers;

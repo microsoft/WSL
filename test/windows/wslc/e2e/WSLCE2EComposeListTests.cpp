@@ -40,11 +40,13 @@ class WSLCE2EComposeListTests
         WriteTestFileContent(
             composePath,
             std::format(
-                "services:\n"
-                "  owned:\n"
-                "    name: {}\n"
-                "    image: {}\n"
-                "    command: [\"/bin/sh\", \"-c\", \"while true; do sleep 1; done\"]\n",
+                R"(
+services:
+  owned:
+    name: {}
+    image: {}
+    command: ["/bin/sh", "-c", "while true; do sleep 1; done"]
+)",
                 WideToMultiByte(OwnedContainerName),
                 WideToMultiByte(AlpineTestImage().NameAndTag())));
 
