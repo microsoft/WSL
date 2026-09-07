@@ -2769,13 +2769,9 @@ try
     {
         Unlock.reset();
 
-        if (Config.CgroupPath.has_value())
+        if (Config.CgroupPath.has_value() && UtilMoveSelfToDistroCgroup(Config.CgroupPath.value(), "login") < 0)
         {
-            const auto CgroupResult = UtilMoveSelfToDistroCgroup(Config.CgroupPath.value(), "login");
-            if (Config.CgroupNamespace && CgroupResult < 0)
-            {
-                _exit(1);
-            }
+            _exit(1);
         }
 
         if (Config.CgroupNamespace && UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "login") < 0)

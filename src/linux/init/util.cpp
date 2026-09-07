@@ -3481,8 +3481,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
         {
             if (DistroCgroupPath.has_value())
             {
-                const auto Result = UtilMoveSelfToDistroCgroup(DistroCgroupPath.value(), "CreateChildProcess");
-                THROW_LAST_ERROR_IF(CgroupNamespaceFd >= 0 && Result < 0);
+                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(DistroCgroupPath.value(), "CreateChildProcess") < 0);
             }
 
             if (CgroupNamespaceFd >= 0)
