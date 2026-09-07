@@ -1191,7 +1191,7 @@ void WslKeepAlive::Run()
 
         // Start a process that outputs 'running', then waits
         const std::wstring expectedOutput = L"running";
-        const auto distroArgument = m_distroName.empty() ? L"" : std::format(L"-d \"{}\" ", m_distroName);
+        const auto distroArgument = m_distroName.empty() ? L"" : std::format(L"-d {} ", m_distroName);
         std::wstring cmd = L"wsl.exe " + distroArgument + L"echo -n " + expectedOutput + L" && read -n 1 ";
         const auto process = LxsstuStartProcess(cmd.data(), m_read.get(), write.get(), nullptr, m_token);
         write.reset();
