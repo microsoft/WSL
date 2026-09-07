@@ -208,7 +208,7 @@ namespace {
             request.ActionOptions.Type = WSLCComposeActionOptionsTypeNone;
         }
 
-        auto callback = Microsoft::WRL::Make<ComposeProgressCallback>(terminal);
+        auto callback = Microsoft::WRL::Make<ComposeProgressCallback>(terminal, action);
         THROW_IF_NULL_ALLOC(callback);
 
         wil::com_ptr<IComposeOperation> operation;

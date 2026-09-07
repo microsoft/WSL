@@ -151,7 +151,7 @@ services:
         VerifyProjectStatus(LifecycleProjectName, L"running(1)");
 
         result = RunWslc(std::format(L"compose remove \"{}\"", composePath.wstring()));
-        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+        result.Verify({.Stderr = L"No stopped containers\r\n", .ExitCode = 0});
         VerifyProjectStatus(LifecycleProjectName, L"running(1)");
 
         auto attach = RunWslcInteractive(std::format(L"compose attach \"{}\"", composePath.wstring()));

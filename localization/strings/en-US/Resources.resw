@@ -2668,6 +2668,9 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ComposeRemoveLongDesc" xml:space="preserve">
     <value>Remove stopped containers in a Compose project.</value>
   </data>
+  <data name="WSLCCLI_ComposeNoStoppedContainers" xml:space="preserve">
+    <value>No stopped containers</value>
+  </data>
   <data name="WSLCCLI_ComposePathArgDescription" xml:space="preserve">
     <value>Path to the Compose YAML file</value>
   </data>

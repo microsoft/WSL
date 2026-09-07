@@ -222,7 +222,7 @@ class WSLCCLITerminalUnitTests
     TEST_METHOD(ComposeProgressCallback_StatusEventsAreNotRendered)
     {
         SplitCaptureTerminal cap;
-        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionStart);
         VERIFY_IS_NOT_NULL(callback.Get());
 
         WSLCComposeProgressEvent event{};
@@ -239,7 +239,7 @@ class WSLCCLITerminalUnitTests
     TEST_METHOD(ComposeProgressCallback_ResourceProgressUsesInfoChannel)
     {
         SplitCaptureTerminal cap;
-        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionStop);
         VERIFY_IS_NOT_NULL(callback.Get());
 
         WSLCComposeProgressEvent event{};
@@ -260,7 +260,7 @@ class WSLCCLITerminalUnitTests
     TEST_METHOD(ComposeProgressCallback_StartProgressUsesInfoChannel)
     {
         SplitCaptureTerminal cap;
-        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionStart);
         VERIFY_IS_NOT_NULL(callback.Get());
 
         WSLCComposeProgressEvent event{};
@@ -281,7 +281,7 @@ class WSLCCLITerminalUnitTests
     TEST_METHOD(ComposeProgressCallback_NetworkAndImageProgressUseInfoChannel)
     {
         SplitCaptureTerminal cap;
-        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionUp);
         VERIFY_IS_NOT_NULL(callback.Get());
 
         WSLCComposeProgressEvent event{};
@@ -305,6 +305,49 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
         VERIFY_ARE_EQUAL(
             std::wstring{L"Creating Network project_default (1/1)\nPulling Image python:3.12-alpine (1/1)\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_RemoveWithoutStoppedContainersUsesInfoChannel)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionRemove);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.SequenceNumber = 1;
+        event.Kind = WSLCComposeProgressEventKindStatus;
+        event.Value.Status.Status = WSLCComposeStatusSucceeded;
+
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"No stopped containers\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_RemoveProgressSuppressesNoStoppedContainers)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionRemove);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.SequenceNumber = 1;
+        event.Kind = WSLCComposeProgressEventKindProgress;
+        event.Value.Progress.Operation = "remove";
+        event.Value.Progress.ResourceKey = "project-web-1";
+        event.Value.Progress.Current = 1;
+        event.Value.Progress.Total = 1;
+        event.Value.Progress.Unit = "container";
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+
+        event.SequenceNumber = 2;
+        event.Kind = WSLCComposeProgressEventKindStatus;
+        event.Value.Status.Status = WSLCComposeStatusSucceeded;
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"Removing Container project-web-1 (1/1)\n"}, cap.errPipe.captured());
     }
 
     TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)

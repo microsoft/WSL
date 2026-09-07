@@ -11,7 +11,7 @@ class DECLSPEC_UUID("6A2033FE-B0DD-4CBD-8EA6-7D6628D9AF9A") ComposeProgressCallb
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IComposeProgressCallback, IFastRundown>
 {
 public:
-    explicit ComposeProgressCallback(Terminal& terminal) noexcept : m_terminal(terminal)
+    ComposeProgressCallback(Terminal& terminal, WSLCComposeAction action) noexcept : m_terminal(terminal), m_action(action)
     {
     }
 
@@ -20,6 +20,8 @@ public:
 
 private:
     Terminal& m_terminal;
+    const WSLCComposeAction m_action;
+    bool m_removeProgressReported{};
 };
 
 } // namespace wsl::windows::wslc::services

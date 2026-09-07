@@ -78,9 +78,19 @@ try
     switch (event->Kind)
     {
     case WSLCComposeProgressEventKindStatus:
+        if (m_action == WSLCComposeActionRemove && event->Value.Status.Status == WSLCComposeStatusSucceeded && !m_removeProgressReported)
+        {
+            m_terminal.Info(L"{}\n", wsl::shared::Localization::WSLCCLI_ComposeNoStoppedContainers());
+        }
         break;
 
     case WSLCComposeProgressEventKindProgress:
+        if (m_action == WSLCComposeActionRemove && event->Value.Progress.Operation != nullptr &&
+            std::string_view{event->Value.Progress.Operation} == "remove")
+        {
+            m_removeProgressReported = true;
+        }
+
         m_terminal.Info(
             L"{}\n",
             wsl::shared::Localization::MessageWslcComposeProgress(
