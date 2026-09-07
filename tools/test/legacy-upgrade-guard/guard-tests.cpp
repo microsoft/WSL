@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 // Isolated contract tests: no real service configuration is changed.
 #include <windows.h>
+#include <optional>
 namespace {
 int openHandles;
 BOOL WINAPI CloseHandleForTest(SC_HANDLE)
@@ -8,10 +9,16 @@ BOOL WINAPI CloseHandleForTest(SC_HANDLE)
     --openHandles;
     return TRUE;
 }
+LSTATUS WINAPI CloseKeyForTest(HKEY)
+{
+    return ERROR_SUCCESS;
+}
 } // namespace
 #define CloseServiceHandle CloseHandleForTest
+#define RegCloseKey CloseKeyForTest
 #include <wil/resource.h>
 #undef CloseServiceHandle
+#undef RegCloseKey
 #include <wil/result.h>
 #include <cstdio>
 #include <stdexcept>
@@ -21,6 +28,54 @@ DWORD startType;
 bool exists;
 bool failChange;
 int writes;
+std::optional<DWORD> journal;
+bool failFlush;
+bool installerBusy;
+
+BOOL WINAPI QueryStatus(SC_HANDLE, SC_STATUS_TYPE, LPBYTE Buffer, DWORD, LPDWORD Size)
+{
+    auto* status = reinterpret_cast<SERVICE_STATUS_PROCESS*>(Buffer);
+    *status = {};
+    status->dwCurrentState = installerBusy ? SERVICE_RUNNING : SERVICE_STOPPED;
+    *Size = sizeof(*status);
+    return TRUE;
+}
+
+LSTATUS WINAPI RegistryOpenForTest(HKEY, LPCWSTR, DWORD, REGSAM, PHKEY Key)
+{
+    *Key = reinterpret_cast<HKEY>(3);
+    return ERROR_SUCCESS;
+}
+LSTATUS WINAPI CreateKeyForTest(HKEY, LPCWSTR, DWORD, LPWSTR, DWORD, REGSAM, LPSECURITY_ATTRIBUTES, PHKEY Key, LPDWORD)
+{
+    *Key = reinterpret_cast<HKEY>(3);
+    return ERROR_SUCCESS;
+}
+LSTATUS WINAPI QueryValue(HKEY, LPCWSTR, LPDWORD, LPDWORD Type, LPBYTE Value, LPDWORD Size)
+{
+    if (!journal)
+    {
+        return ERROR_FILE_NOT_FOUND;
+    }
+    *Type = REG_DWORD;
+    *Size = sizeof(DWORD);
+    *reinterpret_cast<DWORD*>(Value) = *journal;
+    return ERROR_SUCCESS;
+}
+LSTATUS WINAPI SetValue(HKEY, LPCWSTR, DWORD, DWORD, const BYTE* Value, DWORD)
+{
+    journal = *reinterpret_cast<const DWORD*>(Value);
+    return ERROR_SUCCESS;
+}
+LSTATUS WINAPI DeleteValue(HKEY, LPCWSTR)
+{
+    journal.reset();
+    return ERROR_SUCCESS;
+}
+LSTATUS WINAPI FlushKey(HKEY)
+{
+    return failFlush ? ERROR_WRITE_FAULT : ERROR_SUCCESS;
+}
 
 SC_HANDLE WINAPI OpenManager(LPCWSTR, LPCWSTR, DWORD)
 {
@@ -73,6 +128,9 @@ void Reset(DWORD Start = SERVICE_AUTO_START)
     exists = true;
     failChange = false;
     writes = 0;
+    journal.reset();
+    failFlush = false;
+    installerBusy = false;
 }
 } // namespace
 
@@ -81,11 +139,25 @@ void Reset(DWORD Start = SERVICE_AUTO_START)
 #define OpenServiceW OpenService
 #define QueryServiceConfigW QueryConfig
 #define ChangeServiceConfigW ChangeConfig
+#define RegOpenKeyExW RegistryOpenForTest
+#define RegCreateKeyExW CreateKeyForTest
+#define RegQueryValueExW QueryValue
+#define RegSetValueExW SetValue
+#define RegDeleteValueW DeleteValue
+#define RegFlushKey FlushKey
+#define QueryServiceStatusEx QueryStatus
 #include "ServiceUpgradeGuard.h"
 #undef OpenSCManagerW
 #undef OpenServiceW
 #undef QueryServiceConfigW
 #undef ChangeServiceConfigW
+#undef RegOpenKeyExW
+#undef RegCreateKeyExW
+#undef RegQueryValueExW
+#undef RegSetValueExW
+#undef RegDeleteValueW
+#undef RegFlushKey
+#undef QueryServiceStatusEx
 
 int main()
 {
@@ -150,6 +222,68 @@ int main()
             failed = true;
         }
         Check(failed && writes == 0 && startType == SERVICE_AUTO_START && openHandles == 0);
+        failChange = false;
+        ServiceUpgradeGuard::Recover(L"test");
+        Check(!journal && startType == SERVICE_AUTO_START);
+
+        Reset(SERVICE_DISABLED);
+        journal = SERVICE_DEMAND_START;
+        ServiceUpgradeGuard::Recover(L"test");
+        Check(startType == SERVICE_DEMAND_START && !journal);
+
+        Reset();
+        failFlush = true;
+        failed = false;
+        try
+        {
+            ServiceUpgradeGuard guard(L"test");
+        }
+        catch (...)
+        {
+            failed = true;
+        }
+        Check(failed && writes == 0 && startType == SERVICE_AUTO_START);
+
+        Reset(SERVICE_DISABLED);
+        journal = SERVICE_BOOT_START;
+        failed = false;
+        try
+        {
+            ServiceUpgradeGuard::Recover(L"test");
+        }
+        catch (...)
+        {
+            failed = true;
+        }
+        Check(failed && writes == 0 && startType == SERVICE_DISABLED && journal.has_value());
+
+        Reset(SERVICE_DISABLED);
+        journal = SERVICE_AUTO_START;
+        installerBusy = true;
+        failed = false;
+        try
+        {
+            ServiceUpgradeGuard::Recover(L"test");
+        }
+        catch (...)
+        {
+            failed = true;
+        }
+        Check(failed && startType == SERVICE_DISABLED && journal.has_value());
+        installerBusy = false;
+        ServiceUpgradeGuard::Recover(L"test");
+        Check(startType == SERVICE_AUTO_START && !journal);
+
+        Reset();
+        {
+            ServiceUpgradeGuard guard(L"test");
+            // MSI removes the service and rolls back its disabled configuration.
+            exists = false;
+            Check(journal.has_value());
+            exists = true;
+            startType = SERVICE_DISABLED;
+        }
+        Check(startType == SERVICE_AUTO_START && !journal);
         std::puts("PASS: automatic/manual restore, exception, disabled, replaced, absent, deleted, access denied");
         return 0;
     }

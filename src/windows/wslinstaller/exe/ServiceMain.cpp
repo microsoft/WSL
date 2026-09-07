@@ -16,6 +16,9 @@ Abstract:
 #include "comservicehelper.h"
 #include "WslTelemetry.h"
 #include "WslInstallerFactory.h"
+#ifdef WSL_EXPERIMENTAL_UPGRADE_GUARD
+#include "ServiceUpgradeGuard.h"
+#endif
 
 wil::unique_event g_stopEvent{wil::EventOptions::ManualReset};
 
@@ -91,6 +94,10 @@ void Stop()
 HRESULT WslInstallerService::ServiceStarted()
 {
     WSL_LOG("WslInstallServiceStarted", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+
+#ifdef WSL_EXPERIMENTAL_UPGRADE_GUARD
+    ServiceUpgradeGuard::Recover(L"WSLService");
+#endif
 
     if (AutoInstallEnabled())
     {

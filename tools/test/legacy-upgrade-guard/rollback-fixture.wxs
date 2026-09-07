@@ -1,0 +1,26 @@
+<!-- Copyright (C) Microsoft Corporation. All rights reserved. -->
+<!-- VM-only fixture; build versions 1.0.0 and 2.0.0 with the same identities. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="WSL guard rollback fixture" Manufacturer="WSL guard tests"
+           Version="$(var.Version)" ProductCode="$(var.ProductCode)"
+           UpgradeCode="{5DA2CDA1-BA98-4AF9-A0B7-295D576E72A8}" Scope="perMachine">
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="Newer fixture installed" />
+    <MediaTemplate EmbedCab="yes" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="InstallFolder" Name="WslGuardRollbackFixture">
+        <Component Id="Runtime" Guid="{EC897BDE-5D3B-45D7-AF45-91B8E3F1B430}">
+          <File Source="$(var.ProbePath)" KeyPath="yes" />
+          <ServiceInstall Name="WslGuardProbe-RollbackFixture" DisplayName="WSL guard rollback fixture"
+                          Type="ownProcess" Start="demand" ErrorControl="normal" Account="LocalSystem" />
+          <ServiceControl Id="StopService" Name="WslGuardProbe-RollbackFixture" Stop="both" Remove="uninstall" Wait="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Main"><ComponentRef Id="Runtime" /></Feature>
+    <CustomAction Id="FailAfterExecution" Error="Intentional failure to exercise MSI rollback" />
+    <InstallExecuteSequence>
+      <InstallExecute Before="InstallFinalize" />
+      <Custom Action="FailAfterExecution" After="InstallExecute" Condition="FAIL_ROLLBACK=1" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

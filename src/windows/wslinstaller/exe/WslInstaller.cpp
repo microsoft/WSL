@@ -21,6 +21,8 @@ Abstract:
 
 extern wil::unique_event g_stopEvent;
 
+std::pair<bool, std::wstring> IsUpdateNeeded();
+
 std::wstring GetMsiPackagePath()
 {
 #ifdef WSL_DEV_THIN_MSI_PACKAGE
@@ -102,6 +104,13 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
     // The old MSI owns its uninstall actions, so fixing only the new MSI's
     // StopServices sequence cannot protect upgrades from legacy versions.
     const ServiceUpgradeGuard serviceGuard{L"WSLService"};
+    // Another updater may have completed while this thread waited for the
+    // cross-process guard. Do not install a stale package over that result.
+    if (!IsUpdateNeeded().first)
+    {
+        clearLogs.release();
+        return {ERROR_SUCCESS, L""};
+    }
 #endif
 
     auto result = wsl::windows::common::install::UpgradeViaMsi(
