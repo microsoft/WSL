@@ -15,6 +15,9 @@ Abstract:
 #include "precomp.h"
 #include "install.h"
 #include "WslInstaller.h"
+#ifdef WSL_EXPERIMENTAL_UPGRADE_GUARD
+#include "ServiceUpgradeGuard.h"
+#endif
 
 extern wil::unique_event g_stopEvent;
 
@@ -62,7 +65,8 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
 {
     const auto logFile = GetUpgradeLogFileLocation();
 
-    // Delete MSI log on success, preserve on failure for diagnostics (same as wsl --update).
+    // Delete MSI logs only after success without a pending reboot. Keep 3010 logs
+    // because delayed file operations can make a failure visible only after reboot.
     // When the UpgradeLogFile registry value is set, always keep the log — the registry key
     // is explicitly designed to retain MSI logs across installs.
     auto clearLogs = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() {
@@ -94,6 +98,12 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
         }
     };
 
+#ifdef WSL_EXPERIMENTAL_UPGRADE_GUARD
+    // The old MSI owns its uninstall actions, so fixing only the new MSI's
+    // StopServices sequence cannot protect upgrades from legacy versions.
+    const ServiceUpgradeGuard serviceGuard{L"WSLService"};
+#endif
+
     auto result = wsl::windows::common::install::UpgradeViaMsi(
         GetMsiPackagePath().c_str(), L"SKIPMSIX=1", logFile.has_value() ? logFile->path.c_str() : nullptr, messageCallback);
 
@@ -112,7 +122,7 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
         TraceLoggingValue(rebootRequired, "rebootRequired"),
         TraceLoggingValue(errors.c_str(), "errorMessage"));
 
-    if (result != ERROR_SUCCESS && result != ERROR_SUCCESS_REBOOT_REQUIRED)
+    if (result != ERROR_SUCCESS || rebootRequired)
     {
         clearLogs.release();
     }
