@@ -8092,13 +8092,12 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(L"-u root rmdir /sys/fs/cgroup/wsl-test-workload"); });
 
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(
-                    L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
-                    L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
-                    L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
-                    L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
-                    L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
-                    L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
+                LxsstuLaunchWsl(L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                                L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                                L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
+                                L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                                L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                                L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
                 0L);
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /sys/fs/cgroup/wsl-user"), 0L);
