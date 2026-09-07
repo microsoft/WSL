@@ -36,6 +36,18 @@ COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", false) // --ses
 
 // System command tests
 COMMAND_LINE_TEST_CASE(L"system -?", L"system", true)
+COMMAND_LINE_TEST_CASE(L"system info", L"info", true)
+COMMAND_LINE_TEST_CASE(L"info", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --help", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --format json", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --format table", L"info", true)
+COMMAND_LINE_TEST_CASE(L"info --format json", L"info", true)
+COMMAND_LINE_TEST_CASE(L"system info --format invalid", L"info", false)
+COMMAND_LINE_TEST_CASE(L"system info --notanarg", L"info", false)
+COMMAND_LINE_TEST_CASE(L"system info extraarg", L"info", false)
+COMMAND_LINE_TEST_CASE(L"info --format invalid", L"info", false)
+COMMAND_LINE_TEST_CASE(L"info --notanarg", L"info", false)
+COMMAND_LINE_TEST_CASE(L"info extraarg", L"info", false)
 COMMAND_LINE_TEST_CASE(L"system session list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"system session list --verbose --help", L"list", true)
