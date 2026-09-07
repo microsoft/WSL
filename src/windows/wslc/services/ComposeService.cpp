@@ -243,7 +243,6 @@ namespace {
         }
         else if (forceCancelIndex.has_value() && signaledIndex == *forceCancelIndex)
         {
-            THROW_IF_FAILED(operation->Cancel());
             if (forceAction)
             {
                 forceAction();

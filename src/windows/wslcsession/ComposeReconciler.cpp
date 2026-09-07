@@ -76,6 +76,8 @@ ComposeExecutionResult ComposeReconciler::Execute(
 std::shared_ptr<ComposeReconciler::ProjectLock> ComposeReconciler::ResolveProjectLock(std::string_view projectKey)
 {
     std::lock_guard projectLocksLock(m_projectLocksLock);
+    std::erase_if(m_projectLocks, [](const auto& entry) { return entry.second.use_count() == 1; });
+
     const auto existing = m_projectLocks.find(std::string{projectKey});
     if (existing != m_projectLocks.end())
     {
