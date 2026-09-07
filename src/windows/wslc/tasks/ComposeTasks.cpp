@@ -15,55 +15,113 @@ namespace wsl::windows::wslc::task {
 
 namespace {
 
-    std::wstring ComposePath(CLIExecutionContext& Context)
+    bool TryResolveComposePath(const std::filesystem::path& value, std::filesystem::path& result)
     {
-        return std::filesystem::absolute(Context.Args.GetValue<ArgType::Path>()).wstring();
+        std::error_code error;
+        const bool isFile = std::filesystem::is_regular_file(value, error);
+        if (error)
+        {
+            if (error.value() == ERROR_FILE_NOT_FOUND || error.value() == ERROR_PATH_NOT_FOUND)
+            {
+                return false;
+            }
+
+            const auto errorResult = HRESULT_FROM_WIN32(error.value());
+            THROW_HR_WITH_USER_ERROR(
+                errorResult,
+                Localization::MessageWslcFailedToOpenFile(value.wstring(), wsl::windows::common::wslutil::GetSystemErrorString(errorResult)));
+        }
+        if (!isFile)
+        {
+            return false;
+        }
+
+        result = std::filesystem::absolute(value, error);
+        if (error)
+        {
+            const auto errorResult = HRESULT_FROM_WIN32(error.value());
+            THROW_HR_WITH_USER_ERROR(
+                errorResult,
+                Localization::MessageWslcFailedToOpenFile(value.wstring(), wsl::windows::common::wslutil::GetSystemErrorString(errorResult)));
+        }
+
+        return true;
+    }
+
+    std::wstring ComposePath(CLIExecutionContext& context)
+    {
+        const std::filesystem::path value{context.Args.GetValue<ArgType::Path>()};
+        std::filesystem::path result;
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+            Localization::MessageWslcComposeProjectPathNotFound(value.wstring()),
+            !TryResolveComposePath(value, result));
+        return result.wstring();
+    }
+
+    ComposeProjectReference ComposeProject(CLIExecutionContext& context, models::Session& session)
+    {
+        const std::filesystem::path value{context.Args.GetValue<ArgType::Project>()};
+        std::filesystem::path path;
+        if (TryResolveComposePath(value, path))
+        {
+            return ComposeProjectReference{std::move(path)};
+        }
+
+        const auto projectKey = wsl::shared::string::WideToMultiByte(value.wstring());
+        const auto projects = ComposeService::List(session, true);
+        if (std::ranges::find(projects, projectKey, &models::ComposeProjectInformation::Name) != projects.end())
+        {
+            return ComposeProjectReference{projectKey};
+        }
+
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), Localization::MessageWslcComposeProjectOrFileNotFound(value.wstring()));
     }
 
 } // namespace
 
-void AttachCompose(CLIExecutionContext& Context)
+void AttachCompose(CLIExecutionContext& context)
 {
-    Context.ExitCode =
-        ComposeService::Attach(Context.Terminal, Context.Data.Get<Data::Session>(), ComposePath(Context), Context.CreateCancelEvent());
+    auto& session = context.Data.Get<Data::Session>();
+    context.ExitCode = ComposeService::Attach(context.Terminal, session, ComposeProject(context, session), context.CreateCancelEvent());
 }
 
-void CreateCompose(CLIExecutionContext& Context)
+void CreateCompose(CLIExecutionContext& context)
 {
-    ComposeService::Create(Context.Terminal, Context.Data.Get<Data::Session>(), ComposePath(Context), Context.CreateCancelEvent());
+    ComposeService::Create(context.Terminal, context.Data.Get<Data::Session>(), ComposePath(context), context.CreateCancelEvent());
 }
 
-void GetComposeProjects(CLIExecutionContext& Context)
+void GetComposeProjects(CLIExecutionContext& context)
 {
-    Context.Data.Add<Data::ComposeProjects>(ComposeService::List(Context.Data.Get<Data::Session>(), Context.Args.GetValue<ArgType::All>()));
+    context.Data.Add<Data::ComposeProjects>(ComposeService::List(context.Data.Get<Data::Session>(), context.Args.GetValue<ArgType::All>()));
 }
 
-void ListComposeProjects(CLIExecutionContext& Context)
+void ListComposeProjects(CLIExecutionContext& context)
 {
-    const auto& projects = Context.Data.Get<Data::ComposeProjects>();
-    if (Context.Args.GetValue<ArgType::Quiet>())
+    const auto& projects = context.Data.Get<Data::ComposeProjects>();
+    if (context.Args.GetValue<ArgType::Quiet>())
     {
         for (const auto& project : projects)
         {
-            Context.Terminal.Output(L"{}\n", wsl::shared::string::MultiByteToWide(project.Name));
+            context.Terminal.Output(L"{}\n", wsl::shared::string::MultiByteToWide(project.Name));
         }
 
         return;
     }
 
-    switch (Context.Args.GetValue<ArgType::Format>(models::FormatType::Table))
+    switch (context.Args.GetValue<ArgType::Format>(models::FormatType::Table))
     {
     case models::FormatType::Json:
         for (const auto& project : projects)
         {
-            Context.Terminal.Output(L"{}\n", wsl::shared::ToJsonW(project, wsl::shared::c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", wsl::shared::ToJsonW(project, wsl::shared::c_jsonCompactIndent));
         }
         break;
 
     case models::FormatType::Table:
     {
         TableOutput<2> table(
-            Context.Terminal,
+            context.Terminal,
             TableOutput<2>::header_t{Localization::WSLCCLI_TableHeaderName(), Localization::WSLCCLI_TableHeaderStatus()},
             projects.size());
         for (const auto& project : projects)
@@ -80,25 +138,34 @@ void ListComposeProjects(CLIExecutionContext& Context)
     }
 }
 
-void StartCompose(CLIExecutionContext& Context)
+void RemoveCompose(CLIExecutionContext& context)
 {
-    ComposeService::Start(Context.Terminal, Context.Data.Get<Data::Session>(), ComposePath(Context), Context.CreateCancelEvent());
+    auto& session = context.Data.Get<Data::Session>();
+    ComposeService::Remove(context.Terminal, session, ComposeProject(context, session), context.CreateCancelEvent());
 }
 
-void StopCompose(CLIExecutionContext& Context)
+void StartCompose(CLIExecutionContext& context)
+{
+    auto& session = context.Data.Get<Data::Session>();
+    ComposeService::Start(context.Terminal, session, ComposeProject(context, session), context.CreateCancelEvent());
+}
+
+void StopCompose(CLIExecutionContext& context)
 {
     constexpr LONG c_defaultTimeout = 10;
-    const LONG timeout = Context.Args.Contains(ArgType::Time) ? Context.Args.GetValue<ArgType::Time>() : c_defaultTimeout;
+    const LONG timeout = context.Args.Contains(ArgType::Time) ? context.Args.GetValue<ArgType::Time>() : c_defaultTimeout;
     THROW_HR_IF(E_INVALIDARG, timeout < 0);
 
-    ComposeService::Stop(
-        Context.Terminal, Context.Data.Get<Data::Session>(), ComposePath(Context), static_cast<ULONG>(timeout), Context.CreateCancelEvent());
+    auto& session = context.Data.Get<Data::Session>();
+    ComposeService::Stop(context.Terminal, session, ComposeProject(context, session), static_cast<ULONG>(timeout), context.CreateCancelEvent());
 }
 
-void UpCompose(CLIExecutionContext& Context)
+void UpCompose(CLIExecutionContext& context)
 {
-    Context.ExitCode =
-        ComposeService::Up(Context.Terminal, Context.Data.Get<Data::Session>(), ComposePath(Context), Context.CreateCancelEvent());
+    const auto cancelEvent = context.CreateCancelEvent();
+    const auto forceCancelEvent = context.CreateForceCancelEvent();
+    context.ExitCode =
+        ComposeService::Up(context.Terminal, context.Data.Get<Data::Session>(), ComposePath(context), cancelEvent, forceCancelEvent);
 }
 
 } // namespace wsl::windows::wslc::task

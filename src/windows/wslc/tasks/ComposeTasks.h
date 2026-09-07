@@ -8,12 +8,13 @@ using wsl::windows::wslc::execution::CLIExecutionContext;
 
 namespace wsl::windows::wslc::task {
 
-void AttachCompose(CLIExecutionContext& Context);
-void CreateCompose(CLIExecutionContext& Context);
-void GetComposeProjects(CLIExecutionContext& Context);
-void ListComposeProjects(CLIExecutionContext& Context);
-void StartCompose(CLIExecutionContext& Context);
-void StopCompose(CLIExecutionContext& Context);
-void UpCompose(CLIExecutionContext& Context);
+void AttachCompose(CLIExecutionContext& context);
+void CreateCompose(CLIExecutionContext& context);
+void GetComposeProjects(CLIExecutionContext& context);
+void ListComposeProjects(CLIExecutionContext& context);
+void RemoveCompose(CLIExecutionContext& context);
+void StartCompose(CLIExecutionContext& context);
+void StopCompose(CLIExecutionContext& context);
+void UpCompose(CLIExecutionContext& context);
 
 } // namespace wsl::windows::wslc::task

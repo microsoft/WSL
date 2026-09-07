@@ -7,9 +7,9 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    std::string NormalizeProjectName(std::string_view Name)
+    std::string NormalizeProjectName(std::string_view name)
     {
-        std::string result{Name};
+        std::string result{name};
         std::ranges::transform(result, result.begin(), [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
         std::erase_if(result, [](unsigned char value) { return !std::isalnum(value) && value != '-' && value != '_'; });
         while (!result.empty() && !std::isalnum(static_cast<unsigned char>(result.front())))
@@ -24,15 +24,15 @@ namespace {
 
 } // namespace
 
-ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& Documents, const ComposeProjectSelection& Selection)
+ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, const ComposeProjectSelection& selection)
 {
-    THROW_HR_IF(E_INVALIDARG, Documents.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
-    THROW_HR_IF(E_INVALIDARG, Documents.WorkingDirectory.empty());
-    THROW_HR_IF(E_INVALIDARG, Documents.ProjectDirectory.empty());
-    THROW_HR_IF(E_INVALIDARG, Documents.Documents.size() != 1);
-    ValidateSelection(Selection);
+    THROW_HR_IF(E_INVALIDARG, documents.SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
+    THROW_HR_IF(E_INVALIDARG, documents.WorkingDirectory.empty());
+    THROW_HR_IF(E_INVALIDARG, documents.ProjectDirectory.empty());
+    THROW_HR_IF(E_INVALIDARG, documents.Documents.size() != 1);
+    ValidateSelection(selection);
 
-    const auto& document = Documents.Documents.front();
+    const auto& document = documents.Documents.front();
     THROW_HR_IF(E_INVALIDARG, document.SourcePath.empty());
     THROW_HR_IF(E_INVALIDARG, document.BaseDirectory.empty());
     THROW_HR_IF(E_INVALIDARG, document.Content.empty());
@@ -43,13 +43,13 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& Documents, cons
     auto spec = ComposeSpec::Parse(document.SourcePath, content);
 
     std::string projectName;
-    if (Documents.ExplicitProjectName.has_value())
+    if (documents.ExplicitProjectName.has_value())
     {
-        projectName = NormalizeProjectName(*Documents.ExplicitProjectName);
+        projectName = NormalizeProjectName(*documents.ExplicitProjectName);
     }
     else
     {
-        auto projectDirectory = Documents.ProjectDirectory.lexically_normal();
+        auto projectDirectory = documents.ProjectDirectory.lexically_normal();
         if (projectDirectory.filename().empty())
         {
             projectDirectory = projectDirectory.parent_path();
@@ -70,26 +70,26 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& Documents, cons
     return spec;
 }
 
-void ComposeNormalizer::ValidateSelection(const ComposeProjectSelection& Selection)
+void ComposeNormalizer::ValidateSelection(const ComposeProjectSelection& selection)
 {
-    THROW_HR_IF(E_NOTIMPL, !Selection.Profiles.empty() || !Selection.Services.empty() || Selection.IncludeDependencies);
+    THROW_HR_IF(E_NOTIMPL, !selection.Profiles.empty() || !selection.Services.empty() || selection.IncludeDependencies);
 }
 
-std::string ComposeNormalizer::ValidateProjectKey(std::string_view ProjectKey)
+std::string ComposeNormalizer::ValidateProjectKey(std::string_view projectKey)
 {
-    THROW_HR_IF(E_INVALIDARG, !IsValidProjectKey(ProjectKey));
-    return std::string{ProjectKey};
+    THROW_HR_IF(E_INVALIDARG, !IsValidProjectKey(projectKey));
+    return std::string{projectKey};
 }
 
-bool ComposeNormalizer::IsValidProjectKey(std::string_view ProjectKey) noexcept
+bool ComposeNormalizer::IsValidProjectKey(std::string_view projectKey) noexcept
 {
-    if (ProjectKey.empty() || ProjectKey.size() > WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH ||
-        !std::isalnum(static_cast<unsigned char>(ProjectKey.front())))
+    if (projectKey.empty() || projectKey.size() > WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH ||
+        !std::isalnum(static_cast<unsigned char>(projectKey.front())))
     {
         return false;
     }
 
-    return std::ranges::all_of(ProjectKey, [](unsigned char value) {
+    return std::ranges::all_of(projectKey, [](unsigned char value) {
         return std::isdigit(value) || std::islower(value) || value == '-' || value == '_';
     });
 }

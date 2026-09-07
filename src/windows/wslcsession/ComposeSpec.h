@@ -54,7 +54,7 @@ struct ComposeSpec
     std::vector<ComposeContainerDefinition> Containers;
     std::string ProjectName;
 
-    static ComposeSpec Parse(const std::filesystem::path& Path, std::string_view Content);
+    static ComposeSpec Parse(const std::filesystem::path& path, std::string_view content);
 };
 
 } // namespace wsl::windows::service::wslc

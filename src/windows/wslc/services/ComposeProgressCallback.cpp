@@ -8,60 +8,92 @@ namespace wsl::windows::wslc::services {
 
 namespace {
 
-    // Placeholder rendering keeps typed progress visible for engineering and demonstrations until the Compose progress UI is defined.
-    std::wstring ComposeStatusText(WSLCComposeStatus Status)
+    std::wstring ToWide(LPCSTR value)
     {
-        switch (Status)
-        {
-        case WSLCComposeStatusValidating:
-            return L"Validating Compose project";
-        case WSLCComposeStatusPlanning:
-            return L"Planning Compose operation";
-        case WSLCComposeStatusExecuting:
-            return L"Executing Compose operation";
-        case WSLCComposeStatusSucceeded:
-            return L"Compose operation succeeded";
-        case WSLCComposeStatusFailed:
-            return L"Compose operation failed";
-        case WSLCComposeStatusCancelled:
-            return L"Compose operation cancelled";
-        default:
-            THROW_HR(E_INVALIDARG);
-        }
+        return value == nullptr ? std::wstring{} : wsl::shared::string::MultiByteToWide(value);
     }
 
-    std::wstring ToWide(LPCSTR Value)
+    std::wstring ComposeOperationText(LPCSTR operation)
     {
-        return Value == nullptr ? std::wstring{} : wsl::shared::string::MultiByteToWide(Value);
+        if (operation != nullptr)
+        {
+            const std::string_view operationValue{operation};
+            if (operationValue == "create")
+            {
+                return wsl::shared::Localization::WSLCCLI_ComposeProgressCreating();
+            }
+            if (operationValue == "remove")
+            {
+                return wsl::shared::Localization::WSLCCLI_ComposeProgressRemoving();
+            }
+            if (operationValue == "pull")
+            {
+                return wsl::shared::Localization::WSLCCLI_ComposeProgressPulling();
+            }
+            if (operationValue == "start")
+            {
+                return wsl::shared::Localization::WSLCCLI_ComposeProgressStarting();
+            }
+            if (operationValue == "stop")
+            {
+                return wsl::shared::Localization::WSLCCLI_ComposeProgressStopping();
+            }
+        }
+
+        return operation == nullptr ? std::wstring{} : wsl::shared::string::MultiByteToWide(operation);
+    }
+
+    std::wstring ComposeResourceText(LPCSTR unit, LPCSTR resourceKey)
+    {
+        std::wstring resourceType;
+        if (unit != nullptr)
+        {
+            const std::string_view unitValue{unit};
+            if (unitValue == "container")
+            {
+                resourceType = wsl::shared::Localization::WSLCCLI_ComposeResourceContainer();
+            }
+            else if (unitValue == "network")
+            {
+                resourceType = wsl::shared::Localization::WSLCCLI_ComposeResourceNetwork();
+            }
+            else if (unitValue == "image")
+            {
+                resourceType = wsl::shared::Localization::WSLCCLI_ComposeResourceImage();
+            }
+        }
+
+        const auto resourceKeyValue = ToWide(resourceKey);
+        return resourceType.empty() ? resourceKeyValue : wsl::shared::Localization::MessageWslcComposeResource(resourceType, resourceKeyValue);
     }
 
 } // namespace
 
-HRESULT ComposeProgressCallback::OnProgress(const WSLCComposeProgressEvent* Event)
+HRESULT ComposeProgressCallback::OnProgress(const WSLCComposeProgressEvent* event)
 try
 {
-    RETURN_HR_IF_NULL(E_POINTER, Event);
-    RETURN_HR_IF(E_INVALIDARG, Event->SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
+    RETURN_HR_IF_NULL(E_POINTER, event);
+    RETURN_HR_IF(E_INVALIDARG, event->SchemaVersion != WSLC_COMPOSE_SCHEMA_VERSION);
 
-    switch (Event->Kind)
+    switch (event->Kind)
     {
     case WSLCComposeProgressEventKindStatus:
-        m_terminal.Output(L"{}\n", ComposeStatusText(Event->Value.Status.Status));
         break;
 
     case WSLCComposeProgressEventKindProgress:
         m_terminal.Info(
-            L"{}: {} / {} {}\n",
-            ToWide(Event->Value.Progress.ResourceKey),
-            Event->Value.Progress.Current,
-            Event->Value.Progress.Total,
-            ToWide(Event->Value.Progress.Unit));
+            L"{}\n",
+            wsl::shared::Localization::MessageWslcComposeProgress(
+                ComposeOperationText(event->Value.Progress.Operation),
+                ComposeResourceText(event->Value.Progress.Unit, event->Value.Progress.ResourceKey),
+                event->Value.Progress.Current,
+                event->Value.Progress.Total));
         break;
 
     case WSLCComposeProgressEventKindDiagnostic:
     {
-        const auto code = ToWide(Event->Value.Diagnostic.Code);
-        switch (Event->Value.Diagnostic.Severity)
+        const auto code = ToWide(event->Value.Diagnostic.Code);
+        switch (event->Value.Diagnostic.Severity)
         {
         case WSLCComposeDiagnosticSeverityInfo:
             m_terminal.Info(L"{}\n", code);
@@ -86,28 +118,28 @@ try
 }
 CATCH_RETURN();
 
-HRESULT ComposeProgressCallback::OnStreamsReady(const WSLCComposeStreams* Streams)
+HRESULT ComposeProgressCallback::OnStreamsReady(const WSLCComposeStreams* streams)
 try
 {
-    RETURN_HR_IF_NULL(E_POINTER, Streams);
+    RETURN_HR_IF_NULL(E_POINTER, streams);
 
     common::io::MultiHandleWait io;
-    if (Streams->Stdout.Type != WSLCHandleTypeUnknown)
+    if (streams->Stdout.Type != WSLCHandleTypeUnknown)
     {
         io.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
-            wil::unique_handle{Streams->Stdout.Handle.File}, GetStdHandle(STD_OUTPUT_HANDLE)));
+            wil::unique_handle{streams->Stdout.Handle.File}, GetStdHandle(STD_OUTPUT_HANDLE)));
     }
 
-    if (Streams->Stderr.Type != WSLCHandleTypeUnknown)
+    if (streams->Stderr.Type != WSLCHandleTypeUnknown)
     {
         io.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
-            wil::unique_handle{Streams->Stderr.Handle.File}, GetStdHandle(STD_ERROR_HANDLE)));
+            wil::unique_handle{streams->Stderr.Handle.File}, GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     wil::unique_handle stdinHandle;
-    if (Streams->Stdin.Type != WSLCHandleTypeUnknown)
+    if (streams->Stdin.Type != WSLCHandleTypeUnknown)
     {
-        stdinHandle.reset(Streams->Stdin.Handle.File);
+        stdinHandle.reset(streams->Stdin.Handle.File);
     }
 
     io.Run({});

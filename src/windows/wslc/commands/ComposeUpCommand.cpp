@@ -40,9 +40,9 @@ std::wstring ComposeUpCommand::LongDescription() const
     return Localization::WSLCCLI_ComposeUpLongDesc();
 }
 
-void ComposeUpCommand::ExecuteInternal(CLIExecutionContext& Context) const
+void ComposeUpCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    Context << ResolveSession << UpCompose;
+    context << ResolveSession << UpCompose;
 }
 
 } // namespace wsl::windows::wslc

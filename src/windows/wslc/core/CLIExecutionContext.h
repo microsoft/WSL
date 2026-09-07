@@ -48,10 +48,12 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Event signaled when the user presses Ctrl-C.
     wil::unique_event CancelEvent;
+    wil::unique_event ForceCancelEvent;
 
     std::atomic_ulong CancellationCount{};
 
     HANDLE CreateCancelEvent();
+    HANDLE CreateForceCancelEvent();
     bool RecordCancellationRequest() noexcept;
 
     // Applies and freezes environment-only global options before command-line parsing reports errors.

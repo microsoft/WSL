@@ -18,6 +18,7 @@ Abstract:
 
 #include "InputChannel.h"
 #include "OutputChannel.h"
+#include "ComposeProgressCallback.h"
 #include "Terminal.h"
 
 using namespace wsl::windows::wslc;
@@ -216,6 +217,94 @@ class WSLCCLITerminalUnitTests
 
         VERIFY_ARE_EQUAL(std::wstring{L"output text\n"}, cap.outPipe.captured());
         VERIFY_ARE_EQUAL(std::wstring{L"info text\nwarn text\nerror text\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_StatusEventsAreNotRendered)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.SequenceNumber = 1;
+        event.Kind = WSLCComposeProgressEventKindStatus;
+        event.Value.Status.Status = WSLCComposeStatusExecuting;
+
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_ResourceProgressUsesInfoChannel)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.SequenceNumber = 1;
+        event.Kind = WSLCComposeProgressEventKindProgress;
+        event.Value.Progress.Operation = "stop";
+        event.Value.Progress.ResourceKey = "project-web-1";
+        event.Value.Progress.Current = 1;
+        event.Value.Progress.Total = 2;
+        event.Value.Progress.Unit = "container";
+
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"Stopping Container project-web-1 (1/2)\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_StartProgressUsesInfoChannel)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.SequenceNumber = 1;
+        event.Kind = WSLCComposeProgressEventKindProgress;
+        event.Value.Progress.Operation = "start";
+        event.Value.Progress.ResourceKey = "project-web-1";
+        event.Value.Progress.Current = 1;
+        event.Value.Progress.Total = 2;
+        event.Value.Progress.Unit = "container";
+
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(std::wstring{L"Starting Container project-web-1 (1/2)\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_NetworkAndImageProgressUseInfoChannel)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSLCComposeProgressEvent event{};
+        event.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
+        event.SequenceNumber = 1;
+        event.Kind = WSLCComposeProgressEventKindProgress;
+        event.Value.Progress.Operation = "create";
+        event.Value.Progress.ResourceKey = "project_default";
+        event.Value.Progress.Current = 1;
+        event.Value.Progress.Total = 1;
+        event.Value.Progress.Unit = "network";
+
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+
+        event.SequenceNumber = 2;
+        event.Value.Progress.Operation = "pull";
+        event.Value.Progress.ResourceKey = "python:3.12-alpine";
+        event.Value.Progress.Unit = "image";
+        VERIFY_SUCCEEDED(callback->OnProgress(&event));
+
+        VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"Creating Network project_default (1/1)\nPulling Image python:3.12-alpine (1/1)\n"}, cap.errPipe.captured());
     }
 
     TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)

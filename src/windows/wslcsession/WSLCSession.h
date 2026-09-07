@@ -162,8 +162,8 @@ public:
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(BeginContainerOperation)(_Outptr_ IUnknown** Operation) override;
     IFACEMETHOD(BeginComposeOperation)(
-        _In_ const WSLCComposeOperationRequest* Request, _In_opt_ IComposeProgressCallback* ProgressCallback, _Out_ IComposeOperation** Operation) override;
-    IFACEMETHOD(ListComposeProjects)(_In_ const WSLCComposeProjectListOptions* Options, _Out_ WSLCComposeProjectSummary** Projects, _Out_ ULONG* Count) override;
+        _In_ const WSLCComposeOperationRequest* request, _In_opt_ IComposeProgressCallback* progressCallback, _Out_ IComposeOperation** operation) override;
+    IFACEMETHOD(ListComposeProjects)(_In_ const WSLCComposeProjectListOptions* options, _Out_ WSLCComposeProjectSummary** projects, _Out_ ULONG* count) override;
     IFACEMETHOD(ListContainers)(
         _In_opt_ const WSLCListContainersOptions* Options,
         _Out_ WSLCContainerEntry** Containers,
@@ -355,8 +355,9 @@ private:
         DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle, IImageLoadCallback* LoadCallback = nullptr);
     void RecoverExistingContainers();
     void RecoverExistingNetworks();
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> DiscoverComposeContainers(std::string_view ProjectKey);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& Spec, HANDLE CancelEvent);
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> DiscoverComposeContainers(std::string_view projectKey);
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(
+        const ComposeSpec& spec, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);

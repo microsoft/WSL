@@ -31,9 +31,9 @@ std::wstring ComposeListCommand::LongDescription() const
 }
 
 // clang-format off
-void ComposeListCommand::ExecuteInternal(CLIExecutionContext& Context) const
+void ComposeListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    Context
+    context
         << ResolveSession
         << GetComposeProjects
         << ListComposeProjects;

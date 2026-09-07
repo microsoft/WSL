@@ -589,6 +589,7 @@ typedef enum _WSLCComposeAction
     WSLCComposeActionStart,
     WSLCComposeActionAttach,
     WSLCComposeActionStop,
+    WSLCComposeActionRemove,
 } WSLCComposeAction;
 
 typedef enum _WSLCComposeProjectType

@@ -154,13 +154,24 @@ class WSLCCLICommandUnitTests
         auto cmd = ComposeCommand(L"root");
         auto subcommands = cmd.GetCommands();
 
-        VERIFY_ARE_EQUAL(6u, subcommands.size());
-        VERIFY_ARE_EQUAL(ComposeCreateCommand::CommandName, subcommands[0]->Name());
-        VERIFY_ARE_EQUAL(ComposeListCommand::CommandName, subcommands[1]->Name());
-        VERIFY_ARE_EQUAL(ComposeUpCommand::CommandName, subcommands[2]->Name());
-        VERIFY_ARE_EQUAL(ComposeStartCommand::CommandName, subcommands[3]->Name());
-        VERIFY_ARE_EQUAL(ComposeAttachCommand::CommandName, subcommands[4]->Name());
+        VERIFY_ARE_EQUAL(7u, subcommands.size());
+        VERIFY_ARE_EQUAL(ComposeAttachCommand::CommandName, subcommands[0]->Name());
+        VERIFY_ARE_EQUAL(ComposeCreateCommand::CommandName, subcommands[1]->Name());
+        VERIFY_ARE_EQUAL(ComposeListCommand::CommandName, subcommands[2]->Name());
+        VERIFY_ARE_EQUAL(ComposeRemoveCommand::CommandName, subcommands[3]->Name());
+        VERIFY_ARE_EQUAL(ComposeStartCommand::CommandName, subcommands[4]->Name());
         VERIFY_ARE_EQUAL(ComposeStopCommand::CommandName, subcommands[5]->Name());
+        VERIFY_ARE_EQUAL(ComposeUpCommand::CommandName, subcommands[6]->Name());
+
+        VERIFY_ARE_EQUAL(ArgType::Project, subcommands[0]->GetArguments()[0].Type());
+        VERIFY_ARE_EQUAL(ArgType::Path, subcommands[1]->GetArguments()[0].Type());
+        VERIFY_ARE_EQUAL(ArgType::Project, subcommands[3]->GetArguments()[0].Type());
+        VERIFY_ARE_EQUAL(ArgType::Project, subcommands[4]->GetArguments()[0].Type());
+        VERIFY_ARE_EQUAL(ArgType::Project, subcommands[5]->GetArguments()[0].Type());
+        VERIFY_ARE_EQUAL(ArgType::Path, subcommands[6]->GetArguments()[0].Type());
+        VERIFY_ARE_EQUAL(2u, subcommands[3]->Aliases().size());
+        VERIFY_ARE_EQUAL(std::wstring_view{L"delete"}, subcommands[3]->Aliases()[0]);
+        VERIFY_ARE_EQUAL(std::wstring_view{L"rm"}, subcommands[3]->Aliases()[1]);
     }
 
     // Test: Verify VersionCommand has the correct name

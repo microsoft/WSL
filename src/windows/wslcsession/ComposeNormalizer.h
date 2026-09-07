@@ -33,10 +33,10 @@ struct ComposeProjectSelection
 
 struct ComposeNormalizer
 {
-    static ComposeSpec Normalize(const ComposeDocuments& Documents, const ComposeProjectSelection& Selection);
-    static bool IsValidProjectKey(std::string_view ProjectKey) noexcept;
-    static std::string ValidateProjectKey(std::string_view ProjectKey);
-    static void ValidateSelection(const ComposeProjectSelection& Selection);
+    static ComposeSpec Normalize(const ComposeDocuments& documents, const ComposeProjectSelection& selection);
+    static bool IsValidProjectKey(std::string_view projectKey) noexcept;
+    static std::string ValidateProjectKey(std::string_view projectKey);
+    static void ValidateSelection(const ComposeProjectSelection& selection);
 };
 
 } // namespace wsl::windows::service::wslc

@@ -25,7 +25,7 @@ namespace {
 
     constexpr ULONG c_defaultStopTimeoutSeconds = 10;
 
-    std::string FormatProjectStatus(const WSLCComposeProjectSummary& Project)
+    std::string FormatProjectStatus(const WSLCComposeProjectSummary& project)
     {
         std::string result;
         const auto append = [&](std::string_view name, ULONG count) {
@@ -42,18 +42,18 @@ namespace {
             result += std::format("{}({})", name, count);
         };
 
-        append("created", Project.CreatedContainersCount);
-        append("exited", Project.ExitedContainersCount);
-        append("other", Project.OtherContainersCount);
-        append("running", Project.RunningContainersCount);
+        append("created", project.CreatedContainersCount);
+        append("exited", project.ExitedContainersCount);
+        append("other", project.OtherContainersCount);
+        append("running", project.RunningContainersCount);
         return result;
     }
 
     struct CapturedComposeDocuments
     {
-        explicit CapturedComposeDocuments(const std::wstring& Path)
+        explicit CapturedComposeDocuments(const std::wstring& path)
         {
-            sourcePath = std::filesystem::absolute(Path).lexically_normal();
+            sourcePath = std::filesystem::absolute(path).lexically_normal();
             baseDirectory = sourcePath.parent_path();
             projectDirectory = baseDirectory;
             workingDirectory = std::filesystem::current_path();
@@ -118,10 +118,10 @@ namespace {
 
         ComposeOperationResult() = default;
 
-        ComposeOperationResult(ComposeOperationResult&& Other) noexcept : value(Other.value)
+        ComposeOperationResult(ComposeOperationResult&& other) noexcept : value(other.value)
         {
-            Other.value.AffectedContainers = nullptr;
-            Other.value.AffectedContainersCount = 0;
+            other.value.AffectedContainers = nullptr;
+            other.value.AffectedContainersCount = 0;
         }
 
         ~ComposeOperationResult()
@@ -132,47 +132,122 @@ namespace {
         WSLCComposeOperationResult value{};
     };
 
-    ComposeOperationResult Execute(
-        Terminal& Terminal,
-        models::Session& Session,
-        const std::wstring& Path,
-        WSLCComposeAction Action,
-        HANDLE CancelEvent,
-        std::optional<ULONG> Timeout = std::nullopt)
+    void ForceKillContainers(Terminal& terminal, models::Session& session, const ComposeOperationResult& result)
     {
-        CapturedComposeDocuments captured{Path};
+        [[maybe_unused]] auto operation = session.BeginContainerOperation();
+        std::vector<std::pair<std::string, wil::com_ptr<IWSLCContainer>>> running;
+        for (ULONG index = 0; index < result.value.AffectedContainersCount; ++index)
+        {
+            const auto& entry = result.value.AffectedContainers[index];
+            wil::com_ptr<IWSLCContainer> container;
+            const HRESULT openResult = session.Get()->OpenContainer(entry.Id, &container);
+            if (openResult == WSLC_E_CONTAINER_NOT_FOUND)
+            {
+                continue;
+            }
+            THROW_IF_FAILED(openResult);
+
+            WSLCContainerState state{};
+            THROW_IF_FAILED(container->GetState(&state));
+            if (state == WslcContainerStateRunning)
+            {
+                running.emplace_back(entry.Name, std::move(container));
+            }
+        }
+
+        for (size_t index = 0; index < running.size(); ++index)
+        {
+            const auto& [name, container] = running[index];
+            terminal.Info(
+                L"{}\n",
+                wsl::shared::Localization::MessageWslcComposeProgress(
+                    wsl::shared::Localization::WSLCCLI_ComposeProgressKilling(),
+                    wsl::shared::Localization::MessageWslcComposeResource(
+                        wsl::shared::Localization::WSLCCLI_ComposeResourceContainer(), wsl::shared::string::MultiByteToWide(name)),
+                    index + 1,
+                    running.size()));
+
+            const HRESULT killResult = container->Kill(WSLCSignalSIGKILL);
+            THROW_IF_FAILED_EXCEPT(killResult, WSLC_E_CONTAINER_NOT_RUNNING);
+        }
+    }
+
+    ComposeOperationResult Execute(
+        Terminal& terminal,
+        models::Session& session,
+        const ComposeProjectReference& project,
+        WSLCComposeAction action,
+        HANDLE cancelEvent,
+        std::optional<ULONG> timeout = std::nullopt,
+        HANDLE forceCancelEvent = nullptr,
+        std::function<void()> forceAction = {})
+    {
+        std::optional<CapturedComposeDocuments> captured;
         WSLCComposeOperationRequest request{};
         request.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
-        request.Action = Action;
-        request.Project.Type = WSLCComposeProjectTypeDocuments;
-        request.Project.Value.Documents = &captured.documents;
-        if (Timeout.has_value())
+        request.Action = action;
+        if (const auto* path = std::get_if<std::filesystem::path>(&project.Value))
+        {
+            captured.emplace(path->wstring());
+            request.Project.Type = WSLCComposeProjectTypeDocuments;
+            request.Project.Value.Documents = &captured->documents;
+        }
+        else
+        {
+            request.Project.Type = WSLCComposeProjectTypeProjectKey;
+            request.Project.Value.ProjectKey = std::get<std::string>(project.Value).c_str();
+        }
+
+        if (timeout.has_value())
         {
             request.ActionOptions.Type = WSLCComposeActionOptionsTypeStop;
-            request.ActionOptions.Value.Stop.TimeoutSeconds = *Timeout;
+            request.ActionOptions.Value.Stop.TimeoutSeconds = *timeout;
         }
         else
         {
             request.ActionOptions.Type = WSLCComposeActionOptionsTypeNone;
         }
 
-        auto callback = Microsoft::WRL::Make<ComposeProgressCallback>(Terminal);
+        auto callback = Microsoft::WRL::Make<ComposeProgressCallback>(terminal);
         THROW_IF_NULL_ALLOC(callback);
 
         wil::com_ptr<IComposeOperation> operation;
-        THROW_IF_FAILED(Session.Get()->BeginComposeOperation(&request, callback.Get(), &operation));
+        THROW_IF_FAILED(session.Get()->BeginComposeOperation(&request, callback.Get(), &operation));
 
         wil::unique_handle completionEvent;
         THROW_IF_FAILED(operation->GetCompletionEvent(&completionEvent));
 
-        const std::array handles{completionEvent.get(), CancelEvent};
-        const DWORD handleCount = CancelEvent == nullptr ? 1 : static_cast<DWORD>(handles.size());
+        std::array<HANDLE, 3> handles{completionEvent.get()};
+        DWORD handleCount = 1;
+        std::optional<DWORD> cancelIndex;
+        std::optional<DWORD> forceCancelIndex;
+        if (cancelEvent != nullptr)
+        {
+            cancelIndex = handleCount;
+            handles[handleCount++] = cancelEvent;
+        }
+        if (forceCancelEvent != nullptr)
+        {
+            forceCancelIndex = handleCount;
+            handles[handleCount++] = forceCancelEvent;
+        }
+
         const DWORD waitResult = WaitForMultipleObjects(handleCount, handles.data(), FALSE, INFINITE);
         THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
         THROW_HR_IF(E_UNEXPECTED, waitResult < WAIT_OBJECT_0 || waitResult >= WAIT_OBJECT_0 + handleCount);
-        if (CancelEvent != nullptr && waitResult == WAIT_OBJECT_0 + 1)
+        const DWORD signaledIndex = waitResult - WAIT_OBJECT_0;
+        if (cancelIndex.has_value() && signaledIndex == *cancelIndex)
         {
             THROW_IF_FAILED(operation->Cancel());
+            THROW_LAST_ERROR_IF(WaitForSingleObject(completionEvent.get(), INFINITE) == WAIT_FAILED);
+        }
+        else if (forceCancelIndex.has_value() && signaledIndex == *forceCancelIndex)
+        {
+            THROW_IF_FAILED(operation->Cancel());
+            if (forceAction)
+            {
+                forceAction();
+            }
             THROW_LAST_ERROR_IF(WaitForSingleObject(completionEvent.get(), INFINITE) == WAIT_FAILED);
         }
 
@@ -183,23 +258,23 @@ namespace {
         return result;
     }
 
-    int AttachContainers(models::Session& Session, const ComposeOperationResult& Result, HANDLE CancelEvent)
+    int AttachContainers(models::Session& session, const ComposeOperationResult& result, HANDLE cancelEvent)
     {
-        [[maybe_unused]] auto operation = Session.BeginContainerOperation();
+        [[maybe_unused]] auto operation = session.BeginContainerOperation();
         common::io::MultiHandleWait io;
 
-        if (CancelEvent != nullptr)
+        if (cancelEvent != nullptr)
         {
             io.AddHandle(
-                std::make_unique<common::io::EventHandle>(CancelEvent),
+                std::make_unique<common::io::EventHandle>(cancelEvent),
                 common::io::MultiHandleWait::CancelOnCompleted | common::io::MultiHandleWait::NeedNotComplete);
         }
 
-        for (ULONG index = 0; index < Result.value.AffectedContainersCount; ++index)
+        for (ULONG index = 0; index < result.value.AffectedContainersCount; ++index)
         {
-            const auto& entry = Result.value.AffectedContainers[index];
+            const auto& entry = result.value.AffectedContainers[index];
             wil::com_ptr<IWSLCContainer> container;
-            THROW_IF_FAILED(Session.Get()->OpenContainer(entry.Id, &container));
+            THROW_IF_FAILED(session.Get()->OpenContainer(entry.Id, &container));
 
             wsl::windows::common::wslutil::COMOutputHandle stdinHandle;
             wsl::windows::common::wslutil::COMOutputHandle stdoutHandle;
@@ -220,14 +295,14 @@ namespace {
 
 } // namespace
 
-std::vector<models::ComposeProjectInformation> ComposeService::List(models::Session& Session, bool All)
+std::vector<models::ComposeProjectInformation> ComposeService::List(models::Session& session, bool all)
 {
     WSLCComposeProjectListOptions options{};
     options.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
-    options.All = All;
+    options.All = all;
 
     wil::unique_cotaskmem_array_ptr<WSLCComposeProjectSummary> projects;
-    THROW_IF_FAILED(Session.Get()->ListComposeProjects(&options, &projects, projects.size_address<ULONG>()));
+    THROW_IF_FAILED(session.Get()->ListComposeProjects(&options, &projects, projects.size_address<ULONG>()));
 
     std::vector<models::ComposeProjectInformation> result;
     result.reserve(projects.size());
@@ -240,48 +315,61 @@ std::vector<models::ComposeProjectInformation> ComposeService::List(models::Sess
     return result;
 }
 
-void ComposeService::Create(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent)
+void ComposeService::Create(Terminal& terminal, models::Session& session, const std::wstring& path, HANDLE cancelEvent)
 {
-    Execute(Terminal, Session, Path, WSLCComposeActionCreate, CancelEvent);
+    Execute(terminal, session, ComposeProjectReference{std::filesystem::path{path}}, WSLCComposeActionCreate, cancelEvent);
 }
 
-int ComposeService::Up(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent)
+int ComposeService::Up(Terminal& terminal, models::Session& session, const std::wstring& path, HANDLE cancelEvent, HANDLE forceCancelEvent)
 {
+    const ComposeProjectReference project{std::filesystem::path{path}};
+    std::optional<ComposeOperationResult> result;
     auto stopOnCancellation = wil::scope_exit([&]() {
         LOG_IF_FAILED(wil::ResultFromException([&]() {
-            if (CancelEvent == nullptr)
+            if (cancelEvent == nullptr)
             {
                 return;
             }
 
-            const auto waitResult = WaitForSingleObject(CancelEvent, 0);
+            const auto waitResult = WaitForSingleObject(cancelEvent, 0);
             THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
             THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_OBJECT_0 && waitResult != WAIT_TIMEOUT);
             if (waitResult == WAIT_OBJECT_0)
             {
-                Execute(Terminal, Session, Path, WSLCComposeActionStop, nullptr, c_defaultStopTimeoutSeconds);
+                terminal.Info(L"\n{}\n", wsl::shared::Localization::WSLCCLI_ComposeGracefullyStopping());
+                Execute(terminal, session, project, WSLCComposeActionStop, nullptr, c_defaultStopTimeoutSeconds, forceCancelEvent, [&]() {
+                    if (result.has_value())
+                    {
+                        ForceKillContainers(terminal, session, *result);
+                    }
+                });
             }
         }));
     });
 
-    auto result = Execute(Terminal, Session, Path, WSLCComposeActionUp, CancelEvent);
-    return AttachContainers(Session, result, CancelEvent);
+    result.emplace(Execute(terminal, session, project, WSLCComposeActionUp, cancelEvent));
+    return AttachContainers(session, *result, cancelEvent);
 }
 
-void ComposeService::Start(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent)
+void ComposeService::Start(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
 {
-    Execute(Terminal, Session, Path, WSLCComposeActionStart, CancelEvent);
+    Execute(terminal, session, project, WSLCComposeActionStart, cancelEvent);
 }
 
-int ComposeService::Attach(Terminal& Terminal, models::Session& Session, const std::wstring& Path, HANDLE CancelEvent)
+int ComposeService::Attach(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
 {
-    auto result = Execute(Terminal, Session, Path, WSLCComposeActionAttach, CancelEvent);
-    return AttachContainers(Session, result, CancelEvent);
+    auto result = Execute(terminal, session, project, WSLCComposeActionAttach, cancelEvent);
+    return AttachContainers(session, result, cancelEvent);
 }
 
-void ComposeService::Stop(Terminal& Terminal, models::Session& Session, const std::wstring& Path, ULONG Timeout, HANDLE CancelEvent)
+void ComposeService::Stop(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, ULONG timeout, HANDLE cancelEvent)
 {
-    Execute(Terminal, Session, Path, WSLCComposeActionStop, CancelEvent, Timeout);
+    Execute(terminal, session, project, WSLCComposeActionStop, cancelEvent, timeout);
+}
+
+void ComposeService::Remove(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
+{
+    Execute(terminal, session, project, WSLCComposeActionRemove, cancelEvent);
 }
 
 } // namespace wsl::windows::wslc::services

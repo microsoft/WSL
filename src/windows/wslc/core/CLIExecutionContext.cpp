@@ -16,10 +16,27 @@ HANDLE CLIExecutionContext::CreateCancelEvent()
     return CancelEvent.get();
 }
 
+HANDLE CLIExecutionContext::CreateForceCancelEvent()
+{
+    WI_ASSERT(CancelEvent);
+    WI_ASSERT(!ForceCancelEvent);
+    ForceCancelEvent.create(wil::EventOptions::ManualReset);
+    return ForceCancelEvent.get();
+}
+
 bool CLIExecutionContext::RecordCancellationRequest() noexcept
 {
     const auto cancellationCount = CancellationCount.fetch_add(1, std::memory_order_relaxed) + 1;
-    return cancellationCount == 1 && CancelEvent && SetEvent(CancelEvent.get());
+    if (cancellationCount == 1)
+    {
+        return CancelEvent && SetEvent(CancelEvent.get());
+    }
+    if (cancellationCount == 2)
+    {
+        return ForceCancelEvent && SetEvent(ForceCancelEvent.get());
+    }
+
+    return false;
 }
 
 void CLIExecutionContext::ApplyGlobalEnvironmentOptions()

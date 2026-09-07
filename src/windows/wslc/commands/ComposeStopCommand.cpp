@@ -26,7 +26,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ComposeStopCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Path, true, std::nullopt, Localization::WSLCCLI_ComposePathArgDescription()),
+        Argument::Create(ArgType::Project, true),
         Argument::Create(ArgType::Time),
     };
 }
@@ -41,9 +41,9 @@ std::wstring ComposeStopCommand::LongDescription() const
     return Localization::WSLCCLI_ComposeStopLongDesc();
 }
 
-void ComposeStopCommand::ExecuteInternal(CLIExecutionContext& Context) const
+void ComposeStopCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    Context << ResolveSession << StopCompose;
+    context << ResolveSession << StopCompose;
 }
 
 } // namespace wsl::windows::wslc

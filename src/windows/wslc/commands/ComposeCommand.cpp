@@ -22,12 +22,13 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> ComposeCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
+    commands.push_back(std::make_unique<ComposeAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeListCommand>(FullName()));
-    commands.push_back(std::make_unique<ComposeUpCommand>(FullName()));
+    commands.push_back(std::make_unique<ComposeRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeStartCommand>(FullName()));
-    commands.push_back(std::make_unique<ComposeAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ComposeStopCommand>(FullName()));
+    commands.push_back(std::make_unique<ComposeUpCommand>(FullName()));
     return commands;
 }
 
@@ -41,9 +42,9 @@ std::wstring ComposeCommand::LongDescription() const
     return Localization::WSLCCLI_ComposeCommandLongDesc();
 }
 
-void ComposeCommand::ExecuteInternal(CLIExecutionContext& Context) const
+void ComposeCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp(Context.Terminal);
+    OutputHelp(context.Terminal);
 }
 
 } // namespace wsl::windows::wslc

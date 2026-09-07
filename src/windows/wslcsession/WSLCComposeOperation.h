@@ -19,12 +19,12 @@ public:
     WSLCComposeOperation() = default;
     ~WSLCComposeOperation();
 
-    HRESULT RuntimeClassInitialize(WSLCSession* Session, const WSLCComposeOperationRequest* Request, Microsoft::WRL::ComPtr<IComposeProgressCallback> ProgressCallback);
+    HRESULT RuntimeClassInitialize(WSLCSession* session, const WSLCComposeOperationRequest* request, Microsoft::WRL::ComPtr<IComposeProgressCallback> progressCallback);
 
-    IFACEMETHOD(GetCompletionEvent)(_Out_ HANDLE* Event) override;
+    IFACEMETHOD(GetCompletionEvent)(_Out_ HANDLE* event) override;
     IFACEMETHOD(Cancel()) override;
-    IFACEMETHOD(GetResult)(_Out_ WSLCComposeOperationResult* Result) override;
-    IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID InterfaceId) override;
+    IFACEMETHOD(GetResult)(_Out_ WSLCComposeOperationResult* result) override;
+    IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID interfaceId) override;
 
 private:
     struct Request
@@ -37,13 +37,20 @@ private:
         WSLCComposeActionOptions ActionOptions{};
     };
 
-    static Request CaptureRequest(const WSLCComposeOperationRequest& Request);
-    static std::vector<std::string> CaptureStrings(const WSLCStringArray& Values);
+    static Request CaptureRequest(const WSLCComposeOperationRequest& request);
+    static std::vector<std::string> CaptureStrings(const WSLCStringArray& values);
     void Run() noexcept;
-    ComposeExecutionResult RunOperation(IComposeProgressCallback* ProgressCallback);
+    ComposeExecutionResult RunOperation(IComposeProgressCallback* progressCallback);
     void CheckCancelled() const;
-    void ReportStatus(IComposeProgressCallback* ProgressCallback, WSLCComposeStatus Status);
-    void ReportStatusNoThrow(IComposeProgressCallback* ProgressCallback, WSLCComposeStatus Status) noexcept;
+    void ReportStatus(IComposeProgressCallback* progressCallback, WSLCComposeStatus status);
+    void ReportStatusNoThrow(IComposeProgressCallback* progressCallback, WSLCComposeStatus status) noexcept;
+    void ReportProgress(
+        IComposeProgressCallback* progressCallback,
+        std::string_view operation,
+        std::string_view resourceKey,
+        ULONGLONG current,
+        ULONGLONG total,
+        std::string_view unit);
 
     WSLCSession* m_session{};
     Microsoft::WRL::ComPtr<IWSLCSession> m_sessionLifetime;

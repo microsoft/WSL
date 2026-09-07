@@ -4,6 +4,7 @@
 
 #include "ComposeSpec.h"
 #include "wslc.h"
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -18,13 +19,21 @@ struct ComposeExecutionResult
     std::vector<WSLCContainerEntry> AffectedContainers;
 };
 
+using ComposeProgressReporter =
+    std::function<void(std::string_view operation, std::string_view resourceKey, ULONGLONG current, ULONGLONG total, std::string_view unit)>;
+
 class ComposeReconciler
 {
 public:
-    explicit ComposeReconciler(WSLCSession& Session) noexcept;
+    explicit ComposeReconciler(WSLCSession& session) noexcept;
 
     ComposeExecutionResult Execute(
-        WSLCComposeAction Action, const ComposeSpec* DesiredProject, std::string_view ProjectKey, const WSLCComposeActionOptions& ActionOptions, HANDLE CancelEvent);
+        WSLCComposeAction action,
+        const ComposeSpec* desiredProject,
+        std::string_view projectKey,
+        const WSLCComposeActionOptions& actionOptions,
+        HANDLE cancelEvent,
+        const ComposeProgressReporter& progressReporter);
 
 private:
     struct ProjectLock
@@ -32,14 +41,18 @@ private:
         std::timed_mutex Lock;
     };
 
-    std::shared_ptr<ProjectLock> ResolveProjectLock(std::string_view ProjectKey);
-    static std::vector<WSLCContainerEntry> ObserveContainers(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& Containers);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Create(const ComposeSpec& Project, HANDLE CancelEvent);
+    std::shared_ptr<ProjectLock> ResolveProjectLock(std::string_view projectKey);
+    static std::vector<WSLCContainerEntry> ObserveContainers(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers);
+    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Create(const ComposeSpec& project, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Up(
-        const ComposeSpec& Project, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Containers, HANDLE CancelEvent);
-    static void Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& Containers, HANDLE CancelEvent);
-    static void Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& Containers, ULONG Timeout, HANDLE CancelEvent);
-    static void CheckCancelled(HANDLE CancelEvent);
+        const ComposeSpec& project,
+        std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers,
+        HANDLE cancelEvent,
+        const ComposeProgressReporter& progressReporter);
+    static void Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
+    static void Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, ULONG timeout, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
+    static void Remove(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
+    static void CheckCancelled(HANDLE cancelEvent);
 
     WSLCSession& m_session;
     std::mutex m_projectLocksLock;
