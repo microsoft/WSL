@@ -91,11 +91,23 @@ class WSLCE2EGlobalTests
     {
         auto result = RunWslc(L"--help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage: wslc"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage: wslc [global-options] [<command>] [options]"));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(c_copyrightPrefix));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingGlobalOptions()));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--session"));
         VERIFY_IS_FALSE(result.StdoutContainsSubstring(Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc")));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_LeafCommandShowsGlobalOptionsForReference)
+    {
+        auto result = RunWslc(L"image list --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage: wslc image list [options]"));
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"global-options"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingGlobalOptions()));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--session"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Help_CommandErrorRoutesToStderr)
