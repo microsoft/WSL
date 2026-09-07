@@ -165,7 +165,6 @@ void LaunchInit(
     const char* InstallPath = nullptr,
     const char* UserProfile = nullptr,
     std::optional<pid_t> DistroInitPid = {},
-    const char* DistroCgroupPath = nullptr,
     int DistroCgroupNamespaceFd = -1);
 
 void LaunchSystemDistro(
@@ -178,7 +177,6 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    const char* DistroCgroupPath,
     int DistroCgroupNamespaceFd);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
@@ -1431,7 +1429,6 @@ void LaunchInit(
     const char* InstallPath,
     const char* UserProfile,
     std::optional<pid_t> DistroInitPid,
-    const char* DistroCgroupPath,
     int DistroCgroupNamespaceFd)
 
 /*++
@@ -1470,8 +1467,6 @@ Arguments:
         environment variable.
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
-
-    DistroCgroupPath - Supplies the cgroup path of this distribution.
 
     DistroCgroupNamespaceFd - Supplies the cgroup namespace shared by the user and system distros.
 
@@ -1580,7 +1575,6 @@ Return Value:
     AddEnvironmentVariable(LX_WSL2_INSTALL_PATH, InstallPath);
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
-    AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_PATH, DistroCgroupPath);
 
     if (DistroCgroupNamespaceFd >= 0)
     {
@@ -1684,7 +1678,6 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    const char* DistroCgroupPath,
     int DistroCgroupNamespaceFd)
 
 /*++
@@ -1722,8 +1715,6 @@ Arguments:
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
-    DistroCgroupPath - Supplies the cgroup path of this distribution.
-
     DistroCgroupNamespaceFd - Supplies the cgroup namespace shared by the user and system distros.
 
 Return Value:
@@ -1744,7 +1735,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupPath, DistroCgroupNamespaceFd);
+    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupNamespaceFd);
     _exit(1);
 }
 catch (...)
@@ -2364,7 +2355,6 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
                         ChildPid,
-                        DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str(),
                         DistroCgroupNamespace.get());
                 }
             }
@@ -2388,7 +2378,6 @@ void ProcessLaunchInitMessage(
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
             wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
             std::nullopt,
-            DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str(),
             DistroCgroupNamespace.get());
     }
     catch (...)

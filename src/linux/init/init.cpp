@@ -1208,7 +1208,6 @@ try
                 SessionLeaderEntry(SessionLeaderFd.get(), TtyFd.get(), Config);
             },
             {},
-            Config.CgroupPath,
             Config.CgroupNamespace.get());
     }
     else
@@ -1269,7 +1268,6 @@ try
                 SessionLeaderEntryUtilityVm(channel, Config);
             },
             {},
-            Config.CgroupPath,
             Config.CgroupNamespace.get());
     }
 
@@ -2331,58 +2329,31 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_INIT_PID);
     }
 
-    //
-    // Get the per-distro cgroup path.
-    //
-
-    const auto DistroCgroupPath = getenv(LX_WSL2_DISTRO_CGROUP_PATH);
-    if (DistroCgroupPath != nullptr)
-    {
-        if (access(DistroCgroupPath, F_OK) == 0)
-        {
-            Config.CgroupPath = DistroCgroupPath;
-        }
-        else
-        {
-            LOG_ERROR("Cgroup path {} does not exist", DistroCgroupPath);
-        }
-        unsetenv(LX_WSL2_DISTRO_CGROUP_PATH);
-    }
-
     Value = getenv(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD);
     if (Value != nullptr)
     {
         const int CgroupNamespaceFd = std::stoi(Value);
-        THROW_ERRNO_IF(EINVAL, CgroupNamespaceFd < 0);
-        Config.CgroupNamespace.reset(CgroupNamespaceFd);
-        THROW_LAST_ERROR_IF(fcntl(Config.CgroupNamespace.get(), F_SETFD, FD_CLOEXEC) < 0);
-        unsetenv(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD);
-    }
-
-    std::optional<std::string> DistroPayloadCgroupPath = Config.CgroupPath;
-    bool UseNonSystemdCgroup = false;
-    if (Config.CgroupPath.has_value())
-    {
-        const auto NonSystemdCgroupPath = Config.CgroupPath.value() + WSL_USER_NON_SYSTEMD_CGROUP_DIR;
-        if (access(NonSystemdCgroupPath.c_str(), F_OK) == 0)
+        if (CgroupNamespaceFd < 0)
         {
-            DistroPayloadCgroupPath = NonSystemdCgroupPath;
-            UseNonSystemdCgroup = true;
+            LOG_ERROR("Invalid cgroup namespace fd {}", CgroupNamespaceFd);
         }
         else
         {
-            THROW_LAST_ERROR_IF(errno != ENOENT);
+            if (fcntl(CgroupNamespaceFd, F_SETFD, FD_CLOEXEC) < 0)
+            {
+                LOG_ERROR("Invalid cgroup namespace fd {}", CgroupNamespaceFd);
+            }
+            else
+            {
+                Config.CgroupNamespace.reset(CgroupNamespaceFd);
+            }
         }
+        unsetenv(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD);
     }
 
     if (Config.CgroupNamespace)
     {
         MountDistroCgroupNamespace(Config.CgroupNamespace.get());
-        Config.CgroupPath = UseNonSystemdCgroup ? CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR : CGROUP_MOUNTPOINT;
-    }
-    else
-    {
-        Config.CgroupPath = std::move(DistroPayloadCgroupPath);
     }
 
     std::vector<gsl::byte> Buffer;
@@ -2608,7 +2579,11 @@ Return Value:
             break;
 
             case LxInitCreateProcess:
-                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath, Config.CgroupNamespace.get());
+                ProcessCreateProcessMessage(
+                    transaction,
+                    Span,
+                    Config.CgroupNamespace ? std::optional<std::string>{CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR} : std::nullopt,
+                    Config.CgroupNamespace.get());
                 break;
 
             default:

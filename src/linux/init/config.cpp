@@ -1013,7 +1013,6 @@ try
                 LOG_ERROR("execl() failed, {}", errno);
             },
             {},
-            Config.CgroupPath,
             Config.CgroupNamespace.get());
     }
 
@@ -1825,7 +1824,7 @@ try
 
     if (UtilIsUtilityVm())
     {
-        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1 && getenv(LX_WSL2_DISTRO_CGROUP_PATH) != nullptr)
+        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1 && getenv(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD) != nullptr)
         {
             Config.CGroup = WslDistributionConfig::CGroupVersion::v2;
             EMIT_USER_WARNING(wsl::shared::Localization::MessageCgroupV1IncompatibleWithDistroIsolation());
@@ -2769,14 +2768,13 @@ try
     {
         Unlock.reset();
 
-        if (Config.CgroupPath.has_value() && UtilMoveSelfToDistroCgroup(Config.CgroupPath.value(), "login") < 0)
+        if (Config.CgroupNamespace)
         {
-            _exit(1);
-        }
-
-        if (Config.CgroupNamespace && UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "login") < 0)
-        {
-            _exit(1);
+            if (UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, "login") < 0 ||
+                UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "login") < 0)
+            {
+                _exit(1);
+            }
         }
 
         _exit(execl("/bin/login", "/bin/login", "-f", Username, nullptr));

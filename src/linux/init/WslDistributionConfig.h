@@ -96,7 +96,6 @@ struct WslDistributionConfig
     wil::unique_fd BootStartWriteSocket;
     wsl::shared::SocketChannel Plan9ControlChannel;
     std::optional<pid_t> InitPid;
-    std::optional<std::string> CgroupPath;
     wil::unique_fd CgroupNamespace;
 };
 

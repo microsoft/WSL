@@ -144,8 +144,7 @@ int UtilMoveSelfToDistroCgroup(const std::string& CgroupPath, const std::string&
 int UtilEnterCgroupNamespace(int NamespaceFd, const std::string& LogSubject);
 
 template <typename TMethod>
-int UtilCreateChildProcess(
-    const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {}, std::optional<std::string> CgroupPath = {}, int CgroupNamespaceFd = -1)
+int UtilCreateChildProcess(const char* ChildName, TMethod&& ChildFunction, std::optional<int> CloneFlags = {}, int CgroupNamespaceFd = -1)
 
 /*++
 
@@ -161,8 +160,6 @@ Arguments:
 
     CloneFlags - Supplies an optional value containing flags to use for the clone syscall.
         If no flags are specified, fork is used instead.
-
-    CgroupPath - Supplies an optional value containing the path of the cgroup to try move the child process into.
 
     CgroupNamespaceFd - Supplies an optional cgroup namespace to enter after moving the child process.
 
@@ -196,14 +193,9 @@ Return Value:
 
     try
     {
-        if (CgroupPath.has_value())
-        {
-            const auto Result = UtilMoveSelfToDistroCgroup(CgroupPath.value(), ChildName);
-            THROW_LAST_ERROR_IF(CgroupNamespaceFd >= 0 && Result < 0);
-        }
-
         if (CgroupNamespaceFd >= 0)
         {
+            THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, ChildName) < 0);
             THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, ChildName) < 0);
         }
 
