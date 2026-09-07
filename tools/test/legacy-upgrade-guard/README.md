@@ -75,9 +75,14 @@ mechanism; it does not validate the compiled updater or its deployment timing.
   journal. Both fixture products were removed afterward. Normal, crash,
   concurrent recovery and crash-then-normal-reboot probes were repeated with
   the independent journal and passed; their temporary services were deleted.
+* The actual `wslinstaller` target builds with MSVC 19.44 for x64 Release,
+  both with the experimental option ON and OFF. On a Chinese Windows host,
+  explicit `/utf-8` C/C++ flags were needed for existing UTF-8 source files.
+  The toolchain requires Clang, ATL and x64/x86 Spectre runtime libraries.
 * One run in each condition is not a deterministic reproduction rate. The
   script disables activation before MSIX deployment, earlier than the C++
-  prototype. The full WSL build and compiled-updater VM test are not complete.
+  prototype. The complete WSL distribution build and compiled-updater VM
+  test are not complete.
 
 ## Unresolved before an upstream fix
 
