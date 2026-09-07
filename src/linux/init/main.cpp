@@ -2257,7 +2257,6 @@ void ProcessLaunchInitMessage(
         auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
-        bool bootInit = false;
         bool enableGuiApps = Config.EnableGuiApps;
         auto cgroupVersion = wsl::linux::WslDistributionConfig::CGroupVersion::v2;
         {
@@ -2265,7 +2264,6 @@ void ProcessLaunchInitMessage(
             if (File)
             {
                 std::vector<ConfigKey> ConfigKeys = {
-                    ConfigKey("boot.systemd", bootInit),
                     ConfigKey("general.guiApplications", enableGuiApps),
                     ConfigKey(
                         "automount.cgroups",
@@ -2310,11 +2308,7 @@ void ProcessLaunchInitMessage(
             try
             {
                 THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0);
-
-                if (bootInit)
-                {
-                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
-                }
+                THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
 
                 cleanup.release();
             }

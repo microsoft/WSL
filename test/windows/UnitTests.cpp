@@ -8030,8 +8030,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
         else
         {
-            VERIFY_ARE_EQUAL(cgroup1, std::wstring(L"0::/$\n"));
-            VERIFY_ARE_EQUAL(cgroup2, std::wstring(L"0::/$\n"));
+            VERIFY_ARE_EQUAL(cgroup1, std::wstring(L"0::/non-systemd$\n"));
+            VERIFY_ARE_EQUAL(cgroup2, std::wstring(L"0::/non-systemd$\n"));
 
             const auto distroInitCgroup = getOutput(L"cat /proc/1/cgroup");
             VERIFY_ARE_EQUAL(distroInitCgroup, std::wstring(L"0::/../..\n"));
@@ -8041,6 +8041,34 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
             const auto cgroupRoot = getOutput(L"findmnt -n -o FSROOT /sys/fs/cgroup");
             VERIFY_ARE_EQUAL(cgroupRoot, std::wstring(L"/\n"));
+
+            VERIFY_ARE_EQUAL(getOutput(L"cat /sys/fs/cgroup/cgroup.procs"), std::wstring{});
+            VERIFY_ARE_EQUAL(getOutput(L"cat /sys/fs/cgroup/cgroup.subtree_control"), std::wstring{});
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root /bin/sh -c \"echo +cpu +memory > /sys/fs/cgroup/cgroup.subtree_control\""), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"grep -qw cpu /sys/fs/cgroup/cgroup.subtree_control"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"grep -qw memory /sys/fs/cgroup/cgroup.subtree_control"), 0L);
+
+            VERIFY_ARE_EQUAL(getCgroup(LXSS_DISTRO_NAME_TEST_L), cgroup1);
+            VERIFY_ARE_EQUAL(getCgroup(secondDistroName), cgroup2);
+            VERIFY_ARE_EQUAL(getOutput(systemDistroArguments + L"cat -e /proc/self/cgroup"), cgroup1);
+            VERIFY_ARE_EQUAL(getOutput(L"cat /sys/fs/cgroup/cgroup.procs"), std::wstring{});
+            VERIFY_ARE_EQUAL(getOutput(L"cat /sys/fs/cgroup/non-systemd/cgroup.subtree_control"), std::wstring{});
+            VERIFY_ARE_EQUAL(getOutput(std::format(L"-d {} cat /sys/fs/cgroup/cgroup.subtree_control", secondDistroName)), std::wstring{});
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root mkdir /sys/fs/cgroup/wsl-test-workload"), 0L);
+            auto cleanupWorkload = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(L"-u root rmdir /sys/fs/cgroup/wsl-test-workload"); });
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(
+                    L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                    L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                    L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
+                    L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                    L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                    L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
+                0L);
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /sys/fs/cgroup/wsl-user"), 0L);
         }
