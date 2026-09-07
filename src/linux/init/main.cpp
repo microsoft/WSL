@@ -63,7 +63,6 @@ Abstract:
 #include "binfmt.h"
 #include "address.h"
 #include "SocketChannel.h"
-#include "WslDistributionConfig.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
 #define BINFMT_REGISTER_STRING BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"
@@ -2258,35 +2257,12 @@ void ProcessLaunchInitMessage(
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
         bool enableGuiApps = Config.EnableGuiApps;
-        auto cgroupVersion = wsl::linux::WslDistributionConfig::CGroupVersion::v2;
         {
             wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
             if (File)
             {
-                std::vector<ConfigKey> ConfigKeys = {
-                    ConfigKey("general.guiApplications", enableGuiApps),
-                    ConfigKey(
-                        "automount.cgroups",
-                        {{"v1", wsl::linux::WslDistributionConfig::CGroupVersion::v1}, {"v2", wsl::linux::WslDistributionConfig::CGroupVersion::v2}},
-                        cgroupVersion,
-                        nullptr)};
+                std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
                 ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
-            }
-        }
-
-        if (cgroupVersion == wsl::linux::WslDistributionConfig::CGroupVersion::v1)
-        {
-            const auto CommandLine = UtilReadFileContent(PROCFS_PATH "/cmdline");
-            constexpr std::string_view c_cgroupNoV1Option = "cgroup_no_v1=";
-            const auto Position = CommandLine.find(c_cgroupNoV1Option);
-            if (Position != std::string::npos)
-            {
-                auto Controllers = std::string_view{CommandLine}.substr(Position + c_cgroupNoV1Option.size());
-                Controllers = Controllers.substr(0, Controllers.find_first_of(" \n"));
-                if (Controllers == "all")
-                {
-                    cgroupVersion = wsl::linux::WslDistributionConfig::CGroupVersion::v2;
-                }
             }
         }
 
@@ -2316,7 +2292,7 @@ void ProcessLaunchInitMessage(
         }
 
         wil::unique_fd DistroCgroupNamespace;
-        if (!DistroCgroupPath.empty() && cgroupVersion == wsl::linux::WslDistributionConfig::CGroupVersion::v2)
+        if (!DistroCgroupPath.empty())
         {
             DistroCgroupNamespace = CreateDistroCgroupNamespace(DistroCgroupPath);
         }

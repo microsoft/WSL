@@ -1825,6 +1825,12 @@ try
 
     if (UtilIsUtilityVm())
     {
+        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1 && getenv(LX_WSL2_DISTRO_CGROUP_PATH) != nullptr)
+        {
+            Config.CGroup = WslDistributionConfig::CGroupVersion::v2;
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageCgroupV1IncompatibleWithDistroIsolation());
+        }
+
         if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1)
         {
             auto commandLine = UtilReadFileContent("/proc/cmdline");
@@ -1848,11 +1854,6 @@ try
                     DisabledControllers = wsl::shared::string::Split(list, ',');
                 }
             }
-        }
-
-        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1 && getenv(LX_WSL2_DISTRO_CGROUP_PATH) != nullptr)
-        {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageCgroupV1IncompatibleWithDistroIsolation());
         }
 
         if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1)

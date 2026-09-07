@@ -7929,8 +7929,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(readFile(secondPath), wsl::shared::string::WideToMultiByte(fileContent));
     }
 
-    void ValidateIsolatedCgroupLayout(bool systemd)
+    void ValidateIsolatedCgroupLayout(bool systemd, bool requestCgroupV1 = false)
     {
+        VERIFY_IS_FALSE(systemd && requestCgroupV1, L"Invalid test parameters: systemd and cgroup v1 cannot both be requested.");
+
         constexpr auto secondDistroName = L"cgroup-test-distro";
 
         // Ensure no stale state from a previous run.
@@ -7947,14 +7949,33 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         std::optional<decltype(EnableSystemd())> systemdCleanup;
         std::optional<decltype(EnableSystemd())> systemdCleanup2;
+        std::optional<DistroFileChange> cgroupConfig;
         if (systemd)
         {
             systemdCleanup.emplace(EnableSystemd());
             systemdCleanup2.emplace(EnableSystemd("", secondDistroName));
         }
 
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/bin/sh -c \"nohup sleep infinity >/dev/null 2>&1 &\""), 0L);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} /bin/sh -c \"nohup sleep infinity >/dev/null 2>&1 &\"", secondDistroName)), 0L);
+        if (requestCgroupV1)
+        {
+            cgroupConfig.emplace(L"/etc/wsl.conf", false);
+            cgroupConfig->SetContent(L"[automount]\ncgroups=v1\n");
+            LxssWriteWslDistroConfig("[automount]\ncgroups=v1\n", secondDistroName);
+            TerminateDistribution();
+            TerminateDistribution(secondDistroName);
+        }
+
+        for (const auto* distro : {LXSS_DISTRO_NAME_TEST_L, secondDistroName})
+        {
+            const auto [output, warnings] =
+                LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} /bin/sh -c \"nohup sleep infinity >/dev/null 2>&1 &\"", distro));
+            VERIFY_ARE_EQUAL(output, std::wstring{});
+            if (requestCgroupV1)
+            {
+                LogInfo("%ls startup warnings: %ls", distro, warnings.c_str());
+                VERIFY_IS_TRUE(warnings.find(wsl::shared::Localization::MessageCgroupV1IncompatibleWithDistroIsolation()) != std::wstring::npos);
+            }
+        }
 
         auto getCgroup = [](LPCWSTR distro) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} cat -e /proc/self/cgroup", distro));
@@ -7994,6 +8015,16 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command);
             return out;
         };
+
+        if (requestCgroupV1)
+        {
+            for (const auto* distro : {LXSS_DISTRO_NAME_TEST_L, secondDistroName})
+            {
+                VERIFY_ARE_EQUAL(getOutput(std::format(L"-d {} findmnt -n -o FSTYPE /sys/fs/cgroup", distro)), std::wstring(L"cgroup2\n"));
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} test ! -e /sys/fs/cgroup/unified", distro)), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} test ! -e /sys/fs/cgroup/cpu", distro)), 0L);
+            }
+        }
 
         if (systemd)
         {
@@ -8086,6 +8117,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
     WSL2_TEST_METHOD(IsolatedCgroupLayoutSystemd)
     {
         ValidateIsolatedCgroupLayout(true);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutOverridesV1)
+    {
+        ValidateIsolatedCgroupLayout(false, true);
     }
 
     WSL2_TEST_METHOD(IsolatedCgroupLayoutDisabled)
