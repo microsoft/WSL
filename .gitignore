@@ -15,6 +15,7 @@ tmp
 *.lib
 *.dll
 obj/
+/src/windows/wslopenvmm/target/
 Debug/
 Release/
 Properties/

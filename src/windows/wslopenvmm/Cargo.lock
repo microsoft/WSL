@@ -1150,9 +1150,11 @@ dependencies = [
  "prost-types",
  "protoc-bin-vendored",
  "tokio",
+ "tokio-stream",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
  "tower",
  "windows",
+ "windows-sys",
 ]

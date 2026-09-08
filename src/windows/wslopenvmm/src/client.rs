@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use tokio::runtime::Runtime;
@@ -8,10 +9,14 @@ use vmservice::{
     ConsommeBackend, CreateVmRequest, DirectBoot, DiskType, ModifyResourceRequest, ModifyType,
     NicConfig, PortConfig, ScsiDisk, VirtioConsoleConfig, VmConfig, vm_client::VmClient,
 };
-use windows::Win32::Foundation::{E_FAIL, ERROR_CONNECTION_ABORTED, S_OK, WAIT_TIMEOUT};
-use windows::core::HRESULT;
+use windows::Win32::Foundation::{E_FAIL, E_INVALIDARG, ERROR_ALREADY_EXISTS, ERROR_CONNECTION_ABORTED, ERROR_NOT_FOUND, S_OK, WAIT_TIMEOUT};
+use windows::core::{GUID, HRESULT};
+use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 
 use crate::{named_pipe, vmservice};
+
+#[cfg(test)]
+mod tests;
 
 pub struct VmConfigBuilder {
     inner: VmConfig,
@@ -25,6 +30,7 @@ struct VmHandleInner {
     runtime: Runtime,
     client: VmClient<tonic::transport::Channel>,
     timeout: Duration,
+    shares: BTreeMap<String, String>,
 }
 
 impl VmConfigBuilder {
@@ -65,6 +71,7 @@ impl VmConfigBuilder {
                     runtime,
                     client,
                     timeout,
+                    shares: BTreeMap::new(),
                 },
             }),
             Err(error) => Err(rpc_status_to_hresult(error)),
@@ -180,7 +187,11 @@ impl VmHandle {
     }
 
     pub fn teardown_vm(&mut self) -> HRESULT {
-        self.empty_rpc(|client, request| Box::pin(async move { client.teardown_vm(request).await }))
+        let result = self.empty_rpc(|client, request| Box::pin(async move { client.teardown_vm(request).await }));
+        if result.is_ok() {
+            self.inner.shares.clear();
+        }
+        result
     }
 
     pub fn quit(&mut self) -> HRESULT {
@@ -201,12 +212,61 @@ impl VmHandle {
         self.modify_disk(ModifyType::Remove, controller, lun, String::new(), false)
     }
 
-    pub fn bind_port(&mut self, host_port: u16, guest_port: u16, tcp: bool) -> HRESULT {
-        self.modify_port(ModifyType::Add, host_port, guest_port, tcp)
+    pub fn bind_port(&mut self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
+        self.modify_port(ModifyType::Update, host_port, guest_port, tcp, family)
     }
 
-    pub fn unbind_port(&mut self, host_port: u16, guest_port: u16, tcp: bool) -> HRESULT {
-        self.modify_port(ModifyType::Remove, host_port, guest_port, tcp)
+    pub fn unbind_port(&mut self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
+        self.modify_port(ModifyType::Remove, host_port, guest_port, tcp, family)
+    }
+
+    pub fn add_share(&mut self, tag: String, host_path: String, read_only: bool) -> HRESULT {
+        if self.inner.shares.contains_key(&tag) {
+            return HRESULT::from_win32(ERROR_ALREADY_EXISTS.0);
+        }
+        let instance_id = match GUID::new() {
+            Ok(instance_id) => format!("{instance_id:?}"),
+            Err(error) => return error.code(),
+        };
+        let request = vmservice::AddVpciDeviceRequest {
+            instance_id: instance_id.clone(),
+            device: Some(vmservice::PcieDeviceKind {
+                kind: Some(vmservice::pcie_device_kind::Kind::Virtio(vmservice::VirtioDevice {
+                    kind: Some(vmservice::virtio_device::Kind::Fs(vmservice::VirtioFs {
+                        tag: tag.clone(),
+                        root_path: host_path,
+                        read_only,
+                    })),
+                })),
+            }),
+        };
+        match self.inner.runtime.block_on(self.inner.client.add_vpci_device(
+            request_with_timeout(request, self.inner.timeout),
+        )) {
+            Ok(_) => {
+                self.inner.shares.insert(tag, instance_id);
+                S_OK
+            }
+            Err(error) => rpc_status_to_hresult(error),
+        }
+    }
+
+    pub fn remove_share(&mut self, tag: &str) -> HRESULT {
+        let Some(instance_id) = self.inner.shares.get(tag) else {
+            return HRESULT::from_win32(ERROR_NOT_FOUND.0);
+        };
+        let request = vmservice::RemoveVpciDeviceRequest {
+            instance_id: instance_id.clone(),
+        };
+        match self.inner.runtime.block_on(self.inner.client.remove_vpci_device(
+            request_with_timeout(request, self.inner.timeout),
+        )) {
+            Ok(_) => {
+                self.inner.shares.remove(tag);
+                S_OK
+            }
+            Err(error) => rpc_status_to_hresult(error),
+        }
     }
 
     fn empty_rpc<F>(&mut self, operation: F) -> HRESULT
@@ -256,7 +316,13 @@ impl VmHandle {
         host_port: u16,
         guest_port: u16,
         tcp: bool,
+        family: i32,
     ) -> HRESULT {
+        let host_address = match family {
+            family if family == i32::from(AF_INET) => "127.0.0.1",
+            family if family == i32::from(AF_INET6) => "::1",
+            _ => return E_INVALIDARG,
+        };
         let protocol = if tcp {
             vmservice::IpProtocol::Tcp
         } else {
@@ -272,6 +338,7 @@ impl VmHandle {
                             host_port: u32::from(host_port),
                             guest_port: u32::from(guest_port),
                             protocol: protocol as i32,
+                            host_address: host_address.to_string(),
                         }],
                     })),
                     ..Default::default()
