@@ -297,8 +297,6 @@ void PushImage(CLIExecutionContext& context)
 
     const auto reference = ImageReference::Parse(image);
 
-    // --all-tags pushes every tag in the repository, so a reference that already names one is rejected instead of
-    // being silently ignored.
     if (allTags && reference.Format != EnumReferenceFormatNone)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
