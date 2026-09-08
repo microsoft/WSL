@@ -2,6 +2,9 @@
 
 Investigation for https://github.com/microsoft/WSL/issues/41529.
 
+See [compiled-updater evidence](evidence.md) for the controlled ON/OFF results,
+selected MSI/registry observations, and the distinction from E_UNEXPECTED.
+
 This branch contains an **opt-in prototype, not a production fix**. The existing
 uninstall action in #40625 cannot protect upgrades from a package that predates
 that action. The prototype disables WSLService activation before the packaged
