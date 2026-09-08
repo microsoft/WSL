@@ -27,12 +27,12 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerExecCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true),
-        Argument::Create(ArgType::Command, true),
-        Argument::Create(ArgType::ForwardArgs, std::nullopt, std::nullopt, Localization::WSLCCLI_ContainerExecForwardArgsDescription()),
+        Argument::Create(ArgType::ContainerId, {.Required = true}),
+        Argument::Create(ArgType::Command, {.Required = true}),
+        Argument::Create(ArgType::ForwardArgs, {.Desc = Localization::WSLCCLI_ContainerExecForwardArgsDescription()}),
         Argument::Create(ArgType::Detach),
-        Argument::Create(ArgType::Env, false, Limit::Unlimited),
-        Argument::Create(ArgType::EnvFile, false, Limit::Unlimited),
+        Argument::Create(ArgType::Env, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::EnvFile, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),

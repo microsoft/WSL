@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, true, Limit::Unlimited),
+        Argument::Create(ArgType::ContainerId, {.Required = true, .Limit = Limit::Unlimited}),
         Argument::Create(ArgType::InspectFormat),
     };
 }
