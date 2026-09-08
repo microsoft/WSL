@@ -2259,6 +2259,7 @@ Return Value:
 
 {
     UtilSetThreadName("init-distro");
+    const auto distroName = UtilGetEnvironmentVariable(LX_WSL2_DISTRO_NAME_ENV);
 
     //
     // Set the close-on-exec flag on the socket file descriptor inherited from mini_init.
@@ -2495,7 +2496,7 @@ Return Value:
         auto WaitResult = waitpid(distroInitPid.value(), &Status, WNOHANG);
         if (WaitResult > 0 || (WaitResult < 0 && errno == ECHILD))
         {
-            LOG_ERROR("Init has exited. Terminating distribution");
+            LOG_INFO("Distribution {} init process {} exited", distroName, distroInitPid.value());
             InitTerminateInstanceInternal(Config);
             return;
         }
@@ -2620,7 +2621,7 @@ Return Value:
 
             if (distroInitExited)
             {
-                LOG_ERROR("Init has exited. Terminating distribution");
+                LOG_INFO("Distribution {} init process {} exited", distroName, distroInitPid.value());
                 break;
             }
         }

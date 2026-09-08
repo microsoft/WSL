@@ -1466,7 +1466,11 @@ AsyncTask HandleConnections(ISocket& listen, IShareList& shareList, CancelToken&
     }
     catch (...)
     {
-        LOG_CAUGHT_EXCEPTION();
+        if (util::LinuxErrorFromCaughtException() != LX_ECANCELED)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+
         token.Cancel();
     }
 

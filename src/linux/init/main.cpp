@@ -4226,8 +4226,6 @@ int main(int Argc, char* Argv[])
                     auto CgroupDir = UtilGetDistroCgroupPath(Result);
                     if (access(CgroupDir.c_str(), F_OK) == 0)
                     {
-                        LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
-
                         //
                         // Recursively rmdir the cgroup subtree.
                         //
