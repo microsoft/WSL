@@ -296,9 +296,9 @@ pub unsafe extern "C" fn WslOpenVmmVmBindPort(
     host_port: u16,
     guest_port: u16,
     tcp: i32,
-    _: i32,
+    family: i32,
 ) -> i32 {
-    unsafe { with_vm(vm, |vm| vm.bind_port(host_port, guest_port, tcp != 0)).0 }
+    unsafe { with_vm(vm, |vm| vm.bind_port(host_port, guest_port, tcp != 0, family)).0 }
 }
 
 #[unsafe(no_mangle)]
@@ -307,7 +307,37 @@ pub unsafe extern "C" fn WslOpenVmmVmUnbindPort(
     host_port: u16,
     guest_port: u16,
     tcp: i32,
-    _: i32,
+    family: i32,
 ) -> i32 {
-    unsafe { with_vm(vm, |vm| vm.unbind_port(host_port, guest_port, tcp != 0)).0 }
+    unsafe { with_vm(vm, |vm| vm.unbind_port(host_port, guest_port, tcp != 0, family)).0 }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn WslOpenVmmVmAddShare(
+    vm: *mut WslOpenVmmVm,
+    tag: *const u16,
+    host_path: *const u16,
+    read_only: i32,
+) -> i32 {
+    let tag = match unsafe { string_from_wide(tag) } {
+        Ok(tag) => tag,
+        Err(error) => return error.0,
+    };
+    let host_path = match unsafe { string_from_wide(host_path) } {
+        Ok(host_path) => host_path,
+        Err(error) => return error.0,
+    };
+    unsafe { with_vm(vm, |vm| vm.add_share(tag, host_path, read_only != 0)).0 }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn WslOpenVmmVmRemoveShare(
+    vm: *mut WslOpenVmmVm,
+    tag: *const u16,
+) -> i32 {
+    let tag = match unsafe { string_from_wide(tag) } {
+        Ok(tag) => tag,
+        Err(error) => return error.0,
+    };
+    unsafe { with_vm(vm, |vm| vm.remove_share(&tag)).0 }
 }
