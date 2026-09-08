@@ -571,7 +571,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetState([out] WSLCContainerState* State);
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
     HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] const WSLCProcessStartOptions* StartOptions, [out] IWSLCProcess** Process);
-    HRESULT Inspect([out] LPSTR* Output);
+    HRESULT Inspect([in] BOOL Size, [out] LPSTR* Output);
     HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] LONGLONG Since, [in] LONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
