@@ -60,6 +60,7 @@ struct ClusterDeleteCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(ArgMap& args) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -75,6 +76,7 @@ struct ClusterStatusCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(ArgMap& args) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -82,6 +84,69 @@ struct ClusterKubeconfigCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"kubeconfig";
     ClusterKubeconfigCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ValidateArgumentsInternal(ArgMap& args) const override;
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ClusterFleetCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"fleet";
+    ClusterFleetCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::vector<std::unique_ptr<Command>> GetCommands() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ClusterFleetJoinCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"join";
+    ClusterFleetJoinCommand(const std::wstring& parent) : Command(CommandName, {L"attach"}, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ValidateArgumentsInternal(ArgMap& args) const override;
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ClusterFleetLeaveCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"leave";
+    ClusterFleetLeaveCommand(const std::wstring& parent) : Command(CommandName, {L"detach"}, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ClusterFleetStatusCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"status";
+    ClusterFleetStatusCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
 

@@ -165,18 +165,18 @@ namespace {
         switch (type)
         {
             ADD_DEVELOPER_VALUE(DeveloperName);
-            ADD_DEVELOPER_VALUE(DeveloperDistro);
+            ADD_DEVELOPER_VALUE(ClusterDistro);
             ADD_DEVELOPER_VALUE(DeveloperHostName);
             ADD_DEVELOPER_VALUE(DeveloperNodeName);
             ADD_DEVELOPER_VALUE(DeveloperNodeIp);
             ADD_DEVELOPER_VALUE(DeveloperApiPort);
             ADD_DEVELOPER_VALUE(DeveloperKubernetesVersion);
             ADD_DEVELOPER_VALUE(DeveloperPodCidr);
-            ADD_DEVELOPER_VALUE(DeveloperDistribution);
+            ADD_DEVELOPER_VALUE(ClusterDistribution);
             ADD_DEVELOPER_VALUE(DeveloperCni);
             ADD_DEVELOPER_VALUE(DeveloperGpuVendor);
             ADD_DEVELOPER_VALUE(DeveloperNetwork);
-            ADD_DEVELOPER_VALUE(DeveloperKubeconfigOutput);
+            ADD_DEVELOPER_VALUE(ClusterOutput);
             ADD_DEVELOPER_VALUE(DeveloperMergeInto);
             ADD_DEVELOPER_VALUE(DeveloperAgentRepo);
             ADD_DEVELOPER_VALUE(DeveloperDiagnosticsOutput);
@@ -193,8 +193,8 @@ namespace {
         bool present = false;
         switch (type)
         {
-        case ArgType::DeveloperEnableGpu:
-            present = args.GetValue<ArgType::DeveloperEnableGpu>();
+        case ArgType::ClusterEnableGpu:
+            present = args.GetValue<ArgType::ClusterEnableGpu>();
             break;
         case ArgType::DeveloperMerge:
             present = args.GetValue<ArgType::DeveloperMerge>();
@@ -259,51 +259,23 @@ namespace {
     void AddTargetArguments(std::vector<std::wstring>& command, ArgMap& args)
     {
         AddValue(command, args, ArgType::DeveloperName, L"--name");
-        AddValue(command, args, ArgType::DeveloperDistro, L"--distro");
+        AddValue(command, args, ArgType::ClusterDistro, L"--distro");
     }
 
 } // namespace
 
-std::vector<std::unique_ptr<Command>> DeveloperClusterCommand::GetCommands() const
+std::vector<Argument> GetDeveloperClusterArguments(DeveloperClusterOperation operation)
 {
-    std::vector<std::unique_ptr<Command>> commands;
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"create", FullName(), DeveloperClusterOperation::Create));
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(
-        L"delete", FullName(), DeveloperClusterOperation::Delete, std::vector<std::wstring_view>{L"remove", L"rm"}));
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"status", FullName(), DeveloperClusterOperation::Status));
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"kubeconfig", FullName(), DeveloperClusterOperation::Kubeconfig));
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"diagnostics", FullName(), DeveloperClusterOperation::Diagnostics));
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"versions", FullName(), DeveloperClusterOperation::Versions));
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"distributions", FullName(), DeveloperClusterOperation::Distributions));
-    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"cnis", FullName(), DeveloperClusterOperation::Cnis));
-    return commands;
-}
-
-std::wstring DeveloperClusterCommand::ShortDescription() const
-{
-    return Localization::WSLCCLI_DeveloperClusterCommandDesc();
-}
-
-std::wstring DeveloperClusterCommand::LongDescription() const
-{
-    return Localization::WSLCCLI_DeveloperClusterCommandLongDesc();
-}
-
-void DeveloperClusterCommand::ExecuteInternal(CLIExecutionContext& context) const
-{
-    OutputHelp(context.Terminal);
-}
-
-std::vector<Argument> DeveloperClusterActionCommand::GetArguments() const
-{
-    std::vector<Argument> arguments{Argument::Create(ArgType::DeveloperAksEdgePath)};
-    switch (m_operation)
+    std::vector<Argument> arguments{
+        Argument::Create(ArgType::ClusterDeveloper),
+        Argument::Create(ArgType::DeveloperAksEdgePath)};
+    switch (operation)
     {
     case DeveloperClusterOperation::Create:
         arguments.insert(
             arguments.end(),
-            {Argument::Create(ArgType::DeveloperName, true),
-             Argument::Create(ArgType::DeveloperDistro),
+            {Argument::Create(ArgType::DeveloperName),
+             Argument::Create(ArgType::ClusterDistro),
              Argument::Create(ArgType::DeveloperHostName),
              Argument::Create(ArgType::DeveloperNodeName),
              Argument::Create(ArgType::DeveloperNodeIp),
@@ -312,29 +284,29 @@ std::vector<Argument> DeveloperClusterActionCommand::GetArguments() const
              Argument::Create(ArgType::DeveloperApiPort),
              Argument::Create(ArgType::DeveloperKubernetesVersion),
              Argument::Create(ArgType::DeveloperPodCidr),
-             Argument::Create(ArgType::DeveloperDistribution),
+             Argument::Create(ArgType::ClusterDistribution),
              Argument::Create(ArgType::DeveloperCni),
-             Argument::Create(ArgType::DeveloperEnableGpu),
+             Argument::Create(ArgType::ClusterEnableGpu),
              Argument::Create(ArgType::DeveloperGpuVendor),
              Argument::Create(ArgType::DeveloperNetwork),
-             Argument::Create(ArgType::DeveloperKubeconfigOutput),
+             Argument::Create(ArgType::ClusterOutput),
              Argument::Create(ArgType::DeveloperMerge),
              Argument::Create(ArgType::DeveloperMergeInto)});
         break;
     case DeveloperClusterOperation::Delete:
         arguments.insert(
             arguments.end(),
-            {Argument::Create(ArgType::DeveloperName), Argument::Create(ArgType::DeveloperDistro), Argument::Create(ArgType::DeveloperPruneKubeconfigFile)});
+            {Argument::Create(ArgType::DeveloperName), Argument::Create(ArgType::ClusterDistro), Argument::Create(ArgType::DeveloperPruneKubeconfigFile)});
         break;
     case DeveloperClusterOperation::Status:
-        arguments.push_back(Argument::Create(ArgType::DeveloperDistro));
+        arguments.push_back(Argument::Create(ArgType::ClusterDistro));
         break;
     case DeveloperClusterOperation::Kubeconfig:
         arguments.insert(
             arguments.end(),
-            {Argument::Create(ArgType::DeveloperName, true),
-             Argument::Create(ArgType::DeveloperDistro),
-             Argument::Create(ArgType::DeveloperKubeconfigOutput),
+            {Argument::Create(ArgType::DeveloperName),
+             Argument::Create(ArgType::ClusterDistro),
+             Argument::Create(ArgType::ClusterOutput),
              Argument::Create(ArgType::DeveloperMerge),
              Argument::Create(ArgType::DeveloperMergeInto)});
         break;
@@ -342,7 +314,7 @@ std::vector<Argument> DeveloperClusterActionCommand::GetArguments() const
         arguments.insert(
             arguments.end(),
             {Argument::Create(ArgType::DeveloperName),
-             Argument::Create(ArgType::DeveloperDistro),
+             Argument::Create(ArgType::ClusterDistro),
              Argument::Create(ArgType::DeveloperDiagnosticsOutput),
              Argument::Create(ArgType::DeveloperDiagnosticsSince),
              Argument::Create(ArgType::DeveloperRedact)});
@@ -356,34 +328,49 @@ std::vector<Argument> DeveloperClusterActionCommand::GetArguments() const
     return arguments;
 }
 
-void DeveloperClusterActionCommand::ValidateArgumentsInternal(ArgMap& args) const
+void ValidateDeveloperClusterArguments(DeveloperClusterOperation operation, ArgMap& args)
 {
+    if (!args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        throw ArgumentException(
+            Localization::WSLCCLI_DeveloperClusterRequiresDeveloper(),
+            Argument::Create(ArgType::ClusterDeveloper));
+    }
+
+    if ((operation == DeveloperClusterOperation::Create || operation == DeveloperClusterOperation::Kubeconfig) &&
+        !args.Contains(ArgType::DeveloperName))
+    {
+        throw ArgumentException(
+            Localization::WSLCCLI_DeveloperClusterNameRequired(),
+            {Argument::Create(ArgType::ClusterDeveloper), Argument::Create(ArgType::DeveloperName)});
+    }
+
     if (args.GetValue<ArgType::DeveloperMerge>() && args.Contains(ArgType::DeveloperMergeInto))
     {
         throw ArgumentException(
             Localization::WSLCCLI_DeveloperClusterMergeConflict(),
-            GetArgumentsForHelp({ArgType::DeveloperMerge, ArgType::DeveloperMergeInto}));
+            {Argument::Create(ArgType::DeveloperMerge), Argument::Create(ArgType::DeveloperMergeInto)});
     }
 
-    if (m_operation == DeveloperClusterOperation::Create && args.Contains(ArgType::DeveloperAgentDeb) && args.Contains(ArgType::DeveloperAgentRepo))
+    if (operation == DeveloperClusterOperation::Create && args.Contains(ArgType::DeveloperAgentDeb) && args.Contains(ArgType::DeveloperAgentRepo))
     {
         throw ArgumentException(
             Localization::WSLCCLI_DeveloperClusterAgentConflict(),
-            GetArgumentsForHelp({ArgType::DeveloperAgentDeb, ArgType::DeveloperAgentRepo}));
+            {Argument::Create(ArgType::DeveloperAgentDeb), Argument::Create(ArgType::DeveloperAgentRepo)});
     }
 
-    if (m_operation == DeveloperClusterOperation::Create && !args.Contains(ArgType::DeveloperAgentRepo) && ResolveAgentDeb(args).empty())
+    if (operation == DeveloperClusterOperation::Create && !args.Contains(ArgType::DeveloperAgentRepo) && ResolveAgentDeb(args).empty())
     {
         throw ArgumentException(
             Localization::WSLCCLI_DeveloperClusterAgentNotFound(),
-            GetArgumentsForHelp({ArgType::DeveloperAgentDeb, ArgType::DeveloperAgentRepo}));
+            {Argument::Create(ArgType::DeveloperAgentDeb), Argument::Create(ArgType::DeveloperAgentRepo)});
     }
 }
 
-void DeveloperClusterActionCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ExecuteDeveloperCluster(DeveloperClusterOperation operation, CLIExecutionContext& context)
 {
     std::vector<std::wstring> command;
-    switch (m_operation)
+    switch (operation)
     {
     case DeveloperClusterOperation::Create:
     {
@@ -395,13 +382,13 @@ void DeveloperClusterActionCommand::ExecuteInternal(CLIExecutionContext& context
         AddValue(command, context.Args, ArgType::DeveloperApiPort, L"--api-port");
         AddValue(command, context.Args, ArgType::DeveloperKubernetesVersion, L"--k8s-version");
         AddValue(command, context.Args, ArgType::DeveloperPodCidr, L"--pod-cidr");
-        AddValue(command, context.Args, ArgType::DeveloperDistribution, L"--distribution");
+        AddValue(command, context.Args, ArgType::ClusterDistribution, L"--distribution");
         AddValue(command, context.Args, ArgType::DeveloperCni, L"--cni");
         AddValue(command, context.Args, ArgType::DeveloperGpuVendor, L"--gpu-vendor");
         AddValue(command, context.Args, ArgType::DeveloperNetwork, L"--network");
-        AddValue(command, context.Args, ArgType::DeveloperKubeconfigOutput, L"--kubeconfig-out");
+        AddValue(command, context.Args, ArgType::ClusterOutput, L"--kubeconfig-out");
         AddValue(command, context.Args, ArgType::DeveloperMergeInto, L"--merge-into");
-        AddFlag(command, context.Args, ArgType::DeveloperEnableGpu, L"--enable-gpu");
+        AddFlag(command, context.Args, ArgType::ClusterEnableGpu, L"--enable-gpu");
         AddFlag(command, context.Args, ArgType::DeveloperMerge, L"--merge");
         AddValue(command, context.Args, ArgType::DeveloperAgentRepo, L"--agent-repo");
         if (!context.Args.Contains(ArgType::DeveloperAgentRepo))
@@ -418,12 +405,12 @@ void DeveloperClusterActionCommand::ExecuteInternal(CLIExecutionContext& context
         break;
     case DeveloperClusterOperation::Status:
         command = {L"status", L"--driver", L"wsl"};
-        AddValue(command, context.Args, ArgType::DeveloperDistro, L"--distro");
+        AddValue(command, context.Args, ArgType::ClusterDistro, L"--distro");
         break;
     case DeveloperClusterOperation::Kubeconfig:
         command = {L"kubeconfig", L"--driver", L"wsl"};
         AddTargetArguments(command, context.Args);
-        AddValue(command, context.Args, ArgType::DeveloperKubeconfigOutput, L"--kubeconfig-out");
+        AddValue(command, context.Args, ArgType::ClusterOutput, L"--kubeconfig-out");
         AddValue(command, context.Args, ArgType::DeveloperMergeInto, L"--merge-into");
         AddFlag(command, context.Args, ArgType::DeveloperMerge, L"--merge");
         break;
@@ -452,9 +439,9 @@ void DeveloperClusterActionCommand::ExecuteInternal(CLIExecutionContext& context
     }
 }
 
-std::wstring DeveloperClusterActionCommand::ShortDescription() const
+std::wstring DeveloperClusterShortDescription(DeveloperClusterOperation operation)
 {
-    switch (m_operation)
+    switch (operation)
     {
     case DeveloperClusterOperation::Create:
         return Localization::WSLCCLI_DeveloperClusterCreateDesc();
@@ -477,9 +464,9 @@ std::wstring DeveloperClusterActionCommand::ShortDescription() const
     THROW_HR(E_UNEXPECTED);
 }
 
-std::wstring DeveloperClusterActionCommand::LongDescription() const
+std::wstring DeveloperClusterLongDescription(DeveloperClusterOperation operation)
 {
-    switch (m_operation)
+    switch (operation)
     {
     case DeveloperClusterOperation::Create:
         return Localization::WSLCCLI_DeveloperClusterCreateLongDesc();
@@ -500,6 +487,31 @@ std::wstring DeveloperClusterActionCommand::LongDescription() const
     }
 
     THROW_HR(E_UNEXPECTED);
+}
+
+std::vector<Argument> DeveloperClusterActionCommand::GetArguments() const
+{
+    return GetDeveloperClusterArguments(m_operation);
+}
+
+void DeveloperClusterActionCommand::ValidateArgumentsInternal(ArgMap& args) const
+{
+    ValidateDeveloperClusterArguments(m_operation, args);
+}
+
+void DeveloperClusterActionCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    ExecuteDeveloperCluster(m_operation, context);
+}
+
+std::wstring DeveloperClusterActionCommand::ShortDescription() const
+{
+    return DeveloperClusterShortDescription(m_operation);
+}
+
+std::wstring DeveloperClusterActionCommand::LongDescription() const
+{
+    return DeveloperClusterLongDescription(m_operation);
 }
 
 } // namespace wsl::windows::wslc

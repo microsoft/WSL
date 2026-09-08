@@ -14,6 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "ArgumentConvertedTypes.h"
 #include "ClusterCommand.h"
+#include "DeveloperClusterCommand.h"
 #include "Exceptions.h"
 #include "SubProcess.h"
 #include "resource.h"
@@ -56,7 +57,15 @@ namespace {
         std::wstring Wheel;
         std::wstring BuildId;
         std::wstring Output;
+        std::wstring Fleet;
+        std::wstring FleetSubscription;
+        std::wstring FleetResourceGroup;
+        std::wstring FleetLocation;
+        std::wstring FleetMemberName;
         bool EnableGpu = false;
+        bool CreateFleet = false;
+        bool MoveFleet = false;
+        bool Yes = false;
     };
 
     std::wstring Trim(std::wstring value)
@@ -152,7 +161,13 @@ namespace {
             .Wheel = fromConfig(L"AKSARC_WHEEL_PATH"),
             .BuildId = fromConfig(L"AKSARC_BUILD_ID"),
             .Output = fromConfig(L"KUBECONFIG_OUTPUT"),
+            .Fleet = fromConfig(L"FLEET_NAME"),
+            .FleetSubscription = fromConfig(L"FLEET_SUBSCRIPTION"),
+            .FleetResourceGroup = fromConfig(L"FLEET_RESOURCE_GROUP"),
+            .FleetLocation = fromConfig(L"FLEET_LOCATION"),
+            .FleetMemberName = fromConfig(L"FLEET_MEMBER_NAME"),
             .EnableGpu = _wcsicmp(fromConfig(L"ENABLE_GPU", L"false").c_str(), L"true") == 0,
+            .CreateFleet = _wcsicmp(fromConfig(L"CREATE_FLEET", L"false").c_str(), L"true") == 0,
         };
 
         Override<ArgType::ClusterSubscription>(options.Subscription, args);
@@ -170,9 +185,33 @@ namespace {
         Override<ArgType::ClusterWheel>(options.Wheel, args);
         Override<ArgType::ClusterBuildId>(options.BuildId, args);
         Override<ArgType::ClusterOutput>(options.Output, args);
+        Override<ArgType::ClusterFleet>(options.Fleet, args);
+        Override<ArgType::ClusterFleetSubscription>(options.FleetSubscription, args);
+        Override<ArgType::ClusterFleetResourceGroup>(options.FleetResourceGroup, args);
+        Override<ArgType::ClusterFleetLocation>(options.FleetLocation, args);
+        Override<ArgType::ClusterFleetMemberName>(options.FleetMemberName, args);
         if (args.GetValue<ArgType::ClusterEnableGpu>())
         {
             options.EnableGpu = true;
+        }
+        if (args.GetValue<ArgType::ClusterFleetCreate>())
+        {
+            options.CreateFleet = true;
+        }
+        options.MoveFleet = args.GetValue<ArgType::ClusterFleetMove>();
+        options.Yes = args.GetValue<ArgType::ClusterFleetYes>();
+
+        if (options.FleetSubscription.empty())
+        {
+            options.FleetSubscription = options.Subscription;
+        }
+        if (options.FleetResourceGroup.empty())
+        {
+            options.FleetResourceGroup = options.ResourceGroup;
+        }
+        if (options.FleetLocation.empty())
+        {
+            options.FleetLocation = options.Location;
         }
 
         return options;
@@ -458,6 +497,475 @@ namespace {
         return arguments;
     }
 
+    std::vector<Argument> FleetArguments(bool includeCreateOptions)
+    {
+        std::vector<Argument> arguments{
+            Argument::Create(ArgType::ClusterFleet),
+            Argument::Create(ArgType::ClusterFleetSubscription),
+            Argument::Create(ArgType::ClusterFleetResourceGroup),
+            Argument::Create(ArgType::ClusterFleetMemberName),
+        };
+        if (includeCreateOptions)
+        {
+            arguments.push_back(Argument::Create(ArgType::ClusterFleetLocation));
+            arguments.push_back(Argument::Create(ArgType::ClusterFleetCreate));
+            arguments.push_back(Argument::Create(ArgType::ClusterFleetMove));
+        }
+        return arguments;
+    }
+
+    void AppendArguments(std::vector<Argument>& target, std::vector<Argument>&& source)
+    {
+        for (auto& argument : source)
+        {
+            if (std::ranges::none_of(target, [&](const auto& existing) { return existing.Type() == argument.Type(); }))
+            {
+                target.push_back(std::move(argument));
+            }
+        }
+    }
+
+    std::optional<ArgType> FindPresentArgument(const ArgMap& args, std::initializer_list<ArgType> types)
+    {
+        const auto found = std::ranges::find_if(types, [&](ArgType type) { return args.Contains(type); });
+        return found == types.end() ? std::nullopt : std::optional{*found};
+    }
+
+    std::vector<Argument> RelatedArguments(std::initializer_list<ArgType> types)
+    {
+        std::vector<Argument> arguments;
+        arguments.reserve(types.size());
+        std::ranges::transform(types, std::back_inserter(arguments), [](ArgType type) { return Argument::Create(type); });
+        return arguments;
+    }
+
+    void ValidateManagedArguments(ArgMap& args, std::initializer_list<ArgType> additionalDeveloperOptions = {})
+    {
+        const auto developerOption = FindPresentArgument(
+            args,
+            {ArgType::DeveloperAksEdgePath,
+             ArgType::DeveloperAgentDeb,
+             ArgType::DeveloperAgentRepo,
+             ArgType::DeveloperApiPort,
+             ArgType::DeveloperCni,
+             ArgType::DeveloperDiagnosticsOutput,
+             ArgType::DeveloperDiagnosticsSince,
+             ArgType::DeveloperGpuVendor,
+             ArgType::DeveloperHostName,
+             ArgType::DeveloperKubernetesVersion,
+             ArgType::DeveloperMerge,
+             ArgType::DeveloperMergeInto,
+             ArgType::DeveloperName,
+             ArgType::DeveloperNetwork,
+             ArgType::DeveloperNodeIp,
+             ArgType::DeveloperNodeName,
+             ArgType::DeveloperPodCidr,
+             ArgType::DeveloperPruneKubeconfigFile,
+             ArgType::DeveloperRedact});
+        const auto offending = developerOption ? developerOption : FindPresentArgument(args, additionalDeveloperOptions);
+        if (offending)
+        {
+            const auto argument = Argument::Create(*offending);
+            throw ArgumentException(
+                Localization::WSLCCLI_ClusterDeveloperOptionRequiresMode(argument.Name()),
+                RelatedArguments({*offending, ArgType::ClusterDeveloper}));
+        }
+    }
+
+    void ValidateDeveloperModeArguments(DeveloperClusterOperation operation, ArgMap& args)
+    {
+        const auto managedOption = FindPresentArgument(
+            args,
+            {ArgType::ClusterAuthMode,
+             ArgType::ClusterBuildId,
+             ArgType::ClusterClientId,
+             ArgType::ClusterClientSecret,
+             ArgType::ClusterCmpName,
+             ArgType::ClusterCmpResourceGroup,
+             ArgType::ClusterCmpSubscription,
+             ArgType::ClusterConfig,
+             ArgType::ClusterFleet,
+             ArgType::ClusterFleetCreate,
+             ArgType::ClusterFleetLocation,
+             ArgType::ClusterFleetMemberName,
+             ArgType::ClusterFleetMove,
+             ArgType::ClusterFleetResourceGroup,
+             ArgType::ClusterFleetSubscription,
+             ArgType::ClusterFleetYes,
+             ArgType::ClusterLocation,
+             ArgType::ClusterResourceGroup,
+             ArgType::ClusterSubscription,
+             ArgType::ClusterTenantId,
+             ArgType::ClusterWheel});
+        if (managedOption)
+        {
+            const auto argument = Argument::Create(*managedOption);
+            throw ArgumentException(
+                Localization::WSLCCLI_ClusterManagedOptionWithDeveloper(argument.Name()),
+                RelatedArguments({*managedOption, ArgType::ClusterDeveloper}));
+        }
+
+        ValidateDeveloperClusterArguments(operation, args);
+    }
+
+    void ValidateFleetOptions(ArgMap& args, bool requireFleet)
+    {
+        const bool hasFleet = args.Contains(ArgType::ClusterFleet);
+        const bool mayHaveFleetInConfig = args.Contains(ArgType::ClusterConfig);
+        if (requireFleet && !hasFleet && !mayHaveFleetInConfig)
+        {
+            throw ArgumentException(
+                Localization::WSLCCLI_ClusterFleetRequired(),
+                Argument::Create(ArgType::ClusterFleet));
+        }
+
+        if (!hasFleet && !mayHaveFleetInConfig &&
+            FindPresentArgument(
+                args,
+                {ArgType::ClusterFleetCreate,
+                 ArgType::ClusterFleetLocation,
+                 ArgType::ClusterFleetMemberName,
+                 ArgType::ClusterFleetMove,
+                 ArgType::ClusterFleetResourceGroup,
+                 ArgType::ClusterFleetSubscription}))
+        {
+            throw ArgumentException(
+                Localization::WSLCCLI_ClusterFleetRequired(),
+                Argument::Create(ArgType::ClusterFleet));
+        }
+    }
+
+    struct FleetMembership
+    {
+        std::wstring Id;
+        std::wstring MemberName;
+        std::wstring FleetId;
+    };
+
+    struct FleetMembershipCoordinates
+    {
+        std::wstring Subscription;
+        std::wstring ResourceGroup;
+        std::wstring Fleet;
+        std::wstring MemberName;
+    };
+
+    std::wstring ResourceName(std::wstring_view id)
+    {
+        const auto slash = id.find_last_of(L'/');
+        return std::wstring{id.substr(slash == std::wstring_view::npos ? 0 : slash + 1)};
+    }
+
+    std::wstring ResourceIdSegment(std::wstring_view id, std::wstring_view segment)
+    {
+        const auto marker = std::format(L"/{}/", segment);
+        const auto start = id.find(marker);
+        if (start == std::wstring_view::npos)
+        {
+            return {};
+        }
+
+        const auto valueStart = start + marker.size();
+        const auto end = id.find(L'/', valueStart);
+        return std::wstring{id.substr(valueStart, end == std::wstring_view::npos ? id.size() - valueStart : end - valueStart)};
+    }
+
+    std::wstring ExpectedFleetId(const ClusterOptions& options)
+    {
+        return std::format(
+            L"/subscriptions/{}/resourceGroups/{}/providers/Microsoft.ContainerService/fleets/{}",
+            options.FleetSubscription,
+            options.FleetResourceGroup,
+            options.Fleet);
+    }
+
+    std::vector<FleetMembership> ParseMemberships(std::wstring_view output)
+    {
+        std::vector<FleetMembership> memberships;
+        size_t offset = 0;
+        while (offset < output.size())
+        {
+            const auto end = output.find_first_of(L"\r\n", offset);
+            auto line = Trim(std::wstring{output.substr(offset, end == std::wstring_view::npos ? output.size() - offset : end - offset)});
+            offset = end == std::wstring_view::npos ? output.size() : output.find_first_not_of(L"\r\n", end);
+            if (offset == std::wstring_view::npos)
+            {
+                offset = output.size();
+            }
+            if (line.empty())
+            {
+                continue;
+            }
+
+            const auto tab = line.find(L'\t');
+            const auto id = tab == std::wstring::npos ? line : line.substr(0, tab);
+            const auto marker = id.rfind(L"/members/");
+            if (marker == std::wstring::npos)
+            {
+                continue;
+            }
+
+            memberships.push_back(
+                {.Id = id,
+                 .MemberName = tab == std::wstring::npos ? ResourceName(id) : Trim(line.substr(tab + 1)),
+                 .FleetId = id.substr(0, marker)});
+        }
+
+        return memberships;
+    }
+
+    void EnsureFleetExtensions(const std::wstring& distro)
+    {
+        const auto script =
+            "set -e; "
+            "az extension add --name fleet --upgrade --only-show-errors >/dev/null; "
+            "az extension add --name resource-graph --upgrade --only-show-errors >/dev/null";
+        if (RunWslScript(distro, script) != 0)
+        {
+            throw ExecutionException(Localization::WSLCCLI_ClusterFleetExtensionFailed());
+        }
+    }
+
+    std::wstring ResolveConnectedClusterId(const ClusterOptions& options)
+    {
+        const auto script = std::format(
+            "set -e; az account set --subscription {0}; "
+            "cluster=$(az aksarc list -g {1} --query '[0].name' -o tsv); "
+            "[ -n \"$cluster\" ] || {{ echo 'AKS Arc cluster not found' >&2; exit 1; }}; "
+            "for attempt in $(seq 1 30); do "
+            "id=$(az connectedk8s show -g {1} -n \"$cluster\" --query id -o tsv 2>/dev/null || true); "
+            "[ -n \"$id\" ] && {{ printf '%%s\\n' \"$id\"; exit 0; }}; sleep 10; done; "
+            "echo 'Arc-connected Kubernetes resource not found' >&2; exit 1",
+            ShellQuote(options.Subscription),
+            ShellQuote(options.ResourceGroup));
+        const auto result = CaptureWslScript(options.Distro, script);
+        if (result.ExitCode != 0 || Trim(result.Stdout).empty())
+        {
+            throw ExecutionException(Localization::WSLCCLI_ClusterFleetConnectedClusterNotFound());
+        }
+
+        return Trim(result.Stdout);
+    }
+
+    std::wstring ResolveFleetId(const ClusterOptions& options)
+    {
+        const auto result = CaptureWslScript(
+            options.Distro,
+            std::format(
+                "az fleet show --subscription {0} -g {1} -n {2} --query id -o tsv",
+                ShellQuote(options.FleetSubscription),
+                ShellQuote(options.FleetResourceGroup),
+                ShellQuote(options.Fleet)));
+        if (result.ExitCode == 0)
+        {
+            return Trim(result.Stdout);
+        }
+
+        const auto error = result.Stderr + result.Stdout;
+        if (error.find(L"ResourceNotFound") != std::wstring::npos || error.find(L"ResourceGroupNotFound") != std::wstring::npos)
+        {
+            return {};
+        }
+
+        throw ExecutionException(Localization::WSLCCLI_ClusterFleetLookupFailed(options.Fleet));
+    }
+
+    std::vector<FleetMembership> FindFleetMemberships(const ClusterOptions& options, const std::wstring& clusterId)
+    {
+        const auto result = CaptureWslScript(
+            options.Distro,
+            std::format(
+                "az graph query -q \"Resources | where type =~ 'microsoft.containerservice/fleets/members' | "
+                "where tostring(properties.clusterResourceId) =~ '{}' | project id, name\" "
+                "--query 'data[].[id, name]' -o tsv",
+                WideToMultiByte(clusterId)));
+        if (result.ExitCode != 0)
+        {
+            throw ExecutionException(Localization::WSLCCLI_ClusterFleetMembershipLookupFailed());
+        }
+
+        return ParseMemberships(result.Stdout);
+    }
+
+    FleetMembershipCoordinates GetMembershipCoordinates(const FleetMembership& membership)
+    {
+        FleetMembershipCoordinates result{
+            .Subscription = ResourceIdSegment(membership.Id, L"subscriptions"),
+            .ResourceGroup = ResourceIdSegment(membership.Id, L"resourceGroups"),
+            .Fleet = ResourceName(membership.FleetId),
+            .MemberName = membership.MemberName};
+        if (result.Subscription.empty() || result.ResourceGroup.empty() || result.Fleet.empty() || result.MemberName.empty())
+        {
+            throw ExecutionException(Localization::WSLCCLI_ClusterFleetInvalidMembershipId(membership.Id));
+        }
+
+        return result;
+    }
+
+    bool DeleteMembership(const ClusterOptions& options, const FleetMembershipCoordinates& membership)
+    {
+        return RunWslScript(
+                   options.Distro,
+                   std::format(
+                       "az fleet member delete --subscription {0} -g {1} --fleet-name {2} -n {3} --yes --only-show-errors",
+                       ShellQuote(membership.Subscription),
+                       ShellQuote(membership.ResourceGroup),
+                       ShellQuote(membership.Fleet),
+                       ShellQuote(membership.MemberName))) == 0;
+    }
+
+    bool CreateMembership(
+        const ClusterOptions& options,
+        const std::wstring& fleetSubscription,
+        const std::wstring& fleetResourceGroup,
+        const std::wstring& fleet,
+        const std::wstring& memberName,
+        const std::wstring& clusterId)
+    {
+        return RunWslScript(
+                   options.Distro,
+                   std::format(
+                       "az fleet member create --subscription {0} -g {1} --fleet-name {2} -n {3} "
+                       "--member-cluster-id {4} --only-show-errors",
+                       ShellQuote(fleetSubscription),
+                       ShellQuote(fleetResourceGroup),
+                       ShellQuote(fleet),
+                       ShellQuote(memberName),
+                       ShellQuote(clusterId))) == 0;
+    }
+
+    bool Confirm(Terminal& terminal, std::wstring_view prompt)
+    {
+        if (!terminal.IsInputInteractive())
+        {
+            return false;
+        }
+
+        auto response = Trim(terminal.PromptForLine(prompt));
+        std::ranges::transform(response, response.begin(), [](wchar_t value) { return std::towlower(value); });
+        return response == L"y" || response == L"yes";
+    }
+
+    std::wstring EnsureFleet(CLIExecutionContext& context, const ClusterOptions& options)
+    {
+        if (auto fleetId = ResolveFleetId(options); !fleetId.empty())
+        {
+            return fleetId;
+        }
+
+        if (!options.CreateFleet &&
+            !Confirm(
+                context.Terminal,
+                Localization::WSLCCLI_ClusterFleetCreatePrompt(
+                    options.Fleet, options.FleetSubscription, options.FleetResourceGroup, options.FleetLocation)))
+        {
+            throw ExecutionException(Localization::WSLCCLI_ClusterFleetCreateDeclined(options.Fleet));
+        }
+
+        const auto script = std::format(
+            "set -e; "
+            "az group show --subscription {0} -n {1} >/dev/null 2>&1 || "
+            "az group create --subscription {0} -n {1} -l {2} --only-show-errors >/dev/null; "
+            "az fleet create --subscription {0} -g {1} -n {3} -l {2} "
+            "--enable-hub --enable-managed-identity --only-show-errors --query id -o tsv",
+            ShellQuote(options.FleetSubscription),
+            ShellQuote(options.FleetResourceGroup),
+            ShellQuote(options.FleetLocation),
+            ShellQuote(options.Fleet));
+        const auto result = CaptureWslScript(options.Distro, script);
+        if (result.ExitCode != 0 || Trim(result.Stdout).empty())
+        {
+            throw ExecutionException(Localization::WSLCCLI_ClusterFleetCreateFailed(options.Fleet));
+        }
+
+        return Trim(result.Stdout);
+    }
+
+    void JoinFleet(CLIExecutionContext& context, const ClusterOptions& options)
+    {
+        EnsureFleetExtensions(options.Distro);
+        const auto clusterId = ResolveConnectedClusterId(options);
+        const auto memberships = FindFleetMemberships(options, clusterId);
+        const auto expectedFleetId = ExpectedFleetId(options);
+        for (const auto& membership : memberships)
+        {
+            if (_wcsicmp(membership.FleetId.c_str(), expectedFleetId.c_str()) == 0)
+            {
+                context.Terminal.Info(
+                    L"{}", Localization::WSLCCLI_ClusterFleetAlreadyJoined(options.Fleet, membership.MemberName));
+                return;
+            }
+
+            if (!options.MoveFleet)
+            {
+                throw ExecutionException(
+                    Localization::WSLCCLI_ClusterFleetAlreadyMember(ResourceName(membership.FleetId)));
+            }
+        }
+
+        std::vector<FleetMembershipCoordinates> membershipCoordinates;
+        membershipCoordinates.reserve(memberships.size());
+        std::ranges::transform(memberships, std::back_inserter(membershipCoordinates), GetMembershipCoordinates);
+
+        EnsureFleet(context, options);
+        size_t removedMemberships = 0;
+        for (const auto& membership : membershipCoordinates)
+        {
+            if (!DeleteMembership(options, membership))
+            {
+                bool restored = true;
+                for (size_t index = 0; index < removedMemberships; ++index)
+                {
+                    const auto& removed = membershipCoordinates[index];
+                    restored &=
+                        CreateMembership(
+                            options,
+                            removed.Subscription,
+                            removed.ResourceGroup,
+                            removed.Fleet,
+                            removed.MemberName,
+                            clusterId);
+                }
+                if (!restored)
+                {
+                    throw ExecutionException(Localization::WSLCCLI_ClusterFleetMoveRollbackFailed(options.Fleet));
+                }
+                throw ExecutionException(Localization::WSLCCLI_ClusterFleetDetachFailed());
+            }
+            ++removedMemberships;
+        }
+
+        const auto memberName = options.FleetMemberName.empty() ? ResourceName(clusterId) : options.FleetMemberName;
+        if (!CreateMembership(
+                options,
+                options.FleetSubscription,
+                options.FleetResourceGroup,
+                options.Fleet,
+                memberName,
+                clusterId))
+        {
+            bool restored = true;
+            for (const auto& membership : membershipCoordinates)
+            {
+                restored &=
+                    CreateMembership(
+                        options,
+                        membership.Subscription,
+                        membership.ResourceGroup,
+                        membership.Fleet,
+                        membership.MemberName,
+                        clusterId);
+            }
+            if (!restored)
+            {
+                throw ExecutionException(Localization::WSLCCLI_ClusterFleetMoveRollbackFailed(options.Fleet));
+            }
+            throw ExecutionException(Localization::WSLCCLI_ClusterFleetJoinFailed(options.Fleet));
+        }
+
+        context.Terminal.Info(L"{}", Localization::WSLCCLI_ClusterFleetJoined(options.Fleet, memberName));
+    }
+
 } // namespace
 
 std::vector<Argument> ClusterCommand::GetArguments() const
@@ -472,6 +980,13 @@ std::vector<std::unique_ptr<Command>> ClusterCommand::GetCommands() const
     commands.push_back(std::make_unique<ClusterDeleteCommand>(FullName()));
     commands.push_back(std::make_unique<ClusterStatusCommand>(FullName()));
     commands.push_back(std::make_unique<ClusterKubeconfigCommand>(FullName()));
+    commands.push_back(std::make_unique<ClusterFleetCommand>(FullName()));
+    commands.push_back(
+        std::make_unique<DeveloperClusterActionCommand>(L"diagnostics", FullName(), DeveloperClusterOperation::Diagnostics));
+    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"versions", FullName(), DeveloperClusterOperation::Versions));
+    commands.push_back(
+        std::make_unique<DeveloperClusterActionCommand>(L"distributions", FullName(), DeveloperClusterOperation::Distributions));
+    commands.push_back(std::make_unique<DeveloperClusterActionCommand>(L"cnis", FullName(), DeveloperClusterOperation::Cnis));
     return commands;
 }
 
@@ -490,7 +1005,7 @@ void ClusterCommand::ExecuteInternal(CLIExecutionContext& context) const
 
 std::vector<Argument> ClusterCreateCommand::GetArguments() const
 {
-    return {
+    std::vector<Argument> arguments{
         Argument::Create(ArgType::ClusterConfig),
         Argument::Create(ArgType::ClusterSubscription),
         Argument::Create(ArgType::ClusterResourceGroup),
@@ -508,10 +1023,21 @@ std::vector<Argument> ClusterCreateCommand::GetArguments() const
         Argument::Create(ArgType::ClusterBuildId),
         Argument::Create(ArgType::ClusterEnableGpu),
     };
+    AppendArguments(arguments, GetDeveloperClusterArguments(DeveloperClusterOperation::Create));
+    AppendArguments(arguments, FleetArguments(true));
+    return arguments;
 }
 
 void ClusterCreateCommand::ValidateArgumentsInternal(ArgMap& args) const
 {
+    if (args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ValidateDeveloperModeArguments(DeveloperClusterOperation::Create, args);
+        return;
+    }
+
+    ValidateManagedArguments(args, {ArgType::ClusterOutput});
+    ValidateFleetOptions(args, false);
     if (args.Contains(ArgType::ClusterAuthMode) && args.GetValue<ArgType::ClusterAuthMode>() == L"sp" &&
         (!args.Contains(ArgType::ClusterConfig) && (!args.Contains(ArgType::ClusterClientId) || !args.Contains(ArgType::ClusterClientSecret))))
     {
@@ -530,7 +1056,17 @@ std::wstring ClusterCreateCommand::LongDescription() const
 
 void ClusterCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    if (context.Args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ExecuteDeveloperCluster(DeveloperClusterOperation::Create, context);
+        return;
+    }
+
     const auto options = GetOptions(context.Args);
+    if (options.Fleet.empty() && options.CreateFleet)
+    {
+        throw ExecutionException(Localization::WSLCCLI_ClusterFleetRequired());
+    }
     Require(options.Subscription, L"--subscription");
     Require(options.ResourceGroup, L"--resource-group");
     Require(options.TenantId, L"--tenant-id");
@@ -583,11 +1119,18 @@ void ClusterCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         throw ExecutionException(L"AKS Arc deployment failed.");
     }
+
+    if (!options.Fleet.empty())
+    {
+        JoinFleet(context, options);
+    }
 }
 
 std::vector<Argument> ClusterDeleteCommand::GetArguments() const
 {
-    return ConnectionArguments(false);
+    auto arguments = ConnectionArguments(false);
+    AppendArguments(arguments, GetDeveloperClusterArguments(DeveloperClusterOperation::Delete));
+    return arguments;
 }
 std::wstring ClusterDeleteCommand::ShortDescription() const
 {
@@ -598,8 +1141,25 @@ std::wstring ClusterDeleteCommand::LongDescription() const
     return Localization::WSLCCLI_ClusterDeleteLongDesc();
 }
 
+void ClusterDeleteCommand::ValidateArgumentsInternal(ArgMap& args) const
+{
+    if (args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ValidateDeveloperModeArguments(DeveloperClusterOperation::Delete, args);
+        return;
+    }
+
+    ValidateManagedArguments(args);
+}
+
 void ClusterDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    if (context.Args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ExecuteDeveloperCluster(DeveloperClusterOperation::Delete, context);
+        return;
+    }
+
     const auto options = GetOptions(context.Args);
     Require(options.Subscription, L"--subscription");
     Require(options.ResourceGroup, L"--resource-group");
@@ -639,7 +1199,9 @@ void ClusterDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
 
 std::vector<Argument> ClusterStatusCommand::GetArguments() const
 {
-    return ConnectionArguments(false);
+    auto arguments = ConnectionArguments(false);
+    AppendArguments(arguments, GetDeveloperClusterArguments(DeveloperClusterOperation::Status));
+    return arguments;
 }
 std::wstring ClusterStatusCommand::ShortDescription() const
 {
@@ -650,8 +1212,25 @@ std::wstring ClusterStatusCommand::LongDescription() const
     return Localization::WSLCCLI_ClusterStatusLongDesc();
 }
 
+void ClusterStatusCommand::ValidateArgumentsInternal(ArgMap& args) const
+{
+    if (args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ValidateDeveloperModeArguments(DeveloperClusterOperation::Status, args);
+        return;
+    }
+
+    ValidateManagedArguments(args);
+}
+
 void ClusterStatusCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    if (context.Args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ExecuteDeveloperCluster(DeveloperClusterOperation::Status, context);
+        return;
+    }
+
     const auto options = GetOptions(context.Args);
     if (!DistroExists(options.Distro))
     {
@@ -677,6 +1256,7 @@ std::vector<Argument> ClusterKubeconfigCommand::GetArguments() const
 {
     auto arguments = ConnectionArguments(false);
     arguments.push_back(Argument::Create(ArgType::ClusterOutput));
+    AppendArguments(arguments, GetDeveloperClusterArguments(DeveloperClusterOperation::Kubeconfig));
     return arguments;
 }
 std::wstring ClusterKubeconfigCommand::ShortDescription() const
@@ -688,8 +1268,25 @@ std::wstring ClusterKubeconfigCommand::LongDescription() const
     return Localization::WSLCCLI_ClusterKubeconfigLongDesc();
 }
 
+void ClusterKubeconfigCommand::ValidateArgumentsInternal(ArgMap& args) const
+{
+    if (args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ValidateDeveloperModeArguments(DeveloperClusterOperation::Kubeconfig, args);
+        return;
+    }
+
+    ValidateManagedArguments(args);
+}
+
 void ClusterKubeconfigCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    if (context.Args.GetValue<ArgType::ClusterDeveloper>())
+    {
+        ExecuteDeveloperCluster(DeveloperClusterOperation::Kubeconfig, context);
+        return;
+    }
+
     const auto options = GetOptions(context.Args);
     if (!DistroExists(options.Distro))
     {
@@ -729,6 +1326,164 @@ void ClusterKubeconfigCommand::ExecuteInternal(CLIExecutionContext& context) con
     output.write(utf8.data(), utf8.size());
     THROW_HR_IF(E_FAIL, !output);
     context.Terminal.Info(L"Wrote kubeconfig to '{}'.\n", options.Output);
+}
+
+std::vector<Argument> ClusterFleetCommand::GetArguments() const
+{
+    return {};
+}
+
+std::vector<std::unique_ptr<Command>> ClusterFleetCommand::GetCommands() const
+{
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.push_back(std::make_unique<ClusterFleetJoinCommand>(FullName()));
+    commands.push_back(std::make_unique<ClusterFleetLeaveCommand>(FullName()));
+    commands.push_back(std::make_unique<ClusterFleetStatusCommand>(FullName()));
+    return commands;
+}
+
+std::wstring ClusterFleetCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetCommandDesc();
+}
+
+std::wstring ClusterFleetCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetCommandLongDesc();
+}
+
+void ClusterFleetCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    OutputHelp(context.Terminal);
+}
+
+std::vector<Argument> ClusterFleetJoinCommand::GetArguments() const
+{
+    auto arguments = ConnectionArguments(false);
+    AppendArguments(arguments, FleetArguments(true));
+    return arguments;
+}
+
+void ClusterFleetJoinCommand::ValidateArgumentsInternal(ArgMap& args) const
+{
+    ValidateFleetOptions(args, true);
+}
+
+std::wstring ClusterFleetJoinCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetJoinDesc();
+}
+
+std::wstring ClusterFleetJoinCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetJoinLongDesc();
+}
+
+void ClusterFleetJoinCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    const auto options = GetOptions(context.Args);
+    Require(options.Subscription, L"--subscription");
+    Require(options.ResourceGroup, L"--resource-group");
+    Require(options.Distro, L"--distro");
+    Require(options.Fleet, L"--fleet");
+    Require(options.FleetSubscription, L"--fleet-subscription");
+    Require(options.FleetResourceGroup, L"--fleet-resource-group");
+    JoinFleet(context, options);
+}
+
+std::vector<Argument> ClusterFleetLeaveCommand::GetArguments() const
+{
+    auto arguments = ConnectionArguments(false);
+    arguments.push_back(Argument::Create(ArgType::ClusterFleetYes));
+    return arguments;
+}
+
+std::wstring ClusterFleetLeaveCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetLeaveDesc();
+}
+
+std::wstring ClusterFleetLeaveCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetLeaveLongDesc();
+}
+
+void ClusterFleetLeaveCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    const auto options = GetOptions(context.Args);
+    Require(options.Subscription, L"--subscription");
+    Require(options.ResourceGroup, L"--resource-group");
+    Require(options.Distro, L"--distro");
+
+    EnsureFleetExtensions(options.Distro);
+    const auto clusterId = ResolveConnectedClusterId(options);
+    const auto memberships = FindFleetMemberships(options, clusterId);
+    if (memberships.empty())
+    {
+        context.Terminal.Output(L"{}", Localization::WSLCCLI_ClusterFleetNotMember(ResourceName(clusterId)));
+        return;
+    }
+    if (memberships.size() != 1)
+    {
+        throw ExecutionException(Localization::WSLCCLI_ClusterFleetMultipleMemberships());
+    }
+
+    const auto& membership = memberships.front();
+    const auto fleetName = ResourceName(membership.FleetId);
+    if (!options.Yes &&
+        !Confirm(
+            context.Terminal,
+            Localization::WSLCCLI_ClusterFleetLeavePrompt(ResourceName(clusterId), fleetName)))
+    {
+        throw ExecutionException(Localization::WSLCCLI_ClusterFleetLeaveDeclined());
+    }
+
+    if (!DeleteMembership(options, GetMembershipCoordinates(membership)))
+    {
+        throw ExecutionException(Localization::WSLCCLI_ClusterFleetDetachFailed());
+    }
+
+    context.Terminal.Info(L"{}", Localization::WSLCCLI_ClusterFleetLeft(fleetName));
+}
+
+std::vector<Argument> ClusterFleetStatusCommand::GetArguments() const
+{
+    return ConnectionArguments(false);
+}
+
+std::wstring ClusterFleetStatusCommand::ShortDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetStatusDesc();
+}
+
+std::wstring ClusterFleetStatusCommand::LongDescription() const
+{
+    return Localization::WSLCCLI_ClusterFleetStatusLongDesc();
+}
+
+void ClusterFleetStatusCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    const auto options = GetOptions(context.Args);
+    Require(options.Subscription, L"--subscription");
+    Require(options.ResourceGroup, L"--resource-group");
+    Require(options.Distro, L"--distro");
+
+    EnsureFleetExtensions(options.Distro);
+    const auto clusterId = ResolveConnectedClusterId(options);
+    const auto memberships = FindFleetMemberships(options, clusterId);
+    if (memberships.empty())
+    {
+        context.Terminal.Output(L"{}", Localization::WSLCCLI_ClusterFleetNotMember(ResourceName(clusterId)));
+        return;
+    }
+
+    for (const auto& membership : memberships)
+    {
+        context.Terminal.Output(
+            L"{}",
+            Localization::WSLCCLI_ClusterFleetStatusOutput(
+                ResourceName(clusterId), ResourceName(membership.FleetId), membership.MemberName, membership.Id));
+    }
 }
 
 } // namespace wsl::windows::wslc

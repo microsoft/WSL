@@ -3637,29 +3637,35 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DeveloperClusterCancelCleanup" xml:space="preserve">
     <value>Cancellation requested. Waiting briefly for aksedge to clean up the current operation.</value>
   </data>
+  <data name="WSLCCLI_DeveloperClusterRequiresDeveloper" xml:space="preserve">
+    <value>This operation requires --developer.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterNameRequired" xml:space="preserve">
+    <value>Option --name is required with --developer.</value>
+  </data>
   <data name="WSLCCLI_ClusterCommandDesc" xml:space="preserve">
-    <value>Manage AKS Arc clusters on WSL.</value>
+    <value>Manage Kubernetes clusters on WSL.</value>
   </data>
   <data name="WSLCCLI_ClusterCommandLongDesc" xml:space="preserve">
-    <value>Create, delete, inspect, and retrieve credentials for an AKS Arc cluster hosted in a dedicated WSL distro.</value>
+    <value>Manage Azure-connected AKS Arc clusters, or standalone Edge Core SDK clusters selected with --developer.</value>
   </data>
   <data name="WSLCCLI_ClusterCreateDesc" xml:space="preserve">
-    <value>Create an AKS Arc cluster.</value>
+    <value>Create an AKS Arc or standalone developer cluster.</value>
   </data>
   <data name="WSLCCLI_ClusterCreateLongDesc" xml:space="preserve">
-    <value>Creates a dedicated WSL distro, prepares it as an Arc-enabled host, and deploys an AKS Arc cluster.</value>
+    <value>Creates an Azure-connected AKS Arc cluster, or a standalone Edge Core SDK cluster when --developer is specified.</value>
   </data>
   <data name="WSLCCLI_ClusterDeleteDesc" xml:space="preserve">
-    <value>Delete an AKS Arc cluster.</value>
+    <value>Delete an AKS Arc or standalone developer cluster.</value>
   </data>
   <data name="WSLCCLI_ClusterDeleteLongDesc" xml:space="preserve">
-    <value>Undeploys AKS Arc resources, disconnects the Arc machine, and unregisters the dedicated WSL distro.</value>
+    <value>Deletes an Azure-connected AKS Arc cluster, or a standalone Edge Core SDK cluster when --developer is specified.</value>
   </data>
   <data name="WSLCCLI_ClusterStatusDesc" xml:space="preserve">
-    <value>Show AKS Arc cluster status.</value>
+    <value>Show cluster status.</value>
   </data>
   <data name="WSLCCLI_ClusterStatusLongDesc" xml:space="preserve">
-    <value>Shows the WSL distro, Arc agent, and AKS Arc provisioning state.</value>
+    <value>Shows AKS Arc status, or standalone guest and BMAgent status when --developer is specified.</value>
   </data>
   <data name="WSLCCLI_ClusterKubeconfigDesc" xml:space="preserve">
     <value>Retrieve the cluster kubeconfig.</value>
@@ -3669,6 +3675,41 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_ClusterConfigArgDescription" xml:space="preserve">
     <value>Read cluster settings from a KEY=VALUE file</value>
+  </data>
+  <data name="WSLCCLI_ClusterDeveloperArgDescription" xml:space="preserve">
+    <value>Use the standalone Edge Core SDK cluster flow instead of AKS Arc</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetArgDescription" xml:space="preserve">
+    <value>Friendly name of the Azure Kubernetes Fleet Manager resource</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetCreateArgDescription" xml:space="preserve">
+    <value>Create a missing public Fleet Manager hub without prompting</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetLocationArgDescription" xml:space="preserve">
+    <value>Azure location used when creating a missing Fleet</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetMemberNameArgDescription" xml:space="preserve">
+    <value>Fleet member name; defaults to the Arc-connected cluster name</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetMoveArgDescription" xml:space="preserve">
+    <value>Move the cluster from its current Fleet to the requested Fleet</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetResourceGroupArgDescription" xml:space="preserve">
+    <value>Fleet resource group; defaults to the cluster resource group</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetSubscriptionArgDescription" xml:space="preserve">
+    <value>Fleet subscription; defaults to the cluster subscription</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetYesArgDescription" xml:space="preserve">
+    <value>Skip the confirmation prompt</value>
+  </data>
+  <data name="WSLCCLI_ClusterDeveloperOptionRequiresMode" xml:space="preserve">
+    <value>Option '--{}' requires --developer.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterManagedOptionWithDeveloper" xml:space="preserve">
+    <value>Option '--{}' cannot be used with --developer.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ClusterSubscriptionArgDescription" xml:space="preserve">
     <value>Azure subscription ID</value>
@@ -3717,6 +3758,107 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_ClusterOutputArgDescription" xml:space="preserve">
     <value>Write the kubeconfig to this file instead of standard output</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetCommandDesc" xml:space="preserve">
+    <value>Manage Azure Kubernetes Fleet membership.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetCommandLongDesc" xml:space="preserve">
+    <value>Join, leave, or inspect Fleet Manager membership for a managed AKS Arc cluster.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetJoinDesc" xml:space="preserve">
+    <value>Join the cluster to a Fleet.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetJoinLongDesc" xml:space="preserve">
+    <value>Attaches the Arc-connected workload cluster to an existing Fleet, or creates a public hub Fleet after consent.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetLeaveDesc" xml:space="preserve">
+    <value>Leave the cluster's current Fleet.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetLeaveLongDesc" xml:space="preserve">
+    <value>Removes Fleet membership without deleting the cluster, Arc resource, or Fleet.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetStatusDesc" xml:space="preserve">
+    <value>Show the cluster's Fleet membership.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetStatusLongDesc" xml:space="preserve">
+    <value>Finds Fleet member resources that reference the Arc-connected workload cluster.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetRequired" xml:space="preserve">
+    <value>Option --fleet is required for this operation.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetExtensionFailed" xml:space="preserve">
+    <value>Failed to install or update the Azure CLI Fleet and Resource Graph extensions.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetConnectedClusterNotFound" xml:space="preserve">
+    <value>Could not resolve the Arc-connected Kubernetes resource created for the AKS Arc cluster.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetMembershipLookupFailed" xml:space="preserve">
+    <value>Failed to query Azure Resource Graph for Fleet membership.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetLookupFailed" xml:space="preserve">
+    <value>Failed to look up Fleet '{}'. Check Azure authentication, permissions, and connectivity.</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetInvalidMembershipId" xml:space="preserve">
+    <value>Fleet membership resource ID '{}' is invalid.</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource IDs should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetCreatePrompt" xml:space="preserve">
+    <value>Fleet '{}' was not found in subscription '{}', resource group '{}'. Create a public Fleet Manager hub in '{}'? This creates a billable Azure resource. [y/N]: </value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetCreateDeclined" xml:space="preserve">
+    <value>Fleet '{}' was not created; the cluster was retained.</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetCreateFailed" xml:space="preserve">
+    <value>Failed to create Fleet '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetAlreadyJoined" xml:space="preserve">
+    <value>Cluster is already joined to Fleet '{}' as member '{}'.&#xA;</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetAlreadyMember" xml:space="preserve">
+    <value>Cluster already belongs to Fleet '{}'; use --move to move it.</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetDetachFailed" xml:space="preserve">
+    <value>Failed to remove the existing Fleet membership.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetJoinFailed" xml:space="preserve">
+    <value>Failed to join Fleet '{}'; the cluster was retained.</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetMoveRollbackFailed" xml:space="preserve">
+    <value>Failed to join Fleet '{}', and failed to restore the previous Fleet membership. The cluster may not belong to a Fleet.</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetJoined" xml:space="preserve">
+    <value>Joined Fleet '{}' as member '{}'.&#xA;</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetNotMember" xml:space="preserve">
+    <value>Cluster '{}' is not a member of an Azure Kubernetes Fleet.&#xA;</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetMultipleMemberships" xml:space="preserve">
+    <value>Multiple Fleet memberships reference this cluster; remove them explicitly in Azure before retrying.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetLeavePrompt" xml:space="preserve">
+    <value>Remove cluster '{}' from Fleet '{}'? [y/N]: </value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetLeaveDeclined" xml:space="preserve">
+    <value>Fleet detach was cancelled.</value>
+  </data>
+  <data name="WSLCCLI_ClusterFleetLeft" xml:space="preserve">
+    <value>Left Fleet '{}'.&#xA;</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ClusterFleetStatusOutput" xml:space="preserve">
+    <value>Cluster: {}&#xA;Fleet: {}&#xA;Member name: {}&#xA;Membership resource: {}&#xA;</value>
+    <comment>{FixedPlaceholder="{}"}Azure resource names and IDs should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkCommandLongDesc" xml:space="preserve">
     <value>Manage the lifecycle of WSL networks, including creating, inspecting, listing, and deleting them.</value>

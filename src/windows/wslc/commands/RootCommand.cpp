@@ -16,7 +16,6 @@ Abstract:
 // Include all commands that parent to the root.
 #include "ClusterCommand.h"
 #include "ContainerCommand.h"
-#include "DeveloperClusterCommand.h"
 #include "ImageCommand.h"
 #include "NetworkCommand.h"
 #include "RegistryCommand.h"
@@ -35,7 +34,6 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ClusterCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
-    commands.push_back(std::make_unique<DeveloperClusterCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
     commands.push_back(std::make_unique<NetworkCommand>(FullName()));
     commands.push_back(std::make_unique<RegistryCommand>(FullName()));

@@ -61,6 +61,59 @@ COMMAND_LINE_TEST_CASE(L"system session enter", L"enter", false)                
 COMMAND_LINE_TEST_CASE(L"system session enter C:\\storage --notanarg", L"enter", false) // Invalid argument
 COMMAND_LINE_TEST_CASE(L"system session enter --name my-session", L"enter", false)      // Missing required positional before flag
 
+// Cluster command tests
+COMMAND_LINE_TEST_CASE(L"cluster create --subscription sub --resource-group rg --tenant-id tenant", L"create", true)
+COMMAND_LINE_TEST_CASE(
+    L"cluster create --developer --name dev --agent-repo repo --distribution K8s --cni cilium",
+    L"create",
+    true)
+COMMAND_LINE_TEST_CASE(L"cluster create --developer --agent-repo repo", L"create", false)
+COMMAND_LINE_TEST_CASE(L"cluster create --name dev", L"create", false)
+COMMAND_LINE_TEST_CASE(L"cluster create --developer --name dev --agent-repo repo --subscription sub", L"create", false)
+COMMAND_LINE_TEST_CASE(
+    L"cluster create --subscription sub --resource-group rg --tenant-id tenant --output kubeconfig",
+    L"create",
+    false)
+COMMAND_LINE_TEST_CASE(L"cluster status --developer", L"status", true)
+COMMAND_LINE_TEST_CASE(L"cluster kubeconfig --developer --name dev --merge", L"kubeconfig", true)
+COMMAND_LINE_TEST_CASE(L"cluster kubeconfig --developer --name dev --merge --merge-into file", L"kubeconfig", false)
+COMMAND_LINE_TEST_CASE(L"cluster delete --prune-kubeconfig-file file", L"delete", false)
+COMMAND_LINE_TEST_CASE(L"cluster diagnostics --developer --name dev --output .\\support", L"diagnostics", true)
+COMMAND_LINE_TEST_CASE(L"cluster diagnostics --name dev", L"diagnostics", false)
+COMMAND_LINE_TEST_CASE(L"cluster versions --developer", L"versions", true)
+COMMAND_LINE_TEST_CASE(L"developer-cluster status", L"root", false)
+COMMAND_LINE_TEST_CASE(
+    L"cluster create --subscription sub --resource-group rg --tenant-id tenant --fleet retail",
+    L"create",
+    true)
+COMMAND_LINE_TEST_CASE(L"cluster create --subscription sub --resource-group rg --tenant-id tenant --create-fleet", L"create", false)
+COMMAND_LINE_TEST_CASE(
+    L"cluster create --developer --name dev --agent-repo repo --fleet retail",
+    L"create",
+    false)
+COMMAND_LINE_TEST_CASE(
+    L"cluster fleet join --subscription sub --resource-group rg --fleet retail",
+    L"join",
+    true)
+COMMAND_LINE_TEST_CASE(
+    L"cluster fleet attach --subscription sub --resource-group rg --fleet retail --create-fleet",
+    L"join",
+    true)
+COMMAND_LINE_TEST_CASE(L"cluster fleet join --config fleet.env", L"join", true)
+COMMAND_LINE_TEST_CASE(L"cluster fleet join --subscription sub --resource-group rg", L"join", false)
+COMMAND_LINE_TEST_CASE(
+    L"cluster fleet leave --subscription sub --resource-group rg --yes",
+    L"leave",
+    true)
+COMMAND_LINE_TEST_CASE(
+    L"cluster fleet detach --subscription sub --resource-group rg",
+    L"leave",
+    true)
+COMMAND_LINE_TEST_CASE(
+    L"cluster fleet status --subscription sub --resource-group rg",
+    L"status",
+    true)
+
 // Container command tests
 COMMAND_LINE_TEST_CASE(L"container list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container ls", L"list", true)

@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Standalone developer cluster command declarations.
+    Standalone developer cluster helpers used by the cluster command tree.
 
 --*/
 #pragma once
@@ -28,21 +28,11 @@ enum class DeveloperClusterOperation
     Cnis,
 };
 
-struct DeveloperClusterCommand final : public Command
-{
-    constexpr static std::wstring_view CommandName = L"developer-cluster";
-
-    DeveloperClusterCommand(const std::wstring& parent) : Command(CommandName, {L"dev-cluster"}, parent)
-    {
-    }
-
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
-    std::wstring ShortDescription() const override;
-    std::wstring LongDescription() const override;
-
-protected:
-    void ExecuteInternal(CLIExecutionContext& context) const override;
-};
+std::vector<Argument> GetDeveloperClusterArguments(DeveloperClusterOperation operation);
+void ValidateDeveloperClusterArguments(DeveloperClusterOperation operation, ArgMap& args);
+void ExecuteDeveloperCluster(DeveloperClusterOperation operation, CLIExecutionContext& context);
+std::wstring DeveloperClusterShortDescription(DeveloperClusterOperation operation);
+std::wstring DeveloperClusterLongDescription(DeveloperClusterOperation operation);
 
 struct DeveloperClusterActionCommand final : public Command
 {
