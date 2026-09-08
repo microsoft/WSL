@@ -76,11 +76,15 @@ public:
     }
 
     // Call on updater service startup, even if no version upgrade is needed.
-    static void Recover(const std::wstring& Name)
+    // Convert failures to HRESULT so they cannot escape the service callback.
+    static HRESULT Recover(const std::wstring& Name) noexcept
+    try
     {
         const Lock lock(Name);
         Restore(Name);
+        return S_OK;
     }
+    CATCH_RETURN();
 
 private:
     static constexpr auto c_originalStart = L"WslInstallerOriginalStart";

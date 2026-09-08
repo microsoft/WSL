@@ -136,6 +136,15 @@ deliberately exits with 99 via TerminateProcess. Inspect the service start type
 from a separate process and delete the test service afterward. Never substitute
 WSLService or another real service.
 
+### Startup recovery failures
+
+Startup recovery returns an HRESULT without allowing recovery exceptions to
+escape into the service callback. The service logs failures and leaves recovery
+for a later attempt; the probe checks the HRESULT before reporting success.
+Contract tests cover invalid journals, busy Installer deferral, access-denied
+restoration, retained recovery records, and successful retries. The upgrade
+constructor still rejects a new upgrade when recovery cannot complete.
+
 ### MSI rollback fixture
 
 In the disposable elevated VM, use WiX 5 to build `rollback-fixture.wxs` twice,

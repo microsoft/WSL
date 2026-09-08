@@ -3,6 +3,7 @@
 #include "ServiceUpgradeGuard.h"
 #include <cstdio>
 #include <msi.h>
+#include <string>
 
 int wmain(int argc, wchar_t** argv)
 {
@@ -30,7 +31,7 @@ int wmain(int argc, wchar_t** argv)
         }
         if (mode == L"recover")
         {
-            ServiceUpgradeGuard::Recover(argv[1]);
+            THROW_IF_FAILED(ServiceUpgradeGuard::Recover(argv[1]));
             std::puts("PASS: persisted recovery completed");
             return 0;
         }

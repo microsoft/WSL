@@ -223,12 +223,12 @@ int main()
         }
         Check(failed && writes == 0 && startType == SERVICE_AUTO_START && openHandles == 0);
         failChange = false;
-        ServiceUpgradeGuard::Recover(L"test");
+        Check(ServiceUpgradeGuard::Recover(L"test") == S_OK);
         Check(!journal && startType == SERVICE_AUTO_START);
 
         Reset(SERVICE_DISABLED);
         journal = SERVICE_DEMAND_START;
-        ServiceUpgradeGuard::Recover(L"test");
+        Check(ServiceUpgradeGuard::Recover(L"test") == S_OK);
         Check(startType == SERVICE_DEMAND_START && !journal);
 
         Reset();
@@ -246,34 +246,37 @@ int main()
 
         Reset(SERVICE_DISABLED);
         journal = SERVICE_BOOT_START;
-        failed = false;
-        try
-        {
-            ServiceUpgradeGuard::Recover(L"test");
-        }
-        catch (...)
-        {
-            failed = true;
-        }
-        Check(failed && writes == 0 && startType == SERVICE_DISABLED && journal.has_value());
+        Check(ServiceUpgradeGuard::Recover(L"test") == HRESULT_FROM_WIN32(ERROR_INVALID_DATA));
+        Check(writes == 0 && startType == SERVICE_DISABLED && journal == SERVICE_BOOT_START && openHandles == 0);
 
         Reset(SERVICE_DISABLED);
         journal = SERVICE_AUTO_START;
         installerBusy = true;
+        Check(ServiceUpgradeGuard::Recover(L"test") == HRESULT_FROM_WIN32(ERROR_INSTALL_ALREADY_RUNNING));
+        Check(startType == SERVICE_DISABLED && journal == SERVICE_AUTO_START && openHandles == 0);
+        // A new upgrade must still fail closed while recovery is deferred.
         failed = false;
         try
         {
-            ServiceUpgradeGuard::Recover(L"test");
+            ServiceUpgradeGuard guard(L"test");
         }
         catch (...)
         {
             failed = true;
         }
-        Check(failed && startType == SERVICE_DISABLED && journal.has_value());
+        Check(failed && writes == 0 && startType == SERVICE_DISABLED && journal == SERVICE_AUTO_START);
         installerBusy = false;
-        ServiceUpgradeGuard::Recover(L"test");
+        Check(ServiceUpgradeGuard::Recover(L"test") == S_OK);
         Check(startType == SERVICE_AUTO_START && !journal);
 
+        Reset(SERVICE_DISABLED);
+        journal = SERVICE_DEMAND_START;
+        failChange = true;
+        Check(ServiceUpgradeGuard::Recover(L"test") == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+        Check(startType == SERVICE_DISABLED && journal == SERVICE_DEMAND_START && openHandles == 0);
+        failChange = false;
+        Check(ServiceUpgradeGuard::Recover(L"test") == S_OK);
+        Check(startType == SERVICE_DEMAND_START && !journal);
         Reset();
         {
             ServiceUpgradeGuard guard(L"test");

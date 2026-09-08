@@ -96,7 +96,7 @@ HRESULT WslInstallerService::ServiceStarted()
     WSL_LOG("WslInstallServiceStarted", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
 #ifdef WSL_EXPERIMENTAL_UPGRADE_GUARD
-    ServiceUpgradeGuard::Recover(L"WSLService");
+    LOG_IF_FAILED(ServiceUpgradeGuard::Recover(L"WSLService"));
 #endif
 
     if (AutoInstallEnabled())
