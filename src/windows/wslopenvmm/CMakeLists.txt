@@ -20,7 +20,7 @@ endif()
 set(CARGO_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/cargo-target)
 set(CARGO_OUTPUT ${CARGO_TARGET_DIR}/${RUST_TARGET}/${CARGO_PROFILE}/wslopenvmm.dll)
 set(WSLOPENVMM_DLL ${BIN}/wslopenvmm.dll)
-set(VM_SERVICE_PROTO ${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto)
+set(VM_SERVICE_PROTO "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto" CACHE FILEPATH "OpenVMM RPC protocol schema")
 
 add_custom_command(
     OUTPUT ${WSLOPENVMM_DLL}

@@ -18,6 +18,10 @@ tonic-prost = "0.14"
 tokio = { version = "1", features = ["net", "rt", "time"] }
 tower = "0.5"
 windows = { version = "0.62", features = ["Win32_Foundation"] }
+windows-sys = { version = "0.61", features = ["Win32_Networking_WinSock"] }
+
+[dev-dependencies]
+tokio-stream = { version = "0.1", features = ["net"] }
 
 [build-dependencies]
 protoc-bin-vendored = "3"
