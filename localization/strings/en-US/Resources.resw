@@ -3355,6 +3355,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
     <value>Display total file sizes</value>
   </data>
+  <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
+    <value>Display total file sizes if the type is container</value>
+  </data>
   <data name="WSLCCLI_InspectSizeIgnoredWarning" xml:space="preserve">
     <value>WARNING: --size ignored for {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--size "}Command line arguments, file names and string inserts should not be translated</comment>

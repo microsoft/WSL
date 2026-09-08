@@ -44,8 +44,11 @@ namespace {
         const auto pattern = Localization::WSLCCLI_ContainerSizeWithVirtual(writablePlaceholder, totalPlaceholder);
         const auto writablePosition = pattern.find(writablePlaceholder);
         const auto totalPosition = pattern.find(totalPlaceholder);
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, writablePosition);
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, totalPosition);
+        if (writablePosition == std::wstring::npos || totalPosition == std::wstring::npos)
+        {
+            VERIFY_FAIL(L"WSLCCLI_ContainerSizeWithVirtual did not include the expected placeholders");
+            return L"<invalid-virtual-size-separator>";
+        }
 
         const auto writableFirst = writablePosition < totalPosition;
         const auto begin = writableFirst ? writablePosition + wcslen(writablePlaceholder) : totalPosition + wcslen(totalPlaceholder);
