@@ -373,6 +373,11 @@ HcsVirtualMachine::~HcsVirtualMachine()
     // GuestDeviceManager, so it must be released first for the device manager reset to be effective.
     m_networkEngine.reset();
     m_guestDeviceManager.reset();
+    if (m_plan9Server)
+    {
+        LOG_IF_FAILED(m_plan9Server->Teardown());
+        m_plan9Server.reset();
+    }
     m_computeSystem.reset();
 
     // Revoke VM access for attached disks
@@ -610,16 +615,19 @@ try
 
     if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
     {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
+        if (!m_plan9Server)
+        {
+            auto server =
+                wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
+            THROW_IF_FAILED(server->Init(&m_vmId, LX_INIT_UTILITY_VM_PLAN9_PORT));
+            THROW_IF_FAILED(server->Resume());
+            m_plan9Server = std::move(server);
+        }
+
         auto flags = hcs::Plan9ShareFlags::AllowOptions;
         WI_SetFlagIf(flags, hcs::Plan9ShareFlags::ReadOnly, ReadOnly);
-        hcs::AddPlan9Share(
-            m_computeSystem.get(),
-            shareName.c_str(),
-            shareName.c_str(),
-            WindowsPath,
-            LX_INIT_UTILITY_VM_PLAN9_PORT,
-            flags,
-            m_userToken.get());
+        THROW_IF_FAILED(m_plan9Server->AddSharePath(shareName.c_str(), WindowsPath, static_cast<UINT32>(flags)));
     }
     else
     {
@@ -653,8 +661,9 @@ try
 
     if (!it->second.has_value())
     {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
         auto shareName = wsl::shared::string::GuidToString<wchar_t>(it->first, wsl::shared::string::None);
-        hcs::RemovePlan9Share(m_computeSystem.get(), shareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
+        THROW_IF_FAILED(m_plan9Server->RemoveShare(shareName.c_str()));
     }
     else
     {
