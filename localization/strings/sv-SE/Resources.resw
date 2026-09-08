@@ -2195,6 +2195,10 @@ Användning:
     <value>Containern '{}' hittades inte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerDeleted" xml:space="preserve">
+    <value>Containern {} har tagits bort.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Nätverksnamnet får inte vara tomt.</value>
   </data>
@@ -2370,6 +2374,10 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Ogiltigt namn: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcEventsInvalidTimeWindow" xml:space="preserve">
+    <value>`since`-tiden ({}) kan inte vara efter `until`-tiden ({})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="`since`"}{Locked="`until`"}</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Sökvägen är inte absolut: ''{}''</value>
@@ -2901,6 +2909,39 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
     <value>Hanteringskommandon på systemnivå.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoDesc" xml:space="preserve">
+    <value>Visa systeminformation.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoLongDesc" xml:space="preserve">
+    <value>Visar versionsinformation för wslc-klienten och sessionshanterartjänsten, tillsammans med listan över aktiva sessioner.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
+    <value>Klient:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>WSL-version: {}
+Kernelversion: {}
+Direct3D-version: {}
+DXCore-version: {}
+Windows-version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
+    <value>Server:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoSettingsFile" xml:space="preserve">
+    <value>Inställningsfil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessionManagerVersion" xml:space="preserve">
+    <value>Sessionshanterarens version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessions" xml:space="preserve">
+    <value>Sessioner: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Tagga en bild.</value>
@@ -3690,6 +3731,12 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
     <value>NAMN</value>
   </data>
+  <data name="WSLCCLI_TableHeaderNames" xml:space="preserve">
+    <value>NAMN</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCommand" xml:space="preserve">
+    <value>KOMMANDO</value>
+  </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>BILD</value>
   </data>
@@ -3719,6 +3766,26 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
+    <value>skapat</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateRunning" xml:space="preserve">
+    <value>körs</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateStopped" xml:space="preserve">
+    <value>stoppad</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateExited" xml:space="preserve">
+    <value>avslutad</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
+    <value>ogiltig</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>För mindre än en sekund sedan</value>
