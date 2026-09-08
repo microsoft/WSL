@@ -267,8 +267,6 @@ void PullImage(CLIExecutionContext& context)
 
     const auto reference = ImageReference::Parse(image);
 
-    // --all-tags pulls every tag in the repository, so a reference that already names one is
-    // rejected instead of being silently ignored.
     if (allTags && reference.Format != EnumReferenceFormatNone)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_PullAllTagsWithTagError());
@@ -292,8 +290,6 @@ void PullImage(CLIExecutionContext& context)
     IProgressCallback* progress = callback ? &*callback : nullptr;
     services::ImageService::Pull(context.Terminal, session, image, progress, allTags);
 
-    // Always print the resolved canonical image reference as the final line. With --all-tags no
-    // single tag was resolved, so only the repository is printed.
     const auto resolved = allTags ? reference.Repository.GetCanonical() : reference.GetCanonical();
     context.Terminal.Output(L"{}\n", MultiByteToWide(resolved));
 }

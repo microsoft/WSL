@@ -931,8 +931,6 @@ try
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
 
-    // Omitting the tag makes the daemon pull every tag in the repository. A reference that names a
-    // tag or digest is rejected rather than silently ignored.
     RETURN_HR_IF(E_INVALIDARG, AllTags && tagOrDigest.has_value());
 
     if (!AllTags && !tagOrDigest.has_value())
