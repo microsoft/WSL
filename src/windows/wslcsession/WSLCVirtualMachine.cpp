@@ -1434,7 +1434,7 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     {
         try
         {
-            auto socket = socket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
+            auto socket = wsl::windows::common::socket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
             if (!socket)
             {
                 // VM is exiting.

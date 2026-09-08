@@ -29,16 +29,22 @@ namespace wsl::windows::common {
     } while (false);
 
 #define THROW_HR_WITH_USER_ERROR_IF(Result, Message, Condition) \
-    if (Condition) \
+    do \
     { \
-        THROW_HR_WITH_USER_ERROR(Result, Message); \
-    }
+        if (Condition) \
+        { \
+            THROW_HR_WITH_USER_ERROR(Result, Message); \
+        } \
+    } while (false);
 
 #define EMIT_USER_WARNING(Warning) \
-    if (::wsl::windows::common::ExecutionContext* context = ::wsl::windows::common::ExecutionContext::Current(); context != nullptr) \
+    do \
     { \
-        context->EmitUserWarning(Warning); \
-    }
+        if (::wsl::windows::common::ExecutionContext* context = ::wsl::windows::common::ExecutionContext::Current(); context != nullptr) \
+        { \
+            context->EmitUserWarning(Warning); \
+        } \
+    } while (false);
 
 /* List of ExecutionContext that can be passed to ExecutionContext().
  * Note: ExecutionContext makes the assumption that the parent context always has

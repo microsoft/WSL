@@ -25,13 +25,6 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
-if (DEFINED WSL_UNITY_BATCH_SIZE AND WSL_UNITY_BATCH_SIZE GREATER 0)
-    set_target_properties(wsltests PROPERTIES
-        UNITY_BUILD ON
-        UNITY_BUILD_MODE BATCH
-        UNITY_BUILD_BATCH_SIZE ${WSL_UNITY_BATCH_SIZE})
-endif ()
-
 target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK
     ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})

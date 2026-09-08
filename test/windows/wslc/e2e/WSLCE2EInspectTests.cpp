@@ -70,6 +70,22 @@ class WSLCE2EInspectTests
         result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_SizeIgnoredForNonContainerTypes)
+    {
+        // --size on an object with no file sizes warns and inspects the object anyway.
+        auto result = RunWslc(std::format(L"inspect --size {}", DebianImage.NameAndTag()));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"WARNING: --size ignored for image"));
+
+        auto document = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_IS_FALSE(document[0].contains("SizeRw"));
+
+        // A plain inspect of the same image emits no warning.
+        auto plain = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));
+        plain.Verify({.Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_Success)
     {
         auto result = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));

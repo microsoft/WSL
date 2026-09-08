@@ -202,6 +202,76 @@ class WSLCCLICommandUnitTests
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
     }
 
+    // Test: Verify SystemInfoCommand has the correct name
+    TEST_METHOD(SystemInfoCommand_HasCorrectName)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+        VERIFY_ARE_EQUAL(std::wstring_view(L"info"), cmd.Name());
+    }
+
+    // Test: Verify SystemInfoCommand has no subcommands
+    TEST_METHOD(SystemInfoCommand_HasNoSubcommands)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+        VERIFY_ARE_EQUAL(0u, cmd.GetCommands().size());
+    }
+
+    // Test: Verify SystemInfoCommand exposes the --format argument (plus the auto-added --help)
+    TEST_METHOD(SystemInfoCommand_HasFormatArgument)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+
+        auto args = cmd.GetArguments();
+        VERIFY_ARE_EQUAL(1u, args.size());
+
+        const auto& format = args[0];
+        VERIFY_ARE_EQUAL(ArgType::Format, format.Type());
+        VERIFY_ARE_EQUAL(Kind::Value, format.Kind());
+        VERIFY_IS_FALSE(format.Required());
+
+        // GetAllArguments also includes the auto-added --help.
+        VERIFY_ARE_EQUAL(2u, cmd.GetAllArguments().size());
+    }
+
+    // Test: Verify SystemCommand contains SystemInfoCommand as a subcommand
+    TEST_METHOD(SystemCommand_ContainsSystemInfoCommand)
+    {
+        auto cmd = SystemCommand(L"system");
+        auto subcommands = cmd.GetCommands();
+
+        bool found = false;
+        for (const auto& subcmd : subcommands)
+        {
+            if (subcmd->Name() == SystemInfoCommand::CommandName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"SystemCommand should contain SystemInfoCommand");
+    }
+
+    // SystemInfoCommand is registered twice so that both `wslc system info` and the
+    // `wslc info` alias resolve; this pins the second registration.
+    TEST_METHOD(RootCommand_ContainsSystemInfoCommand)
+    {
+        auto root = RootCommand();
+        auto subcommands = root.GetCommands();
+
+        bool found = false;
+        for (const auto& subcmd : subcommands)
+        {
+            if (subcmd->Name() == SystemInfoCommand::CommandName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"RootCommand should contain SystemInfoCommand");
+    }
+
     // RootCommand exposes Session as the sole CLI global option. The override
     // is the entry point for future globals; the test pins the current shape.
     TEST_METHOD(RootCommand_GlobalArguments_OnlySession)

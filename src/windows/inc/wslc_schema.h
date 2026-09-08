@@ -157,9 +157,31 @@ struct InspectContainer
     std::vector<InspectMount> Mounts;
     std::map<std::string, std::string> Labels;
     InspectNetworkSettings NetworkSettings;
+    std::optional<std::int64_t> SizeRw;
+    std::optional<std::int64_t> SizeRootFs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
 };
+
+// Serializes a container inspect document. SizeRw and SizeRootFs are only populated when the
+// daemon was asked to compute them, so the keys are omitted entirely when they have no value.
+inline nlohmann::json ToInspectJson(const InspectContainer& container)
+{
+    nlohmann::json document = container;
+
+    if (!container.SizeRw.has_value())
+    {
+        document.erase("SizeRw");
+    }
+
+    if (!container.SizeRootFs.has_value())
+    {
+        document.erase("SizeRootFs");
+    }
+
+    return document;
+}
 
 struct ImageConfig
 {
@@ -346,6 +368,24 @@ struct VolumeListEntry
     std::map<std::string, std::string> Labels;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeListEntry, Name, Driver, Mountpoint, Scope, Labels);
+};
+
+struct EventActor
+{
+    std::string ID;
+    std::map<std::string, std::string> Attributes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(EventActor, ID, Attributes);
+};
+
+struct Event
+{
+    std::string Type;
+    std::string Action;
+    EventActor Actor;
+    std::int64_t time{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Event, Type, Action, Actor, time);
 };
 
 } // namespace wsl::windows::common::wslc_schema
