@@ -174,17 +174,7 @@ try
 
         if (FAILED(result))
         {
-            if (const auto& reported = context.ReportedError())
-            {
-                auto strings = wslutil::ErrorToString(*reported);
-                auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
-            }
-            else
-            {
-                // Fallback for errors without context
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
-            }
+            context.ReportError(result);
         }
     }
 
