@@ -79,10 +79,29 @@ mechanism; it does not validate the compiled updater or its deployment timing.
   both with the experimental option ON and OFF. On a Chinese Windows host,
   explicit `/utf-8` C/C++ flags were needed for existing UTF-8 source files.
   The toolchain requires Clang, ATL and x64/x86 Spectre runtime libraries.
+* Compiled-updater run E: replace only wslinstaller.exe in the official 2.7.13
+  x64 MSIX layout, sign locally with the repository's development certificate,
+  and deploy from the 2.7.12 baseline with the same bounded clients. The bundled
+  official MSI is unchanged. With the guard enabled, MSI returned 0 and neither
+  runtime VHD was pending deletion. After reboot, both files remained and Ubuntu
+  exited 0. However, before reboot Ubuntu returned -1 / Wsl/Service/E_UNEXPECTED;
+  this run is not a complete success for pre-reboot availability.
+* Compiled control F uses the same source and packaging procedure with the guard
+  disabled. MSI returned 3010 and scheduled both runtime VHDs for deletion.
+  Ubuntu worked before reboot; after reboot both VHDs were gone and Ubuntu
+  reported Wsl/Service/CreateInstance/CreateVm/HCS/ERROR_FILE_NOT_FOUND. This
+  strengthens the causal evidence beyond the earlier script-level intervention.
+* Guarded runs G and H again returned 0 and retained both VHDs, but reproduced
+  pre-reboot E_UNEXPECTED. H's trace shows client timeouts and forced termination
+  preceding CoImpersonateClient failures (0x800706E5), followed by a closed
+  WslCorePort during CreateSession. Restarting only WSLService restored Ubuntu
+  without rebooting Windows. This was a diagnostic script intervention, not a
+  change to the candidate installer. The 5-second client deadline may expose a
+  separate cancellation failure; this causal link still needs a controlled test.
 * One run in each condition is not a deterministic reproduction rate. The
   script disables activation before MSIX deployment, earlier than the C++
-  prototype. The complete WSL distribution build and compiled-updater VM
-  test are not complete.
+  prototype. The complete WSL distribution build has not been run. Further
+  compiled-updater trials and diagnosis of pre-reboot E_UNEXPECTED remain.
 
 ## Unresolved before an upstream fix
 
@@ -100,6 +119,9 @@ mechanism; it does not validate the compiled updater or its deployment timing.
   or all `wsl --update` paths.
 * Repeat from a clean baseline without interactive WSL calls and verify the built
   updater across reboot. The original failure was one full instrumented run.
+* Compare longer client deadlines while preserving the original 5-second stress
+  results. Do not add unconditional service restarts or claim pre-reboot
+  availability fixed solely because the diagnostic restart recovered it.
 
 Do not deploy this prototype to the host or claim #41529 fixed on these unit
 tests alone.
