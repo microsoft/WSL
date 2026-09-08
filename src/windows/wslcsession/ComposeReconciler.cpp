@@ -59,9 +59,10 @@ ComposeExecutionResult ComposeReconciler::Execute(
         break;
 
     case WSLCComposeActionRemove:
-        Remove(containers, cancelEvent, progressReporter);
-        containers.clear();
-        break;
+        return {
+            .ProjectKey = std::string{projectKey},
+            .AffectedContainers = Remove(containers, cancelEvent, progressReporter),
+        };
 
     default:
         THROW_HR(E_INVALIDARG);
@@ -192,7 +193,8 @@ void ComposeReconciler::Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCConta
     THROW_IF_FAILED(firstFailure);
 }
 
-void ComposeReconciler::Remove(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
+std::vector<WSLCContainerEntry> ComposeReconciler::Remove(
+    const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
 {
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> stoppedContainers;
     for (const auto& container : containers)
@@ -205,6 +207,7 @@ void ComposeReconciler::Remove(const std::vector<Microsoft::WRL::ComPtr<IWSLCCon
         }
     }
 
+    auto result = ObserveContainers(stoppedContainers);
     for (size_t index = 0; index < stoppedContainers.size(); ++index)
     {
         CheckCancelled(cancelEvent);
@@ -217,9 +220,12 @@ void ComposeReconciler::Remove(const std::vector<Microsoft::WRL::ComPtr<IWSLCCon
             CheckCancelled(cancelEvent);
         }
 
-        const HRESULT result = container->Delete(WSLCDeleteFlagsNone);
-        THROW_IF_FAILED_EXCEPT(result, RPC_E_DISCONNECTED);
+        const HRESULT deleteResult = container->Delete(WSLCDeleteFlagsNone);
+        THROW_IF_FAILED_EXCEPT(deleteResult, RPC_E_DISCONNECTED);
+        result[index].State = WslcContainerStateDeleted;
     }
+
+    return result;
 }
 
 void ComposeReconciler::CheckCancelled(HANDLE cancelEvent)

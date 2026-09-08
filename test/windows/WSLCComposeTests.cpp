@@ -405,35 +405,42 @@ class WSLCComposeTests
         VERIFY_IS_TRUE(removeRunningProgress->ProgressDescriptions().empty());
         wil::com_ptr<IWSLCContainer> runningContainer;
         VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-compose-basic", &runningContainer));
+        VERIFY_SUCCEEDED(runningContainer->Stop(WSLCSignalSIGTERM, 0));
+
+        ComposeRequestStorage removeMixedRequest{std::string{upResult.value.ProjectKey}, WSLCComposeActionRemove};
+        auto removeMixedProgress = Microsoft::WRL::Make<TestComposeProgressCallback>();
+        VERIFY_IS_NOT_NULL(removeMixedProgress.Get());
+        const auto removeMixedResult = ExecuteCompose(*m_defaultSession, removeMixedRequest, removeMixedProgress.Get());
+        VERIFY_ARE_EQUAL(1u, removeMixedResult.value.AffectedContainersCount);
+        VERIFY_ARE_EQUAL(std::string{"wslc-compose-basic"}, std::string{removeMixedResult.value.AffectedContainers[0].Name});
+        VERIFY_ARE_EQUAL(WslcContainerStateDeleted, removeMixedResult.value.AffectedContainers[0].State);
+        VERIFY_ARE_EQUAL(std::vector<std::string>({"container:remove:wslc-compose-basic:1/1"}), removeMixedProgress->ProgressDescriptions());
+        runningContainer.reset();
+        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("wslc-compose-basic", &runningContainer));
 
         ComposeRequestStorage stopRequest{std::string{upResult.value.ProjectKey}, WSLCComposeActionStop};
         stopRequest.SetStopTimeout(10);
         auto stopProgress = Microsoft::WRL::Make<TestComposeProgressCallback>();
         VERIFY_IS_NOT_NULL(stopProgress.Get());
         const auto stopResult = ExecuteCompose(*m_defaultSession, stopRequest, stopProgress.Get());
+        VERIFY_ARE_EQUAL(1u, stopResult.value.AffectedContainersCount);
         VERIFY_ARE_EQUAL(WslcContainerStateExited, stopResult.value.AffectedContainers[0].State);
-        VERIFY_ARE_EQUAL(WslcContainerStateExited, stopResult.value.AffectedContainers[1].State);
         const auto stopProgressEvents = stopProgress->ProgressEvents();
-        VERIFY_ARE_EQUAL(2u, static_cast<ULONG>(stopProgressEvents.size()));
+        VERIFY_ARE_EQUAL(1u, static_cast<ULONG>(stopProgressEvents.size()));
         VERIFY_ARE_EQUAL(std::string{"stop"}, stopProgressEvents[0].Operation);
-        VERIFY_ARE_EQUAL(std::string{"wslc-compose-basic"}, stopProgressEvents[0].ResourceKey);
+        VERIFY_ARE_EQUAL(std::string{"wslc-compose-secondary"}, stopProgressEvents[0].ResourceKey);
         VERIFY_ARE_EQUAL(std::string{"container"}, stopProgressEvents[0].Unit);
         VERIFY_ARE_EQUAL(1ull, stopProgressEvents[0].Current);
-        VERIFY_ARE_EQUAL(2ull, stopProgressEvents[0].Total);
-        VERIFY_ARE_EQUAL(std::string{"stop"}, stopProgressEvents[1].Operation);
-        VERIFY_ARE_EQUAL(std::string{"wslc-compose-secondary"}, stopProgressEvents[1].ResourceKey);
-        VERIFY_ARE_EQUAL(std::string{"container"}, stopProgressEvents[1].Unit);
-        VERIFY_ARE_EQUAL(2ull, stopProgressEvents[1].Current);
-        VERIFY_ARE_EQUAL(2ull, stopProgressEvents[1].Total);
+        VERIFY_ARE_EQUAL(1ull, stopProgressEvents[0].Total);
 
         ComposeRequestStorage removeRequest{std::string{upResult.value.ProjectKey}, WSLCComposeActionRemove};
         auto removeProgress = Microsoft::WRL::Make<TestComposeProgressCallback>();
         VERIFY_IS_NOT_NULL(removeProgress.Get());
         const auto removeResult = ExecuteCompose(*m_defaultSession, removeRequest, removeProgress.Get());
-        VERIFY_ARE_EQUAL(0u, removeResult.value.AffectedContainersCount);
-        VERIFY_ARE_EQUAL(
-            std::vector<std::string>({"container:remove:wslc-compose-basic:1/2", "container:remove:wslc-compose-secondary:2/2"}),
-            removeProgress->ProgressDescriptions());
+        VERIFY_ARE_EQUAL(1u, removeResult.value.AffectedContainersCount);
+        VERIFY_ARE_EQUAL(std::string{"wslc-compose-secondary"}, std::string{removeResult.value.AffectedContainers[0].Name});
+        VERIFY_ARE_EQUAL(WslcContainerStateDeleted, removeResult.value.AffectedContainers[0].State);
+        VERIFY_ARE_EQUAL(std::vector<std::string>({"container:remove:wslc-compose-secondary:1/1"}), removeProgress->ProgressDescriptions());
 
         wil::com_ptr<IWSLCContainer> removedContainer;
         VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("wslc-compose-basic", &removedContainer));
@@ -756,6 +763,44 @@ services:
         VERIFY_ARE_NOT_EQUAL(existingId, std::string{upResult.value.AffectedContainers[0].Id});
         VERIFY_ARE_EQUAL(composeContainerName, std::string{upResult.value.AffectedContainers[0].Name});
         VERIFY_ARE_EQUAL(WslcContainerStateRunning, upResult.value.AffectedContainers[0].State);
+    }
+
+    TEST_METHOD(ComposeDiscoveryValidatesAndSortsContainerNumbers)
+    {
+        const auto projectKey = std::format("compose-discovery-order-{}", GetCurrentProcessId());
+        std::vector<wsl::windows::common::RunningWSLCContainer> containers;
+        std::map<uint64_t, std::string> containerIds;
+
+        const auto createContainer = [&](std::string_view suffix, std::string_view containerNumber) {
+            WSLCContainerLauncher launcher(
+                "alpine:latest", std::format("{}-{}", projectKey, suffix), {"/bin/sh", "-c", "while true; do sleep 1; done"});
+            launcher.AddLabel("com.docker.compose.project", projectKey);
+            launcher.AddLabel("com.docker.compose.service", "service");
+            launcher.AddLabel("com.docker.compose.container-number", std::string{containerNumber});
+            launcher.AddLabel("com.docker.compose.oneoff", "False");
+            launcher.AddLabel("com.microsoft.wslc.compose.managed", "true");
+            launcher.AddLabel("com.microsoft.wslc.compose.metadata-version", "1");
+            containers.emplace_back(launcher.Create(*m_defaultSession));
+        };
+
+        for (const auto number : {10ull, 2ull, 1ull})
+        {
+            createContainer(std::to_string(number), std::to_string(number));
+            containerIds.emplace(number, containers.back().Id());
+        }
+
+        ComposeRequestStorage attachRequest{projectKey, WSLCComposeActionAttach};
+        const auto attachResult = ExecuteCompose(*m_defaultSession, attachRequest);
+        VERIFY_ARE_EQUAL(3u, attachResult.value.AffectedContainersCount);
+        VERIFY_ARE_EQUAL(containerIds.at(1), std::string{attachResult.value.AffectedContainers[0].Id});
+        VERIFY_ARE_EQUAL(containerIds.at(2), std::string{attachResult.value.AffectedContainers[1].Id});
+        VERIFY_ARE_EQUAL(containerIds.at(10), std::string{attachResult.value.AffectedContainers[2].Id});
+
+        createContainer("invalid", "not-a-number");
+        const auto invalidResult = WaitForCompose(*m_defaultSession, attachRequest);
+        VERIFY_ARE_EQUAL(WSLCComposeOperationStatusFailed, invalidResult.value.Status);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), invalidResult.value.Result);
+        VERIFY_ARE_EQUAL(0u, invalidResult.value.AffectedContainersCount);
     }
 
     TEST_METHOD(ComposeUnsupportedReferencesFailBeforeMutation)

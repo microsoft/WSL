@@ -51,7 +51,8 @@ private:
         const ComposeProgressReporter& progressReporter);
     static void Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
     static void Stop(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, ULONG timeout, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
-    static void Remove(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
+    static std::vector<WSLCContainerEntry> Remove(
+        const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter);
     static void CheckCancelled(HANDLE cancelEvent);
 
     WSLCSession& m_session;

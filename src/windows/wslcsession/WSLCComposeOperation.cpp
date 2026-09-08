@@ -98,10 +98,12 @@ try
 
     if (!m_affectedContainers.empty())
     {
-        auto containers = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(m_affectedContainers.size());
+        THROW_HR_IF(E_UNEXPECTED, m_affectedContainers.size() > ULONG_MAX);
+        const auto affectedContainersCount = static_cast<ULONG>(m_affectedContainers.size());
+        auto containers = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(affectedContainersCount);
         std::ranges::copy(m_affectedContainers, containers.get());
         result->AffectedContainers = containers.release();
-        result->AffectedContainersCount = static_cast<ULONG>(m_affectedContainers.size());
+        result->AffectedContainersCount = affectedContainersCount;
     }
 
     return S_OK;

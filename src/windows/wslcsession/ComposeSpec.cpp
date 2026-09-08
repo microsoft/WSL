@@ -213,9 +213,9 @@ namespace {
         };
     }
 
-    ComposeSpec ParseComposeFile(const std::filesystem::path& path, std::string_view content)
+    ComposeSpec ParseComposeFile(const std::filesystem::path& path, const std::string& content)
     {
-        const auto root = YAML::Load(std::string{content});
+        const auto root = YAML::Load(content);
         if (!root.IsMap())
         {
             ThrowInvalidComposeFile(path, L"the file must contain a map");
@@ -375,7 +375,7 @@ namespace {
 
 } // namespace
 
-ComposeSpec ComposeSpec::Parse(const std::filesystem::path& path, std::string_view content)
+ComposeSpec ComposeSpec::Parse(const std::filesystem::path& path, const std::string& content)
 {
     try
     {

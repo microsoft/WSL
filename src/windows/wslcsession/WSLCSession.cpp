@@ -2439,7 +2439,8 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
 
     struct ComposeContainer
     {
-        std::string ResourceKey;
+        std::string Service;
+        uint64_t ContainerNumber;
         Microsoft::WRL::ComPtr<IWSLCContainer> Container;
     };
 
@@ -2468,6 +2469,18 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
             projectKeyValue.c_str(),
             dockerContainer.Id.c_str());
 
+        uint64_t parsedContainerNumber{};
+        const auto parseResult = std::from_chars(
+            containerNumber->second.data(), containerNumber->second.data() + containerNumber->second.size(), parsedContainerNumber);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
+            parseResult.ec != std::errc{} || parseResult.ptr != containerNumber->second.data() + containerNumber->second.size() ||
+                parsedContainerNumber == 0,
+            "WSLC Compose project '%hs' contains container '%hs' with invalid container number '%hs'",
+            projectKeyValue.c_str(),
+            dockerContainer.Id.c_str(),
+            containerNumber->second.c_str());
+
         auto existing = m_containers.find(dockerContainer.Id);
         if (existing == m_containers.end())
         {
@@ -2478,17 +2491,22 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
 
         Microsoft::WRL::ComPtr<IWSLCContainer> container;
         existing->second->CopyTo(&container);
-        composeContainers.emplace_back(std::format("{}:{}", service->second, containerNumber->second), std::move(container));
+        composeContainers.emplace_back(service->second, parsedContainerNumber, std::move(container));
     }
 
-    std::ranges::sort(composeContainers, {}, &ComposeContainer::ResourceKey);
-    const auto duplicate = std::ranges::adjacent_find(composeContainers, {}, &ComposeContainer::ResourceKey);
+    const auto compareResourceIdentity = [](const ComposeContainer& left, const ComposeContainer& right) {
+        return std::tie(left.Service, left.ContainerNumber) < std::tie(right.Service, right.ContainerNumber);
+    };
+    std::ranges::sort(composeContainers, compareResourceIdentity);
+    const auto duplicate = std::ranges::adjacent_find(composeContainers, [](const ComposeContainer& left, const ComposeContainer& right) {
+        return left.Service == right.Service && left.ContainerNumber == right.ContainerNumber;
+    });
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
         duplicate != composeContainers.end(),
         "WSLC Compose project '%hs' contains duplicate resource identity '%hs'",
         projectKeyValue.c_str(),
-        duplicate == composeContainers.end() ? "" : duplicate->ResourceKey.c_str());
+        duplicate == composeContainers.end() ? "" : std::format("{}:{}", duplicate->Service, duplicate->ContainerNumber).c_str());
 
     std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> result;
     result.reserve(composeContainers.size());
