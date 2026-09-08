@@ -931,7 +931,7 @@ try
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
 
-    RETURN_HR_IF(E_INVALIDARG, AllTags && tagOrDigest.has_value());
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_PullAllTagsWithTagError(), AllTags && tagOrDigest.has_value());
 
     if (!AllTags && !tagOrDigest.has_value())
     {
