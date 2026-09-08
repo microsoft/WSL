@@ -83,7 +83,7 @@ class WSLCE2EImagePushTests
         auto session = OpenDefaultElevatedSession();
 
         {
-            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15005);
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15006);
             const auto repository = std::format(L"{}/{}", string::MultiByteToWide(registryAddress), testImage.Name);
             const std::vector<std::wstring> tags = {L"latest", L"e2e-all-tags-first", L"e2e-all-tags-second"};
 
