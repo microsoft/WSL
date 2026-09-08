@@ -21,6 +21,7 @@ Abstract:
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 #include <WSLCProcessLauncher.h>
+#include <WSLCContainerEntry.h>
 #include <ConsoleState.h>
 #include <CommandLine.h>
 #include <WSLCUserSettings.h>
@@ -340,35 +341,206 @@ int ContainerService::Attach(Terminal& terminal, Session& session, const std::st
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt)
+// The invariant state name. This is what "container list --format json" reports.
+std::wstring ContainerService::ContainerStateName(WSLCContainerState state)
 {
-    std::wstring stateString;
     switch (state)
     {
     case WSLCContainerState::WslcContainerStateCreated:
-        stateString = L"created";
-        break;
+        return L"created";
     case WSLCContainerState::WslcContainerStateRunning:
-        stateString = L"running";
-        break;
+        return L"running";
     case WSLCContainerState::WslcContainerStateDeleted:
-        stateString = L"stopped";
-        break;
+        return L"stopped";
     case WSLCContainerState::WslcContainerStateExited:
-        stateString = L"exited";
-        break;
+        return L"exited";
     case WSLCContainerState::WslcContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
+}
 
-    if (stateChangedAt == 0)
+std::wstring ContainerService::LocalizedContainerStateName(WSLCContainerState state)
+{
+    switch (state)
+    {
+    case WSLCContainerState::WslcContainerStateCreated:
+        return Localization::WSLCCLI_ContainerStateCreated();
+    case WSLCContainerState::WslcContainerStateRunning:
+        return Localization::WSLCCLI_ContainerStateRunning();
+    case WSLCContainerState::WslcContainerStateDeleted:
+        return Localization::WSLCCLI_ContainerStateStopped();
+    case WSLCContainerState::WslcContainerStateExited:
+        return Localization::WSLCCLI_ContainerStateExited();
+    case WSLCContainerState::WslcContainerStateInvalid:
+        return Localization::WSLCCLI_ContainerStateInvalid();
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+}
+
+std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, LONGLONG stateChangedAt, FormatType format)
+{
+    const auto invariant = format == FormatType::Json;
+    auto stateString = invariant ? ContainerStateName(state) : LocalizedContainerStateName(state);
+    if (stateChangedAt == 0 || state == WSLCContainerState::WslcContainerStateInvalid)
     {
         return stateString;
     }
 
-    return std::format(L"{} {}", stateString, wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt));
+    const auto relative = invariant ? wsl::windows::common::timestamp::FormatInvariantRelativeTime(stateChangedAt)
+                                    : wsl::windows::common::timestamp::FormatRelativeTime(stateChangedAt);
+
+    return std::format(L"{} {}", stateString, relative);
+}
+
+// Reports whether a code point is printable using the same rule as Go's unicode.IsPrint, which docker relies on when
+// quoting: letters, marks, numbers, punctuation, symbols and the ASCII space.
+static bool IsPrintable(UChar32 codePoint)
+{
+    constexpr auto printableMask = U_GC_L_MASK | U_GC_M_MASK | U_GC_N_MASK | U_GC_P_MASK | U_GC_S_MASK;
+    return codePoint == U' ' || (U_GET_GC_MASK(codePoint) & printableMask) != 0;
+}
+
+// Appends a code point that has no printable representation, mirroring the escapes Go's strconv.Quote emits.
+static void AppendEscape(std::wstring& quoted, UChar32 codePoint)
+{
+    switch (codePoint)
+    {
+    case L'\a':
+        quoted += L"\\a";
+        return;
+    case L'\b':
+        quoted += L"\\b";
+        return;
+    case L'\f':
+        quoted += L"\\f";
+        return;
+    case L'\n':
+        quoted += L"\\n";
+        return;
+    case L'\r':
+        quoted += L"\\r";
+        return;
+    case L'\t':
+        quoted += L"\\t";
+        return;
+    case L'\v':
+        quoted += L"\\v";
+        return;
+    default:
+        break;
+    }
+
+    if (codePoint < L' ' || codePoint == 0x7F)
+    {
+        quoted += std::format(L"\\x{:02x}", static_cast<unsigned int>(codePoint));
+    }
+    else if (U_IS_SURROGATE(codePoint))
+    {
+        // An unpaired surrogate is not a valid code point, and Go substitutes the replacement character.
+        quoted += L"\\ufffd";
+    }
+    else if (codePoint < 0x10000)
+    {
+        quoted += std::format(L"\\u{:04x}", static_cast<unsigned int>(codePoint));
+    }
+    else
+    {
+        quoted += std::format(L"\\U{:08x}", static_cast<unsigned int>(codePoint));
+    }
+}
+
+std::wstring ContainerService::FormatCommand(const std::string& command, bool truncate)
+{
+    constexpr size_t c_maxDisplayWidth = 20;
+
+    auto wide = wsl::shared::string::MultiByteToWide(command);
+    if (truncate)
+    {
+        wide = wsl::windows::common::string::Ellipsis(wide, c_maxDisplayWidth);
+    }
+
+    // Quoting happens after truncation, so the result can exceed c_maxDisplayWidth. This matches docker, which truncates
+    // the command first and quotes the truncated value.
+    const auto length = static_cast<int32_t>(wide.size());
+    std::wstring quoted{L'"'};
+    for (int32_t index = 0; index < length;)
+    {
+        const auto start = index;
+        UChar32 codePoint{};
+        U16_NEXT(wide.data(), index, length, codePoint);
+
+        if (codePoint == L'"' || codePoint == L'\\')
+        {
+            quoted += L'\\';
+            quoted += static_cast<wchar_t>(codePoint);
+        }
+        else if (IsPrintable(codePoint))
+        {
+            quoted.append(wide, start, static_cast<size_t>(index - start));
+        }
+        else
+        {
+            AppendEscape(quoted, codePoint);
+        }
+    }
+
+    quoted += L'"';
+    return quoted;
+}
+
+std::wstring ContainerService::FormatMounts(const std::string& mounts, bool truncate)
+{
+    constexpr size_t c_maxDisplayWidth = 15;
+
+    auto wide = wsl::shared::string::MultiByteToWide(mounts);
+    if (!truncate || wide.empty())
+    {
+        return wide;
+    }
+
+    std::vector<std::wstring> shortened;
+    for (const auto& mount : wsl::shared::string::SplitPreserveEmpty(std::wstring_view{wide}, L','))
+    {
+        shortened.emplace_back(wsl::windows::common::string::Ellipsis(mount, c_maxDisplayWidth));
+    }
+
+    return wsl::shared::string::Join(shortened, L',');
+}
+
+std::wstring ContainerService::FormatStatus(const std::string& status, WSLCContainerState state, LONGLONG stateChangedAt, FormatType format)
+{
+    if (!status.empty())
+    {
+        return wsl::shared::string::MultiByteToWide(status);
+    }
+
+    return ContainerStateToString(state, stateChangedAt, format);
+}
+
+std::string ContainerService::FormatHealthStatus(const std::string& status)
+{
+    const auto open = status.find('(');
+    if (open == std::string::npos || status.back() != ')')
+    {
+        return {};
+    }
+
+    constexpr std::string_view c_healthPrefix = "health: ";
+    auto health = std::string_view{status}.substr(open + 1, status.size() - open - 2);
+    if (health.starts_with(c_healthPrefix))
+    {
+        health.remove_prefix(c_healthPrefix.size());
+    }
+
+    if (health == "healthy" || health == "unhealthy" || health == "starting")
+    {
+        return std::string{health};
+    }
+
+    return {};
 }
 
 std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
@@ -535,7 +707,7 @@ std::vector<ContainerInformation> ContainerService::List(
     options.Filters = filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
-    wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+    wsl::windows::common::wslc::unique_container_entry_array containers;
     wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
     THROW_IF_FAILED(
         session.Get()->ListContainers(&options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
@@ -547,6 +719,12 @@ std::vector<ContainerInformation> ContainerService::List(
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
+        entry.Command = current.Command == nullptr ? "" : current.Command;
+        entry.Status = current.Status == nullptr ? "" : current.Status;
+        entry.Labels = current.Labels == nullptr ? "" : current.Labels;
+        entry.Networks = current.Networks == nullptr ? "" : current.Networks;
+        entry.Mounts = current.Mounts == nullptr ? "" : current.Mounts;
+        entry.LocalVolumes = current.LocalVolumes;
         entry.State = current.State;
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;

@@ -406,3 +406,54 @@ std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, b
 {
     return TruncateIdImpl(id, shortenLength);
 }
+
+// Returns the number of terminal columns a code point occupies. This mirrors docker's charWidth, which treats
+// East Asian wide and fullwidth code points as two columns and everything else as one.
+static size_t CharacterWidth(UChar32 CodePoint)
+{
+    const auto width = u_getIntPropertyValue(CodePoint, UCHAR_EAST_ASIAN_WIDTH);
+    return (width == U_EA_WIDE || width == U_EA_FULLWIDTH) ? 2 : 1;
+}
+
+std::wstring wsl::windows::common::string::Ellipsis(_In_ std::wstring_view Value, _In_ size_t MaxDisplayWidth)
+{
+    if (MaxDisplayWidth == 0 || Value.empty())
+    {
+        return {};
+    }
+
+    const auto length = gsl::narrow_cast<int32_t>(Value.size());
+    if (MaxDisplayWidth == 1)
+    {
+        // There is no room for both content and an ellipsis, so the leading code point is kept as-is even
+        // if it is wider than the limit.
+        int32_t index = 0;
+        UChar32 codePoint{};
+        U16_NEXT(Value.data(), index, length, codePoint);
+        return std::wstring{Value.substr(0, index)};
+    }
+
+    // The ellipsis occupies one column, so the retained content has one column less to work with.
+    const auto budget = MaxDisplayWidth - 1;
+    size_t totalWidth = 0;
+    size_t cutoff = 0;
+    for (int32_t index = 0; index < length;)
+    {
+        UChar32 codePoint{};
+        U16_NEXT(Value.data(), index, length, codePoint);
+        totalWidth += CharacterWidth(codePoint);
+        if (totalWidth <= budget)
+        {
+            cutoff = index;
+        }
+    }
+
+    // A cutoff of zero means the first code point alone leaves no room for the ellipsis, in which case docker
+    // returns the value untouched.
+    if (totalWidth <= MaxDisplayWidth || cutoff == 0)
+    {
+        return std::wstring{Value};
+    }
+
+    return std::wstring{Value.substr(0, cutoff)} + L'\u2026';
+}

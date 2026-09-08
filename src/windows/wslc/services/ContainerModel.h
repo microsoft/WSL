@@ -134,12 +134,50 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
+    // Command and runtime supplied status description.
+    std::string Command;
+    std::string Status;
+    std::string Labels;
+    std::string Networks;
+    std::string Mounts;
+    ULONG LocalVolumes{};
     WSLCContainerState State;
     LONGLONG StateChangedAt{};
     LONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
+};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
+// The platform a container runs on. Emitted as a nested object to match docker.
+struct ContainerPlatform
+{
+    std::string architecture;
+    std::string os;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPlatform, architecture, os);
+};
+
+// The shape emitted by "container list --format json".
+struct ContainerOutputInformation
+{
+    std::string Command;
+    std::string CreatedAt;
+    std::string HealthStatus;
+    std::string ID;
+    std::string Image;
+    std::string Labels;
+    std::string LocalVolumes;
+    std::string Mounts;
+    std::string Names;
+    std::string Networks;
+    ContainerPlatform Platform;
+    std::string Ports;
+    std::string RunningFor;
+    std::string Size;
+    std::string State;
+    std::string Status;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ContainerOutputInformation, Command, CreatedAt, HealthStatus, ID, Image, Labels, LocalVolumes, Mounts, Names, Networks, Platform, Ports, RunningFor, Size, State, Status);
 };
 
 struct EnvironmentVariable

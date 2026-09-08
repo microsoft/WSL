@@ -152,6 +152,22 @@ TestSession::~TestSession()
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status, const std::wstring& sessionName)
 {
+    // The status column reports the runtime's description, e.g. "Up 5 seconds", so map the logical
+    // state callers pass in onto the text that description starts with.
+    std::wstring expectedStatus = status;
+    if (status == L"created")
+    {
+        expectedStatus = L"Created";
+    }
+    else if (status == L"running")
+    {
+        expectedStatus = L"Up ";
+    }
+    else if (status == L"exited")
+    {
+        expectedStatus = L"Exited (";
+    }
+
     std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
@@ -167,8 +183,8 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
         if (line.find(containerNameOrId) != std::wstring::npos)
         {
             const std::wstring message = L"Container '" + containerNameOrId + L"' found in container list output but status '" +
-                                         status + L"' was not found in the same line";
-            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(status), message.c_str());
+                                         expectedStatus + L"' was not found in the same line";
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(expectedStatus), message.c_str());
             return;
         }
     }
@@ -348,7 +364,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     const auto name = wsl::shared::string::WideToMultiByte(containerName);
     const auto containers = ListAllContainers();
-    auto it = std::ranges::find_if(containers, [&](const auto& c) { return c.Name == name; });
+    auto it = std::ranges::find_if(containers, [&](const auto& c) { return c.Names == name; });
     if (it == containers.end())
     {
         return;
@@ -362,11 +378,12 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     }
 }
 
-std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers()
+std::vector<wsl::windows::wslc::models::ContainerOutputInformation> ListAllContainers()
 {
-    auto result = RunWslc(L"container list --all --format json");
+    // --no-trunc keeps the full ids, which callers use to address containers.
+    auto result = RunWslc(L"container list --all --format json --no-trunc");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    return ParseNdjsonOutputAs<wsl::windows::wslc::models::ContainerInformation>(result);
+    return ParseNdjsonOutputAs<wsl::windows::wslc::models::ContainerOutputInformation>(result);
 }
 
 void EnsureImageContainersAreDeleted(const TestImage& image)
@@ -377,8 +394,8 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
         auto nameAndTag = wsl::shared::string::WideToMultiByte(image.NameAndTag());
         if (container.Image.find(nameAndTag) != std::string::npos)
         {
-            auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
-            result.Verify({.Stdout = std::format(L"{}\r\n", container.Id), .Stderr = L"", .ExitCode = 0});
+            auto result = RunWslc(std::format(L"container remove --force {}", container.ID));
+            result.Verify({.Stdout = std::format(L"{}\r\n", container.ID), .Stderr = L"", .ExitCode = 0});
         }
     }
 }
