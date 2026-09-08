@@ -2981,10 +2981,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Show all regardless of state.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Download all tagged images in the repository</value>
+    <value>Download all tagged images in the repository.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>tag or digest can't be used with --all-tags/-a</value>
     <comment>{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">

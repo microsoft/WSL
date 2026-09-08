@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -46,6 +47,7 @@ class WSLCE2EImagePushTests
         result.Verify({.Stdout = L"", .ExitCode = 1});
         VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_AllTagsWithTagError()));
     }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Push_NameOnlyDefaultsTag)
     {
         const auto errorMessage = FormatErrorMessage(L"An image does not exist locally with the tag: does-not-exist", L"E_FAIL");
@@ -71,6 +73,46 @@ class WSLCE2EImagePushTests
         const auto result = RunWslc(L"image push does-not-exist --all-tags");
         result.Verify({.ExitCode = 1});
         VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"Using default tag"));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Push_AllTagsPushesEveryTag)
+    {
+        const auto& testImage = AlpineTestImage();
+        TestImageRegistry::Instance().EnsureLoaded(testImage);
+
+        auto session = OpenDefaultElevatedSession();
+
+        {
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15005);
+            const auto repository = std::format(L"{}/{}", string::MultiByteToWide(registryAddress), testImage.Name);
+            const std::vector<std::wstring> tags = {L"latest", L"e2e-all-tags-first", L"e2e-all-tags-second"};
+
+            auto tagCleanup = wil::scope_exit([&]() {
+                for (const auto& tag : tags)
+                {
+                    RunWslc(std::format(L"image delete --force {}:{}", repository, tag));
+                }
+            });
+
+            for (const auto& tag : tags)
+            {
+                RunWslcAndVerify(std::format(L"image tag {} {}:{}", testImage.NameAndTag(), repository, tag), {.ExitCode = 0});
+            }
+
+            // A repository reference without a tag pushes every local tag in that repository.
+            RunWslcAndVerify(std::format(L"image push {} --all-tags", repository), {.Stderr = L"", .ExitCode = 0});
+
+            // Drop the local copies so each pull has to fetch the tag back from the registry.
+            for (const auto& tag : tags)
+            {
+                RunWslcAndVerify(std::format(L"image delete --force {}:{}", repository, tag), {.ExitCode = 0});
+            }
+
+            for (const auto& tag : tags)
+            {
+                RunWslcAndVerify(std::format(L"image pull {}:{}", repository, tag), {.Stderr = L"", .ExitCode = 0});
+            }
+        }
     }
 };
 } // namespace WSLCE2ETests
