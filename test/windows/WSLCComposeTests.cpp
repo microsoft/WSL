@@ -44,7 +44,7 @@ struct ComposeRequestStorage
         document.SourcePath = sourcePath.c_str();
         document.BaseDirectory = baseDirectory.c_str();
         document.Content = reinterpret_cast<const byte*>(content.data());
-        document.ContentSize = static_cast<ULONG>(content.size());
+        document.ContentSize = gsl::narrow<ULONG>(content.size());
 
         documents.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
         documents.WorkingDirectory = workingDirectory.c_str();
@@ -530,6 +530,7 @@ services:
         VERIFY_SUCCEEDED(operation->GetResult(&result.value));
         VERIFY_ARE_EQUAL(WSLCComposeOperationStatusCancelled, result.value.Status);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_CANCELLED), result.value.Result);
+        VERIFY_ARE_EQUAL(projectPath.filename().string(), std::string{result.value.ProjectKey});
         VERIFY_ARE_EQUAL(0u, result.value.AffectedContainersCount);
         VERIFY_IS_TRUE(progress->OrderValid());
         VERIFY_ARE_EQUAL(WSLCComposeStatusCancelled, progress->Statuses().back());
@@ -670,6 +671,7 @@ services:
         VERIFY_SUCCEEDED(operation->GetResult(&result.value));
         VERIFY_ARE_EQUAL(WSLCComposeOperationStatusCancelled, result.value.Status);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_CANCELLED), result.value.Result);
+        VERIFY_ARE_EQUAL(std::string{upResult.value.ProjectKey}, std::string{result.value.ProjectKey});
 
         wil::com_ptr<IWSLCContainer> firstContainer;
         wil::com_ptr<IWSLCContainer> secondContainer;

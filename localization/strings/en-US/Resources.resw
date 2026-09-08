@@ -2600,10 +2600,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_ComposeUpDesc" xml:space="preserve">
-    <value>Start and attach to a Compose project.</value>
+    <value>Destructively recreate, start, and attach to a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeUpLongDesc" xml:space="preserve">
-    <value>Start all containers in a Compose project, then attach interactively and display their output.</value>
+    <value>Force-remove existing project containers, recreate the default network and containers, then start them and attach interactively to their output. A failure during recreation can leave the project partially or fully absent.</value>
   </data>
   <data name="WSLCCLI_ComposeGracefullyStopping" xml:space="preserve">
     <value>Gracefully stopping... Press Ctrl+C again to force termination.</value>

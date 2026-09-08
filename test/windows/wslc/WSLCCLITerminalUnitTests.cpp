@@ -20,6 +20,7 @@ Abstract:
 #include "OutputChannel.h"
 #include "ComposeProgressCallback.h"
 #include "Terminal.h"
+#include "wslutil.h"
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::common::vt;
@@ -348,6 +349,47 @@ class WSLCCLITerminalUnitTests
 
         VERIFY_ARE_EQUAL(std::wstring{}, cap.outPipe.captured());
         VERIFY_ARE_EQUAL(std::wstring{L"Removing Container project-web-1 (1/1)\n"}, cap.errPipe.captured());
+    }
+
+    TEST_METHOD(ComposeProgressCallback_StreamsReadyBorrowsPipeHandle)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionAttach);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        writePipe.reset();
+
+        WSLCComposeStreams streams{};
+        streams.Stdout.Type = WSLCHandleTypePipe;
+        streams.Stdout.Handle.Pipe = readPipe.get();
+
+        VERIFY_SUCCEEDED(callback->OnStreamsReady(&streams));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(FILE_TYPE_PIPE), GetFileType(readPipe.get()));
+    }
+
+    TEST_METHOD(ComposeProgressCallback_StreamsReadyBorrowsSocketHandle)
+    {
+        SplitCaptureTerminal cap;
+        auto callback = Microsoft::WRL::Make<services::ComposeProgressCallback>(cap.terminal, WSLCComposeActionAttach);
+        VERIFY_IS_NOT_NULL(callback.Get());
+
+        WSADATA wsaData{};
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &wsaData));
+        auto cleanup = wil::scope_exit([]() { WSACleanup(); });
+
+        auto [peer, stream] = MakeSocketPair();
+        VERIFY_ARE_EQUAL(0, shutdown(peer.get(), SD_SEND));
+
+        WSLCComposeStreams streams{};
+        streams.Stdout.Type = WSLCHandleTypeSocket;
+        streams.Stdout.Handle.Socket = reinterpret_cast<HANDLE>(stream.get());
+
+        VERIFY_SUCCEEDED(callback->OnStreamsReady(&streams));
+
+        int socketType{};
+        int socketTypeSize = sizeof(socketType);
+        VERIFY_ARE_EQUAL(0, getsockopt(stream.get(), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &socketTypeSize));
     }
 
     TEST_METHOD(Terminal_SetNoColorTogglesIsNoColor)

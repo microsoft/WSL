@@ -221,6 +221,7 @@ void WSLCComposeOperation::Run() noexcept
     });
 
     ComposeExecutionResult executionResult;
+    std::string projectKey;
     const HRESULT result = wil::ResultFromException([&]() {
         if (m_progressCallbackGitCookie != 0)
         {
@@ -228,7 +229,7 @@ void WSLCComposeOperation::Run() noexcept
                 m_progressCallbackGitCookie, __uuidof(IComposeProgressCallback), progressCallback.put_void()));
         }
 
-        executionResult = RunOperation(progressCallback.get());
+        executionResult = RunOperation(progressCallback.get(), projectKey);
     });
     const bool cancelled = result == HRESULT_FROM_WIN32(ERROR_CANCELLED);
 
@@ -242,18 +243,17 @@ void WSLCComposeOperation::Run() noexcept
     m_status = cancelled           ? WSLCComposeOperationStatusCancelled
                : SUCCEEDED(result) ? WSLCComposeOperationStatusSucceeded
                                    : WSLCComposeOperationStatusFailed;
-    m_projectKey = std::move(executionResult.ProjectKey);
+    m_projectKey = std::move(projectKey);
     m_affectedContainers = std::move(executionResult.AffectedContainers);
 }
 
-ComposeExecutionResult WSLCComposeOperation::RunOperation(IComposeProgressCallback* progressCallback)
+ComposeExecutionResult WSLCComposeOperation::RunOperation(IComposeProgressCallback* progressCallback, std::string& projectKey)
 {
     ReportStatus(progressCallback, WSLCComposeStatusValidating);
     CheckCancelled();
     ComposeNormalizer::ValidateSelection(m_request.Selection);
 
     std::optional<ComposeSpec> desiredProject;
-    std::string projectKey;
     if (m_request.ProjectType == WSLCComposeProjectTypeDocuments)
     {
         desiredProject = ComposeNormalizer::Normalize(*m_request.Documents, m_request.Selection);
@@ -268,7 +268,7 @@ ComposeExecutionResult WSLCComposeOperation::RunOperation(IComposeProgressCallba
     if (m_request.Action == WSLCComposeActionValidate)
     {
         ReportStatus(progressCallback, WSLCComposeStatusSucceeded);
-        return {.ProjectKey = std::move(projectKey)};
+        return {.ProjectKey = projectKey};
     }
 
     ReportStatus(progressCallback, WSLCComposeStatusPlanning);

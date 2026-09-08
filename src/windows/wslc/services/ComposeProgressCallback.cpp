@@ -67,6 +67,31 @@ namespace {
         return resourceType.empty() ? resourceKeyValue : wsl::shared::Localization::MessageWslcComposeResource(resourceType, resourceKeyValue);
     }
 
+    common::io::HandleWrapper BorrowComposeStreamHandle(const WSLCHandle& handle)
+    {
+        // COM owns callback input handles through method return, so the relay must borrow them.
+        switch (handle.Type)
+        {
+        case WSLCHandleTypeFile:
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), handle.Handle.File == nullptr || handle.Handle.File == INVALID_HANDLE_VALUE);
+            return common::io::HandleWrapper{handle.Handle.File};
+
+        case WSLCHandleTypePipe:
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), handle.Handle.Pipe == nullptr || handle.Handle.Pipe == INVALID_HANDLE_VALUE);
+            return common::io::HandleWrapper{handle.Handle.Pipe};
+
+        case WSLCHandleTypeSocket:
+        {
+            const auto socket = reinterpret_cast<SOCKET>(handle.Handle.Socket);
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), socket == INVALID_SOCKET);
+            return common::io::HandleWrapper{socket};
+        }
+
+        default:
+            THROW_HR_MSG(E_INVALIDARG, "Unsupported Compose stream handle type: %d", handle.Type);
+        }
+    }
+
 } // namespace
 
 HRESULT ComposeProgressCallback::OnProgress(const WSLCComposeProgressEvent* event)
@@ -137,19 +162,13 @@ try
     if (streams->Stdout.Type != WSLCHandleTypeUnknown)
     {
         io.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
-            wil::unique_handle{streams->Stdout.Handle.File}, GetStdHandle(STD_OUTPUT_HANDLE)));
+            BorrowComposeStreamHandle(streams->Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
     }
 
     if (streams->Stderr.Type != WSLCHandleTypeUnknown)
     {
         io.AddHandle(std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(
-            wil::unique_handle{streams->Stderr.Handle.File}, GetStdHandle(STD_ERROR_HANDLE)));
-    }
-
-    wil::unique_handle stdinHandle;
-    if (streams->Stdin.Type != WSLCHandleTypeUnknown)
-    {
-        stdinHandle.reset(streams->Stdin.Handle.File);
+            BorrowComposeStreamHandle(streams->Stderr), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     io.Run({});

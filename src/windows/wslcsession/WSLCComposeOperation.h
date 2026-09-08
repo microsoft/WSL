@@ -40,7 +40,7 @@ private:
     static Request CaptureRequest(const WSLCComposeOperationRequest& request);
     static std::vector<std::string> CaptureStrings(const WSLCStringArray& values);
     void Run() noexcept;
-    ComposeExecutionResult RunOperation(IComposeProgressCallback* progressCallback);
+    ComposeExecutionResult RunOperation(IComposeProgressCallback* progressCallback, std::string& projectKey);
     void CheckCancelled() const;
     void ReportStatus(IComposeProgressCallback* progressCallback, WSLCComposeStatus status);
     void ReportStatusNoThrow(IComposeProgressCallback* progressCallback, WSLCComposeStatus status) noexcept;

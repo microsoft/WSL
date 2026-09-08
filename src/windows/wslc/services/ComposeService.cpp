@@ -73,13 +73,15 @@ namespace {
                 static_cast<uint64_t>(documentSize) > ULONG_MAX,
                 "Compose document exceeds the maximum transport size: %ls",
                 sourcePath.c_str());
+            const auto contentSize = gsl::narrow<ULONG>(static_cast<uint64_t>(documentSize));
+            const auto streamSize = gsl::narrow<std::streamsize>(contentSize);
 
-            content.resize(static_cast<size_t>(documentSize));
+            content.resize(contentSize);
             stream.seekg(0, std::ios::beg);
-            stream.read(content.data(), static_cast<std::streamsize>(content.size()));
+            stream.read(content.data(), streamSize);
             THROW_HR_IF_MSG(
                 HRESULT_FROM_WIN32(ERROR_READ_FAULT),
-                stream.gcount() != static_cast<std::streamsize>(content.size()),
+                stream.gcount() != streamSize,
                 "Failed to read compose document: %ls",
                 sourcePath.c_str());
 
@@ -94,7 +96,7 @@ namespace {
             document.SourcePath = sourcePath.c_str();
             document.BaseDirectory = baseDirectory.c_str();
             document.Content = reinterpret_cast<const byte*>(content.data());
-            document.ContentSize = static_cast<ULONG>(content.size());
+            document.ContentSize = contentSize;
 
             documents.SchemaVersion = WSLC_COMPOSE_SCHEMA_VERSION;
             documents.WorkingDirectory = workingDirectory.c_str();
@@ -236,6 +238,7 @@ namespace {
         THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
         THROW_HR_IF(E_UNEXPECTED, waitResult < WAIT_OBJECT_0 || waitResult >= WAIT_OBJECT_0 + handleCount);
         const DWORD signaledIndex = waitResult - WAIT_OBJECT_0;
+        bool forceCancellationRequested = false;
         if (cancelIndex.has_value() && signaledIndex == *cancelIndex)
         {
             THROW_IF_FAILED(operation->Cancel());
@@ -243,15 +246,25 @@ namespace {
         }
         else if (forceCancelIndex.has_value() && signaledIndex == *forceCancelIndex)
         {
+            auto cancelOperation = wil::scope_exit([&]() { LOG_IF_FAILED(operation->Cancel()); });
             if (forceAction)
             {
                 forceAction();
             }
+            THROW_IF_FAILED(operation->Cancel());
+            cancelOperation.release();
+            forceCancellationRequested = true;
             THROW_LAST_ERROR_IF(WaitForSingleObject(completionEvent.get(), INFINITE) == WAIT_FAILED);
         }
 
         ComposeOperationResult result;
         THROW_IF_FAILED(operation->GetResult(&result.value));
+        if (forceCancellationRequested && result.value.Result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+        {
+            THROW_HR_IF(E_UNEXPECTED, result.value.Status != WSLCComposeOperationStatusCancelled);
+            return result;
+        }
+
         THROW_IF_FAILED(result.value.Result);
         THROW_HR_IF(E_UNEXPECTED, result.value.Status != WSLCComposeOperationStatusSucceeded);
         return result;

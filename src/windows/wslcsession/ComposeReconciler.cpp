@@ -122,6 +122,8 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Create(co
 std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Up(
     const ComposeSpec& project, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers, HANDLE cancelEvent, const ComposeProgressReporter& progressReporter)
 {
+    // Up removes current containers before creating replacements. CreateComposeContainers deletes the default network,
+    // so failures can leave the project partially or fully absent.
     for (size_t index = 0; index < containers.size(); ++index)
     {
         CheckCancelled(cancelEvent);
