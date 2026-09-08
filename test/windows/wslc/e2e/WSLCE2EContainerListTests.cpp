@@ -25,8 +25,8 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::common::string;
 
 namespace {
-    // The table header is always the first stdout line. Scoping column assertions to it keeps them from
-    // matching container names, image names or IDs in the data rows that happen to contain the title.
+    // Column assertions are scoped to the first stdout line, which keeps them from matching container names,
+    // image names or IDs in the data rows that happen to contain the title.
     bool HeaderHasColumn(const WSLCExecutionResult& result, const std::wstring& column)
     {
         const auto lines = result.GetStdoutLines();
