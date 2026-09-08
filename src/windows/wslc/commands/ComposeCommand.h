@@ -21,7 +21,7 @@ namespace wsl::windows::wslc {
 struct ComposeCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"compose";
-    ComposeCommand(const std::wstring& Parent) : Command(CommandName, Parent)
+    ComposeCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
 
@@ -30,58 +30,13 @@ struct ComposeCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
-    void ExecuteInternal(CLIExecutionContext& Context) const override;
-};
-
-struct ComposeCreateCommand final : public Command
-{
-    constexpr static std::wstring_view CommandName = L"create";
-    ComposeCreateCommand(const std::wstring& Parent) : Command(CommandName, Parent)
-    {
-    }
-
-    std::vector<Argument> GetArguments() const override;
-    std::wstring ShortDescription() const override;
-    std::wstring LongDescription() const override;
-
-protected:
-    void ExecuteInternal(CLIExecutionContext& Context) const override;
-};
-
-struct ComposeUpCommand final : public Command
-{
-    constexpr static std::wstring_view CommandName = L"up";
-    ComposeUpCommand(const std::wstring& Parent) : Command(CommandName, Parent)
-    {
-    }
-
-    std::vector<Argument> GetArguments() const override;
-    std::wstring ShortDescription() const override;
-    std::wstring LongDescription() const override;
-
-protected:
-    void ExecuteInternal(CLIExecutionContext& Context) const override;
-};
-
-struct ComposeStartCommand final : public Command
-{
-    constexpr static std::wstring_view CommandName = L"start";
-    ComposeStartCommand(const std::wstring& Parent) : Command(CommandName, Parent)
-    {
-    }
-
-    std::vector<Argument> GetArguments() const override;
-    std::wstring ShortDescription() const override;
-    std::wstring LongDescription() const override;
-
-protected:
-    void ExecuteInternal(CLIExecutionContext& Context) const override;
+    void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
 struct ComposeAttachCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"attach";
-    ComposeAttachCommand(const std::wstring& Parent) : Command(CommandName, Parent)
+    ComposeAttachCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
 
@@ -90,13 +45,73 @@ struct ComposeAttachCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
-    void ExecuteInternal(CLIExecutionContext& Context) const override;
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ComposeCreateCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"create";
+    ComposeCreateCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ComposeListCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"list";
+    ComposeListCommand(const std::wstring& parent) : Command(CommandName, {L"ls"}, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ComposeRemoveCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"remove";
+    ComposeRemoveCommand(const std::wstring& parent) : Command(CommandName, {L"delete", L"rm"}, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ComposeStartCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"start";
+    ComposeStartCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
 struct ComposeStopCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"stop";
-    ComposeStopCommand(const std::wstring& Parent) : Command(CommandName, Parent)
+    ComposeStopCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
 
@@ -105,7 +120,22 @@ struct ComposeStopCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
-    void ExecuteInternal(CLIExecutionContext& Context) const override;
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+struct ComposeUpCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"up";
+    ComposeUpCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
 } // namespace wsl::windows::wslc

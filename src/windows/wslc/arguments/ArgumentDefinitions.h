@@ -111,6 +111,7 @@ _(Password,         "password",             L"p",             Kind::Value,      
 _(PasswordStdin,    "password-stdin",       NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_LoginPasswordStdinArgDescription()) \
 _(Path,             "path",                 NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_PathArgDescription()) \
 _(Progress,         "progress",             NO_ALIAS,         Kind::Value,      ProgressMode, Localization::WSLCCLI_ProgressArgDescription()) \
+_(Project,          "project",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ComposeProjectArgDescription()) \
 _(Publish,          "publish",              L"p",             Kind::Value,      NoConversion, Localization::WSLCCLI_PublishArgDescription()) \
 _(PublishAll,       "publish-all",          L"P",             Kind::Flag,       NoConversion, Localization::WSLCCLI_PublishAllArgDescription()) \
 _(Pull,             "pull",                 NO_ALIAS,         Kind::Value,      PullPolicy,   Localization::WSLCCLI_PullArgDescription()) \

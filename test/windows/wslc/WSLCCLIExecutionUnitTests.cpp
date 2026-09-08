@@ -97,6 +97,40 @@ class WSLCCLIExecutionUnitTests
         }
     }
 
+    TEST_METHOD(ComposeCancellationRequests_GracefulThenForceThenTerminate)
+    {
+        CLIExecutionContext context;
+        const auto cancelEvent = context.CreateCancelEvent();
+        const auto forceCancelEvent = context.CreateForceCancelEvent();
+
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(1ul, context.CancellationCount.load());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(cancelEvent, 0));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(forceCancelEvent, 0));
+
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(2ul, context.CancellationCount.load());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(forceCancelEvent, 0));
+
+        VERIFY_IS_FALSE(context.RecordCancellationRequest());
+        VERIFY_ARE_EQUAL(3ul, context.CancellationCount.load());
+    }
+
+    TEST_METHOD(ComposeCancellationRequestsBeforeEventCreation_AreReplayed)
+    {
+        CLIExecutionContext context;
+
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+        VERIFY_IS_TRUE(context.RecordCancellationRequest());
+
+        const auto cancelEvent = context.CreateCancelEvent();
+        const auto forceCancelEvent = context.CreateForceCancelEvent();
+
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(cancelEvent, 0));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(forceCancelEvent, 0));
+        VERIFY_ARE_EQUAL(2ul, context.CancellationCount.load());
+    }
+
     // Test: Verify EnumVariantMap on DataMap for Context Data
     TEST_METHOD(EnumVariantMap_DataMapValidation)
     {

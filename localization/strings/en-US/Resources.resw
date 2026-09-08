@@ -2581,43 +2581,109 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_ComposeCommandDesc" xml:space="preserve">
-    <value>Manage compose sessions.</value>
+    <value>Manage Compose projects.</value>
   </data>
   <data name="WSLCCLI_ComposeCommandLongDesc" xml:space="preserve">
-    <value>Create and manage containers declared by a compose file.</value>
+    <value>Create and manage containers declared by a Compose file.</value>
   </data>
   <data name="WSLCCLI_ComposeCreateDesc" xml:space="preserve">
-    <value>Create a compose session.</value>
+    <value>Create a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeCreateLongDesc" xml:space="preserve">
-    <value>Create the containers declared by a compose file.</value>
+    <value>Create the containers declared by a Compose file.</value>
+  </data>
+  <data name="WSLCCLI_ComposeListDesc" xml:space="preserve">
+    <value>List running Compose projects.</value>
+  </data>
+  <data name="WSLCCLI_ComposeListLongDesc" xml:space="preserve">
+    <value>List Compose projects managed by WSLC.</value>
+    <comment>{Locked="WSLC"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_ComposeUpDesc" xml:space="preserve">
-    <value>Start and attach to a compose session.</value>
+    <value>Destructively recreate, start, and attach to a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeUpLongDesc" xml:space="preserve">
-    <value>Start all containers in a compose session, then attach interactively and display their output.</value>
+    <value>Force-remove existing project containers, recreate the default network and containers, then start them and attach interactively to their output. A failure during recreation can leave the project partially or fully absent.</value>
+  </data>
+  <data name="WSLCCLI_ComposeGracefullyStopping" xml:space="preserve">
+    <value>Gracefully stopping... Press Ctrl+C again to force termination.</value>
+    <comment>{Locked="Ctrl+C"}Key combination should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ComposeProgressStopping" xml:space="preserve">
+    <value>Stopping</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressCreating" xml:space="preserve">
+    <value>Creating</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressRemoving" xml:space="preserve">
+    <value>Removing</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressPulling" xml:space="preserve">
+    <value>Pulling</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressKilling" xml:space="preserve">
+    <value>Killing</value>
+  </data>
+  <data name="WSLCCLI_ComposeProgressStarting" xml:space="preserve">
+    <value>Starting</value>
+  </data>
+  <data name="WSLCCLI_ComposeResourceContainer" xml:space="preserve">
+    <value>Container</value>
+  </data>
+  <data name="WSLCCLI_ComposeResourceNetwork" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="WSLCCLI_ComposeResourceImage" xml:space="preserve">
+    <value>Image</value>
+  </data>
+  <data name="MessageWslcComposeResource" xml:space="preserve">
+    <value>{0} {1}</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}Resource type and resource name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeProgress" xml:space="preserve">
+    <value>{0} {1} ({2}/{3})</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}{Locked="{3}"}Progress operation, resource name, current count, and total count should not be translated</comment>
   </data>
   <data name="WSLCCLI_ComposeStartDesc" xml:space="preserve">
-    <value>Start a compose session.</value>
+    <value>Start a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeStartLongDesc" xml:space="preserve">
-    <value>Start all containers in a compose session.</value>
+    <value>Start all containers in a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeAttachDesc" xml:space="preserve">
-    <value>Attach to a compose session.</value>
+    <value>Attach to a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeAttachLongDesc" xml:space="preserve">
-    <value>Attach interactively and display output from all containers in a compose session.</value>
+    <value>Attach interactively and display output from all containers in a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeStopDesc" xml:space="preserve">
-    <value>Stop a compose session.</value>
+    <value>Stop a Compose project.</value>
   </data>
   <data name="WSLCCLI_ComposeStopLongDesc" xml:space="preserve">
-    <value>Stop all containers in a compose session.</value>
+    <value>Stop all containers in a Compose project.</value>
+  </data>
+  <data name="WSLCCLI_ComposeRemoveDesc" xml:space="preserve">
+    <value>Remove a Compose project.</value>
+  </data>
+  <data name="WSLCCLI_ComposeRemoveLongDesc" xml:space="preserve">
+    <value>Remove stopped containers in a Compose project.</value>
+  </data>
+  <data name="WSLCCLI_ComposeNoStoppedContainers" xml:space="preserve">
+    <value>No stopped containers</value>
   </data>
   <data name="WSLCCLI_ComposePathArgDescription" xml:space="preserve">
-    <value>Path to the compose YAML file</value>
+    <value>Path to the Compose YAML file</value>
+  </data>
+  <data name="WSLCCLI_ComposeProjectArgDescription" xml:space="preserve">
+    <value>Compose project name or path to the Compose YAML file</value>
+  </data>
+  <data name="MessageWslcComposeProjectPathNotFound" xml:space="preserve">
+    <value>The Compose file '{0}' does not exist or is not a regular file.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeProjectOrFileNotFound" xml:space="preserve">
+    <value>No Compose project or file was found for '{0}'.</value>
+    <comment>{Locked="{0}"}Project names and file paths should not be translated</comment>
   </data>
   <data name="MessageWslcComposeFileInvalid" xml:space="preserve">
     <value>The compose file '{0}' is invalid: {1}.</value>

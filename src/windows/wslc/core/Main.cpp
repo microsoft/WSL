@@ -65,15 +65,11 @@ try
 
     // SetConsoleCtrlHandler only accepts plain function pointers, so route Ctrl-C
     // through a static reference into the context.
-    static auto& s_cancelEvent = context.CancelEvent;
+    static auto& s_context = context;
     auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
         if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT)
         {
-            if (s_cancelEvent && !s_cancelEvent.is_signaled())
-            {
-                s_cancelEvent.SetEvent();
-                return TRUE;
-            }
+            return s_context.RecordCancellationRequest();
         }
         return FALSE;
     };
