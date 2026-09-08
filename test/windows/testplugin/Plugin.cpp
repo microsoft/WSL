@@ -653,17 +653,7 @@ try
         static std::atomic<bool> done = false;
         if (!done.exchange(true))
         {
-            try
-            {
-                RunWslcSuccessChecks(Session);
-            }
-            catch (const wil::ResultException& exception)
-            {
-                const auto& failure = exception.GetFailureInfo();
-                g_logfile << "WSLC success checks failed: " << std::hex << failure.hr << std::dec << ", file=" << failure.pszFile
-                          << ", line=" << failure.uLineNumber << std::endl;
-                throw;
-            }
+            RunWslcSuccessChecks(Session);
         }
 
         return S_OK;
