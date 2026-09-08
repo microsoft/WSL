@@ -58,7 +58,7 @@ class WSLCCLIExecutionUnitTests
     {
         RootCommand command;
         ArgMap args;
-        const std::vector<Argument> definitions{Argument::Create(ArgType::Password, true)};
+        const std::vector<Argument> definitions{Argument::Create(ArgType::Password, {.Required = true})};
 
         try
         {
@@ -144,13 +144,13 @@ class WSLCCLIExecutionUnitTests
             }
             else if (dataType == Data::Volumes)
             {
-                std::vector<WSLCVolumeInformation> volumes;
+                std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> volumes;
                 dataMap.Add<Data::Volumes>(std::move(volumes));
                 handled = true;
             }
             else if (dataType == Data::Networks)
             {
-                std::vector<WSLCNetworkInformation> networks;
+                std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> networks;
                 dataMap.Add<Data::Networks>(std::move(networks));
                 handled = true;
             }

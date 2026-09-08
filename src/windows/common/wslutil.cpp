@@ -21,6 +21,7 @@ Abstract:
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
+#include "HandleIO.h"
 #include "MsiQuery.h"
 #include "WslInstall.h"
 
@@ -33,6 +34,21 @@ using namespace wsl::windows::common::wslutil;
 
 constexpr auto c_latestReleaseUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/latest";
 constexpr auto c_releaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases";
+
+wsl::windows::common::io::HandleWrapper COMOutputHandle::Release()
+{
+    const auto type = Type;
+    const auto handle = Handle.File;
+    Handle.File = nullptr;
+    Type = WSLCHandleTypeUnknown;
+
+    if (type == WSLCHandleTypeSocket)
+    {
+        return wsl::windows::common::io::HandleWrapper{wil::unique_socket{reinterpret_cast<SOCKET>(handle)}};
+    }
+
+    return wsl::windows::common::io::HandleWrapper{wil::unique_handle{handle}};
+}
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
 constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";
@@ -164,6 +180,9 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_NETWORK_NOT_FOUND),
     X(WSLC_E_SESSION_NOT_FOUND),
     X(WSLC_E_VM_NOT_RUNNING),
+    X(WSLC_E_CONTAINER_DELETED),
+    X(WSLC_E_EVENTS_LOST),
+    X(WSLC_E_EVENT_STREAM_FINISHED),
     X(WSLC_E_WU_SEARCH_FAILED),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED),

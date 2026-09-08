@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,7 +26,7 @@ class WSLCE2EContainerRemoveTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         BuildAnonymousVolumeImage();
         return true;
     }
@@ -35,8 +36,7 @@ class WSLCE2EContainerRemoveTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureVolumeDoesNotExist(TestVolumeName);
-        EnsureImageIsDeleted(AnonymousVolumeImage);
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(AnonymousVolumeImage);
         return true;
     }
 
@@ -62,7 +62,8 @@ class WSLCE2EContainerRemoveTests
         auto result = RunWslc(std::format(L"container remove {}", WslcContainerName));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+             .Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 
@@ -254,8 +255,9 @@ private:
         VERIFY_ARE_EQUAL(mount->Destination, "/data");
 
         const auto volumeName = wsl::shared::string::MultiByteToWide(mount->Name);
+        const auto volumeLabels = InspectVolume(volumeName).Labels;
         VERIFY_IS_TRUE(
-            InspectVolume(volumeName).Labels.contains("com.docker.volume.anonymous"),
+            volumeLabels.has_value() && volumeLabels->contains("com.docker.volume.anonymous"),
             L"The volume returned by container inspect is not anonymous");
         return volumeName;
     }

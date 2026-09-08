@@ -60,4 +60,3 @@ stages:
 
                 New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
                 Copy-Item $jsonFiles.FullName $outputPath
-                Copy-Item "$(Pipeline.Workspace)\s\wsl-release-scripts\scripts\Dcat\Update-DcatSubmission.ps1" $outputPath

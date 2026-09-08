@@ -24,24 +24,24 @@ Abstract:
 #include "WSLCSessionDefaults.h"
 #include "wslpolicies.h"
 #include "APICompat.h"
+#include "WSLCContainerEntry.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
 using io::OverlappedIOHandle;
 using io::WriteHandle;
 using wsl::shared::Localization;
-using wsl::windows::common::string::FormatBytes;
+using wsl::windows::common::string::FormatHumanReadableSize;
 using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
-constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
-constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
-constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
+constexpr uint32_t c_progressPrecision = 4;
+constexpr auto c_containerCreateEventTimeout = std::chrono::seconds{60};
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
 // session's IdleTimeoutSec setting is 0/unset). This avoids thrashing the VM (repeated
@@ -500,6 +500,9 @@ try
 
     m_runtime.Initialize(m_vmFactoryGitCookie, m_git, &m_settings, idleGracePeriod, std::move(sessionContext), std::move(hooks));
 
+    m_containerEventTracking = m_runtime.Events().RegisterContainerCreate(
+        std::bind(&WSLCSession::OnContainerCreated, this, std::placeholders::_1, std::placeholders::_2));
+
     return S_OK;
 }
 CATCH_RETURN()
@@ -575,7 +578,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     if (Settings.StoragePath == nullptr)
     {
         // If no storage path is specified, use a tmpfs for convenience.
-        m_runtime.Vm().Mount("", c_containerdStorage, "tmpfs", "", 0);
+        m_runtime.Vm().Mount("", wsl::windows::wslc::ContainerdStorageMountPoint, "tmpfs", "", 0);
         m_runtime.SetStorageMounted(true);
         return;
     }
@@ -641,7 +644,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     }
 
     // Mount the device to /root.
-    m_runtime.Vm().Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
+    m_runtime.Vm().Mount(diskDevice.c_str(), wsl::windows::wslc::ContainerdStorageMountPoint, "ext4", "discard", 0);
     m_runtime.SetStorageMounted(true);
 
     // Configure swap on a separate ephemeral VHD.
@@ -1432,8 +1435,8 @@ try
             {
                 auto currentBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.current, 0));
                 auto totalBytes = static_cast<ULONGLONG>(std::max<int64_t>(entry.total, 0));
-                auto current = FormatBytes(currentBytes);
-                auto total = FormatBytes(totalBytes);
+                auto current = FormatHumanReadableSize(currentBytes, c_progressPrecision);
+                auto total = FormatHumanReadableSize(totalBytes, c_progressPrecision);
                 reportProgress(std::format("{}{} {} / {}", logPrefix(it->second), entry.id, current, total), entry.id.c_str(), currentBytes, totalBytes);
             }
             else if (reportedSteps.insert(entry.id).second)
@@ -2313,7 +2316,9 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
 
     try
     {
-        std::scoped_lock lock(m_containersLock, m_networksLock);
+        std::unique_lock containersLock{m_containersLock};
+        WaitForConflictingCreateToComplete(containersLock);
+        std::unique_lock networksLock{m_networksLock};
 
         // Generate a unique container name if the user didn't provide one.
         std::string containerName;
@@ -2351,13 +2356,24 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             m_runtime,
             m_pluginNotifier.get(),
             m_networks,
-            std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1));
+            std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
+            m_eventStore);
 
-        // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
-        auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
-        WI_ASSERT(inserted);
+        auto pendingCreate = StartPendingCreate(container);
 
-        it->second->CopyTo(Container);
+        containersLock.unlock();
+        networksLock.unlock();
+
+        // m_pendingCreate is published under m_containersLock before the event thread can observe it, so
+        // OnContainerCreated() is guaranteed to complete this create unless the session tears down first.
+        WaitForPendingCreateCompletion(pendingCreate);
+
+        if (pendingCreate->Exception)
+        {
+            std::rethrow_exception(pendingCreate->Exception);
+        }
+
+        container->CopyTo(Container);
     }
     catch (const DockerHTTPException& e)
     {
@@ -2372,6 +2388,97 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
+
+__requires_lock_held(m_containersLock) std::shared_ptr<WSLCSession::PendingContainerCreate> WSLCSession::StartPendingCreate(std::shared_ptr<WSLCContainerImpl> Container)
+{
+    WI_ASSERT(!m_pendingCreate);
+
+    m_pendingCreate = std::make_shared<PendingContainerCreate>();
+    m_pendingCreate->Container = std::move(Container);
+
+    return m_pendingCreate;
+}
+
+void WSLCSession::WaitForPendingCreateCompletion(const std::shared_ptr<PendingContainerCreate>& PendingCreate)
+{
+    auto io = CreateIOContext();
+    io.AddHandle(std::make_unique<io::EventHandle>(PendingCreate->Completed.get()));
+
+    try
+    {
+        io.Run(c_containerCreateEventTimeout);
+    }
+    catch (...)
+    {
+        if (wil::ResultFromCaughtException() != HRESULT_FROM_WIN32(ERROR_TIMEOUT))
+        {
+            throw;
+        }
+
+        // Fail this create rather than leaving m_pendingCreate set, which would wedge every later one.
+        // Any container docker did manage to create is left behind; the same broken event stream makes
+        // deleting it unreliable, and a late create event is ignored once m_pendingCreate is cleared.
+        std::lock_guard containersLock{m_containersLock};
+        if (m_pendingCreate == PendingCreate)
+        {
+            CompletePendingCreate(PendingCreate, std::current_exception());
+        }
+    }
+
+    WI_ASSERT(PendingCreate->Completed.is_signaled());
+}
+
+__requires_lock_held(m_containersLock) void WSLCSession::CompletePendingCreate(
+    const std::shared_ptr<PendingContainerCreate>& PendingCreate, std::exception_ptr Exception) noexcept
+{
+    WI_ASSERT(m_pendingCreate == PendingCreate);
+    PendingCreate->Exception = std::move(Exception);
+    m_pendingCreate.reset();
+    PendingCreate->Completed.SetEvent();
+}
+
+void WSLCSession::WaitForConflictingCreateToComplete(std::unique_lock<std::mutex>& ContainersLock)
+{
+    while (m_pendingCreate)
+    {
+        auto pendingCreate = m_pendingCreate;
+        ContainersLock.unlock();
+
+        WaitForPendingCreateCompletion(pendingCreate);
+
+        ContainersLock.lock();
+    }
+}
+
+void WSLCSession::OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept
+try
+{
+    std::lock_guard containersLock{m_containersLock};
+
+    // Containers created behind our back (BuildKit, for instance) have no pending create to match.
+    if (!m_pendingCreate || m_pendingCreate->Container->ID() != ContainerId)
+    {
+        return;
+    }
+
+    auto pendingCreate = m_pendingCreate;
+    std::exception_ptr exception;
+
+    try
+    {
+        // Key the map by Docker's container ID, which is set in the WSLCContainerImpl constructor and stable for its lifetime.
+        WI_VERIFY(m_containers.emplace(ContainerId, pendingCreate->Container).second);
+        pendingCreate->Container->RecordEvent("create", Time);
+    }
+    catch (...)
+    {
+        // Hand the failure to the waiting create rather than letting it return a container the session isn't tracking.
+        exception = std::current_exception();
+    }
+
+    CompletePendingCreate(pendingCreate, std::move(exception));
+}
+CATCH_LOG()
 
 HRESULT WSLCSession::OpenContainer(LPCSTR Id, IWSLCContainer** Container)
 try
@@ -2547,6 +2654,13 @@ try
     // if some IDs returned by Docker aren't in m_containers (e.g. created externally), but in the
     // common case the two should match.
     auto output = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(dockerContainers.size());
+    auto freeStrings = wil::scope_exit([&] {
+        for (size_t i = 0; i < dockerContainers.size(); ++i)
+        {
+            wsl::windows::common::wslc::FreeContainerEntryStrings(&output[i]);
+        }
+    });
+
     std::vector<WSLCContainerPortMapping> allPorts;
 
     size_t index = 0;
@@ -2562,6 +2676,47 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
+
+        // Commands and status descriptions have no bound imposed by the runtime, so they are
+        // allocated rather than copied into a fixed buffer.
+        output[index].Command = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(dockerContainer.Command.c_str()).release();
+        output[index].Status = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(dockerContainer.Status.c_str()).release();
+
+        // Labels, networks and mounts are reported the way the docker CLI renders them: a comma
+        // separated list. Like the command and status above they are unbounded.
+        std::vector<std::string> labels;
+        for (const auto& [key, value] : dockerContainer.Labels)
+        {
+            labels.push_back(std::format("{}={}", key, value));
+        }
+
+        std::vector<std::string> networks;
+        for (const auto& [name, _] : dockerContainer.NetworkSettings.Networks)
+        {
+            networks.push_back(name);
+        }
+
+        std::vector<std::string> mounts;
+        ULONG localVolumes = 0;
+        for (const auto& mount : dockerContainer.Mounts)
+        {
+            // Named volumes report a name, bind mounts only report the host path.
+            mounts.push_back(mount.Name.empty() ? mount.Source : mount.Name);
+            if (mount.Type == "volume")
+            {
+                localVolumes++;
+            }
+        }
+
+        const auto joinedLabels = wsl::shared::string::Join(labels, ',');
+        const auto joinedNetworks = wsl::shared::string::Join(networks, ',');
+        const auto joinedMounts = wsl::shared::string::Join(mounts, ',');
+
+        output[index].Labels = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedLabels.c_str()).release();
+        output[index].Networks = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedNetworks.c_str()).release();
+        output[index].Mounts = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(joinedMounts.c_str()).release();
+        output[index].LocalVolumes = localVolumes;
+
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
@@ -2582,13 +2737,21 @@ try
         index++;
     }
 
+    // Finish every allocation before transferring ownership so nothing can throw once the caller
+    // owns the results.
+    wil::unique_cotaskmem_ptr<WSLCContainerPortMapping[]> portsOutput;
+    if (!allPorts.empty())
+    {
+        portsOutput = wil::make_unique_cotaskmem<WSLCContainerPortMapping[]>(allPorts.size());
+        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLCContainerPortMapping));
+    }
+
+    freeStrings.release();
     *Count = static_cast<ULONG>(index);
     *Containers = output.release();
 
-    if (!allPorts.empty())
+    if (portsOutput)
     {
-        auto portsOutput = wil::make_unique_cotaskmem<WSLCContainerPortMapping[]>(allPorts.size());
-        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLCContainerPortMapping));
         *PortsCount = static_cast<ULONG>(allPorts.size());
         *Ports = portsOutput.release();
     }
@@ -2776,16 +2939,14 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeInformation** Volumes, ULONG* Count)
+HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Volumes);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
-    *Volumes = nullptr;
-    *Count = 0;
+    *Output = nullptr;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
@@ -2794,16 +2955,9 @@ try
 
     auto volumeList = m_runtime.Volumes().ListVolumes(std::move(filters));
 
-    if (volumeList.empty())
-    {
-        return S_OK;
-    }
+    std::string json = wsl::shared::ToJson(volumeList);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
-    auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(volumeList.size());
-    memcpy(output.get(), volumeList.data(), volumeList.size() * sizeof(WSLCVolumeInformation));
-
-    *Count = static_cast<ULONG>(volumeList.size());
-    *Volumes = output.release();
     return S_OK;
 }
 CATCH_RETURN();
@@ -2983,10 +3137,7 @@ try
     entry.Scope = full.Scope;
     entry.Internal = full.Internal;
     entry.Labels = full.Labels;
-    if (full.Options)
-    {
-        entry.Options = *full.Options;
-    }
+    entry.Options = full.Options;
     entry.IPAM.Driver = full.IPAM.Driver;
     if (full.IPAM.Config)
     {
@@ -3046,63 +3197,49 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, WSLCNetworkInformation** Networks, ULONG* Count)
+HRESULT WSLCSession::ListNetworks(const WSLCFilter* Filters, ULONG FiltersCount, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(this);
 
-    RETURN_HR_IF_NULL(E_POINTER, Networks);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
 
-    *Networks = nullptr;
-    *Count = 0;
+    *Output = nullptr;
 
     auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
-    const bool filtered = !filters.empty();
-
-    if (filtered)
-    {
-        // Scope the filtered query to WSLC-managed networks.
-        filters["label"].push_back(WSLCNetworkManagedLabel);
-    }
 
     auto lock = AcquireLease();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::vector<docker_schema::Network> dockerNetworks;
-    if (filtered)
+    try
     {
-        try
-        {
-            dockerNetworks = m_runtime.Docker().ListNetworks(filters);
-        }
-        CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+        dockerNetworks = m_runtime.Docker().ListNetworks(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list networks");
+
+    std::vector<wslc_schema::NetworkListEntry> networks;
+    networks.reserve(dockerNetworks.size());
+    for (const auto& network : dockerNetworks)
+    {
+        wslc_schema::NetworkListEntry entry;
+        entry.Id = network.Id;
+        entry.Name = network.Name;
+        entry.Driver = network.Driver;
+        entry.Scope = network.Scope;
+        entry.Created = network.Created;
+        entry.EnableIPv4 = network.EnableIPv4;
+        entry.EnableIPv6 = network.EnableIPv6;
+        entry.Internal = network.Internal;
+        entry.Labels = network.Labels;
+        entry.Labels.erase(WSLCNetworkManagedLabel);
+
+        networks.push_back(std::move(entry));
     }
 
-    std::lock_guard networksLock(m_networksLock);
-
-    auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
-
-    ULONG index = 0;
-    for (const auto& [name, entry] : m_networks)
-    {
-        if (filtered && std::ranges::find_if(dockerNetworks, [&](const auto& n) { return n.Name == name; }) == dockerNetworks.end())
-        {
-            continue;
-        }
-
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
-        index++;
-    }
-
-    if (index == 0)
-    {
-        return S_OK;
-    }
-
-    *Networks = output.release();
-    *Count = index;
+    std::string json = wsl::shared::ToJson(networks);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
     return S_OK;
 }
@@ -3122,30 +3259,44 @@ try
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     auto lock = AcquireLease();
-    std::lock_guard networksLock(m_networksLock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    auto it = m_networks.find(name);
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
-
-    const auto& entry = it->second;
-
-    wslc_schema::Network result;
-    result.Id = entry.Id;
-    result.Name = name;
-    result.Driver = entry.Driver;
-    result.Scope = entry.Scope;
-    result.Internal = entry.Internal;
-    result.Labels = entry.Labels;
-    if (!entry.Options.empty())
+    docker_schema::Network network;
+    try
     {
-        result.Options = entry.Options;
+        network = m_runtime.Docker().InspectNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", name.c_str());
     }
 
-    result.IPAM.Driver = entry.IPAM.Driver;
-    if (entry.IPAM.Config)
+    wslc_schema::Network result;
+    result.Id = network.Id;
+    result.Name = network.Name;
+    result.Created = network.Created;
+    result.Driver = network.Driver;
+    result.Scope = network.Scope;
+    result.EnableIPv4 = network.EnableIPv4;
+    result.EnableIPv6 = network.EnableIPv6;
+    result.Internal = network.Internal;
+    result.Attachable = network.Attachable;
+    result.Ingress = network.Ingress;
+    result.ConfigOnly = network.ConfigOnly;
+    result.ConfigFrom.Network = network.ConfigFrom.Network;
+    result.Options = network.Options;
+    result.Labels = network.Labels;
+    result.Labels.erase(WSLCNetworkManagedLabel);
+    result.Status = network.Status;
+
+    result.IPAM.Driver = network.IPAM.Driver;
+    result.IPAM.Options = network.IPAM.Options;
+    if (network.IPAM.Config)
     {
         auto& configs = result.IPAM.Config.emplace();
-        for (const auto& cfg : *entry.IPAM.Config)
+        for (const auto& cfg : *network.IPAM.Config)
         {
             wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
@@ -3153,6 +3304,17 @@ try
             inspectCfg.IPRange = cfg.IPRange;
             configs.push_back(std::move(inspectCfg));
         }
+    }
+
+    for (const auto& [id, container] : network.Containers)
+    {
+        wslc_schema::NetworkContainer inspectContainer;
+        inspectContainer.Name = container.Name;
+        inspectContainer.EndpointID = container.EndpointID;
+        inspectContainer.MacAddress = container.MacAddress;
+        inspectContainer.IPv4Address = container.IPv4Address;
+        inspectContainer.IPv6Address = container.IPv6Address;
+        result.Containers.emplace(id, std::move(inspectContainer));
     }
 
     std::string json = wsl::shared::ToJson(result);
@@ -3288,6 +3450,9 @@ try
             if (!m_sessionTerminatingEvent.is_signaled())
             {
                 m_sessionTerminatingEvent.SetEvent();
+
+                // Wake any readers parked in an event stream so they abort instead of waiting forever.
+                m_eventStore.OnSessionTerminating();
             }
 
             // Cancel any pending IO on user-provided handles to unblock operations
@@ -3853,6 +4018,23 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::GetEvents(LONGLONG SinceTime, LONGLONG UntilTime, const WSLCFilter* Filters, ULONG FiltersCount, IWSLCEventStream** Stream)
+try
+{
+    WSLCExecutionContext context(this);
+
+    RETURN_HR_IF_NULL(E_POINTER, Stream);
+
+    *Stream = nullptr;
+
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+    auto stream = m_eventStore.CreateStream(Microsoft::WRL::ComPtr<WSLCSession>{this}, SinceTime, UntilTime, std::move(filters));
+
+    *Stream = stream.Detach();
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::RecoverExistingContainers()
 {
     WI_ASSERT(m_runtime.HasDocker());
@@ -3886,7 +4068,7 @@ void WSLCSession::RecoverExistingContainers()
         try
         {
             auto container = WSLCContainerImpl::Open(
-                dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1));
+                dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
 
             auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
             WI_ASSERT(inserted);
@@ -3931,10 +4113,7 @@ void WSLCSession::RecoverExistingNetworks()
             entry.Scope = network.Scope;
             entry.Internal = network.Internal;
             entry.Labels = network.Labels;
-            if (network.Options)
-            {
-                entry.Options = *network.Options;
-            }
+            entry.Options = network.Options;
             entry.IPAM.Driver = network.IPAM.Driver;
             if (network.IPAM.Config)
             {

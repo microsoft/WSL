@@ -27,8 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> VolumeRemoveCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::VolumeName, true, Limit::Unlimited),
-        Argument::Create(ArgType::Force, std::nullopt, std::nullopt, Localization::WSLCCLI_VolumeForceArgDescription()),
+        Argument::Create(ArgType::VolumeName, {.Required = true, .Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Force, {.Desc = Localization::WSLCCLI_VolumeForceArgDescription()}),
     };
 }
 

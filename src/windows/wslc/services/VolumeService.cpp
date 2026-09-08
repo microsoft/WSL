@@ -60,7 +60,8 @@ void VolumeService::Delete(models::Session& session, const std::string& name)
     THROW_IF_FAILED(session.Get()->DeleteVolume(name.c_str()));
 }
 
-std::vector<WSLCVolumeInformation> VolumeService::List(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
+std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> VolumeService::List(
+    models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -69,19 +70,11 @@ std::vector<WSLCVolumeInformation> VolumeService::List(models::Session& session,
         filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
     }
 
-    wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> rawVolumes;
-    ULONG count = 0;
+    wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(session.Get()->ListVolumes(
-        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &rawVolumes, &count));
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &output));
 
-    std::vector<WSLCVolumeInformation> volumes;
-    volumes.reserve(count);
-    for (auto ptr = rawVolumes.get(), end = rawVolumes.get() + count; ptr != end; ++ptr)
-    {
-        volumes.push_back(*ptr);
-    }
-
-    return volumes;
+    return FromJson<std::vector<wsl::windows::common::wslc_schema::VolumeListEntry>>(output.get());
 }
 
 wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::Session& session, const std::string& name)

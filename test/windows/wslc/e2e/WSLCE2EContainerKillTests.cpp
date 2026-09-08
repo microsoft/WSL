@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,7 +26,7 @@ class WSLCE2EContainerKillTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
@@ -33,7 +34,6 @@ class WSLCE2EContainerKillTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -95,7 +95,8 @@ class WSLCE2EContainerKillTests
 
         auto result = RunWslc(std::format(L"container kill {}", WslcContainerName));
         result.Verify(
-            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+            {.Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 

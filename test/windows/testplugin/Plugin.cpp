@@ -123,21 +123,6 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
             return E_ABORT;
         }
     }
-    else if (g_testType == PluginTestType::MountFolderAccess)
-    {
-        const auto key = OpenTestRegistryKey(KEY_READ);
-        const auto mountSource = ReadString(key.get(), nullptr, c_mountFolder);
-
-        RETURN_IF_FAILED(
-            g_api->MountFolder(Session->SessionId, mountSource.c_str(), L"/test-plugin-access", false, L"test-plugin-access"));
-
-        std::vector<const char*> arguments = {"/bin/sh", "-c", "{ echo test > /test-plugin-access/plugin-test.txt; } 2>&1", nullptr};
-        wil::unique_socket socket;
-        RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, arguments[0], arguments.data(), &socket));
-
-        const auto output = ReadFromSocket(socket.get());
-        g_logfile.write(output.data(), output.size());
-    }
     else if (g_testType == PluginTestType::ApiErrors)
     {
         auto result = g_api->MountFolder(Session->SessionId, L"C:\\DoesNotExit", L"/dummy", true, L"test-plugin-mount");
@@ -511,6 +496,48 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
                 file << "Windows-content";
             }
 
+            const auto deniedFilePath = std::wstring(testFolder) + L"plugin-denied.txt";
+            {
+                wil::unique_hfile deniedFile{
+                    CreateFileW(deniedFilePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                THROW_LAST_ERROR_IF(!deniedFile);
+            }
+
+            auto deniedFileCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(deniedFilePath); });
+
+            PACL originalAcl = nullptr;
+            wil::unique_hlocal originalDescriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                deniedFilePath.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &originalAcl, nullptr, &originalDescriptor));
+
+            auto restoreAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                    const_cast<LPWSTR>(deniedFilePath.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, originalAcl, nullptr));
+            });
+
+            EXPLICIT_ACCESSW deniedAccess{};
+            deniedAccess.grfAccessPermissions = FILE_READ_DATA;
+            deniedAccess.grfAccessMode = DENY_ACCESS;
+            deniedAccess.grfInheritance = NO_INHERITANCE;
+            deniedAccess.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+            deniedAccess.Trustee.ptstrName = static_cast<LPWSTR>(Session->UserSid);
+
+            wsl::windows::common::security::unique_acl deniedAcl;
+            THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &deniedAccess, originalAcl, &deniedAcl));
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(deniedFilePath.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, deniedAcl.get(), nullptr));
+
+            {
+                wil::unique_handle impersonationToken;
+                THROW_LAST_ERROR_IF(!DuplicateTokenEx(
+                    Session->UserToken, TOKEN_IMPERSONATE | TOKEN_QUERY, nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
+                auto revert = wil::impersonate_token(impersonationToken.get());
+                wil::unique_hfile deniedFile{
+                    CreateFileW(deniedFilePath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                const auto openError = GetLastError();
+                THROW_HR_IF(E_UNEXPECTED, deniedFile || openError != ERROR_ACCESS_DENIED);
+            }
+
             // Mount read-write and verify the file can be read from Linux.
             THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, rwMountpoint, false));
 
@@ -518,6 +545,9 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
 
             auto readCmd = std::format("cat {}/{}", rwMountpoint, testFileName);
             runCommand(readCmd.c_str());
+
+            auto deniedReadCmd = std::format("cat {}/plugin-denied.txt", rwMountpoint);
+            runCommand(deniedReadCmd.c_str());
 
             THROW_IF_FAILED(g_api->WSLCUnmountFolder(Session->SessionId, rwMountpoint));
         }
@@ -581,8 +611,8 @@ try
 {
     auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
 
-    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id
-              << ", name=" << container.Name << ", image=" << container.Image << ", state=" << container.State.Status << std::endl;
+    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
+              << ", image=" << container.Config.Image << ", state=" << container.State.Status << std::endl;
 
     if (g_testType == PluginTestType::WslcContainerRejected)
     {
@@ -802,7 +832,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::MountFolderAccess));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmNeverStarted));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

@@ -1474,7 +1474,6 @@ Return Value:
 
 --*/
 
-try
 {
     std::vector<std::string> Variables;
     auto AddEnvironmentVariable = [&Variables](const char* Name, const char* Value) {
@@ -1500,7 +1499,7 @@ try
     {
         THROW_LAST_ERROR_IF(TEMP_FAILURE_RETRY(dup2(SocketFd, LX_INIT_UTILITY_VM_INIT_SOCKET_FD)) < 0);
 
-        close(SocketFd);
+        THROW_LAST_ERROR_IF(SetCloseOnExec(SocketFd, true));
         SocketFd = LX_INIT_UTILITY_VM_INIT_SOCKET_FD;
     }
     else
@@ -1659,11 +1658,6 @@ try
 
     execle(LX_INIT_PATH, LX_INIT_PATH, nullptr, Environment.data());
     LOG_ERROR("execle({}) failed {}", LX_INIT_PATH, errno);
-    _exit(1);
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
     _exit(1);
 }
 
@@ -2170,7 +2164,9 @@ Return Value:
 
 try
 {
-    wil::unique_fd InitFd{open(Target, (O_CREAT | O_WRONLY | O_TRUNC), 0755)};
+    THROW_LAST_ERROR_IF(unlink(Target) < 0 && errno != ENOENT);
+
+    wil::unique_fd InitFd{open(Target, (O_CREAT | O_EXCL | O_WRONLY), 0755)};
     THROW_LAST_ERROR_IF(!InitFd);
 
     THROW_LAST_ERROR_IF(mount(LX_INIT_PATH, Target, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);
@@ -2381,6 +2377,7 @@ void ProcessLaunchInitMessage(
     }
     catch (...)
     {
+        LOG_CAUGHT_EXCEPTION();
         ReportStatus(wil::ResultFromCaughtException());
         _exit(1);
     }
@@ -3223,7 +3220,10 @@ try
         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
         //      directory must be writable for tools like depmod to work.
         //
-
+        // N.B. The artifacts VHD nests the modules under <release>/modules.
+        //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
+        //      layout when the nested modules directory is not present.
+        //
         if (EarlyConfig->KernelModulesDeviceId != UINT_MAX)
         {
             THROW_LAST_ERROR_IF(
@@ -3232,9 +3232,33 @@ try
 
             utsname UnameBuffer{};
             THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+            const std::string Release{UnameBuffer.release};
 
-            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, UnameBuffer.release);
-            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), KERNEL_MODULES_VHD_PATH, (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
+            const std::string ArtifactsBase = std::format("{}/{}", KERNEL_MODULES_VHD_PATH, Release);
+            const std::string NestedModules = ArtifactsBase + "/modules";
+
+            std::error_code Error{};
+            const bool NestedLayout = std::filesystem::is_directory(NestedModules, Error);
+            const std::string ModulesLower = NestedLayout ? NestedModules : std::string{KERNEL_MODULES_VHD_PATH};
+            const bool LegacyLayout = !NestedLayout && std::filesystem::is_regular_file(ModulesLower + "/modules.dep", Error);
+
+            //
+            // A valid artifacts VHD nests the tree under <release>/modules; a legacy module-only VHD
+            // places it at the root.
+            //
+            if (LegacyLayout)
+            {
+                LOG_WARNING(
+                    "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
+                    "removed in a future version");
+            }
+            else if (!NestedLayout)
+            {
+                LOG_WARNING("kernel modules VHD does not contain modules for {}", Release);
+            }
+
+            std::string Target = std::format("{}/{}", KERNEL_MODULES_PATH, Release);
+            THROW_LAST_ERROR_IF(UtilMountOverlayFs(Target.c_str(), ModulesLower.c_str(), (MS_NOATIME | MS_NOSUID | MS_NODEV)) < 0);
 
             const std::string KernelModulesList = wsl::shared::string::FromSpan(Buffer, EarlyConfig->KernelModulesListOffset);
             for (const auto& Module : wsl::shared::string::Split(KernelModulesList, ','))

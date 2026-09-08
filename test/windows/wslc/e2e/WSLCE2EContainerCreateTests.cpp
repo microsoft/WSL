@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <fstream>
 #include <wil/network.h>
 #include <wil/resource.h>
@@ -30,9 +31,9 @@ class WSLCE2EContainerCreateTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(AlpineImage);
-        EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsLoaded(HelloWorldImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(HelloWorldImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), HostEnvVariableValue2.c_str()));
@@ -43,9 +44,6 @@ class WSLCE2EContainerCreateTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(AlpineImage);
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(HelloWorldImage);
         EnsureVolumeDoesNotExist(WslcVolumeName);
         EnsureNetworkDoesNotExist(TestNetworkName);
 
@@ -99,11 +97,11 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, reference));
 
-        std::wstringstream expectedError;
-        expectedError << L"Image '" << reference << L"' not found, pulling\r\n"
-                      << L"manifest for " << reference << L" not found: manifest unknown: manifest unknown\r\n"
-                      << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
-        result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
+        const auto expectedError = std::format(L"Image '{}' not found, pulling\r\n", reference) +
+                                   FormatErrorMessage(
+                                       std::format(L"manifest for {} not found: manifest unknown: manifest unknown", reference),
+                                       L"WSLC_E_IMAGE_NOT_FOUND");
+        result.Verify({.Stderr = expectedError, .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_PullPolicy)
@@ -122,8 +120,9 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
 
         result = RunWslc(std::format(L"container create --pull=always --name {} {}", WslcContainerName, registryImage));
-        const auto errorMessage = std::format(
-            L"manifest for {} not found: manifest unknown: manifest unknown\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", registryImage);
+        const auto errorMessage = FormatErrorMessage(
+            std::format(L"manifest for {} not found: manifest unknown: manifest unknown", registryImage),
+            L"WSLC_E_IMAGE_NOT_FOUND");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
 
@@ -173,7 +172,8 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(std::format(
             L"container create --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_FILE_EXISTS\r\n", EscapePath(cidFilePath.wstring())),
+            {.Stderr = FormatErrorMessage(
+                 std::format(L"CID file '{}' already exists", EscapePath(cidFilePath.wstring())), L"ERROR_FILE_EXISTS"),
              .ExitCode = 1});
 
         VerifyContainerIsNotListed(WslcContainerName);
@@ -191,7 +191,13 @@ class WSLCE2EContainerCreateTests
         // Attempt to create another container with the same name
         result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"Conflict. The container name \"/{}\" is already in use by container \"{}\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n", WslcContainerName, containerId),
+            {.Stderr = FormatErrorMessage(
+                 std::format(
+                     L"Conflict. The container name \"/{}\" is already in use by container \"{}\". You have to remove "
+                     L"(or rename) that container to be able to reuse that name.",
+                     WslcContainerName,
+                     containerId),
+                 L"ERROR_ALREADY_EXISTS"),
              .ExitCode = 1});
     }
 
@@ -634,7 +640,9 @@ class WSLCE2EContainerCreateTests
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify(
-            {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            {.Stderr =
+                 FormatErrorMessage(L"unable to find user user_does_not_exist: no matching entries in passwd file", L"E_FAIL"),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs)
@@ -780,7 +788,10 @@ class WSLCE2EContainerCreateTests
             WslcContainerName,
             source.wstring(),
             AlpineImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::MessageWslcBindSourcePathNotFound(source.wstring())), .ExitCode = 1});
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = FormatErrorMessage(Localization::MessageWslcBindSourcePathNotFound(source.wstring()), L"E_INVALIDARG"),
+             .ExitCode = 1});
         VERIFY_IS_FALSE(std::filesystem::exists(source));
         EnsureContainerDoesNotExist(WslcContainerName);
     }
@@ -924,7 +935,10 @@ class WSLCE2EContainerCreateTests
         {
             const auto result =
                 RunWslc(std::format(L"container create --name {} {} {} true", WslcContainerName, arguments, DebianImage.NameAndTag()));
-            result.Verify({.Stdout = L"", .Stderr = FormatWslcError(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data")), .ExitCode = 1});
+            result.Verify(
+                {.Stdout = L"",
+                 .Stderr = FormatErrorMessage(Localization::WSLCCLI_DuplicateMountDestinationError(L"/data"), L"E_INVALIDARG"),
+                 .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
     }
@@ -1096,7 +1110,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container create --stop-timeout -2 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-            result.Verify({.Stderr = L"Invalid stop timeout value: -2\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = FormatErrorMessage(L"Invalid stop timeout value: -2", L"E_INVALIDARG"), .ExitCode = 1});
             VerifyContainerIsNotListed(WslcContainerName);
         }
     }
@@ -1312,7 +1326,7 @@ class WSLCE2EContainerCreateTests
     {
         auto result = RunWslc(
             std::format(L"container create --network does-not-exist --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Network not found: 'does-not-exist'\r\nError code: WSLC_E_NETWORK_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = FormatErrorMessage(L"Network not found: 'does-not-exist'", L"WSLC_E_NETWORK_NOT_FOUND"), .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
@@ -1371,8 +1385,8 @@ class WSLCE2EContainerCreateTests
         auto result =
             RunWslc(std::format(L"container create --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr =
-                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+            {.Stderr = FormatErrorMessage(
+                 L"Network aliases require a user-defined network. Use --network to specify one.", L"E_INVALIDARG"),
              .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
@@ -1382,8 +1396,8 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(std::format(
             L"container create --network none --network-alias db --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr =
-                 L"Network aliases require a user-defined network. Use --network to specify one.\r\nError code: E_INVALIDARG\r\n",
+            {.Stderr = FormatErrorMessage(
+                 L"Network aliases require a user-defined network. Use --network to specify one.", L"E_INVALIDARG"),
              .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
@@ -1439,7 +1453,7 @@ class WSLCE2EContainerCreateTests
         auto result =
             RunWslc(std::format(L"container create --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+            {.Stderr = FormatErrorMessage(wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork(), L"E_INVALIDARG"),
              .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
@@ -1451,7 +1465,7 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(std::format(
             L"container create --network bridge --ip {} --name {} {} true", ipAddress, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"{}\r\nError code: E_INVALIDARG\r\n", wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork()),
+            {.Stderr = FormatErrorMessage(wsl::shared::Localization::MessageWslcIpRequiresUserDefinedNetwork(), L"E_INVALIDARG"),
              .ExitCode = 1});
         VerifyContainerIsNotListed(WslcContainerName);
     }
@@ -1749,11 +1763,11 @@ class WSLCE2EContainerCreateTests
         // to arm before either resource exists.
         auto cleanup = wil::scope_exit([&] {
             EnsureContainerDoesNotExist(WslcContainerName);
-            EnsureImageIsDeleted(PublishAllImage);
+            TestImageRegistry::Instance().Delete(PublishAllImage);
         });
 
         // Load the Python base image so the test image can be built offline.
-        EnsureImageIsLoaded(PythonImage);
+        TestImageRegistry::Instance().EnsureLoaded(PythonImage);
 
         // Build an image that exposes a TCP and a UDP port and ships a server that listens on both,
         // so publish-all can be exercised end to end.

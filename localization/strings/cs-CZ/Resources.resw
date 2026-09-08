@@ -1169,8 +1169,9 @@ Stisknutím libovolné klávesy opravíte WSL nebo CTRL-C akci zrušíte.
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Kód chyby: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Kód chyby: {}
+Pokud byla tato chyba neočekávaná, zvažte vyhledání existujících problémů nebo vytvoření nového problému na https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Neplatný dokument JSON. Chyba analýzy: {}</value>
@@ -2496,6 +2497,14 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network option.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>IP adresa vyžaduje síť definovanou uživatelem. Zadejte --network .</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>An IP address cannot be specified when multiple networks are requested. Use a single --network option.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nepodařilo se vytvořit svazek '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2678,6 +2687,9 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Zobrazit protokoly kontejneru.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDeletedHeader" xml:space="preserve">
+    <value>Odstraněné kontejnery:</value>
+  </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
     <value>Odeberte všechny zastavené kontejnery.</value>
   </data>
@@ -2771,8 +2783,11 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Odeberte všechny nepoužívané image, ne jenom ty nevyužité.</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
-    <value>Odstraněno: {}</value>
+    <value>odstraněno: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
+    <value>Odstraněné obrázky:</value>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Odeberte nepoužívané image.</value>
@@ -2786,7 +2801,7 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
-    <value>Neoznačeno: {}</value>
+    <value>neoznačené: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
@@ -2794,6 +2809,14 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Nahrajte imagi do registru.</value>
+  </data>
+  <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
+    <value>Odstraněno: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageDeleteUntagged" xml:space="preserve">
+    <value>Neoznačeno: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Odstranit image.</value>
@@ -3538,9 +3561,8 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Odstraní všechny nepoužívané sítě. Síť se považuje za nepoužívanou, pokud na ni neodkazuje žádný kontejner.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Odstraněno: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Odstraněné sítě:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Připojte kontejner k síti</value>
@@ -3595,9 +3617,8 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Odeberte všechny nepoužívané svazky, nejen ty anonymní.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Odstraněno: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Odstraněné svazky:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Celkové uvolněné místo: {}</value>

@@ -1169,8 +1169,9 @@ This prompt will time out in 60 seconds.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Error code: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Error code: {}
+If this error was unexpected, please consider searching for existing issues or filing a new issue at https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
     <data name="MessageInvalidJson" xml:space="preserve">
     <value>Invalid JSON document. Parse error: {}</value>
@@ -2224,6 +2225,10 @@ Usage:
     <value>Container '{}' not found.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerDeleted" xml:space="preserve">
+    <value>Container '{}' has been deleted.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Network name cannot be empty.</value>
   </data>
@@ -2399,6 +2404,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name = "MessageWslcInvalidName" xml:space = "preserve" >
     <value>Invalid name: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcEventsInvalidTimeWindow" xml:space = "preserve" >
+    <value>`since` time ({}) cannot be after `until` time ({})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="`since`"}{Locked="`until`"}</comment>
   </data>
   <data name = "MessagePathNotAbsolute" xml:space = "preserve" >
     <value>Path is not absolute: '{}'</value>
@@ -2716,6 +2725,9 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>View logs for a container.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Containers:</value>
+  </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
     <value>Remove all stopped containers.</value>
   </data>
@@ -2809,8 +2821,11 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Remove all unused images, not just dangling ones.</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>deleted: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Images:</value>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Remove unused images.</value>
@@ -2824,7 +2839,7 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
-    <value>Untagged: {}</value>
+    <value>untagged: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
@@ -2832,6 +2847,14 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Upload an image to a registry.</value>
+  </data>
+  <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
+    <value>Deleted: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageDeleteUntagged" xml:space="preserve">
+    <value>Untagged: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Remove images.</value>
@@ -2915,6 +2938,39 @@ Example: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
     <value>System-level management commands.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoDesc" xml:space="preserve">
+    <value>Display system information.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoLongDesc" xml:space="preserve">
+    <value>Displays version information for the wslc client and the session manager service, along with the list of active sessions.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
+    <value>Client:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>WSL version: {}
+Kernel version: {}
+Direct3D version: {}
+DXCore version: {}
+Windows version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
+    <value>Server:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoSettingsFile" xml:space="preserve">
+    <value>Settings file: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessionManagerVersion" xml:space="preserve">
+    <value>Session manager version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessions" xml:space="preserve">
+    <value>Sessions: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Tag an image.</value>
@@ -3576,9 +3632,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Removes all unused networks. A network is considered unused when it is not referenced by any container.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Networks:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Connect a container to a network.</value>
@@ -3633,9 +3688,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Remove all unused volumes, not just anonymous ones.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Deleted Volumes:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Total reclaimed space: {}</value>
@@ -3706,6 +3760,12 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
     <value>NAME</value>
   </data>
+  <data name="WSLCCLI_TableHeaderNames" xml:space="preserve">
+    <value>NAMES</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCommand" xml:space="preserve">
+    <value>COMMAND</value>
+  </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>IMAGE</value>
   </data>
@@ -3735,6 +3795,26 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
+    <value>created</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateRunning" xml:space="preserve">
+    <value>running</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateStopped" xml:space="preserve">
+    <value>stopped</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateExited" xml:space="preserve">
+    <value>exited</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
+    <value>invalid</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>Less than a second ago</value>

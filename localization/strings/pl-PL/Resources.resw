@@ -1169,8 +1169,9 @@ Ten monit przekroczy limit czasu w ciągu 60 sekund.</value>
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Kod błędu: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+Kod błędu: {}
+Jeśli ten błąd był nieoczekiwany, rozważ wyszukanie istniejących problemów lub zgłoszenie nowego problemu w https://github.com/microsoft/WSL/issues.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
     <value>Nieprawidłowy dokument JSON. Błąd analizy: {}</value>
@@ -2496,6 +2497,14 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
     <value>Network aliases cannot be specified when multiple networks are requested. Use a single --network option.</value>
     <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcIpRequiresUserDefinedNetwork" xml:space="preserve">
+    <value>An IP address requires a user-defined network. Use --network to specify one.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcIpAmbiguousWithMultipleNetworks" xml:space="preserve">
+    <value>An IP address cannot be specified when multiple networks are requested. Use a single --network option.</value>
+    <comment>{Locked="--network "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
     <value>Nie można utworzyć woluminu „{}”: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2678,6 +2687,9 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>Wyświetl dzienniki kontenera.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDeletedHeader" xml:space="preserve">
+    <value>Usunięte kontenery:</value>
+  </data>
   <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
     <value>Usuń wszystkie zatrzymane kontenery.</value>
   </data>
@@ -2771,8 +2783,11 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Usuń wszystkie nieużywane obrazy, a nie tylko wiszące.</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
-    <value>Usunięto: {}</value>
+    <value>usunięto: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneDeletedHeader" xml:space="preserve">
+    <value>Usunięte obrazy:</value>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
     <value>Usuń nieużywane obrazy.</value>
@@ -2786,7 +2801,7 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
-    <value>Bez tagu: {}</value>
+    <value>bez tagu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
@@ -2794,6 +2809,14 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Przekaż obraz do rejestru.</value>
+  </data>
+  <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
+    <value>Usunięto: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageDeleteUntagged" xml:space="preserve">
+    <value>Bez tagu: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Usuń obrazy.</value>
@@ -3538,9 +3561,8 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_NetworkPruneLongDesc" xml:space="preserve">
     <value>Usuwa wszystkie nieużywane sieci. Sieć jest uznawana za nieużywaną, gdy nie odwołuje się do niej żaden kontener.</value>
   </data>
-  <data name="WSLCCLI_NetworkPruneDeleted" xml:space="preserve">
-    <value>Usunięto: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_NetworkPruneDeletedHeader" xml:space="preserve">
+    <value>Usunięte sieci:</value>
   </data>
   <data name="WSLCCLI_NetworkConnectDesc" xml:space="preserve">
     <value>Połącz kontener z siecią</value>
@@ -3595,9 +3617,8 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_VolumePruneAllArgDescription" xml:space="preserve">
     <value>Usuń wszystkie nieużywane woluminy, nie tylko anonimowe.</value>
   </data>
-  <data name="WSLCCLI_VolumePruneDeleted" xml:space="preserve">
-    <value>Usunięto: {}</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="WSLCCLI_VolumePruneDeletedHeader" xml:space="preserve">
+    <value>Usunięte woluminy:</value>
   </data>
   <data name="WSLCCLI_VolumePruneSpaceReclaimed" xml:space="preserve">
     <value>Łączna ilość odzyskanego miejsca: {}</value>
@@ -3699,47 +3720,47 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>PIDS</value>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
-    <value>Less than a second ago</value>
+    <value>Mniej niż sekundę temu</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeOneSecond" xml:space="preserve">
-    <value>1 second ago</value>
+    <value>1 sekundę temu</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeSeconds" xml:space="preserve">
-    <value>{} seconds ago</value>
+    <value>{} s temu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of seconds. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeAboutAMinute" xml:space="preserve">
-    <value>About a minute ago</value>
+    <value>Około minutę temu</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeMinutes" xml:space="preserve">
-    <value>{} minutes ago</value>
+    <value>{} min temu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of minutes. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeAboutAnHour" xml:space="preserve">
-    <value>About an hour ago</value>
+    <value>Około godzinę temu</value>
     <comment>Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeHours" xml:space="preserve">
-    <value>{} hours ago</value>
+    <value>{} godz. temu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of hours. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeDays" xml:space="preserve">
-    <value>{} days ago</value>
+    <value>{} dni temu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of days. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeWeeks" xml:space="preserve">
-    <value>{} weeks ago</value>
+    <value>{} tyg. temu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of weeks. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeMonths" xml:space="preserve">
-    <value>{} months ago</value>
+    <value>{} mies. temu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of months. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeYears" xml:space="preserve">
-    <value>{} years ago</value>
+    <value>{} lat(a) temu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholder is a number of years. Describes how long ago something happened, shown in the CREATED column of 'wslc container list' and 'wslc image list'.</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
