@@ -161,11 +161,12 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
 
 namespace wsl::windows::wslc::task {
 
-static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
+static bool TryInspectContainer(
+    Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData, bool size = false)
 {
     try
     {
-        inspectData = ContainerService::Inspect(session, containerId);
+        inspectData = ContainerService::Inspect(session, containerId, size);
         return true;
     }
     catch (const wil::ResultException& ex)
@@ -239,10 +240,11 @@ void InspectContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     std::vector<wsl::windows::common::wslc_schema::InspectContainer> result;
+    const bool size = context.Args.GetValue<ArgType::Size>();
     for (const auto& id : containerIds)
     {
         std::optional<wslc_schema::InspectContainer> inspectData;
-        if (TryInspectContainer(context.Terminal, session, WideToMultiByte(id), inspectData))
+        if (TryInspectContainer(context.Terminal, session, WideToMultiByte(id), inspectData, size))
         {
             result.push_back(*inspectData);
         }
@@ -252,7 +254,13 @@ void InspectContainers(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
+    nlohmann::json array = nlohmann::json::array();
+    for (const auto& entry : result)
+    {
+        array.push_back(wslc_schema::ToInspectJson(entry));
+    }
+
+    auto json = array.dump(context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
