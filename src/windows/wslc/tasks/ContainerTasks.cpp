@@ -381,8 +381,6 @@ void ContainerCp(CLIExecutionContext& context)
 
             auto absPath = std::filesystem::absolute(source);
 
-            // With --follow-link, resolve symlinks in the source so the link target is archived instead of the
-            // link itself.
             if (followLink)
             {
                 std::error_code linkError;
@@ -428,7 +426,6 @@ void ContainerCp(CLIExecutionContext& context)
         auto [containerId, srcPath] = parseContainerPath(source);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
 
-        // With --follow-link, when the container path is a symbolic link, copy what it points at.
         if (followLink)
         {
             auto linkTarget = ContainerService::ResolveContainerSymlink(session, containerId, srcPath);

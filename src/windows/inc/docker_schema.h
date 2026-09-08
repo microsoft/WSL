@@ -64,7 +64,6 @@ struct ContainerPathStat
     std::string mtime;
     std::string linkTarget;
 
-    // Go encodes os.FileMode in the mode field; the symlink bit is 27.
     static constexpr uint32_t c_modeSymlink = 1u << 27;
 
     bool IsSymlink() const

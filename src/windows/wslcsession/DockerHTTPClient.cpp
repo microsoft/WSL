@@ -441,9 +441,8 @@ std::optional<docker_schema::ContainerPathStat> DockerHTTPClient::StatArchivePat
     auto url = URL::Create("/containers/{}/archive", ContainerID);
     url.SetParameter("path", Path);
 
-    // The engine reports the stat in a response header, so the archive body is never read and the connection is
-    // dropped as soon as the header has been parsed.
-    auto [response, socket] = SendRequest(verb::get, url, {}, {});
+    // The engine reports the stat in a response header, so a HEAD request is enough.
+    auto [response, socket] = SendRequest(verb::head, url, {}, {});
     socket.reset();
 
     if (response.result_int() == 404)
@@ -453,7 +452,7 @@ std::optional<docker_schema::ContainerPathStat> DockerHTTPClient::StatArchivePat
 
     if (response.result_int() != 200)
     {
-        throw DockerHTTPException(std::move(response), verb::get, url.Get(), "", "");
+        throw DockerHTTPException(std::move(response), verb::head, url.Get(), "", "");
     }
 
     const auto header = response["X-Docker-Container-Path-Stat"];
