@@ -2107,18 +2107,12 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-
-    if (m_pluginPlan9Server && m_pluginPlan9Server->IsRunning() != S_OK)
-    {
-        m_pluginPlan9Server.reset();
-    }
+    wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
 
     {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!m_pluginPlan9Server)
         {
-            wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
-
-            auto runAsUser = wil::impersonate_token(m_userToken.get());
             auto server =
                 wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
             THROW_IF_FAILED(server->Init(&m_runtimeId, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT));
@@ -2126,14 +2120,12 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
             m_pluginPlan9Server = std::move(server);
         }
 
-        auto runAsUser = wil::impersonate_token(m_userToken.get());
         THROW_IF_FAILED(m_pluginPlan9Server->AddSharePath(Name, HostPath, static_cast<UINT32>(flags)));
     }
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
     message.WriteString(message->NameIndex, Name);
-    message->HostPort = LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT;
     message->ReadOnly = ReadOnly;
 
     const auto& ResultMessage = m_miniInitChannel.Transaction<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE>(message.Span());

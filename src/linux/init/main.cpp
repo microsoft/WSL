@@ -2638,7 +2638,7 @@ Return Value:
         return -1;
     }
 
-    int Result = MountPlan9(Name, Target, Message->ReadOnly, Message->HostPort);
+    int Result = MountPlan9(Name, Target, Message->ReadOnly, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT);
     Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }
