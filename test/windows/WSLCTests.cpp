@@ -9706,7 +9706,7 @@ class WSLCTests
             auto container = launcher.Launch(*m_defaultSession);
 
             // Validate that inspect fails with a null pointer.
-            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().Inspect(nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().Inspect(FALSE, nullptr));
 
             auto details = container.Inspect();
 
