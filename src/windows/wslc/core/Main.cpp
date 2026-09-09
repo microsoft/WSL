@@ -91,8 +91,8 @@ try
     // The env-bound argument set is the only state needed before NO_COLOR is
     // applied; keep just this and the noexcept env apply outside the try so a
     // throw can't reroute through the colored-help error path.
-    auto envDefs = command->GetGlobalsAndEnvArguments();
-    ApplyEnvironmentOptions(context.GlobalArgs, envDefs);
+    const auto earlyEnvironmentArguments = command->GetEnvArguments();
+    ApplyEnvironmentOptions(context.GlobalArgs, earlyEnvironmentArguments);
     context.ApplyGlobalEnvironmentOptions();
 
     // Past this point, environment variable options are in effect.
