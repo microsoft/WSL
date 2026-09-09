@@ -11,6 +11,7 @@ Abstract:
     Implementation of command execution logic.
 
 --*/
+#include "precomp.h"
 #include "Argument.h"
 #include "Command.h"
 #include "CommandLineParser.h"
