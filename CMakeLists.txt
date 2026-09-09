@@ -42,7 +42,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 # Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
 option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
 option(INCLUDE_OPENVMM "Include the OpenVMM WSL backend" OFF)
-set(GRPC_INSTALL_DIR "" CACHE PATH "Path to the staged gRPC installation for the target architecture and configuration")
 if (BUNDLE_ONLY)
     if (NOT PACKAGE_VERSION)
         message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
@@ -184,10 +183,6 @@ else()
 endif()
 
 if (INCLUDE_OPENVMM)
-    if (NOT GRPC_INSTALL_DIR)
-        message(FATAL_ERROR "GRPC_INSTALL_DIR is required when INCLUDE_OPENVMM is enabled")
-    endif()
-
     set(
         OPENVMM_EXE_PATH
         "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe"
@@ -196,22 +191,9 @@ if (INCLUDE_OPENVMM)
         OPENVMM_PDB_PATH
         "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.pdb"
         CACHE FILEPATH "Path to openvmm.pdb")
-    set(
-        OPENVMM_PROTO_PATH
-        "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto"
-        CACHE FILEPATH "Path to the OpenVMM vmservice proto")
-
     set(OPENVMM_REQUIRED_FILES
         "${OPENVMM_EXE_PATH}"
-        "${OPENVMM_PDB_PATH}"
-        "${OPENVMM_PROTO_PATH}"
-        "${GRPC_INSTALL_DIR}/bin/protoc.exe"
-        "${GRPC_INSTALL_DIR}/bin/grpc_cpp_plugin.exe"
-        "${GRPC_INSTALL_DIR}/include/grpcpp/grpcpp.h"
-        "${GRPC_INSTALL_DIR}/include/google/protobuf/message.h"
-        "${GRPC_INSTALL_DIR}/lib/grpc.lib"
-        "${GRPC_INSTALL_DIR}/lib/grpc++.lib"
-        "${GRPC_INSTALL_DIR}/lib/libprotobuf.lib")
+        "${OPENVMM_PDB_PATH}")
 
     foreach(required_file IN LISTS OPENVMM_REQUIRED_FILES)
         if (NOT EXISTS "${required_file}")

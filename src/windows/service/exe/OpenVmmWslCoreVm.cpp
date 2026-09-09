@@ -4,7 +4,6 @@
 #include "OpenVmmWslCoreVm.h"
 
 #include "Dmesg.h"
-#include "OpenVmmGrpcClient.h"
 #include "VirtioFsShareRequest.h"
 #include "WslCoreInstance.h"
 #include "WslCoreVmDiskState.h"
@@ -110,8 +109,7 @@ OpenVmmWslCoreVm::OpenVmmWslCoreVm(
     m_userToken(UserToken),
     m_vmConfig(std::move(VmConfig)),
     m_vmId(VmId),
-    m_initializeDrvFs(std::move(InitializeDrvFs)),
-    m_vmService(std::make_unique<wsl::windows::service::OpenVmmGrpcClient>())
+    m_initializeDrvFs(std::move(InitializeDrvFs))
 {
     m_processJobObject = wsl::windows::common::helpers::CreateKillOnCloseJob();
 }
@@ -141,17 +139,6 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
         m_virtioFsThread.join();
     }
 
-    if (m_processHandle && !m_vmExitEvent.wait(c_shutdownTimeoutMs) && m_vmService)
-    {
-        LOG_IF_FAILED(m_vmService->TeardownVm());
-    }
-
-    if (m_vmService)
-    {
-        LOG_IF_FAILED(m_vmService->Quit());
-        LOG_IF_FAILED(m_vmService->Disconnect());
-    }
-
     if (m_processHandle)
     {
         const auto waitResult = WaitForSingleObject(m_processHandle.get(), c_processTerminationTimeoutMs);
@@ -176,14 +163,12 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
     m_dmesgCollector.reset();
     m_listenSocket.reset();
     m_virtioFsListenSocket.reset();
-    m_vmService.reset();
     m_processHandle.reset();
     m_processJobObject.reset();
 
     DeleteFileW(m_listenPath.c_str());
     DeleteFileW(m_virtioFsListenPath.c_str());
     DeleteFileW(m_vsockPath.c_str());
-    DeleteFileW(m_grpcSocketPath.c_str());
 
     WSL_LOG("OpenVmmTerminateVmStop", TraceLoggingValue(m_vmId, "VmId"));
 }
@@ -212,11 +197,6 @@ void OpenVmmWslCoreVm::Initialize()
 
         UnregisterProcess();
         m_processWait.reset();
-        if (m_vmService)
-        {
-            LOG_IF_FAILED(m_vmService->Disconnect());
-        }
-
         m_gnsSocket.reset();
         m_notifyChannel.reset();
         m_miniInitChannel.Close();
@@ -226,7 +206,6 @@ void OpenVmmWslCoreVm::Initialize()
 
         DeleteFileW(m_listenPath.c_str());
         DeleteFileW(m_vsockPath.c_str());
-        DeleteFileW(m_grpcSocketPath.c_str());
     });
 
     InitializeConfiguration();
@@ -363,9 +342,7 @@ void OpenVmmWslCoreVm::InitializeConfiguration()
 
     const auto shortId = vmId.substr(0, 8);
     m_vsockPath = socketDirectory / std::format(L"wsl-{}.v", shortId);
-    m_grpcSocketPath = socketDirectory / std::format(L"wsl-{}.g", shortId);
     DeleteFileW(m_vsockPath.c_str());
-    DeleteFileW(m_grpcSocketPath.c_str());
 
     if (m_vmConfig.EnableDebugConsole || !m_vmConfig.DebugConsoleLogFile.empty())
     {
@@ -445,10 +422,7 @@ std::pair<wil::unique_socket, std::filesystem::path> OpenVmmWslCoreVm::CreateVso
 
 std::wstring OpenVmmWslCoreVm::BuildCommandLine() const
 {
-    return std::format(
-        L"\"{}\" --rpc \"path={},transport=grpc\"",
-        m_openVmmPath.wstring(),
-        m_grpcSocketPath.wstring());
+    THROW_HR_MSG(E_NOTIMPL, "OpenVMM RPC client integration is not implemented");
 }
 
 std::wstring OpenVmmWslCoreVm::BuildKernelCommandLine() const
@@ -486,46 +460,6 @@ std::wstring OpenVmmWslCoreVm::BuildKernelCommandLine() const
     }
 
     return commandLine;
-}
-
-void OpenVmmWslCoreVm::ConfigureVmService() const
-{
-    THROW_IF_FAILED(m_vmService->SetKernelPath(m_vmConfig.KernelPath.c_str()));
-    THROW_IF_FAILED(m_vmService->SetInitrdPath(m_initrdPath.c_str()));
-
-    const auto kernelCommandLine = BuildKernelCommandLine();
-    THROW_IF_FAILED(m_vmService->SetKernelCmdLine(kernelCommandLine.c_str()));
-    THROW_IF_FAILED(m_vmService->SetMemoryMb(m_vmConfig.MemorySizeBytes / _1MB));
-    THROW_IF_FAILED(m_vmService->SetProcessorCount(gsl::narrow_cast<UINT32>(m_vmConfig.ProcessorCount)));
-    THROW_IF_FAILED(m_vmService->SetHvSocketPath(m_vsockPath.c_str()));
-
-    for (const auto& [lun, disk] : m_attachedDisks)
-    {
-        THROW_IF_FAILED(m_vmService->AddBootDisk(0, lun, disk.Path.c_str(), disk.ReadOnly));
-    }
-
-    GUID nicGuid = m_vmId;
-    nicGuid.Data1 ^= c_nicGuidXorMask;
-    const auto nicId = wsl::shared::string::GuidToString<wchar_t>(nicGuid, wsl::shared::string::GuidToStringFlags::None);
-    const auto macAddress = std::ranges::all_of(m_vmConfig.MacAddress, [](const auto octet) { return octet == 0; })
-                                ? std::wstring{c_defaultConsommeMacAddress}
-                                : wsl::shared::string::FormatMacAddress<wchar_t>(m_vmConfig.MacAddress, L'-');
-    THROW_IF_FAILED(m_vmService->SetConsommeNic(nicId.c_str(), macAddress.c_str()));
-
-    if (m_dmesgCollector)
-    {
-        if (const auto earlyConsoleName = m_dmesgCollector->EarlyConsoleName(); !earlyConsoleName.empty())
-        {
-            THROW_IF_FAILED(m_vmService->AddSerialPort(0, earlyConsoleName.c_str()));
-        }
-
-        const auto consoleName = m_dmesgCollector->VirtioConsoleName();
-        THROW_IF_FAILED(m_vmService->SetVirtioConsolePath(consoleName.c_str()));
-    }
-    else if (!m_comPipe0.empty())
-    {
-        THROW_IF_FAILED(m_vmService->AddSerialPort(0, m_comPipe0.c_str()));
-    }
 }
 
 void OpenVmmWslCoreVm::LaunchOpenVmm()
@@ -566,11 +500,6 @@ void OpenVmmWslCoreVm::LaunchOpenVmm()
     m_processWait.reset(CreateThreadpoolWait(&OpenVmmWslCoreVm::OnProcessExit, this, nullptr));
     THROW_LAST_ERROR_IF(!m_processWait);
     SetThreadpoolWait(m_processWait.get(), m_processHandle.get(), nullptr);
-
-    THROW_IF_FAILED_MSG(m_vmService->Connect(m_grpcSocketPath.c_str(), m_vmConfig.KernelBootTimeout), "Failed to connect to OpenVMM gRPC server");
-    ConfigureVmService();
-    THROW_IF_FAILED_MSG(m_vmService->CreateVm(), "Failed to create VM via OpenVMM gRPC");
-    THROW_IF_FAILED_MSG(m_vmService->ResumeVm(), "Failed to resume VM via OpenVMM gRPC");
 }
 
 wil::unique_socket OpenVmmWslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout) const
@@ -634,54 +563,9 @@ wil::unique_socket OpenVmmWslCoreVm::AcceptConnection(
 
 _Requires_lock_held_(m_guestDeviceLock)
 std::tuple<std::wstring, std::wstring, std::wstring> OpenVmmWslCoreVm::AddVirtioFsShare(
-    _In_ bool Admin, _In_ const std::wstring& Path, _In_ const std::wstring& Options)
+    _In_ bool, _In_ const std::wstring&, _In_ const std::wstring&)
 {
-    THROW_HR_IF(E_ACCESSDENIED, Admin != m_creatorElevated);
-
-    std::filesystem::path sharePath{Path};
-    if (!sharePath.native().ends_with(L'\\') && !sharePath.native().ends_with(L'/'))
-    {
-        sharePath += L'\\';
-    }
-
-    {
-        const auto runAsUser = wil::impersonate_token(m_userToken.get());
-        sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath);
-    }
-
-    const auto existing = std::ranges::find_if(m_virtioFsShares, [&](const auto& Share) {
-        return Share.Admin == Admin && Share.Options == Options &&
-               wsl::windows::common::string::IsPathComponentEqual(Share.Path.native(), sharePath.native());
-    });
-    if (existing != m_virtioFsShares.end())
-    {
-        return {existing->Tag, {}, existing->Path.wstring()};
-    }
-
-    GUID tagGuid{};
-    THROW_IF_FAILED(CoCreateGuid(&tagGuid));
-    auto tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::GuidToStringFlags::None);
-
-    GUID instanceId{};
-    THROW_IF_FAILED(m_vmService->AddVirtioFsDevice(tag.c_str(), sharePath.c_str(), &instanceId));
-    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        LOG_IF_FAILED(m_vmService->RemoveVpciDevice(instanceId));
-    });
-
-    m_virtioFsShares.emplace_back(
-        VirtioFsShare{std::move(sharePath), Options, Admin, std::move(tag), instanceId});
-    removeOnFailure.release();
-
-    const auto& share = m_virtioFsShares.back();
-    WSL_LOG(
-        "OpenVmmAddVirtioFsShare",
-        TraceLoggingValue(share.Path.c_str(), "Path"),
-        TraceLoggingValue(share.Options.c_str(), "Options"),
-        TraceLoggingValue(share.Admin, "Admin"),
-        TraceLoggingValue(share.Tag.c_str(), "Tag"),
-        TraceLoggingValue(share.InstanceId, "InstanceId"));
-
-    return {share.Tag, {}, share.Path.wstring()};
+    THROW_HR_MSG(E_NOTIMPL, "OpenVMM share RPC integration is not implemented");
 }
 
 std::vector<char> OpenVmmWslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request)
@@ -981,55 +865,9 @@ ULONG OpenVmmWslCoreVm::AttachDisk(
 
 _Requires_lock_held_(m_lock)
 ULONG OpenVmmWslCoreVm::AttachDiskLockHeld(
-    _In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ bool ReadOnly)
+    _In_ PCWSTR, _In_ DiskType, _In_ std::optional<ULONG>, _In_ bool, _In_ bool)
 {
-    ExecutionContext context{Context::MountDisk};
-    THROW_HR_IF(E_INVALIDARG, !ARGUMENT_PRESENT(Disk));
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), Type != DiskType::VHD);
-
-    for (const auto& [attachedLun, attachedDisk] : m_attachedDisks)
-    {
-        if (attachedDisk.Type == Type && wsl::windows::common::string::IsPathComponentEqual(attachedDisk.Path.native(), Disk))
-        {
-            THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, attachedDisk.User);
-            return attachedLun;
-        }
-    }
-
-    const auto allocatedLun = ReserveLun(Lun);
-    bool attached = false;
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        if (attached)
-        {
-            LOG_IF_FAILED(m_vmService->DetachScsiDisk(0, allocatedLun));
-        }
-
-        FreeLun(allocatedLun);
-    });
-
-    try
-    {
-        wil::unique_hfile backingFile{CreateFileW(
-            Disk, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        THROW_LAST_ERROR_IF(!backingFile);
-
-        THROW_IF_FAILED(m_vmService->AttachScsiDisk(0, allocatedLun, Disk, ReadOnly));
-        attached = true;
-
-        m_attachedDisks.emplace(
-            allocatedLun, AttachedDisk{Type, Disk, ReadOnly, IsUserDisk, {}, std::move(backingFile)});
-    }
-    catch (...)
-    {
-        const auto result = wil::ResultFromCaughtException();
-        THROW_HR_WITH_USER_ERROR(
-            result,
-            wsl::shared::Localization::MessageFailedToAttachDisk(
-                Disk, wsl::windows::common::wslutil::GetSystemErrorString(result)));
-    }
-
-    cleanup.release();
-    return allocatedLun;
+    THROW_HR_MSG(E_NOTIMPL, "OpenVMM disk RPC integration is not implemented");
 }
 
 wil::unique_socket OpenVmmWslCoreVm::ConnectToGuest(_In_ ULONG Port) const
@@ -1123,65 +961,14 @@ wil::unique_socket OpenVmmWslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path
         Path, Arguments, connectToGuest, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
 }
 
-std::pair<int, LX_MINI_MOUNT_STEP> OpenVmmWslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
+std::pair<int, LX_MINI_MOUNT_STEP> OpenVmmWslCoreVm::DetachDisk(_In_opt_ PCWSTR)
 {
-    bool detached = !ARGUMENT_PRESENT(Disk);
-    auto lock = m_lock.lock_exclusive();
-
-    for (auto disk = m_attachedDisks.begin(); disk != m_attachedDisks.end();)
-    {
-        if (!disk->second.User)
-        {
-            ++disk;
-            continue;
-        }
-
-        std::error_code error;
-        const bool matches = !ARGUMENT_PRESENT(Disk) || std::filesystem::equivalent(disk->second.Path, Disk, error);
-        if (!matches)
-        {
-            ++disk;
-            continue;
-        }
-
-        const auto result = UnmountDisk(disk->first, disk->second);
-        if (result.first != 0)
-        {
-            return result;
-        }
-
-        THROW_IF_FAILED(m_vmService->DetachScsiDisk(0, disk->first));
-        FreeLun(disk->first);
-        detached = true;
-        disk = m_attachedDisks.erase(disk);
-    }
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !detached);
-    return {0, LxMiniInitMountStepNone};
+    THROW_HR_MSG(E_NOTIMPL, "OpenVMM disk RPC integration is not implemented");
 }
 
-void OpenVmmWslCoreVm::EjectVhd(_In_ PCWSTR VhdPath)
+void OpenVmmWslCoreVm::EjectVhd(_In_ PCWSTR)
 {
-    auto lock = m_lock.lock_exclusive();
-    const auto disk = std::ranges::find_if(m_attachedDisks, [&](const auto& entry) {
-        return entry.second.Type == DiskType::VHD &&
-               wsl::windows::common::string::IsPathComponentEqual(entry.second.Path.native(), VhdPath);
-    });
-    if (disk == m_attachedDisks.end())
-    {
-        return;
-    }
-
-    EJECT_VHD_MESSAGE message{};
-    message.Header.MessageSize = sizeof(message);
-    message.Header.MessageType = LxMiniInitMessageEjectVhd;
-    message.Lun = disk->first;
-    const auto& result = m_miniInitChannel.Transaction(message);
-    LOG_HR_IF_MSG(E_UNEXPECTED, result.Result != 0, "VHD eject failed: %u", result.Result);
-
-    THROW_IF_FAILED(m_vmService->DetachScsiDisk(0, disk->first));
-    FreeLun(disk->first);
-    m_attachedDisks.erase(disk);
+    THROW_HR_MSG(E_NOTIMPL, "OpenVMM disk RPC integration is not implemented");
 }
 
 const wsl::core::Config& OpenVmmWslCoreVm::GetConfig() const noexcept

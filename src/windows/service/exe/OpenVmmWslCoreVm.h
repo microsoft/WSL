@@ -7,10 +7,6 @@
 
 class DmesgCollector;
 
-namespace wsl::windows::service {
-class OpenVmmGrpcClient;
-}
-
 class OpenVmmWslCoreVm final : public IWslCoreVm
 {
 public:
@@ -112,7 +108,6 @@ private:
         _In_ bool ReadOnly);
     std::wstring BuildCommandLine() const;
     std::wstring BuildKernelCommandLine() const;
-    void ConfigureVmService() const;
     std::pair<wil::unique_socket, std::filesystem::path> CreateVsockListener(_In_ ULONG Port) const;
     void Initialize();
     void InitializeConfiguration();
@@ -136,10 +131,7 @@ private:
 
     static constexpr ULONG c_maxVhdCount = 254;
     static constexpr int c_pageReportingOrder = 5;
-    static constexpr DWORD c_shutdownTimeoutMs = 30 * 1000;
     static constexpr DWORD c_processTerminationTimeoutMs = 5 * 1000;
-    static constexpr uint32_t c_nicGuidXorMask = 0x4E494300;
-    static constexpr wchar_t c_defaultConsommeMacAddress[] = L"00-15-5D-00-00-01";
 
     wil::shared_handle m_userToken;
     wil::unique_handle m_restrictedToken;
@@ -151,7 +143,6 @@ private:
     std::filesystem::path m_initrdPath;
     std::filesystem::path m_openVmmPath;
     std::filesystem::path m_vsockPath;
-    std::filesystem::path m_grpcSocketPath;
     std::filesystem::path m_listenPath;
     std::wstring m_userProfile;
     std::wstring m_comPipe0;
@@ -178,7 +169,6 @@ private:
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     wil::unique_handle m_processJobObject;
     wil::unique_handle m_processHandle;
-    std::unique_ptr<wsl::windows::service::OpenVmmGrpcClient> m_vmService;
     wil::unique_socket m_listenSocket;
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;
