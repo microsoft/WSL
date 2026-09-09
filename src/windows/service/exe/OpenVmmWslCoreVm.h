@@ -3,7 +3,9 @@
 #pragma once
 
 #include "IWslCoreVm.h"
+#include "GnsPortTrackerChannel.h"
 #include "SocketChannel.h"
+#include "wslopenvmm.h"
 
 class DmesgCollector;
 
@@ -85,7 +87,6 @@ private:
         std::wstring Options;
         bool Admin;
         std::wstring Tag;
-        GUID InstanceId;
     };
 
     OpenVmmWslCoreVm(
@@ -109,6 +110,7 @@ private:
         _In_ bool ReadOnly);
     std::wstring BuildCommandLine() const;
     std::wstring BuildKernelCommandLine() const;
+    void ConfigureVm(_In_ WslOpenVmmConfig* Config) const;
     std::pair<wil::unique_socket, std::filesystem::path> CreateVsockListener(_In_ ULONG Port) const;
     void Initialize();
     void InitializeConfiguration();
@@ -132,7 +134,10 @@ private:
 
     static constexpr ULONG c_maxVhdCount = 254;
     static constexpr int c_pageReportingOrder = 5;
+    static constexpr DWORD c_shutdownTimeoutMs = 30 * 1000;
     static constexpr DWORD c_processTerminationTimeoutMs = 5 * 1000;
+    static constexpr uint32_t c_nicGuidXorMask = 0x4E494300;
+    static constexpr wchar_t c_defaultConsommeMacAddress[] = L"00-15-5D-00-00-01";
 
     wil::shared_handle m_userToken;
     wil::unique_handle m_restrictedToken;
@@ -143,6 +148,8 @@ private:
     std::filesystem::path m_rootFsPath;
     std::filesystem::path m_initrdPath;
     std::filesystem::path m_openVmmPath;
+    std::wstring m_rpcPipeName;
+    wil::unique_any<WslOpenVmmVm*, decltype(&WslOpenVmmDestroyVm), WslOpenVmmDestroyVm> m_vm;
     std::filesystem::path m_vsockPath;
     std::filesystem::path m_listenPath;
     std::wstring m_userProfile;
@@ -174,6 +181,7 @@ private:
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;
     wil::unique_socket m_gnsSocket;
+    std::optional<wsl::core::GnsPortTrackerChannel> m_portTracker;
     wil::unique_socket m_virtioFsListenSocket;
     std::filesystem::path m_virtioFsListenPath;
     std::thread m_distroExitThread;

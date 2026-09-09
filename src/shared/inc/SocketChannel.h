@@ -111,6 +111,7 @@ public:
 #ifdef WIN32
         m_exitEvents = std::move(other.m_exitEvents);
         m_pendingBytes = std::move(other.m_pendingBytes);
+        m_unixSocket = other.m_unixSocket;
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -122,6 +123,9 @@ public:
 
     SocketChannel(TSocket&& socket, std::string&& name) : m_socket(std::move(socket)), m_name(std::move(name))
     {
+#ifdef WIN32
+        InitializeSocket();
+#endif
     }
 
 #ifdef WIN32
@@ -129,6 +133,7 @@ public:
     SocketChannel(TSocket&& socket, std::string&& name, std::vector<HANDLE>&& exitEvents) :
         m_socket(std::move(socket)), m_exitEvents(std::move(exitEvents)), m_name(std::move(name))
     {
+        InitializeSocket();
     }
 
     std::vector<HANDLE> SetExitEvents(std::vector<HANDLE>&& exitEvents)
@@ -184,10 +189,16 @@ public:
 
 #ifdef WIN32
 
-        auto io = CreateIO();
-        io.AddHandle(std::make_unique<windows::common::io::WriteHandle>(m_socket.get(), span));
-
-        io.Run(TimeoutToMilliseconds(timeout));
+        if (m_unixSocket)
+        {
+            SendUnixMessage(span, timeout);
+        }
+        else
+        {
+            auto io = CreateIO();
+            io.AddHandle(std::make_unique<windows::common::io::WriteHandle>(m_socket.get(), span));
+            io.Run(TimeoutToMilliseconds(timeout));
+        }
 
         WSL_LOG(
             "SentMessage",
@@ -606,6 +617,139 @@ public:
 
 private:
 #ifdef WIN32
+    void InitializeSocket()
+    {
+        WSAPROTOCOL_INFOW protocol{};
+        int size = sizeof(protocol);
+        THROW_WIN32_IF(
+            static_cast<DWORD>(WSAGetLastError()),
+            getsockopt(m_socket.get(), SOL_SOCKET, SO_PROTOCOL_INFOW, reinterpret_cast<char*>(&protocol), &size) == SOCKET_ERROR);
+        m_unixSocket = protocol.iAddressFamily == AF_UNIX;
+        if (m_unixSocket)
+        {
+            THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), WSAEventSelect(m_socket.get(), nullptr, 0) == SOCKET_ERROR);
+            u_long nonBlocking = 1;
+            THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), ioctlsocket(m_socket.get(), FIONBIO, &nonBlocking) == SOCKET_ERROR);
+        }
+    }
+
+    DWORD CheckUnixIo(ULONGLONG start, DWORD timeout, bool waiting = false) const
+    {
+        for (const auto event : m_exitEvents)
+        {
+            const auto result = WaitForSingleObject(event, 0);
+            THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+            THROW_HR_IF_MSG(E_ABORT, result == WAIT_OBJECT_0, "Exit event signaled on channel: %hs", m_name.c_str());
+        }
+
+        if (timeout == INFINITE)
+        {
+            return INFINITE;
+        }
+
+        const auto elapsed = GetTickCount64() - start;
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            elapsed >= timeout && (timeout != 0 || waiting),
+            "Socket operation timed out on channel: %hs",
+            m_name.c_str());
+        return elapsed < timeout ? timeout - static_cast<DWORD>(elapsed) : 0;
+    }
+
+    void WaitForUnixSocket(bool write, ULONGLONG start, DWORD timeout) const
+    {
+        const auto remaining = CheckUnixIo(start, timeout, true);
+        const auto waitMs = (std::min)(remaining, DWORD{20});
+        timeval interval{0, static_cast<long>(waitMs * 1000)};
+        fd_set sockets;
+        FD_ZERO(&sockets);
+        FD_SET(m_socket.get(), &sockets);
+        THROW_WIN32_IF(
+            static_cast<DWORD>(WSAGetLastError()),
+            select(0, write ? nullptr : &sockets, write ? &sockets : nullptr, nullptr, &interval) == SOCKET_ERROR);
+    }
+
+    void SendUnixMessage(gsl::span<gsl::byte> span, DWORD timeout)
+    {
+        const auto start = GetTickCount64();
+        size_t offset = 0;
+        while (offset < span.size())
+        {
+            CheckUnixIo(start, timeout);
+            const auto length = gsl::narrow_cast<int>((std::min)(span.size() - offset, static_cast<size_t>(INT_MAX)));
+            const auto sent = send(m_socket.get(), reinterpret_cast<const char*>(span.data() + offset), length, 0);
+            if (sent == SOCKET_ERROR)
+            {
+                const auto error = WSAGetLastError();
+                THROW_WIN32_IF(static_cast<DWORD>(error), error != WSAEWOULDBLOCK);
+                WaitForUnixSocket(true, start, timeout);
+                continue;
+            }
+
+            THROW_HR_IF_MSG(E_UNEXPECTED, sent == 0, "Socket closed during send on channel: %hs", m_name.c_str());
+            offset += sent;
+        }
+    }
+
+    gsl::span<gsl::byte> ReceiveUnixMessage(DWORD timeout)
+    {
+        const auto start = GetTickCount64();
+        size_t offset = m_pendingBytes.size();
+        m_buffer.resize((std::max)(sizeof(MESSAGE_HEADER), offset));
+        std::copy(m_pendingBytes.begin(), m_pendingBytes.end(), m_buffer.begin());
+        m_pendingBytes.clear();
+        auto preservePartialMessage = wil::scope_exit([&] { m_pendingBytes.assign(m_buffer.begin(), m_buffer.begin() + offset); });
+
+        size_t targetSize = sizeof(MESSAGE_HEADER);
+        bool readingHeader = true;
+        for (;;)
+        {
+            CheckUnixIo(start, timeout);
+            if (readingHeader && offset >= sizeof(MESSAGE_HEADER))
+            {
+                targetSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(m_buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
+                THROW_HR_IF_MSG(
+                    E_UNEXPECTED,
+                    targetSize < sizeof(MESSAGE_HEADER) || targetSize > 16 * 1024 * 1024 || offset > targetSize,
+                    "Invalid message size: %zu on channel: %hs",
+                    targetSize,
+                    m_name.c_str());
+                m_buffer.resize(targetSize);
+                readingHeader = false;
+            }
+
+            if (!readingHeader && offset == targetSize)
+            {
+                preservePartialMessage.release();
+                return gsl::make_span(m_buffer.data(), targetSize);
+            }
+
+            auto received =
+                recv(m_socket.get(), reinterpret_cast<char*>(m_buffer.data() + offset), gsl::narrow_cast<int>(targetSize - offset), 0);
+            if (received == SOCKET_ERROR)
+            {
+                const auto error = WSAGetLastError();
+                if (error == WSAEWOULDBLOCK)
+                {
+                    WaitForUnixSocket(false, start, timeout);
+                    continue;
+                }
+
+                THROW_WIN32_IF(static_cast<DWORD>(error), error != WSAECONNABORTED && error != WSAECONNRESET);
+                received = 0;
+            }
+
+            if (received == 0)
+            {
+                THROW_HR_IF_MSG(E_UNEXPECTED, offset != 0, "Socket closed mid-message on channel: %hs", m_name.c_str());
+                preservePartialMessage.release();
+                return {};
+            }
+
+            offset += received;
+        }
+    }
+
     windows::common::io::MultiHandleWait CreateIO() const
     {
         wsl::windows::common::io::MultiHandleWait io;
@@ -634,6 +778,11 @@ private:
 
     gsl::span<gsl::byte> ReceiveImpl(TTimeout timeout)
     {
+        if (m_unixSocket)
+        {
+            return ReceiveUnixMessage(timeout);
+        }
+
         auto io = CreateIO();
 
         gsl::span<gsl::byte> message;
@@ -724,6 +873,7 @@ private:
 
     std::vector<HANDLE> m_exitEvents;
     std::vector<gsl::byte> m_pendingBytes;
+    bool m_unixSocket = false;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;

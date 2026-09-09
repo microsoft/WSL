@@ -93,4 +93,7 @@ target_link_libraries(wslservice
                       yaml-cpp)
 
 target_precompile_headers(wslservice REUSE_FROM common)
+if (INCLUDE_OPENVMM)
+    target_link_libraries(wslservice wslopenvmm_client)
+endif()
 set_target_properties(wslservice PROPERTIES FOLDER windows)
