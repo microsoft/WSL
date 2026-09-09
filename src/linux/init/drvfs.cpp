@@ -205,7 +205,7 @@ Return Value:
     // Query the interop server for which port to use.
     //
 
-    MESSAGE_HEADER QueryPortMessage;
+    MESSAGE_HEADER QueryPortMessage{};
     QueryPortMessage.MessageType = LxInitMessageQueryDrvfsElevated;
     QueryPortMessage.MessageSize = sizeof(QueryPortMessage);
 
