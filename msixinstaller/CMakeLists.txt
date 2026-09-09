@@ -1,7 +1,7 @@
 if (NOT BUNDLE_ONLY)
     set(DEPENDENCIES "wsl.exe;wslinstaller.exe;wslinstallerproxystub.dll")
     set(MSIXINSTALLER_DEPENDENCIES "wsl;wslinstaller;msipackage;wslinstallerproxystub")
-    if (DEFINED INCLUDE_OPENVMM)
+    if (INCLUDE_OPENVMM)
         list(APPEND DEPENDENCIES wslopenvmm.dll)
         list(APPEND MSIXINSTALLER_DEPENDENCIES wslopenvmm)
     endif()

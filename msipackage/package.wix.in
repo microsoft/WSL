@@ -33,9 +33,7 @@
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
                 <File Id="wsldevicehostproxystub.dll" Name="wsldevicehostproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wsldevicehostproxystub.dll" />
-                <?if "${INCLUDE_OPENVMM}" != "" ?>
-                <File Id="wslopenvmm.dll" Name="wslopenvmm.dll" Source="${PACKAGE_INPUT_DIR}/wslopenvmm.dll" />
-                <?endif?>
+${WSLOPENVMM_WIX_FILE}
                 <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />
 
                 <File Id="NOTICE.txt" Name="NOTICE.txt" Source="${CMAKE_SOURCE_DIR}/NOTICE.txt" />

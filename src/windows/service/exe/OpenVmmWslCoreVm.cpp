@@ -125,6 +125,7 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
         m_terminatingEvent.SetEvent();
     }
 
+    m_portTracker.reset();
     m_gnsSocket.reset();
     m_notifyChannel.reset();
     m_miniInitChannel.Close();
@@ -137,6 +138,17 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
     if (m_virtioFsThread.joinable())
     {
         m_virtioFsThread.join();
+    }
+
+    if (m_vm)
+    {
+        if (m_processHandle && !m_vmExitEvent.wait(c_shutdownTimeoutMs))
+        {
+            LOG_IF_FAILED(WslOpenVmmVmTeardown(m_vm.get()));
+        }
+
+        LOG_IF_FAILED(WslOpenVmmVmQuit(m_vm.get()));
+        m_vm.reset();
     }
 
     if (m_processHandle)
@@ -197,10 +209,12 @@ void OpenVmmWslCoreVm::Initialize()
 
         UnregisterProcess();
         m_processWait.reset();
+        m_portTracker.reset();
         m_gnsSocket.reset();
         m_notifyChannel.reset();
         m_miniInitChannel.Close();
         m_listenSocket.reset();
+        m_vm.reset();
         m_processHandle.reset();
         m_processJobObject.reset();
 
@@ -318,7 +332,6 @@ void OpenVmmWslCoreVm::InitializeConfiguration()
     m_vmConfig.EnableDnsTunneling = false;
     m_vmConfig.EnableGpuSupport = false;
     m_vmConfig.EnableGuiApps = false;
-    m_vmConfig.EnableLocalhostRelay = false;
     m_vmConfig.EnableVirtio = true;
     m_vmConfig.EnableVirtio9p = false;
     m_vmConfig.EnableVirtioFs = m_vmConfig.EnableHostFileSystemAccess;
@@ -341,6 +354,7 @@ void OpenVmmWslCoreVm::InitializeConfiguration()
     }
 
     const auto shortId = vmId.substr(0, 8);
+    m_rpcPipeName = wsl::windows::common::helpers::GetUniquePipeName();
     m_vsockPath = socketDirectory / std::format(L"wsl-{}.v", shortId);
     DeleteFileW(m_vsockPath.c_str());
 
@@ -422,7 +436,7 @@ std::pair<wil::unique_socket, std::filesystem::path> OpenVmmWslCoreVm::CreateVso
 
 std::wstring OpenVmmWslCoreVm::BuildCommandLine() const
 {
-    THROW_HR_MSG(E_NOTIMPL, "OpenVMM RPC client integration is not implemented");
+    return std::format(L"\"{}\" --rpc \"path={},transport=grpc,allow-sid=S-1-5-18\"", m_openVmmPath.wstring(), m_rpcPipeName);
 }
 
 std::wstring OpenVmmWslCoreVm::BuildKernelCommandLine() const
@@ -462,8 +476,51 @@ std::wstring OpenVmmWslCoreVm::BuildKernelCommandLine() const
     return commandLine;
 }
 
+void OpenVmmWslCoreVm::ConfigureVm(_In_ WslOpenVmmConfig* Config) const
+{
+    THROW_IF_FAILED(WslOpenVmmConfigSetKernelPath(Config, m_vmConfig.KernelPath.c_str()));
+    THROW_IF_FAILED(WslOpenVmmConfigSetInitrdPath(Config, m_initrdPath.c_str()));
+    const auto commandLine = BuildKernelCommandLine();
+    THROW_IF_FAILED(WslOpenVmmConfigSetKernelCmdLine(Config, commandLine.c_str()));
+    THROW_IF_FAILED(WslOpenVmmConfigSetMemoryMb(Config, m_vmConfig.MemorySizeBytes / _1MB));
+    THROW_IF_FAILED(WslOpenVmmConfigSetProcessorCount(Config, gsl::narrow_cast<UINT32>(m_vmConfig.ProcessorCount)));
+    THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(Config, m_vsockPath.c_str()));
+
+    for (const auto& [lun, disk] : m_attachedDisks)
+    {
+        THROW_IF_FAILED(WslOpenVmmConfigAddBootDisk(Config, 0, lun, disk.Path.c_str(), disk.ReadOnly));
+    }
+
+    GUID nicGuid = m_vmId;
+    nicGuid.Data1 ^= c_nicGuidXorMask;
+    const auto nicId = wsl::shared::string::GuidToString<wchar_t>(nicGuid, wsl::shared::string::GuidToStringFlags::None);
+    const auto macAddress = std::ranges::all_of(m_vmConfig.MacAddress, [](const auto octet) { return octet == 0; })
+                                ? std::wstring{c_defaultConsommeMacAddress}
+                                : wsl::shared::string::FormatMacAddress<wchar_t>(m_vmConfig.MacAddress, L'-');
+    THROW_IF_FAILED(WslOpenVmmConfigSetConsommeNic(Config, nicId.c_str(), macAddress.c_str()));
+
+    if (m_dmesgCollector)
+    {
+        if (const auto earlyConsole = m_dmesgCollector->EarlyConsoleName(); !earlyConsole.empty())
+        {
+            THROW_IF_FAILED(WslOpenVmmConfigAddSerialPort(Config, 0, earlyConsole.c_str()));
+        }
+
+        const auto console = m_dmesgCollector->VirtioConsoleName();
+        THROW_IF_FAILED(WslOpenVmmConfigSetVirtioConsolePath(Config, console.c_str()));
+    }
+    else if (!m_comPipe0.empty())
+    {
+        THROW_IF_FAILED(WslOpenVmmConfigAddSerialPort(Config, 0, m_comPipe0.c_str()));
+    }
+}
+
 void OpenVmmWslCoreVm::LaunchOpenVmm()
 {
+    wil::unique_any<WslOpenVmmConfig*, decltype(&WslOpenVmmDestroyConfig), WslOpenVmmDestroyConfig> config;
+    THROW_IF_FAILED(WslOpenVmmCreateConfig(config.put()));
+    ConfigureVm(config.get());
+
     const auto commandLine = BuildCommandLine();
     WSL_LOG("LaunchOpenVmm", TraceLoggingValue(commandLine.c_str(), "CommandLine"));
 
@@ -475,6 +532,7 @@ void OpenVmmWslCoreVm::LaunchOpenVmm()
     THROW_LAST_ERROR_IF(!CreateEnvironmentBlock(&environment, primaryToken.get(), false));
 
     SubProcess process{m_openVmmPath.c_str(), commandLine.c_str()};
+    process.SetFlags(CREATE_NO_WINDOW);
     process.SetToken(primaryToken.get());
     process.SetEnvironment(environment.get());
     process.SetJobObject(m_processJobObject.get());
@@ -500,6 +558,10 @@ void OpenVmmWslCoreVm::LaunchOpenVmm()
     m_processWait.reset(CreateThreadpoolWait(&OpenVmmWslCoreVm::OnProcessExit, this, nullptr));
     THROW_LAST_ERROR_IF(!m_processWait);
     SetThreadpoolWait(m_processWait.get(), m_processHandle.get(), nullptr);
+    THROW_IF_FAILED_MSG(
+        WslOpenVmmCreateVm(config.addressof(), m_rpcPipeName.c_str(), m_vmConfig.KernelBootTimeout, m_vm.put()),
+        "Failed to create OpenVMM VM");
+    THROW_IF_FAILED_MSG(WslOpenVmmVmResume(m_vm.get()), "Failed to resume OpenVMM VM");
 }
 
 wil::unique_socket OpenVmmWslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout) const
@@ -546,6 +608,10 @@ wil::unique_socket OpenVmmWslCoreVm::AcceptConnection(
     wil::unique_socket socket{accept(ListenSocket, nullptr, nullptr)};
     THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !socket);
 
+    THROW_WIN32_IF(
+        static_cast<DWORD>(WSAGetLastError()),
+        WSAEventSelect(socket.get(), nullptr, 0) == SOCKET_ERROR);
+
     u_long blocking = 0;
     THROW_WIN32_IF(
         static_cast<DWORD>(WSAGetLastError()),
@@ -563,9 +629,61 @@ wil::unique_socket OpenVmmWslCoreVm::AcceptConnection(
 
 _Requires_lock_held_(m_guestDeviceLock)
 std::tuple<std::wstring, std::wstring, std::wstring> OpenVmmWslCoreVm::AddVirtioFsShare(
-    _In_ bool, _In_ const std::wstring&, _In_ const std::wstring&)
+    _In_ bool Admin, _In_ const std::wstring& Path, _In_ const std::wstring& Options)
 {
-    THROW_HR_MSG(E_NOTIMPL, "OpenVMM share RPC integration is not implemented");
+    THROW_HR_IF(E_ACCESSDENIED, Admin != m_creatorElevated);
+
+    std::filesystem::path sharePath{Path};
+    if (!sharePath.native().ends_with(L'\\') && !sharePath.native().ends_with(L'/'))
+    {
+        sharePath += L'\\';
+    }
+
+    {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+        sharePath = wsl::windows::common::filesystem::GetCanonicalPath(sharePath);
+    }
+
+    const auto existing = std::ranges::find_if(m_virtioFsShares, [&](const auto& Share) {
+        return Share.Admin == Admin && Share.Options == Options &&
+               wsl::windows::common::string::IsPathComponentEqual(Share.Path.native(), sharePath.native());
+    });
+    if (existing != m_virtioFsShares.end())
+    {
+        return {existing->Tag, {}, existing->Path.wstring()};
+    }
+
+    bool readOnly = false;
+    for (const auto option : Options | std::views::split(L','))
+    {
+        if (std::ranges::equal(option, std::wstring_view{L"ro"}))
+        {
+            readOnly = true;
+        }
+        else if (std::ranges::equal(option, std::wstring_view{L"rw"}))
+        {
+            readOnly = false;
+        }
+    }
+
+    GUID tagGuid{};
+    THROW_IF_FAILED(CoCreateGuid(&tagGuid));
+    const auto tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::GuidToStringFlags::None);
+    THROW_IF_FAILED(WslOpenVmmVmAddShare(m_vm.get(), tag.c_str(), sharePath.c_str(), readOnly));
+    auto removeOnFailure =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { LOG_IF_FAILED(WslOpenVmmVmRemoveShare(m_vm.get(), tag.c_str())); });
+
+    m_virtioFsShares.emplace_back(VirtioFsShare{std::move(sharePath), Options, Admin, tag});
+    removeOnFailure.release();
+
+    const auto& share = m_virtioFsShares.back();
+    WSL_LOG(
+        "OpenVmmAddVirtioFsShare",
+        TraceLoggingValue(share.Path.c_str(), "Path"),
+        TraceLoggingValue(share.Options.c_str(), "Options"),
+        TraceLoggingValue(share.Admin, "Admin"),
+        TraceLoggingValue(share.Tag.c_str(), "Tag"));
+    return {share.Tag, {}, share.Path.wstring()};
 }
 
 std::vector<char> OpenVmmWslCoreVm::ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request)
@@ -693,7 +811,8 @@ void OpenVmmWslCoreVm::InitializeGuest()
     config->NetworkingConfiguration.DisableIpv6 = false;
     config->NetworkingConfiguration.EnableDhcpClient = true;
     config->NetworkingConfiguration.DhcpTimeout = m_vmConfig.DhcpTimeout;
-    config->NetworkingConfiguration.PortTrackerType = LxMiniInitPortTrackerTypeNone;
+    config->NetworkingConfiguration.PortTrackerType =
+        m_vmConfig.EnableLocalhostRelay ? LxMiniInitPortTrackerTypeMirrored : LxMiniInitPortTrackerTypeNone;
 
     THROW_IF_NTSTATUS_FAILED(BCryptGenRandom(
         nullptr,
@@ -703,6 +822,33 @@ void OpenVmmWslCoreVm::InitializeGuest()
 
     auto configTransaction = m_miniInitChannel.StartTransaction();
     configTransaction.Send<LX_MINI_INIT_CONFIG_MESSAGE>(config.Span());
+
+    if (m_vmConfig.EnableLocalhostRelay)
+    {
+        m_portTracker.emplace(
+            AcceptConnection(m_vmConfig.KernelBootTimeout),
+            [this](const SOCKADDR_INET& address, int protocol, bool allocate) -> HRESULT {
+                RETURN_HR_IF(E_INVALIDARG, address.si_family != AF_INET && address.si_family != AF_INET6);
+                RETURN_HR_IF(E_INVALIDARG, protocol != IPPROTO_TCP && protocol != IPPROTO_UDP);
+                const auto* ipAddress = address.si_family == AF_INET ? reinterpret_cast<const void*>(&address.Ipv4.sin_addr)
+                                                                     : reinterpret_cast<const void*>(&address.Ipv6.sin6_addr);
+                if (!INET_IS_ADDR_UNSPECIFIED(address.si_family, ipAddress) && !INET_IS_ADDR_LOOPBACK(address.si_family, ipAddress))
+                {
+                    return S_OK;
+                }
+
+                if (address.si_family == AF_INET && INET_IS_ADDR_LOOPBACK(AF_INET, ipAddress) &&
+                    address.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
+                {
+                    return S_OK;
+                }
+
+                const auto port = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&address));
+                return allocate ? WslOpenVmmVmBindPort(m_vm.get(), port, port, protocol == IPPROTO_TCP, address.si_family)
+                                : WslOpenVmmVmUnbindPort(m_vm.get(), port, port, protocol == IPPROTO_TCP, address.si_family);
+            },
+            [](const std::string&, bool) {});
+    }
 }
 
 std::string OpenVmmWslCoreVm::GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex)
@@ -864,10 +1010,51 @@ ULONG OpenVmmWslCoreVm::AttachDisk(
 }
 
 _Requires_lock_held_(m_lock)
-ULONG OpenVmmWslCoreVm::AttachDiskLockHeld(
-    _In_ PCWSTR, _In_ DiskType, _In_ std::optional<ULONG>, _In_ bool, _In_ bool)
+ULONG OpenVmmWslCoreVm::AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ bool ReadOnly)
 {
-    THROW_HR_MSG(E_NOTIMPL, "OpenVMM disk RPC integration is not implemented");
+    ExecutionContext context{Context::MountDisk};
+    THROW_HR_IF(E_INVALIDARG, !ARGUMENT_PRESENT(Disk));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), Type != DiskType::VHD);
+
+    for (const auto& [attachedLun, attachedDisk] : m_attachedDisks)
+    {
+        if (attachedDisk.Type == Type && wsl::windows::common::string::IsPathComponentEqual(attachedDisk.Path.native(), Disk))
+        {
+            THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, attachedDisk.User);
+            return attachedLun;
+        }
+    }
+
+    const auto allocatedLun = ReserveLun(Lun);
+    bool attached = false;
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        if (attached)
+        {
+            LOG_IF_FAILED(WslOpenVmmVmDetachScsiDisk(m_vm.get(), 0, allocatedLun));
+        }
+
+        FreeLun(allocatedLun);
+    });
+
+    try
+    {
+        wil::unique_hfile backingFile{CreateFileW(
+            Disk, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!backingFile);
+
+        THROW_IF_FAILED(WslOpenVmmVmAttachScsiDisk(m_vm.get(), 0, allocatedLun, Disk, ReadOnly));
+        attached = true;
+        m_attachedDisks.emplace(allocatedLun, AttachedDisk{Type, Disk, ReadOnly, IsUserDisk, {}, std::move(backingFile)});
+    }
+    catch (...)
+    {
+        const auto result = wil::ResultFromCaughtException();
+        THROW_HR_WITH_USER_ERROR(
+            result, wsl::shared::Localization::MessageFailedToAttachDisk(Disk, wsl::windows::common::wslutil::GetSystemErrorString(result)));
+    }
+
+    cleanup.release();
+    return allocatedLun;
 }
 
 wil::unique_socket OpenVmmWslCoreVm::ConnectToGuest(_In_ ULONG Port) const
@@ -961,14 +1148,63 @@ wil::unique_socket OpenVmmWslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path
         Path, Arguments, connectToGuest, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout);
 }
 
-std::pair<int, LX_MINI_MOUNT_STEP> OpenVmmWslCoreVm::DetachDisk(_In_opt_ PCWSTR)
+std::pair<int, LX_MINI_MOUNT_STEP> OpenVmmWslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
 {
-    THROW_HR_MSG(E_NOTIMPL, "OpenVMM disk RPC integration is not implemented");
+    bool detached = !ARGUMENT_PRESENT(Disk);
+    auto lock = m_lock.lock_exclusive();
+    for (auto disk = m_attachedDisks.begin(); disk != m_attachedDisks.end();)
+    {
+        if (!disk->second.User)
+        {
+            ++disk;
+            continue;
+        }
+
+        std::error_code error;
+        const bool matches = !ARGUMENT_PRESENT(Disk) || std::filesystem::equivalent(disk->second.Path, Disk, error);
+        if (!matches)
+        {
+            ++disk;
+            continue;
+        }
+
+        const auto result = UnmountDisk(disk->first, disk->second);
+        if (result.first != 0)
+        {
+            return result;
+        }
+
+        THROW_IF_FAILED(WslOpenVmmVmDetachScsiDisk(m_vm.get(), 0, disk->first));
+        FreeLun(disk->first);
+        detached = true;
+        disk = m_attachedDisks.erase(disk);
+    }
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !detached);
+    return {0, LxMiniInitMountStepNone};
 }
 
-void OpenVmmWslCoreVm::EjectVhd(_In_ PCWSTR)
+void OpenVmmWslCoreVm::EjectVhd(_In_ PCWSTR VhdPath)
 {
-    THROW_HR_MSG(E_NOTIMPL, "OpenVMM disk RPC integration is not implemented");
+    auto lock = m_lock.lock_exclusive();
+    const auto disk = std::ranges::find_if(m_attachedDisks, [&](const auto& entry) {
+        return entry.second.Type == DiskType::VHD && wsl::windows::common::string::IsPathComponentEqual(entry.second.Path.native(), VhdPath);
+    });
+    if (disk == m_attachedDisks.end())
+    {
+        return;
+    }
+
+    EJECT_VHD_MESSAGE message{};
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = LxMiniInitMessageEjectVhd;
+    message.Lun = disk->first;
+    const auto& result = m_miniInitChannel.Transaction(message);
+    LOG_HR_IF_MSG(E_UNEXPECTED, result.Result != 0, "VHD eject failed: %u", result.Result);
+
+    THROW_IF_FAILED(WslOpenVmmVmDetachScsiDisk(m_vm.get(), 0, disk->first));
+    FreeLun(disk->first);
+    m_attachedDisks.erase(disk);
 }
 
 const wsl::core::Config& OpenVmmWslCoreVm::GetConfig() const noexcept
