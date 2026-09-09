@@ -2111,7 +2111,7 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
 
     {
         auto runAsUser = wil::impersonate_token(m_userToken.get());
-        if (!m_pluginPlan9Server)
+        if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
         {
             auto server =
                 wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
