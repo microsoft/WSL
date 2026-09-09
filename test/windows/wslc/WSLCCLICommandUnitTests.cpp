@@ -375,7 +375,22 @@ class WSLCCLICommandUnitTests
             std::unordered_map<std::wstring, argument::ArgType> seenNames;
             std::unordered_map<std::wstring, argument::ArgType> seenAliases;
 
-            for (const auto& arg : current->GetAllArguments())
+            auto configuredArguments = current->GetAllArguments();
+            const auto globalArguments = current->GetGlobalArguments();
+            configuredArguments.insert(configuredArguments.end(), globalArguments.begin(), globalArguments.end());
+
+            for (const auto& arg : globalArguments)
+            {
+                VERIFY_IS_TRUE(
+                    arg.IsOption(),
+                    std::format(L"Command '{}' configures non-option '{}' as global", commandFullName, ArgTypeName(arg.Type())).c_str());
+                VERIFY_IS_FALSE(
+                    arg.Required(),
+                    std::format(L"Command '{}' configures required option '{}' as global", commandFullName, ArgTypeName(arg.Type()))
+                        .c_str());
+            }
+
+            for (const auto& arg : configuredArguments)
             {
                 // Check for duplicate ArgType registration.
                 if (!seenTypes.emplace(static_cast<size_t>(arg.Type())).second)
@@ -427,6 +442,87 @@ class WSLCCLICommandUnitTests
             for (auto& sub : current->GetCommands())
             {
                 commands.push_back(std::move(sub));
+            }
+        }
+    }
+
+    TEST_METHOD(AllCommands_NoInheritedGlobalArgumentCollisions)
+    {
+        struct PendingCommand
+        {
+            std::unique_ptr<Command> Command;
+            std::vector<Argument> InheritedCliGlobals;
+            std::vector<Argument> InheritedGlobalStorage;
+        };
+
+        std::vector<PendingCommand> pending;
+        pending.emplace_back(PendingCommand{.Command = std::make_unique<RootCommand>()});
+
+        while (!pending.empty())
+        {
+            auto current = std::move(pending.back());
+            pending.pop_back();
+
+            const auto cliGlobals = current.Command->GetGlobalArguments();
+            const auto globalStorage = current.Command->GetGlobalsAndEnvArguments();
+
+            for (const auto& argument : globalStorage)
+            {
+                const auto duplicateType = std::ranges::find(current.InheritedGlobalStorage, argument.Type(), &Argument::Type);
+                VERIFY_IS_TRUE(
+                    duplicateType == current.InheritedGlobalStorage.end(),
+                    std::format(
+                        L"Command '{}' reuses inherited global ArgType '{}'",
+                        current.Command->FullName(),
+                        static_cast<size_t>(argument.Type()))
+                        .c_str());
+            }
+
+            for (const auto& argument : cliGlobals)
+            {
+                const auto duplicateName = std::ranges::find_if(current.InheritedCliGlobals, [&](const auto& inherited) {
+                    return wsl::shared::string::IsEqual(argument.Name(), inherited.Name());
+                });
+                VERIFY_IS_TRUE(
+                    duplicateName == current.InheritedCliGlobals.end(),
+                    std::format(L"Command '{}' reuses inherited global option name '--{}'", current.Command->FullName(), argument.Name())
+                        .c_str());
+
+                if (!argument.Alias().empty())
+                {
+                    const auto duplicateAlias = std::ranges::find_if(current.InheritedCliGlobals, [&](const auto& inherited) {
+                        return !inherited.Alias().empty() && wsl::shared::string::IsEqual(argument.Alias(), inherited.Alias());
+                    });
+                    VERIFY_IS_TRUE(
+                        duplicateAlias == current.InheritedCliGlobals.end(),
+                        std::format(
+                            L"Command '{}' reuses inherited global option alias '-{}'", current.Command->FullName(), argument.Alias())
+                            .c_str());
+                }
+            }
+
+            current.InheritedCliGlobals.insert(current.InheritedCliGlobals.end(), cliGlobals.begin(), cliGlobals.end());
+            current.InheritedGlobalStorage.insert(current.InheritedGlobalStorage.end(), globalStorage.begin(), globalStorage.end());
+
+            for (const auto& argument : current.Command->GetAllArguments())
+            {
+                const auto duplicateType = std::ranges::find(current.InheritedGlobalStorage, argument.Type(), &Argument::Type);
+                VERIFY_IS_TRUE(
+                    duplicateType == current.InheritedGlobalStorage.end(),
+                    std::format(
+                        L"Command '{}' registers ArgType '{}' in both GlobalArgs and Args",
+                        current.Command->FullName(),
+                        static_cast<size_t>(argument.Type()))
+                        .c_str());
+            }
+
+            for (auto& subcommand : current.Command->GetCommands())
+            {
+                pending.emplace_back(PendingCommand{
+                    .Command = std::move(subcommand),
+                    .InheritedCliGlobals = current.InheritedCliGlobals,
+                    .InheritedGlobalStorage = current.InheritedGlobalStorage,
+                });
             }
         }
     }

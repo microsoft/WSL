@@ -379,7 +379,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return BackUpAndStop();
         }
 
-        return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
+        return ArgumentException::CreateUnknownOption(Localization::WSLCCLI_InvalidAliasError(currArg), currArg);
     }
 
     // Position after the first alias
@@ -530,7 +530,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
         return BackUpAndStop();
     }
 
-    return ArgumentException(Localization::WSLCCLI_InvalidNameError(currArg));
+    return ArgumentException::CreateUnknownOption(Localization::WSLCCLI_InvalidNameError(currArg), currArg);
 }
 
 void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring_view value)

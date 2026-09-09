@@ -29,11 +29,10 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     NON_COPYABLE(CLIExecutionContext);
     NON_MOVABLE(CLIExecutionContext);
 
-    // Per-subcommand arguments parsed by the resolved leaf Command.
+    // Arguments owned by the resolved command.
     argument::ArgMap Args;
 
-    // Global options parsed from tokens that appear before any subcommand
-    // (e.g. `wslc <global-option> image list`). Populated early in CoreMain.
+    // Global options accumulated from each command scope along the resolved command path.
     argument::ArgMap GlobalArgs;
 
     // Map of data stored in the context.

@@ -18,6 +18,7 @@ Abstract:
 #include "wslutil.h"
 #include "Errors.h"
 #include "CLIExecutionContext.h"
+#include "CommandLineParser.h"
 #include "EnvironmentOptions.h"
 #include "Invocation.h"
 #include "RootCommand.h"
@@ -106,32 +107,7 @@ try
 
         Invocation invocation{std::move(args)};
 
-        // Pass 1 — CLI globals. Consume only the global options we recognize at
-        // the front of the invocation; anything else (subcommands, unknown
-        // options, --help, --version, malformed tokens) is left in place for
-        // the regular pipeline to parse and report against the right command.
-        auto cliGlobals = command->GetGlobalArguments();
-        command->ParseArguments(
-            invocation,
-            context.GlobalArgs,
-            cliGlobals,
-            /*optionsOnly*/ true,
-            /*stopOnUnknown*/ true,
-            /*overridableDefaults*/ envDefs);
-        command->ValidateArguments(context.GlobalArgs, envDefs, /*runInternalHook*/ false);
-
-        // Past this point, global option parsing and validation are complete.
-
-        // Pass 2 - Subcommand and leaf command resolution.
-        std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);
-        while (subCommand)
-        {
-            command = std::move(subCommand);
-            subCommand = command->FindSubCommand(invocation);
-        }
-
-        command->ParseArguments(invocation, context.Args);
-        command->ValidateArguments(context.Args);
+        ParseCommandLine(invocation, context, command);
         command->Execute(context);
     }
     catch (const ArgumentException& ae)

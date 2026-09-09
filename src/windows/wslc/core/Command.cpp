@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "Command.h"
+#include "CommandLineParser.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
 #include "RootCommand.h"
@@ -268,7 +269,16 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     const bool hasHelpOptions = !helpStandardArgs.empty();
     const bool hasHelpForwardArgs = !helpForwardArgs.empty();
 
-    auto globalArgs = RootCommand().GetGlobalArguments();
+    const auto currentGlobalArguments = GetGlobalArguments();
+    auto globalArgumentScopes = GetGlobalArgumentPath(RootCommand(), FullName());
+    if (globalArgumentScopes.empty() && !currentGlobalArguments.empty())
+    {
+        globalArgumentScopes.emplace_back(GlobalArgumentScope{
+            .CommandFullName = FullName(),
+            .CommandInvocation = FormatCommandInvocation(*this, Name()),
+            .Arguments = currentGlobalArguments,
+        });
+    }
 
     // Build usage line with Write calls for each segment.
     {
@@ -280,6 +290,19 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         }
 
         terminal.Write(helpLevel, L"{}{}{}", HelpHeadingEmphasis, usageText, Format::Default);
+
+        if (!currentGlobalArguments.empty())
+        {
+            terminal.Write(
+                helpLevel,
+                L" {}[{}{}{}{}]{}",
+                HelpMetaEmphasis,
+                Format::Default,
+                HelpPlaceholderEmphasis,
+                Localization::WSLCCLI_GlobalOptions(),
+                HelpMetaEmphasis,
+                Format::Default);
+        }
 
         if (!commands.empty())
         {
@@ -504,7 +527,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
     // Options table: alias (emphasized) | long name (emphasized) | description
     // Global options are appended to the same table so column widths are shared.
-    if (fullHelp && (hasHelpOptions || !globalArgs.empty()))
+    if (fullHelp && (hasHelpOptions || !globalArgumentScopes.empty()))
     {
         if (hasHelpArguments || hasHelpForwardArgs)
         {
@@ -523,14 +546,16 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
             AddArgumentRows(table, helpStandardArgs);
         }
 
-        if (fullHelp && !globalArgs.empty())
+        for (size_t i = 0; i < globalArgumentScopes.size(); ++i)
         {
-            if (hasHelpOptions)
+            if (hasHelpOptions || i > 0)
             {
                 table.WriteLine();
             }
-            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingGlobalOptions(), HelpHeadingEmphasis));
-            AddArgumentRows(table, globalArgs);
+
+            const auto& scope = globalArgumentScopes[i];
+            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingScopedGlobalOptions(scope.CommandInvocation), HelpHeadingEmphasis));
+            AddArgumentRows(table, scope.Arguments);
         }
 
         table.Complete();
@@ -703,8 +728,20 @@ void Command::ValidateArgumentsInternal(ArgMap&) const
 std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType> types) const
 {
     auto arguments = GetAllArguments();
-    auto globalArguments = RootCommand().GetGlobalArguments();
-    arguments.insert(arguments.end(), globalArguments.begin(), globalArguments.end());
+    auto globalArgumentScopes = GetGlobalArgumentPath(RootCommand(), FullName());
+    if (globalArgumentScopes.empty() && !GetGlobalArguments().empty())
+    {
+        globalArgumentScopes.emplace_back(GlobalArgumentScope{
+            .CommandFullName = FullName(),
+            .CommandInvocation = FormatCommandInvocation(*this, Name()),
+            .Arguments = GetGlobalArguments(),
+        });
+    }
+
+    for (auto& scope : globalArgumentScopes)
+    {
+        arguments.insert(arguments.end(), scope.Arguments.begin(), scope.Arguments.end());
+    }
 
     std::vector<Argument> result;
     result.reserve(types.size());

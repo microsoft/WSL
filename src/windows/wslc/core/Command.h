@@ -90,7 +90,8 @@ struct Command
         return args;
     }
 
-    // Options accepted before any subcommand on the command line.
+    // Options accepted after this command and before its subcommand. Parsed values are inherited
+    // by every descendant through CLIExecutionContext::GlobalArgs.
     virtual std::vector<Argument> GetGlobalArguments() const
     {
         return {};
