@@ -127,7 +127,7 @@ namespace {
             }
 
             const auto& configuredName = longName ? argument.Name() : argument.Alias();
-            if (!configuredName.empty() && string::IsEqual(optionName, configuredName))
+            if (!configuredName.empty() && wsl::shared::string::IsEqual(optionName, configuredName))
             {
                 return std::cref(argument);
             }
