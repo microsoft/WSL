@@ -142,6 +142,21 @@ namespace {
         std::reference_wrapper<const Argument> Argument;
     };
 
+    std::optional<std::wstring_view> GetNextCommandName(const GlobalArgumentScope& scope, const Command& currentCommand)
+    {
+        const auto& scopeName = scope.CommandFullName;
+        const auto& currentName = currentCommand.FullName();
+        if (currentName.length() <= scopeName.length() || !currentName.starts_with(scopeName) ||
+            currentName[scopeName.length()] != Command::ParentSplitChar)
+        {
+            return std::nullopt;
+        }
+
+        const auto nameStart = scopeName.length() + 1;
+        const auto nameEnd = currentName.find(Command::ParentSplitChar, nameStart);
+        return std::wstring_view{currentName}.substr(nameStart, nameEnd - nameStart);
+    }
+
     void ThrowIfMisplacedGlobalOption(std::wstring_view token, const Command& currentCommand, std::span<const GlobalArgumentScope> globalScopes)
     {
         const auto commandArguments = currentCommand.GetAllArguments();
@@ -178,6 +193,13 @@ namespace {
                 return match.Scope.get().CommandFullName == firstMatch.Scope.get().CommandFullName;
             }))
         {
+            if (const auto nextCommand = GetNextCommandName(firstMatch.Scope.get(), currentCommand))
+            {
+                throw ArgumentException(
+                    Localization::WSLCCLI_MisplacedInheritedGlobalOptionError(optionName, firstMatch.Scope.get().CommandInvocation, *nextCommand),
+                    firstMatch.Argument.get());
+            }
+
             throw ArgumentException(
                 Localization::WSLCCLI_MisplacedGlobalOptionError(optionName, firstMatch.Scope.get().CommandInvocation),
                 firstMatch.Argument.get());

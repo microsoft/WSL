@@ -289,7 +289,9 @@ class WSLCCLIExecutionUnitTests
         }
         catch (const ArgumentException& exception)
         {
-            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_MisplacedGlobalOptionError(L"--session", L"wslc"), exception.Message());
+            VERIFY_ARE_EQUAL(
+                wsl::shared::Localization::WSLCCLI_MisplacedInheritedGlobalOptionError(L"--session", L"wslc", L"compose"),
+                exception.Message());
         }
     }
 
@@ -305,7 +307,8 @@ class WSLCCLIExecutionUnitTests
         catch (const ArgumentException& exception)
         {
             VERIFY_ARE_EQUAL(
-                wsl::shared::Localization::WSLCCLI_MisplacedGlobalOptionError(L"--progress", L"wslc compose"), exception.Message());
+                wsl::shared::Localization::WSLCCLI_MisplacedInheritedGlobalOptionError(L"--progress", L"wslc compose", L"up"),
+                exception.Message());
         }
     }
 
