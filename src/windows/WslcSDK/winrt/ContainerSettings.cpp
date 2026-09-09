@@ -231,6 +231,46 @@ void ContainerSettings::NamedVolumes(winrt::Windows::Foundation::Collections::IV
     m_namedVolumes = value;
 }
 
+winrt::Windows::Foundation::Collections::IVector<hstring> ContainerSettings::CapabilityAdditions()
+{
+    return m_capabilityAdditions;
+}
+
+void ContainerSettings::CapabilityAdditions(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
+{
+    if (m_containerSettings)
+    {
+        winrt::throw_hresult(E_ILLEGAL_STATE_CHANGE);
+    }
+
+    if (!value)
+    {
+        winrt::throw_hresult(E_POINTER);
+    }
+
+    m_capabilityAdditions = value;
+}
+
+winrt::Windows::Foundation::Collections::IVector<hstring> ContainerSettings::CapabilityDrops()
+{
+    return m_capabilityDrops;
+}
+
+void ContainerSettings::CapabilityDrops(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
+{
+    if (m_containerSettings)
+    {
+        winrt::throw_hresult(E_ILLEGAL_STATE_CHANGE);
+    }
+
+    if (!value)
+    {
+        winrt::throw_hresult(E_POINTER);
+    }
+
+    m_capabilityDrops = value;
+}
+
 WslcContainerSettings* ContainerSettings::ToStructPointer()
 {
     if (!m_containerSettings)
@@ -315,6 +355,46 @@ WslcContainerSettings* ContainerSettings::ToStructPointer()
 
             winrt::check_hresult(WslcSetContainerSettingsNamedVolumes(
                 m_containerSettings.get(), m_namedVolumesStructs.data(), static_cast<uint32_t>(m_namedVolumesStructs.size())));
+        }
+
+        if (m_capabilityAdditions.Size() > 0)
+        {
+            m_capabilityAdditionStrings.clear();
+            m_capabilityAdditionStrings.reserve(m_capabilityAdditions.Size());
+            for (const auto& capability : m_capabilityAdditions)
+            {
+                m_capabilityAdditionStrings.push_back(winrt::to_string(capability));
+            }
+
+            m_capabilityAdditionPointers.clear();
+            m_capabilityAdditionPointers.reserve(m_capabilityAdditionStrings.size());
+            for (const auto& capability : m_capabilityAdditionStrings)
+            {
+                m_capabilityAdditionPointers.push_back(capability.c_str());
+            }
+
+            winrt::check_hresult(WslcSetContainerSettingsCapabilityAdditions(
+                m_containerSettings.get(), m_capabilityAdditionPointers.data(), static_cast<uint32_t>(m_capabilityAdditionPointers.size())));
+        }
+
+        if (m_capabilityDrops.Size() > 0)
+        {
+            m_capabilityDropStrings.clear();
+            m_capabilityDropStrings.reserve(m_capabilityDrops.Size());
+            for (const auto& capability : m_capabilityDrops)
+            {
+                m_capabilityDropStrings.push_back(winrt::to_string(capability));
+            }
+
+            m_capabilityDropPointers.clear();
+            m_capabilityDropPointers.reserve(m_capabilityDropStrings.size());
+            for (const auto& capability : m_capabilityDropStrings)
+            {
+                m_capabilityDropPointers.push_back(capability.c_str());
+            }
+
+            winrt::check_hresult(WslcSetContainerSettingsCapabilityDrops(
+                m_containerSettings.get(), m_capabilityDropPointers.data(), static_cast<uint32_t>(m_capabilityDropPointers.size())));
         }
     }
 

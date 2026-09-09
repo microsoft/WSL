@@ -391,9 +391,11 @@ struct HostConfig
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::optional<std::vector<Ulimit>> Ulimits;
+    std::optional<std::vector<std::string>> CapAdd;
+    std::optional<std::vector<std::string>> CapDrop;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits, CapAdd, CapDrop);
 };
 
 struct InspectEndpointIPAMConfig

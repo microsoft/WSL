@@ -277,6 +277,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         containerLauncher.AddLabel(key, value);
     }
 
+    if (!options.CapAdd.empty())
+    {
+        containerLauncher.SetCapAdd(std::vector<std::string>(options.CapAdd));
+    }
+
+    if (!options.CapDrop.empty())
+    {
+        containerLauncher.SetCapDrop(std::vector<std::string>(options.CapDrop));
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get(), &warningCallback);
     if (result == WSLC_E_IMAGE_NOT_FOUND && options.Pull == PullPolicy::Missing)
     {

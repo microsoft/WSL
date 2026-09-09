@@ -1005,6 +1005,9 @@ Falling back to NAT networking.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL container is disabled by the computer policy.</value>
   </data>
+  <data name="MessageWslcCapabilityAdditionsDisabled" xml:space="preserve">
+    <value>The requested Linux capability additions were ignored because they are disabled by the computer policy.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>The container image registry '{}' is blocked by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3460,6 +3463,12 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
     <value>Expose virtualization capabilities to the container</value>
+  </data>
+  <data name="WSLCCLI_CapAddArgDescription" xml:space="preserve">
+    <value>Add Linux capabilities (repeatable)</value>
+  </data>
+  <data name="WSLCCLI_CapDropArgDescription" xml:space="preserve">
+    <value>Drop Linux capabilities (repeatable)</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Arguments to pass to the command being executed inside the container</value>

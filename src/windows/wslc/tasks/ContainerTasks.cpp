@@ -906,6 +906,26 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.WorkingDirectory = WideToMultiByte(context.Args.GetValue<ArgType::WorkDir>());
     }
 
+    if (context.Args.Contains(ArgType::CapAdd))
+    {
+        auto capabilities = context.Args.GetAllValues<ArgType::CapAdd>();
+        options.CapAdd.reserve(capabilities.size());
+        for (const auto& capability : capabilities)
+        {
+            options.CapAdd.emplace_back(WideToMultiByte(capability));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::CapDrop))
+    {
+        auto capabilities = context.Args.GetAllValues<ArgType::CapDrop>();
+        options.CapDrop.reserve(capabilities.size());
+        for (const auto& capability : capabilities)
+        {
+            options.CapDrop.emplace_back(WideToMultiByte(capability));
+        }
+    }
+
     context.Data.Add<Data::ContainerOptions>(std::move(options));
 }
 

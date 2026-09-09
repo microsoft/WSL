@@ -87,6 +87,10 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerProcessOptionsInternal* initProcessOptions;
     PCSTR networkMode;
     WslcContainerFlags containerFlags;
+    PCSTR const* capabilityAdditions;
+    uint32_t capabilityAdditionsCount;
+    PCSTR const* capabilityDrops;
+    uint32_t capabilityDropsCount;
 
 } WslcContainerOptionsInternal;
 
@@ -104,7 +108,7 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLCCompatSession> session;
+    wil::com_ptr<IWSLCCompatSession2> session;
 };
 
 WslcSessionImpl* GetInternalType(WslcSession handle);

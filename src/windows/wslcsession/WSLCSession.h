@@ -80,7 +80,7 @@ private:
 // lazily on first use and may be torn down when idle and recreated on demand.
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, Microsoft::WRL::ChainInterfaces<IWSLCCompatSession2, IWSLCCompatSession>, IFastRundown, ISupportErrorInfo>
 {
     // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
     // teardown) for the duration of a container deletion.
@@ -263,6 +263,12 @@ public:
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR NameOrId, _Out_ IWSLCCompatContainer** Container) override;
     IFACEMETHOD(CreateVolume)(_In_ const WSLCCompatVolumeOptions* Options, _Out_ WSLCCompatVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(RegisterCrashDumpCallback)(_In_ IWSLCCompatCrashDumpCallback* Callback, _Out_ IUnknown** Subscription) override;
+
+    // IWSLCCompatSession2
+    IFACEMETHOD(CreateContainer2)(
+        _In_ const WSLCCompatContainerOptions2* Options,
+        _In_opt_ IWSLCCompatWarningCallback* WarningCallback,
+        _Out_ IWSLCCompatContainer** Container) override;
 
     common::io::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 

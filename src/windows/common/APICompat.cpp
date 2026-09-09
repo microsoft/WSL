@@ -273,7 +273,40 @@ WSLCCompatVolumeInformation Convert(const WSLCVolumeInformation& Volume)
 // Composite struct conversions.
 //
 
-ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainerOptions& Options)
+WSLCCompatContainerOptions2 Convert(const WSLCCompatContainerOptions& Options)
+{
+    WSLCCompatContainerOptions2 result{};
+    result.Image = Options.Image;
+    result.Name = Options.Name;
+    result.Entrypoint = Options.Entrypoint;
+    result.InitProcessOptions = Options.InitProcessOptions;
+    result.Volumes = Options.Volumes;
+    result.VolumesCount = Options.VolumesCount;
+    result.Ports = Options.Ports;
+    result.PortsCount = Options.PortsCount;
+    result.Labels = Options.Labels;
+    result.LabelsCount = Options.LabelsCount;
+    result.Flags = Options.Flags;
+    result.StopSignal = Options.StopSignal;
+    result.HostName = Options.HostName;
+    result.DomainName = Options.DomainName;
+    result.DnsServers = Options.DnsServers;
+    result.DnsSearchDomains = Options.DnsSearchDomains;
+    result.DnsOptions = Options.DnsOptions;
+    result.ShmSize = Options.ShmSize;
+    result.ContainerNetwork = Options.ContainerNetwork;
+    result.Tmpfs = Options.Tmpfs;
+    result.TmpfsCount = Options.TmpfsCount;
+    result.NamedVolumes = Options.NamedVolumes;
+    result.NamedVolumesCount = Options.NamedVolumesCount;
+    result.MemoryBytes = Options.MemoryBytes;
+    result.NanoCpus = Options.NanoCpus;
+    result.Ulimits = Options.Ulimits;
+    result.UlimitsCount = Options.UlimitsCount;
+    return result;
+}
+
+ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options)
 {
     m_value.Image = Options.Image;
     m_value.Name = Options.Name;
@@ -341,6 +374,9 @@ ContainerOptionsConversion::ContainerOptionsConversion(const WSLCCompatContainer
     m_ulimits = ConvertArray<WSLCUlimit>(Options.Ulimits, Options.UlimitsCount);
     m_value.Ulimits = m_ulimits.empty() ? nullptr : m_ulimits.data();
     m_value.UlimitsCount = Options.UlimitsCount;
+
+    m_value.CapAdd = Convert(Options.CapAdd);
+    m_value.CapDrop = Convert(Options.CapDrop);
 }
 
 ListImagesOptionsConversion::ListImagesOptionsConversion(const WSLCCompatListImagesOptions& Options)

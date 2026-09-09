@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include "wslpolicies.h"
 #include <WSLCProcessLauncher.h>
 
 namespace WSLCE2ETests {
@@ -114,6 +115,22 @@ class WSLCE2EWarningTests
         // below would pass without proving anything.
         VERIFY_IS_TRUE(result.Stderr.has_value());
         VERIFY_IS_TRUE(result.Stderr->find(recoveryWarning) == std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Warning_CapAddIgnoredByPolicy)
+    {
+        namespace policies = wsl::windows::policies;
+        RegistryKeyChange<DWORD> policy(HKEY_LOCAL_MACHINE, policies::c_registryKey, policies::c_allowWSLContainerPrivileged, 0);
+        const std::wstring name = L"wslc-capability-policy-test";
+        EnsureContainerDoesNotExist(name);
+        auto cleanup = wil::scope_exit([&]() { EnsureContainerDoesNotExist(name); });
+
+        const auto expectedWarning = L"wsl: " + Localization::MessageWslcCapabilityAdditionsDisabled() + L"\r\n";
+        auto result =
+            RunWslc(std::format(L"container run --pull=never --name {} --cap-add NET_ADMIN {} true", name, AlpineImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = expectedWarning, .ExitCode = 0});
+        const auto inspect = InspectContainer(name);
+        VERIFY_IS_TRUE(inspect.HostConfig.CapAdd.empty());
     }
 };
 

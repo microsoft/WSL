@@ -2085,6 +2085,9 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         }
     }
 
+    wslcInspect.HostConfig.CapAdd = dockerInspect.HostConfig.CapAdd.value_or(std::vector<std::string>{});
+    wslcInspect.HostConfig.CapDrop = dockerInspect.HostConfig.CapDrop.value_or(std::vector<std::string>{});
+
     wslcInspect.Config.Image = m_image;
     wslcInspect.Config.Env = dockerInspect.Config.Env;
     wslcInspect.Config.Cmd = dockerInspect.Config.Cmd;
@@ -2328,6 +2331,16 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             containerOptions.DnsOptions.Count);
 
         request.HostConfig.DnsOptions = StringArrayToVector(containerOptions.DnsOptions);
+    }
+
+    if (containerOptions.CapAdd.Count > 0)
+    {
+        request.HostConfig.CapAdd = StringArrayToVector(containerOptions.CapAdd);
+    }
+
+    if (containerOptions.CapDrop.Count > 0)
+    {
+        request.HostConfig.CapDrop = StringArrayToVector(containerOptions.CapDrop);
     }
 
     if (containerOptions.InitProcessOptions.User != nullptr)

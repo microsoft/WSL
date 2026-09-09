@@ -59,7 +59,7 @@ public:
     NON_COPYABLE(ContainerOptionsConversion);
     DEFAULT_MOVABLE(ContainerOptionsConversion);
 
-    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions& Options);
+    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options);
 
     const WSLCContainerOptions* Get() const noexcept
     {
@@ -132,7 +132,10 @@ private:
     WSLCSessionSettings m_value{};
 };
 
-inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Options)
+// Upgrade legacy options with empty capability lists.
+WSLCCompatContainerOptions2 Convert(const WSLCCompatContainerOptions& Options);
+
+inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions2& Options)
 {
     return ContainerOptionsConversion(Options);
 }

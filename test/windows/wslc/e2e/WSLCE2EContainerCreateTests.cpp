@@ -1875,6 +1875,27 @@ while True:
         SendUdpAndReceive(udpIpv6, "hello", "HELLO", AF_INET6);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Capabilities)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --cap-add NET_ADMIN --cap-add SYS_TIME --cap-drop NET_RAW --cap-drop CHOWN {} true",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";

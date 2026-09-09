@@ -170,6 +170,8 @@ namespace Microsoft.WSL.Containers
         IVector<ContainerPortMapping> PortMappings;
         IVector<ContainerVolume> Volumes;
         IVector<ContainerNamedVolume> NamedVolumes;
+        IVector<String> CapabilityAdditions;
+        IVector<String> CapabilityDrops;
     };
 
     enum Signal

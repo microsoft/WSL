@@ -364,6 +364,9 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
     ULONG MountsCount;
+
+    WSLCStringArray CapAdd;
+    WSLCStringArray CapDrop;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;

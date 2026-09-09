@@ -1615,6 +1615,38 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Capabilities)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --name {} --cap-add NET_ADMIN --cap-add SYS_TIME "
+            L"--cap-drop NET_RAW --cap-drop CHOWN {} cat /proc/self/status",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), inspect.HostConfig.CapAdd.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("NET_ADMIN"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapAdd, [](const auto& capability) { return capability.ends_with("SYS_TIME"); }));
+        VERIFY_ARE_EQUAL(2u, inspect.HostConfig.CapDrop.size());
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("NET_RAW"); }));
+        VERIFY_IS_TRUE(
+            std::ranges::any_of(inspect.HostConfig.CapDrop, [](const auto& capability) { return capability.ends_with("CHOWN"); }));
+
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        constexpr std::wstring_view c_prefix = L"CapEff:";
+        const auto start = result.Stdout->find(c_prefix);
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, start);
+        const auto effective = std::stoull(result.Stdout->substr(start + c_prefix.size()), nullptr, 16);
+        constexpr auto c_addedCapabilities = (1ull << 12) | (1ull << 25);  // NET_ADMIN, SYS_TIME
+        constexpr auto c_droppedCapabilities = (1ull << 13) | (1ull << 0); // NET_RAW, CHOWN
+        VERIFY_ARE_EQUAL(c_addedCapabilities, effective & c_addedCapabilities);
+        VERIFY_ARE_EQUAL(0ull, effective & c_droppedCapabilities);
+    }
+
 private:
     void VerifyHostLoopback(std::string_view setting, std::string_view dnsName, bool forceTcp)
     {
