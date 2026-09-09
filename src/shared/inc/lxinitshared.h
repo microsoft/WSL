@@ -118,6 +118,7 @@ Abstract:
 #define LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT (50003)
 #define LX_INIT_UTILITY_VM_VIRTIOFS_PORT (50004)
 #define LX_INIT_UTILITY_VM_CRASH_DUMP_PORT (50005)
+#define LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT (50006)
 
 //
 // HvSocket buffer size for 9p connections.
@@ -1491,12 +1492,13 @@ typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
     using TResponse = RESULT_MESSAGE<int32_t>;
 
     MESSAGE_HEADER Header;
+    unsigned int HostPort;
     bool ReadOnly;
     unsigned int PathIndex;
     unsigned int NameIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ReadOnly), STRING_FIELD(PathIndex), STRING_FIELD(NameIndex));
+    PRETTY_PRINT(FIELD(Header), FIELD(HostPort), FIELD(ReadOnly), STRING_FIELD(PathIndex), STRING_FIELD(NameIndex));
 } LX_MINI_INIT_MOUNT_FOLDER_MESSAGE, *PLX_MINI_INIT_MOUNT_FOLDER_MESSAGE;
 
 typedef struct _LX_MINI_INIT_RESIZE_DISTRIBUTION_RESPONSE
