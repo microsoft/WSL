@@ -149,6 +149,11 @@ try
         context.Terminal.Error(L"{}\n", ee.Message());
         return 1;
     }
+    catch (const TerminateException&)
+    {
+        // The user declined a confirmation prompt, so the requested action is not performed.
+        return 0;
+    }
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();

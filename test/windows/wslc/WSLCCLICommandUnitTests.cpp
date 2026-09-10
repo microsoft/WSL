@@ -104,6 +104,52 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    // Test: Every prune command binds -f to --force and leaves --filter unaliased. Aliases resolve
+    // by first match with no collision detection, so an aliased --filter here would shadow -f.
+    TEST_METHOD(PruneCommands_BindShortFToForce)
+    {
+        const auto verifyPruneArguments = [](const std::vector<Argument>& args, const std::wstring& command) {
+            LogComment(L"Verifying prune argument aliases for: " + command);
+
+            const auto find = [&args](ArgType type) -> const Argument* {
+                const auto itr = std::find_if(args.begin(), args.end(), [type](const auto& arg) { return arg.Type() == type; });
+                return itr == args.end() ? nullptr : &*itr;
+            };
+
+            const auto* force = find(ArgType::Force);
+            VERIFY_IS_NOT_NULL(force);
+            VERIFY_ARE_EQUAL(std::wstring{L"force"}, force->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L"f"}, force->Alias());
+
+            const auto* filter = find(ArgType::Filter);
+            VERIFY_IS_NOT_NULL(filter);
+            VERIFY_ARE_EQUAL(std::wstring{L"filter"}, filter->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L""}, filter->Alias());
+        };
+
+        verifyPruneArguments(ContainerPruneCommand(L"container").GetArguments(), L"container prune");
+        verifyPruneArguments(ImagePruneCommand(L"image").GetArguments(), L"image prune");
+        verifyPruneArguments(VolumePruneCommand(L"volume").GetArguments(), L"volume prune");
+        verifyPruneArguments(NetworkPruneCommand(L"network").GetArguments(), L"network prune");
+    }
+
+    // Test: List commands keep -f bound to --filter, which is why only prune commands were realigned.
+    TEST_METHOD(ListCommands_KeepShortFOnFilter)
+    {
+        const auto verifyFilterAlias = [](const std::vector<Argument>& args, const std::wstring& command) {
+            LogComment(L"Verifying filter alias for: " + command);
+
+            const auto itr = std::find_if(args.begin(), args.end(), [](const auto& arg) { return arg.Type() == ArgType::Filter; });
+            VERIFY_IS_TRUE(itr != args.end());
+            VERIFY_ARE_EQUAL(std::wstring{L"f"}, itr->Alias());
+        };
+
+        verifyFilterAlias(ContainerListCommand(L"container").GetArguments(), L"container list");
+        verifyFilterAlias(ImageListCommand(L"image").GetArguments(), L"image list");
+        verifyFilterAlias(VolumeListCommand(L"volume").GetArguments(), L"volume list");
+        verifyFilterAlias(NetworkListCommand(L"network").GetArguments(), L"network list");
+    }
+
     // Test: Verify SessionEnterCommand has the expected arguments
     TEST_METHOD(SessionEnterCommand_HasExpectedArguments)
     {
