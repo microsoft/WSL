@@ -54,6 +54,7 @@ struct ContainerService
     static models::CreateContainerResult Create(Terminal& terminal, models::Session& session, const std::string& image, models::ContainerOptions options);
     static int Start(Terminal& terminal, models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
+    static void Restart(Terminal& terminal, models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force, bool deleteVolumes = false);
     static std::vector<models::ContainerInformation> List(
@@ -64,9 +65,9 @@ struct ContainerService
     static void Export(models::Session& session, const std::string& id, HANDLE outputHandle);
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
     static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle);
-    static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
+    static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id, bool size = false);
     static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);
-    static models::PruneContainersResult Prune(models::Session& session);
+    static models::PruneContainersResult Prune(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters);
 };
 } // namespace wsl::windows::wslc::services

@@ -68,6 +68,7 @@ public:
         wsl::windows::wslc::models::Session& session,
         const std::vector<std::pair<std::string, std::string>>& filters = {},
         bool containerCounts = false,
+        bool all = false,
         bool digests = false);
     static void Load(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, IImageLoadCallback* callback = nullptr);
     static std::string Import(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName);

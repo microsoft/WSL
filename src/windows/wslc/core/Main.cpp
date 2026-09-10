@@ -149,6 +149,11 @@ try
         context.Terminal.Error(L"{}\n", ee.Message());
         return 1;
     }
+    catch (const TerminateException&)
+    {
+        // The user declined a confirmation prompt, so the requested action is not performed.
+        return 0;
+    }
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
@@ -174,17 +179,7 @@ try
 
         if (FAILED(result))
         {
-            if (const auto& reported = context.ReportedError())
-            {
-                auto strings = wslutil::ErrorToString(*reported);
-                auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
-            }
-            else
-            {
-                // Fallback for errors without context
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
-            }
+            context.ReportError(result);
         }
     }
 

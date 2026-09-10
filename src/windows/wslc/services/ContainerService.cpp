@@ -671,6 +671,16 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
     THROW_IF_FAILED_EXCEPT(container->Stop(options.Signal, options.Timeout), WSLC_E_CONTAINER_NOT_RUNNING);
 }
 
+void ContainerService::Restart(Terminal& terminal, Session& session, const std::string& id, StopContainerOptions options)
+{
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    WarningCallback warningCallback(terminal);
+    THROW_IF_FAILED(container->Restart(options.Signal, options.Timeout, &warningCallback));
+}
+
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
@@ -776,13 +786,13 @@ int ContainerService::Exec(Terminal& terminal, Session& session, const std::stri
     return ConsoleService::AttachToCurrentConsole(terminal, console, processLauncher.Launch(*container));
 }
 
-InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
+InspectContainer ContainerService::Inspect(Session& session, const std::string& id, bool size)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     wil::unique_cotaskmem_ansistring output;
-    THROW_IF_FAILED(container->Inspect(&output));
+    THROW_IF_FAILED(container->Inspect(size ? TRUE : FALSE, &output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
@@ -870,10 +880,18 @@ wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Sess
     return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
 }
 
-PruneContainersResult ContainerService::Prune(Session& session)
+PruneContainersResult ContainerService::Prune(Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
     PruneResult result;
-    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, &result.result));
+    THROW_IF_FAILED(session.Get()->PruneContainers(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &result.result));
 
     PruneContainersResult pruneResult;
     pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;

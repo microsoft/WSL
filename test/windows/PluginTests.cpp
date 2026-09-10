@@ -176,7 +176,9 @@ class PluginTests
     WSL2_TEST_METHOD(MountFolderAccess)
     {
         const auto testFolder = std::filesystem::current_path() / "deny-write";
+        std::filesystem::remove_all(testFolder);
         VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder));
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder / "allowed"));
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
 
@@ -188,43 +190,38 @@ class PluginTests
         access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
         access.Trustee.ptstrName = static_cast<LPWSTR>(user->User.Sid);
 
-        PACL acl = nullptr;
-        wil::unique_hlocal descriptor;
+        PACL originalAcl = nullptr;
+        wil::unique_hlocal originalDescriptor;
         THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
-            testFolder.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
+            testFolder.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &originalAcl, nullptr, &originalDescriptor));
 
-        wsl::windows::common::security::unique_acl newAcl;
-        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, acl, &newAcl));
+        auto restoreAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, originalAcl, nullptr));
+        });
+
+        wsl::windows::common::security::unique_acl deniedAcl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, originalAcl, &deniedAcl));
         THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
-            const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
+            const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, deniedAcl.get(), nullptr));
 
         const auto testFile = testFolder / L"plugin-test.txt";
         wil::unique_hfile deniedFile{CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_TRUE(!deniedFile);
-        VERIFY_ARE_EQUAL(GetLastError(), ERROR_ACCESS_DENIED);
-
-        auto resetAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            wsl::windows::common::security::unique_acl restoredAcl;
-            access.grfAccessPermissions = 0;
-            access.grfAccessMode = REVOKE_ACCESS;
-
-            THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, acl, &restoredAcl));
-
-            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
-                const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, restoredAcl.get(), nullptr));
-        });
+        VERIFY_ARE_EQUAL(ERROR_ACCESS_DENIED, GetLastError());
 
         ConfigurePlugin(PluginTestType::MountFolderAccess, testFolder.c_str());
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=25
                 VM created (settings->CustomConfigurationFlags=0)
-                /bin/sh: line 1: /test-plugin-access/plugin-test.txt: Permission denied
+                *Permission denied
                 Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
                 Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
                 VM Stopping)";
 
         StartWsl(0);
+        VERIFY_IS_TRUE(std::filesystem::exists(testFolder / "allowed" / "plugin-allowed.txt"));
         VERIFY_IS_FALSE(std::filesystem::exists(testFile));
         ValidateLogFile(ExpectedOutput);
     }
@@ -724,6 +721,7 @@ class PluginTests
             WSLCProcessGetExitCode(<running>): {}
             WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
             Command: 'cat /mnt/wsl-plugin/plugin-rw-test/plugin-test.txt', status=0, stdout: Windows-content, stderr: 
+            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/plugin-denied.txt', status=1, stdout: , stderr: *
             WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
             Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
             WSLCMountFolder(nonexistent): {}

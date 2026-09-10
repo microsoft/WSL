@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
@@ -236,6 +237,11 @@ void ListVolumes(CLIExecutionContext& context)
 
 void PruneVolumes(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_VolumePruneAllConfirm() : Localization::WSLCCLI_VolumePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 
