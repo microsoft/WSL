@@ -64,17 +64,10 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     for (const auto type : unsupportedArguments)
     {
         const auto argument = Argument::Create(type);
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            !m_unsupportedArguments.emplace(type).second,
-            "Argument type %d is declared unsupported more than once",
-            static_cast<int>(type));
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            FindArgument(type) != nullptr,
-            "Unsupported argument type %d is also declared as a command argument",
-            static_cast<int>(type));
-        THROW_HR_IF_MSG(E_INVALIDARG, !argument.IsOption(), "Unsupported argument type %d is not an option", static_cast<int>(type));
+        const auto inserted = m_unsupportedArguments.emplace(type).second;
+        WI_ASSERT(inserted);
+        WI_ASSERT(FindArgument(type) == nullptr);
+        WI_ASSERT(argument.IsOption());
         m_standardArgs.emplace_back(argument);
     }
 
@@ -86,38 +79,16 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
         const auto deprecatedArgument = Argument::Create(deprecatedType);
         const auto replacementArgument = FindArgument(replacementType);
 
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            !deprecatedTypes.emplace(deprecatedType).second,
-            "Argument type %d has multiple deprecation mappings",
-            static_cast<int>(deprecatedType));
-        THROW_HR_IF_MSG(
-            E_INVALIDARG, deprecatedType == replacementType, "Deprecated argument type %d cannot replace itself", static_cast<int>(deprecatedType));
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            FindArgument(deprecatedType) != nullptr,
-            "Deprecated argument type %d is also declared as a command argument",
-            static_cast<int>(deprecatedType));
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            m_unsupportedArguments.contains(deprecatedType),
-            "Argument type %d is declared both deprecated and unsupported",
-            static_cast<int>(deprecatedType));
-        THROW_HR_IF_MSG(
-            E_INVALIDARG, replacementArgument == nullptr, "Replacement argument type %d is not a command argument", static_cast<int>(replacementType));
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            !deprecatedArgument.IsOption() || deprecatedArgument.Kind() != replacementArgument->Kind(),
-            "Deprecated argument type %d is incompatible with replacement type %d",
-            static_cast<int>(deprecatedType),
-            static_cast<int>(replacementType));
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            std::ranges::any_of(
-                m_argumentDeprecations,
-                [replacementType](const auto& candidate) { return candidate.DeprecatedType() == replacementType; }),
-            "Deprecated argument type %d maps to another deprecated argument type",
-            static_cast<int>(deprecatedType));
+        const auto inserted = deprecatedTypes.emplace(deprecatedType).second;
+        WI_ASSERT(inserted);
+        WI_ASSERT(deprecatedType != replacementType);
+        WI_ASSERT(FindArgument(deprecatedType) == nullptr);
+        WI_ASSERT(!m_unsupportedArguments.contains(deprecatedType));
+        WI_ASSERT(replacementArgument != nullptr);
+        WI_ASSERT(deprecatedArgument.IsOption() && deprecatedArgument.Kind() == replacementArgument->Kind());
+        WI_ASSERT(!std::ranges::any_of(m_argumentDeprecations, [replacementType](const auto& candidate) {
+            return candidate.DeprecatedType() == replacementType;
+        }));
 
         m_standardArgs.emplace_back(deprecatedArgument);
         m_executionArgs.RegisterArgumentDeprecation(deprecatedType, replacementType);
@@ -488,19 +459,19 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         ThrowUnsupportedArgument(*firstArg);
     }
 
+    const auto firstType = ResolveArgumentType(*firstArg);
+
     // Position after the first alias
     size_t currentPos = 1 + aliasLength;
 
     // Check if this argument expects a value
     if (firstArg->Kind() == Kind::Value)
     {
-        const auto type = ResolveArgumentType(*firstArg);
-
         // Kind::Value is only allowed if it's the last flag (no more characters after it, or '=' follows)
         if (currentPos >= currArg.length())
         {
             // No more characters - value should be in next argument
-            return {type, currArg};
+            return {firstType, currArg};
         }
 
         if (currArg[currentPos] != WSLC_CLI_ARG_SPLIT_CHAR)
@@ -510,11 +481,9 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         }
 
         // Value is adjoined after '='
-        ProcessAdjoinedValue(type, currArg.substr(currentPos + 1));
+        ProcessAdjoinedValue(firstType, currArg.substr(currentPos + 1));
         return {};
     }
-
-    const auto firstType = ResolveArgumentType(*firstArg);
 
     // Boolean flag - check for adjoined boolean value (e.g., -a=true or -a=false).
     if (currentPos < currArg.length() && currArg[currentPos] == WSLC_CLI_ARG_SPLIT_CHAR)
@@ -540,13 +509,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             ThrowUnsupportedArgument(*nextArg);
         }
 
+        const auto type = ResolveArgumentType(*nextArg);
+
         // Update position before checking Kind
         size_t nextPos = currentPos + aliasLength;
 
         if (nextArg->Kind() == Kind::Value)
         {
-            const auto type = ResolveArgumentType(*nextArg);
-
             // Kind::Value is only allowed if it's the last flag
             if (nextPos >= currArg.length())
             {
@@ -564,8 +533,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             ProcessAdjoinedValue(type, currArg.substr(nextPos + 1));
             return {};
         }
-
-        const auto type = ResolveArgumentType(*nextArg);
 
         // Boolean flag in chain — check for adjoined boolean value.
         if (nextPos < currArg.length() && currArg[nextPos] == WSLC_CLI_ARG_SPLIT_CHAR)
