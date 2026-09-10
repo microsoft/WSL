@@ -4,9 +4,9 @@ WSL provides a Linux environment that is deeply integrated with Windows. It is n
 
 ## Trust boundaries
 
-Code running in WSL should be treated as having the same trust level as code running under the Windows account that launched it. A
-WSL distribution does not isolate malicious or untrusted workloads from the Windows host or from other distributions running for
-the same user.
+Code running in WSL should be treated as having the same trust level as code running under the Windows account that launched it.
+WSL distributions provide functional process and file system separation, but a distribution is not a security boundary from the
+Windows host or from other distributions running for the same user.
 
 The Linux `root` user has full control of its distribution and can change its configuration. Linux `root` is not the same as a
 Windows administrator, but the distribution is not a security boundary from the associated Windows user.
@@ -30,8 +30,8 @@ Windows resources available to the user.
 
 ## Untrusted workloads and containers
 
-To isolate untrusted code from the Windows host, use a security boundary designed for that purpose, such as a dedicated virtual
-machine with appropriately restricted access.
+To isolate untrusted code from the Windows host, use a security boundary designed for that purpose, such as a separately managed
+virtual machine outside WSL with appropriately restricted access.
 
 Containers running inside WSL inherit the security properties of their container runtime configuration and WSL. Running a workload
 in a container does not make WSL a security boundary from the Windows host.
