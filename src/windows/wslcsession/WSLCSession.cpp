@@ -2105,7 +2105,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -2116,6 +2116,14 @@ try
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError(), AllTags && tagOrDigest.has_value());
+
+    if (!AllTags && !tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
     EnforceRegistryAllowlist(repo);
 
     auto lock = AcquireLease();
@@ -3786,7 +3794,7 @@ HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return PushImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+    return PushImage(Image, RegistryAuthenticationInformation, FALSE, progress.Get(), warning.Get());
 }
 
 HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
