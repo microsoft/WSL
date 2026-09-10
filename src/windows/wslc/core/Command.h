@@ -19,6 +19,7 @@ Abstract:
 #include "Invocation.h"
 #include "ArgumentParser.h"
 #include "Terminal.h"
+#include "defs.h"
 
 #include <functional>
 #include <initializer_list>
@@ -56,11 +57,8 @@ struct Command
 
     virtual ~Command() = default;
 
-    Command(const Command&) = delete;
-    Command& operator=(const Command&) = delete;
-
-    Command(Command&&) = delete;
-    Command& operator=(Command&&) = delete;
+    NON_COPYABLE(Command);
+    NON_MOVABLE(Command);
 
     std::wstring_view Name() const
     {

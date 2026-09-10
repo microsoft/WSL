@@ -15,6 +15,7 @@ Abstract:
 
 #include "Argument.h"
 #include "Invocation.h"
+#include "defs.h"
 
 #include <functional>
 #include <memory>
@@ -41,8 +42,8 @@ public:
     explicit CommandTree(std::unique_ptr<Command> root);
     ~CommandTree();
 
-    CommandTree(const CommandTree&) = delete;
-    CommandTree& operator=(const CommandTree&) = delete;
+    NON_COPYABLE(CommandTree);
+
     CommandTree(CommandTree&&) noexcept;
     CommandTree& operator=(CommandTree&&) noexcept;
 
@@ -58,8 +59,8 @@ public:
     CommandInvocation(std::unique_ptr<Command> root, std::vector<std::wstring>&& arguments);
     ~CommandInvocation();
 
-    CommandInvocation(const CommandInvocation&) = delete;
-    CommandInvocation& operator=(const CommandInvocation&) = delete;
+    NON_COPYABLE(CommandInvocation);
+
     CommandInvocation(CommandInvocation&& other) noexcept;
     CommandInvocation& operator=(CommandInvocation&& other) noexcept;
 
