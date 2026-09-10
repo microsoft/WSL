@@ -543,8 +543,11 @@ struct InspectContainer
     HostConfig HostConfig;
     std::vector<InspectMount> Mounts;
     NetworkSettings NetworkSettings;
+    std::optional<int64_t> SizeRw;
+    std::optional<int64_t> SizeRootFs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts, NetworkSettings, SizeRw, SizeRootFs);
 };
 
 struct InspectExec
@@ -782,11 +785,13 @@ struct ContainerInfo
     std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
     int64_t Created{};
+    int64_t SizeRw{};
+    int64_t SizeRootFs{};
     HostConfig HostConfig;
     NetworkSettings NetworkSettings;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        ContainerInfo, Id, Names, Image, ImageID, Command, Status, Labels, Ports, Mounts, State, Created, HostConfig, NetworkSettings);
+        ContainerInfo, Id, Names, Image, ImageID, Command, Status, Labels, Ports, Mounts, State, Created, SizeRw, SizeRootFs, HostConfig, NetworkSettings);
 };
 
 struct BuildKitVertex

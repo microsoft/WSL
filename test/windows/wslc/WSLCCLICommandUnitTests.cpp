@@ -104,6 +104,52 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    // Test: Every prune command binds -f to --force and leaves --filter unaliased. Aliases resolve
+    // by first match with no collision detection, so an aliased --filter here would shadow -f.
+    TEST_METHOD(PruneCommands_BindShortFToForce)
+    {
+        const auto verifyPruneArguments = [](const std::vector<Argument>& args, const std::wstring& command) {
+            LogComment(L"Verifying prune argument aliases for: " + command);
+
+            const auto find = [&args](ArgType type) -> const Argument* {
+                const auto itr = std::find_if(args.begin(), args.end(), [type](const auto& arg) { return arg.Type() == type; });
+                return itr == args.end() ? nullptr : &*itr;
+            };
+
+            const auto* force = find(ArgType::Force);
+            VERIFY_IS_NOT_NULL(force);
+            VERIFY_ARE_EQUAL(std::wstring{L"force"}, force->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L"f"}, force->Alias());
+
+            const auto* filter = find(ArgType::Filter);
+            VERIFY_IS_NOT_NULL(filter);
+            VERIFY_ARE_EQUAL(std::wstring{L"filter"}, filter->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L""}, filter->Alias());
+        };
+
+        verifyPruneArguments(ContainerPruneCommand(L"container").GetArguments(), L"container prune");
+        verifyPruneArguments(ImagePruneCommand(L"image").GetArguments(), L"image prune");
+        verifyPruneArguments(VolumePruneCommand(L"volume").GetArguments(), L"volume prune");
+        verifyPruneArguments(NetworkPruneCommand(L"network").GetArguments(), L"network prune");
+    }
+
+    // Test: List commands keep -f bound to --filter, which is why only prune commands were realigned.
+    TEST_METHOD(ListCommands_KeepShortFOnFilter)
+    {
+        const auto verifyFilterAlias = [](const std::vector<Argument>& args, const std::wstring& command) {
+            LogComment(L"Verifying filter alias for: " + command);
+
+            const auto itr = std::find_if(args.begin(), args.end(), [](const auto& arg) { return arg.Type() == ArgType::Filter; });
+            VERIFY_IS_TRUE(itr != args.end());
+            VERIFY_ARE_EQUAL(std::wstring{L"f"}, itr->Alias());
+        };
+
+        verifyFilterAlias(ContainerListCommand(L"container").GetArguments(), L"container list");
+        verifyFilterAlias(ImageListCommand(L"image").GetArguments(), L"image list");
+        verifyFilterAlias(VolumeListCommand(L"volume").GetArguments(), L"volume list");
+        verifyFilterAlias(NetworkListCommand(L"network").GetArguments(), L"network list");
+    }
+
     // Test: Verify SessionEnterCommand has the expected arguments
     TEST_METHOD(SessionEnterCommand_HasExpectedArguments)
     {
@@ -149,6 +195,26 @@ class WSLCCLICommandUnitTests
         for (const auto& subcmd : subcommands)
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
+        }
+    }
+
+    // Test: Verify image list exposes --all/-a on both the subcommand and root 'images' spelling
+    TEST_METHOD(ImageListCommand_HasAllArgument)
+    {
+        const std::pair<std::wstring, std::vector<Argument>> spellings[] = {
+            {L"image list", ImageListCommand(L"image").GetArguments()}, {L"images", ImageListCommand(L"wslc", true).GetArguments()}};
+
+        for (const auto& [label, args] : spellings)
+        {
+            LogComment(L"Verifying --all for: " + label);
+
+            auto itr = std::find_if(args.begin(), args.end(), [](const Argument& arg) { return arg.Type() == ArgType::All; });
+
+            VERIFY_IS_TRUE(itr != args.end());
+            VERIFY_ARE_EQUAL(std::wstring{L"all"}, itr->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L"a"}, itr->Alias());
+            VERIFY_ARE_EQUAL(Kind::Flag, itr->Kind());
+            VERIFY_IS_FALSE(itr->Required());
         }
     }
 
@@ -200,6 +266,76 @@ class WSLCCLICommandUnitTests
         }
 
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
+    }
+
+    // Test: Verify SystemInfoCommand has the correct name
+    TEST_METHOD(SystemInfoCommand_HasCorrectName)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+        VERIFY_ARE_EQUAL(std::wstring_view(L"info"), cmd.Name());
+    }
+
+    // Test: Verify SystemInfoCommand has no subcommands
+    TEST_METHOD(SystemInfoCommand_HasNoSubcommands)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+        VERIFY_ARE_EQUAL(0u, cmd.GetCommands().size());
+    }
+
+    // Test: Verify SystemInfoCommand exposes the --format argument (plus the auto-added --help)
+    TEST_METHOD(SystemInfoCommand_HasFormatArgument)
+    {
+        auto cmd = SystemInfoCommand(L"system");
+
+        auto args = cmd.GetArguments();
+        VERIFY_ARE_EQUAL(1u, args.size());
+
+        const auto& format = args[0];
+        VERIFY_ARE_EQUAL(ArgType::Format, format.Type());
+        VERIFY_ARE_EQUAL(Kind::Value, format.Kind());
+        VERIFY_IS_FALSE(format.Required());
+
+        // GetAllArguments also includes the auto-added --help.
+        VERIFY_ARE_EQUAL(2u, cmd.GetAllArguments().size());
+    }
+
+    // Test: Verify SystemCommand contains SystemInfoCommand as a subcommand
+    TEST_METHOD(SystemCommand_ContainsSystemInfoCommand)
+    {
+        auto cmd = SystemCommand(L"system");
+        auto subcommands = cmd.GetCommands();
+
+        bool found = false;
+        for (const auto& subcmd : subcommands)
+        {
+            if (subcmd->Name() == SystemInfoCommand::CommandName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"SystemCommand should contain SystemInfoCommand");
+    }
+
+    // SystemInfoCommand is registered twice so that both `wslc system info` and the
+    // `wslc info` alias resolve; this pins the second registration.
+    TEST_METHOD(RootCommand_ContainsSystemInfoCommand)
+    {
+        auto root = RootCommand();
+        auto subcommands = root.GetCommands();
+
+        bool found = false;
+        for (const auto& subcmd : subcommands)
+        {
+            if (subcmd->Name() == SystemInfoCommand::CommandName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"RootCommand should contain SystemInfoCommand");
     }
 
     // RootCommand exposes Session as the sole CLI global option. The override
@@ -269,6 +405,28 @@ class WSLCCLICommandUnitTests
         }
 
         VERIFY_IS_TRUE(found, L"image pull does not register --all-tags");
+    }
+
+    // --all-tags is exposed with the -a short alias.
+    TEST_METHOD(ImagePushCommand_HasAllTagsArgumentWithAlias)
+    {
+        auto cmd = ImagePushCommand(L"image");
+
+        bool found = false;
+        for (const auto& arg : cmd.GetArguments())
+        {
+            if (arg.Type() == argument::ArgType::AllTags)
+            {
+                found = true;
+                VERIFY_ARE_EQUAL(argument::Kind::Flag, arg.Kind());
+                VERIFY_IS_FALSE(arg.Required());
+                VERIFY_ARE_EQUAL(std::wstring(L"all-tags"), std::wstring(arg.Name()));
+                VERIFY_ARE_EQUAL(std::wstring(L"a"), std::wstring(arg.Alias()));
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"image push does not register --all-tags");
     }
 
     // Every command in the inspect family exposes docker's `-f` alias for --format

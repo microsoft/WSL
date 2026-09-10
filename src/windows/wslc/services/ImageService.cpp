@@ -290,7 +290,7 @@ void ImageService::Build(
 }
 
 std::vector<ImageInformation> ImageService::List(
-    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts)
+    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts, bool all)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -300,7 +300,9 @@ std::vector<ImageInformation> ImageService::List(
     }
 
     WSLCListImagesOptions options{};
-    options.Flags = containerCounts ? WSLCListImagesFlagsContainerCounts : WSLCListImagesFlagsNone;
+    options.Flags = WSLCListImagesFlagsNone;
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsContainerCounts, containerCounts);
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsAll, all);
     options.Filters = filterEntries.empty() ? nullptr : filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
@@ -410,12 +412,12 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
     WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, &warningCallback));
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent)

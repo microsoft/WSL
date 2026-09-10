@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
@@ -184,7 +185,7 @@ void GetImages(CLIExecutionContext& context)
     const bool containerCounts =
         context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
 
-    auto images = ImageService::List(session, filters, containerCounts);
+    auto images = ImageService::List(session, filters, containerCounts, context.Args.GetValue<ArgType::All>());
     context.Data.Add<Data::Images>(std::move(images));
 }
 
@@ -299,10 +300,24 @@ void PushImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.GetValue<ArgType::ImageId>();
+    const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
+    const bool allTags = context.Args.GetValue<ArgType::AllTags>();
+
+    const auto reference = ImageReference::Parse(image);
+
+    if (allTags && reference.Format != EnumReferenceFormatNone)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
+    }
+
+    // For a name-only reference the tag defaults to "latest", reported on stdout before contacting the registry.
+    if (!allTags && reference.Format == EnumReferenceFormatNone)
+    {
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
+    }
 
     ImageProgressCallback callback(context.Terminal, Terminal::Level::Output);
-    services::ImageService::Push(context.Terminal, session, WideToMultiByte(imageId), &callback);
+    services::ImageService::Push(context.Terminal, session, image, &callback, allTags);
 }
 
 void DeleteImage(CLIExecutionContext& context)
@@ -430,6 +445,11 @@ void TagImage(CLIExecutionContext& context)
 
 void PruneImages(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_ImagePruneAllConfirm() : Localization::WSLCCLI_ImagePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

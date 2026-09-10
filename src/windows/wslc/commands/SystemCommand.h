@@ -31,4 +31,19 @@ struct SystemCommand final : public Command
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
+
+// System Info Command
+struct SystemInfoCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"info";
+    SystemInfoCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
 } // namespace wsl::windows::wslc
