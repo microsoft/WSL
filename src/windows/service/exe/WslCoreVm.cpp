@@ -2113,6 +2113,13 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
         auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
         {
+            // Tear down the previous server so it releases the port before the replacement binds it.
+            if (m_pluginPlan9Server)
+            {
+                LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
+                m_pluginPlan9Server.reset();
+            }
+
             auto server =
                 wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
             THROW_IF_FAILED(server->Init(&m_runtimeId, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT));
