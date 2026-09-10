@@ -16,7 +16,9 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include "WSLCSessionDefaults.h"
+#include "WSLCUserSettings.h"
 #include "Argument.h"
 
 using namespace WEX::Logging;
@@ -25,6 +27,8 @@ namespace WSLCE2ETests {
 using namespace wsl::shared;
 
 namespace {
+
+    const std::wstring c_copyrightPrefix = L"Copyright (c) Microsoft Corporation.";
 
     // Returns the expected default session name for the current user (e.g. "wslc-cli-admin-benhill").
     std::wstring GetExpectedDefaultSessionName(bool elevated)
@@ -36,6 +40,19 @@ namespace {
         THROW_IF_WIN32_BOOL_FALSE(GetUserNameW(username, &usernameLen));
 
         return std::format(L"{}-{}", baseName, username);
+    }
+
+    // TableOutput sizes each column to its widest row, so a session leaving re-pads the survivors.
+    // Comparing leading ID tokens rather than whole rendered lines keeps comparisons padding-independent.
+    std::vector<std::wstring> GetLeadingTokens(const std::vector<std::wstring>& lines)
+    {
+        std::vector<std::wstring> tokens;
+        for (const auto& line : lines)
+        {
+            tokens.emplace_back(line.substr(0, line.find(L' ')));
+        }
+
+        return tokens;
     }
 
 } // namespace
@@ -75,16 +92,71 @@ class WSLCE2EGlobalTests
         auto result = RunWslc(L"--help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage: wslc"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc")));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Help_ErrorRoutesToStderr)
+    WSLC_TEST_METHOD(WSLCE2E_Help_CommandErrorRoutesToStderr)
     {
-        // Help on error must land on stderr; stdout must remain empty.
         auto result = RunWslc(L"INVALID_CMD");
         VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
         VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Unrecognized command: 'INVALID_CMD'"));
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage: wslc"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingCommands()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc")));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ArgumentErrorRoutesToStderr)
+    {
+        auto result = RunWslc(L"container create");
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage: wslc container create"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedArguments()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_ImageIdArgDescription()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_ContainerCreateLongDesc()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_NameArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_ImageIdArgDescription() + L"\r\n\r\n" +
+            Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc container create")));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ArgumentConflictShowsRelevantArguments)
+    {
+        auto result = RunWslc(L"container list --last 1 --latest");
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(L"--last, --latest")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_LastArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_LatestArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedOptions()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_AllArgDescription()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_LatestArgDescription() + L"\r\n\r\n" + Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc container list")));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_OptionErrorUsesOptionTerminology)
+    {
+        auto result = RunWslc(L"list -a=falseee");
+        VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_FlagInvalidBooleanError(L"-a=falseee")));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedOptions()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_AllArgDescription()));
+        VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedArguments()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            Localization::WSLCCLI_AllArgDescription() + L"\r\n\r\n" + Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc list")));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Help_NoColorWhenRedirected)
@@ -127,6 +199,98 @@ class WSLCE2EGlobalTests
     {
         // Explicit table format matches the default plain-text output.
         RunWslcAndVerify(L"version --format table", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand)
+    {
+        auto result = RunWslc(L"system info");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+
+        const auto& output = result.Stdout.value();
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoClientHeader()) != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(std::format(L"{}", WSL_PACKAGE_VERSION)) != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoServerHeader()) != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoSessionManagerVersion(GetExpectedManagerVersion())) != std::wstring::npos);
+
+        const auto settingsFilePath = wsl::windows::wslc::settings::User().SettingsFilePath().wstring();
+        VERIFY_IS_TRUE(output.find(Localization::WSLCCLI_SystemInfoSettingsFile(settingsFilePath)) != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_InvalidFormatOption)
+    {
+        const auto result = RunWslc(L"system info --format invalid");
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(
+            L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table."));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_FormatJson)
+    {
+        auto result = RunWslc(L"system info --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto root = VerifyCompactJsonOutput(result);
+
+        const auto& client = root.at("Client");
+        VERIFY_ARE_EQUAL(std::string{WSL_PACKAGE_VERSION}, client.at("Version").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{KERNEL_VERSION}, client.at("KernelVersion").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{DIRECT3D_VERSION}, client.at("Direct3DVersion").get<std::string>());
+        VERIFY_ARE_EQUAL(std::string{DXCORE_VERSION}, client.at("DxCoreVersion").get<std::string>());
+        VERIFY_IS_FALSE(client.at("WindowsVersion").get<std::string>().empty());
+        VERIFY_IS_FALSE(client.at("SettingsFile").get<std::string>().empty());
+
+        // WSLg and MSRDC aren't relevant to wslc.
+        VERIFY_IS_FALSE(client.contains("WslgVersion"));
+        VERIFY_IS_FALSE(client.contains("MsrdcVersion"));
+
+        const auto& server = root.at("Server");
+        VERIFY_ARE_EQUAL(
+            wsl::shared::string::WideToMultiByte(GetExpectedManagerVersion()), server.at("SessionManagerVersion").get<std::string>());
+
+        const auto& sessions = server.at("Sessions");
+        VERIFY_IS_TRUE(sessions.is_array());
+        for (const auto& session : sessions)
+        {
+            VERIFY_ARE_EQUAL(3u, session.size());
+            VERIFY_IS_TRUE(session.contains("ID"));
+            VERIFY_IS_FALSE(session.contains("Id"));
+            VERIFY_IS_TRUE(session.contains("CreatorPid"));
+            VERIFY_IS_TRUE(session.contains("Name"));
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_RootAlias)
+    {
+        auto systemResult = RunWslc(L"system info --format json");
+        systemResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto rootResult = RunWslc(L"info --format json");
+        rootResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // The server section can change between invocations; the client section cannot.
+        VERIFY_ARE_EQUAL(
+            VerifyCompactJsonOutput(systemResult).at("Client").dump(), VerifyCompactJsonOutput(rootResult).at("Client").dump());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_SystemInfoCommand_DoesNotCreateSession)
+    {
+        auto before = RunWslc(L"system session list");
+        before.Verify({.Stderr = L"", .ExitCode = 0});
+
+        RunWslcAndVerify(L"system info --format json", {.Stderr = L"", .ExitCode = 0});
+
+        auto after = RunWslc(L"system session list");
+        after.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // An idle session can terminate between the two snapshots, so only assert that none appeared.
+        const auto beforeIds = GetLeadingTokens(before.GetStdoutLines());
+        for (const auto& id : GetLeadingTokens(after.GetStdoutLines()))
+        {
+            VERIFY_IS_TRUE(
+                std::find(beforeIds.begin(), beforeIds.end(), id) != beforeIds.end(),
+                std::format(L"'system info' must not create a session, but session '{}' appeared", id).c_str());
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_DefaultElevated)
@@ -172,7 +336,7 @@ class WSLCE2EGlobalTests
         result = RunWslc(std::format(L"--session \"{}\" container list", adminName), ElevationType::NonElevated);
 
         // Should fail with access denied.
-        result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = FormatErrorMessage(L"The requested operation requires elevation. ", L"ERROR_ELEVATION_REQUIRED"), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_ElevatedCanAccessNonElevatedSession)
@@ -198,11 +362,13 @@ class WSLCE2EGlobalTests
         auto nonAdminName = GetExpectedDefaultSessionName(false);
         auto adminName = GetExpectedDefaultSessionName(true);
         auto result = RunWslc(std::format(L"--session \"{}\" container list", nonAdminName), ElevationType::Elevated);
-        result.Verify({.Stderr = std::format(L"Session not found: '{}'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", nonAdminName), .ExitCode = 1});
+        result.Verify(
+            {.Stderr = FormatErrorMessage(std::format(L"Session not found: '{}'", nonAdminName), L"WSLC_E_SESSION_NOT_FOUND"), .ExitCode = 1});
 
         // Ensure non-elevated cannot create the elevated session.
         result = RunWslc(std::format(L"--session \"{}\" container list", adminName), ElevationType::NonElevated);
-        result.Verify({.Stderr = std::format(L"Session not found: '{}'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", adminName), .ExitCode = 1});
+        result.Verify(
+            {.Stderr = FormatErrorMessage(std::format(L"Session not found: '{}'", adminName), L"WSLC_E_SESSION_NOT_FOUND"), .ExitCode = 1});
     }
 
     // Regression test for session name squatting vulnerability.
@@ -403,7 +569,7 @@ class WSLCE2EGlobalTests
 
         // Attempt to terminate the admin session from the non-elevated process and fail.
         result = RunWslc(std::format(L"--session \"{}\" system session terminate", adminName), ElevationType::NonElevated);
-        result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = FormatErrorMessage(L"The requested operation requires elevation. ", L"ERROR_ELEVATION_REQUIRED"), .ExitCode = 1});
 
         // Terminate the non-elevated session from the elevated process.
         result = RunWslc(std::format(L"--session \"{}\" system session terminate", nonAdminName), ElevationType::Elevated);
@@ -428,12 +594,14 @@ class WSLCE2EGlobalTests
         auto session = TestSession::Create(sessionName);
 
         // Load the Debian image into the test session to avoid hitting Docker Hub rate limits.
-        EnsureImageIsLoaded(DebianTestImage(), session.Name());
+        TestImageRegistry::Instance().EnsureLoaded(DebianTestImage(), session.Name());
 
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"--session INVALID_SESSION_NAME container list");
         result.Verify(
-            {.Stdout = L"", .Stderr = L"Session not found: 'INVALID_SESSION_NAME'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", .ExitCode = 1});
+            {.Stdout = L"",
+             .Stderr = FormatErrorMessage(L"Session not found: 'INVALID_SESSION_NAME'", L"WSLC_E_SESSION_NOT_FOUND"),
+             .ExitCode = 1});
 
         // Verify session list
         result = RunWslc(L"system session list");
@@ -448,17 +616,20 @@ class WSLCE2EGlobalTests
         result = RunWslc(std::format(L"--session \"{}\" container list", session.Name()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Add a container to the new session.
+        // Add a container to the new session. The listing checks below match on substrings, so the
+        // name carries the session's unique suffix: "test-cont" on its own is a prefix of the
+        // "wslc-test-container" names other tests leave in the default session.
+        const auto containerName = std::format(L"wslc-session-cont-{}", guidStr.substr(0, 8));
         result = RunWslc(std::format(
-            L"--session \"{}\" container create --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
+            L"--session \"{}\" container create --name {} {}", session.Name(), containerName, DebianTestImage().NameAndTag()));
         result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
         result.Verify({.ExitCode = 0});
 
         // Verify container exists in the custom session
-        VerifyContainerIsListed(L"test-cont", L"created", session.Name());
+        VerifyContainerIsListed(containerName, L"created", session.Name());
 
         // Verify container does not exist in the default CLI session.
-        VerifyContainerIsNotListed(L"test-cont");
+        VerifyContainerIsNotListed(containerName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_Shell)
@@ -560,12 +731,13 @@ class WSLCE2EGlobalTests
 
         {
             auto result = RunWslc(L"--session not-found system session run echo OK");
-            result.Verify({.Stderr = L"Session not found: 'not-found'\r\nError code: WSLC_E_SESSION_NOT_FOUND\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = FormatErrorMessage(L"Session not found: 'not-found'", L"WSLC_E_SESSION_NOT_FOUND"), .ExitCode = 1});
         }
 
         {
             auto result = RunWslc(L"system session run not-found");
-            result.Verify({.Stdout = L"", .Stderr = L"Failed to launch command not-found. Errno = 2\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify(
+                {.Stdout = L"", .Stderr = FormatErrorMessage(L"Failed to launch command not-found. Errno = 2", L"E_FAIL"), .ExitCode = 1});
         }
     }
 
@@ -592,6 +764,12 @@ private:
     std::wstring GetVersionMessage() const
     {
         return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
+    }
+
+    // The session manager reports only the first three version components.
+    std::wstring GetExpectedManagerVersion() const
+    {
+        return std::format(L"{}.{}.{}", WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION);
     }
 };
 } // namespace WSLCE2ETests

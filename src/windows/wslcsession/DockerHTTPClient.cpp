@@ -355,9 +355,12 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool D
     Transaction(verb::delete_, url);
 }
 
-docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
+docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id, bool Size)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
+    auto url = URL::Create("/containers/{}/json", Id);
+    url.SetParameter("size", Size);
+
+    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, url);
 }
 
 docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string& Id)
@@ -493,9 +496,16 @@ void DockerHTTPClient::DisconnectContainerFromNetwork(const std::string& Network
     Transaction(verb::post, URL::Create("/networks/{}/disconnect", NetworkName), Request);
 }
 
-std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
+std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks(const std::map<std::string, std::vector<std::string>>& filters)
 {
-    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
+    auto url = URL::Create("/networks");
+
+    if (!filters.empty())
+    {
+        url.SetParameter("filters", nlohmann::json(filters).dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, url);
 }
 
 docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)
@@ -515,7 +525,7 @@ docker_schema::PruneNetworkResult DockerHTTPClient::PruneNetworks(const std::map
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneNetworkResult>(verb::post, url);
 }
 
-wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
     url.SetParameter("follow", WI_IsFlagSet(Flags, WSLCLogsFlagsFollow));

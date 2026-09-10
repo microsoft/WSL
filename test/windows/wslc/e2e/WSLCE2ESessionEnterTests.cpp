@@ -115,8 +115,18 @@ class WSLCE2ESessionEnterTests
         // found in '<path>'" message rather than a bare system error.
         const auto storagePath = std::filesystem::absolute(L"does-not-exist").wstring();
         result.Verify({
-            .Stderr = wsl::shared::Localization::MessageWslcSessionStorageNotFound(storagePath) +
-                      L"\r\nError code: ERROR_PATH_NOT_FOUND\r\n",
+            .Stderr = FormatErrorMessage(
+                wsl::shared::Localization::MessageWslcSessionStorageNotFound(storagePath), L"ERROR_PATH_NOT_FOUND"),
+            .ExitCode = 1,
+        });
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Help_ExecutionErrorDoesNotShowHelp)
+    {
+        const auto result = RunWslc(L"--session unsupported system session enter ignored");
+        result.Verify({
+            .Stdout = L"",
+            .Stderr = wsl::shared::Localization::MessageWslcSessionOptionNotSupported() + L"\r\n",
             .ExitCode = 1,
         });
     }

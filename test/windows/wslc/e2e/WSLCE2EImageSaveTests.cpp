@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,14 +26,14 @@ class WSLCE2EImageSaveTests
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
         return true;
     }
 
     TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         SavedArchivePath = wsl::windows::common::filesystem::GetTempFilename();
         return true;
     }
@@ -60,7 +61,7 @@ class WSLCE2EImageSaveTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ImageNotFound)
     {
         const auto result = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), InvalidImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"reference does not exist\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = FormatErrorMessage(L"reference does not exist", L"WSLC_E_IMAGE_NOT_FOUND"), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_Success)
@@ -81,7 +82,7 @@ class WSLCE2EImageSaveTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete source image
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
 
         // Load from saved archive
         auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
@@ -120,7 +121,7 @@ class WSLCE2EImageSaveTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete source image
-        EnsureImageIsDeleted(DebianImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
 
         // Load from saved archive
         auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));
@@ -132,13 +133,13 @@ class WSLCE2EImageSaveTests
     }
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_MultipleImages_Load)
     {
-        EnsureImageIsLoaded(AlpineImage);
+        TestImageRegistry::Instance().EnsureLoaded(AlpineImage);
 
         // Force a pristine re-load of DebianImage at the end so subsequent tests (in fast mode)
         // see the same on-disk tar as DebianImage.Path. Without this, reloading from a
         // multi-image archive can produce a slightly different on-disk representation that
         // breaks byte-exact size checks in WSLCE2E_Image_Save_Success.
-        auto restoreDebian = wil::scope_exit([&]() { EnsureImageIsDeleted(DebianImage); });
+        auto restoreDebian = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Delete(DebianImage); });
 
         // Save both images into a single archive.
         const auto saveResult = RunWslc(std::format(
@@ -146,8 +147,8 @@ class WSLCE2EImageSaveTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete both source images.
-        EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(AlpineImage);
+        TestImageRegistry::Instance().Delete(DebianImage);
+        TestImageRegistry::Instance().Delete(AlpineImage);
 
         // Load both images back from the single archive.
         const auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", SavedArchivePath.wstring()));

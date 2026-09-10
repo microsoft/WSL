@@ -19,6 +19,7 @@ Abstract:
 #include "Distribution.h"
 #include "HandleConsoleProgressBar.h"
 #include "svccomm.hpp"
+#include "WmiService.h"
 
 extern HINSTANCE g_dllInstance;
 
@@ -249,6 +250,22 @@ void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& comp
     const auto key =
         wsl::windows::common::registry::CreateKey(lxssKey.get(), c_optionalFeatureInstallStatus, KEY_ALL_ACCESS, nullptr, REG_OPTION_VOLATILE);
     wsl::windows::common::registry::WriteString(key.get(), nullptr, nullptr, wsl::shared::string::Join(installedComponents, L',').c_str());
+}
+
+bool WslInstall::IsOptionalComponentInstalled(LPCWSTR component)
+{
+    constexpr int32_t c_enabled = 1;
+
+    wsl::core::WmiService service(L"ROOT\\CIMV2");
+    wsl::core::WmiEnumerate optionalFeatures(service);
+    const auto query = std::format(L"SELECT InstallState FROM Win32_OptionalFeature WHERE Name = '{}'", component);
+    const auto& results = optionalFeatures.query(query.c_str());
+    const auto result = results.begin();
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == results.end(), "Optional component not found: %ls", component);
+
+    int32_t installState{};
+    THROW_HR_IF_MSG(E_UNEXPECTED, !result->get(L"InstallState", &installState), "Invalid optional component state: %ls", component);
+    return installState == c_enabled;
 }
 
 std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(

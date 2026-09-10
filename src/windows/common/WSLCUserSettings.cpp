@@ -72,9 +72,17 @@ namespace details {
 
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
     {
-        auto parsed = wsl::shared::string::ParseMemorySize(value.c_str());
-        auto converted = parsed.has_value() ? *parsed / _1MB : 0; // To Mb, and anything less than 1Mb is considered invalid.
-        return converted > 0 ? std::optional{static_cast<uint32_t>(converted)} : std::nullopt;
+
+        // WSLC settings accept leading whitespace for compatibility with existing settings files.
+        const auto wideValue = MultiByteToWide(value);
+        const auto parsed = ParseStorageSize(StripLeadingWhitespace(wideValue), StorageSizeUnit::Binary);
+        const auto converted = parsed.has_value() ? *parsed / _1MB : 0;
+        if (converted == 0 || converted > std::numeric_limits<uint32_t>::max())
+        {
+            return std::nullopt;
+        }
+
+        return static_cast<uint32_t>(converted);
     }
 
 #define WSLC_VALIDATE_SETTING(_setting_) \

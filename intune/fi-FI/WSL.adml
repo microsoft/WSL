@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Salli WSL-säilö</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Tämä käytäntö määrittää, voiko WSL-säilöä käyttää tässä laitteessa. Kun se on käytössä tai sitä ei ole määritetty, käyttäjät ja Windows-sovellukset voivat suorittaa Linux-säilöjä WSL:n kautta. Kun se on poissa käytöstä, WSL-säilö on estetty kaikilta käyttäjiltä, eivätkä Windows-sovellukset voi suorittaa Linux-säilöjä. Varoitus: Jos asetat käytännön tilaan Disabled, se voi rikkoa Windows-sovelluksia, jotka ovat riippuvaisia Linux-säilöistä.</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Salli etuoikeutetut WSL-säilöt</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Tämä käytäntö määrittää, voivatko WSL-kontit toimia tässä koneessa etuoikeutetussa tilassa. Kun se on käytössä tai sitä ei ole määritetty, käyttäjät ja Windows-sovellukset voivat käynnistää etuoikeutettuja kontteja. Kun asetuksena on Disabled, kaikkien käyttäjien ja Windows-sovellusten pyyntöjä käynnistää etuoikeutettu kontti ei hyväksytä. Etuoikeutetut kontit toimivat Linuxin korotetuilla oikeuksilla ja ovat vähemmän eristettyjä säilöisännästä.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->WSL-säilörekisterien sallittujen luettelo</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Kun tämä asetus on käytössä, WSL-säilö voi noutaa kuvia vain täällä luetelluista rekistereistä. Tämä vaikuttaa sekä WSL-säilön CLI:hin että kaikkiin sovelluksiin, jotka käyttävät WSL-säilön ohjelmointirajapintaa.</string>
     </stringTable>

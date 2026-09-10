@@ -26,8 +26,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> SessionEnterCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::StoragePath, true),
-        Argument::Create(ArgType::Name, std::nullopt, std::nullopt, Localization::WSLCCLI_SessionEnterNameArgDescription()),
+        Argument::Create(ArgType::StoragePath, {.Required = true}),
+        Argument::Create(ArgType::Name, {.Desc = Localization::WSLCCLI_SessionEnterNameArgDescription()}),
     };
 }
 
@@ -45,7 +45,7 @@ void SessionEnterCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        throw CommandException(Localization::MessageWslcSessionOptionNotSupported());
+        throw ExecutionException(Localization::MessageWslcSessionOptionNotSupported());
     }
 
     context << EnterSession;

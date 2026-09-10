@@ -136,6 +136,16 @@ inline constexpr auto* c_ipv4TestRequestTargetA = "www.msftconnecttest.com";
 inline constexpr auto* c_ipv6TestRequestTarget = L"ipv6.msftconnecttest.com";
 inline constexpr auto* c_ipv6TestRequestTargetA = "ipv6.msftconnecttest.com";
 
+inline HRESULT GetGnsCallbackResult(LX_MESSAGE_TYPE messageType, HRESULT transportResult, int linuxResultCode) noexcept
+{
+    if (FAILED(transportResult) || messageType == LxGnsMessageConnectTestRequest || linuxResultCode == 0)
+    {
+        return transportResult;
+    }
+
+    return E_FAIL;
+}
+
 inline constexpr GUID c_wslFirewallVmCreatorId = {0x40E0AC32, 0x46A5, 0x438A, {0xA0, 0xB2, 0x2B, 0x47, 0x9E, 0x8F, 0x2E, 0x90}};
 
 inline constexpr auto c_networkAdapterPrefix = L"VirtualMachine/Devices/NetworkAdapters/";

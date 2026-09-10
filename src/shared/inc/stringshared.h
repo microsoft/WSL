@@ -1053,30 +1053,6 @@ struct CaseInsensitiveCompare
     }
 };
 
-inline std::wstring FormatBytes(uint64_t bytes)
-{
-    constexpr double c_kB = 1000.0;
-    constexpr double c_MB = 1000.0 * 1000.0;
-    constexpr double c_GB = 1000.0 * 1000.0 * 1000.0;
-
-    if (bytes >= static_cast<uint64_t>(c_GB))
-    {
-        return std::format(L"{:.2f} GB", bytes / c_GB);
-    }
-    else if (bytes >= static_cast<uint64_t>(c_MB))
-    {
-        return std::format(L"{:.2f} MB", bytes / c_MB);
-    }
-    else if (bytes >= static_cast<uint64_t>(c_kB))
-    {
-        return std::format(L"{:.2f} KB", bytes / c_kB);
-    }
-    else
-    {
-        return std::format(L"{} B", bytes);
-    }
-}
-
 template <typename TChar>
 inline std::basic_string<TChar> Trim(const std::basic_string<TChar>& input)
 {
@@ -1277,7 +1253,7 @@ struct std::formatter<char*, wchar_t>
     template <typename TCtx>
     auto format(const char* str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1293,7 +1269,7 @@ struct std::formatter<const char*, wchar_t>
     template <typename TCtx>
     auto format(const char* str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1309,7 +1285,7 @@ struct std::formatter<char[N], wchar_t>
     template <typename TCtx>
     auto format(const char str[N], TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 
@@ -1325,7 +1301,7 @@ struct std::formatter<std::basic_string<char, Traits, Allocator>, wchar_t>
     template <typename TCtx>
     auto format(const std::basic_string<char, Traits, Allocator>& str, TCtx& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", wsl::shared::string::MultiByteToWide(str));
+        return std::format_to(ctx.out(), L"{}", wsl::shared::string::MultiByteToWide(str));
     }
 };
 

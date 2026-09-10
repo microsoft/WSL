@@ -353,8 +353,9 @@ class MountTests
             const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(mountCommand, -1);
             VERIFY_ARE_EQUAL(
                 output,
-                L"The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.\r\n"
-                L"Error code: Wsl/Service/MountDisk/WSL_E_VM_MODE_INVALID_MOUNT_NAME\r\n",
+                FormatErrorMessage(
+                    L"The mount name cannot be empty, '.', '..', or contain '/'. Please retry with a valid mount name.",
+                    L"Wsl/Service/MountDisk/WSL_E_VM_MODE_INVALID_MOUNT_NAME"),
                 name);
             VERIFY_ARE_EQUAL(error, L"", name);
         }

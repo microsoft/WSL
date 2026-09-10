@@ -17,6 +17,8 @@ Abstract:
 #include "LxssUserSession.h"
 #include "LxssInstance.h"
 #include "LxssSecurity.h"
+#include "notifications.h"
+#include "WslInstall.h"
 #include "WslCoreInstance.h"
 #include "resource.h"
 #include <winrt\Windows.ApplicationModel.Background.h>
@@ -949,6 +951,14 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     // Cross-volume MoveFileEx creates a new file using the impersonation token's
     // default owner. Normalize that owner to the caller's user SID so elevated moves
     // do not produce a VHD owned by BUILTIN\Administrators.
+    PSID originalVhdOwner = nullptr;
+    wil::unique_hlocal originalSecurityDescriptor;
+    {
+        auto impersonate = wil::impersonate_token(userToken.get());
+        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+            distro.VhdFilePath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &originalVhdOwner, nullptr, nullptr, nullptr, &originalSecurityDescriptor));
+    }
+
     auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
     TOKEN_OWNER tokenOwner{tokenUser->User.Sid};
     THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(userToken.get(), TokenOwner, &tokenOwner, sizeof(tokenOwner)));
@@ -967,6 +977,9 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     }
 
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        TOKEN_OWNER originalOwner{originalVhdOwner};
+        LOG_IF_WIN32_BOOL_FALSE(SetTokenInformation(userToken.get(), TokenOwner, &originalOwner, sizeof(originalOwner)));
+
         auto impersonate = wil::impersonate_token(userToken.get());
         if (!MoveFileExW(destPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
         {
@@ -2726,6 +2739,20 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             catch (...)
             {
                 result = wil::ResultFromCaughtException();
+
+                if (version == LXSS_WSL_VERSION_2)
+                {
+                    try
+                    {
+                        if (!WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameVmp))
+                        {
+                            wsl::windows::common::notifications::DisplayOptionalComponentsNotification();
+                            EMIT_USER_WARNING(wsl::shared::Localization::MessageVirtualMachinePlatformNotInstalled());
+                        }
+                    }
+                    CATCH_LOG()
+                }
+
                 throw;
             }
         }
@@ -2951,8 +2978,13 @@ void LxssUserSessionImpl::_CreateVm()
 
         m_vmId.store(vmId);
 
+        const auto weakSession = weak_from_this();
+        auto initializeDrvFs = [weakSession, vmId](HANDLE userToken) noexcept {
+            return s_InitializeDrvFs(weakSession, vmId, userToken);
+        };
+
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
+        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
 
         if (m_httpProxyStateTracker)
         {
@@ -3477,8 +3509,9 @@ void LxssUserSessionImpl::_ProcessImportResultMessage(
         {
             if (Message.TerminalProfileIndex != 0)
             {
-                const auto terminalProfileSpan = Span.subspan(Message.TerminalProfileIndex);
-                const std::string_view terminalProfile(reinterpret_cast<const char*>(terminalProfileSpan.data()), Message.TerminalProfileSize);
+                const auto terminalProfileSpan = Span.subspan(Message.TerminalProfileIndex, Message.TerminalProfileSize);
+                const std::string_view terminalProfile(
+                    reinterpret_cast<const char*>(terminalProfileSpan.data()), terminalProfileSpan.size());
                 _CreateTerminalProfile(terminalProfile, iconPath, Configuration, Registration);
             }
             else
@@ -4206,6 +4239,31 @@ wil::unique_hkey LxssUserSessionImpl::s_OpenLxssUserKey(_In_ HANDLE UserToken)
 {
     auto runAsUser = wil::impersonate_token(UserToken);
     return wsl::windows::common::registry::OpenLxssUserKey();
+}
+
+LX_INIT_DRVFS_MOUNT LxssUserSessionImpl::s_InitializeDrvFs(_In_ const std::weak_ptr<LxssUserSessionImpl>& Session, _In_ const GUID& VmId, _In_ HANDLE UserToken) noexcept
+{
+    try
+    {
+        const auto session = Session.lock();
+        if (!session)
+        {
+            return LxInitDrvfsMountNone;
+        }
+
+        std::lock_guard lock(session->m_instanceLock);
+        if (!session->m_utilityVm || !IsEqualGUID(session->m_utilityVm->GetRuntimeId(), VmId))
+        {
+            return LxInitDrvfsMountNone;
+        }
+
+        return session->m_utilityVm->InitializeDrvFs(UserToken) ? LxInitDrvfsMountElevated : LxInitDrvfsMountNonElevated;
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        return LxInitDrvfsMountNone;
+    }
 }
 
 bool LxssUserSessionImpl::s_TerminateInstance(_Inout_ LxssUserSessionImpl* UserSession, _In_ GUID DistroGuid, _In_ bool CheckForClients)

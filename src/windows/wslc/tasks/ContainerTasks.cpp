@@ -19,6 +19,7 @@ Abstract:
 #include "ContainerService.h"
 #include "ContainerTasks.h"
 #include "ImageModel.h"
+#include "MountSpecParsing.h"
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
@@ -30,37 +31,28 @@ Abstract:
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::timestamp;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
+using wsl::windows::common::string::FormatHumanReadableSize;
+using wsl::windows::common::string::StorageSizeUnit;
 
 namespace {
 
-std::string FormatBytes(uint64_t bytes)
-{
-    constexpr uint64_t c_kib = 1024;
-    constexpr uint64_t c_mib = 1024 * c_kib;
-    constexpr uint64_t c_gib = 1024 * c_mib;
+// Docker reports memory in binary units and network and block IO in decimal units.
+constexpr uint32_t c_statsMemoryPrecision = 4;
+constexpr uint32_t c_statsIoPrecision = 3;
 
-    if (bytes >= c_gib)
-    {
-        return std::format("{:.2f} GiB", static_cast<double>(bytes) / static_cast<double>(c_gib));
-    }
-    else if (bytes >= c_mib)
-    {
-        return std::format("{:.2f} MiB", static_cast<double>(bytes) / static_cast<double>(c_mib));
-    }
-    else if (bytes >= c_kib)
-    {
-        return std::format("{:.2f} KiB", static_cast<double>(bytes) / static_cast<double>(c_kib));
-    }
-    else
-    {
-        // Bytes are always whole numbers, so decimal places are intentionally omitted here.
-        // This matches the behaviour of `docker stats`.
-        return std::format("{} B", bytes);
-    }
+std::string FormatStatsMemory(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsMemoryPrecision, StorageSizeUnit::Binary));
+}
+
+std::string FormatStatsIo(uint64_t Bytes)
+{
+    return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
@@ -125,23 +117,79 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
         {"ID", stats.id},
         {"Name", containerName},
         {"CPUPerc", std::format("{:.2f}%", cpuPercent)},
-        {"MemUsage", std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit))},
+        {"MemUsage", std::format("{} / {}", FormatStatsMemory(stats.memory_stats.usage), FormatStatsMemory(stats.memory_stats.limit))},
         {"MemPerc", std::format("{:.2f}%", memPercent)},
-        {"NetIO", std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes))},
-        {"BlockIO", std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes))},
+        {"NetIO", std::format("{} / {}", FormatStatsIo(netRxBytes), FormatStatsIo(netTxBytes))},
+        {"BlockIO", std::format("{} / {}", FormatStatsIo(blkReadBytes), FormatStatsIo(blkWriteBytes))},
         {"PIDs", stats.pids_stats.current},
     };
+}
+
+// Builds the representation of a container, shared by the table and json output so the two cannot
+// drift. Every value is emitted as a string apart from the platform object, and the id is truncated
+// unless --no-trunc is passed. RunningFor and Status are the only fields that vary with the format:
+// docker renders them in invariant English, so json keeps that while the table is localized.
+ContainerOutputInformation ToContainerOutput(const ContainerInformation& container, bool truncate, FormatType format)
+{
+    ContainerOutputInformation entry;
+    entry.Command = WideToMultiByte(ContainerService::FormatCommand(container.Command, truncate));
+    entry.CreatedAt = EpochToLocalDisplayTime(container.CreatedAt);
+    // The runtime reports health as a suffix on the status description, which is the only place it is
+    // exposed by the listing API.
+    entry.HealthStatus = ContainerService::FormatHealthStatus(container.Status);
+    entry.ID = truncate ? TruncateId(container.Id) : container.Id;
+    entry.Image = container.Image;
+    entry.Labels = container.Labels;
+    entry.LocalVolumes = std::to_string(container.LocalVolumes);
+    entry.Mounts = WideToMultiByte(ContainerService::FormatMounts(container.Mounts, truncate));
+    entry.Names = container.Name;
+    entry.Networks = container.Networks;
+    entry.Platform.architecture = wsl::shared::Arm64 ? "arm64" : "amd64";
+    entry.Platform.os = "linux";
+    entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
+    entry.RunningFor = WideToMultiByte(
+        format == FormatType::Json ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
+    // Container sizes are only computed when docker is passed --size, which wslc does not support.
+    entry.Size = WideToMultiByte(FormatHumanReadableSize(0));
+    entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
+    entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt, format));
+
+    return entry;
 }
 
 } // namespace
 
 namespace wsl::windows::wslc::task {
 
-static bool TryInspectContainer(Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
+// Every container is attempted even if an earlier one fails; the command still exits nonzero.
+template <typename TAction>
+static void ForEachContainer(CLIExecutionContext& context, TAction&& action)
+{
+    for (const auto& id : context.Args.GetAllValues<ArgType::ContainerId>())
+    {
+        try
+        {
+            action(WideToMultiByte(id));
+            context.Terminal.Output(L"{}\n", id);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            context.ReportError(wil::ResultFromCaughtException());
+
+            // CollectErrorImpl keeps the first message when the next container fails with the same HRESULT.
+            context.ClearError();
+            context.ExitCode = 1;
+        }
+    }
+}
+
+static bool TryInspectContainer(
+    Terminal& terminal, Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData, bool size = false)
 {
     try
     {
-        inspectData = ContainerService::Inspect(session, containerId);
+        inspectData = ContainerService::Inspect(session, containerId, size);
         return true;
     }
     catch (const wil::ResultException& ex)
@@ -215,10 +263,11 @@ void InspectContainers(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     std::vector<wsl::windows::common::wslc_schema::InspectContainer> result;
+    const bool size = context.Args.GetValue<ArgType::Size>();
     for (const auto& id : containerIds)
     {
         std::optional<wslc_schema::InspectContainer> inspectData;
-        if (TryInspectContainer(context.Terminal, session, WideToMultiByte(id), inspectData))
+        if (TryInspectContainer(context.Terminal, session, WideToMultiByte(id), inspectData, size))
         {
             result.push_back(*inspectData);
         }
@@ -228,7 +277,13 @@ void InspectContainers(CLIExecutionContext& context)
         }
     }
 
-    auto json = ToJson(result, context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
+    nlohmann::json array = nlohmann::json::array();
+    for (const auto& entry : result)
+    {
+        array.push_back(wslc_schema::ToInspectJson(entry));
+    }
+
+    auto json = array.dump(context.Args.GetValue<ArgType::InspectFormat>(c_jsonPrettyPrintIndent));
     context.Terminal.Output(L"{}\n", MultiByteToWide(json));
 }
 
@@ -236,14 +291,9 @@ void KillContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
     const auto signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalSIGKILL);
 
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Kill(session, WideToMultiByte(id), signal);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Kill(session, id, signal); });
 }
 
 void ExportContainer(CLIExecutionContext& context)
@@ -543,15 +593,17 @@ void ListContainers(CLIExecutionContext& context)
     if (context.Args.GetValue<ArgType::Quiet>())
     {
         // Print only the container ids
+        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", MultiByteToWide(container.Id));
+            context.Terminal.Output(L"{}\n", MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id));
         }
 
         return;
     }
 
     const auto format = context.Args.GetValue<ArgType::Format>(FormatType::Table);
+    bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
 
     switch (format)
     {
@@ -559,45 +611,48 @@ void ListContainers(CLIExecutionContext& context)
     {
         for (const auto& container : containers)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(container, c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToContainerOutput(container, trunc, FormatType::Json), c_jsonCompactIndent));
         }
 
         break;
     }
     case FormatType::Table:
     {
-        bool trunc = !context.Args.GetValue<ArgType::NoTrunc>();
         using enum ColumnOverflow;
 
         // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
+        auto table = trunc ? wsl::windows::wslc::TableOutput<7>(
                                  context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderName(), {.MaxWidth = 20, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderCommand(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}}}},
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}}}},
                                  containers.size())
-                           : wsl::windows::wslc::TableOutput<6>(
+                           : wsl::windows::wslc::TableOutput<7>(
                                  context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
-                                  Localization::WSLCCLI_TableHeaderName(),
                                   Localization::WSLCCLI_TableHeaderImage(),
+                                  Localization::WSLCCLI_TableHeaderCommand(),
                                   Localization::WSLCCLI_TableHeaderCreated(),
                                   Localization::WSLCCLI_TableHeaderStatus(),
-                                  Localization::WSLCCLI_TableHeaderPorts()});
+                                  Localization::WSLCCLI_TableHeaderPorts(),
+                                  Localization::WSLCCLI_TableHeaderNames()});
 
         // Add each container as a row
         for (const auto& container : containers)
         {
+            const auto entry = ToContainerOutput(container, trunc, FormatType::Table);
             table.WriteRow({
-                MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
-                MultiByteToWide(container.Name),
-                MultiByteToWide(container.Image),
-                ContainerService::FormatRelativeTime(container.CreatedAt),
-                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
-                ContainerService::FormatPorts(container.State, container.Ports),
+                MultiByteToWide(entry.ID),
+                MultiByteToWide(entry.Image),
+                MultiByteToWide(entry.Command),
+                MultiByteToWide(entry.RunningFor),
+                MultiByteToWide(entry.Status),
+                MultiByteToWide(entry.Ports),
+                MultiByteToWide(entry.Names),
             });
         }
 
@@ -613,14 +668,10 @@ void RemoveContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAllValues<ArgType::ContainerId>();
-    bool force = context.Args.GetValue<ArgType::Force>();
-    bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Delete(session, WideToMultiByte(id), force, deleteVolumes);
-        context.Terminal.Output(L"{}\n", id);
-    }
+    const bool force = context.Args.GetValue<ArgType::Force>();
+    const bool deleteVolumes = context.Args.GetValue<ArgType::Volumes>();
+
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Delete(session, id, force, deleteVolumes); });
 }
 
 void RunContainer(CLIExecutionContext& context)
@@ -678,11 +729,13 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAllValues<ArgType::Volume>();
-        options.Volumes.reserve(options.Volumes.size() + volumes.size());
-        for (const auto& volume : volumes)
-        {
-            options.Volumes.emplace_back(volume);
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(volumes.begin()), std::make_move_iterator(volumes.end()));
+    }
+
+    if (context.Args.Contains(ArgType::Mount))
+    {
+        auto mounts = context.Args.GetAllValues<ArgType::Mount>();
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(mounts.begin()), std::make_move_iterator(mounts.end()));
     }
 
     options.Remove = context.Args.GetValue<ArgType::Remove>();
@@ -839,6 +892,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::IpAddress))
+    {
+        options.IpAddress = WideToMultiByte(context.Args.GetValue<ArgType::IpAddress>());
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.GetValue<ArgType::User>());
@@ -847,11 +905,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::TMPFS))
     {
         auto tmpfs = context.Args.GetAllValues<ArgType::TMPFS>();
-        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
-        for (const auto& value : tmpfs)
-        {
-            options.Tmpfs.emplace_back(WideToMultiByte(value));
-        }
+        options.Mounts.insert(options.Mounts.end(), std::make_move_iterator(tmpfs.begin()), std::make_move_iterator(tmpfs.end()));
     }
 
     for (const auto& label : context.Args.GetAllValues<ArgType::Label>())
@@ -1019,7 +1073,6 @@ void StopContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
-    auto containersToStop = context.Args.GetAllValues<ArgType::ContainerId>();
     StopContainerOptions options;
 
     // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
@@ -1030,11 +1083,24 @@ void StopContainers(CLIExecutionContext& context)
         options.Timeout = context.Args.GetValue<ArgType::Time>();
     }
 
-    for (const auto& id : containersToStop)
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Stop(session, id, options); });
+}
+
+void RestartContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    StopContainerOptions options;
+
+    // WSLCSignalNone lets Docker use the container's configured STOPSIGNAL, or its default when none is configured.
+    options.Signal = context.Args.GetValue<ArgType::Signal>(WSLCSignalNone);
+
+    if (context.Args.Contains(ArgType::Timeout))
     {
-        ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
-        context.Terminal.Output(L"{}\n", id);
+        options.Timeout = context.Args.GetValue<ArgType::Timeout>();
     }
+
+    ForEachContainer(context, [&](const std::string& id) { ContainerService::Restart(context.Terminal, session, id, options); });
 }
 
 void ViewContainerLogs(CLIExecutionContext& context)
@@ -1054,13 +1120,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     // N.B. since=0 and until=0 mean "unset" — the Docker API omits the parameter when the value is 0,
     // which is equivalent to "no lower/upper bound". This matches Docker CLI behavior where
     // `docker logs --since 0` returns all logs and `docker logs --until 0` applies no upper bound.
-    ULONGLONG since = 0;
+    LONGLONG since = 0;
     if (context.Args.Contains(ArgType::Since))
     {
         since = context.Args.GetValue<ArgType::Since>();
     }
 
-    ULONGLONG until = 0;
+    LONGLONG until = 0;
     if (context.Args.Contains(ArgType::Until))
     {
         until = context.Args.GetValue<ArgType::Until>();
@@ -1076,13 +1142,18 @@ void PruneContainers(CLIExecutionContext& context)
 
     auto result = ContainerService::Prune(session);
 
-    for (const auto& containerId : result.PrunedContainers)
+    if (!result.PrunedContainers.empty())
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_ContainerPruneDeletedHeader());
+        for (const auto& containerId : result.PrunedContainers)
+        {
+            context.Terminal.Output(L"{}\n", MultiByteToWide(containerId));
+        }
+
+        context.Terminal.Output(L"\n");
     }
 
-    context.Terminal.Output(L"\n");
     context.Terminal.Output(
-        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(wsl::shared::string::FormatBytes(result.SpaceReclaimed)));
+        L"{}\n", Localization::WSLCCLI_ContainerPruneSpaceReclaimedBytes(FormatHumanReadableSize(result.SpaceReclaimed, c_reclaimedSpacePrecision)));
 }
 } // namespace wsl::windows::wslc::task

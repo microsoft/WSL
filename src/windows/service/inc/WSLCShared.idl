@@ -74,9 +74,10 @@ typedef enum _WSLCListImagesFlags
     WSLCListImagesFlagsNone = 0,
     WSLCListImagesFlagsAll = 1,     // Show all images (default hides intermediate images)
     WSLCListImagesFlagsDigests = 2, // Include digest information
+    WSLCListImagesFlagsContainerCounts = 4, // Populate WSLCImageInformation::Containers
 } WSLCListImagesFlags;
 
-cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests)")
+cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests | WSLCListImagesFlagsContainerCounts)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);")
 

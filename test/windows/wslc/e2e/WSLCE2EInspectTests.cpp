@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 #include <wslc_schema.h>
 #include <JsonUtils.h>
 
@@ -27,7 +28,7 @@ class WSLCE2EInspectTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
@@ -37,7 +38,6 @@ class WSLCE2EInspectTests
         EnsureContainerDoesNotExist(DebianImage.Name);
         EnsureNetworkDoesNotExist(WslcNetworkName);
         EnsureNetworkDoesNotExist(DebianImage.Name);
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -68,6 +68,22 @@ class WSLCE2EInspectTests
     {
         auto result = RunWslc(std::format(L"inspect {}", InvalidImage.NameAndTag()));
         result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_SizeIgnoredForNonContainerTypes)
+    {
+        // --size on an object with no file sizes warns and inspects the object anyway.
+        auto result = RunWslc(std::format(L"inspect --size {}", DebianImage.NameAndTag()));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"WARNING: --size ignored for image"));
+
+        auto document = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
+        VERIFY_ARE_EQUAL(1u, document.size());
+        VERIFY_IS_FALSE(document[0].contains("SizeRw"));
+
+        // A plain inspect of the same image emits no warning.
+        auto plain = RunWslc(std::format(L"inspect {}", DebianImage.NameAndTag()));
+        plain.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_Success)
@@ -154,7 +170,7 @@ class WSLCE2EInspectTests
         auto inspectData =
             wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
-        VERIFY_ARE_EQUAL(WslcContainerName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        VERIFY_ARE_EQUAL(std::format(L"/{}", WslcContainerName), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
 
         // Config.Labels must be present in the emitted JSON even when empty.
         auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(result.Stdout.value()));
@@ -166,7 +182,8 @@ class WSLCE2EInspectTests
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_InheritsImageLabels)
     {
-        auto imageCleanup = wil::scope_exit([&]() { EnsureImageIsDeleted(LabelInheritImage); });
+        auto imageCleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { TestImageRegistry::Instance().Delete(LabelInheritImage); });
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-inspect-inherit-labels";
         auto cleanup = SetupTestDirectory(testRoot);
 
@@ -236,7 +253,7 @@ class WSLCE2EInspectTests
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(std::format(L"/{}", DebianImage.Name), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
 
         // With --type container
@@ -246,7 +263,7 @@ class WSLCE2EInspectTests
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(std::format(L"/{}", DebianImage.Name), wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
 
         // With --type image

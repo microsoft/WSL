@@ -78,7 +78,6 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 
-void ValidateVolumeMount(const std::vector<std::wstring>& values);
 void ValidateFilter(const std::vector<std::wstring>& values);
 
 } // namespace wsl::windows::wslc::validation

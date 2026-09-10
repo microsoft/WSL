@@ -24,7 +24,8 @@ struct NetworkService
 {
     static void Create(Terminal& terminal, models::Session& session, const models::CreateNetworkOptions& createOptions);
     static void Delete(models::Session& session, const std::string& name);
-    static std::vector<WSLCNetworkInformation> List(models::Session& session);
+    static std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> List(
+        models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
     static wsl::windows::common::wslc_schema::Network Inspect(models::Session& session, const std::string& name);
     static models::PruneNetworksResult Prune(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters = {});
     static void Connect(models::Session& session, const models::ConnectNetworkOptions& connectOptions);

@@ -54,6 +54,23 @@ class WSLCCLIExecutionUnitTests
         return true;
     }
 
+    TEST_METHOD(ValidateArguments_RequiredOptionUsesLongName)
+    {
+        RootCommand command;
+        ArgMap args;
+        const std::vector<Argument> definitions{Argument::Create(ArgType::Password, {.Required = true})};
+
+        try
+        {
+            command.ValidateArguments(args, definitions, false);
+            VERIFY_FAIL(L"Expected ArgumentException");
+        }
+        catch (const ArgumentException& exception)
+        {
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_RequiredArgumentOptionError(L"--password"), exception.Message());
+        }
+    }
+
     TEST_METHOD(GlobalEnvironmentOptions_NoColorIsAppliedAndFrozen)
     {
         {
@@ -127,13 +144,13 @@ class WSLCCLIExecutionUnitTests
             }
             else if (dataType == Data::Volumes)
             {
-                std::vector<WSLCVolumeInformation> volumes;
+                std::vector<wsl::windows::common::wslc_schema::VolumeListEntry> volumes;
                 dataMap.Add<Data::Volumes>(std::move(volumes));
                 handled = true;
             }
             else if (dataType == Data::Networks)
             {
-                std::vector<WSLCNetworkInformation> networks;
+                std::vector<wsl::windows::common::wslc_schema::NetworkListEntry> networks;
                 dataMap.Add<Data::Networks>(std::move(networks));
                 handled = true;
             }

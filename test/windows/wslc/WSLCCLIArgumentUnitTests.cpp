@@ -22,6 +22,7 @@ Abstract:
 #include "ImageService.h"
 #include "JsonUtils.h"
 #include "Exceptions.h"
+#include <chrono>
 #include <wslc.h>
 
 using namespace wsl::windows::wslc;
@@ -33,6 +34,8 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCCLIArgumentUnitTests {
+namespace mount = wsl::windows::common::mount;
+
 using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
 
 static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
@@ -53,6 +56,36 @@ class WSLCCLIArgumentUnitTests
     {
         // Add any necessary cleanup for argument tests
         return true;
+    }
+
+    TEST_METHOD(ArgumentException_OptionalArgumentHelp)
+    {
+        const ArgumentException withoutArgument{L"error"};
+        VERIFY_IS_TRUE(withoutArgument.Arguments().empty());
+
+        const auto argument = Argument::Create(ArgType::Verbose);
+        const ArgumentException withArgument{L"error", argument};
+        VERIFY_ARE_EQUAL(1u, withArgument.Arguments().size());
+        VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
+    }
+
+    TEST_METHOD(ArgumentCreate_DefaultsAndOverrides)
+    {
+        const auto defaults = Argument::Create(ArgType::Quiet);
+        VERIFY_ARE_EQUAL(std::wstring{L"quiet"}, defaults.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"q"}, defaults.Alias());
+
+        const auto noAlias = Argument::Create(ArgType::Quiet, {.Alias = NO_ALIAS});
+        VERIFY_IS_TRUE(noAlias.Alias().empty());
+        VERIFY_ARE_EQUAL(defaults.Description(), noAlias.Description());
+
+        const auto overrides = Argument::Create(
+            ArgType::Filter, {.Name = L"where", .Alias = L"x", .Required = true, .Limit = Limit::Unlimited, .Desc = L"Custom description"});
+        VERIFY_ARE_EQUAL(std::wstring{L"where"}, overrides.Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"x"}, overrides.Alias());
+        VERIFY_IS_TRUE(overrides.Required());
+        VERIFY_ARE_EQUAL(Limit::Unlimited, overrides.Limit());
+        VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
     }
 
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
@@ -169,6 +202,15 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"quiet"), ProgressMode::Quiet);
         VERIFY_THROWS(validation::GetProgressModeFromString(L"TTY"), ArgumentException); // Case-sensitive: only lowercase accepted
         VERIFY_THROWS(validation::GetProgressModeFromString(L"fancy"), ArgumentException);
+
+        // Verify Docker-style memory size conversion.
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(1'610'612'736), validation::GetMemorySizeFromString(L"1.5G"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(314'572), validation::GetMemorySizeFromString(L"0.3MiB"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(32), validation::GetMemorySizeFromString(L"32.3"));
+        VERIFY_ARE_EQUAL(static_cast<int64_t>(9'007'199'254'740'993), validation::GetMemorySizeFromString(L"9007199254740993"));
+        VERIFY_ARE_EQUAL(std::numeric_limits<int64_t>::max(), validation::GetMemorySizeFromString(L"9223372036854775807"));
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"-1.5G"), ArgumentException);
+        VERIFY_THROWS(validation::GetMemorySizeFromString(L"9223372036854775808"), ArgumentException);
 
         // Verify GPU device argument
         VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
@@ -370,8 +412,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthRetries>(L"3"), 3);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Last>(L"5"), 5);
 
-        // string -> LONG
+        // string -> LONG (Time and Timeout share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Time>(L"5"), 5L);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Timeout>(L"5"), 5L);
 
         // string -> ULONGLONG (Tail is a raw integer; Since/Until go through the timestamp parser)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Tail>(L"10"), 10ULL);
@@ -380,7 +423,7 @@ class WSLCCLIArgumentUnitTests
 
         // string -> int64_t (memory sizes). The cached value matches the converter's result.
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Memory>(L"512M"), validation::GetMemorySizeFromString(L"512M"));
-        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::ShmSize>(L"64M"), validation::GetMemorySizeFromString(L"64M"));
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::ShmSize>(L"1.5G"), static_cast<int64_t>(1'610'612'736));
 
         // string -> int64_t (durations, in nanoseconds)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthInterval>(L"30s"), validation::GetDurationNanosFromString(L"30s"));
@@ -389,6 +432,22 @@ class WSLCCLIArgumentUnitTests
 
         // string -> int64_t (nano CPUs)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Cpus>(L"1.5"), validation::GetNanoCpusFromString(L"1.5"));
+
+        // mount strings -> mount::Spec
+        {
+            const auto volume = ValidateAndGetCached<ArgType::Volume>(LR"(C:\hostPath:/containerPath)");
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeBind), static_cast<int>(volume.MountType));
+            VERIFY_ARE_EQUAL(static_cast<int>(mount::BindSourcePolicy::CreateIfMissing), static_cast<int>(volume.BindSource));
+
+            const auto tmpfs = ValidateAndGetCached<ArgType::TMPFS>(L"/tmp:size=64k");
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeTmpfs), static_cast<int>(tmpfs.MountType));
+            VERIFY_IS_TRUE(tmpfs.TmpfsOptions.has_value());
+            VERIFY_ARE_EQUAL(std::string("size=64k"), tmpfs.TmpfsOptions.value());
+
+            const auto structured = ValidateAndGetCached<ArgType::Mount>(L"type=volume,source=data-volume,target=/data");
+            VERIFY_ARE_EQUAL(static_cast<int>(WSLCMountTypeVolume), static_cast<int>(structured.MountType));
+            VERIFY_ARE_EQUAL(std::wstring(L"data-volume"), structured.Source);
+        }
 
         // string -> tuple<name, soft, hard> (ulimit)
         auto ulimit = ValidateAndGetCached<ArgType::Ulimit>(L"nofile=1024:2048");
@@ -524,7 +583,6 @@ class WSLCCLIArgumentUnitTests
 
         const std::vector<Case> cases = {
             {ArgType::Gpus, L"all"},
-            {ArgType::Volume, LR"(C:\hostPath:/containerPath)"},
             {ArgType::WorkDir, L"/app"},
             {ArgType::NetworkAlias, L"myalias"},
         };
@@ -625,7 +683,7 @@ class WSLCCLIArgumentUnitTests
         // the failure the up-front pass raises for the same value.
         ArgMap invalid;
         invalid.Add(ArgType::Network, std::wstring(L"host"));
-        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ArgumentException);
+        VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ExecutionException);
 
         // Valid up-front, then an unsupported value added before the first read: the map-action
         // callback clears the validated record, so the read re-validates on demand and throws.
@@ -633,7 +691,7 @@ class WSLCCLIArgumentUnitTests
         added.Add(ArgType::Network, std::wstring(L"bridge"));
         Argument::Create(ArgType::Network).Validate(added);
         added.Add(ArgType::Network, std::wstring(L"host"));
-        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ArgumentException);
+        VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ExecutionException);
     }
 
     TEST_METHOD(ArgumentValidate_ReadMakesArgumentImmutable)
@@ -695,36 +753,114 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ValidateTimestamp_ValidUnixEpochSeconds)
     {
         // Integer timestamps should parse directly
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0"), 0ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1700000000"), 1700000000ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1"), 1ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999999999"), 9999999999ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0"), 0LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1700000000"), 1700000000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1"), 1LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999999999"), 9999999999LL);
     }
 
     TEST_METHOD(ValidateTimestamp_ValidRfc3339_UTC)
     {
         // Basic UTC timestamps with Z suffix
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00Z"), 1705314600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1970-01-01T00:00:00Z"), 0ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00z"), 1705314600ULL); // lowercase z
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1970-01-01T00:00:00Z"), 0LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00z"), 1705314600LL); // lowercase z
     }
 
     TEST_METHOD(ValidateTimestamp_ValidRfc3339_WithOffset)
     {
         // Timestamps with timezone offsets (+HH:MM / -HH:MM)
         // 2024-01-15T10:30:00+05:30 = 2024-01-15T05:00:00Z = 1705294800
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+05:30"), 1705294800ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+05:30"), 1705294800LL);
         // 2024-01-15T10:30:00-05:00 = 2024-01-15T15:30:00Z = 1705332600
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00-05:00"), 1705332600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+00:00"), 1705314600ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00-05:00"), 1705332600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00+00:00"), 1705314600LL);
     }
 
     TEST_METHOD(ValidateTimestamp_ValidRfc3339_FractionalSeconds)
     {
         // Fractional seconds should be consumed (truncated to seconds)
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123Z"), 1705314600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123456789Z"), 1705314600ULL);
-        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.1+05:30"), 1705294800ULL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123456789Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.1+05:30"), 1705294800LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidPreEpoch)
+    {
+        // No lower bound is applied, so pre-1970 values convert to a negative epoch.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1960-01-15T10:30:00Z"), -314371800LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"0001-01-01T00:00:00Z"), -62135596800LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"-314371800"), -314371800LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_OutsideNanosecondRange)
+    {
+        // Values beyond the range of a nanosecond representation still convert exactly.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"1600-01-01T00:00:00Z"), -11676096000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2300-01-01T00:00:00Z"), 10413792000LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"9999-12-31T23:59:59Z"), 253402300799LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidZoneLessLocalTime)
+    {
+        // A value with no zone designator is resolved against the local UTC offset.
+        const auto offset = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::current_zone()->get_info(std::chrono::system_clock::now()).offset)
+                                .count();
+        const auto expected = 1705314600LL - offset;
+
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00"), expected);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30:00.123"), expected);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidPartialAndDateOnly)
+    {
+        // Hour-only, minute-only and date-only values are padded out to a full time.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15"), validation::GetTimestampFromString(L"2024-01-15T00:00:00"));
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10"), validation::GetTimestampFromString(L"2024-01-15T10:00:00"));
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30"), validation::GetTimestampFromString(L"2024-01-15T10:30:00"));
+
+        // The same padding applies when an explicit zone is present.
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10Z"), 1705312800LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15T10:30Z"), 1705314600LL);
+        VERIFY_ARE_EQUAL(validation::GetTimestampFromString(L"2024-01-15Z"), 1705276800LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_ValidGoDuration)
+    {
+        const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        // Durations are measured back from the current time, so allow a small window for the clock
+        // to advance while the test runs.
+        auto verifyDuration = [&](LPCWSTR value, LONGLONG expectedOffset) {
+            const auto parsed = validation::GetTimestampFromString(value);
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(parsed, now - expectedOffset);
+            VERIFY_IS_LESS_THAN_OR_EQUAL(parsed, now - expectedOffset + 30);
+        };
+
+        verifyDuration(L"10m", 600LL);
+        verifyDuration(L"1h30m", 5400LL);
+        verifyDuration(L"90s", 90LL);
+        verifyDuration(L"1.5h", 5400LL);
+        verifyDuration(L"2h45m30s", 9930LL);
+
+        // A negative duration selects a time in the future.
+        verifyDuration(L"-1h", -3600LL);
+    }
+
+    TEST_METHOD(ValidateTimestamp_SubSecondGoDuration)
+    {
+        // A sub-second duration is applied before the value is truncated, so a negative one still
+        // resolves at or after the current second rather than being rounded away.
+        const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+        const auto future = validation::GetTimestampFromString(L"-500ms");
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(future, now);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(future, now + 30);
+
+        const auto past = validation::GetTimestampFromString(L"500ms");
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(past, now - 1);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(past, now + 30);
     }
 
     TEST_METHOD(ValidateTimestamp_InvalidRfc3339_Rejected)
@@ -735,10 +871,6 @@ class WSLCCLIArgumentUnitTests
         VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T25:30:00Z"), ArgumentException);
         // Invalid day (Feb 31)
         VERIFY_THROWS(validation::GetTimestampFromString(L"2024-02-31T10:30:00Z"), ArgumentException);
-        // Missing timezone
-        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00"), ArgumentException);
-        // Date only (no time)
-        VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15"), ArgumentException);
         // Trailing characters
         VERIFY_THROWS(validation::GetTimestampFromString(L"2024-01-15T10:30:00Zextra"), ArgumentException);
         // +HHMM without colon (not supported by %Ez)
@@ -748,8 +880,9 @@ class WSLCCLIArgumentUnitTests
         // Random text
         VERIFY_THROWS(validation::GetTimestampFromString(L"abc"), ArgumentException);
         VERIFY_THROWS(validation::GetTimestampFromString(L"not-a-timestamp"), ArgumentException);
-        // Negative epoch (pre-1970)
-        VERIFY_THROWS(validation::GetTimestampFromString(L"1960-01-15T10:30:00Z"), ArgumentException);
+        // Duration with no unit
+        VERIFY_THROWS(validation::GetTimestampFromString(L"10x"), ArgumentException);
+        VERIFY_THROWS(validation::GetTimestampFromString(L"1h30"), ArgumentException);
     }
 };
 } // namespace WSLCCLIArgumentUnitTests

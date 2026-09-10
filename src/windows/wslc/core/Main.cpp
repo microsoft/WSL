@@ -134,10 +134,19 @@ try
         command->ValidateArguments(context.Args);
         command->Execute(context);
     }
+    catch (const ArgumentException& ae)
+    {
+        command->OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        return 1;
+    }
     catch (const CommandException& ce)
     {
-        // Input failure: show help alongside the error so the user can correct it.
-        command->OutputHelp(context.Terminal, &ce);
+        command->OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        return 1;
+    }
+    catch (const ExecutionException& ee)
+    {
+        context.Terminal.Error(L"{}\n", ee.Message());
         return 1;
     }
     catch (...)
@@ -165,17 +174,7 @@ try
 
         if (FAILED(result))
         {
-            if (const auto& reported = context.ReportedError())
-            {
-                auto strings = wslutil::ErrorToString(*reported);
-                auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)));
-            }
-            else
-            {
-                // Fallback for errors without context
-                context.Terminal.Error(L"{}\n", Localization::MessageErrorCode(L"", wslutil::ErrorCodeToString(result)));
-            }
+            context.ReportError(result);
         }
     }
 
