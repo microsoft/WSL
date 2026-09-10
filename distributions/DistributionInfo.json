@@ -10,7 +10,7 @@
                     "Sha256": "48d56724b5c8e60f24893e83e73bbb58c60b3ca22fba3da977075420acd54104"
                 },
                 "Arm64Url": {
-                    "Url": "https://cdimage.ubuntu.com/releases/26.04.1/release/ubuntu-26.04.1-wsl-arm64.wsl",
+                    "Url": "https://cdimages.ubuntu.com/releases/26.04.1/release/ubuntu-26.04.1-wsl-arm64.wsl",
                     "Sha256": "c7d893d7ccb291009e6096c5a946937337b6fd4c426f11b6541f6cd2bf894f7d"
                 }
             },
@@ -23,7 +23,7 @@
                     "Sha256": "48d56724b5c8e60f24893e83e73bbb58c60b3ca22fba3da977075420acd54104"
                 },
                 "Arm64Url": {
-                    "Url": "https://cdimage.ubuntu.com/releases/26.04.1/release/ubuntu-26.04.1-wsl-arm64.wsl",
+                    "Url": "https://cdimages.ubuntu.com/releases/26.04.1/release/ubuntu-26.04.1-wsl-arm64.wsl",
                     "Sha256": "c7d893d7ccb291009e6096c5a946937337b6fd4c426f11b6541f6cd2bf894f7d"
                 }
             },
