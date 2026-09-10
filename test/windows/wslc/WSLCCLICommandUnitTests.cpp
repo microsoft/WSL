@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 #include "windows/Common.h"
@@ -58,7 +59,7 @@ class WSLCCLICommandUnitTests
     {
         auto cmd = RootCommand();
 
-        auto subcommands = cmd.GetCommands();
+        const auto& subcommands = cmd.GetCommands();
 
         // Verify it has subcommands
         VERIFY_IS_TRUE(subcommands.size() > 0);
@@ -71,11 +72,23 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    TEST_METHOD(RootCommand_RetainsSubcommands)
+    {
+        RootCommand root;
+        const auto& first = root.GetCommands();
+        const auto& second = root.GetCommands();
+
+        VERIFY_ARE_EQUAL(first.size(), second.size());
+        VERIFY_ARE_EQUAL(first.front().get(), second.front().get());
+        VERIFY_IS_TRUE(first.front()->Parent().has_value());
+        VERIFY_ARE_EQUAL(&root, &first.front()->Parent()->get());
+    }
+
     // Test: Verify SystemCommand has subcommands
     TEST_METHOD(SystemCommand_HasSubcommands)
     {
         auto cmd = SystemCommand(L"system");
-        auto subcommands = cmd.GetCommands();
+        const auto& subcommands = cmd.GetCommands();
 
         // Verify it has subcommands
         VERIFY_IS_TRUE(subcommands.size() > 0);
@@ -91,7 +104,7 @@ class WSLCCLICommandUnitTests
     TEST_METHOD(SessionCommand_HasSubcommands)
     {
         auto cmd = SessionCommand(L"system session");
-        auto subcommands = cmd.GetCommands();
+        const auto& subcommands = cmd.GetCommands();
 
         // Verify it has subcommands
         VERIFY_IS_TRUE(subcommands.size() > 0);
@@ -139,7 +152,7 @@ class WSLCCLICommandUnitTests
     TEST_METHOD(ContainerCommand_HasSubcommands)
     {
         auto cmd = ContainerCommand(L"container");
-        auto subcommands = cmd.GetCommands();
+        const auto& subcommands = cmd.GetCommands();
 
         // Verify it has subcommands
         VERIFY_IS_TRUE(subcommands.size() > 0);
@@ -187,7 +200,7 @@ class WSLCCLICommandUnitTests
     TEST_METHOD(RootCommand_ContainsVersionCommand)
     {
         auto root = RootCommand();
-        auto subcommands = root.GetCommands();
+        const auto& subcommands = root.GetCommands();
 
         bool found = false;
         for (const auto& subcmd : subcommands)
@@ -237,7 +250,7 @@ class WSLCCLICommandUnitTests
     TEST_METHOD(SystemCommand_ContainsSystemInfoCommand)
     {
         auto cmd = SystemCommand(L"system");
-        auto subcommands = cmd.GetCommands();
+        const auto& subcommands = cmd.GetCommands();
 
         bool found = false;
         for (const auto& subcmd : subcommands)
@@ -257,7 +270,7 @@ class WSLCCLICommandUnitTests
     TEST_METHOD(RootCommand_ContainsSystemInfoCommand)
     {
         auto root = RootCommand();
-        auto subcommands = root.GetCommands();
+        const auto& subcommands = root.GetCommands();
 
         bool found = false;
         for (const auto& subcmd : subcommands)
@@ -361,22 +374,22 @@ class WSLCCLICommandUnitTests
         };
 
         // Starting with the Root command, verify no argument collisions.
-        std::vector<std::unique_ptr<Command>> commands;
-        commands.push_back(std::make_unique<RootCommand>());
+        RootCommand root;
+        std::vector<std::reference_wrapper<const Command>> commands;
+        commands.emplace_back(std::cref(root));
 
         while (!commands.empty())
         {
-            auto current = std::move(commands.back());
+            const auto& current = commands.back().get();
             commands.pop_back();
-            VERIFY_IS_NOT_NULL(current.get());
 
-            const std::wstring commandFullName(current->FullName());
+            const std::wstring commandFullName(current.FullName());
             std::unordered_set<size_t> seenTypes;
             std::unordered_map<std::wstring, argument::ArgType> seenNames;
             std::unordered_map<std::wstring, argument::ArgType> seenAliases;
 
-            auto configuredArguments = current->GetAllArguments();
-            const auto globalArguments = current->GetGlobalArguments();
+            auto configuredArguments = current.GetAllArguments();
+            const auto globalArguments = current.GetGlobalArguments();
             configuredArguments.insert(configuredArguments.end(), globalArguments.begin(), globalArguments.end());
 
             for (const auto& arg : globalArguments)
@@ -439,9 +452,9 @@ class WSLCCLICommandUnitTests
             }
 
             // Add any subcommands of this command for validation.
-            for (auto& sub : current->GetCommands())
+            for (const auto& subcommand : current.GetCommands())
             {
-                commands.push_back(std::move(sub));
+                commands.emplace_back(std::cref(*subcommand));
             }
         }
     }
@@ -450,21 +463,23 @@ class WSLCCLICommandUnitTests
     {
         struct PendingCommand
         {
-            std::unique_ptr<Command> Command;
+            std::reference_wrapper<const Command> Command;
             std::vector<Argument> InheritedCliGlobals;
             std::vector<Argument> InheritedGlobalStorage;
         };
 
+        RootCommand root;
         std::vector<PendingCommand> pending;
-        pending.emplace_back(PendingCommand{.Command = std::make_unique<RootCommand>()});
+        pending.emplace_back(PendingCommand{.Command = std::cref(root)});
 
         while (!pending.empty())
         {
             auto current = std::move(pending.back());
             pending.pop_back();
+            const auto& command = current.Command.get();
 
-            const auto cliGlobals = current.Command->GetGlobalArguments();
-            const auto globalStorage = current.Command->GetGlobalsAndEnvArguments();
+            const auto cliGlobals = command.GetGlobalArguments();
+            const auto globalStorage = command.GetGlobalsAndEnvArguments();
 
             for (const auto& argument : globalStorage)
             {
@@ -472,9 +487,7 @@ class WSLCCLICommandUnitTests
                 VERIFY_IS_TRUE(
                     duplicateType == current.InheritedGlobalStorage.end(),
                     std::format(
-                        L"Command '{}' reuses inherited global ArgType '{}'",
-                        current.Command->FullName(),
-                        static_cast<size_t>(argument.Type()))
+                        L"Command '{}' reuses inherited global ArgType '{}'", command.FullName(), static_cast<size_t>(argument.Type()))
                         .c_str());
             }
 
@@ -485,8 +498,7 @@ class WSLCCLICommandUnitTests
                 });
                 VERIFY_IS_TRUE(
                     duplicateName == current.InheritedCliGlobals.end(),
-                    std::format(L"Command '{}' reuses inherited global option name '--{}'", current.Command->FullName(), argument.Name())
-                        .c_str());
+                    std::format(L"Command '{}' reuses inherited global option name '--{}'", command.FullName(), argument.Name()).c_str());
 
                 if (!argument.Alias().empty())
                 {
@@ -495,8 +507,7 @@ class WSLCCLICommandUnitTests
                     });
                     VERIFY_IS_TRUE(
                         duplicateAlias == current.InheritedCliGlobals.end(),
-                        std::format(
-                            L"Command '{}' reuses inherited global option alias '-{}'", current.Command->FullName(), argument.Alias())
+                        std::format(L"Command '{}' reuses inherited global option alias '-{}'", command.FullName(), argument.Alias())
                             .c_str());
                 }
             }
@@ -504,22 +515,22 @@ class WSLCCLICommandUnitTests
             current.InheritedCliGlobals.insert(current.InheritedCliGlobals.end(), cliGlobals.begin(), cliGlobals.end());
             current.InheritedGlobalStorage.insert(current.InheritedGlobalStorage.end(), globalStorage.begin(), globalStorage.end());
 
-            for (const auto& argument : current.Command->GetAllArguments())
+            for (const auto& argument : command.GetAllArguments())
             {
                 const auto duplicateType = std::ranges::find(current.InheritedGlobalStorage, argument.Type(), &Argument::Type);
                 VERIFY_IS_TRUE(
                     duplicateType == current.InheritedGlobalStorage.end(),
                     std::format(
                         L"Command '{}' registers ArgType '{}' in both GlobalArgs and Args",
-                        current.Command->FullName(),
+                        command.FullName(),
                         static_cast<size_t>(argument.Type()))
                         .c_str());
             }
 
-            for (auto& subcommand : current.Command->GetCommands())
+            for (const auto& subcommand : command.GetCommands())
             {
                 pending.emplace_back(PendingCommand{
-                    .Command = std::move(subcommand),
+                    .Command = std::cref(*subcommand),
                     .InheritedCliGlobals = current.InheritedCliGlobals,
                     .InheritedGlobalStorage = current.InheritedGlobalStorage,
                 });

@@ -85,13 +85,13 @@ try
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
-    std::unique_ptr<Command> command = std::make_unique<RootCommand>();
+    CommandTree commandTree{std::make_unique<RootCommand>()};
 
     // Environment variable scanning.
     // The env-bound argument set is the only state needed before NO_COLOR is
     // applied; keep just this and the noexcept env apply outside the try so a
     // throw can't reroute through the colored-help error path.
-    const auto earlyEnvironmentArguments = command->GetEnvArguments();
+    const auto earlyEnvironmentArguments = commandTree.Root().GetEnvArguments();
     ApplyEnvironmentOptions(context.GlobalArgs, earlyEnvironmentArguments);
     context.ApplyGlobalEnvironmentOptions();
 
@@ -107,17 +107,17 @@ try
 
         Invocation invocation{std::move(args)};
 
-        ParseCommandLine(invocation, context, command);
-        command->Execute(context);
+        ParseCommandLine(invocation, context, commandTree);
+        commandTree.Selected().Execute(context);
     }
     catch (const ArgumentException& ae)
     {
-        command->OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        commandTree.Selected().OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
         return 1;
     }
     catch (const CommandException& ce)
     {
-        command->OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        commandTree.Selected().OutputHelp(context.Terminal, HelpOutput::Command, &ce);
         return 1;
     }
     catch (const ExecutionException& ee)

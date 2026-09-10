@@ -23,7 +23,6 @@ struct RootCommand final : public Command
     {
     }
 
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
     std::vector<Argument> GetArguments() const override;
     std::vector<Argument> GetGlobalArguments() const override;
     std::vector<Argument> GetEnvArguments() const override;
@@ -31,6 +30,7 @@ struct RootCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    std::vector<std::unique_ptr<Command>> CreateCommands() const override;
     virtual void ExecuteInternal(CLIExecutionContext& context) const;
 };
 } // namespace wsl::windows::wslc

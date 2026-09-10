@@ -71,13 +71,6 @@ namespace {
         {
         }
 
-        std::vector<std::unique_ptr<Command>> GetCommands() const override
-        {
-            std::vector<std::unique_ptr<Command>> commands;
-            commands.emplace_back(std::make_unique<TestUpCommand>(FullName()));
-            return commands;
-        }
-
         std::vector<Argument> GetGlobalArguments() const override
         {
             return {Argument::Create(ArgType::Progress)};
@@ -94,6 +87,13 @@ namespace {
         }
 
     protected:
+        std::vector<std::unique_ptr<Command>> CreateCommands() const override
+        {
+            std::vector<std::unique_ptr<Command>> commands;
+            commands.emplace_back(std::make_unique<TestUpCommand>(FullName()));
+            return commands;
+        }
+
         void ExecuteInternal(CLIExecutionContext&) const override
         {
         }
@@ -103,13 +103,6 @@ namespace {
     {
         TestRootCommand() : Command(L"root", L"")
         {
-        }
-
-        std::vector<std::unique_ptr<Command>> GetCommands() const override
-        {
-            std::vector<std::unique_ptr<Command>> commands;
-            commands.emplace_back(std::make_unique<TestComposeCommand>(FullName()));
-            return commands;
         }
 
         std::vector<Argument> GetGlobalArguments() const override
@@ -128,6 +121,13 @@ namespace {
         }
 
     protected:
+        std::vector<std::unique_ptr<Command>> CreateCommands() const override
+        {
+            std::vector<std::unique_ptr<Command>> commands;
+            commands.emplace_back(std::make_unique<TestComposeCommand>(FullName()));
+            return commands;
+        }
+
         void ExecuteInternal(CLIExecutionContext&) const override
         {
         }
@@ -137,14 +137,6 @@ namespace {
     {
         MultipleTestRootCommand() : Command(L"root", L"")
         {
-        }
-
-        std::vector<std::unique_ptr<Command>> GetCommands() const override
-        {
-            std::vector<std::unique_ptr<Command>> commands;
-            commands.emplace_back(std::make_unique<TestComposeCommand>(L"compose", FullName()));
-            commands.emplace_back(std::make_unique<TestComposeCommand>(L"stack", FullName()));
-            return commands;
         }
 
         std::wstring ShortDescription() const override
@@ -158,17 +150,25 @@ namespace {
         }
 
     protected:
+        std::vector<std::unique_ptr<Command>> CreateCommands() const override
+        {
+            std::vector<std::unique_ptr<Command>> commands;
+            commands.emplace_back(std::make_unique<TestComposeCommand>(L"compose", FullName()));
+            commands.emplace_back(std::make_unique<TestComposeCommand>(L"stack", FullName()));
+            return commands;
+        }
+
         void ExecuteInternal(CLIExecutionContext&) const override
         {
         }
     };
 
-    std::unique_ptr<Command> ParseTestCommandLine(std::vector<std::wstring> arguments, CLIExecutionContext& context)
+    CommandTree ParseTestCommandLine(std::vector<std::wstring> arguments, CLIExecutionContext& context)
     {
         Invocation invocation{std::move(arguments)};
-        std::unique_ptr<Command> command = std::make_unique<TestRootCommand>();
-        ParseCommandLine(invocation, context, command, /*applyEnvironmentOptions*/ false);
-        return command;
+        CommandTree commandTree{std::make_unique<TestRootCommand>()};
+        ParseCommandLine(invocation, context, commandTree, /*applyEnvironmentOptions*/ false);
+        return commandTree;
     }
 } // namespace
 
@@ -240,26 +240,55 @@ class WSLCCLIExecutionUnitTests
     TEST_METHOD(ScopedGlobalArguments_AccumulateAcrossCommandScopes)
     {
         CLIExecutionContext context;
-        const auto command = ParseTestCommandLine({L"--session", L"foo", L"compose", L"--progress", L"plain", L"up", L"--detach"}, context);
+        const auto commandTree =
+            ParseTestCommandLine({L"--session", L"foo", L"compose", L"--progress", L"plain", L"up", L"--detach"}, context);
 
-        VERIFY_ARE_EQUAL(std::wstring_view{L"up"}, command->Name());
+        VERIFY_ARE_EQUAL(std::wstring_view{L"up"}, commandTree.Selected().Name());
         VERIFY_ARE_EQUAL(std::wstring{L"foo"}, context.GlobalArgs.GetValue<ArgType::Session>());
         VERIFY_IS_TRUE(context.GlobalArgs.Contains(ArgType::Progress));
         VERIFY_IS_TRUE(context.Args.GetValue<ArgType::Detach>());
         VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
         VERIFY_IS_FALSE(context.Args.Contains(ArgType::Progress));
+
+        const auto compose = commandTree.Selected().Parent();
+        VERIFY_IS_TRUE(compose.has_value());
+        VERIFY_ARE_EQUAL(std::wstring_view{L"compose"}, compose->get().Name());
+
+        const auto root = compose->get().Parent();
+        VERIFY_IS_TRUE(root.has_value());
+        VERIFY_ARE_EQUAL(&commandTree.Root(), &root->get());
     }
 
     TEST_METHOD(ScopedGlobalArguments_PathPreservesOwningCommands)
     {
         const TestRootCommand root;
-        const auto scopes = GetGlobalArgumentPath(root, L"root:compose:up");
+        const auto& compose = *root.GetCommands().front();
+        const auto& up = *compose.GetCommands().front();
+        const auto scopes = GetGlobalArgumentPath(up);
 
         VERIFY_ARE_EQUAL(2u, scopes.size());
         VERIFY_ARE_EQUAL(std::wstring{L"wslc"}, scopes[0].CommandInvocation);
         VERIFY_ARE_EQUAL(ArgType::Session, scopes[0].Arguments[0].Type());
         VERIFY_ARE_EQUAL(std::wstring{L"wslc compose"}, scopes[1].CommandInvocation);
         VERIFY_ARE_EQUAL(ArgType::Progress, scopes[1].Arguments[0].Type());
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_PathIncludesStandaloneTarget)
+    {
+        const TestComposeCommand command{L"standalone"};
+        const auto scopes = GetGlobalArgumentPath(command);
+
+        VERIFY_ARE_EQUAL(1u, scopes.size());
+        VERIFY_ARE_EQUAL(std::wstring{L"wslc compose"}, scopes[0].CommandInvocation);
+        VERIFY_ARE_EQUAL(ArgType::Progress, scopes[0].Arguments[0].Type());
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_DetachedSubtreeFormatsChildInvocation)
+    {
+        const TestComposeCommand command{L"root"};
+        const auto& child = *command.GetCommands().front();
+
+        VERIFY_ARE_EQUAL(std::wstring{L"wslc compose up"}, child.FormatInvocation());
     }
 
     TEST_METHOD(ScopedGlobalArguments_DescendantGlobalAtRootReportsCorrectPlacement)
@@ -316,11 +345,11 @@ class WSLCCLIExecutionUnitTests
     {
         Invocation invocation{{L"--progress", L"plain", L"compose", L"up"}};
         CLIExecutionContext context;
-        std::unique_ptr<Command> command = std::make_unique<MultipleTestRootCommand>();
+        CommandTree commandTree{std::make_unique<MultipleTestRootCommand>()};
 
         try
         {
-            ParseCommandLine(invocation, context, command, /*applyEnvironmentOptions*/ false);
+            ParseCommandLine(invocation, context, commandTree, /*applyEnvironmentOptions*/ false);
             VERIFY_FAIL(L"Expected ArgumentException");
         }
         catch (const ArgumentException& exception)
@@ -979,12 +1008,12 @@ class WSLCCLIExecutionUnitTests
             try
             {
                 Invocation invocation{std::move(args)};
-                std::unique_ptr<Command> command = std::make_unique<RootCommand>();
+                CommandTree commandTree{std::make_unique<RootCommand>()};
                 CLIExecutionContext context;
-                ParseCommandLine(invocation, context, command, /*applyEnvironmentOptions*/ false);
+                ParseCommandLine(invocation, context, commandTree, /*applyEnvironmentOptions*/ false);
 
                 // Ensure we found the expected command
-                VERIFY_ARE_EQUAL(testCase.expectedCommand, command->Name());
+                VERIFY_ARE_EQUAL(testCase.expectedCommand, commandTree.Selected().Name());
             }
             catch (const CommandException& ce)
             {

@@ -15,9 +15,10 @@ Abstract:
 
 #include "Argument.h"
 
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace wsl::windows::wslc {
@@ -30,19 +31,36 @@ namespace execution {
 
 struct GlobalArgumentScope
 {
-    std::wstring CommandFullName;
     std::wstring CommandInvocation;
     std::vector<Argument> Arguments;
 };
 
-// Returns every command scope in the tree rooted at root that defines global options.
-std::vector<GlobalArgumentScope> GetGlobalArgumentScopes(const Command& root);
+class CommandTree
+{
+public:
+    explicit CommandTree(std::unique_ptr<Command> root);
+    ~CommandTree();
 
-// Returns the global option scopes inherited along the path from root to commandFullName.
-std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& root, std::wstring_view commandFullName);
+    CommandTree(const CommandTree&) = delete;
+    CommandTree& operator=(const CommandTree&) = delete;
+    CommandTree(CommandTree&&) noexcept;
+    CommandTree& operator=(CommandTree&&) noexcept;
 
-// Parses scoped global options while resolving each command level, then parses the selected command.
-// The command reference is updated as each subcommand is selected so callers can report errors against
-// the command scope where they occurred.
-void ParseCommandLine(Invocation& invocation, execution::CLIExecutionContext& context, std::unique_ptr<Command>& command, bool applyEnvironmentOptions = true);
+    const Command& Root() const;
+    const Command& Selected() const;
+
+private:
+    void Select(const Command& command);
+
+    std::unique_ptr<Command> m_root;
+    std::optional<std::reference_wrapper<const Command>> m_selected;
+
+    friend void ParseCommandLine(Invocation& invocation, execution::CLIExecutionContext& context, CommandTree& commandTree, bool applyEnvironmentOptions);
+};
+
+// Returns the global option scopes along target's path from the root.
+std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& target);
+
+// Parses scoped global options while selecting each command level in the persistent command tree.
+void ParseCommandLine(Invocation& invocation, execution::CLIExecutionContext& context, CommandTree& commandTree, bool applyEnvironmentOptions = true);
 } // namespace wsl::windows::wslc

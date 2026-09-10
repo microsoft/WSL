@@ -17,7 +17,6 @@ Abstract:
 #include "CommandLineParser.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
-#include "RootCommand.h"
 #include "TableOutput.h"
 
 #include <algorithm>
@@ -69,30 +68,10 @@ namespace {
         return lines;
     }
 
-    std::wstring FormatCommandInvocation(const Command& command, std::wstring_view name)
-    {
-        std::wstring commandChain = command.FullName();
-        const auto firstSplit = commandChain.find_first_of(Command::ParentSplitChar);
-        if (firstSplit == std::wstring::npos)
-        {
-            return s_ExecutableName;
-        }
-
-        commandChain = commandChain.substr(firstSplit + 1);
-        const auto lastSplit = commandChain.find_last_of(Command::ParentSplitChar);
-        commandChain.replace(lastSplit == std::wstring::npos ? 0 : lastSplit + 1, std::wstring::npos, name);
-        std::ranges::replace(commandChain, Command::ParentSplitChar, L' ');
-
-        std::wstring invocation = s_ExecutableName;
-        invocation += L' ';
-        invocation += commandChain;
-        return invocation;
-    }
-
     void AddCommandInvocations(const Command& command, std::vector<std::wstring>& invocations)
     {
         const auto addInvocation = [&](std::wstring_view name) {
-            auto invocation = FormatCommandInvocation(command, name);
+            auto invocation = command.FormatInvocation(name);
             if (std::ranges::find(invocations, invocation) == invocations.end())
             {
                 invocations.emplace_back(std::move(invocation));
@@ -106,23 +85,26 @@ namespace {
         }
     }
 
-    void FindCommandInvocations(const Command& target, const Command& parent, std::vector<std::wstring>& invocations)
-    {
-        for (const auto& command : parent.GetCommands())
-        {
-            if (typeid(target) == typeid(*command))
-            {
-                AddCommandInvocations(*command, invocations);
-            }
-
-            FindCommandInvocations(target, *command, invocations);
-        }
-    }
-
     std::vector<std::wstring> GetCommandInvocations(const Command& command)
     {
         std::vector<std::wstring> invocations;
-        FindCommandInvocations(command, RootCommand(), invocations);
+        std::vector<std::reference_wrapper<const Command>> pending{std::cref(command.Root())};
+        while (!pending.empty())
+        {
+            const auto& current = pending.back().get();
+            pending.pop_back();
+
+            if (typeid(command) == typeid(current))
+            {
+                AddCommandInvocations(current, invocations);
+            }
+
+            const auto& children = current.GetCommands();
+            for (auto child = children.rbegin(); child != children.rend(); ++child)
+            {
+                pending.emplace_back(std::cref(**child));
+            }
+        }
 
         if (invocations.empty())
         {
@@ -152,6 +134,77 @@ Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliase
     {
         m_fullName = name;
     }
+}
+
+std::wstring Command::FormatInvocation(std::wstring_view name) const
+{
+    if (Parent().has_value())
+    {
+        std::vector<std::wstring_view> commandPath{name};
+        auto command = Parent();
+        while (command.has_value())
+        {
+            if (command->get().Parent().has_value() || command->get().FullName().find_first_of(ParentSplitChar) != std::wstring::npos)
+            {
+                commandPath.emplace_back(command->get().Name());
+            }
+
+            command = command->get().Parent();
+        }
+
+        std::wstring invocation = s_ExecutableName;
+        for (auto command = commandPath.rbegin(); command != commandPath.rend(); ++command)
+        {
+            invocation += L' ';
+            invocation += *command;
+        }
+
+        return invocation;
+    }
+
+    std::wstring commandChain = FullName();
+    const auto firstSplit = commandChain.find_first_of(ParentSplitChar);
+    if (firstSplit == std::wstring::npos)
+    {
+        return s_ExecutableName;
+    }
+
+    commandChain = commandChain.substr(firstSplit + 1);
+    const auto lastSplit = commandChain.find_last_of(ParentSplitChar);
+    commandChain.replace(lastSplit == std::wstring::npos ? 0 : lastSplit + 1, std::wstring::npos, name);
+    std::ranges::replace(commandChain, ParentSplitChar, L' ');
+    return std::format(L"{} {}", s_ExecutableName, commandChain);
+}
+
+const Command& Command::Root() const
+{
+    std::reference_wrapper<const Command> root = std::cref(*this);
+    for (auto parent = Parent(); parent.has_value(); parent = parent->get().Parent())
+    {
+        root = *parent;
+    }
+
+    return root.get();
+}
+
+const std::vector<std::unique_ptr<Command>>& Command::GetCommands() const
+{
+    if (!m_commands.has_value())
+    {
+        auto commands = CreateCommands();
+        for (auto& command : commands)
+        {
+            THROW_HR_IF(E_UNEXPECTED, !command);
+            command->m_parent = std::cref(*this);
+            command->m_fullName = m_fullName;
+            command->m_fullName += ParentSplitChar;
+            command->m_fullName += command->Name();
+        }
+
+        m_commands.emplace(std::move(commands));
+    }
+
+    return *m_commands;
 }
 
 void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const
@@ -186,31 +239,14 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         terminal.Write(helpLevel, L"{}\n\n", LongDescription());
     }
 
-    // Build command chain from full name (replace ParentSplitChar with spaces, strip root).
-    std::wstring commandChain = FullName();
-    size_t firstSplit = commandChain.find_first_of(ParentSplitChar);
-    if (firstSplit == std::wstring::npos)
-    {
-        commandChain.clear();
-    }
-    else
-    {
-        commandChain = commandChain.substr(firstSplit + 1);
-        for (wchar_t& c : commandChain)
-        {
-            if (c == ParentSplitChar)
-            {
-                c = L' ';
-            }
-        }
-    }
+    const auto commandInvocation = FormatInvocation();
 
     std::vector<std::wstring> commandAliases;
     if (fullHelp)
     {
         commandAliases = GetCommandInvocations(*this);
     }
-    auto commands = GetCommands();
+    const auto& commands = GetCommands();
     auto arguments = GetAllArguments();
     std::vector<Argument> helpArguments;
     if (fullHelp)
@@ -271,19 +307,11 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     const bool hasHelpForwardArgs = !helpForwardArgs.empty();
 
     const auto currentGlobalArguments = GetGlobalArguments();
-    auto globalArgumentScopes = GetGlobalArgumentPath(RootCommand(), FullName());
-    if (globalArgumentScopes.empty() && !currentGlobalArguments.empty())
-    {
-        globalArgumentScopes.emplace_back(GlobalArgumentScope{
-            .CommandFullName = FullName(),
-            .CommandInvocation = FormatCommandInvocation(*this, Name()),
-            .Arguments = currentGlobalArguments,
-        });
-    }
+    const auto globalArgumentScopes = GetGlobalArgumentPath(*this);
 
     // Build usage line with Write calls for each segment.
     {
-        std::wstring usageText = Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
+        std::wstring usageText = Localization::WSLCCLI_Usage(commandInvocation, L"");
 
         while (!usageText.empty() && usageText.back() == L' ')
         {
@@ -547,16 +575,17 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
             AddArgumentRows(table, helpStandardArgs);
         }
 
-        for (size_t i = 0; i < globalArgumentScopes.size(); ++i)
+        bool hasPreviousOptionSection = hasHelpOptions;
+        for (const auto& scope : globalArgumentScopes)
         {
-            if (hasHelpOptions || i > 0)
+            if (hasPreviousOptionSection)
             {
                 table.WriteLine();
             }
 
-            const auto& scope = globalArgumentScopes[i];
             table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingScopedGlobalOptions(scope.CommandInvocation), HelpHeadingEmphasis));
             AddArgumentRows(table, scope.Arguments);
+            hasPreviousOptionSection = true;
         }
 
         table.Complete();
@@ -569,18 +598,11 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
             terminal.Write(helpLevel, L"\n");
         }
 
-        std::wstring helpCommand = s_ExecutableName;
-        if (!commandChain.empty())
-        {
-            helpCommand += L' ';
-            helpCommand += commandChain;
-        }
-
-        terminal.Write(helpLevel, L"{}\n", Localization::WSLCCLI_RunHelpForMoreInformation(helpCommand));
+        terminal.Write(helpLevel, L"{}\n", Localization::WSLCCLI_RunHelpForMoreInformation(commandInvocation));
     }
 }
 
-std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
+std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Invocation& inv) const
 {
     auto itr = inv.begin();
     if (itr == inv.end() || (*itr)[0] == WSLC_CLI_ARG_ID_CHAR)
@@ -589,18 +611,18 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
         return {};
     }
 
-    auto commands = GetCommands();
+    const auto& commands = GetCommands();
     if (commands.empty())
     {
         return {};
     }
 
-    for (auto& command : commands)
+    for (const auto& command : commands)
     {
         if (wsl::shared::string::IsEqual(*itr, command->Name()))
         {
             inv.consume(itr);
-            return std::move(command);
+            return std::cref(*command);
         }
 
         for (const auto& alias : command->Aliases())
@@ -608,7 +630,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
             if (wsl::shared::string::IsEqual(*itr, alias))
             {
                 inv.consume(itr);
-                return std::move(command);
+                return std::cref(*command);
             }
         }
     }
@@ -715,12 +737,6 @@ void Command::Execute(CLIExecutionContext& context) const
     }
 }
 
-// External execution entry point called by the core execution flow.
-void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
-{
-    command->Execute(context);
-}
-
 void Command::ValidateArgumentsInternal(ArgMap&) const
 {
     // Commands may not need any extra validation; they'll override if they do.
@@ -729,17 +745,9 @@ void Command::ValidateArgumentsInternal(ArgMap&) const
 std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType> types) const
 {
     auto arguments = GetAllArguments();
-    auto globalArgumentScopes = GetGlobalArgumentPath(RootCommand(), FullName());
-    if (globalArgumentScopes.empty() && !GetGlobalArguments().empty())
-    {
-        globalArgumentScopes.emplace_back(GlobalArgumentScope{
-            .CommandFullName = FullName(),
-            .CommandInvocation = FormatCommandInvocation(*this, Name()),
-            .Arguments = GetGlobalArguments(),
-        });
-    }
+    const auto globalArgumentScopes = GetGlobalArgumentPath(*this);
 
-    for (auto& scope : globalArgumentScopes)
+    for (const auto& scope : globalArgumentScopes)
     {
         arguments.insert(arguments.end(), scope.Arguments.begin(), scope.Arguments.end());
     }

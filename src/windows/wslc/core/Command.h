@@ -20,6 +20,7 @@ Abstract:
 #include "ArgumentParser.h"
 #include "Terminal.h"
 
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -55,11 +56,11 @@ struct Command
 
     virtual ~Command() = default;
 
-    Command(const Command&) = default;
-    Command& operator=(const Command&) = default;
+    Command(const Command&) = delete;
+    Command& operator=(const Command&) = delete;
 
-    Command(Command&&) = default;
-    Command& operator=(Command&&) = default;
+    Command(Command&&) = delete;
+    Command& operator=(Command&&) = delete;
 
     std::wstring_view Name() const
     {
@@ -69,15 +70,24 @@ struct Command
     {
         return m_fullName;
     }
+    std::wstring FormatInvocation(std::wstring_view name) const;
+    std::wstring FormatInvocation() const
+    {
+        return FormatInvocation(Name());
+    }
     const std::vector<std::wstring_view>& Aliases() const
     {
         return m_aliases;
     }
 
-    virtual std::vector<std::unique_ptr<Command>> GetCommands() const
+    const Command& Root() const;
+    std::optional<std::reference_wrapper<const Command>> Parent() const noexcept
     {
-        return {};
+        return m_parent;
     }
+
+    const std::vector<std::unique_ptr<Command>>& GetCommands() const;
+
     virtual std::vector<Argument> GetArguments() const
     {
         return {};
@@ -117,7 +127,7 @@ struct Command
         const CommandException* exception = nullptr,
         std::span<const Argument> relevantArguments = {}) const;
 
-    std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
+    std::optional<std::reference_wrapper<const Command>> FindSubCommand(Invocation& inv) const;
 
     // optionsOnly:          stop (without consuming) at the first positional token.
     // stopOnUnknown:        stop (without consuming) at the first unknown option
@@ -151,6 +161,11 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
+    virtual std::vector<std::unique_ptr<Command>> CreateCommands() const
+    {
+        return {};
+    }
+
     // Command-specific validation hook, run after the shared per-argument Argument::Validate pass.
     // Override to enforce cross-argument rules that per-argument validation cannot express, such as
     // mutually-exclusive arguments or required argument combinations.
@@ -167,7 +182,7 @@ private:
     std::wstring_view m_name;
     std::vector<std::wstring_view> m_aliases;
     std::wstring m_fullName;
+    std::optional<std::reference_wrapper<const Command>> m_parent;
+    mutable std::optional<std::vector<std::unique_ptr<Command>>> m_commands;
 };
-
-void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
 } // namespace wsl::windows::wslc

@@ -30,73 +30,50 @@ using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
 namespace {
-    std::wstring FormatCommandInvocation(std::wstring_view fullName)
+    struct DiagnosticGlobalArgumentScope
     {
-        const auto firstSplit = fullName.find_first_of(Command::ParentSplitChar);
-        if (firstSplit == std::wstring_view::npos)
-        {
-            return s_ExecutableName;
-        }
+        std::reference_wrapper<const Command> Owner;
+        std::wstring CommandInvocation;
+        std::vector<Argument> Arguments;
+    };
 
-        std::wstring commandChain{fullName.substr(firstSplit + 1)};
-        std::ranges::replace(commandChain, Command::ParentSplitChar, L' ');
-        return std::format(L"{} {}", s_ExecutableName, commandChain);
-    }
-
-    GlobalArgumentScope MakeGlobalArgumentScope(const Command& command)
+    GlobalArgumentScope MakeGlobalArgumentScope(const Command& command, std::vector<Argument> arguments)
     {
         return {
-            .CommandFullName = command.FullName(),
-            .CommandInvocation = FormatCommandInvocation(command.FullName()),
-            .Arguments = command.GetGlobalArguments(),
+            .CommandInvocation = command.FormatInvocation(),
+            .Arguments = std::move(arguments),
         };
     }
 
-    void CollectGlobalArgumentScopes(const Command& command, std::vector<GlobalArgumentScope>& scopes)
+    DiagnosticGlobalArgumentScope MakeDiagnosticGlobalArgumentScope(const Command& command, std::vector<Argument> arguments)
     {
-        auto globalArguments = command.GetGlobalArguments();
-        if (!globalArguments.empty())
-        {
-            scopes.emplace_back(GlobalArgumentScope{
-                .CommandFullName = command.FullName(),
-                .CommandInvocation = FormatCommandInvocation(command.FullName()),
-                .Arguments = std::move(globalArguments),
-            });
-        }
-
-        for (const auto& subcommand : command.GetCommands())
-        {
-            CollectGlobalArgumentScopes(*subcommand, scopes);
-        }
+        return {
+            .Owner = std::cref(command),
+            .CommandInvocation = command.FormatInvocation(),
+            .Arguments = std::move(arguments),
+        };
     }
 
-    bool CollectGlobalArgumentPath(const Command& command, std::wstring_view targetFullName, std::vector<GlobalArgumentScope>& path)
+    void CollectGlobalArgumentScopes(const Command& command, std::vector<DiagnosticGlobalArgumentScope>& scopes)
     {
-        const bool addedScope = !command.GetGlobalArguments().empty();
-        if (addedScope)
+        std::vector<std::reference_wrapper<const Command>> pending{std::cref(command)};
+        while (!pending.empty())
         {
-            path.emplace_back(MakeGlobalArgumentScope(command));
-        }
+            const auto& current = pending.back().get();
+            pending.pop_back();
 
-        if (command.FullName() == targetFullName)
-        {
-            return true;
-        }
-
-        for (const auto& subcommand : command.GetCommands())
-        {
-            if (CollectGlobalArgumentPath(*subcommand, targetFullName, path))
+            auto globalArguments = current.GetGlobalArguments();
+            if (!globalArguments.empty())
             {
-                return true;
+                scopes.emplace_back(MakeDiagnosticGlobalArgumentScope(current, std::move(globalArguments)));
+            }
+
+            const auto& children = current.GetCommands();
+            for (auto child = children.rbegin(); child != children.rend(); ++child)
+            {
+                pending.emplace_back(std::cref(**child));
             }
         }
-
-        if (addedScope)
-        {
-            path.pop_back();
-        }
-
-        return false;
     }
 
     std::optional<std::reference_wrapper<const Argument>> FindOption(std::wstring_view token, std::span<const Argument> arguments)
@@ -138,26 +115,35 @@ namespace {
 
     struct GlobalArgumentMatch
     {
-        std::reference_wrapper<const GlobalArgumentScope> Scope;
+        std::reference_wrapper<const DiagnosticGlobalArgumentScope> Scope;
         std::reference_wrapper<const Argument> Argument;
     };
 
-    std::optional<std::wstring_view> GetNextCommandName(const GlobalArgumentScope& scope, const Command& currentCommand)
+    std::optional<std::wstring_view> GetNextCommandName(const Command& scopeCommand, const Command& currentCommand)
     {
-        const auto& scopeName = scope.CommandFullName;
-        const auto& currentName = currentCommand.FullName();
-        if (currentName.length() <= scopeName.length() || !currentName.starts_with(scopeName) ||
-            currentName[scopeName.length()] != Command::ParentSplitChar)
+        std::optional<std::reference_wrapper<const Command>> nextCommand;
+        std::reference_wrapper<const Command> command = std::cref(currentCommand);
+        while (&command.get() != &scopeCommand)
+        {
+            nextCommand = command;
+            const auto parent = command.get().Parent();
+            if (!parent.has_value())
+            {
+                return std::nullopt;
+            }
+
+            command = *parent;
+        }
+
+        if (!nextCommand.has_value())
         {
             return std::nullopt;
         }
 
-        const auto nameStart = scopeName.length() + 1;
-        const auto nameEnd = currentName.find(Command::ParentSplitChar, nameStart);
-        return std::wstring_view{currentName}.substr(nameStart, nameEnd - nameStart);
+        return nextCommand->get().Name();
     }
 
-    void ThrowIfMisplacedGlobalOption(std::wstring_view token, const Command& currentCommand, std::span<const GlobalArgumentScope> globalScopes)
+    void ThrowIfMisplacedGlobalOption(std::wstring_view token, const Command& currentCommand)
     {
         const auto commandArguments = currentCommand.GetAllArguments();
         if (FindOption(token, commandArguments).has_value())
@@ -165,10 +151,12 @@ namespace {
             return;
         }
 
+        std::vector<DiagnosticGlobalArgumentScope> globalScopes;
+        CollectGlobalArgumentScopes(currentCommand.Root(), globalScopes);
         std::vector<GlobalArgumentMatch> matches;
         for (const auto& scope : globalScopes)
         {
-            if (scope.CommandFullName == currentCommand.FullName())
+            if (&scope.Owner.get() == &currentCommand)
             {
                 continue;
             }
@@ -189,11 +177,10 @@ namespace {
 
         const auto& firstMatch = matches.front();
         const auto optionName = std::format(L"--{}", firstMatch.Argument.get().Name());
-        if (std::ranges::all_of(matches, [&](const auto& match) {
-                return match.Scope.get().CommandFullName == firstMatch.Scope.get().CommandFullName;
-            }))
+        if (std::ranges::all_of(
+                matches, [&](const auto& match) { return &match.Scope.get().Owner.get() == &firstMatch.Scope.get().Owner.get(); }))
         {
-            if (const auto nextCommand = GetNextCommandName(firstMatch.Scope.get(), currentCommand))
+            if (const auto nextCommand = GetNextCommandName(firstMatch.Scope.get().Owner.get(), currentCommand))
             {
                 throw ArgumentException(
                     Localization::WSLCCLI_MisplacedInheritedGlobalOptionError(optionName, firstMatch.Scope.get().CommandInvocation, *nextCommand),
@@ -219,8 +206,8 @@ namespace {
         throw ArgumentException(Localization::WSLCCLI_MisplacedGlobalOptionMultipleScopesError(optionName, commandScopes));
     }
 
-    std::unique_ptr<Command> ParseGlobalArgumentsAndFindSubcommand(
-        Invocation& invocation, CLIExecutionContext& context, const Command& command, std::span<const GlobalArgumentScope> globalScopes, bool applyEnvironmentOptions)
+    std::optional<std::reference_wrapper<const Command>> ParseGlobalArgumentsAndFindSubcommand(
+        Invocation& invocation, CLIExecutionContext& context, const Command& command, bool applyEnvironmentOptions)
     {
         const auto globalAndEnvironmentArguments = command.GetGlobalsAndEnvArguments();
         if (applyEnvironmentOptions)
@@ -244,7 +231,7 @@ namespace {
             const auto currentArgument = invocation.begin();
             if (currentArgument != invocation.end())
             {
-                ThrowIfMisplacedGlobalOption(*currentArgument, command, globalScopes);
+                ThrowIfMisplacedGlobalOption(*currentArgument, command);
             }
         }
 
@@ -252,49 +239,86 @@ namespace {
     }
 } // namespace
 
-std::vector<GlobalArgumentScope> GetGlobalArgumentScopes(const Command& root)
+CommandTree::CommandTree(std::unique_ptr<Command> root) : m_root(std::move(root))
 {
-    std::vector<GlobalArgumentScope> scopes;
-    CollectGlobalArgumentScopes(root, scopes);
-    return scopes;
+    THROW_HR_IF(E_INVALIDARG, !m_root);
+    m_selected = std::cref(*m_root);
 }
 
-std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& root, std::wstring_view commandFullName)
+CommandTree::~CommandTree() = default;
+CommandTree::CommandTree(CommandTree&& other) noexcept : m_root(std::move(other.m_root)), m_selected(other.m_selected)
 {
-    std::vector<GlobalArgumentScope> path;
-    if (!CollectGlobalArgumentPath(root, commandFullName, path))
+    other.m_selected.reset();
+}
+
+CommandTree& CommandTree::operator=(CommandTree&& other) noexcept
+{
+    if (this != &other)
     {
-        path.clear();
+        m_root = std::move(other.m_root);
+        m_selected = other.m_selected;
+        other.m_selected.reset();
     }
 
+    return *this;
+}
+
+const Command& CommandTree::Root() const
+{
+    THROW_HR_IF(E_ILLEGAL_METHOD_CALL, !m_root);
+    return *m_root;
+}
+
+const Command& CommandTree::Selected() const
+{
+    THROW_HR_IF(E_ILLEGAL_METHOD_CALL, !m_selected.has_value());
+    return m_selected.value().get();
+}
+
+void CommandTree::Select(const Command& command)
+{
+    m_selected = std::cref(command);
+}
+
+std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& target)
+{
+    std::vector<GlobalArgumentScope> path;
+    for (auto command = std::optional{std::cref(target)}; command.has_value(); command = command->get().Parent())
+    {
+        auto globalArguments = command->get().GetGlobalArguments();
+        if (!globalArguments.empty())
+        {
+            path.emplace_back(MakeGlobalArgumentScope(command->get(), std::move(globalArguments)));
+        }
+    }
+
+    std::ranges::reverse(path);
     return path;
 }
 
-void ParseCommandLine(Invocation& invocation, CLIExecutionContext& context, std::unique_ptr<Command>& command, bool applyEnvironmentOptions)
+void ParseCommandLine(Invocation& invocation, CLIExecutionContext& context, CommandTree& commandTree, bool applyEnvironmentOptions)
 {
-    const auto globalScopes = GetGlobalArgumentScopes(*command);
-
-    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation, context, *command, globalScopes, applyEnvironmentOptions);
+    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation, context, commandTree.Selected(), applyEnvironmentOptions);
     while (subcommand)
     {
-        command = std::move(subcommand);
-        subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation, context, *command, globalScopes, applyEnvironmentOptions);
+        commandTree.Select(subcommand->get());
+        subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation, context, commandTree.Selected(), applyEnvironmentOptions);
     }
 
     try
     {
-        command->ParseArguments(invocation, context.Args);
+        commandTree.Selected().ParseArguments(invocation, context.Args);
     }
     catch (const ArgumentException& exception)
     {
         if (exception.UnknownOptionToken().has_value())
         {
-            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), *command, globalScopes);
+            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), commandTree.Selected());
         }
 
         throw;
     }
 
-    command->ValidateArguments(context.Args);
+    commandTree.Selected().ValidateArguments(context.Args);
 }
 } // namespace wsl::windows::wslc
