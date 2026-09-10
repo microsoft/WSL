@@ -271,6 +271,7 @@ private:
     _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
     _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
     wil::srwlock m_lock;
+    _Guarded_by_(m_lock) wil::com_ptr<IPlan9FileSystem> m_pluginPlan9Server;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
     _Guarded_by_(m_lock) wil::unique_event m_vmExitEvent { wil::EventOptions::ManualReset };
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};

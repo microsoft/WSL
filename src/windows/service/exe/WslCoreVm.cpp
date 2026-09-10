@@ -758,6 +758,12 @@ WslCoreVm::~WslCoreVm() noexcept
     // Close the handle to the VM. This will wait for any outstanding callbacks.
     m_system.reset();
 
+    if (m_pluginPlan9Server)
+    {
+        LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
+        m_pluginPlan9Server.reset();
+    }
+
     // This loops helps against a potential crash in build <= Windows 11 22H2.
     for (const auto& e : m_plan9Servers)
     {
@@ -2055,7 +2061,21 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-    wsl::windows::common::hcs::AddPlan9Share(m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags);
+    wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
+
+    {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
+        if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
+        {
+            auto server =
+                wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
+            THROW_IF_FAILED(server->Init(&m_runtimeId, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT));
+            THROW_IF_FAILED(server->Resume());
+            m_pluginPlan9Server = std::move(server);
+        }
+
+        THROW_IF_FAILED(m_pluginPlan9Server->AddSharePath(Name, HostPath, static_cast<UINT32>(flags)));
+    }
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
