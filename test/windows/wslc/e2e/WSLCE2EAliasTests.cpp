@@ -72,7 +72,7 @@ class WSLCE2EAliasTests
         auto position = wslcOutput.find(c_wslcName);
         while (position != std::wstring::npos)
         {
-            wslcOutput.replace(position, c_wslcName.size(), c_containerName);
+            wslcOutput.replace(position, c_wslcName.size(), c_containerName.data(), c_containerName.size());
             position = wslcOutput.find(c_wslcName, position + c_containerName.size());
         }
 
