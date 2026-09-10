@@ -2133,7 +2133,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -2144,6 +2144,14 @@ try
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError(), AllTags && tagOrDigest.has_value());
+
+    if (!AllTags && !tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
     EnforceRegistryAllowlist(repo);
 
     auto lock = AcquireLease();
@@ -2646,6 +2654,7 @@ try
     *PortsCount = 0;
 
     bool all = false;
+    bool size = false;
     int limit = -1;
     std::map<std::string, std::vector<std::string>> filters;
 
@@ -2658,6 +2667,7 @@ try
             Options->Flags);
 
         all = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsAll);
+        size = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsSize);
         limit = static_cast<int>(Options->Limit);
 
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
@@ -2669,7 +2679,7 @@ try
     std::vector<docker_schema::ContainerInfo> dockerContainers;
     try
     {
-        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters);
+        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters, size);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
 
@@ -2748,6 +2758,8 @@ try
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
+        output[index].SizeRw = dockerContainer.SizeRw;
+        output[index].SizeRootFs = dockerContainer.SizeRootFs;
 
         for (const auto& port : e->GetPorts())
         {
@@ -3810,7 +3822,7 @@ HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return PushImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+    return PushImage(Image, RegistryAuthenticationInformation, FALSE, progress.Get(), warning.Get());
 }
 
 HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)
