@@ -195,6 +195,23 @@ void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expect
     RunWslc(cmd, elevationType).Verify(expected);
 }
 
+std::set<std::wstring> RunWslcAndGetStdoutLineSet(const std::wstring& cmd, ElevationType elevationType)
+{
+    const auto result = RunWslc(cmd, elevationType);
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+
+    std::set<std::wstring> lines;
+    for (auto& line : result.GetStdoutLines())
+    {
+        if (!line.empty())
+        {
+            lines.insert(std::move(line));
+        }
+    }
+
+    return lines;
+}
+
 WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, std::optional<std::filesystem::path> outputPath, ElevationType elevationType)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;

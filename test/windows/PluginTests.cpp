@@ -89,7 +89,7 @@ class PluginTests
         return true;
     }
 
-    void ConfigurePlugin(PluginTestType testCase) const
+    void ConfigurePlugin(PluginTestType testCase, LPCWSTR mountFolder = L"") const
     {
         StopWslService();
         if (!DeleteFile(logFile.c_str()))
@@ -100,6 +100,7 @@ class PluginTests
         const auto testKey = OpenTestRegistryKey(KEY_SET_VALUE);
         WriteDword(testKey.get(), nullptr, c_testType, static_cast<DWORD>(testCase));
         WriteString(testKey.get(), nullptr, c_logFile, logFile.c_str());
+        WriteString(testKey.get(), nullptr, c_mountFolder, mountFolder);
 
         const auto lxssKey =
             CreateKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_SET_VALUE, nullptr, 0);
@@ -169,6 +170,59 @@ class PluginTests
 
         ConfigurePlugin(PluginTestType::Success);
         StartWsl(0);
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(MountFolderAccess)
+    {
+        const auto testFolder = std::filesystem::current_path() / "deny-write";
+        std::filesystem::remove_all(testFolder);
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder));
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder / "allowed"));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        const auto user = wil::get_token_information<TOKEN_USER>();
+        EXPLICIT_ACCESSW access{};
+        access.grfAccessPermissions = FILE_ADD_FILE;
+        access.grfAccessMode = DENY_ACCESS;
+        access.grfInheritance = NO_INHERITANCE;
+        access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        access.Trustee.ptstrName = static_cast<LPWSTR>(user->User.Sid);
+
+        PACL originalAcl = nullptr;
+        wil::unique_hlocal originalDescriptor;
+        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+            testFolder.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &originalAcl, nullptr, &originalDescriptor));
+
+        auto restoreAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, originalAcl, nullptr));
+        });
+
+        wsl::windows::common::security::unique_acl deniedAcl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, originalAcl, &deniedAcl));
+        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+            const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, deniedAcl.get(), nullptr));
+
+        const auto testFile = testFolder / L"plugin-test.txt";
+        wil::unique_hfile deniedFile{CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(!deniedFile);
+        VERIFY_ARE_EQUAL(ERROR_ACCESS_DENIED, GetLastError());
+
+        ConfigurePlugin(PluginTestType::MountFolderAccess, testFolder.c_str());
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=25
+                VM created (settings->CustomConfigurationFlags=0)
+                *Permission denied
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+                VM Stopping)";
+
+        StartWsl(0);
+        VERIFY_IS_TRUE(std::filesystem::exists(testFolder / "allowed" / "plugin-allowed.txt"));
+        VERIFY_IS_FALSE(std::filesystem::exists(testFile));
         ValidateLogFile(ExpectedOutput);
     }
 
