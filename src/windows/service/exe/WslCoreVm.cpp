@@ -2304,14 +2304,15 @@ void WslCoreVm::OnExit(_In_opt_ PCWSTR ExitDetails)
 
 void WslCoreVm::ReadGuestCapabilities()
 {
-    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>();
+    gsl::span<gsl::byte> span;
+    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(&span);
+    const std::string input{wsl::shared::string::FromMessageBuffer<LX_INIT_GUEST_CAPABILITIES>(span)};
 
-    m_kernelVersionString = wsl::shared::string::MultiByteToWide(info.Buffer);
+    m_kernelVersionString = wsl::shared::string::MultiByteToWide(input);
 
     // Parse the version string.
     const std::regex pattern("(\\d+)\\.(\\d+)\\.(\\d+).*");
     std::smatch match;
-    const std::string input = info.Buffer;
     if (!std::regex_match(input, match, pattern) || match.size() != 4)
     {
         THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs'", input.c_str());
@@ -2325,7 +2326,7 @@ void WslCoreVm::ReadGuestCapabilities()
     }
     catch (const std::exception& e)
     {
-        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", info.Buffer, e.what());
+        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", input.c_str(), e.what());
     }
 
     m_seccompAvailable = info.SeccompAvailable;
