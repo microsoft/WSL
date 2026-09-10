@@ -42,7 +42,7 @@ Microsoft follows the principle of [Coordinated Vulnerability Disclosure](https:
 
 ## WSL security model
 
-WSL is an integrated development environment, not a security sandbox for running untrusted code. Configuration options that disable
+WSL provides a Linux environment that is deeply integrated with Windows; it is not a security sandbox for running untrusted code. Configuration options that disable
 integration features do not establish a security boundary unless they are explicitly documented as security controls.
 
 Before reporting an issue, review the [WSL security model](./doc/docs/security.md). Reports should describe the unexpected security
