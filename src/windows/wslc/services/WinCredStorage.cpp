@@ -53,7 +53,11 @@ std::pair<std::string, std::string> WinCredStorage::Get(const std::string& serve
     unique_credential cred;
     if (!CredReadW(targetName.c_str(), CRED_TYPE_GENERIC, 0, &cred))
     {
-        THROW_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        auto error = GetLastError();
+
+        // Credential Manager is unavailable under network logon session (e.g. an SSH network logon),
+        // Treat it like "no credential found" so anonymous pull/push can proceed.
+        THROW_LAST_ERROR_IF(error != ERROR_NOT_FOUND && error != ERROR_NO_SUCH_LOGON_SESSION);
         return {};
     }
 
@@ -94,7 +98,11 @@ std::vector<std::wstring> WinCredStorage::List()
     unique_credential_array creds;
     if (!CredEnumerateW(filter.c_str(), 0, &count, &creds))
     {
-        THROW_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        auto error = GetLastError();
+
+        // Credential Manager is unavailable under network logon session (e.g. an SSH network logon),
+        // Treat it like "no credential found" so anonymous pull/push can proceed.
+        THROW_LAST_ERROR_IF(error != ERROR_NOT_FOUND && error != ERROR_NO_SUCH_LOGON_SESSION);
         return {};
     }
 

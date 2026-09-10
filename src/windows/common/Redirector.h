@@ -26,11 +26,23 @@ public:
 
     void RemoveAll();
 
+    void UpdateUid(LX_UID_T uid);
+
 private:
+    struct ConnectionTarget
+    {
+        LUID logonId;
+        std::string aname;
+        LX_UID_T uid;
+        std::wstring unixSocketPath;
+        GUID instanceId;
+        ULONG port;
+    };
+
     bool Contains(LUID luid) const;
 
     std::wstring_view m_name;
-    std::vector<LUID> m_logonIds;
+    std::vector<ConnectionTarget> m_targets;
     wil::srwlock m_lock;
 };
 

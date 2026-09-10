@@ -301,6 +301,7 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
+                    LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", message->Port, message->Family, errno);
                     return;
                 }
 
@@ -408,7 +409,9 @@ int RunPortTracker(int Argc, char** Argv)
                             " fd]"
                             " [" INIT_NETLINK_FD_ARG
                             " fd]"
-                            " [" INIT_PORT_TRACKER_LOCALHOST_RELAY " fd]\n";
+                            " [" INIT_PORT_TRACKER_LOCALHOST_RELAY
+                            " fd]"
+                            " [" INIT_PORT_TRACKER_NETWORKING_MODE_ARG " mode]\n";
 
     // This is only supported on VM mode.
     if (!UtilIsUtilityVm())
@@ -423,12 +426,14 @@ int RunPortTracker(int Argc, char** Argv)
     int PortTrackerFd = -1;
     int NetlinkSocketFd = -1;
     int GuestRelayFd = -1;
+    int NetworkingMode = static_cast<int>(LxMiniInitNetworkingModeNone);
 
     ArgumentParser parser(Argc, Argv);
     parser.AddArgument(Integer{BpfFd}, INIT_BPF_FD_ARG);
     parser.AddArgument(Integer{PortTrackerFd}, INIT_PORT_TRACKER_FD_ARG);
     parser.AddArgument(Integer{NetlinkSocketFd}, INIT_NETLINK_FD_ARG);
     parser.AddArgument(Integer{GuestRelayFd}, INIT_PORT_TRACKER_LOCALHOST_RELAY);
+    parser.AddArgument(Integer{NetworkingMode}, INIT_PORT_TRACKER_NETWORKING_MODE_ARG);
 
     try
     {
@@ -437,6 +442,12 @@ int RunPortTracker(int Argc, char** Argv)
     catch (const wil::ExceptionWithUserMessage& e)
     {
         std::cerr << e.what() << "\n" << Usage;
+        return 1;
+    }
+
+    if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeConsomme)
+    {
+        std::cerr << "Invalid networking mode (" << NetworkingMode << ")\n";
         return 1;
     }
 
@@ -469,10 +480,16 @@ int RunPortTracker(int Argc, char** Argv)
 
     auto seccompDispatcher = std::make_shared<SecCompDispatcher>(BpfFd);
 
-    GnsPortTracker portTracker(hvSocketChannel, std::move(channel), seccompDispatcher);
+    GnsPortTracker portTracker(hvSocketChannel, std::move(channel), seccompDispatcher, static_cast<LX_MINI_INIT_NETWORKING_MODE>(NetworkingMode));
 
     seccompDispatcher->RegisterHandler(
         __NR_bind, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
+
+    // listen() can perform an implicit autobind (assigning an ephemeral port) when called on a
+    // socket that was never explicitly bind()'d. That autobind is otherwise invisible to the
+    // port tracker, so listen() needs to be intercepted the same way bind() is.
+    seccompDispatcher->RegisterHandler(
+        __NR_listen, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
 
 #ifdef __x86_64__
     seccompDispatcher->RegisterHandler(I386_NR_socketcall, [&portTracker](seccomp_notif* notification) {
@@ -480,6 +497,9 @@ int RunPortTracker(int Argc, char** Argv)
     });
 #else
     seccompDispatcher->RegisterHandler(ARMV7_NR_bind, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+    seccompDispatcher->RegisterHandler(ARMV7_NR_listen, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
     });
 #endif

@@ -18,17 +18,20 @@ Abstract:
 #include "install.h"
 #include <AclAPI.h>
 #include <fstream>
+#include <sstream>
 #include <filesystem>
 #include "wslservice.h"
 #include "registry.hpp"
 #include "helpers.hpp"
 #include "svccomm.hpp"
+#include "ConsoleState.h"
 #include "lxfsshares.h"
 #include <userenv.h>
 #include <nlohmann/json.hpp>
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
+#include "retryshared.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -41,8 +44,6 @@ Abstract:
 #define LXSST_FSTAB_BACKUP_COMMAND_LINE L"/bin/bash -c 'cp /etc/fstab /etc/fstab.bak'"
 #define LXSST_FSTAB_SETUP_COMMAND_LINE L"/bin/bash -c 'echo C:\\\\ /mnt/c drvfs metadata 0 0 >> /etc/fstab'"
 #define LXSST_FSTAB_CLEANUP_COMMAND_LINE L"/bin/bash -c \"cp /etc/fstab.bak /etc/fstab\""
-
-#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
 
 #define LXSST_IMPORT_DISTRO_TEST_DIR L"C:\\importtest\\"
 
@@ -165,9 +166,13 @@ class UnitTests
             auto [out, err] =
                 LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdPath), -1);
 
-            VERIFY_ARE_EQUAL(out, L"This operation is only supported by WSL2.\r\nError code: Wsl/Service/WSL_E_WSL2_NEEDED\r\n");
+            VERIFY_ARE_EQUAL(
+                out, FormatErrorMessage(L"This operation is only supported by WSL2.", L"Wsl/Service/WSL_E_WSL2_NEEDED"));
             VERIFY_ARE_EQUAL(err, L"");
         }
+
+        VerifyInvalidUsage(std::format(L"--export {} {} --format tar.gz --format tar.xz", LXSS_DISTRO_NAME_TEST_L, tarPath));
+        VerifyInvalidUsage(std::format(L"--export {} {} --format tar.xz --vhd", LXSS_DISTRO_NAME_TEST_L, tarPath));
     }
 
     WSL2_TEST_METHOD(SystemdSafeMode)
@@ -345,51 +350,257 @@ class UnitTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
     }
 
-    WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
+    WSL2_TEST_METHOD(BinfmtStatusIsLocked)
     {
-        // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        //
+        // Validates the protection mechanism for the cross-distro binfmt wipe bug.
+        //
+        // Fix: per-distro init bind-mounts a read-only file over
+        // /proc/sys/fs/binfmt_misc/status before exec'ing the distro's init
+        // (see LockBinfmtStatusReadOnly in src/linux/init/init.cpp). systemd-shutdown's
+        // disable_binfmt() writes "-1" to that file to clear the kernel-global
+        // binfmt_misc table at shutdown; with the bind-mount in place the write
+        // fails with EROFS so the entries shared with other running distros
+        // survive. Per-entry operations (registering new entries via /register,
+        // unregistering individual entries via the entry file) are unaffected.
+        //
 
-        auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
-            LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
-            WslShutdown(); // Required since this test registers a custom binfmt interpreter.
-        });
-
+        // Default: bind-mount must be in place.
         {
-            // Enable systemd (restarts distro).
+            // EnableSystemd raises /proc/sys/fs/nr_open VM-wide; without a full
+            // VM teardown that bumped value persists across distro restarts and
+            // breaks later tests like ResourceLimits that assume the kernel default.
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
             auto cleanupSystemd = EnableSystemd();
 
-            auto validateBinfmt = []() {
-                // Validate that WSL's binfmt interpreter is still in place.
-                auto [cmdOutput, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-                VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
-            };
+            // /status is its own mount point.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
 
-            validateBinfmt();
+            // Reading /status returns the lock-file content ("enabled\n") so
+            // callers that just check whether binfmt_misc is enabled still get a
+            // sensible answer.
+            {
+                auto [status, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/status");
+                VERIFY_ARE_EQUAL(status, L"enabled\n");
+            }
 
-            // Validate that this still works after restarting the distribution.
-            TerminateDistribution();
-            validateBinfmt();
+            // Direct write to /status — the wipe vector — must fail with EROFS.
+            // The shell's redirection error ("cannot create ...: Read-only file
+            // system") goes to the shell's stderr when the `>` open fails.
+            {
+                auto [_, err] = LxsstuLaunchWslAndCaptureOutput(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/status; exit 0'");
+                VERIFY_IS_TRUE(err.find(L"Read-only file system") != std::wstring::npos);
+            }
 
-            // Validate that stopping or restarting systemd-binfmt doesn't break interop.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl stop systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // WSLInterop survives the failed wipe attempt.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/WSLInterop"), 0L);
 
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // Runtime registration via /register still works (we only block /status).
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
 
-            // Validate that the unit is regenerated after a daemon-reload.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload && systemctl restart systemd-binfmt.service"), 0u);
-            validateBinfmt();
+            // binfmt_misc is VM-global, so a leftover wsltestbinfmt entry would
+            // cascade into later tests. Always remove it on scope exit.
+            auto cleanupTestEntry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+                LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt 2>/dev/null || true'");
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+
+            // Per-entry unregister (writing -1 to the entry file, not /status) still works.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo -1 > /proc/sys/fs/binfmt_misc/wsltestbinfmt'"), 0L);
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"test -e /proc/sys/fs/binfmt_misc/wsltestbinfmt"), 0L);
+            cleanupTestEntry.release();
+
+            // Interop still works.
+            {
+                auto [cmd, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+                VERIFY_ARE_EQUAL(cmd, L"ok\r\n");
+            }
+        }
+
+        // protectBinfmt=false: bind-mount must NOT be installed (kill switch).
+        // EnableSystemd's cleanup re-launches the distro to revert wsl.conf and
+        // then terminates it; that termination invokes systemd-shutdown's
+        // disable_binfmt() which wipes the kernel-global table because
+        // protectBinfmt=false leaves /status writable. WslShutdown registered
+        // FIRST (runs LAST in LIFO unwind) ensures the VM is fully torn down
+        // after the wipe, so the next test starts a fresh VM where mini_init
+        // re-registers WSLInterop.
+        {
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+            auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+
+            VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0L);
+        }
+    }
+
+    WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
+    {
+        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        auto revert = EnableSystemd("initTimeout=0");
+        // Wait for systemd to start
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+
+        // Kill the WSL init process
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
+
+        // Wait for the distro to exit.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+
+        // Verify that a new WSL command succeeds (the distro restarts cleanly).
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
+        VERIFY_ARE_EQUAL(out, L"hello\n");
+    }
+
+    WSL2_TEST_METHOD(BinfmtSurvivesDistroTermination)
+    {
+        //
+        // Regression test for the "Exec format error" bug: binfmt_misc registrations
+        // (most importantly WSLInterop) must survive when a peer systemd-enabled distro
+        // terminates. Before this fix, systemd-shutdown's disable_binfmt() wrote `-1`
+        // to /proc/sys/fs/binfmt_misc/status, which clears the entire binfmt_misc
+        // entry table. binfmt_misc itself is a single kernel-global registry — it is
+        // not isolated per distro — so that one write wiped WSLInterop for every
+        // running distro and broke Windows interop everywhere.
+        //
+
+        constexpr auto peerDistroName = L"binfmt-peer-test";
+
+        // EnableSystemd raises /proc/sys/fs/nr_open VM-wide; without a full
+        // VM teardown that bumped value persists across distro restarts and
+        // breaks later tests like ResourceLimits that assume the kernel default.
+        auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+
+        // Enable systemd on the primary test distro.
+        auto cleanupSystemd = EnableSystemd();
+
+        // Import a second distro from the same tarball as the test distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+
+        auto cleanupPeer =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+
+        // Enable systemd in the peer distro (no helper exists for non-test distros).
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
+            0L);
+
+        // Terminate so the config takes effect on next start.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop works in both distros (this also starts the peer with systemd).
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo alive");
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
         }
 
         {
-            // Enable systemd (restarts distro).
-            auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cmd.exe /c echo alive", peerDistroName));
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
+        }
 
-            // Validate that WSL's binfmt interpreter is overridden
-            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
-            VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
+        // Terminate the peer distro — this triggers systemd shutdown. Without
+        // the fix, systemd-shutdown's disable_binfmt() would clear the kernel-
+        // global binfmt_misc table for every running distro.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop still works in the primary distro.
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo survived");
+            VERIFY_ARE_EQUAL(out, L"survived\r\n");
+        }
+
+        // Verify the binfmt entry still exists and carries the F (fix-binary) flag.
+        // The F flag is required so the kernel resolves the interpreter at
+        // registration time, making the entry independent of mount-namespace state.
+        {
+            auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
+            VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
+        }
+    }
+
+    WSL2_TEST_METHOD(SharedMountSurvivesDistroTermination)
+    {
+        constexpr auto peerDistroName = L"mount-guard-peer-test";
+
+        auto validate = [&](const std::string& automountRoot) {
+            const auto extraConfig = automountRoot.empty() ? "" : std::format("[automount]\nroot={}\n", automountRoot);
+            const auto effectiveAutomountRoot = automountRoot.empty() ? "/mnt" : automountRoot;
+            const auto mountPoint = std::format(L"{}/wsl/mount-guard-test", wsl::shared::string::MultiByteToWide(effectiveAutomountRoot));
+
+            auto cleanupVm = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
+            auto cleanupSystemd = EnableSystemd(extraConfig);
+
+            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+            auto cleanupPeer = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName)); });
+
+            auto cleanupPeerSystemd = EnableSystemd(extraConfig, peerDistroName);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)), 0L);
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
+                0L);
+            auto cleanupMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"sh -c 'umount {0} 2>/dev/null || true; rmdir {0} 2>/dev/null || true'", mountPoint));
+            });
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- findmnt -n {}", peerDistroName, mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-d {} -- grep -qx survived {}/marker", peerDistroName, mountPoint)), 0L);
+
+            TerminateDistribution(peerDistroName);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"findmnt -n {}", mountPoint)), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"grep -qx survived {}/marker", mountPoint)), 0L);
+        };
+
+        validate("");
+        validate("/wsl-test-mount");
+    }
+
+    WSL2_TEST_METHOD(ConfigUpdateLanguage)
+    {
+        // Validates that init populates $LANG from the distro locale configuration file.
+        // ConfigUpdateLanguage reads /etc/default/locale first, then /etc/locale.conf, and uses
+        // the first file that exists. See ConfigUpdateLanguage in src/linux/init/config.cpp.
+
+        DistroFileChange defaultLocale(L"/etc/default/locale", LxsstuLaunchWsl(L"test -f /etc/default/locale") == 0);
+        DistroFileChange localeConf(L"/etc/locale.conf", LxsstuLaunchWsl(L"test -f /etc/locale.conf") == 0);
+
+        const auto readLang = []() { return LxsstuLaunchWslAndCaptureOutput(L"printenv LANG").first; };
+
+        // Only /etc/default/locale is present (Debian/Ubuntu).
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            defaultLocale.SetContent(L"LANG=de_DE.UTF-8\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"de_DE.UTF-8\n");
+        }
+
+        // Only /etc/locale.conf is present (Fedora, Arch, openSUSE, ...).
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            localeConf.SetContent(L"LANG=\"fr_FR.UTF-8\"\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"fr_FR.UTF-8\n");
+        }
+
+        // Both files are present: /etc/default/locale takes precedence because it is read first.
+        {
+            defaultLocale.Delete();
+            localeConf.Delete();
+            defaultLocale.SetContent(L"LANG=ja_JP.UTF-8\n");
+            localeConf.SetContent(L"LANG=en_US.UTF-8\n");
+            TerminateDistribution();
+            VERIFY_ARE_EQUAL(readLang(), L"ja_JP.UTF-8\n");
         }
     }
 
@@ -535,6 +746,10 @@ class UnitTests
 
     WSL1_TEST_METHOD(Timer)
     {
+        // This is disabled because of intermittent test failures.
+        // TODO: Enable this test once the underlying issue is resolved.
+        SKIP_TEST_UNSTABLE();
+
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests timer", L"timer"));
     }
 
@@ -981,17 +1196,14 @@ class UnitTests
         {
             validateOutput(
                 commandLine.c_str(),
-                std::format(
-                    L"Failed to create disk '{}ext4.vhdx': The file exists. \r\n"
-                    L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n",
-                    LXSST_IMPORT_DISTRO_TEST_DIR));
+                FormatErrorMessage(
+                    std::format(L"Failed to create disk '{}ext4.vhdx': The file exists. ", LXSST_IMPORT_DISTRO_TEST_DIR),
+                    L"Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS"));
         }
         else
         {
             validateOutput(
-                commandLine.c_str(),
-                L"The file exists. \r\n"
-                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+                commandLine.c_str(), FormatErrorMessage(L"The file exists. ", L"Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS"));
         }
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
@@ -1002,8 +1214,7 @@ class UnitTests
             commandLine = std::format(L"--import dummy {} {} --vhd --version 1", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName);
             validateOutput(
                 commandLine.c_str(),
-                L"This operation is only supported by WSL2.\r\n"
-                L"Error code: Wsl/Service/RegisterDistro/WSL_E_WSL2_NEEDED\r\n");
+                FormatErrorMessage(L"This operation is only supported by WSL2.", L"Wsl/Service/RegisterDistro/WSL_E_WSL2_NEEDED"));
         }
 
         //
@@ -1021,8 +1232,8 @@ class UnitTests
             commandLine = std::format(L"--import path-conflict-distro \"{}\" \"{}\" --version {}", basePath, tarFileName, version);
             validateOutput(
                 commandLine.c_str(),
-                L"The supplied install location is already in use.\r\n"
-                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+                FormatErrorMessage(
+                    L"The supplied install location is already in use.", L"Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS"));
         }
 
         //
@@ -1063,8 +1274,18 @@ class UnitTests
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(commandLine.c_str(), -1);
 
         VERIFY_ARE_EQUAL(
-            out, L"Importing the distribution failed.\r\nError code: Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
-        VERIFY_ARE_EQUAL(err, L"bsdtar: Error opening archive: Unrecognized archive format\n");
+            out, FormatErrorMessage(L"Importing the distribution failed.", L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED"));
+
+        constexpr auto expectedError = L"bsdtar: Error opening archive: Unrecognized archive format\n";
+        if (LxsstuVmMode())
+        {
+            VERIFY_ARE_EQUAL(err, expectedError);
+        }
+        else
+        {
+            // lxcore.sys can close the stderr pipe before bsdtar has finished writing.
+            VERIFY_IS_TRUE(std::wstring_view{expectedError}.starts_with(err));
+        }
     }
 
     TEST_METHOD(AppxDistroDeletion)
@@ -1208,7 +1429,7 @@ class UnitTests
         auto [output, _] = LxsstuLaunchWslAndCaptureOutput(
             Cmd.c_str(), wcscmp(EntryPoint, L"bash.exe") == 0 ? 1 : -1, nullptr, nullptr, EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, EntryPoint);
 
-        const auto expectedOutput = Message + L"\r\nError code: " + Code + L"\r\n";
+        const auto expectedOutput = FormatErrorMessage(Message, Code);
 
         if (!wsl::shared::string::IsEqual(output, expectedOutput, ignoreCasing))
         {
@@ -1223,6 +1444,29 @@ class UnitTests
             Cmd.c_str(), ExpectedExitCode, nullptr, nullptr, EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, EntryPoint);
 
         VERIFY_ARE_EQUAL(output, ExpectedOutput);
+    }
+
+    static std::wstring ExpectedUsageMessage()
+    {
+        std::wstring expectedUsageMessage;
+        for (auto e : wsl::shared::Localization::MessageWslUsage())
+        {
+            if (e == L'\n')
+            {
+                expectedUsageMessage += L'\r';
+            }
+
+            expectedUsageMessage += e;
+        }
+
+        return expectedUsageMessage + L"\r\n";
+    }
+
+    static void VerifyInvalidUsage(const std::wstring& Cmd)
+    {
+        auto [output, error] = LxsstuLaunchWslAndCaptureOutput(Cmd.c_str(), -1);
+        VERIFY_ARE_EQUAL(ExpectedUsageMessage(), output);
+        VERIFY_ARE_EQUAL(error, L"");
     }
 
     TEST_METHOD(ErrorMessages)
@@ -1269,7 +1513,7 @@ class UnitTests
                     L"-d DummyBrokenDistro",
                     L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
                     L"specified. ",
-                    L"Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND");
+                    L"Wsl/Service/CreateInstance/MountDisk/ERROR_PATH_NOT_FOUND");
 
                 // Purposefully set an incorrect value type to validate registry error handling.
                 wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"Version", L"Broken");
@@ -1282,9 +1526,7 @@ class UnitTests
                     L"-d DummyBrokenDistro",
                     L"An error occurred accessing the registry. Path: '\\REGISTRY\\USER\\" + Sid +
                         L"\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{baa405ef-1822-4bbe-84e2-30e4c6330d42}"
-                        L"\\Version'."
-                        L" "
-                        L"Error: Data of this type is not supported. ",
+                        L"\\Version'. Error: Data of this type is not supported. ",
                     L"Wsl/Service/ReadDistroConfig/ERROR_UNSUPPORTED_TYPE",
                     {},
                     L"wsl.exe",
@@ -1304,6 +1546,10 @@ class UnitTests
                 L"--manage test_distro --resize 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
+
+            // wsl.exe --manage --compact requires WSL2.
+            ValidateErrorMessage(
+                L"--manage test_distro --compact", L"This operation is only supported by WSL2.", L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
 
         ValidateErrorMessage(
@@ -1418,20 +1664,7 @@ class UnitTests
 
         VerifyOutput(L"--install --no-distribution", L"The operation completed successfully. \r\n");
 
-        {
-            std::wstring expectedUsageMessage;
-            for (auto e : wsl::shared::Localization::MessageWslUsage())
-            {
-                if (e == L'\n')
-                {
-                    expectedUsageMessage += L'\r';
-                }
-
-                expectedUsageMessage += e;
-            }
-
-            VerifyOutput(L"--manage --move .", expectedUsageMessage + L"\r\n", -1);
-        }
+        VerifyInvalidUsage(L"--manage --move .");
     }
 
     TEST_METHOD(CommandLineParsing)
@@ -1455,6 +1688,11 @@ class UnitTests
         VerifyOutput(L"--exec echo -n \\\"a\\\"", L"\"a\"");
         VerifyOutput(L"--exec echo -n \"a\"\"b\"", L"a\"b");
         VerifyOutput(L"--exec echo -n \\\"", L"\"");
+    }
+
+    TEST_METHOD(ManageInvalidUsage)
+    {
+        VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
     }
 
     // This test validates that the help messages for wsl.exe and wsl.config are correctly displayed.
@@ -1562,6 +1800,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a WSL 2 distribution.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -1696,12 +1937,6 @@ Usage:
         Unregisters the distribution and deletes the root filesystem.
 )""";
 
-        const std::wstring WslInstallHelpMessage =
-            LR"""(Invalid distribution name: 'foo'.
-To get a list of valid distributions, use 'wsl.exe --list --online'.
-Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
-)""";
-
         auto AddCrlf = [](const std::wstring& Input) {
             std::wstring MessageWithCrlf;
 
@@ -1727,7 +1962,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         RegistryKeyChange<std::wstring> keyChange(
             HKEY_LOCAL_MACHINE, LXSS_REGISTRY_PATH, wsl::windows::common::distribution::c_distroUrlRegistryValue, c_testDistributionEndpoint);
 
-        VerifyOutput(L"--install foo", AddCrlf(WslInstallHelpMessage), -1);
+        VerifyOutput(
+            L"--install foo",
+            FormatErrorMessage(
+                L"Invalid distribution name: 'foo'.\r\nTo get a list of valid distributions, use 'wsl.exe --list --online'.",
+                L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"),
+            -1);
     }
 
     WSL2_TEST_METHOD(TestExistingSwapVhd)
@@ -1809,7 +2049,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(
                     L"mount | grep -iF '" TEXT(
-                        LXSS_GPU_DRIVERS_SHARE) L" on /usr/lib/wsl/drivers type 9p (ro,nosuid,nodev,noatime,aname=" TEXT(LXSS_GPU_DRIVERS_SHARE) L";fmask=222;dmask=222,cache=5,access=client,msize=65536,trans=fd,rfd=8,wfd=8)'",
+                        LXSS_GPU_DRIVERS_SHARE) L" on /usr/lib/wsl/drivers type 9p (ro,nosuid,nodev,noatime,aname=" TEXT(LXSS_GPU_DRIVERS_SHARE) L";fmask=222;dmask=222,cache=0x5,access=client,msize=65536,trans=fd,rfd=8,wfd=8)'",
                     nullptr,
                     nullptr,
                     nullptr,
@@ -2020,7 +2260,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=InvalidMode",
-            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
+            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
             L"[wsl2]\n");
         validateWarnings(
             L"networkingMode=a\\m", std::format(L"wsl: Invalid escaped character: 'm' in {}:2\r\n", wslConfigPath), L"[wsl2]\n");
@@ -2039,7 +2279,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:21\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=",
-            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
 
         validateWarnings(
             L"ipv6=true\nipv6=false",
@@ -2052,16 +2292,20 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         validateWarnings(
             L"networkingMode=bridged",
-            L"wsl: Bridged networking requires wsl2.vmSwitch to be set.\r\n"
-            L"Error code: CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_SET\r\n"
-            L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
+            L"wsl: " +
+                FormatErrorMessage(
+                    L"Bridged networking requires wsl2.vmSwitch to be set.",
+                    L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_SET") +
+                L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
             L"[wsl2]\n");
 
         validateWarnings(
             L"networkingMode=bridged\nvmSwitch=DoesNotExist",
-            L"wsl: The VmSwitch 'DoesNotExist' was not found. Available switches:*\r\n"
-            L"Error code: CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_FOUND\r\n"
-            L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
+            L"wsl: " +
+                FormatErrorMessage(
+                    L"The VmSwitch 'DoesNotExist' was not found. Available switches:*",
+                    L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_FOUND") +
+                L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
             L"[wsl2]\n",
             true);
 
@@ -2103,6 +2347,24 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateWarnings(
             L"[experimental]\nignoredPorts=65536",
             std::format(L"wsl: Invalid integer value '65536' for key 'experimental.ignoredPorts' in {}:22\r\n", wslConfigPath));
+
+        // Verify experimental.swiotlb parsing and validation.
+        //
+        // With wsl2.virtio enabled (the default), a valid swiotlb value is accepted silently.
+
+        validateWarnings(L"[experimental]\nswiotlb=64M", L"");
+
+        constexpr auto expectedWarning =
+            wsl::shared::Arm64 ? L"wsl: The running kernel is missing a patch that significantly improves virtio device "
+                                 L"performance. Update to a more recent WSL kernel to enable this optimization.\r\n"
+                               : L"";
+
+        validateWarnings(L"[experimental]\nswiotlb=4096K", expectedWarning);
+
+        // Malformed values are rejected by the parser; only the parser warning is reported.
+        validateWarnings(
+            L"[experimental]\nswiotlb=garbage",
+            std::format(L"wsl: Invalid memory string 'garbage' for .wslconfig entry 'experimental.swiotlb' in {}:22\r\n", wslConfigPath));
 
         // Verify that the vhdSize setting is parsed correctly.
         validateWarnings(L"[wsl2]\ndefaultVhdSize=64GB\n", L"");
@@ -2153,6 +2415,70 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
+    WSL2_TEST_METHOD(DmesgCollection)
+    {
+        const auto dmesgLogFile = std::filesystem::current_path() / L"test-dmesg.txt";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(dmesgLogFile.c_str()); });
+        WslConfigChange config(LxssGenerateTestConfig({}));
+
+        auto readDmesgLog = [&](uint64_t offset) -> std::string {
+            wil::unique_hfile file(CreateFileW(
+                dmesgLogFile.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            if (!file)
+            {
+                return {};
+            }
+
+            LARGE_INTEGER fileOffset{};
+            fileOffset.QuadPart = static_cast<LONGLONG>(offset);
+            THROW_LAST_ERROR_IF(!SetFilePointerEx(file.get(), fileOffset, nullptr, FILE_BEGIN));
+
+            return ReadToString(file.get());
+        };
+
+        auto fileSize = [&]() -> uint64_t {
+            WIN32_FILE_ATTRIBUTE_DATA attributes{};
+            if (!GetFileAttributesExW(dmesgLogFile.c_str(), GetFileExInfoStandard, &attributes))
+            {
+                return 0;
+            }
+
+            return (static_cast<uint64_t>(attributes.nFileSizeHigh) << 32) | attributes.nFileSizeLow;
+        };
+
+        auto expectInDmesg = [&](bool earlyBootLogging, const std::string_view& expectedLine) -> std::string {
+            config.Update(LxssGenerateTestConfig({.earlyBootLogging = earlyBootLogging, .debugConsoleLogFile = dmesgLogFile}));
+
+            const auto offset = fileSize();
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"/bin/true"), 0L);
+
+            return wsl::shared::retry::RetryWithTimeout<std::string>(
+                [&]() {
+                    auto content = readDmesgLog(offset);
+                    THROW_HR_IF_MSG(E_FAIL, content.find(expectedLine) == std::string::npos, "%hs", content.c_str());
+
+                    return content;
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(120));
+        };
+
+        // 'Linux version' is printed during early boot. 'brd: module loaded' is printed after transitioning to the virtio console.
+        {
+            // N.B. brd is only loaded on X64.
+            auto dmesg = expectInDmesg(true, wsl::shared::Arm64 ? "Linux version" : "brd: module loaded");
+            VERIFY_ARE_NOT_EQUAL(dmesg.find("Linux version"), std::string::npos);
+        }
+
+        // N.B. Early boot logging is always enabled on ARM64.
+        if constexpr (!wsl::shared::Arm64)
+        {
+            auto dmesg = expectInDmesg(false, "brd: module loaded");
+            VERIFY_ARE_EQUAL(dmesg.find("Linux version"), std::string::npos);
+        }
+    }
+
     WSL2_TEST_METHOD(GuiApplications)
     {
         auto validateEnvironment = [&](bool systemdEnabled) {
@@ -2169,6 +2495,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:/tmp/.X11-unix/X0 < /dev/null"), 0L);
 
+            // Validate that distro-provided tmpfiles rules cannot modify the read-only X11 mount.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/tmpfiles.d/x11.conf"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemd-tmpfiles --create --boot x11.conf"), 0L);
+
             // Validate the runtime dir exists and the wayland-0 socket is in the expected location.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep XDG_RUNTIME_DIR="), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d $XDG_RUNTIME_DIR"), 0L);
@@ -2182,6 +2512,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"echo ok");
             VERIFY_ARE_EQUAL(L"ok\n", output);
             VERIFY_ARE_EQUAL(L"", warnings);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/tmpfiles.d/x11.conf"), 0L);
 
             // Validate that WSLg-related environment variables are not present.
             //
@@ -2203,9 +2534,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             std::tie(output, warnings) = LxsstuLaunchWslAndCaptureOutput(L"--system echo not ok", -1);
 
             const std::wstring configPath = wsl::windows::common::helpers::GetWslConfigPath();
-            const auto expectedOutput =
-                L"GUI application support is disabled via " + configPath +
-                L" or /etc/wsl.conf.\r\nError code: Wsl/Service/CreateInstance/WSL_E_GUI_APPLICATIONS_DISABLED\r\n";
+            const auto expectedOutput = FormatErrorMessage(
+                L"GUI application support is disabled via " + configPath + L" or /etc/wsl.conf.",
+                L"Wsl/Service/CreateInstance/WSL_E_GUI_APPLICATIONS_DISABLED");
 
             VERIFY_ARE_EQUAL(output, expectedOutput);
             VERIFY_ARE_EQUAL(L"", warnings);
@@ -2287,8 +2618,18 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Keys that are only created by the MSI.
         const std::vector<LPCWSTR> serviceKeys{
             L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns\\WSLDVC_PACKAGE",
-            L"SOFTWARE\\Classes\\CLSID\\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}",
-            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"};
+            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}",
+            L"SOFTWARE\\Classes\\CLSID\\{2C3E9A41-7B5D-4F18-93D6-A8C2E4F7B1D9}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{E3146082-A0DA-43A7-813B-A89EEE8C7628}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{4F9C8B23-D6E1-4A85-BF2A-E7C5D8F931A6}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{9C9C7131-D756-48FA-BD49-734E75AF37C0}\\InProcServer32",
+            L"SOFTWARE\\Classes\\CLSID\\{6D32A4B7-9E1F-4C82-A573-F8B1C4D29E60}\\InProcServer32",
+            L"SOFTWARE\\Classes\\Interface\\{27394DCF-6383-4E4E-BB0A-C13D4E5F6071}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{D2F47B8A-1E3C-4D9F-A6B5-7C8E9F0A1B2C}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{E3F58C9B-2F4D-4E0A-B7C6-8D9F0A1B2C3D}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{F406DACB-3050-4F1B-A8D7-9E0A1B2C3D4E}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{05172EBD-4161-4C2C-99E8-AF1B2C3D4E5F}\\ProxyStubClsid32",
+            L"SOFTWARE\\Classes\\Interface\\{16283FCE-5272-4D3D-AAF9-B02C3D4E5F60}\\ProxyStubClsid32"};
 
         for (const auto* keyName : serviceKeys)
         {
@@ -2329,7 +2670,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     WSL2_TEST_METHOD(CorruptedVhd)
     {
         // Create a 100MB vhd without a filesystem.
-        auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
+        auto distroPath = wsl::windows::common::filesystem::GetCanonicalPath(wil::GetCurrentDirectoryW<std::wstring>());
         auto vhdPath = distroPath / L"CorruptedTest.vhdx";
 
         VIRTUAL_STORAGE_TYPE storageType{};
@@ -2360,11 +2701,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Attempt to import a vhd with an open handle.
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
-            std::format(
-                L"Failed to attach disk '\\\\?\\{}' to WSL2: The process cannot access the file because it is being used by "
-                L"another process. \r\n"
-                L"Error code: Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION\r\n",
-                vhdPath.wstring()));
+            FormatErrorMessage(
+                std::format(
+                    L"Failed to attach disk '\\\\?\\{}' to WSL2: The process cannot access the file because it is being used by "
+                    L"another process. ",
+                    vhdPath.wstring()),
+                L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
 
         vhd.reset();
 
@@ -2389,14 +2731,16 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             // Validate that starting the distribution fails with the correct error code.
             validateOutput(
                 L"-d BrokenDistro echo ok",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED\r\n");
+                FormatErrorMessage(
+                    L"The distribution failed to start because its virtual disk is corrupted.",
+                    L"Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED"));
 
             // Validate that trying to export the distribution fails with the correct error code.
             validateOutput(
                 L"--export BrokenDistro dummy.tar",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/WSL_E_DISK_CORRUPTED\r\n");
+                FormatErrorMessage(
+                    L"The distribution failed to start because its virtual disk is corrupted.",
+                    L"Wsl/Service/WSL_E_DISK_CORRUPTED"));
 
             // Shutdown WSL to force the disk to detach.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0L);
@@ -2405,8 +2749,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Import a corrupted vhd.
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
-            L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-            L"Error code: Wsl/Service/RegisterDistro/WSL_E_DISK_CORRUPTED\r\n");
+            FormatErrorMessage(
+                L"The distribution failed to start because its virtual disk is corrupted.",
+                L"Wsl/Service/RegisterDistro/WSL_E_DISK_CORRUPTED"));
 
         // Ensure the VHD can be deleted to make sure it was properly ejected from the VM.
         VERIFY_ARE_EQUAL(DeleteFileW(vhdPath.c_str()), TRUE);
@@ -2608,8 +2953,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Ensure the kernel modules folder is mounted correctly.
         std::wstring command = std::format(
             L"mount | grep -iF 'none on /usr/lib/modules/{} type overlay "
-            L"(rw,nosuid,nodev,noatime,lowerdir=/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
+            L"(rw,nosuid,nodev,noatime,lowerdir=/modules/{}/modules,upperdir=/lib/modules/{}/rw/upper,workdir=/lib/modules/{}/rw/"
             L"work,uuid=on)'",
+            kernelVersion,
             kernelVersion,
             kernelVersion,
             kernelVersion);
@@ -2622,23 +2968,23 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         WslConfigChange configChange(LxssGenerateTestConfig({.kernel = nonExistentFile.c_str()}));
         ValidateOutput(
             L"echo ok",
-            std::format(
-                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
-                wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, nonExistentFile)),
+            FormatErrorMessage(
+                wsl::shared::Localization::MessageCustomKernelNotFound(wslConfigPath, nonExistentFile),
+                L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
             L"");
 
         configChange.Update(LxssGenerateTestConfig({.kernelModules = nonExistentFile.c_str()}));
         ValidateOutput(
             L"echo ok",
-            std::format(
-                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
-                wsl::shared::Localization::MessageCustomKernelModulesNotFound(wslConfigPath, nonExistentFile)),
+            FormatErrorMessage(
+                wsl::shared::Localization::MessageCustomKernelModulesNotFound(wslConfigPath, nonExistentFile),
+                L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
             L"");
 
 #ifdef WSL_DEV_INSTALL_PATH
 
         std::wstring kernelPath = WSL_DEV_INSTALL_PATH L"/kernel";
-        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/modules.vhd";
+        std::wstring kernelModulesPath = WSL_DEV_INSTALL_PATH L"/artifacts.vhd";
 
 #else
 
@@ -2648,7 +2994,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         std::filesystem::path wslInstallPath(installPath.value());
 
         std::wstring kernelPath = wslInstallPath / "tools" / "kernel";
-        std::wstring kernelModulesPath = wslInstallPath / "tools" / "modules.vhd";
+        std::wstring kernelModulesPath = wslInstallPath / "tools" / "artifacts.vhd";
 
 #endif
 
@@ -2662,9 +3008,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         configChange.Update(LxssGenerateTestConfig({.kernelModules = kernelModulesPath.c_str()}));
         ValidateOutput(
             L"echo ok",
-            std::format(
-                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND\r\n",
-                wsl::shared::Localization::MessageMismatchedKernelModulesError()),
+            FormatErrorMessage(
+                wsl::shared::Localization::MessageMismatchedKernelModulesError(),
+                L"Wsl/Service/CreateInstance/CreateVm/WSL_E_CUSTOM_KERNEL_NOT_FOUND"),
             L"");
 
         configChange.Update(LxssGenerateTestConfig());
@@ -2790,7 +3136,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", testFolder)));
         }
 
-        auto absolutePath = std::filesystem::weakly_canonical(".").wstring();
+        auto absolutePath = wsl::windows::common::filesystem::GetCanonicalPath(".").wstring();
 
         // Move the distro to a different folder (absolute path)
         {
@@ -2813,8 +3159,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The supplied install location is already in use.\r\nError code: "
-                L"Wsl/Service/MoveDistro/ERROR_FILE_EXISTS\r\n");
+                FormatErrorMessage(
+                    L"The supplied install location is already in use.", L"Wsl/Service/MoveDistro/ERROR_FILE_EXISTS"));
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
@@ -2828,8 +3174,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The filename, directory name, or volume label syntax is incorrect. \r\nError code: "
-                L"Wsl/Service/MoveDistro/ERROR_INVALID_NAME\r\n");
+                FormatErrorMessage(
+                    L"The filename, directory name, or volume label syntax is incorrect. ",
+                    L"Wsl/Service/MoveDistro/ERROR_INVALID_NAME"));
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
@@ -2910,6 +3257,76 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
+    WSL2_TEST_METHOD(MoveVhdWithAdminOwner)
+    {
+        // Regression test for #40716: a same-volume move must succeed when the VHD
+        // is already owned by BUILTIN\Administrators.
+        constexpr auto name = L"move-admin-owner-test-distro";
+        constexpr auto firstFolder = L"move-admin-owner-first";
+        constexpr auto secondFolder = L"move-admin-owner-second";
+
+        // Import a WSL2 distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            std::filesystem::remove_all(firstFolder);
+            std::filesystem::remove_all(secondFolder);
+        });
+
+        // Move to first folder so we know where the VHD is.
+        WslShutdown();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, firstFolder)), 0L);
+
+        auto vhdPath = std::format(L"{}\\ext4.vhdx", firstFolder);
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        // Simulate cross-volume MoveFileEx side-effect: change VHD owner to BUILTIN\Administrators.
+        {
+            BYTE adminsSidBuffer[SECURITY_MAX_SID_SIZE];
+            DWORD sidSize = sizeof(adminsSidBuffer);
+            THROW_IF_WIN32_BOOL_FALSE(CreateWellKnownSid(WinBuiltinAdministratorsSid, nullptr, adminsSidBuffer, &sidSize));
+
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(vhdPath.c_str()), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, adminsSidBuffer, nullptr, nullptr, nullptr));
+
+            // Verify it took effect.
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                vhdPath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+            VERIFY_IS_TRUE(EqualSid(ownerSid, adminsSidBuffer));
+        }
+
+        // Now move again as non-elevated. Before the fix, this would fail with E_ACCESSDENIED
+        // because CreateFileW(WRITE_OWNER) was called under user impersonation.
+        const auto nonElevatedToken = GetNonElevatedToken();
+        WslShutdown();
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, secondFolder), nullptr, nullptr, nullptr, nonElevatedToken.get()), 0L);
+
+        auto newVhdPath = std::format(L"{}\\ext4.vhdx", secondFolder);
+        VERIFY_IS_TRUE(std::filesystem::exists(newVhdPath));
+
+        // A same-volume move preserves the VHD owner.
+        {
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                newVhdPath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+
+            BYTE adminsSidCheck[SECURITY_MAX_SID_SIZE] = {};
+            DWORD sidSize = sizeof(adminsSidCheck);
+            THROW_IF_WIN32_BOOL_FALSE(CreateWellKnownSid(WinBuiltinAdministratorsSid, nullptr, adminsSidCheck, &sidSize));
+            VERIFY_IS_TRUE(EqualSid(ownerSid, adminsSidCheck));
+        }
+
+        // Validate distro still works.
+        WslShutdown();
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+    }
+
     WSL2_TEST_METHOD(Resize)
     {
         constexpr auto name = L"resize-test-distro";
@@ -2920,9 +3337,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanupName =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
 
-        auto validateDistro = [name](LPCWSTR size, LPCWSTR expectedSize, LPCWSTR expectedError = nullptr) {
-            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --resize {}", name, size), expectedError ? -1 : 0);
-            if (expectedError)
+        auto validateDistro = [name](LPCWSTR size, LPCWSTR expectedSize, const std::wstring& expectedError = {}) {
+            auto [out, _] =
+                LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --resize {}", name, size), expectedError.empty() ? 0 : -1);
+            if (!expectedError.empty())
             {
                 VERIFY_ARE_EQUAL(expectedError, out);
                 return;
@@ -2935,16 +3353,158 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         validateDistro(L"1500G", L"1.5T");
         validateDistro(L"500G", L"492G");
-        validateDistro(L"1M", nullptr, L"Failed to resize disk.\r\nError code: Wsl/Service/E_FAIL\r\n");
+        validateDistro(L"1M", nullptr, FormatErrorMessage(L"Failed to resize disk.", L"Wsl/Service/E_FAIL"));
 
         {
             WslKeepAlive keepAlive;
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --resize 1500GB", -1);
             VERIFY_ARE_EQUAL(
-                L"The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe "
-                L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
+                FormatErrorMessage(
+                    L"The operation could not be completed because the VHD is currently in use. To force WSL "
+                    L"to stop use: wsl.exe --shutdown",
+                    L"Wsl/Service/WSL_E_DISTRO_NOT_STOPPED"),
                 out);
         }
+    }
+
+    // Verifies that VHD-mutating manage operations (--resize, --set-sparse, --move) are rejected while a
+    // long-running conversion/export holds the distribution lock, rather than racing with it on the VHD.
+    WSL2_TEST_METHOD(ManageRejectedWhileLocked)
+    {
+        constexpr auto name = L"manage-locked-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+        WslShutdown();
+
+        // Start an export to a pipe we deliberately don't drain. Use a tiny buffer so the export blocks
+        // as soon as it writes any data, regardless of the test distro's size, deterministically holding
+        // the distribution in the "Exporting" locked state.
+        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true, 1);
+
+        std::thread exportThread([&]() { LxsstuLaunchWsl(std::format(L"--export {} -", name), nullptr, writePipe.get()); });
+
+        auto joinExport = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            // Close the read end so the blocked export fails with a broken pipe and returns, then join.
+            readPipe.reset();
+            if (exportThread.joinable())
+            {
+                exportThread.join();
+            }
+        });
+
+        // Wait until the service reports the distribution as Exporting (i.e. the lock is held), retrying for up
+        // to two minutes so a slow machine doesn't flake before the export acquires the lock.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --verbose");
+                bool locked = false;
+                std::wistringstream stream(out);
+                for (std::wstring line; std::getline(stream, line);)
+                {
+                    if (line.find(name) != std::wstring::npos && line.find(L"Exporting") != std::wstring::npos)
+                    {
+                        locked = true;
+                        break;
+                    }
+                }
+
+                THROW_HR_IF(E_ABORT, !locked);
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::minutes(2),
+            [] { return wil::ResultFromCaughtException() == E_ABORT; });
+
+        // Each VHD-mutating manage operation must be rejected with E_ILLEGAL_STATE_CHANGE while the lock is held.
+        auto verifyRejected = [&](const std::wstring& command) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(command, -1);
+            VERIFY_IS_TRUE(out.find(L"E_ILLEGAL_STATE_CHANGE") != std::wstring::npos);
+        };
+
+        verifyRejected(std::format(L"--manage {} --resize 2GB", name));
+        verifyRejected(std::format(L"--manage {} --set-sparse false", name));
+
+        const auto moveTarget = std::filesystem::absolute(L"manage-locked-move-target").wstring();
+        verifyRejected(std::format(L"--manage {} --move \"{}\"", name, moveTarget));
+    }
+
+    WSL2_TEST_METHOD(Compact)
+    {
+        constexpr auto name = L"compact-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        WslShutdown();
+
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+
+        const auto distroKey = OpenDistributionKey(name);
+        VERIFY_IS_NOT_NULL(distroKey.get());
+
+        const auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        const auto vhdFileName =
+            wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        const auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+        VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+
+        auto getVhdSizeOnDisk = [](const std::filesystem::path& path) {
+            DWORD highPart{};
+            SetLastError(NO_ERROR);
+            const auto lowPart = GetCompressedFileSizeW(path.c_str(), &highPart);
+            THROW_LAST_ERROR_IF(lowPart == INVALID_FILE_SIZE && GetLastError() != NO_ERROR);
+
+            ULARGE_INTEGER size{};
+            size.LowPart = lowPart;
+            size.HighPart = highPart;
+            return size.QuadPart;
+        };
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
+        const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
+            L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
+            L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
+            name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeAfterWrite = getVhdSizeOnDisk(vhdPath);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeBeforeWrite + minimumCompactionDelta);
+
+        // Delete the file but do NOT trim from inside the guest: reclaiming the freed blocks now
+        // depends on the trim that '--compact' performs on the host before compacting the VHD.
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -u root -- sh -c 'rm /root/vhdx-compact-test/nonzero.bin && sync'", name));
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        const auto sizeBeforeCompact = getVhdSizeOnDisk(vhdPath);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        const auto sizeAfterCompact = getVhdSizeOnDisk(vhdPath);
+        LogInfo(
+            "Compact test VHD size on disk: before write=%llu, after write=%llu, before compact=%llu, after compact=%llu",
+            static_cast<unsigned long long>(sizeBeforeWrite),
+            static_cast<unsigned long long>(sizeAfterWrite),
+            static_cast<unsigned long long>(sizeBeforeCompact),
+            static_cast<unsigned long long>(sizeAfterCompact));
+
+        VERIFY_IS_TRUE(sizeBeforeCompact >= sizeAfterCompact);
+        VERIFY_IS_TRUE(sizeAfterWrite >= sizeAfterCompact + minimumCompactionDelta);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+        VERIFY_ARE_EQUAL(err, L"");
     }
 
     WSL2_TEST_METHOD(FileOffsets)
@@ -3291,7 +3851,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 {NetworkingConfiguration::Nat, NetworkingConfiguration::Nat},
                 {NetworkingConfiguration::Bridged, NetworkingConfiguration::Bridged},
                 {NetworkingConfiguration::Mirrored, NetworkingConfiguration::Mirrored},
-                {NetworkingConfiguration::VirtioProxy, NetworkingConfiguration::VirtioProxy},
+                {NetworkingConfiguration::Consomme, NetworkingConfiguration::Consomme},
             };
 
             // tuple: WslConfigSetting, expectedValue, actualValue
@@ -3839,7 +4399,23 @@ localhostForwarding=true
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
         VERIFY_ARE_EQUAL(
-            out, L"There is no distribution with the supplied name.\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_FOUND\r\n");
+            out, FormatErrorMessage(L"There is no distribution with the supplied name.", L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND"));
+
+        constexpr auto injectionMarker = L"/tmp/wsl-manage-default-user-injection";
+        LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/rm -f {}", injectionMarker));
+        auto cleanupInjectionMarker = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [injectionMarker]() {
+            LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/rm -f {}", injectionMarker));
+        });
+
+        const auto injectionUsername = std::format(L"' || touch {} || '", injectionMarker);
+        const std::array<std::wstring_view, 4> injectionArguments{
+            WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG, injectionUsername};
+        const auto injectionCommand = wil::ArgvToCommandLine(injectionArguments, wil::ArgvToCommandLineFlags::FirstArgumentIsNotPath);
+        auto injectionCommandLine = LxssGenerateWslCommandLine(injectionCommand.c_str());
+        const auto injectionExitCode = LxsstuRunCommand(injectionCommandLine.data());
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root -e /usr/bin/test ! -e {}", injectionMarker)), 0L);
+        VERIFY_ARE_EQUAL(injectionExitCode, 1L);
     }
 
     TEST_METHOD(PostDistroRegistrationSettingsOOBE)
@@ -4070,7 +4646,7 @@ VERSION_ID="Invalid|Format"
         const auto testDistroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
         VERIFY_IS_TRUE(testDistroId.has_value());
 
-        auto validateOutput = [](const std::wstring& Cmd, LPCWSTR ExpectedOutput, int ExitCode = 0) {
+        auto validateOutput = [](const std::wstring& Cmd, const std::wstring& ExpectedOutput, int ExitCode = 0) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(Cmd, ExitCode);
 
             VERIFY_ARE_EQUAL(out, ExpectedOutput);
@@ -4094,11 +4670,12 @@ VERSION_ID="Invalid|Format"
                 wsl::shared::string::GuidToString<wchar_t>(testDistroId.value(), wsl::shared::string::GuidToStringFlags::Uppercase)),
             L"OK");
 
-        validateOutput(L"--distribution-id InvalidGuid", L"The parameter is incorrect. \r\nError code: Wsl/E_INVALIDARG\r\n", -1);
+        validateOutput(L"--distribution-id InvalidGuid", FormatErrorMessage(L"The parameter is incorrect. ", L"Wsl/E_INVALIDARG"), -1);
         validateOutput(
             L"--distribution-id  {C13B2B63-F9D5-4840-8105-F6ABECCF46CA}",
-            L"There is no distribution with the supplied name.\r\nError code: "
-            L"Wsl/Service/CreateInstance/ReadDistroConfig/WSL_E_DISTRO_NOT_FOUND\r\n",
+            FormatErrorMessage(
+                L"There is no distribution with the supplied name.",
+                L"Wsl/Service/CreateInstance/ReadDistroConfig/WSL_E_DISTRO_NOT_FOUND"),
             -1);
     }
 
@@ -4175,6 +4752,15 @@ VERSION_ID="Invalid|Format"
             // Validate that DefaultUid was set
             validateOutput(L"id -u", L"1010\n");
             VERIFY_ARE_EQUAL(defaultUid.Get(), 1010);
+
+            // New file should be created with the correct uid.
+            const std::wstring testFilePathLinux = L"/tmp/oobe_file_test";
+            const std::wstring testFilePathWindows = L"\\\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST_L L"\\tmp\\oobe_file_test";
+
+            const wil::unique_hfile file(CreateFile(
+                testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+            VERIFY_IS_TRUE(file.is_valid());
+            validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
         }
 
         // Verify that the default UID isn't changed if it's not present in wsl-distribution.conf.
@@ -4399,12 +4985,13 @@ VERSION_ID="Invalid|Format"
             CreateTarFromManifest(L"", L"distro-no-default-name.tar");
 
             // Import should fail without --name
-            constexpr auto expectedOutput =
-                L"Installing: distro-no-default-name.tar\r\n\
-This distribution doesn't contain a default name. Use --name to chose the distribution name.\r\n\
-Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
+            const auto expectedOutput = L"Installing: distro-no-default-name.tar\r\n" +
+                                        FormatErrorMessage(
+                                            L"This distribution doesn't contain a default name. Use --name to choose the "
+                                            L"distribution name.",
+                                            L"Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED");
 
-            InstallFromTar(L"distro-no-default-name.tar", L"", -1, expectedOutput);
+            InstallFromTar(L"distro-no-default-name.tar", L"", -1, expectedOutput.c_str());
 
             // And succeed with --name
             InstallFromTar(L"distro-no-default-name.tar", L"--name test-distro-no-default-name");
@@ -4658,12 +5245,13 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
             CreateTarFromManifest(L"[oobe]\ndefaultName = test_distro", L"conflict.tar");
 
-            constexpr auto expectedOutput =
-                L"Installing: conflict.tar\r\n\
-A distribution with the supplied name already exists. Use --name to chose a different name.\r\n\
-Error code: Wsl/Service/RegisterDistro/ERROR_ALREADY_EXISTS\r\n";
+            const auto expectedOutput = L"Installing: conflict.tar\r\n" +
+                                        FormatErrorMessage(
+                                            L"A distribution with the supplied name already exists. Use --name to choose a "
+                                            L"different name.",
+                                            L"Wsl/Service/RegisterDistro/ERROR_ALREADY_EXISTS");
 
-            InstallFromTar(L"conflict.tar", L"", -1, expectedOutput);
+            InstallFromTar(L"conflict.tar", L"", -1, expectedOutput.c_str());
         }
 
         // Distribution default name is invalid
@@ -4672,12 +5260,11 @@ Error code: Wsl/Service/RegisterDistro/ERROR_ALREADY_EXISTS\r\n";
 
             CreateTarFromManifest(L"[oobe]\ndefaultName = invalid!", L"invalid.tar");
 
-            constexpr auto expectedOutput =
-                L"Installing: invalid.tar\r\n\
-Invalid distribution name: \"invalid!\".\r\n\
-Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
+            const auto expectedOutput =
+                L"Installing: invalid.tar\r\n" +
+                FormatErrorMessage(L"Invalid distribution name: \"invalid!\".", L"Wsl/Service/RegisterDistro/E_INVALIDARG");
 
-            InstallFromTar(L"invalid.tar", L"", -1, expectedOutput);
+            InstallFromTar(L"invalid.tar", L"", -1, expectedOutput.c_str());
         }
 
         // Distribution icon file is too big
@@ -5026,8 +5613,12 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
                 "FriendlyName": "DebianFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5050,9 +5641,10 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
 
             ValidateInstallError(
                 L"--install DoesNotExists",
-                L"Invalid distribution name: 'DoesNotExists'.\r\n\
-To get a list of valid distributions, use 'wsl.exe --list --online'.\r\n\
-Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
+                FormatErrorMessage(
+                    L"Invalid distribution name: 'DoesNotExists'.\r\nTo get a list of valid distributions, use 'wsl.exe "
+                    L"--list --online'.",
+                    L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
 
@@ -5092,6 +5684,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "Amd64Url": {{
                     "Url": "",
                     "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "",
+                    "Sha256": ""
                 }}
             }},
             {{
@@ -5099,8 +5695,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "FriendlyName": "DebianFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ],
@@ -5112,6 +5712,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "Amd64Url": {{
                     "Url": "",
                     "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "",
+                    "Sha256": ""
                 }}
             }},
             {{
@@ -5119,8 +5723,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
                 "FriendlyName": "UbuntuFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{2}",
+                    "Sha256": "{3}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{2}",
+                    "Sha256": "{3}"
                 }}
             }}
         ]
@@ -5176,6 +5784,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 "Amd64Url": {{
                     "Url": "",
                     "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "",
+                    "Sha256": ""
                 }}
             }}
         ]
@@ -5187,7 +5799,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
           "PackageFamilyName": "Dummy",
           "Amd64": true,
           "Arm64": true,
-          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
+          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl",
+          "Arm64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
 }})",
                 tarPath);
 
@@ -5196,16 +5809,16 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             // There's no easy way to automate the appx package installation, but verify that we take the legacy path
             ValidateInstallError(
                 L"--install legacy --no-launch --web-download",
-                L"Downloading: legacy\r\n\
-A connection with the server could not be established \r\n\
-Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
+                L"Downloading: legacy\r\n" +
+                    FormatErrorMessage(
+                        L"A connection with the server could not be established ", L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT"),
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
 
             ValidateInstallError(
                 L"--install legacy --no-launch --web-download --legacy",
-                L"Downloading: legacy\r\n\
-A connection with the server could not be established \r\n\
-Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
+                L"Downloading: legacy\r\n" +
+                    FormatErrorMessage(
+                        L"A connection with the server could not be established ", L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT"),
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
@@ -5219,8 +5832,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5232,7 +5849,8 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
           "PackageFamilyName": "Dummy",
           "Amd64": true,
           "Arm64": true,
-          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
+          "Amd64PackageUrl": "http://127.0.0.1:12/dummyUrl",
+          "Arm64PackageUrl": "http://127.0.0.1:12/dummyUrl" }}]
 }})",
                 tarPath,
                 tarHash);
@@ -5247,9 +5865,9 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
             // Validate that --legacy takes the appx path.
             ValidateInstallError(
                 L"--install debian-12 --no-launch --web-download --legacy",
-                L"Downloading: debian-12\r\n\
-A connection with the server could not be established \r\n\
-Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
+                L"Downloading: debian-12\r\n" +
+                    FormatErrorMessage(
+                        L"A connection with the server could not be established ", L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT"),
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
@@ -5263,8 +5881,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }},
             {{
@@ -5272,7 +5894,11 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "FriendlyName": "DebianFriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}",
+                    "Url": "{2}",
+                    "Sha256": ""
+                }},
+                "Arm64Url": {{
+                    "Url": "{2}",
                     "Sha256": ""
                 }}
             }}
@@ -5292,8 +5918,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyNameOverridden",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5326,8 +5956,12 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "test-default-manifest-name",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
-                    "Sha256": "{}"
+                    "Url": "{0}",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5354,7 +5988,11 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
+                    "Url": "{0}",
+                    "Sha256": "0x12"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
                     "Sha256": "0x12"
                 }}
             }}
@@ -5367,11 +6005,10 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
 
             ValidateInstallError(
                 L"--install debian-12",
-                std::format(
-                    L"Installing: DebianFriendlyName\r\n\
-The distribution hash doesn't match. Expected: 0x12, actual hash: {}\r\n\
-Error code: Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST\r\n",
-                    wsl::shared::string::MultiByteToWide(tarHash)),
+                L"Installing: DebianFriendlyName\r\n" +
+                    FormatErrorMessage(
+                        std::format(L"The distribution hash doesn't match. Expected: 0x12, actual hash: {}", wsl::shared::string::MultiByteToWide(tarHash)),
+                        L"Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST"),
                 L"");
         }
 
@@ -5385,7 +6022,11 @@ Error code: Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST\r\n",
                 "Name": "debian-12",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "{}",
+                    "Url": "{0}",
+                    "Sha256": "wrongformat"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}",
                     "Sha256": "wrongformat"
                 }}
             }}
@@ -5398,9 +6039,8 @@ Error code: Wsl/InstallDistro/VerifyChecksum/TRUST_E_BAD_DIGEST\r\n",
 
             ValidateInstallError(
                 L"--install debian-12",
-                L"Installing: DebianFriendlyName\r\n\
-Invalid hex string: wrongformat\r\n\
-Error code: Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG\r\n",
+                L"Installing: DebianFriendlyName\r\n" +
+                    FormatErrorMessage(L"Invalid hex string: wrongformat", L"Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG"),
                 L"");
         }
 
@@ -5415,7 +6055,8 @@ Error code: Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG\r\n",
           "PackageFamilyName": "Dummy",
           "Amd64": true,
           "Arm64": true,
-          "Amd64PackageUrl": "" }]
+          "Amd64PackageUrl": "",
+          "Arm64PackageUrl": "" }]
 })";
 
             auto restore = SetManifest(manifest);
@@ -5435,9 +6076,10 @@ Error code: Wsl/InstallDistro/VerifyChecksum/E_INVALIDARG\r\n",
 
             ValidateInstallError(
                 L"--install invalid",
-                L"Invalid distribution name: 'invalid'.\r\n\
-To get a list of valid distributions, use 'wsl.exe --list --online'.\r\n\
-Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
+                FormatErrorMessage(
+                    L"Invalid distribution name: 'invalid'.\r\nTo get a list of valid distributions, use 'wsl.exe --list "
+                    L"--online'.",
+                    L"Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND"),
                 L"");
         }
 
@@ -5448,9 +6090,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
     "ModernDistributions": {{
         "debian": [
             {{
-                "Name": "{}",
+                "Name": "{0}",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
+                    "Url": "file://nonexistent",
+                    "Sha256": ""
+                }},
+                "Arm64Url": {{
                     "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
@@ -5459,6 +6105,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "dummy",
                 "FriendlyName": "dummy",
                 "Amd64Url": {{
+                    "Url": "file://nonexistent",
+                    "Sha256": ""
+                }},
+                "Arm64Url": {{
                     "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
@@ -5475,8 +6125,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"Cannot create a file when that file already exists. \r\n"
-                    L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
+                    FormatErrorMessage(
+                        L"Cannot create a file when that file already exists. ", L"Wsl/InstallDistro/ERROR_ALREADY_EXISTS"));
 
                 VERIFY_ARE_EQUAL(err, L"");
             }
@@ -5486,8 +6136,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"Cannot create a file when that file already exists. \r\n"
-                    L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
+                    FormatErrorMessage(
+                        L"Cannot create a file when that file already exists. ", L"Wsl/InstallDistro/ERROR_ALREADY_EXISTS"));
 
                 VERIFY_ARE_EQUAL(err, L"");
             }
@@ -5505,6 +6155,10 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Amd64Url": {
                     "Url": "",
                     "Sha256": ""
+                },
+                "Arm64Url": {
+                    "Url": "",
+                    "Sha256": ""
                 }
             }
         ]
@@ -5514,8 +6168,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
             auto restore = SetManifest(manifest);
             ValidateInstallError(
                 L"--install",
-                L"No default distribution has been configured. Please provide a distribution to install.\r\n\
-Error code: Wsl/InstallDistro/E_UNEXPECTED\r\n",
+                FormatErrorMessage(
+                    L"No default distribution has been configured. Please provide a distribution to install.",
+                    L"Wsl/InstallDistro/E_UNEXPECTED"),
                 L"");
         }
 
@@ -5525,8 +6180,10 @@ Error code: Wsl/InstallDistro/E_UNEXPECTED\r\n",
 
             ValidateInstallError(
                 L"--install debian",
-                L"Invalid JSON document. Parse error: [json.exception.parse_error.101] parse error at line 1, column 1: syntax error while parsing value - invalid literal; last read: 'B'\r\n\
-Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
+                FormatErrorMessage(
+                    L"Invalid JSON document. Parse error: [json.exception.parse_error.101] parse error at line 1, column 1: "
+                    L"syntax error while parsing value - invalid literal; last read: 'B'",
+                    L"Wsl/InstallDistro/WSL_E_INVALID_JSON"),
                 L"");
         }
 
@@ -5548,8 +6205,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 "FriendlyName": "FriendlyName",
                 "Default": true,
                 "Amd64Url": {{
-                    "Url": "{}/distro.tar?foo=bar&key=value",
-                    "Sha256": "{}"
+                    "Url": "{0}/distro.tar?foo=bar&key=value",
+                    "Sha256": "{1}"
+                }},
+                "Arm64Url": {{
+                    "Url": "{0}/distro.tar?foo=bar&key=value",
+                    "Sha256": "{1}"
                 }}
             }}
         ]
@@ -5674,8 +6335,12 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 \"FriendlyName\": \"FriendlyName\",
                 \"Default\": true,
                 \"Amd64Url\": {{
-                    \"Url\": \"{}/distro.tar\",
-                    \"Sha256\": \"{}\"
+                    \"Url\": \"{0}/distro.tar\",
+                    \"Sha256\": \"{1}\"
+                }},
+                \"Arm64Url\": {{
+                    \"Url\": \"{0}/distro.tar\",
+                    \"Sha256\": \"{1}\"
                 }}
             }}
         ]
@@ -6152,31 +6817,32 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
+    static LxssDistributionState GetDistroState()
+    {
+        wsl::windows::common::SvcComm service;
+
+        for (const auto& e : service.EnumerateDistributions())
+        {
+            if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
+            {
+                return e.State;
+            }
+        }
+
+        return LxssDistributionStateInvalid;
+    }
+
     TEST_METHOD(DistroTimeout)
     {
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
-
-        auto getDistroState = [&]() {
-            wsl::windows::common::SvcComm service;
-
-            for (const auto& e : service.EnumerateDistributions())
-            {
-                if (wsl::shared::string::IsEqual(e.DistroName, LXSS_DISTRO_NAME_TEST_L))
-                {
-                    return e.State;
-                }
-            }
-
-            return LxssDistributionStateInvalid;
-        };
 
         // Validate that distributions don't time out when timeout is -1
         {
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo OK"), 0L);
 
             std::this_thread::sleep_for(std::chrono::seconds(20));
-            VERIFY_ARE_EQUAL(getDistroState(), LxssDistributionStateRunning);
+            VERIFY_ARE_EQUAL(GetDistroState(), LxssDistributionStateRunning);
         }
 
         // Validate that distributions time out when timeout value is > 0
@@ -6190,7 +6856,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             unsigned long iterations = 0;
             while (std::chrono::steady_clock::now() < deadline)
             {
-                if (getDistroState() == LxssDistributionStateInstalled)
+                if (GetDistroState() == LxssDistributionStateInstalled)
                 {
                     LogInfo("Distribution stopped after %lu iterations", iterations);
                     return;
@@ -6200,7 +6866,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 iterations++;
             }
 
-            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, getDistroState());
+            LogError("Distribution failed to time out after %lu iterations. State: %i", iterations, GetDistroState());
             VERIFY_FAIL();
         }
     }
@@ -6228,9 +6894,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(false, json);
 
             VERIFY_ARE_EQUAL(version, L"2.4.12");
-            VERIFY_ARE_EQUAL(asset.id, 2);
-            VERIFY_ARE_EQUAL(asset.url, L"http://x64-url");
-            VERIFY_ARE_EQUAL(asset.name, L"wsl.2.4.12.0.x64.msi");
+            VERIFY_ARE_EQUAL(asset.id, wsl::shared::Arm64 ? 1 : 2);
+            VERIFY_ARE_EQUAL(asset.url, wsl::shared::Arm64 ? L"http://arm-url" : L"http://x64-url");
+            VERIFY_ARE_EQUAL(asset.name, wsl::shared::Arm64 ? L"wsl.2.4.12.0.arm64.msi" : L"wsl.2.4.12.0.x64.msi");
         }
 
         // Test wsl --update --pre-release
@@ -6262,44 +6928,88 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(true, json);
 
             VERIFY_ARE_EQUAL(version, L"2.5.1");
-            VERIFY_ARE_EQUAL(asset.id, 2);
-            VERIFY_ARE_EQUAL(asset.url, L"http://x64-url");
-            VERIFY_ARE_EQUAL(asset.name, L"wsl.2.5.1.0.x64.msi");
+            VERIFY_ARE_EQUAL(asset.id, wsl::shared::Arm64 ? 1 : 2);
+            VERIFY_ARE_EQUAL(asset.url, wsl::shared::Arm64 ? L"http://arm-url" : L"http://x64-url");
+            VERIFY_ARE_EQUAL(asset.name, wsl::shared::Arm64 ? L"wsl.2.5.1.0.arm64.msi" : L"wsl.2.5.1.0.x64.msi");
         }
     }
 
-    WSL2_TEST_METHOD(CustomModulesVhd)
+    WSL2_TEST_METHOD(CustomVhdsInUserProfile)
     {
+        // Regression: HCS fails with E_ACCESSDENIED when user-supplied kernelModules or
+        // systemDistro VHDs live under the user profile and VMWP wasn't granted access.
 #ifdef WSL_DEV_INSTALL_PATH
 
-        auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
-        auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
 
 #else
-        auto modulesPath = std::format(L"{}\\tools\\modules.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
-        auto kernelPath = std::format(L"{}\\tools\\kernel", wsl::windows::common::wslutil::GetMsiPackagePath().value());
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
 
 #endif
 
-        // Create a copy of the modules vhd
-        auto testModules = std::filesystem::current_path() / "test-modules.vhd";
+        // Unique folder under %TEMP% so parallel runs don't collide.
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto testFolder =
+            std::filesystem::temp_directory_path() /
+            std::format(L"wsl-test-vhd-grant-{}", wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None));
+        const auto testModules = testFolder / L"test-modules.vhd";
+        const auto testSystemDistro = testFolder / L"test-system.vhd";
+
+        // Construct the cleanup scope before any filesystem mutations so a failed copy or
+        // VERIFY does not leak the directory across runs.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ignored;
+            std::filesystem::remove_all(testFolder, ignored);
+        });
+
+        std::filesystem::create_directories(testFolder);
 
         VERIFY_IS_TRUE(CopyFile(modulesPath.c_str(), testModules.c_str(), false));
+        VERIFY_IS_TRUE(CopyFile(systemDistroPath.c_str(), testSystemDistro.c_str(), false));
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(testModules); });
+        for (const auto& path : {testModules, testSystemDistro})
+        {
+            auto cmd = std::format(L"icacls.exe \"{}\" /remove Everyone /Q", path.wstring());
+            LxsstuLaunchCommandAndCaptureOutput(cmd.data());
+        }
 
-        auto cmd = std::format(
-            LR"($acl = Get-Acl '{}' ; $acl.RemoveAccessRuleAll((New-Object System.Security.AccessControl.FileSystemAccessRule(\"Everyone\", \"Read\", \"None\", \"None\", \"Allow\"))); Set-Acl -Path '{}' -AclObject $acl)",
-            testModules,
-            testModules);
+        WslConfigChange config{LxssGenerateTestConfig(
+            {.kernel = kernelPath, .kernelModules = testModules.wstring(), .systemDistro = testSystemDistro.wstring()})};
 
-        LxsstuLaunchPowershellAndCaptureOutput(cmd);
-
-        // Update .wslconfig to point to the copied kernel
-        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = testModules.wstring()})};
-
-        // Validate that WSL starts correctly
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK");
+        VERIFY_ARE_EQUAL(out, L"OK\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    WSL2_TEST_METHOD(CustomVhdsAccessibleViaInheritedAcls)
+    {
+        // Regression: VHDs reachable to VMWP via inherited ACLs must boot even when the
+        // impersonated user lacks WRITE_DAC for HcsGrantVmAccess.
+#ifdef WSL_DEV_INSTALL_PATH
+
+        const auto modulesPath = std::format(L"{}\\artifacts.vhd", WSL_DEV_INSTALL_PATH);
+        const auto kernelPath = std::format(L"{}\\kernel", WSL_DEV_INSTALL_PATH);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", WSL_DEV_INSTALL_PATH);
+
+#else
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        const auto modulesPath = std::format(L"{}\\tools\\artifacts.vhd", installPath);
+        const auto kernelPath = std::format(L"{}\\tools\\kernel", installPath);
+        const auto systemDistroPath = std::format(L"{}\\system.vhd", installPath);
+
+#endif
+
+        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath, .kernelModules = modulesPath, .systemDistro = systemDistroPath})};
+
+        // Non-elevated launch so impersonation cannot WRITE_DAC the SYSTEM-owned VHD.
+        const auto nonElevatedToken = GetNonElevatedToken();
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo OK", 0, nullptr, nonElevatedToken.get());
         VERIFY_ARE_EQUAL(out, L"OK\n");
         VERIFY_ARE_EQUAL(err, L"");
     }
@@ -6311,8 +7021,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The imported file is not a valid Linux distribution.\r\nError code: "
-                L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO\r\n");
+                FormatErrorMessage(
+                    L"The imported file is not a valid Linux distribution.",
+                    L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO"));
 
             // TODO: Uncomment once SetVersionDebug is removed from the tests .wslconfig.
             // VERIFY_ARE_EQUAL(err, L"");
@@ -6324,8 +7035,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"Installing: NUL\r\nThe imported file is not a valid Linux distribution.\r\nError code: "
-                L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO\r\n");
+                L"Installing: NUL\r\n" + FormatErrorMessage(
+                                             L"The imported file is not a valid Linux distribution.",
+                                             L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO"));
             // TODO: Uncomment once SetVersionDebug is removed from the tests .wslconfig.
             // VERIFY_ARE_EQUAL(err, L"");
         }
@@ -6347,8 +7059,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The imported file is not a valid Linux distribution.\r\nError code: "
-                L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO\r\n");
+                FormatErrorMessage(
+                    L"The imported file is not a valid Linux distribution.",
+                    L"Wsl/Service/RegisterDistro/WSL_E_NOT_A_LINUX_DISTRO"));
             // TODO: Uncomment once SetVersionDebug is removed from the tests .wslconfig.
             // VERIFY_ARE_EQUAL(err, L"");
         }
@@ -6451,6 +7164,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
     WSL2_TEST_METHOD(CGroupv1)
     {
+        // cgroupv1 conflicts with the per-distro cgroup hierarchy
+        WslConfigChange config(LxssGenerateTestConfig({.isolateDistroCgroup = false}));
+
         auto expectedMount = [](const char* path, const wchar_t* expected) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
 
@@ -6473,7 +7189,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
 
         // Validate that having cgroup_no_v1=all causes the distribution to fall back to v2.
-        WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
+        config.Update(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all", .isolateDistroCgroup = false}));
 
         expectedMount("/sys/fs/cgroup/unified", L"");
         expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
@@ -6511,7 +7227,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto [out, err] =
             LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdPath), -1);
         VERIFY_ARE_EQUAL(
-            out, L"The specified file must have the .vhdx file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+            out,
+            FormatErrorMessage(L"The specified file must have the .vhdx file extension.", L"Wsl/Service/WSL_E_EXPORT_FAILED"));
         VERIFY_ARE_EQUAL(err, L"");
 
         // Export the distribution to a .vhdx.
@@ -6537,7 +7254,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         // Attempt to export to a .vhdx (should fail).
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", newDistroName, vhdxPath), -1);
         VERIFY_ARE_EQUAL(
-            out, L"The specified file must have the .vhd file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+            out, FormatErrorMessage(L"The specified file must have the .vhd file extension.", L"Wsl/Service/WSL_E_EXPORT_FAILED"));
         VERIFY_ARE_EQUAL(err, L"");
 
         // Attempt to import to a non VHD file.
@@ -6551,8 +7268,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             std::format(L"--import {} {} {} --vhd", negativeVariationDistro, negativeVariationDistro, tempFile.Path), -1);
         VERIFY_ARE_EQUAL(
             out,
-            L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
-            L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
+            FormatErrorMessage(
+                L"The specified file must have the .vhd or .vhdx file extension.",
+                L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED"));
         VERIFY_ARE_EQUAL(err, L"");
     }
 
@@ -6652,6 +7370,680 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"--uninstall Distro",
             wsl::shared::Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG) + L"\r\n",
             -1);
+    }
+
+    TEST_METHOD(ReadSocketMessageHandle)
+    {
+        // Drive a ReadSocketMessageHandle until completion and return the bytes delivered to its
+        // OnMessage callback. If a non-success HRESULT is supplied, the call is expected to throw
+        // that HRESULT instead, and the OnMessage callback must not be invoked.
+        auto readMessage = [](wil::unique_socket&& server, HRESULT expectedHr = S_OK, std::vector<gsl::byte> pendingBytes = {}) {
+            std::vector<gsl::byte> buffer;
+            bool callbackInvoked = false;
+            std::vector<gsl::byte> message;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                wsl::windows::common::io::HandleWrapper{std::move(server)},
+                buffer,
+                pendingBytes,
+                [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                    callbackInvoked = true;
+                    message.assign(received.begin(), received.end());
+                }));
+
+            const auto hr = wil::ResultFromException([&]() { io.Run(std::chrono::seconds(60)); });
+            VERIFY_ARE_EQUAL(hr, expectedHr);
+            VERIFY_ARE_EQUAL(callbackInvoked, SUCCEEDED(expectedHr));
+            return message;
+        };
+
+        // Scenario 1: A complete header-only message is delivered intact.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 7;
+            header.TransactionStep = 1;
+            WriteSocket(client.get(), &header, sizeof(header));
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), sizeof(header));
+            VERIFY_IS_TRUE(std::memcmp(message.data(), &header, sizeof(header)) == 0);
+        }
+
+        // Scenario 2: A complete message with a payload body is delivered intact.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 128;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 42;
+            header->TransactionStep = 2;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i & 0xFF);
+            }
+            WriteSocket(client.get(), payload.data(), payload.size());
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 3: Sender closes without writing any bytes. The reader should observe a clean
+        // end-of-stream and signal completion with an empty span (no exception).
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            const auto message = readMessage(std::move(server));
+            VERIFY_ARE_EQUAL(message.size(), static_cast<size_t>(0));
+        }
+
+        // Scenario 4: Sender closes after sending fewer bytes than a full header.
+        // The reader should treat this as a protocol error and throw E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            std::array<gsl::byte, sizeof(MESSAGE_HEADER) - 1> partialHeader{};
+            std::memset(partialHeader.data(), 0xCC, partialHeader.size());
+            WriteSocket(client.get(), partialHeader.data(), partialHeader.size());
+            client.reset();
+
+            readMessage(std::move(server), E_UNEXPECTED);
+        }
+
+        // Scenario 5: Sender provides a complete header but closes after sending only part of the body.
+        // The reader should treat this as a protocol error and throw E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t fullBodySize = 64;
+            constexpr size_t partialBodySize = 16;
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = gsl::narrow_cast<unsigned int>(sizeof(header) + fullBodySize);
+            header.TransactionId = 11;
+            header.TransactionStep = 1;
+            WriteSocket(client.get(), &header, sizeof(header));
+
+            std::array<gsl::byte, partialBodySize> partialBody{};
+            std::memset(partialBody.data(), 0x55, partialBody.size());
+            WriteSocket(client.get(), partialBody.data(), partialBody.size());
+            client.reset();
+
+            readMessage(std::move(server), E_UNEXPECTED);
+        }
+
+        // Scenario 6: PendingBytes carries a complete header-only message left over from a
+        // previous aborted receive. The reader should deliver it without touching the socket.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset(); // close the peer; we should still complete from PendingBytes alone.
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 77;
+            header.TransactionStep = 1;
+
+            const auto* headerBytes = reinterpret_cast<const gsl::byte*>(&header);
+            std::vector<gsl::byte> pendingBytes(headerBytes, headerBytes + sizeof(header));
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), sizeof(header));
+            VERIFY_IS_TRUE(std::memcmp(message.data(), &header, sizeof(header)) == 0);
+        }
+
+        // Scenario 7: PendingBytes carries a complete message with a body left over from a
+        // previous aborted receive. The reader should deliver it without touching the socket.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            constexpr size_t bodySize = 32;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 81;
+            header->TransactionStep = 3;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i ^ 0xA5);
+            }
+
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.end());
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 8: PendingBytes carries only part of a header. The reader must fill in the
+        // rest of the header (and the body) from the socket and deliver the assembled message.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 48;
+            constexpr size_t prebufferedBytes = 6; // less than sizeof(MESSAGE_HEADER) = 16
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 91;
+            header->TransactionStep = 4;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(0xC3);
+            }
+
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.begin() + prebufferedBytes);
+            WriteSocket(client.get(), payload.data() + prebufferedBytes, payload.size() - prebufferedBytes);
+            client.reset();
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 9: PendingBytes carries the full header plus part of the body. The reader
+        // must read the remaining body bytes from the socket and deliver the assembled message.
+        {
+            auto [client, server] = MakeSocketPair();
+
+            constexpr size_t bodySize = 64;
+            constexpr size_t prebufferedBodyBytes = 12;
+            std::vector<gsl::byte> payload(sizeof(MESSAGE_HEADER) + bodySize);
+            auto* header = reinterpret_cast<MESSAGE_HEADER*>(payload.data());
+            header->MessageType = LxMiniInitMessageAny;
+            header->MessageSize = gsl::narrow_cast<unsigned int>(payload.size());
+            header->TransactionId = 92;
+            header->TransactionStep = 5;
+            for (size_t i = 0; i < bodySize; ++i)
+            {
+                payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i & 0xFF);
+            }
+
+            const size_t prebufferedBytes = sizeof(MESSAGE_HEADER) + prebufferedBodyBytes;
+            std::vector<gsl::byte> pendingBytes(payload.begin(), payload.begin() + prebufferedBytes);
+            WriteSocket(client.get(), payload.data() + prebufferedBytes, payload.size() - prebufferedBytes);
+            client.reset();
+
+            const auto message = readMessage(std::move(server), S_OK, std::move(pendingBytes));
+            VERIFY_ARE_EQUAL(message.size(), payload.size());
+            VERIFY_IS_TRUE(std::memcmp(message.data(), payload.data(), payload.size()) == 0);
+        }
+
+        // Scenario 10: PendingBytes contains an invalid (too-small) message size. The
+        // IO should detect this and throw E_UNEXPECTED without invoking OnMessage.
+        {
+            auto [client, server] = MakeSocketPair();
+            client.reset();
+
+            MESSAGE_HEADER header{};
+            header.MessageType = LxMiniInitMessageAny;
+            header.MessageSize = sizeof(header) - 1; // invalid: smaller than the header itself
+            header.TransactionId = 99;
+            header.TransactionStep = 1;
+
+            const auto* headerBytes = reinterpret_cast<const gsl::byte*>(&header);
+            std::vector<gsl::byte> pendingBytes{headerBytes, headerBytes + sizeof(header)};
+
+            std::vector<gsl::byte> buffer;
+            bool callbackInvoked = false;
+            const auto hr = wil::ResultFromException([&]() {
+                wsl::windows::common::io::MultiHandleWait io;
+                io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                    wsl::windows::common::io::HandleWrapper{std::move(server)},
+                    buffer,
+                    pendingBytes,
+                    [&callbackInvoked](const gsl::span<gsl::byte>&) { callbackInvoked = true; }));
+                io.Run(std::chrono::seconds(60));
+            });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+            VERIFY_IS_FALSE(callbackInvoked);
+        }
+    }
+
+    TEST_METHOD(MultiHandleWaitAboveMaximumWaitObjects)
+    {
+        // Validate that MultiHandleWait can wait on more than MAXIMUM_WAIT_OBJECTS (64) handles.
+        constexpr size_t handleCount = 100;
+        static_assert(handleCount > MAXIMUM_WAIT_OBJECTS);
+
+        // Scenario 1: signal every event before Run(); all callbacks must fire and Run() must return.
+        {
+            std::vector<wil::unique_event> events;
+            events.reserve(handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                events.emplace_back(wil::EventOptions::ManualReset);
+            }
+
+            std::vector<bool> fired(handleCount, false);
+            std::atomic<size_t> firedCount{0};
+            std::mutex firedLock;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
+                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                        std::lock_guard lock{firedLock};
+                        VERIFY_IS_FALSE(fired[i]);
+                        fired[i] = true;
+                        firedCount.fetch_add(1);
+                    }));
+            }
+
+            for (auto& e : events)
+            {
+                e.SetEvent();
+            }
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(60)));
+            VERIFY_ARE_EQUAL(firedCount.load(), handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                VERIFY_IS_TRUE(fired[i]);
+            }
+        }
+
+        // Scenario 2: signal events one at a time from another thread while Run() processes them.
+        {
+            std::vector<wil::unique_event> events;
+            events.reserve(handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                events.emplace_back(wil::EventOptions::ManualReset);
+            }
+
+            std::vector<bool> fired(handleCount, false);
+            std::atomic<size_t> firedCount{0};
+            std::mutex firedLock;
+
+            wsl::windows::common::io::MultiHandleWait io;
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
+                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                        std::lock_guard lock{firedLock};
+                        VERIFY_IS_FALSE(fired[i]);
+                        fired[i] = true;
+                        firedCount.fetch_add(1);
+                    }));
+            }
+
+            std::thread signaller([&events]() {
+                for (auto& e : events)
+                {
+                    e.SetEvent();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            });
+
+            VERIFY_IS_TRUE(io.Run(std::chrono::seconds(60)));
+            signaller.join();
+
+            VERIFY_ARE_EQUAL(firedCount.load(), handleCount);
+            for (size_t i = 0; i < handleCount; ++i)
+            {
+                VERIFY_IS_TRUE(fired[i]);
+            }
+        }
+    }
+
+    TEST_METHOD(SocketChannel)
+    {
+        // Read exactly `size` bytes from a raw socket into the destination buffer.
+        auto recvAll = [](SOCKET socket, void* destination, size_t size) {
+            auto* cursor = static_cast<char*>(destination);
+            size_t total = 0;
+            while (total < size)
+            {
+                const auto received = recv(socket, cursor + total, gsl::narrow_cast<int>(size - total), 0);
+                VERIFY_IS_TRUE(received > 0);
+                total += static_cast<size_t>(received);
+            }
+        };
+
+        // Scenario 1: SendMessage produces the expected wire format on the peer socket.
+        // The header should carry the auto-stamped TransactionId (1 for the first non-transaction
+        // message) and a NONE transaction step, and the payload bytes should match exactly.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(client), "client"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Result = static_cast<int32_t>(0xCAFEBABE);
+            channel.SendMessage(message);
+
+            std::array<gsl::byte, sizeof(message)> received{};
+            recvAll(server.get(), received.data(), received.size());
+
+            const auto* header = reinterpret_cast<const MESSAGE_HEADER*>(received.data());
+            VERIFY_ARE_EQUAL(header->MessageType, RESULT_MESSAGE<int32_t>::Type);
+            VERIFY_ARE_EQUAL(header->MessageSize, gsl::narrow_cast<unsigned int>(sizeof(message)));
+            VERIFY_ARE_EQUAL(header->TransactionId, 1u);
+            VERIFY_ARE_EQUAL(header->TransactionStep, static_cast<unsigned int>(TRANSACTION_STEP::NONE));
+
+            const auto* payload = reinterpret_cast<const RESULT_MESSAGE<int32_t>*>(received.data());
+            VERIFY_ARE_EQUAL(payload->Result, static_cast<int32_t>(0xCAFEBABE));
+        }
+
+        // Scenario 2: Two channels can round-trip a typed message end-to-end.
+        {
+            auto [a, b] = MakeSocketPair();
+            wsl::shared::SocketChannel sender{std::move(a), "sender"};
+            wsl::shared::SocketChannel receiver{std::move(b), "receiver"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Result = 1234;
+            sender.SendMessage(message);
+
+            auto& received = receiver.ReceiveMessage<RESULT_MESSAGE<int32_t>>();
+            VERIFY_ARE_EQUAL(received.Header.MessageType, RESULT_MESSAGE<int32_t>::Type);
+            VERIFY_ARE_EQUAL(received.Header.MessageSize, gsl::narrow_cast<unsigned int>(sizeof(message)));
+            VERIFY_ARE_EQUAL(received.Header.TransactionId, 1u);
+            VERIFY_ARE_EQUAL(received.Result, 1234);
+        }
+
+        // Scenario 3: An exit event signaled while ReceiveMessage is waiting causes the call to
+        // throw E_ABORT. Pre-signaling avoids racing a worker thread with the call.
+        {
+            auto [client, server] = MakeSocketPair();
+            wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+            exitEvent.SetEvent();
+            wsl::shared::SocketChannel channel{std::move(server), "server", std::vector<HANDLE>{exitEvent.get()}};
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_ABORT);
+        }
+
+        // Scenario 4: ReceiveMessageOrClosed on a peer that closed the socket without sending
+        // any data returns {nullptr, empty span} and does not throw.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+            client.reset();
+
+            auto [message, span] = channel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
+            VERIFY_IS_NULL(message);
+            VERIFY_ARE_EQUAL(span.size(), static_cast<size_t>(0));
+        }
+
+        // Scenario 5: A message arriving with a TransactionId other than the next expected
+        // sequence number (the first message must have id 1) is rejected with E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Header.TransactionId = 99;
+            message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
+            message.Result = 0;
+            WriteSocket(client.get(), &message, sizeof(message));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 6: A transaction-tagged message arriving on a channel waiting for a
+        // non-transaction message is rejected with E_UNEXPECTED.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            RESULT_MESSAGE<int32_t> message{};
+            message.Header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            message.Header.MessageSize = sizeof(message);
+            message.Header.TransactionId = 1;
+            message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::REQUEST);
+            message.Result = 0;
+            WriteSocket(client.get(), &message, sizeof(message));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 7: A header-only message arriving when a larger message type is expected
+        // is rejected with E_UNEXPECTED because the received span is too small for the type.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            MESSAGE_HEADER header{};
+            header.MessageType = RESULT_MESSAGE<int32_t>::Type;
+            header.MessageSize = sizeof(header);
+            header.TransactionId = 1;
+            header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
+            WriteSocket(client.get(), &header, sizeof(header));
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        // Scenario 8: ReceiveMessage with a finite timeout on an idle socket throws
+        // HRESULT_FROM_WIN32(ERROR_TIMEOUT) once the timeout elapses.
+        {
+            auto [client, server] = MakeSocketPair();
+            wsl::shared::SocketChannel channel{std::move(server), "server"};
+
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+        }
+    }
+
+    TEST_METHOD(DownloadToHiddenSystemTempFolder)
+    {
+        // Avoid contaminating the real temp folder.
+        const auto testTempFolder = std::filesystem::temp_directory_path() / L"wsl-download-test";
+        std::filesystem::create_directories(testTempFolder);
+        auto cleanupTempFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            std::error_code error;
+            std::filesystem::remove_all(testTempFolder, error);
+        });
+
+        const auto originalAttributes = GetFileAttributesW(testTempFolder.c_str());
+        VERIFY_IS_TRUE(originalAttributes != INVALID_FILE_ATTRIBUTES);
+        VERIFY_IS_TRUE(SetFileAttributesW(testTempFolder.c_str(), originalAttributes | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM));
+
+        ScopedEnvVariable temp(L"TEMP", testTempFolder.wstring());
+        ScopedEnvVariable tmp(L"TMP", testTempFolder.wstring());
+
+        VERIFY_IS_TRUE(std::filesystem::equivalent(std::filesystem::temp_directory_path(), testTempFolder));
+
+        constexpr USHORT port = 6666;
+        const auto endpoint = std::format(L"http://127.0.0.1:{}/", port);
+        constexpr auto fileName = L"downloaded-file.bin";
+        constexpr auto fileContent = L"wsl download test content";
+        UniqueWebServer server(endpoint.c_str(), fileContent);
+
+        const auto url = endpoint + fileName;
+        const auto noProgress = [](uint64_t, uint64_t) {};
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket probe{socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+                THROW_LAST_ERROR_IF(!probe);
+
+                sockaddr_in address{};
+                address.sin_family = AF_INET;
+                address.sin_port = htons(port);
+                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+                THROW_LAST_ERROR_IF(connect(probe.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+            },
+            std::chrono::milliseconds(500),
+            std::chrono::seconds(5));
+
+        const auto firstPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        auto readFile = [](const std::filesystem::path& Path) {
+            std::ifstream file(Path, std::ios::binary);
+            VERIFY_IS_TRUE(file.good());
+            return std::string{std::istreambuf_iterator<char>(file), {}};
+        };
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(firstPath).filename().wstring(), std::wstring(fileName));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_ARE_EQUAL(readFile(firstPath), wsl::shared::string::WideToMultiByte(fileContent));
+
+        const auto secondPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
+
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).parent_path(), testTempFolder);
+        VERIFY_ARE_EQUAL(std::filesystem::path(secondPath).filename().wstring(), std::wstring(L"downloaded-file (2).bin"));
+        VERIFY_IS_TRUE(std::filesystem::exists(firstPath));
+        VERIFY_IS_TRUE(std::filesystem::exists(secondPath));
+        VERIFY_ARE_EQUAL(readFile(secondPath), wsl::shared::string::WideToMultiByte(fileContent));
+    }
+
+    void ValidateIsolatedCgroupLayout(bool systemd)
+    {
+        constexpr auto secondDistroName = L"cgroup-test-distro";
+
+        // Ensure no stale state from a previous run.
+        LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
+        LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--terminate {}", secondDistroName));
+            LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistroName));
+        });
+
+        // Import the second distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", secondDistroName, g_testDistroPath)), 0L);
+
+        std::optional<decltype(EnableSystemd())> systemdCleanup;
+        std::optional<decltype(EnableSystemd())> systemdCleanup2;
+        if (systemd)
+        {
+            systemdCleanup.emplace(EnableSystemd());
+            systemdCleanup2.emplace(EnableSystemd("", secondDistroName));
+        }
+
+        auto getCgroup = [](LPCWSTR distro) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} cat -e /proc/self/cgroup", distro));
+            return out;
+        };
+
+        const auto cgroup1 = getCgroup(LXSS_DISTRO_NAME_TEST_L);
+        const auto cgroup2 = getCgroup(secondDistroName);
+
+        LogInfo("test_distro cgroup: %ls", cgroup1.c_str());
+        LogInfo("%ls cgroup: %ls", secondDistroName, cgroup2.c_str());
+
+        const std::wstring prefix = L"0::/wsl-user/distro-";
+        VERIFY_IS_TRUE(cgroup1.starts_with(prefix));
+        VERIFY_IS_TRUE(cgroup2.starts_with(prefix));
+        VERIFY_ARE_NOT_EQUAL(cgroup1, cgroup2);
+
+        // Terminate both distros -- this should trigger cleanup of their per-distro cgroups.
+        TerminateDistribution(LXSS_DISTRO_NAME_TEST_L);
+        TerminateDistribution(secondDistroName);
+
+        // Re-start the default test_distro and confirm that exactly one distro-<pid> cgroup remains:
+        // the one belonging to the distro we just started to perform the check.  The stale cgroups of
+        // the two terminated distros must have been removed.
+        //
+        // N.B. Mini_init cleans up per-distro cgroups asynchronously from its SIGCHLD reaper after
+        // wsl --terminate returns. On slower hosts (e.g. CI pipelines) the cleanup of the two terminated distros
+        // can still be in flight when this check runs, so retry until cleanup completes.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto [out2, _] =
+                    LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"ls -1 /sys/fs/cgroup/wsl-user | grep -c '^distro-'\"");
+                THROW_HR_IF(E_UNEXPECTED, out2 != std::wstring(L"1\n"));
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayout)
+    {
+        ValidateIsolatedCgroupLayout(false);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutSystemd)
+    {
+        ValidateIsolatedCgroupLayout(true);
+    }
+
+    WSL2_TEST_METHOD(IsolatedCgroupLayoutDisabled)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.isolateDistroCgroup = false}));
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/self/cgroup");
+        while (!out.empty() && (out.back() == L'\n' || out.back() == L'\r'))
+        {
+            out.pop_back();
+        }
+
+        LogInfo("cgroup with isolateDistroCgroup=false: %ls", out.c_str());
+
+        VERIFY_ARE_EQUAL(out, std::wstring(L"0::/"));
+
+        auto [exists, __] =
+            LxsstuLaunchWslAndCaptureOutput(L"/bin/sh -c \"[ -d /sys/fs/cgroup/wsl-user ] && echo yes || echo no\"");
+        while (!exists.empty() && (exists.back() == L'\n' || exists.back() == L'\r'))
+        {
+            exists.pop_back();
+        }
+        VERIFY_ARE_EQUAL(exists, std::wstring(L"no"));
+    }
+
+    TEST_METHOD(ConsoleState_SetOutputCodePageUtf8)
+    {
+        // 437 (OEM-US) and 850 (OEM Multilingual) are built-in Windows code pages that are always
+        // available. 437 is the baseline the helper must restore; 850 stands in for another
+        // component changing the code page after the helper first ran.
+        constexpr UINT baselineCodePage = 437;
+        constexpr UINT intermediateCodePage = 850;
+
+        const UINT originalCodePage = GetConsoleOutputCP();
+        auto restore = wil::scope_exit([originalCodePage]() { SetConsoleOutputCP(originalCodePage); });
+
+        // A settable console output code page requires an attached console, which CI and service
+        // contexts often lack. Skip the test when the code page cannot be set so the suite stays stable.
+        if (!SetConsoleOutputCP(baselineCodePage))
+        {
+            LogSkipped("Skipping test: no attached console with a settable output code page");
+            return;
+        }
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP());
+
+        {
+            wsl::windows::common::ConsoleState console;
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8),
+                GetConsoleOutputCP(),
+                L"SetOutputCodePageUtf8 sets the console output code page to UTF-8");
+
+            // Another component changes the code page; a repeated call must re-assert UTF-8.
+            VERIFY_IS_TRUE(static_cast<bool>(SetConsoleOutputCP(intermediateCodePage)));
+            console.SetOutputCodePageUtf8();
+            VERIFY_ARE_EQUAL(
+                static_cast<UINT>(CP_UTF8), GetConsoleOutputCP(), L"A repeated call re-asserts UTF-8 after the code page changed");
+        }
+
+        VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
 }; // namespace UnitTests

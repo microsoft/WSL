@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Implementation of a type that implements IProgressCallback.
+    Implementation of a type that implements IWSLCCompatProgressCallback.
 
 --*/
 #include "precomp.h"
@@ -25,16 +25,30 @@ WslcImageProgressStatus ConvertStatus(LPCSTR Status)
         return _status_; \
     }
 
-    // TODO: Mapping engine strings to status values seems fragile.
-    //       WSLC is intentionally avoiding this kind of thing for localization of engine strings, which amounts to the same
-    //       thing. If we keep this, a test should be added to explicitly validate that each status is returned properly.
-    WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_PULLING, "Pulling fs layer");
-    WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_WAITING, "Waiting");
-    WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_DOWNLOADING, "Downloading");
-    WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_VERIFYING, "Verifying Checksum");
-    WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_EXTRACTING, "Extracting");
-    WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_COMPLETE, "Pull complete");
+#define WSLC_PREFIX_TO_STATUS_MAPPING(_status_, _prefix_) \
+    if (std::string_view{Status}.starts_with(_prefix_##sv)) \
+    { \
+        return _status_; \
+    }
 
+    if (Status)
+    {
+        // TODO: Mapping engine strings to status values seems fragile.
+        //       WSLC is intentionally avoiding this kind of thing for localization of engine strings, which amounts to the same
+        //       thing. If we keep this, a test should be added to explicitly validate that each status is returned properly.
+        WSLC_PREFIX_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_PULLING, "Pulling from ");
+        WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_PULLING, "Pulling fs layer");
+        WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_WAITING, "Waiting");
+        WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_DOWNLOADING, "Downloading");
+        WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_COMPLETE, "Download complete");
+        WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_VERIFYING, "Verifying Checksum");
+        WSLC_PREFIX_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_VERIFYING, "Digest: ");
+        WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_EXTRACTING, "Extracting");
+        WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_COMPLETE, "Pull complete");
+        WSLC_PREFIX_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_COMPLETE, "Status: ");
+    }
+
+    WSL_LOG_DEBUG("UnknownImageProgressStatus", TraceLoggingString(Status, "status"));
     return WSLC_IMAGE_PROGRESS_STATUS_UNKNOWN;
 }
 } // namespace

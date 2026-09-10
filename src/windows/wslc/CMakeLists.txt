@@ -9,6 +9,7 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 # Object library for WSLC components.
 # Used to build the executable and also unit testing components.
 add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
+
 target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS})
 
 target_link_libraries(wslclib
@@ -25,10 +26,11 @@ set_target_properties(wslclib PROPERTIES FOLDER windows)
 # Create wslc.exe
 # N.B. Linking wslclib (OBJECT library) brings both object files and
 # transitive dependencies. Do not also use $<TARGET_OBJECTS:wslclib>.
-add_executable(wslc)
+add_executable(wslc main.rc resource.h)
 
-target_link_libraries(wslc wslclib)
+target_link_libraries(wslc wslclib delayimp.lib)
 
+set_target_properties(wslc PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
 set_target_properties(wslc PROPERTIES FOLDER windows)
 
 # For prettier source tree browsing

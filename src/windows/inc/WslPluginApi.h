@@ -26,6 +26,12 @@ extern "C" {
 #define WSLPLUGINAPI_ENTRYPOINTV1 WSLPluginAPIV1_EntryPoint
 #define WSL_E_PLUGIN_REQUIRES_UPDATE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x032A)
 
+// Returned by the WSLC plugin API calls below when the session has no running VM.
+// N.B. This value is also defined in wslc.idl; the two definitions must stay in sync.
+#ifndef WSLC_E_VM_NOT_RUNNING
+#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0610)
+#endif
+
 #define WSL_PLUGIN_REQUIRE_VERSION(_Major, _Minor, _Revision, Api) \
     if (Api->Version.Major < (_Major) || (Api->Version.Major == (_Major) && Api->Version.Minor < (_Minor)) || \
         (Api->Version.Major == (_Major) && Api->Version.Minor == (_Minor) && Api->Version.Revision < (_Revision))) \
@@ -85,12 +91,117 @@ struct WslOfflineDistributionInformation
     LPCWSTR Version;           // Distribution version. Introduced in 2.4.4
 };
 
+// Identifies a WSLC session inside the WSLC plugin API. Distinct from WSLSessionId.
+typedef DWORD WSLCSessionId;
+
+// Information about a WSLC session passed to plugin notifications.
+struct WSLCSessionInformation
+{
+    WSLCSessionId SessionId;
+    LPCWSTR DisplayName;
+    DWORD ApplicationPid;
+    HANDLE UserToken;
+    PSID UserSid;
+};
+
+// Opaque handle to a WSLC process created via WSLCPluginAPI_CreateProcess.
+// Must be released with WSLCPluginAPI_ReleaseProcess.
+typedef void* WSLCProcessHandle;
+
+typedef enum _WSLCProcessFd
+{
+    WSLCProcessFdStdin = 0,
+    WSLCProcessFdStdout = 1,
+    WSLCProcessFdStderr = 2
+} WSLCProcessFd;
+
 // Create plan9 mount between Windows & Linux
 typedef HRESULT (*WSLPluginAPI_MountFolder)(WSLSessionId Session, LPCWSTR WindowsPath, LPCWSTR LinuxPath, BOOL ReadOnly, LPCWSTR Name);
 
 // Execute a program in the root namespace.
 // On success, 'Socket' is connected to stdin & stdout (stderr goes to dmesg) // 'Arguments' is expected to be NULL terminated
 typedef HRESULT (*WSLPluginAPI_ExecuteBinary)(WSLSessionId Session, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket);
+
+//
+// WSLC plugin hooks.
+//
+
+// Called when a WSLC session is created. Returning an error prevents the session creation.
+typedef HRESULT (*WSLPluginAPI_OnSessionCreated)(const struct WSLCSessionInformation* Session);
+
+// Called when a WSLC session is about to stop. Errors are ignored.
+typedef HRESULT (*WSLPluginAPI_OnSessionStopping)(const struct WSLCSessionInformation* Session);
+
+// Called when a container starts. Returning an error prevents the container creation.
+// 'InspectContainer' is a JSON document that follows the wslc_schema::InspectContainer format.
+typedef HRESULT (*WSLPluginAPI_ContainerStarted)(const struct WSLCSessionInformation* Session, LPCSTR InspectContainer);
+
+// Called when a container is about to stop. 'ContainerId' is the container identifier. Errors are ignored.
+typedef HRESULT (*WSLPluginAPI_ContainerStopping)(const struct WSLCSessionInformation* Session, LPCSTR ContainerId);
+
+// Called when an image is created (either pulled, or imported). Errors are ignored.
+// 'InspectImage' is a JSON document that follows the wslc_schema::InspectImage format.
+// N.B. This callback is currently only invoked when images are pulled or imported. Images created via load or build are not reported.
+typedef HRESULT (*WSLPluginAPI_ImageCreated)(const struct WSLCSessionInformation* Session, LPCSTR InspectImage);
+
+// Called when an image is deleted. 'ImageId' is the deleted image identifier. Errors are ignored.
+typedef HRESULT (*WSLPluginAPI_ImageDeleted)(const struct WSLCSessionInformation* Session, LPCSTR ImageId);
+
+// Called when the VM backing a WSLC session has started. Unlike OnSessionCreated (which fires once
+// per session), this fires every time a VM is created for the session: on the first operation that
+// needs a VM, and again each time the VM is recreated after being idle-terminated. Errors are logged
+// but ignored (they do not abort VM startup or the triggering operation).
+typedef HRESULT (*WSLPluginAPI_OnWslcVmStarted)(const struct WSLCSessionInformation* Session);
+
+// Called when the VM backing a WSLC session is about to stop (idle teardown, explicit termination,
+// or unexpected exit). Fires exactly once per OnWslcVmStarted. Errors are logged but ignored.
+//
+// The VM is still alive for the duration of this call, so a callback may run last-minute work in it
+// (e.g. WSLCCreateProcess) to react to the VM going away. During a permanent session termination
+// such a call fails cleanly, because the session itself is being torn down.
+//
+// The stop is guaranteed: the VM is torn down as soon as this call returns, and nothing the callback
+// does can keep it alive. Any work the callback leaves running in the VM -- a process it did not wait
+// for, for example -- dies with it. Calls made by other threads while this callback is running are
+// served by the same stopping VM, on the same terms; once the teardown starts they fail with
+// WSLC_E_VM_NOT_RUNNING rather than waiting for or creating another VM.
+typedef HRESULT (*WSLPluginAPI_OnWslcVmStopping)(const struct WSLCSessionInformation* Session);
+
+//
+// WSLC plugin API calls.
+//
+// These operate on the VM that is currently backing the session; they never create one. A call made
+// while the session has no running VM fails with WSLC_E_VM_NOT_RUNNING, so a plugin that needs a VM
+// should do its work from OnWslcVmStarted (or before OnWslcVmStopping returns) rather than from a
+// session-level callback.
+//
+
+// Mount a Windows folder into the WSLC session VM at the given 'Mountpoint' path. If the 'Mountpoint' doesn't exist, it will be created.
+typedef HRESULT (*WSLCPluginAPI_MountFolder)(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly);
+
+// Unmount a folder previously mounted via WSLCPluginAPI_MountFolder.
+typedef HRESULT (*WSLCPluginAPI_UnmountFolder)(WSLCSessionId Session, LPCSTR Mountpoint);
+
+// Create a process in the WSLC session's root namespace.
+// 'Arguments' and 'Env' are NULL-terminated arrays. 'Env' may be NULL.
+// 'Errno' is optional and receives the errno value if the process creation fails.
+// On success, 'Process' receives an opaque handle that must be released with WSLCPluginAPI_ReleaseProcess.
+typedef HRESULT (*WSLCPluginAPI_CreateProcess)(
+    WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno);
+
+// Get a stdio handle from a WSLC process. The caller takes ownership and must close it with CloseHandle().
+typedef HRESULT (*WSLCPluginAPI_ProcessGetFd)(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle);
+
+// Get the exit event for a WSLC process. Signaled when the process exits.
+// The caller takes ownership and must close it with CloseHandle().
+typedef HRESULT (*WSLCPluginAPI_ProcessGetExitEvent)(WSLCProcessHandle Process, HANDLE* ExitEvent);
+
+// Get the exit code of a WSLC process. The process must have exited.
+typedef HRESULT (*WSLCPluginAPI_ProcessGetExitCode)(WSLCProcessHandle Process, int* ExitCode);
+
+// Release a WSLC process handle. All outstanding handles obtained via
+// WSLCPluginAPI_ProcessGetFd/GetExitEvent must be closed before calling this.
+typedef void (*WSLCPluginAPI_ReleaseProcess)(WSLCProcessHandle Process);
 
 // Execute a program in a user distribution
 // On success, 'Socket' is connected to stdin & stdout (stderr goes to dmesg) // 'Arguments' is expected to be NULL terminated
@@ -132,6 +243,16 @@ struct WSLPluginHooksV1
     WSLPluginAPI_OnDistributionStopping OnDistributionStopping;
     WSLPluginAPI_OnDistributionRegistered OnDistributionRegistered;   // Introduced in 2.1.2
     WSLPluginAPI_OnDistributionRegistered OnDistributionUnregistered; // Introduced in 2.1.2
+
+    // WSLC hooks. Plugins compiled against older headers leave these zero-initialized.
+    WSLPluginAPI_OnSessionCreated OnSessionCreated;
+    WSLPluginAPI_OnSessionStopping OnSessionStopping;
+    WSLPluginAPI_ContainerStarted ContainerStarted;
+    WSLPluginAPI_ContainerStopping ContainerStopping;
+    WSLPluginAPI_ImageCreated ImageCreated;
+    WSLPluginAPI_ImageDeleted ImageDeleted;
+    WSLPluginAPI_OnWslcVmStarted WslcVmStarted;   // Introduced in 2.9.5
+    WSLPluginAPI_OnWslcVmStopping WslcVmStopping; // Introduced in 2.9.5
 };
 
 struct WSLPluginAPIV1
@@ -141,6 +262,15 @@ struct WSLPluginAPIV1
     WSLPluginAPI_ExecuteBinary ExecuteBinary;
     WSLPluginAPI_PluginError PluginError;
     WSLPluginAPI_ExecuteBinaryInDistribution ExecuteBinaryInDistribution; // Introduced in 2.1.2
+
+    // WSLC API calls.
+    WSLCPluginAPI_MountFolder WSLCMountFolder;                 // Introduced in 2.9.0
+    WSLCPluginAPI_UnmountFolder WSLCUnmountFolder;             // Introduced in 2.9.0
+    WSLCPluginAPI_CreateProcess WSLCCreateProcess;             // Introduced in 2.9.0
+    WSLCPluginAPI_ProcessGetFd WSLCProcessGetFd;               // Introduced in 2.9.0
+    WSLCPluginAPI_ProcessGetExitEvent WSLCProcessGetExitEvent; // Introduced in 2.9.0
+    WSLCPluginAPI_ProcessGetExitCode WSLCProcessGetExitCode;   // Introduced in 2.9.0
+    WSLCPluginAPI_ReleaseProcess WSLCReleaseProcess;           // Introduced in 2.9.0
 };
 
 typedef HRESULT (*WSLPluginAPI_EntryPointV1)(const struct WSLPluginAPIV1* Api, struct WSLPluginHooksV1* Hooks);

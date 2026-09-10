@@ -15,11 +15,16 @@
 #include "waitablevalue.h"
 #include "SecCompDispatcher.h"
 #include "SocketChannel.h"
+#include "lxinitshared.h"
 
 class GnsPortTracker
 {
 public:
-    GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel, NetlinkChannel&& netlinkChannel, std::shared_ptr<SecCompDispatcher> seccompDispatcher);
+    GnsPortTracker(
+        std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
+        NetlinkChannel&& netlinkChannel,
+        std::shared_ptr<SecCompDispatcher> seccompDispatcher,
+        LX_MINI_INIT_NETWORKING_MODE networkingMode);
 
     GnsPortTracker(const GnsPortTracker&) = delete;
     GnsPortTracker(GnsPortTracker&&) = delete;
@@ -116,19 +121,32 @@ public:
         std::uint64_t CallId;
     };
 
+private:
+    using ActivePortSet = std::set<std::pair<std::uint16_t, int>>;
+
+    struct ActivePorts
+    {
+        std::set<PortAllocation> FullAllocations;
+        ActivePortSet PortProtocolPairs; // Always populated, but only used in mirrored mode
+    };
+
     struct PortRefreshResult
     {
-        std::set<PortAllocation> Ports;
+        ActivePorts Ports;
         time_t Timestamp;
         std::function<void()> Resume;
     };
 
-private:
-    void OnRefreshAllocatedPorts(const std::set<PortAllocation>& Ports, time_t Timestamp);
+    bool IsMirroredMode() const
+    {
+        return m_networkingMode == LxMiniInitNetworkingModeMirrored;
+    }
+
+    void OnRefreshAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
 
     void RunPortRefresh();
 
-    std::set<PortAllocation> ListAllocatedPorts();
+    ActivePorts ListAllocatedPorts();
 
     std::optional<BindCall> ReadNextRequest();
 
@@ -157,6 +175,8 @@ private:
     WaitableValue<int> m_reply;
 
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
+
+    LX_MINI_INIT_NETWORKING_MODE m_networkingMode;
 
     std::string m_networkNamespace;
 };

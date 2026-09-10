@@ -49,10 +49,16 @@ namespace {
 WSLCGuestVolumeImpl::WSLCGuestVolumeImpl(
     std::string&& Name,
     std::string&& CreatedAt,
+    std::string&& Mountpoint,
     std::map<std::string, std::string>&& DriverOpts,
     std::map<std::string, std::string>&& Labels,
     DockerHTTPClient& DockerClient) :
-    m_name(std::move(Name)), m_createdAt(std::move(CreatedAt)), m_driverOpts(std::move(DriverOpts)), m_labels(std::move(Labels)), m_dockerClient(DockerClient)
+    m_name(std::move(Name)),
+    m_createdAt(std::move(CreatedAt)),
+    m_mountpoint(std::move(Mountpoint)),
+    m_driverOpts(std::move(DriverOpts)),
+    m_labels(std::move(Labels)),
+    m_dockerClient(DockerClient)
 {
 }
 
@@ -61,10 +67,6 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
 {
     ValidateDriverOpts(DriverOpts);
 
-    WSLCVolumeMetadata metadata;
-    metadata.Driver = WSLCGuestVolumeDriver;
-    metadata.DriverOpts = DriverOpts;
-
     docker_schema::CreateVolume request{};
     if (Name != nullptr && Name[0] != '\0')
     {
@@ -72,7 +74,6 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
     }
     request.Driver = "local";
     request.DriverOpts = DriverOpts;
-    request.Labels = {{WSLCVolumeMetadataLabel, wsl::shared::ToJson(metadata)}};
 
     // Merge user labels into the Docker volume labels.
     for (const auto& [key, value] : Labels)
@@ -85,21 +86,18 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
         auto createdVolume = DockerClient.CreateVolume(request);
 
         return std::make_unique<WSLCGuestVolumeImpl>(
-            std::move(createdVolume.Name), std::move(createdVolume.CreatedAt), std::move(DriverOpts), std::move(Labels), DockerClient);
+            std::move(createdVolume.Name),
+            std::move(createdVolume.CreatedAt),
+            std::move(createdVolume.Mountpoint),
+            std::move(DriverOpts),
+            std::move(Labels),
+            DockerClient);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create volume '%hs'", Name != nullptr ? Name : "");
 }
 
 std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Open(const wsl::windows::common::docker_schema::Volume& Volume, DockerHTTPClient& DockerClient)
 {
-    THROW_HR_IF(E_INVALIDARG, !Volume.Labels.has_value());
-
-    auto metadataIt = Volume.Labels->find(WSLCVolumeMetadataLabel);
-    THROW_HR_IF(E_INVALIDARG, metadataIt == Volume.Labels->end());
-
-    auto metadata = wsl::shared::FromJson<WSLCVolumeMetadata>(metadataIt->second.c_str());
-    THROW_HR_IF(E_INVALIDARG, metadata.Driver != WSLCGuestVolumeDriver);
-
     THROW_HR_IF(E_INVALIDARG, Volume.Driver != "local");
 
     if (Volume.Options.has_value())
@@ -107,20 +105,11 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Open(const wsl::window
         ValidateDriverOpts(Volume.Options.value());
     }
 
-    // Extract user labels (all labels except our internal metadata label).
-    std::map<std::string, std::string> userLabels;
-    for (const auto& [key, value] : *Volume.Labels)
-    {
-        if (key != WSLCVolumeMetadataLabel)
-        {
-            userLabels[key] = value;
-        }
-    }
+    std::map<std::string, std::string> driverOpts = Volume.Options.value_or(std::map<std::string, std::string>{});
+    std::map<std::string, std::string> labels = Volume.Labels.value_or(std::map<std::string, std::string>{});
 
-    auto volume = std::make_unique<WSLCGuestVolumeImpl>(
-        std::string{Volume.Name}, std::string{Volume.CreatedAt}, std::move(metadata.DriverOpts), std::move(userLabels), DockerClient);
-
-    return volume;
+    return std::make_unique<WSLCGuestVolumeImpl>(
+        std::string{Volume.Name}, std::string{Volume.CreatedAt}, std::string{Volume.Mountpoint}, std::move(driverOpts), std::move(labels), DockerClient);
 }
 
 void WSLCGuestVolumeImpl::Delete()
@@ -144,7 +133,9 @@ std::string WSLCGuestVolumeImpl::Inspect() const
     inspect.Name = m_name;
     inspect.Driver = WSLCGuestVolumeDriver;
     inspect.CreatedAt = m_createdAt;
-    inspect.DriverOpts = m_driverOpts;
+    inspect.Mountpoint = m_mountpoint;
+    inspect.Scope = WSLCVolumeScope;
+    inspect.Options = m_driverOpts;
     inspect.Labels = m_labels;
 
     return wsl::shared::ToJson(inspect);

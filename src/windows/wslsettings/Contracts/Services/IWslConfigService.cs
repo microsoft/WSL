@@ -76,6 +76,7 @@ public static class WslConfigEntryExtensions
 
         WslConfigEntry.ProcessorCount or
         WslConfigEntry.InitialAutoProxyTimeout or
+        WslConfigEntry.InstanceIdleTimeout or
         WslConfigEntry.VMIdleTimeout => WslConfigValueKind.Int32,
 
         WslConfigEntry.MemorySizeBytes or

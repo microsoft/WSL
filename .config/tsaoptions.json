@@ -1,0 +1,12 @@
+{
+    "codebaseName": "microsoft_WSL",
+    "serviceTreeID": "d8846bef-e9b5-4542-bcfc-98ebabac8a7b",
+    "instanceUrl": "https://microsoft.visualstudio.com/",
+    "projectName": "OS",
+    "areaPath": "OS\\Core\\Base\\VMAC - Virtual Machines and Containers\\LOW-Linux on Windows\\WSL",
+    "notificationAliases": [
+        "wslteam@microsoft.com"
+    ],
+    "validateToolOutput": "None",
+    "allTools": true
+}

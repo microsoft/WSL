@@ -1,0 +1,2 @@
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\${TARGET_PLATFORM}\${CMAKE_BUILD_TYPE}\wslcsdkcs.dll" target="lib\${WSL_NUGET_TARGET_FRAMEWORK}\"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\Microsoft.WSL.Containers\build\net\**" target="build\${WSL_NUGET_TARGET_FRAMEWORK}"/>

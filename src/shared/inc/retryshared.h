@@ -40,4 +40,19 @@ T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTime
     }
 }
 
+#ifdef WIN32
+
+template <typename T, typename TPeriod, typename TTimeout>
+T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTimeout timeout, std::vector<HRESULT>&& retryErrors)
+{
+    auto pred = [retryErrors = std::move(retryErrors)]() {
+        auto hr = HRESULT_FROM_WIN32(GetLastError());
+        return std::find(retryErrors.begin(), retryErrors.end(), hr) != retryErrors.end();
+    };
+
+    return RetryWithTimeout(routine, retryPeriod, timeout, pred);
+}
+
+#endif
+
 } // namespace wsl::shared::retry

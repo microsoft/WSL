@@ -187,8 +187,8 @@ File::File(std::shared_ptr<const Root> root) : m_Root{root}
 {
 }
 
-// Copies a file. This does not clone the open file state, just the name and qid.
-File::File(const File& file) : m_FileName{file.m_FileName}, m_Root{file.m_Root}, m_Qid{file.m_Qid}
+// Copies a file. This does not clone the open file state, just the name and metadata.
+File::File(const File& file) : m_FileName{file.m_FileName}, m_Root{file.m_Root}, m_Qid{file.m_Qid}, m_Device{file.m_Device}
 {
 }
 

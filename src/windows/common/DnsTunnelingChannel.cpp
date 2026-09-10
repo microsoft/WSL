@@ -6,7 +6,7 @@
 using wsl::core::networking::DnsTunnelingChannel;
 
 DnsTunnelingChannel::DnsTunnelingChannel(wil::unique_socket&& socket, DnsTunnelingCallback&& reportDnsRequest) :
-    m_channel{std::move(socket), "DnsTunneling", m_stopEvent.get()}, m_reportDnsRequest(std::move(reportDnsRequest))
+    m_channel{std::move(socket), "DnsTunneling", {m_stopEvent.get()}}, m_reportDnsRequest(std::move(reportDnsRequest))
 {
     WSL_LOG("DnsTunnelingChannel::DnsTunnelingChannel [Windows]", TraceLoggingValue(m_channel.Socket(), "socket"));
 

@@ -12,9 +12,11 @@ Abstract:
 
 --*/
 #pragma once
-#include "ArgumentTypes.h"
+#include "ArgMap.h"
 
+#include <optional>
 #include <string>
+#include <utility>
 
 #define WSLC_CLI_ARG_ID_CHAR L'-'
 #define WSLC_CLI_ARG_ID_STRING L"-"
@@ -22,29 +24,37 @@ Abstract:
 #define WSLC_CLI_HELP_ARG L"?"
 #define WSLC_CLI_HELP_ARG_STRING WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
 #define NO_ALIAS L""
-#define NO_LIMIT -1
 
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
+struct ArgumentOverrides
+{
+    std::optional<std::wstring> Name;
+    std::optional<std::wstring> Alias;
+    std::optional<bool> Required;
+    std::optional<argument::Limit> Limit;
+    std::optional<std::wstring> Desc;
+};
+
 // An argument to a command.
 struct Argument
 {
     // Default argument configuration constants
     static constexpr Kind DefaultKind = Kind::Flag;
     static constexpr bool DefaultRequired = false;
-    static constexpr int DefaultCountLimit = 1;
+    static constexpr argument::Limit DefaultLimit = argument::Limit::Single;
 
     // Full constructor with all parameters
     Argument(
         ArgType argType,
-        const std::wstring& name,
-        const std::wstring& alias,
-        const std::wstring& desc,
+        std::wstring name,
+        std::wstring alias,
+        std::wstring desc,
         argument::Kind kind = DefaultKind,
         bool required = DefaultRequired,
-        int countLimit = DefaultCountLimit) :
-        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_countLimit(countLimit)
+        argument::Limit limit = DefaultLimit) :
+        m_argType(argType), m_name(std::move(name)), m_desc(std::move(desc)), m_alias(std::move(alias)), m_required(required), m_type(kind), m_limit(limit)
     {
     }
 
@@ -54,12 +64,8 @@ struct Argument
     Argument(Argument&&) = default;
     Argument& operator=(Argument&&) = default;
 
-    // Creates an argument with optional overrides for table defaults
-    static Argument Create(
-        ArgType type,
-        std::optional<bool> required = std::nullopt,
-        std::optional<int> countLimit = std::nullopt,
-        std::optional<std::wstring> desc = std::nullopt);
+    // Creates an argument using its table defaults and any command-specific overrides.
+    static Argument Create(ArgType type, ArgumentOverrides overrides = {});
 
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;
@@ -89,13 +95,30 @@ struct Argument
     {
         return m_type;
     }
-    int Limit() const
+    bool IsOption() const
     {
-        return m_countLimit;
+        return m_type == argument::Kind::Flag || m_type == argument::Kind::Value;
+    }
+    Limit Limit() const
+    {
+        return m_limit;
     }
 
-    // Validates this argument's value in the provided args
-    void Validate(const ArgMap& execArgs) const;
+    // A single-value argument accepts one value (last-wins on repeats).
+    bool IsSingle() const
+    {
+        return m_limit == argument::Limit::Single;
+    }
+
+    // An unlimited argument accumulates every value supplied.
+    bool IsUnlimited() const
+    {
+        return m_limit == argument::Limit::Unlimited;
+    }
+
+    // Validates this argument's current values, caching the converted result (converted arguments
+    // only) on `execArgs` so reads reuse it without re-parsing until the raw values change.
+    void Validate(ArgMap& execArgs) const;
 
 private:
     ArgType m_argType;
@@ -104,6 +127,6 @@ private:
     std::wstring m_alias;
     bool m_required = DefaultRequired;
     argument::Kind m_type = DefaultKind;
-    int m_countLimit = DefaultCountLimit;
+    argument::Limit m_limit = DefaultLimit;
 };
 } // namespace wsl::windows::wslc

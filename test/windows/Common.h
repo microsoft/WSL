@@ -37,28 +37,27 @@ using namespace std::chrono_literals;
 #define LXSS_DISTRO_NAME_TEST_L WIDEN(LXSS_DISTRO_NAME_TEST)
 
 #define LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE L"-u root -e rm /etc/wsl.conf"
+#define LXSST_TESTS_INSTALL_COMMAND_LINE L"/bin/bash -c 'cd /data/test; ./build_tests.sh'"
 
 //
 // Test method declaration macros that tag tests with TAEF metadata for version-based selection.
-// Use these instead of TEST_METHOD() for tests that only apply to a specific WSL version.
-// When run via run-tests.ps1 or CloudTest, inapplicable tests are excluded from the run
-// entirely (no "skipped" noise) via TAEF /select: queries.
+// If the test version doesn't match the version passed to te.exe, the test is ignored.
 //
 #define WSL1_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"1") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=1)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSL2_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSLC_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
@@ -88,6 +87,15 @@ using namespace std::chrono_literals;
         if constexpr (wsl::shared::Arm64) \
         { \
             LogSkipped("This test is skipped for ARM64"); \
+            return; \
+        } \
+    }
+
+#define SKIP_TEST_SERVER() \
+    { \
+        if (IsWindowsServer()) \
+        { \
+            LogSkipped("This test is skipped on Windows Server SKUs"); \
             return; \
         } \
     }
@@ -179,6 +187,27 @@ public:
 
 private:
     std::optional<std::wstring> m_originalContent;
+};
+
+//
+// RAII wrapper for host file change.
+//
+
+class HostFileChange
+{
+public:
+    HostFileChange(const std::filesystem::path& Path, const std::string& NewContent);
+
+    ~HostFileChange();
+
+    NON_COPYABLE(HostFileChange);
+    NON_MOVABLE(HostFileChange);
+
+    void Update(const std::string& NewContent) const;
+
+private:
+    std::filesystem::path m_path;
+    std::optional<std::string> m_originalContent;
 };
 
 template <typename T>
@@ -302,22 +331,33 @@ private:
 class ScopedEnvVariable
 {
 public:
+    // Captures any existing value and clears the variable.
+    explicit ScopedEnvVariable(const std::wstring& Name);
+
+    // Captures any existing value and sets the variable to Value.
     ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value);
+
+    // Restores the original value.
     ~ScopedEnvVariable();
 
-    ScopedEnvVariable(const WslConfigChange&) = delete;
-    ScopedEnvVariable(WslConfigChange&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&&) = delete;
-    const ScopedEnvVariable& operator=(ScopedEnvVariable&) = delete;
+    NON_COPYABLE(ScopedEnvVariable);
+    NON_MOVABLE(ScopedEnvVariable);
+
+    // Sets the variable to a new value.
+    void Set(const std::wstring& Value);
+
+    // Clears (unsets) the variable.
+    void Clear();
 
 private:
     std::wstring m_name;
+    std::optional<std::wstring> m_originalValue;
 };
 
 class UniqueWebServer
 {
 public:
-    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent);
+    UniqueWebServer(LPCWSTR Endpoint, LPCWSTR ResponseContent, UINT StatusCode = 200);
     UniqueWebServer(LPCWSTR Endpoint, const std::filesystem::path& path);
     ~UniqueWebServer();
     UniqueWebServer(const UniqueWebServer&) = delete;
@@ -360,6 +400,7 @@ public:
     void Expect(const std::string& Expected);
     void ExpectConsume(const std::string& Expected);
     void ExpectClosed(DWORD Timeout = 60 * 1000);
+    void Stop();
 
     std::string ReadBytes(size_t Length);
     std::string ConsumeBytes(size_t Length);
@@ -498,7 +539,7 @@ wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type = TokenPrimary);
 
 std::wstring LxssWriteWslConfig(const std::wstring& Content);
 
-std::string LxssWriteWslDistroConfig(const std::string& Content);
+std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 enum class DrvFsMode
 {
@@ -513,7 +554,10 @@ struct TestConfigDefaults
     std::optional<size_t> vmIdleTimeout;
     std::optional<bool> safeMode;
     std::optional<bool> guiApplications;
+    std::optional<bool> earlyBootLogging;
+    std::optional<std::wstring> debugConsoleLogFile;
     std::optional<DrvFsMode> drvFsMode;
+    std::optional<bool> virtioFsAggregateShares;
     std::optional<wsl::core::NetworkingMode> networkingMode;
     const std::optional<std::wstring> vmSwitch;
     const std::optional<std::wstring> macAddress;
@@ -528,10 +572,12 @@ struct TestConfigDefaults
     std::optional<std::wstring> kernelModules;
     std::optional<std::wstring> loadKernelModules;
     std::optional<bool> loadDefaultKernelModules;
+    std::optional<std::wstring> systemDistro;
     std::optional<bool> sparse;
     std::optional<bool> hostAddressLoopback;
     int crashDumpCount = 100;
     std::optional<std::wstring> CrashDumpFolder;
+    std::optional<bool> isolateDistroCgroup;
 };
 
 std::wstring LxssGenerateTestConfig(TestConfigDefaults Default = {});
@@ -569,16 +615,16 @@ void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 void Trim(std::wstring& string);
 
-inline auto EnableSystemd(const std::string& extraConfig = "")
+inline auto EnableSystemd(const std::string& extraConfig = "", LPCWSTR distroName = LXSS_DISTRO_NAME_TEST_L)
 {
     // enable systemd on the test distro by editing /etc/wsl.conf
-    LxssWriteWslDistroConfig("[boot]\nsystemd=true\n" + extraConfig);
-    TerminateDistribution();
+    LxssWriteWslDistroConfig("[boot]\nsystemd=true\n" + extraConfig, distroName);
+    TerminateDistribution(distroName);
 
-    return wil::scope_exit([] {
+    return wil::scope_exit([distroName] {
         // clean up wsl.conf file
-        LxsstuLaunchWsl(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
-        TerminateDistribution();
+        LxsstuLaunchWsl(std::format(L"-d {} " LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE, distroName));
+        TerminateDistribution(distroName);
     });
 }
 
@@ -594,10 +640,18 @@ void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, con
 std::string ReadToString(SOCKET Handle);
 std::string ReadToString(HANDLE Handle);
 
+// Connects a pair of overlapped TCP sockets via an anonymous bind on the loopback interface.
+// Returns {client, server}.
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair();
+
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
-void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s);
+void WaitForOutput(wsl::windows::common::io::HandleWrapper handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s);
+inline void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s)
+{
+    WaitForOutput(wsl::windows::common::io::HandleWrapper{std::move(handle)}, targetValue, timeout);
+}
 
 std::string EscapeString(const std::string& Input);
 
@@ -605,7 +659,11 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
+void LoadTestImage(IWSLCSession& session, std::string_view imageName);
+
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
+
+std::optional<std::wstring> GetHostAdapterIpv4();
 
 template <typename T>
 void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
@@ -664,3 +722,11 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size);
+
+void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current());
+
+void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring);
+
+std::wstring FormatErrorMessage(std::wstring_view message, std::wstring_view errorCode);

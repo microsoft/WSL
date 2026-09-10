@@ -17,45 +17,10 @@ Abstract:
 #include "RegistryTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
-#include <iostream>
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 using namespace wsl::shared;
-
-namespace {
-
-auto MaskInput()
-{
-    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode = 0;
-
-    if ((input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &mode))
-    {
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT));
-        return wil::scope_exit(std::function<void()>([input, mode] {
-            SetConsoleMode(input, mode);
-            std::wcerr << L'\n';
-        }));
-    }
-
-    return wil::scope_exit(std::function<void()>([] {}));
-}
-
-std::wstring Prompt(const std::wstring& label, bool maskInput)
-{
-    // Write without a trailing newline so the cursor stays inline (matching Docker's behavior).
-    std::wcerr << label;
-
-    auto restoreConsole = maskInput ? MaskInput() : wil::scope_exit(std::function<void()>([] {}));
-
-    std::wstring value;
-    std::getline(std::wcin, value);
-
-    return value;
-}
-
-} // namespace
 
 namespace wsl::windows::wslc {
 
@@ -85,7 +50,7 @@ std::wstring RegistryCommand::LongDescription() const
 
 void RegistryCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    OutputHelp();
+    OutputHelp(context.Terminal);
 }
 
 // Registry Login Command
@@ -96,7 +61,6 @@ std::vector<Argument> RegistryLoginCommand::GetArguments() const
         Argument::Create(ArgType::PasswordStdin),
         Argument::Create(ArgType::Username),
         Argument::Create(ArgType::Server),
-        Argument::Create(ArgType::Session),
     };
 }
 
@@ -110,49 +74,45 @@ std::wstring RegistryLoginCommand::LongDescription() const
     return Localization::WSLCCLI_LoginLongDesc();
 }
 
-void RegistryLoginCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+void RegistryLoginCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
-    if (execArgs.Contains(ArgType::Password) && execArgs.Contains(ArgType::PasswordStdin))
+    if (execArgs.Contains(ArgType::Password) && execArgs.GetValue<ArgType::PasswordStdin>())
     {
-        throw CommandException(Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive());
+        throw ArgumentException(
+            Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive(), GetArgumentsForHelp({ArgType::Password, ArgType::PasswordStdin}));
     }
 
-    if (execArgs.Contains(ArgType::PasswordStdin) && !execArgs.Contains(ArgType::Username))
+    if (execArgs.GetValue<ArgType::PasswordStdin>() && !execArgs.Contains(ArgType::Username))
     {
-        throw CommandException(Localization::WSLCCLI_LoginPasswordStdinRequiresUsername());
+        throw ArgumentException(
+            Localization::WSLCCLI_LoginPasswordStdinRequiresUsername(), GetArgumentsForHelp({ArgType::PasswordStdin, ArgType::Username}));
     }
 }
 
 void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    // Prompt for username if not provided.
     if (!context.Args.Contains(ArgType::Username))
     {
-        context.Args.Add(ArgType::Username, Prompt(Localization::WSLCCLI_LoginUsernamePrompt(), false));
+        auto username = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginUsernamePrompt());
+        context.Args.Add(ArgType::Username, std::move(username));
     }
 
     // Resolve password: --password, --password-stdin, or interactive prompt.
     if (!context.Args.Contains(ArgType::Password))
     {
-        if (context.Args.Contains(ArgType::PasswordStdin))
+        if (context.Args.GetValue<ArgType::PasswordStdin>())
         {
-            std::wstring line;
-            std::getline(std::wcin, line);
-            if (!line.empty() && line.back() == L'\r')
-            {
-                line.pop_back();
-            }
-
-            context.Args.Add(ArgType::Password, std::move(line));
+            context.Args.Add(ArgType::Password, context.Terminal.ReadLine().value_or(std::wstring{}));
         }
         else
         {
-            context.Args.Add(ArgType::Password, Prompt(Localization::WSLCCLI_LoginPasswordPrompt(), true));
+            auto password = context.Terminal.PromptForLine(Localization::WSLCCLI_LoginPasswordPrompt(), true);
+            context.Args.Add(ArgType::Password, std::move(password));
         }
     }
 
     context //
-        << CreateSession << Login;
+        << ResolveSession << Login;
 }
 
 // Registry Logout Command

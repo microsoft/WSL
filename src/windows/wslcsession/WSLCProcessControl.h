@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 #include "wslc.h"
 #include "DockerHTTPClient.h"
-#include "ContainerEventTracker.h"
+#include "DockerEventTracker.h"
 
 namespace wsl::windows::service::wslc {
 
@@ -42,27 +42,27 @@ protected:
 class DockerContainerProcessControl : public WSLCProcessControl
 {
 public:
-    DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker);
+    DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient);
     ~DockerContainerProcessControl();
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
     void OnContainerReleased() noexcept;
 
-private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t eventTime);
+    // Records the exit code observed from Docker. Idempotent: first call wins.
+    void SetExitCode(int ExitCode);
+    void SignalExit();
 
+private:
     std::mutex m_lock;
     DockerHTTPClient& m_client;
     WSLCContainerImpl* m_container{};
-    ContainerEventTracker::ContainerTrackingReference m_trackingReference;
 };
 
 class DockerExecProcessControl : public WSLCProcessControl
 {
 public:
-    DockerExecProcessControl(WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker);
-    ~DockerExecProcessControl();
+    DockerExecProcessControl(WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker);
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
@@ -72,14 +72,14 @@ public:
     void SetExitCode(int ExitCode);
 
 private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t eventTime);
+    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t eventTime);
 
     mutable std::mutex m_lock;
     std::string m_id;
     std::optional<int> m_pid{};
     DockerHTTPClient& m_client;
     WSLCContainerImpl* m_container{};
-    ContainerEventTracker::ContainerTrackingReference m_trackingReference;
+    DockerEventTracker::EventTrackingReference m_eventTrackingReference;
 };
 
 class VMProcessControl : public WSLCProcessControl

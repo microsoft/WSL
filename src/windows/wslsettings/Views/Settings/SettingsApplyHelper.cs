@@ -156,6 +156,7 @@ internal static class SettingsApplyHelper
             { WslConfigEntry.SafeModeEnabled, "Settings_SafeMode/Header" },
             { WslConfigEntry.SparseVHDEnabled, "Settings_SparseVHD/Header" },
             { WslConfigEntry.VMIdleTimeout, "Settings_VMIdleTimeout/Header" },
+            { WslConfigEntry.InstanceIdleTimeout, "Settings_InstanceIdleTimeout/Header" },
             { WslConfigEntry.DebugConsoleEnabled, "Settings_DebugConsole/Header" },
             { WslConfigEntry.HardwarePerformanceCountersEnabled, "Settings_HWPerfCounters/Header" },
             { WslConfigEntry.KernelPath, "Settings_CustomKernelPath/Header" },
@@ -173,6 +174,7 @@ internal static class SettingsApplyHelper
                 switch (entry)
                 {
                     case WslConfigEntry.InitialAutoProxyTimeout:
+                    case WslConfigEntry.InstanceIdleTimeout:
                     case WslConfigEntry.VMIdleTimeout:
                         return string.Format("Settings_MillisecondsStringFormat".GetLocalized(), (int)value);
                     default:

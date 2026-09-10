@@ -19,6 +19,7 @@ Abstract:
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <pthread.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include "lxtcommon.h"
@@ -71,6 +72,10 @@ int SocketServerDgram(PLXT_ARGS Args);
 
 int SocketServerUnix(PLXT_ARGS Args);
 
+int SocketServerPortZeroFromThread(PLXT_ARGS Args);
+
+void* SocketServerPortZeroFromThreadWorker(void* Context);
+
 //
 // Global constants.
 //
@@ -99,7 +104,8 @@ static const LXT_VARIATION g_LxtServerVariations[] = {
     {"Socket Server - AF_UNIX", SocketServerUnix},
     {"Socket Server - accept multiple Ipv6", SocketServerAcceptMultipleIpv6},
     {"Socket Server - accept (MSG_WAITALL)", SocketServerAcceptWithFlags},
-    {"Socket Server - SOCK_DGRAM", SocketServerDgram}};
+    {"Socket Server - SOCK_DGRAM", SocketServerDgram},
+    {"Socket Server - port zero bind from thread", SocketServerPortZeroFromThread}};
 
 //
 // Function definitions.
@@ -118,7 +124,7 @@ long long GetTickCount(void)
     return Now.tv_sec * 1000 + Now.tv_nsec / 1000000;
 }
 
-int main(int Argc, char* Argv[])
+int SocketTestEntry(int Argc, char* Argv[])
 
 /*++
 --*/
@@ -1109,4 +1115,97 @@ int SocketServerUnix(PLXT_ARGS Args)
 {
 
     return SocketServerAccept(1, AF_UNIX, SOCK_SEQPACKET, 0);
+}
+
+int SocketServerPortZeroFromThread(PLXT_ARGS Args)
+{
+    int Error;
+    int Result = LXT_RESULT_FAILURE;
+    int ThreadError = 0;
+    pthread_t Thread;
+
+    Error = pthread_create(&Thread, NULL, SocketServerPortZeroFromThreadWorker, &ThreadError);
+    if (Error != 0)
+    {
+        LxtLogError("pthread_create - %s", strerror(Error));
+        goto ErrorExit;
+    }
+
+    Error = pthread_join(Thread, NULL);
+    if (Error != 0)
+    {
+        LxtLogError("pthread_join - %s", strerror(Error));
+        goto ErrorExit;
+    }
+
+    if (ThreadError != 0)
+    {
+        LxtLogError("Threaded port-zero server failed - %s", strerror(ThreadError));
+        goto ErrorExit;
+    }
+
+    Result = LXT_RESULT_SUCCESS;
+
+ErrorExit:
+    return Result;
+}
+
+void* SocketServerPortZeroFromThreadWorker(void* Context)
+{
+    int* ThreadError = Context;
+    int AcceptedSocket = -1;
+    struct sockaddr_in ServerAddress = {0};
+    socklen_t ServerAddressLength = sizeof(ServerAddress);
+    int ServerSocket = -1;
+    int Error = 0;
+
+    ServerSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (ServerSocket < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    ServerAddress.sin_family = AF_INET;
+    ServerAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(ServerSocket, (struct sockaddr*)&ServerAddress, sizeof(ServerAddress)) < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    if (getsockname(ServerSocket, (struct sockaddr*)&ServerAddress, &ServerAddressLength) < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    if (listen(ServerSocket, 1) < 0)
+    {
+        Error = errno;
+        goto ErrorExit;
+    }
+
+    printf("PORT_ZERO_THREAD_LISTENER_PORT=%u\n", ntohs(ServerAddress.sin_port));
+    fflush(stdout);
+
+    AcceptedSocket = accept(ServerSocket, NULL, NULL);
+    if (AcceptedSocket < 0)
+    {
+        Error = errno;
+    }
+
+ErrorExit:
+    *ThreadError = Error;
+    if (AcceptedSocket >= 0)
+    {
+        close(AcceptedSocket);
+    }
+
+    if (ServerSocket >= 0)
+    {
+        close(ServerSocket);
+    }
+
+    return NULL;
 }

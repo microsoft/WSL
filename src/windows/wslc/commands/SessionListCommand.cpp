@@ -25,7 +25,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> SessionListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Verbose, std::nullopt, std::nullopt, Localization::WSLCCLI_SessionListVerboseArgDescription()),
+        Argument::Create(ArgType::Verbose, {.Desc = Localization::WSLCCLI_SessionListVerboseArgDescription()}),
     };
 }
 

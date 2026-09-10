@@ -27,6 +27,7 @@ parameters:
         image: win11-23h2-ent-2024-11-18
       - name: fe_release
         image: 2022-datacenter-g2-2024-09-10
+        server: true
       - name: vb_release
         image: win10-22h2-ent-g2-2024-09-10
 
@@ -46,5 +47,7 @@ stages:
               branch: "${{ image.name }}"
               version: ${{ version }}
               image: "${{ image.image }}"
-              run: ${{ or(not(parameters.rs_prerelease_only), eq(image.name, 'rs_prerelease')) }}
+              # Skip the WSLC suite on Server images: it triggers a Hyper-V VMBus
+              # PowerOff hang during VM teardown that times out the job.
+              run: ${{ and(or(not(parameters.rs_prerelease_only), eq(image.name, 'rs_prerelease')), or(ne(version, 'wslc'), ne(image.server, true))) }}
               pool: "${{ parameters.pool }}"

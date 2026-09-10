@@ -7,7 +7,7 @@
 using namespace wsl::shared;
 using wsl::core::GnsChannel;
 
-GnsChannel::GnsChannel(wil::unique_socket&& socket) : m_channel(std::move(socket), "GNS", m_stopEvent.get())
+GnsChannel::GnsChannel(wil::unique_socket&& socket) : m_channel(std::move(socket), "GNS", {m_stopEvent.get()})
 {
     WSL_LOG("GnsChannel::GnsChannel", TraceLoggingValue(m_channel.Socket(), "socket"));
 }

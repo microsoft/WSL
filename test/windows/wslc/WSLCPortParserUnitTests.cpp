@@ -23,7 +23,7 @@ using namespace wsl::windows::wslc::models;
 
 class WSLCPortParserUnitTests
 {
-    WSL_TEST_CLASS(WSLCPortParserUnitTests)
+    WSLC_TEST_CLASS(WSLCPortParserUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

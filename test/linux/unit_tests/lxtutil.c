@@ -492,13 +492,15 @@ int LxtCheckWslPathTranslation(char* Path, const char* ExpectedPath, bool WinPat
 Description:
 
     This routine checks whether translating a path with wslpath matches the
-    specified result.
+    specified result. Pass NULL as ExpectedPath to assert that wslpath fails
+    to translate the path.
 
 Arguments:
 
     Path - Supplies the path to translate.
 
-    ExpectedPath - Supplies the expected translated path.
+    ExpectedPath - Supplies the expected translated path, or NULL to assert
+        that wslpath fails.
 
     WinPath - Supplies a value that indicates whether the specified path is a
         Windows path. When true, the expected path must be a Linux path and
@@ -515,15 +517,22 @@ Return Value:
     int Result;
     char TranslatedPath[4096];
 
-    LxtCheckResult(LxtExecuteWslPath(Path, WinPath, TranslatedPath, sizeof(TranslatedPath)));
-    LxtCheckStringEqual(ExpectedPath, TranslatedPath);
-    LxtLogInfo("%s => %s", Path, TranslatedPath);
+    LxtCheckResult(LxtExecuteWslPath(Path, WinPath, TranslatedPath, sizeof(TranslatedPath), ExpectedPath == NULL ? 1 : 0));
+    if (ExpectedPath == NULL)
+    {
+        LxtLogInfo("%s => (failed as expected)", Path);
+    }
+    else
+    {
+        LxtCheckStringEqual(ExpectedPath, TranslatedPath);
+        LxtLogInfo("%s => %s", Path, TranslatedPath);
+    }
 
 ErrorExit:
     return Result;
 }
 
-int LxtExecuteAndReadOutput(char** Argv, char* OutputBuffer, size_t OutputBufferSize)
+int LxtExecuteAndReadOutput(char** Argv, char* OutputBuffer, size_t OutputBufferSize, int ExpectedExitCode)
 
 /*++
 
@@ -542,6 +551,8 @@ Arguments:
     OutputBuffer - Supplies the buffer to hold the process's stdout.
 
     OutputBufferSize - Supplies the size of the output buffer.
+
+    ExpectedExitCode - Supplies the expected exit code of the child process.
 
 Return Value:
 
@@ -585,10 +596,10 @@ Return Value:
     OutputBuffer[BytesRead] = '\0';
 
     //
-    // Make sure the executable exited successfully.
+    // Make sure the executable exited with the expected status.
     //
 
-    LxtCheckResult(LxtWaitPidPoll(ChildPid, 0));
+    LxtCheckResult(LxtWaitPidPoll(ChildPid, ExpectedExitCode << 8));
 
 ErrorExit:
     LxtClosePipe(&Pipe);
@@ -596,7 +607,7 @@ ErrorExit:
     return Result;
 }
 
-int LxtExecuteWslPath(char* Path, bool WinPath, char* OutputBuffer, size_t OutputBufferSize)
+int LxtExecuteWslPath(char* Path, bool WinPath, char* OutputBuffer, size_t OutputBufferSize, int ExpectedExitCode)
 
 /*++
 
@@ -617,6 +628,9 @@ Arguments:
     OutputBuffer - Supplies the buffer to hold the process's stdout.
 
     OutputBufferSize - Supplies the size of the output buffer.
+
+    ExpectedExitCode - Supplies the expected exit code of wslpath. Pass 1 when
+        the translation is expected to fail.
 
 Return Value:
 
@@ -648,7 +662,7 @@ Return Value:
     // Execute wslpath.
     //
 
-    LxtCheckResult(LxtExecuteAndReadOutput(Argv, OutputBuffer, OutputBufferSize));
+    LxtCheckResult(LxtExecuteAndReadOutput(Argv, OutputBuffer, OutputBufferSize, ExpectedExitCode));
 
     //
     // Wslpath outputs a new line at the end. Strip it to make things easier on

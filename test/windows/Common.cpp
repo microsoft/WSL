@@ -17,6 +17,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "LxssDynamicFunction.h"
+#include "WslCoreNetworkEndpointSettings.h"
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
@@ -58,13 +59,14 @@ static HANDLE g_OriginalStderr;
 static BOOL g_RelogEverything = TRUE;
 static bool g_LogDmesgAfterEachTest = false;
 static PTP_TIMER g_WatchdogTimer;
+
 static BOOL g_VmMode;
 static std::wstring g_originalConfig;
 static std::wstring g_originalDefaultDistro;
 std::wstring g_dumpFolder;
 std::optional<std::wstring> g_dumpToolPath;
 static bool g_enableWerReport = false;
-static std::wstring g_pipelineBuildId;
+std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f
@@ -1389,6 +1391,48 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+HostFileChange::HostFileChange(const std::filesystem::path& Path, const std::string& NewContent) : m_path(Path)
+{
+    if (std::filesystem::exists(m_path))
+    {
+        std::ifstream file(m_path, std::ios::binary);
+        THROW_HR_IF(E_FAIL, !file.is_open());
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        m_originalContent = buffer.str();
+    }
+
+    Update(NewContent);
+}
+
+HostFileChange::~HostFileChange()
+try
+{
+    if (m_originalContent.has_value())
+    {
+        std::filesystem::create_directories(m_path.parent_path());
+        std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+        if (file.is_open())
+        {
+            file.write(m_originalContent->data(), static_cast<std::streamsize>(m_originalContent->size()));
+        }
+    }
+    else
+    {
+        std::filesystem::remove(m_path);
+    }
+}
+CATCH_LOG()
+
+void HostFileChange::Update(const std::string& NewContent) const
+{
+    std::filesystem::create_directories(m_path.parent_path());
+    std::ofstream file(m_path, std::ios::binary | std::ios::trunc);
+    THROW_HR_IF(E_FAIL, !file.is_open());
+    file.write(NewContent.data(), static_cast<std::streamsize>(NewContent.size()));
+    THROW_HR_IF(E_FAIL, !file.good());
+}
+
 std::wstring ReadFileContent(const std::string& Path)
 {
     std::ifstream configRead(Path);
@@ -1416,9 +1460,9 @@ std::wstring LxssWriteWslConfig(const std::wstring& Content)
 }
 
 // writes distro specific settings /etc/wsl.conf
-std::string LxssWriteWslDistroConfig(const std::string& Content)
+std::string LxssWriteWslDistroConfig(const std::string& Content, LPCWSTR DistributionName)
 {
-    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", LXSS_DISTRO_NAME_TEST);
+    std::string path = std::format("\\\\wsl.localhost\\{}\\etc\\wsl.conf", DistributionName);
 
     std::ifstream distroConfigRead(path);
     auto previousContent = std::string{std::istreambuf_iterator<char>(distroConfigRead), {}};
@@ -1495,11 +1539,12 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
         L"debugConsoleLogFile=" +
-        EscapePath(kernelLogs) +
+        EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
         L"telemetry=false\n" +
         boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
-        L"earlyBootLogging=false\n" + networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
+        boolOptionToString(L"earlyBootLogging", Default.earlyBootLogging, false) +
+        networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())
     {
@@ -1525,6 +1570,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
     {
         newConfig +=
             L"loadDefaultKernelModules=" + std::wstring(Default.loadDefaultKernelModules.value() ? L"true" : L"false") + L"\n";
+    }
+
+    if (Default.systemDistro.has_value())
+    {
+        newConfig += L"systemDistro=" + EscapePath(Default.systemDistro.value()) + L"\n";
     }
 
     switch (Default.networkingMode.value_or(wsl::core::NetworkingMode::Nat))
@@ -1595,8 +1645,20 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         newConfig += L"[wsl2]\n";
     }
 
+    if (Default.virtioFsAggregateShares.has_value())
+    {
+        newConfig += L"\n[experimental]\n";
+        newConfig += boolOptionToString(L"virtioFsAggregateShares", Default.virtioFsAggregateShares, true);
+        newConfig += L"[wsl2]\n";
+    }
+
     // TODO: Remove once SetVersion() truncated archive error is root caused.
     newConfig += L"\n[experimental]\nSetVersionDebug=true\n[wsl2]\n";
+
+    if (Default.isolateDistroCgroup.has_value())
+    {
+        newConfig += boolOptionToString(L"isolateDistroCgroup", Default.isolateDistroCgroup, true);
+    }
 
     return newConfig;
 }
@@ -1976,6 +2038,17 @@ Return Value:
     wsl::windows::common::wslutil::InitializeWil();
 
     THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
+
+    // Assign a job object to the current process to ensure that we don't leak processes on failure.
+    // N.B. When the job object is closed, all processes associated with the job will be terminated.
+    // Because of that, we're purposefully leaking this job object so we don't kill the test process on cleanup.
+    auto job = CreateJobObjectW(nullptr, nullptr);
+    THROW_LAST_ERROR_IF(!job);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(job, GetCurrentProcess()));
 
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG
@@ -2457,17 +2530,45 @@ void Trim(std::wstring& string)
     std::erase_if(string, [](auto c) { return !isalnum(c); });
 }
 
-ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) : m_name(Name)
+static std::optional<std::wstring> CaptureEnvValue(const std::wstring& Name)
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(Name.c_str(), Value.c_str()));
+    std::wstring value;
+    HRESULT hr = wil::GetEnvironmentVariableW(Name.c_str(), value);
+    if (hr == HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND))
+    {
+        return std::nullopt;
+    }
+    THROW_IF_FAILED(hr);
+    return value;
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name) : m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), nullptr));
+}
+
+ScopedEnvVariable::ScopedEnvVariable(const std::wstring& Name, const std::wstring& Value) :
+    m_name(Name), m_originalValue(CaptureEnvValue(Name))
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(Name.c_str(), Value.c_str()));
 }
 
 ScopedEnvVariable::~ScopedEnvVariable()
 {
-    VERIFY_IS_TRUE(SetEnvironmentVariable(m_name.c_str(), nullptr));
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), m_originalValue.has_value() ? m_originalValue->c_str() : nullptr));
 }
 
-UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content)
+void ScopedEnvVariable::Set(const std::wstring& Value)
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), Value.c_str()));
+}
+
+void ScopedEnvVariable::Clear()
+{
+    VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
+}
+
+UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content, UINT StatusCode)
 {
     auto cmd = std::format(
         LR"(Powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
@@ -2478,12 +2579,13 @@ $server.Start()
 while ($true)
 {{
     $context = $server.GetContext()
-    $context.Response.StatusCode
+    $context.Response.StatusCode = {}
     $content = [Text.Encoding]::UTF8.GetBytes('{}')
     $context.Response.OutputStream.Write($content , 0, $content.length)
     $context.Response.close()
 }}")",
         Endpoint,
+        StatusCode,
         Content);
 
     m_process = LxsstuStartProcess(cmd.data());
@@ -2603,6 +2705,32 @@ std::string ReadToString(SOCKET Handle)
     return output;
 }
 
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair()
+{
+    wil::unique_socket listenSocket{WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED)};
+    THROW_LAST_ERROR_IF(!listenSocket);
+
+    sockaddr_in bindAddr{};
+    bindAddr.sin_family = AF_INET;
+    bindAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    bindAddr.sin_port = 0;
+    THROW_LAST_ERROR_IF(bind(listenSocket.get(), reinterpret_cast<sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR);
+    THROW_LAST_ERROR_IF(listen(listenSocket.get(), 1) == SOCKET_ERROR);
+
+    sockaddr_in boundAddr{};
+    int boundAddrLen = sizeof(boundAddr);
+    THROW_LAST_ERROR_IF(getsockname(listenSocket.get(), reinterpret_cast<sockaddr*>(&boundAddr), &boundAddrLen) == SOCKET_ERROR);
+
+    wil::unique_socket clientSocket{WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED)};
+    THROW_LAST_ERROR_IF(!clientSocket);
+    THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<sockaddr*>(&boundAddr), sizeof(boundAddr)) == SOCKET_ERROR);
+
+    wil::unique_socket serverSocket{accept(listenSocket.get(), nullptr, nullptr)};
+    THROW_LAST_ERROR_IF(!serverSocket);
+
+    return {std::move(clientSocket), std::move(serverSocket)};
+}
+
 std::string ReadToString(HANDLE Handle)
 {
     std::string output;
@@ -2679,6 +2807,11 @@ PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
 }
 
 PartialHandleRead::~PartialHandleRead()
+{
+    Stop();
+}
+
+void PartialHandleRead::Stop()
 {
     m_exitEvent.SetEvent();
     if (m_thread.joinable())
@@ -2771,13 +2904,13 @@ try
 }
 CATCH_LOG();
 
-class ReadHandleWithTargetValue : public wsl::windows::common::relay::ReadHandle
+class ReadHandleWithTargetValue : public wsl::windows::common::io::ReadHandle
 {
 public:
     NON_COPYABLE(ReadHandleWithTargetValue);
     NON_MOVABLE(ReadHandleWithTargetValue);
 
-    ReadHandleWithTargetValue(wsl::windows::common::relay::HandleWrapper&& MovedHandle, std::string_view targetValue) :
+    ReadHandleWithTargetValue(wsl::windows::common::io::HandleWrapper&& MovedHandle, std::string_view targetValue) :
         ReadHandle(std::move(MovedHandle), [this](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
         m_targetValue(targetValue)
     {
@@ -2798,7 +2931,7 @@ public:
 private:
     void CheckIfTargetFound()
     {
-        using namespace wsl::windows::common::relay;
+        using namespace wsl::windows::common::io;
 
         if (State == IOHandleStatus::Standby || State == IOHandleStatus::Completed)
         {
@@ -2822,9 +2955,9 @@ private:
     std::string m_targetValue;
 };
 
-void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout)
+void WaitForOutput(wsl::windows::common::io::HandleWrapper handle, std::string_view targetValue, std::chrono::milliseconds timeout)
 {
-    wsl::windows::common::relay::MultiHandleWait io;
+    wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));
     io.Run(timeout);
 }
@@ -2859,6 +2992,19 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     }
 
     return result;
+}
+
+void LoadTestImage(IWSLCSession& session, std::string_view imageName)
+{
+    std::filesystem::path imagePath = GetTestImagePath(imageName);
+    wil::unique_hfile imageFile{
+        CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!imageFile);
+
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+
+    THROW_IF_FAILED(session.LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), fileSize.QuadPart, nullptr, nullptr));
 }
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
@@ -2914,6 +3060,17 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
     }
 }
 
+std::optional<std::wstring> GetHostAdapterIpv4()
+{
+    auto endpoint = wsl::core::networking::GetHostEndpointSettings();
+    if (!endpoint || endpoint->PreferredIpAddress.AddressString.empty())
+    {
+        return {};
+    }
+
+    return endpoint->PreferredIpAddress.AddressString;
+}
+
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)
 {
     auto [everyoneSid, everyoneSidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
@@ -2935,4 +3092,75 @@ void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_
 
     THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
         const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
+}
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size)
+{
+    while (size > 0)
+    {
+        auto result = send(Socket, static_cast<const char*>(data), gsl::narrow_cast<int>(size), 0);
+        VERIFY_IS_TRUE(result > 0);
+
+        size -= result;
+        data = static_cast<const char*>(data) + result;
+    }
+}
+
+void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source)
+{
+    auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+    if (comError.has_value())
+    {
+        if (!Expected.has_value())
+        {
+            LogError("Unexpected COM error: '%ls'. Source: %hs", comError->Message.get(), std::format("{}", Source).c_str());
+            VERIFY_FAIL();
+        }
+
+        VERIFY_ARE_EQUAL(Expected.value(), comError->Message.get());
+    }
+    else
+    {
+        if (Expected.has_value())
+        {
+            LogError("Expected COM error: '%ls' but none was set. Source: %hs", Expected->c_str(), std::format("{}", Source).c_str());
+            VERIFY_FAIL();
+        }
+    }
+}
+
+void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
+{
+    auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+    if (comError.has_value())
+    {
+        if (!comError->Message)
+        {
+            LogError("Expected COM error containing: '%ls', but COM error message was null", ExpectedSubstring.c_str());
+            VERIFY_FAIL();
+        }
+
+        if (wcsstr(comError->Message.get(), ExpectedSubstring.c_str()) == nullptr)
+        {
+            LogError("Expected COM error containing: '%ls', but got: '%ls'", ExpectedSubstring.c_str(), comError->Message.get());
+            VERIFY_FAIL();
+        }
+    }
+    else
+    {
+        LogError("Expected COM error containing: '%ls' but none was set", ExpectedSubstring.c_str());
+        VERIFY_FAIL();
+    }
+}
+
+std::wstring FormatErrorMessage(std::wstring_view message, std::wstring_view errorCode)
+{
+    return std::format(
+        L"{}\r\nError code: {}\r\n"
+        L"If this error was unexpected, please consider searching for existing issues or filing a new issue at "
+        L"https://github.com/microsoft/WSL/issues.\r\n",
+        message,
+        errorCode);
 }

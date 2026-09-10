@@ -25,8 +25,31 @@ Abstract:
 
 EXTERN_C_START
 
+// WSLC specific error codes
+// Ensure wslc.idl and wslcsdk.idl are also updated.
+#define WSLC_E_BASE (0x0600)
+#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 1)             /* 0x80040601 */
+#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2)  /* 0x80040602 */
+#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3)         /* 0x80040603 */
+#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4)            /* 0x80040604 */
+#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5)       /* 0x80040605 */
+#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6)        /* 0x80040606 */
+#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7)            /* 0x80040607 */
+#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8)        /* 0x80040608 */
+#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9)           /* 0x80040609 */
+#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10)           /* 0x8004060A */
+#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)          /* 0x8004060B */
+#define WSLC_E_CONTAINER_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 12)         /* 0x8004060C */
+#define WSLC_E_REGISTRY_BLOCKED_BY_POLICY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 13) /* 0x8004060D */
+#define WSLC_E_VOLUME_NOT_AVAILABLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 14)       /* 0x8004060E */
+#define WSLC_E_SESSION_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 15)          /* 0x8004060F */
+#define WSLC_E_VM_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 16)             /* 0x80040610 */
+#define WSLC_E_EVENTS_LOST MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 17)                /* 0x80040611 */
+#define WSLC_E_EVENT_STREAM_FINISHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 18)      /* 0x80040612 */
+#define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)          /* 0x80040613 */
+
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 80
+#define WSLC_SESSION_OPTIONS_SIZE 72
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -37,7 +60,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 96
+#define WSLC_CONTAINER_OPTIONS_SIZE 104
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -66,8 +89,18 @@ typedef enum WslcContainerNetworkingMode
 typedef enum WslcVhdType
 {
     WSLC_VHD_TYPE_DYNAMIC = 0, // Expanding VHDX (default)
-    WSLC_VHD_TYPE_FIXED = 1
+    WSLC_VHD_TYPE_FIXED = 1    // Fixed-allocation VHDX (only honored by WslcCreateSessionVhdVolume)
 } WslcVhdType;
+
+typedef enum WslcVhdRequirementsFlags
+{
+    WSLC_VHD_REQ_FLAG_NONE = 0x00000000,
+    // When set, WslcVhdRequirements::uid and gid are honored. When clear,
+    // those fields are ignored and the volume is left owned by root:root.
+    WSLC_VHD_REQ_FLAG_OWNER = 0x00000001,
+} WslcVhdRequirementsFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcVhdRequirementsFlags);
 
 typedef struct WslcVhdRequirements
 {
@@ -75,6 +108,11 @@ typedef struct WslcVhdRequirements
     _In_z_ PCSTR name;
     _In_ uint64_t sizeBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
+    // The remaining fields are only honored by WslcCreateSessionVhdVolume.
+    // WslcSetSessionSettingsVhd rejects non-NONE flags with E_INVALIDARG.
+    _In_ WslcVhdRequirementsFlags flags;
+    _In_ uint32_t uid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
+    _In_ uint32_t gid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
 } WslcVhdRequirements;
 
 typedef enum WslcSessionFeatureFlags
@@ -92,7 +130,20 @@ typedef enum WslcSessionTerminationReason
     WSLC_SESSION_TERMINATION_REASON_CRASHED = 2,
 } WslcSessionTerminationReason;
 
-typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
+typedef struct WslcSessionCrashDumpInfo
+{
+    _Field_z_ PCWSTR dumpPath;
+    _Field_z_ PCSTR processName;
+    uint32_t pid;
+    uint32_t signal;
+    uint64_t timestamp;
+} WslcSessionCrashDumpInfo;
+
+typedef __callback void(CALLBACK* WslcSessionCrashDumpCallback)(_In_ const WslcSessionCrashDumpInfo* info, _In_opt_ PVOID context);
+
+// Opaque handle returned by WslcRegisterSessionCrashDumpCallback. Holding it keeps the crash dump
+// registration alive; pass it to WslcReleaseCrashDumpSubscription to unsubscribe.
+DECLARE_HANDLE(WslcCrashDumpSubscription);
 
 STDAPI WslcInitSessionSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
@@ -107,12 +158,24 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
-// Pass in Null for callback to clear the termination callback
-STDAPI WslcSetSessionSettingsTerminationCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext);
+STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent);
+STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason);
 
 STDAPI WslcTerminateSession(_In_ WslcSession session);
 STDAPI WslcReleaseSession(_In_ WslcSession session);
+
+// Registers a callback invoked when a Linux process crash dump is written for the session.
+// Works for any caller holding a live session. The returned subscription keeps the registration
+// alive; release it with WslcReleaseCrashDumpSubscription to unsubscribe. Multiple subscriptions
+// can be registered against the same session.
+STDAPI WslcRegisterSessionCrashDumpCallback(
+    _In_ WslcSession session,
+    _In_ WslcSessionCrashDumpCallback crashDumpCallback,
+    _In_opt_ PVOID crashDumpContext,
+    _Out_ WslcCrashDumpSubscription* subscription,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcReleaseCrashDumpSubscription(_In_ WslcCrashDumpSubscription subscription);
 
 // CONTAINER DEFINITIONS
 
@@ -169,6 +232,12 @@ DEFINE_ENUM_FLAG_OPERATORS(WslcContainerStartFlags);
 STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Opens an existing container by name, full ID, or partial ID prefix.
+// The returned WslcContainer handle is owned by the caller; release it with WslcReleaseContainer.
+// Returns WSLC_E_CONTAINER_NOT_FOUND if no matching container exists, or
+// WSLC_E_CONTAINER_PREFIX_AMBIGUOUS if the given prefix matches more than one container.
+STDAPI WslcOpenContainer(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
@@ -341,6 +410,11 @@ typedef struct WslcProcessCallbacks
 
 STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
 
+// Sets IO callbacks for the init process of a container.
+// Must be called before WslcStartContainer (with WSLC_CONTAINER_START_FLAG_ATTACH).
+// Has no effect on a container that is already running.
+STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
+
 // PROCESS MANAGEMENT
 
 STDAPI WslcGetProcessPid(_In_ WslcProcess process, _Out_ uint32_t* pid);
@@ -446,7 +520,7 @@ typedef struct WslcImageInfo
     // we should expose this
     CHAR name[WSLC_IMAGE_NAME_LENGTH];
     uint8_t sha256[32];
-    uint64_t sizeBytes;
+    int64_t sizeBytes;
     uint64_t createdUnixTime;
 } WslcImageInfo;
 
@@ -471,7 +545,15 @@ typedef struct WslcPushImageOptions
 
 STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-// Authenticates with a container registry and returns an identity token.
+typedef enum WslcIdentityTokenType
+{
+    WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN = 0,
+    WSLC_IDENTITY_TOKEN_TYPE_TOKEN = 1,
+    WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS = 2,
+} WslcIdentityTokenType;
+
+// Authenticates with a container registry and returns an identity token suitable for use as
+// the registryAuth value in WslcPullSessionImage and WslcPushSessionImage.
 //
 // Parameters:
 //   session
@@ -487,21 +569,42 @@ STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOp
 //       The password for authentication.
 //
 //   identityToken
-//       On success, receives a pointer to a null-terminated ANSI string
-//       containing the identity token.
+//       On success, receives a pointer to a null-terminated ANSI string containing a
+//       base64-encoded JSON object that can be passed directly as the registryAuth value to
+//       WslcPullSessionImage or WslcPushSessionImage.
 //
-//       The string is allocated using CoTaskMemAlloc. The caller takes
-//       ownership of the returned memory and must free it by calling
-//       CoTaskMemFree when it is no longer needed.
+//       The string is allocated using CoTaskMemAlloc. The caller takes ownership of the
+//       returned memory and must free it by calling CoTaskMemFree when it is no longer needed.
+//
+//   tokenType
+//       Optional. On success, receives the type of credential embedded in identityToken:
+//         WSLC_IDENTITY_TOKEN_TYPE_TOKEN      - the server returned an identity token;
+//                                               identityToken encodes {"identitytoken": ...}
+//         WSLC_IDENTITY_TOKEN_TYPE_CREDENTIALS - the server returned no token; the supplied
+//                                               username/password are embedded instead as
+//                                               {"username": ..., "password": ...}
+//       On failure, set to WSLC_IDENTITY_TOKEN_TYPE_UNKNOWN.
+//       May be null if the caller does not need the token type.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
 //
 // Return Value:
 //   S_OK on success. Otherwise, an HRESULT error code indicating the failure.
+//
+// Outcome table:
+//   Outcome                       | HRESULT | identityToken                        | tokenType
+//   ------------------------------|---------|--------------------------------------|----------
+//   Failure                       | FAILED  | nullptr                              | UNKNOWN
+//   Success, server returns token | S_OK    | base64({"identitytoken": "<token>"}) | TOKEN
+//   Success, no token returned    | S_OK    | base64({"username":..,"password":..})| CREDENTIALS
 STDAPI WslcSessionAuthenticate(
     _In_ WslcSession session,
     _In_z_ PCSTR serverAddress,
     _In_z_ PCSTR username,
     _In_z_ PCSTR password,
     _Outptr_result_z_ PSTR* identityToken,
+    _Out_opt_ WslcIdentityTokenType* tokenType,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Retrieves the list of container images
@@ -546,6 +649,8 @@ typedef enum WslcComponentFlags
     WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM = 1,
     // The WSL runtime package, at an appropriate version to provide support for WSLC.
     WSLC_COMPONENT_FLAG_WSL_PACKAGE = 2,
+    // Set if the WSLC SDK itself needs to be updated.
+    WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE = 4,
 } WslcComponentFlags;
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcComponentFlags);
@@ -563,8 +668,18 @@ STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version);
 typedef __callback void(CALLBACK* WslcInstallCallback)(
     _In_ WslcComponentFlags component, _In_ uint32_t progressSteps, _In_ uint32_t totalSteps, _In_opt_ PVOID context);
 
+typedef enum WslcInstallOptions
+{
+    WSLC_INSTALL_OPTION_NONE = 0,
+    // Allows components to be reinstalled.
+    WSLC_INSTALL_OPTION_REPAIR = 1,
+} WslcInstallOptions;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcInstallOptions);
+
 // Callbacks will only be made for components that are actively installed by this call.
-// That list can be acquired prior to this call with `WslcCanRun`.
-STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
+// The list of required components can be acquired prior to this call with `WslcGetMissingComponents`.
+STDAPI WslcInstallWithDependencies(
+    _In_ WslcComponentFlags components, _In_ WslcInstallOptions options, _In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
 
 EXTERN_C_END

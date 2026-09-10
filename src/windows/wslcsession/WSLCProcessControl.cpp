@@ -41,12 +41,8 @@ const wil::unique_event& WSLCProcessControl::GetExitEvent() const
     return m_exitEvent;
 }
 
-DockerContainerProcessControl::DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker) :
-    m_container(&Container),
-    m_client(DockerClient),
-    m_trackingReference(EventTracker.RegisterContainerStateUpdates(
-        Container.ID(),
-        std::bind(&DockerContainerProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
+DockerContainerProcessControl::DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient) :
+    m_container(&Container), m_client(DockerClient)
 {
 }
 
@@ -70,19 +66,23 @@ void DockerContainerProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
     m_client.ResizeContainerTty(m_container->ID(), Rows, Columns);
 }
 
-void DockerContainerProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t /*eventTime*/)
+void DockerContainerProcessControl::SetExitCode(int ExitCode)
 {
-    if (Event == ContainerEvent::Stop)
+    std::lock_guard lock{m_lock};
+    if (!m_exitedCode.has_value())
     {
-        std::lock_guard lock{m_lock};
-        if (!m_exitEvent.is_signaled())
-        {
-            WSL_LOG("ContainerProcessStop");
-            WI_ASSERT(ExitCode.has_value());
-            WI_ASSERT(!m_exitedCode.has_value());
-            m_exitedCode = ExitCode.value();
-            m_exitEvent.SetEvent();
-        }
+        m_exitedCode = ExitCode;
+    }
+}
+
+void DockerContainerProcessControl::SignalExit()
+{
+    std::lock_guard lock{m_lock};
+    if (!m_exitEvent.is_signaled())
+    {
+        WSL_LOG("ContainerProcessStop");
+        WI_ASSERT(m_exitedCode.has_value());
+        m_exitEvent.SetEvent();
     }
 }
 
@@ -93,43 +93,35 @@ int DockerContainerProcessControl::GetPid() const
 
 void DockerContainerProcessControl::OnContainerReleased() noexcept
 {
-    {
-        std::lock_guard lock{m_lock};
+    std::lock_guard lock{m_lock};
 
-        WI_ASSERT(m_container != nullptr);
-        m_container = nullptr;
-    }
-
-    // N.B. The caller might keep a reference to the process even after the container is released.
-    // If that happens, make sure that the state tracking can't outlive the session.
-    // This is safe to call without the lock because removing the tracking reference is protected by the event tracker lock.
-    m_trackingReference.Reset();
+    WI_ASSERT(m_container != nullptr);
+    m_container = nullptr;
 
     // Signal the exit event to prevent callers from being blocked on it.
     if (!m_exitEvent.is_signaled())
     {
-        m_exitedCode = 128 + WSLCSignalSIGKILL;
+        // If the container already produced a real exit code (recorded by SetExitCode but not yet
+        // signaled — e.g. an --rm container whose init-exit signal is deferred to the Destroy
+        // event), preserve it. Only synthesize SIGKILL when the container is released without ever
+        // having produced an exit code (an abrupt teardown of a still-running container).
+        if (!m_exitedCode.has_value())
+        {
+            m_exitedCode = 128 + WSLCSignalSIGKILL;
+        }
+
         m_exitEvent.SetEvent();
     }
 }
 
 DockerExecProcessControl::DockerExecProcessControl(
-    WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker) :
+    WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker) :
     m_container(&Container),
     m_id(Id),
     m_client(DockerClient),
-    m_trackingReference(EventTracker.RegisterExecStateUpdates(
+    m_eventTrackingReference(EventTracker.RegisterExecStateUpdates(
         Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
-}
-
-DockerExecProcessControl::~DockerExecProcessControl()
-{
-    std::lock_guard lock{m_lock};
-    if (m_container != nullptr)
-    {
-        m_container->OnProcessReleased(this);
-    }
 }
 
 int DockerExecProcessControl::GetPid() const
@@ -158,6 +150,12 @@ void DockerExecProcessControl::SetPid(int Pid)
 {
     std::lock_guard lock{m_lock};
 
+    // Pid must be a real (forked) process. Docker reports Pid=0 in the brief
+    // window between StartExec returning and runc actually forking the user
+    // process; treating 0 as a valid PID causes the exec wait to hang forever
+    // because Docker never emits exec_die for a process that never spawned
+    // (see PR #40550). Callers must filter Pid > 0 themselves.
+    WI_ASSERT(Pid > 0);
     WI_ASSERT(!m_pid.has_value());
 
     m_pid = Pid;
@@ -174,7 +172,7 @@ void DockerExecProcessControl::SetExitCode(int ExitCode)
     }
 }
 
-void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t /*eventTime*/)
+void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::int64_t)
 {
     if (Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
     {
@@ -197,7 +195,7 @@ void DockerExecProcessControl::OnContainerReleased() noexcept
     // If that happens, make sure that the state tracking can't outlive the session.
     // This is safe to call without the lock because removing the tracking reference is protected by the event tracker lock.
 
-    m_trackingReference.Reset();
+    m_eventTrackingReference.Reset();
 
     // Signal the exit event to prevent callers being blocked on it.
     if (!m_exitEvent.is_signaled())
@@ -208,7 +206,7 @@ void DockerExecProcessControl::OnContainerReleased() noexcept
 }
 
 VMProcessControl::VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl) :
-    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", VirtualMachine.TerminatingEvent()), m_vm(&VirtualMachine)
+    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", {VirtualMachine.TerminatingEvent()}), m_vm(&VirtualMachine)
 {
 }
 

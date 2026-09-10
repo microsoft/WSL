@@ -24,6 +24,10 @@ Abstract:
 namespace wsl::windows::common {
 struct Error;
 
+namespace io {
+    struct HandleWrapper;
+}
+
 struct ErrorStrings
 {
     std::wstring Message;
@@ -47,13 +51,6 @@ inline auto c_githubUrlOverrideRegistryValue = L"GitHubUrlOverride";
 inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
 inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLC: Does this apply to WSLC ?
-
-enum class EnumReferenceFormat
-{
-    None,
-    Tag,
-    Digest
-};
 
 struct GitHubReleaseAsset
 {
@@ -103,18 +100,21 @@ struct COMOutputHandle : public WSLCHandle
     {
         if (!Empty())
         {
-            LOG_IF_WIN32_BOOL_FALSE(CloseHandle(Handle.File));
+            if (Type == WSLCHandleTypeSocket)
+            {
+                LOG_LAST_ERROR_IF(closesocket(reinterpret_cast<SOCKET>(Handle.Socket)) == SOCKET_ERROR);
+            }
+            else
+            {
+                LOG_IF_WIN32_BOOL_FALSE(CloseHandle(Handle.File));
+            }
+
             Handle.File = nullptr;
+            Type = WSLCHandleTypeUnknown;
         }
     }
 
-    [[nodiscard]] wil::unique_handle Release() noexcept
-    {
-        wil::unique_handle handle(Handle.File);
-        Handle.File = nullptr;
-
-        return handle;
-    }
+    [[nodiscard]] io::HandleWrapper Release();
 
     HANDLE Get() const noexcept
     {
@@ -209,7 +209,7 @@ std::wstring ConstructPipePath(_In_ std::wstring_view PipeName);
 
 GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> name);
 
-std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
+std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename, bool reportProgress = true);
 
 std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
 
@@ -271,7 +271,22 @@ bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
 
-std::pair<std::string, std::string> NormalizeRepo(const std::string& Input);
+// An immutable container repository reference. Holds the original repository token together with its normalized
+// registry server and path, following Docker's client-side normalization (e.g. "ubuntu" -> {"docker.io",
+// "library/ubuntu"}). Construct one with Parse(). Normalization is lossy, so the original Name is retained for
+// callers that must echo the repository exactly as it was written.
+struct RepositoryReference
+{
+    const std::string Name;
+    const std::string Server;
+    const std::string Path;
+
+    // Split and normalize a repository string into its registry server and path.
+    static RepositoryReference Parse(const std::string& repository);
+
+    // The fully-qualified "server/path" form (e.g. "docker.io/library/ubuntu").
+    std::string GetCanonical() const;
+};
 
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 
@@ -283,7 +298,29 @@ void ParseIpv6Address(const char* Address, in_addr6& Result);
 
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input, EnumReferenceFormat* Format = nullptr);
+// A parsed, immutable image reference such as "ubuntu:22.04@sha256:...". Construct one with Parse().
+struct ImageReference
+{
+    const RepositoryReference Repository;
+    const std::optional<std::string> Tag;
+    const std::optional<std::string> Digest;
+    const EnumReferenceFormat Format;
+
+    // Parse an image reference string into its components. Throws E_INVALIDARG (with a user-facing error) when the
+    // reference is malformed.
+    static ImageReference Parse(const std::string& input);
+
+    // Collapse the reference to a single tag-or-digest field, where a digest takes precedence over a tag. This matches
+    // how callers that resolve, pull or push a single reference treat the two.
+    std::optional<std::string> TagOrDigest() const
+    {
+        return Digest.has_value() ? Digest : Tag;
+    }
+
+    // The fully-qualified canonical reference, matching the string printed by `docker pull`
+    // (e.g. "ubuntu" -> "docker.io/library/ubuntu:latest").
+    std::string GetCanonical() const;
+};
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
@@ -318,6 +355,10 @@ void PrintMessage(_In_ const std::wstring& message, _Inout_ FILE* const stream =
     PrintMessageImpl(message, stream, std::forward<Args>(args)...);
 }
 
+// Reads an environment variable. Returns nullopt iff the variable is not defined; an engaged
+// (possibly empty) string otherwise.
+std::optional<std::wstring> ReadEnvironmentVariable(_In_ LPCWSTR Name);
+
 void SetCrtEncoding(int Mode);
 
 void SetThreadDescription(LPCWSTR Name);
@@ -342,5 +383,6 @@ std::string BuildRegistryAuthHeader(const std::string& username, const std::stri
 std::string BuildRegistryAuthHeader(const std::string& identityToken);
 
 std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
+std::map<std::string, std::vector<std::string>> ParseKeyMultiValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count);
 
 } // namespace wsl::windows::common::wslutil

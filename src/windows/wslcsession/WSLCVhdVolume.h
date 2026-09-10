@@ -42,10 +42,14 @@ public:
         ULONGLONG SizeBytes,
         ULONG Lun,
         std::string&& VirtualMachinePath,
+        std::string&& CreatedAt,
+        std::string&& Mountpoint,
         std::map<std::string, std::string>&& DriverOpts,
         std::map<std::string, std::string>&& Labels,
         WSLCVirtualMachine& VirtualMachine,
-        DockerHTTPClient& DockerClient);
+        DockerHTTPClient& DockerClient,
+        bool Attached = true,
+        std::pair<HRESULT, std::string> Status = {S_OK, {}});
 
     ~WSLCVhdVolumeImpl();
 
@@ -69,6 +73,20 @@ public:
     {
         return WSLCVhdVolumeDriver;
     }
+    const std::map<std::string, std::string>& Labels() const noexcept override
+    {
+        return m_labels;
+    }
+    const std::string& Mountpoint() const noexcept override
+    {
+        return m_mountpoint;
+    }
+
+    std::pair<HRESULT, std::string> Status() const override
+    {
+        return m_status;
+    }
+
     void Delete() override;
     std::string Inspect() const override;
     WSLCVolumeInformation GetVolumeInformation() const override;
@@ -78,7 +96,7 @@ public:
         return m_virtualMachinePath;
     }
 
-    void OnDeleted();
+    void OnDeleted() override;
 
 private:
     void Detach();
@@ -86,13 +104,16 @@ private:
     std::filesystem::path m_hostPath;
     std::string m_virtualMachinePath;
     std::string m_createdAt;
+    std::string m_mountpoint;
     std::map<std::string, std::string> m_driverOpts;
     std::map<std::string, std::string> m_labels;
     ULONGLONG m_sizeBytes{};
     ULONG m_lun{};
     WSLCVirtualMachine& m_virtualMachine;
     DockerHTTPClient& m_dockerClient;
-    bool m_attached{true};
+    bool m_attached;
+
+    std::pair<HRESULT, std::string> m_status;
 };
 
 } // namespace wsl::windows::service::wslc

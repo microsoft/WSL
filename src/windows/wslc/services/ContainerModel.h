@@ -14,17 +14,45 @@ Abstract:
 
 #pragma once
 
+#include "MountSpecParsing.h"
 #include <wslservice.h>
 #include <wslc.h>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace wsl::windows::wslc::models {
+
+namespace mount = wsl::windows::common::mount;
 
 // Valid formats for container list output.
 enum class FormatType
 {
     Table,
     Json,
+};
+
+struct ContainerNetwork
+{
+    std::string Name;
+    std::vector<std::string> Aliases;
+};
+
+enum class PullPolicy
+{
+    Missing,
+    Always,
+    Never,
+};
+
+// Progress output style for `wslc build`. Auto resolves to Tty when progress output is an
+// interactive VT console and Plain otherwise.
+enum class ProgressMode
+{
+    Auto,
+    Tty,
+    Plain,
+    Quiet,
 };
 
 struct ContainerOptions
@@ -37,9 +65,18 @@ struct ContainerOptions
     bool Remove = false;
     bool TTY = false;
     bool PublishAll = false;
+    WSLCSignal StopSignal = WSLCSignalNone;
+    std::optional<int> StopTimeout{};
+    std::optional<int64_t> ShmSize{};
+    std::optional<std::string> HealthCmd{};
+    std::optional<int64_t> HealthInterval{};    // nanoseconds
+    std::optional<int64_t> HealthTimeout{};     // nanoseconds
+    std::optional<int64_t> HealthStartPeriod{}; // nanoseconds
+    std::optional<int> HealthRetries{};
+    bool NoHealthcheck = false;
     bool Gpu = false;
     std::vector<std::string> Ports;
-    std::vector<std::wstring> Volumes;
+    std::vector<mount::Spec> Mounts;
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
@@ -48,8 +85,16 @@ struct ContainerOptions
     std::vector<std::string> DnsServers;
     std::vector<std::string> DnsSearchDomains;
     std::vector<std::string> DnsOptions;
+    std::vector<ContainerNetwork> Networks;
+    std::vector<std::string> NetworkAliases;
+    std::optional<std::string> IpAddress{};
     std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
+    std::optional<std::wstring> CidFile{};
+    std::optional<int64_t> MemoryBytes{};
+    std::optional<int64_t> NanoCpus{};
+    std::vector<std::tuple<std::string, int64_t, int64_t>> Ulimits;
+    PullPolicy Pull = PullPolicy::Missing;
 };
 
 struct CreateContainerResult
@@ -59,10 +104,14 @@ struct CreateContainerResult
 
 struct StopContainerOptions
 {
-    static constexpr LONG DefaultTimeout = -1;
+    WSLCSignal Signal = WSLCSignalNone;
+    LONG Timeout = WSLC_STOP_TIMEOUT_DEFAULT;
+};
 
-    WSLCSignal Signal = WSLCSignalSIGTERM;
-    LONG Timeout = DefaultTimeout;
+struct PruneContainersResult
+{
+    std::vector<std::string> PrunedContainers;
+    ULONGLONG SpaceReclaimed{};
 };
 
 struct KillContainerOptions
@@ -85,12 +134,50 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
+    // Command and runtime supplied status description.
+    std::string Command;
+    std::string Status;
+    std::string Labels;
+    std::string Networks;
+    std::string Mounts;
+    ULONG LocalVolumes{};
     WSLCContainerState State;
-    ULONGLONG StateChangedAt{};
-    ULONGLONG CreatedAt{};
+    LONGLONG StateChangedAt{};
+    LONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
+};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
+// The platform a container runs on. Emitted as a nested object to match docker.
+struct ContainerPlatform
+{
+    std::string architecture;
+    std::string os;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerPlatform, architecture, os);
+};
+
+// The shape emitted by "container list --format json".
+struct ContainerOutputInformation
+{
+    std::string Command;
+    std::string CreatedAt;
+    std::string HealthStatus;
+    std::string ID;
+    std::string Image;
+    std::string Labels;
+    std::string LocalVolumes;
+    std::string Mounts;
+    std::string Names;
+    std::string Networks;
+    ContainerPlatform Platform;
+    std::string Ports;
+    std::string RunningFor;
+    std::string Size;
+    std::string State;
+    std::string Status;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ContainerOutputInformation, Command, CreatedAt, HealthStatus, ID, Image, Labels, LocalVolumes, Mounts, Names, Networks, Platform, Ports, RunningFor, Size, State, Status);
 };
 
 struct EnvironmentVariable
@@ -260,32 +347,22 @@ private:
     std::string m_containerPath;
     bool m_isReadOnlyMode = false;
     bool m_isNamedVolume = false;
-
-    static bool IsReadOnlyMode(const std::wstring& mode)
-    {
-        return mode == L"ro";
-    }
-
-    static bool IsValidMode(const std::wstring& mode)
-    {
-        return IsReadOnlyMode(mode) || mode == L"rw";
-    }
 };
 
-struct TmpfsMount
+class CidFile
 {
-    std::string ContainerPath() const
-    {
-        return m_containerPath;
-    }
-    std::string Options() const
-    {
-        return m_options;
-    }
-    static TmpfsMount Parse(const std::string& value);
+public:
+    explicit CidFile(const std::optional<std::wstring>& path);
+    ~CidFile();
+
+    NON_COPYABLE(CidFile);
+    NON_MOVABLE(CidFile);
+
+    void Commit(const std::string& containerId);
 
 private:
-    std::string m_containerPath;
-    std::string m_options;
+    std::optional<std::wstring> m_path{};
+    wil::unique_hfile m_file;
+    bool m_committed = false;
 };
 } // namespace wsl::windows::wslc::models

@@ -24,9 +24,7 @@ namespace wsl::windows::wslc {
 // Session Terminate Command
 std::vector<Argument> SessionTerminateCommand::GetArguments() const
 {
-    return {
-        Argument::Create(ArgType::SessionId),
-    };
+    return {};
 }
 
 std::wstring SessionTerminateCommand::ShortDescription() const
@@ -41,6 +39,9 @@ std::wstring SessionTerminateCommand::LongDescription() const
 
 void SessionTerminateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << TerminateSession;
+    context                       //
+        << OpenSessionIfSpecified //
+        << OpenDefaultSession     //
+        << TerminateSession;
 }
 } // namespace wsl::windows::wslc

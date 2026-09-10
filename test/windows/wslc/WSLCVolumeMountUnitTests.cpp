@@ -22,7 +22,7 @@ namespace WSLCVolumeMount {
 
 class WSLCVolumeMountUnitTests
 {
-    WSL_TEST_CLASS(WSLCVolumeMountUnitTests)
+    WSLC_TEST_CLASS(WSLCVolumeMountUnitTests)
 
     TEST_METHOD(VolumeMount_Parse_ReturnExpectedResult)
     {

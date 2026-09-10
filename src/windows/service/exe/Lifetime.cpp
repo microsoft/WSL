@@ -236,12 +236,16 @@ VOID CALLBACK LifetimeManager::s_OnTimeout(_Inout_ PTP_CALLBACK_INSTANCE, _Inout
                 manager->m_callbackList.erase(client);
             }
 
-            // The destructor has not run because m_callbackList is not empty.
-            // Put the current timer in previousTimerWait to make sure the destructor waits for us if
-            // it runs after we drop manager->m_lock.
-            clientLocal.CancelTimer();
-            previousTimerWait.reset(clientLocal.timer.release());
-            previousTimerWait.swap(manager->m_lastTimerWait);
+            // If we took ownership of the timer (moved into clientLocal), stash it so the
+            // destructor waits for this callback to finish before exiting. Otherwise this
+            // firing is a no-op (e.g., the entry was erased, the timer was replaced, or the
+            // matched entry still has live processes).
+            if (clientLocal.timer)
+            {
+                clientLocal.CancelTimer();
+                previousTimerWait.reset(clientLocal.timer.release());
+                previousTimerWait.swap(manager->m_lastTimerWait);
+            }
         }
 
         // If a callback was found, execute it. If the callback succeeds the

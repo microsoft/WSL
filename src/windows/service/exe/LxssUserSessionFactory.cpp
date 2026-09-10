@@ -30,7 +30,7 @@ srwlock g_sessionLock;
 std::optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>> g_sessions =
     std::make_optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>>();
 
-std::optional<wsl::windows::service::PluginManager> g_pluginManager;
+extern wsl::windows::service::PluginManager g_pluginManager;
 
 extern unique_event g_networkingReady;
 extern bool g_lxcoreInitialized;
@@ -53,9 +53,6 @@ void ClearSessionsAndBlockNewInstancesLockHeld(std::optional<std::vector<std::sh
 
         sessions.reset();
     }
-
-    // Unload plugins
-    g_pluginManager.reset();
 }
 
 void ClearSessionsAndBlockNewInstances()
@@ -83,12 +80,6 @@ void SetSessionPolicy(_In_ bool enabled)
         if (!g_sessions)
         {
             g_sessions = std::make_optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>>();
-        }
-
-        if (!g_pluginManager.has_value())
-        {
-            g_pluginManager.emplace();
-            g_pluginManager->LoadPlugins();
         }
     }
     else
@@ -236,7 +227,7 @@ std::weak_ptr<LxssUserSessionImpl> CreateInstanceForCurrentUser()
 
         if (!userSession)
         {
-            userSession.reset(new LxssUserSessionImpl(tokenInfo->User.Sid, sessionId, *g_pluginManager));
+            userSession.reset(new LxssUserSessionImpl(tokenInfo->User.Sid, sessionId, g_pluginManager));
             g_sessions->emplace_back(userSession);
         }
     }

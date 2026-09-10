@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "DockerHTTPClient.h"
+#include "OptionParser.h"
 #include "WSLCVhdVolume.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCVolumeMetadata.h"
@@ -26,6 +27,45 @@ using wsl::shared::Localization;
 namespace wsl::windows::service::wslc {
 
 namespace {
+    constexpr auto c_sizeBytesOpt = "SizeBytes";
+    constexpr auto c_fixedOpt = "Fixed";
+    constexpr auto c_uidOpt = "Uid";
+    constexpr auto c_gidOpt = "Gid";
+
+    struct VhdVolumeOptions
+    {
+        ULONGLONG SizeBytes{};
+        bool Fixed{false};
+        std::optional<uint32_t> Uid;
+        std::optional<uint32_t> Gid;
+
+        static VhdVolumeOptions Parse(const std::map<std::string, std::string>& DriverOpts)
+        {
+            OptionParser parser(DriverOpts);
+            VhdVolumeOptions opts{};
+
+            opts.SizeBytes = parser.Required<ULONGLONG>(c_sizeBytesOpt);
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sizeBytesOpt, DriverOpts.at(c_sizeBytesOpt)), opts.SizeBytes == 0);
+
+            opts.Fixed = parser.OptionalBool(c_fixedOpt).value_or(false);
+
+            // Uid and Gid must be supplied together — leaving one as the
+            // mkfs default (root) is a confusing footgun.
+            opts.Uid = parser.Optional<uint32_t>(c_uidOpt);
+            opts.Gid = parser.Optional<uint32_t>(c_gidOpt);
+            if (opts.Uid.has_value() != opts.Gid.has_value())
+            {
+                const auto* missing = opts.Uid.has_value() ? c_gidOpt : c_uidOpt;
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(missing));
+            }
+
+            parser.RejectUnknown();
+
+            return opts;
+        }
+    };
+
     std::string GenerateName()
     {
         std::random_device rd;
@@ -44,22 +84,31 @@ namespace {
         return name;
     }
 
-    ULONGLONG ParseSizeBytes(std::map<std::string, std::string>& DriverOpts)
+    void RemoveLostFoundDirectory(WSLCVirtualMachine& VirtualMachine, const std::string& VolumeName, const std::string& MountPath)
+    try
     {
-        const auto it = DriverOpts.find("SizeBytes");
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption("SizeBytes"), it == DriverOpts.end());
+        constexpr auto c_lostFoundDir = "lost+found";
+        const auto entries = VirtualMachine.ListDirectory(MountPath);
 
-        auto& value = it->second;
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), value.empty() || value[0] == '-');
+        // Only remove lost+found if the disk is empty besides that directory.
+        if (entries.size() != 1 || entries.front() != c_lostFoundDir)
+        {
+            return;
+        }
 
-        errno = 0;
-        char* end = nullptr;
-        auto sizeBytes = wsl::shared::string::ToUInt64(value.c_str(), &end);
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), errno != 0 || *end != '\0' || sizeBytes == 0);
-
-        return sizeBytes;
+        try
+        {
+            VirtualMachine.RemoveDirectory(std::format("{}/{}", MountPath, c_lostFoundDir));
+        }
+        catch (...)
+        {
+            // rmdir only removes an empty directory, so reaching here means the
+            // lone lost+found captured recovered data. Leave it and warn.
+            LOG_CAUGHT_EXCEPTION();
+            EMIT_USER_WARNING(Localization::MessageWslcVolumeLostFoundNotEmpty(VolumeName));
+        }
     }
-
+    CATCH_LOG();
 } // namespace
 
 WSLCVhdVolumeImpl::WSLCVhdVolumeImpl(
@@ -68,19 +117,27 @@ WSLCVhdVolumeImpl::WSLCVhdVolumeImpl(
     ULONGLONG SizeBytes,
     ULONG Lun,
     std::string&& VirtualMachinePath,
+    std::string&& CreatedAt,
+    std::string&& Mountpoint,
     std::map<std::string, std::string>&& DriverOpts,
     std::map<std::string, std::string>&& Labels,
     WSLCVirtualMachine& VirtualMachine,
-    DockerHTTPClient& DockerClient) :
+    DockerHTTPClient& DockerClient,
+    bool Attached,
+    std::pair<HRESULT, std::string> Status) :
     m_name(std::move(Name)),
     m_hostPath(std::move(HostPath)),
     m_virtualMachinePath(std::move(VirtualMachinePath)),
+    m_createdAt(std::move(CreatedAt)),
+    m_mountpoint(std::move(Mountpoint)),
     m_driverOpts(std::move(DriverOpts)),
     m_labels(std::move(Labels)),
     m_sizeBytes(SizeBytes),
     m_lun(Lun),
     m_virtualMachine(VirtualMachine),
-    m_dockerClient(DockerClient)
+    m_dockerClient(DockerClient),
+    m_attached(Attached),
+    m_status(std::move(Status))
 {
 }
 
@@ -98,7 +155,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     DockerHTTPClient& DockerClient)
 {
     std::string name = (Name != nullptr && Name[0] != '\0') ? std::string(Name) : GenerateName();
-    auto sizeBytes = ParseSizeBytes(DriverOpts);
+    const auto opts = VhdVolumeOptions::Parse(DriverOpts);
     auto hostPath = StoragePath / "volumes" / (name + ".vhdx");
 
     auto createVhdCleanup =
@@ -107,17 +164,28 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     std::filesystem::create_directories(hostPath.parent_path());
 
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
-    wsl::core::filesystem::CreateVhd(hostPath.c_str(), sizeBytes, tokenInfo->User.Sid, false, false);
+    wsl::core::filesystem::CreateVhd(hostPath.c_str(), opts.SizeBytes, tokenInfo->User.Sid, false, opts.Fixed);
 
     auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
     auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });
 
-    VirtualMachine.Ext4Format(device);
+    // Ownership is baked into the ext4 root inode at format time so the
+    // container user can write without a post-mount chown.
+    VirtualMachine.Ext4Format(device, opts.Uid, opts.Gid);
 
     auto virtualMachinePath = std::format("/mnt/wslc-volumes/{}", name);
-    VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
+
+    // These should match the mount options used in Open
+    VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "discard", 0);
 
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
+
+    // mkfs.ext4 always creates a lost+found directory at the filesystem root,
+    // which makes a freshly formatted volume look non-empty to Docker and
+    // suppresses the copy-up that seeds image data on first use. Drop it so
+    // Docker seeds the volume with the image's contents. No-op when the volume
+    // already contains data.
+    RemoveLostFoundDirectory(VirtualMachine, name, virtualMachinePath);
 
     WSLCVolumeMetadata metadata;
     metadata.Driver = WSLCVhdVolumeDriver;
@@ -147,8 +215,17 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
         auto createdVolume = DockerClient.CreateVolume(request);
 
         auto volume = std::make_unique<WSLCVhdVolumeImpl>(
-            std::move(name), std::move(hostPath), sizeBytes, lun, std::move(virtualMachinePath), std::move(DriverOpts), std::move(Labels), VirtualMachine, DockerClient);
-        volume->m_createdAt = createdVolume.CreatedAt;
+            std::move(name),
+            std::move(hostPath),
+            opts.SizeBytes,
+            lun,
+            std::move(virtualMachinePath),
+            std::move(createdVolume.CreatedAt),
+            std::move(createdVolume.Mountpoint),
+            std::move(DriverOpts),
+            std::move(Labels),
+            VirtualMachine,
+            DockerClient);
 
         mountCleanup.release();
         attachCleanup.release();
@@ -176,7 +253,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
 
     auto hostPath = std::filesystem::path(hostPathIt->second);
     auto driverOpts = metadata.DriverOpts;
-    auto sizeBytes = ParseSizeBytes(driverOpts);
+    const auto opts = VhdVolumeOptions::Parse(driverOpts);
 
     THROW_HR_IF(E_INVALIDARG, !Volume.Options.has_value());
     auto deviceIt = Volume.Options->find("device");
@@ -194,20 +271,51 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
         }
     }
 
-    auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
-    auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });
+    ULONG lun = 0;
+    bool attached = false;
+    std::pair<HRESULT, std::string> status{S_OK, {}};
 
-    VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
-    auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
+    try
+    {
+        auto [attachedLun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
+        auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(attachedLun); });
 
-    auto volume = std::make_unique<WSLCVhdVolumeImpl>(
-        std::string{Volume.Name}, std::move(hostPath), sizeBytes, lun, std::move(virtualMachinePath), std::move(driverOpts), std::move(userLabels), VirtualMachine, DockerClient);
-    volume->m_createdAt = Volume.CreatedAt;
+        // These should match the mount options used in Create
+        VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "discard", 0);
+        auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
 
-    mountCleanup.release();
-    attachCleanup.release();
+        RemoveLostFoundDirectory(VirtualMachine, Volume.Name, virtualMachinePath);
 
-    return volume;
+        lun = attachedLun;
+        attached = true;
+
+        mountCleanup.release();
+        attachCleanup.release();
+    }
+    catch (...)
+    {
+        // The backing VHD could not be attached or mounted. Track the volume in an errored state so the user can still inspect
+        // and delete it; containers that reference it should refuse to start. The reason is surfaced via Inspect(), not the warning.
+        const auto hr = wil::ResultFromCaughtException();
+        const auto message = wslutil::GetErrorString(hr);
+        EMIT_USER_WARNING(Localization::MessageWslcFailedToRecoverVolume(Volume.Name));
+        status = {hr, wsl::shared::string::WideToMultiByte(message)};
+    }
+
+    return std::make_unique<WSLCVhdVolumeImpl>(
+        std::string{Volume.Name},
+        std::move(hostPath),
+        opts.SizeBytes,
+        lun,
+        std::move(virtualMachinePath),
+        std::string{Volume.CreatedAt},
+        std::string{Volume.Mountpoint},
+        std::move(driverOpts),
+        std::move(userLabels),
+        VirtualMachine,
+        DockerClient,
+        attached,
+        std::move(status));
 }
 
 void WSLCVhdVolumeImpl::Delete()
@@ -233,12 +341,20 @@ std::string WSLCVhdVolumeImpl::Inspect() const
     inspect.Name = m_name;
     inspect.Driver = WSLCVhdVolumeDriver;
     inspect.CreatedAt = m_createdAt;
-    inspect.DriverOpts = m_driverOpts;
+    inspect.Mountpoint = m_mountpoint;
+    inspect.Scope = WSLCVolumeScope;
+    inspect.Options = m_driverOpts;
     inspect.Labels = m_labels;
     inspect.Status = std::map<std::string, std::string>{
         {"HostPath", m_hostPath.string()},
         {"SizeBytes", std::to_string(m_sizeBytes)},
     };
+
+    // Surface the recovery failure so callers can see why the volume is unusable.
+    if (FAILED(m_status.first))
+    {
+        inspect.Status->emplace("Error", m_status.second);
+    }
 
     return wsl::shared::ToJson(inspect);
 }

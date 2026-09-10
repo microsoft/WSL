@@ -126,7 +126,6 @@ find_nuget_package(Microsoft.Identity.MSAL.WSL.Proxy MSAL /build/native/bin)
 find_nuget_package(Microsoft.RemoteDesktop.Client.MSRDC.SessionHost MSRDC /build/native/bin)
 find_nuget_package(Microsoft.Taef TAEF /)
 find_nuget_package(Microsoft.Windows.ImplementationLibrary WIL /)
-find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
 find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
@@ -158,6 +157,9 @@ find_nuget_package(Microsoft.Windows.SDK.NET.Ref WINDOWS_SDK_DOTNET /)
 find_nuget_package(Microsoft.Xaml.Behaviors.WinUI.Managed XAML_BEHAVIORS /)
 find_nuget_package(WinUIEx WINUIEX /)
 
+# WSLC C# API packages
+find_nuget_package(Microsoft.Windows.CsWinRT CSWINRT /)
+
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
@@ -166,16 +168,48 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
 endif()
 
+if (WSL_DEVICEHOST_BIN)
+    set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICEHOST_BIN}/WslDeviceHost.idl")
+    set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICEHOST_BIN}/wsldevicehost.dll")
+    set(WSL_DEVICE_HOST_VERSION "9.0.0-localbuild")
+else()
+    find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
+    set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/idl/WslDeviceHost.idl")
+    set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll")
+endif()
+
 # Optional target configuration
 
 if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
-if (NOT DEFINED WSL_BUILD_SDKCS)
-    set(WSL_BUILD_SDKCS false)
+if (NOT DEFINED WSL_INCLUDE_SDK_CSHARP)
+    set(WSL_INCLUDE_SDK_CSHARP false)
 endif ()
 
+# Number of sources combined into each unity translation unit.
+# Set to 0 to compile every file separately.
+set(WSL_UNITY_BATCH_SIZE_DEFAULT 0)
+
+if (NOT DEFINED WSL_UNITY_BATCH_SIZE)
+    set(WSL_UNITY_BATCH_SIZE ${WSL_UNITY_BATCH_SIZE_DEFAULT})
+endif ()
+
+if (NOT WSL_UNITY_BATCH_SIZE MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "WSL_UNITY_BATCH_SIZE must be a non-negative integer: got '${WSL_UNITY_BATCH_SIZE}'")
+endif ()
+
+# Applies to every target created below. Targets that can't be unified opt out
+# individually with UNITY_BUILD OFF.
+# N.B. This is set after the FetchContent dependencies are made available so that
+# third party targets keep building file by file.
+if (WSL_UNITY_BATCH_SIZE GREATER 0)
+    set(CMAKE_UNITY_BUILD ON)
+    set(CMAKE_UNITY_BUILD_MODE BATCH)
+    set(CMAKE_UNITY_BUILD_BATCH_SIZE ${WSL_UNITY_BATCH_SIZE})
+    message(STATUS "Unity build enabled with a batch size of ${WSL_UNITY_BATCH_SIZE}")
+endif ()
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
@@ -227,8 +261,20 @@ if (DEFINED PIPELINE_BUILD_ID)
 endif()
 
 set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
+
+# Link the third-party binaries we ship (and their PDBs) into bin so packaging
+# and the pipeline's symbol publishing step find them. Without the PDBs here,
+# Watson can't resolve function names in their crash frames.
+string(REPLACE ".dll" ".pdb" WSLG_TS_PLUGIN_PDB ${WSLG_TS_PLUGIN_DLL})
 file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
+file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_PDB} ${BIN}/${WSLG_TS_PLUGIN_PDB})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
+file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.pdb ${BIN}/wsldeps.pdb)
+# wsldevicehost.dll is packaged directly from its NuGet package, so only its PDB
+# needs linking into bin for symbol publishing.
+if (NOT WSL_DEVICEHOST_BIN)
+    file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.pdb ${BIN}/wsldevicehost.pdb)
+endif()
 
 if (${SKIP_PACKAGE_SIGNING})
     set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
@@ -314,6 +360,15 @@ if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /CETCOMPAT")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
 endif()
+
+# Hybrid CRT: static-link the C++ runtime and STL (/MT|/MTd from CMAKE_MSVC_RUNTIME_LIBRARY),
+# but dynamic-link the Universal CRT (ucrt.dll) which is an OS component on Windows 10+.
+# This eliminates the VCRUNTIME/MSVCP redistributable dependency while avoiding the size
+# cost of statically linking the UCRT. See https://aka.ms/hybridcrt for details.
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE}    /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
+set(CMAKE_SHARED_LINKER_FLAGS_DEBUG   "${CMAKE_SHARED_LINKER_FLAGS_DEBUG}   /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG      "${CMAKE_EXE_LINKER_FLAGS_DEBUG}      /NODEFAULTLIB:libucrtd.lib /defaultlib:ucrtd.lib")
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
@@ -483,7 +538,7 @@ endif()
 if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smaller
     add_compile_definitions(WSL_SYSTEM_DISTRO_PATH="${WSL_DEV_BINARY_PATH}/system.vhd"
                             WSL_KERNEL_PATH="${WSL_DEV_BINARY_PATH}/kernel"
-                            WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/modules.vhd"
+                            WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/artifacts.vhd"
                             WSL_DEV_INSTALL_PATH="${WSL_DEV_BINARY_PATH}"
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
 endif()
@@ -497,6 +552,7 @@ include_directories(${WSLDEPS_SOURCE_DIR}/include/schemas)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/lxcore)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/inc)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wsldevicehoststub/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/linux/init/inc)
@@ -521,8 +577,10 @@ add_subdirectory(nuget)
 add_subdirectory(msixgluepackage)
 add_subdirectory(msipackage)
 add_subdirectory(msixinstaller)
+add_subdirectory(src/windows/wsldevicehoststub/inc)
 add_subdirectory(src/windows/common)
 add_subdirectory(src/windows/service)
+add_subdirectory(src/windows/wsldevicehoststub)
 add_subdirectory(src/windows/wslcsession)
 add_subdirectory(src/windows/wslinstaller/inc)
 add_subdirectory(src/windows/wslinstaller/stub)
@@ -535,10 +593,6 @@ add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
-
-if (WSL_BUILD_SDKCS)
-    add_subdirectory(src/windows/WslcSDK/csharp)
-endif()
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

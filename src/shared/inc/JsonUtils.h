@@ -34,13 +34,26 @@ namespace wsl::shared {
 
 constexpr int c_jsonPrettyPrintIndent = 2;
 
+// A negative indent makes nlohmann::json::dump() emit the document on a single line.
+constexpr int c_jsonCompactIndent = -1;
+
+struct EmptyObject
+{
+};
+
+inline void to_json(nlohmann::json& j, const EmptyObject&)
+{
+    j = nlohmann::json::object();
+}
+
+inline void from_json(const nlohmann::json&, EmptyObject&)
+{
+}
+
 template <typename T>
 std::string ToJson(const T& Value, int indent = -1)
 {
-    nlohmann::json json;
-    to_json(json, Value);
-
-    return json.dump(indent);
+    return nlohmann::json(Value).dump(indent);
 }
 
 template <typename T>
@@ -171,25 +184,5 @@ struct adl_serializer<wsl::shared::string::MacAddress>
         }
     }
 };
-
-#ifdef WIN32
-template <>
-struct adl_serializer<WSLCVolumeInformation>
-{
-    static void to_json(json& j, const WSLCVolumeInformation& volume)
-    {
-        j = json{{"Name", std::string(volume.Name)}, {"Driver", std::string(volume.Driver)}};
-    }
-
-    static void from_json(const json& j, WSLCVolumeInformation& volume)
-    {
-        std::string name = j.at("Name").get<std::string>();
-        std::string driver = j.at("Driver").get<std::string>();
-
-        strncpy_s(volume.Name, sizeof(volume.Name), name.c_str(), _TRUNCATE);
-        strncpy_s(volume.Driver, sizeof(volume.Driver), driver.c_str(), _TRUNCATE);
-    }
-};
-#endif
 
 } // namespace nlohmann

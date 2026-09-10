@@ -2,13 +2,9 @@
 #include <string>
 #include <string_view>
 #include <cerrno>
-#include <cstdio>
-#include <functional>
 #include <sys/types.h>
 #include <sys/mount.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <dirent.h>
 #include <unistd.h>
 #include <lxdef.h>
 #include <lxwil.h>
@@ -142,6 +138,11 @@ ParsedOptions MountParseFlags(std::string_view options)
     {
         // Get the next option and check if it's a flag.
         auto option = NextToken(options, ',');
+        if (option.empty())
+        {
+            continue;
+        }
+
         auto flag = FindOption(option);
         if (flag == nullptr)
         {

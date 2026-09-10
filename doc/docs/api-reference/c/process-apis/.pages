@@ -1,0 +1,15 @@
+title: Process APIs
+nav:
+  - index.md
+  - wslcinitprocesssettings.md
+  - wslcsetprocesssettingsworkingdirectory.md
+  - wslcsetprocesssettingscmdline.md
+  - wslcsetprocesssettingsenvvariables.md
+  - wslcsetprocesssettingscallbacks.md
+  - wslcgetprocesspid.md
+  - wslcgetprocessexitevent.md
+  - wslcgetprocessstate.md
+  - wslcgetprocessexitcode.md
+  - wslcsignalprocess.md
+  - wslcgetprocessiohandle.md
+  - wslcreleaseprocess.md

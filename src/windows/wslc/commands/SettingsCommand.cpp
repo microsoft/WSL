@@ -83,7 +83,7 @@ std::wstring SettingsResetCommand::LongDescription() const
 void SettingsResetCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     settings::User().Reset();
-    PrintMessage(Localization::WSLCCLI_SettingsResetConfirm());
+    context.Terminal.Output(L"{}\n", Localization::WSLCCLI_SettingsResetConfirm());
 }
 
 } // namespace wsl::windows::wslc

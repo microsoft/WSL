@@ -150,29 +150,16 @@ if (-not (Test-Path -Type Leaf -Path $ClangFormat)) {
     exit 1
 }
 
-function Format-Directory {
+function Collect-FilesToFormat {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $True)]
         [string]$Path,
-        [Parameter(Mandatory = $True)]
-        [string]$ClangFormat,
-        [string]$RepoRoot = $null,
-        [AllowEmptyString()][string]$FilePatterns = $null,
-        [string[]]$ModifiedFiles = $null,
-        [boolean]$Verify = $false
+        [string[]]$ModifiedFiles = $null
     )
     process {
-        if (-not (Test-Path -Path $Path)) {
-            Write-Host -ForegroundColor Red "Item not found: $Path"
-            return $False
-        }
-        if ($null -eq $FilePatterns) {
-            $FilePatterns = ""
-        }
         $Path = Resolve-Path $Path
-        $Success = $True
-        $FilesToFormat = @()
+        $files = [System.Collections.Generic.List[string]]::new()
         if ((Get-Item -Path $Path) -is [System.IO.DirectoryInfo]) {
             Get-ChildItem -Path $Path -File `
             | Where-Object { $_.Name -match $FilePatterns } `
@@ -180,46 +167,133 @@ function Format-Directory {
                 $FilePath = "$Path\$($_.Name)"
                 if (($null -eq $ModifiedFiles) -or ($ModifiedFiles -contains $FilePath)) {
                     if (!($FilePath -match "Intermediate")) {
-                        $FilesToFormat += $FilePath
+                        [void]$files.Add($FilePath)
                     }
                 }
             }
             Get-ChildItem -Path $Path -Directory `
             | Where-Object { $_.Name -notmatch $IgnoreFolders } `
             | ForEach-Object {
-                $SubResult = (Format-Directory -Path "$Path\$($_.Name)" `
-                        -ClangFormat $ClangFormat `
-                        -RepoRoot $RepoRoot `
-                        -FilePatterns $FilePatterns `
-                        -ModifiedFiles $ModifiedFiles `
-                        -Verify $Verify)
-                $Success = $SubResult -and $Success
+                $subFiles = @(Collect-FilesToFormat -Path "$Path\$($_.Name)" `
+                        -ModifiedFiles $ModifiedFiles)
+                foreach ($f in $subFiles) {
+                    [void]$files.Add($f)
+                }
             }
         }
         else {
-            $FilesToFormat += $Path
+            [void]$files.Add("$Path")
         }
-        $FilesToFormat | ForEach-Object {
-            if ($Verify) {
-                Write-Host "[clang-format] Checking formatting: $_"
-                & $ClangFormat --style=file -Werror --dry-run $_
-            }
-            else {
-                Write-Host "[clang-format] Formatting $_"
-                & $ClangFormat --style=file -Werror -i $_
-            }
-            $Success = (0 -eq $LASTEXITCODE) -and $Success
-        }
-        return $Success
+        return @($files)
     }
 }
 
-$Success = (Format-Directory -Path $Path `
-        -ClangFormat $ClangFormat `
-        -FilePatterns $FilePatterns `
-        -ModifiedFiles $ModifiedFiles `
-        -RepoRoot $RepoRoot `
-        -Verify $Verify)
+$allFiles = @(Collect-FilesToFormat -Path $Path -ModifiedFiles $ModifiedFiles)
+
+if ($allFiles.Count -eq 0) {
+    Write-Host -ForegroundColor Green "No files to format."
+    exit 0
+}
+
+$threadCount = [Environment]::ProcessorCount
+$totalFiles = $allFiles.Count
+Write-Host "[clang-format] Checking $totalFiles files using $threadCount threads..."
+
+# Create runspace pool for parallel execution (one thread per CPU core)
+$pool = [RunspaceFactory]::CreateRunspacePool(1, $threadCount)
+$pool.Open()
+
+$formatScript = {
+    param($clangFormatExe, $filePath, $verifyMode)
+    $pinfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $pinfo.FileName = $clangFormatExe
+    if ($verifyMode) {
+        $pinfo.Arguments = "--style=file -Werror --dry-run `"$filePath`""
+    }
+    else {
+        $pinfo.Arguments = "--style=file -Werror -i `"$filePath`""
+    }
+    $pinfo.RedirectStandardError = $true # Not redirecting stdout to avoid a pipe deadlock.
+    $pinfo.UseShellExecute = $false
+
+    $proc = [System.Diagnostics.Process]::new()
+    $proc.StartInfo = $pinfo
+    [void]$proc.Start()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+
+    [PSCustomObject]@{
+        File     = $filePath
+        ExitCode = $proc.ExitCode
+        Output   = $stderr.TrimEnd()
+    }
+}
+
+# Submit all jobs to the runspace pool
+$jobs = [System.Collections.ArrayList]::new()
+foreach ($file in $allFiles) {
+    $ps = [PowerShell]::Create()
+    $ps.RunspacePool = $pool
+    [void]$ps.AddScript($formatScript).AddArgument($ClangFormat).AddArgument($file).AddArgument($Verify)
+    $handle = $ps.BeginInvoke()
+    [void]$jobs.Add([PSCustomObject]@{
+        PowerShell = $ps
+        Handle     = $handle
+    })
+}
+
+# Determine console width for progress display
+try { $lineWidth = [Math]::Max(([Console]::BufferWidth - 1), 40) } catch { $lineWidth = 120 }
+
+$Success = $true
+
+try {
+    while ($jobs.Count -gt 0) {
+        $finishedJobs = @($jobs | Where-Object { $_.Handle.IsCompleted })
+        foreach ($job in $finishedJobs) {
+            try {
+                $result = $job.PowerShell.EndInvoke($job.Handle)[0]
+            }
+            catch {
+                $result = [PSCustomObject]@{ File = "unknown"; ExitCode = 1; Output = $_.Exception.Message }
+            }
+            $job.PowerShell.Dispose()
+            [void]$jobs.Remove($job)
+
+            if ($result.ExitCode -ne 0) {
+                $Success = $false
+                # Clear progress line and print error permanently
+                [Console]::Write("`r" + (" " * $lineWidth) + "`r")
+                Write-Host -ForegroundColor Red "[clang-format] $($result.File)"
+                if ($result.Output) {
+                    Write-Host $result.Output
+                }
+            }
+
+            # Update progress line in-place with latest file
+            $completed = $totalFiles - $jobs.Count
+            $status = "[clang-format] ($completed/$totalFiles) $($result.File)"
+            if ($status.Length -gt $lineWidth) {
+                $status = $status.Substring(0, $lineWidth)
+            }
+            [Console]::Write("`r" + $status.PadRight($lineWidth))
+        }
+        Start-Sleep -Milliseconds 50
+    }
+}
+finally {
+    # Clean up any remaining jobs and the pool
+    foreach ($job in $jobs) {
+        $job.PowerShell.Stop()
+        $job.PowerShell.Dispose()
+    }
+
+    # Clear final progress line
+    [Console]::Write("`r" + (" " * $lineWidth) + "`r")
+
+    $pool.Close()
+    $pool.Dispose()
+}
 
 if ($Success) {
     Write-Host "Done."

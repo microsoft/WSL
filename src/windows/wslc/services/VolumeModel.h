@@ -19,22 +19,35 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-struct Label
-{
-    static std::pair<std::string, std::string> Parse(const std::wstring& value);
-};
-
-struct DriverOption
-{
-    static std::pair<std::string, std::string> Parse(const std::wstring& value);
-};
-
 struct CreateVolumeOptions
 {
     std::string Name;
     std::optional<std::string> Driver;
     std::vector<std::pair<std::string, std::string>> DriverOpts{};
     std::vector<std::pair<std::string, std::string>> Labels{};
+};
+
+struct PruneVolumesResult
+{
+    std::vector<std::string> PrunedVolumes;
+    ULONGLONG SpaceReclaimed{};
+};
+
+// The shape emitted by "volume list --format json"; every value is reported as a string.
+struct VolumeOutputInformation
+{
+    std::string Availability;
+    std::string Driver;
+    std::string Group;
+    std::string Labels;
+    std::string Links;
+    std::string Mountpoint;
+    std::string Name;
+    std::string Scope;
+    std::string Size;
+    std::string Status;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeOutputInformation, Availability, Driver, Group, Labels, Links, Mountpoint, Name, Scope, Size, Status);
 };
 
 } // namespace wsl::windows::wslc::models

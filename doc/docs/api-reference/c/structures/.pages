@@ -1,0 +1,23 @@
+title: Structures
+nav:
+  - index.md
+  - handle-types.md
+  - constants.md
+  - wslcsessionsettings.md
+  - wslccontainersettings.md
+  - wslcprocesssettings.md
+  - wslcvhdrequirements.md
+  - wslcsessioncrashdumpinfo.md
+  - wslccontainerportmapping.md
+  - wslccontainervolume.md
+  - wslccontainernamedvolume.md
+  - wslcprocesscallbacks.md
+  - wslcimageprogressdetail.md
+  - wslcimageprogressmessage.md
+  - wslcpullimageoptions.md
+  - wslcimportimageoptions.md
+  - wslcloadimageoptions.md
+  - wslcimageinfo.md
+  - wslctagimageoptions.md
+  - wslcpushimageoptions.md
+  - wslcversion.md

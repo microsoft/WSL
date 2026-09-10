@@ -64,7 +64,7 @@ try
 #endif
     }
 
-    if (MessageSize > 4 * 1024 * 1024) // 4 MiB
+    if (MessageSize > 16 * 1024 * 1024) // 16 MiB
     {
 #if defined(_MSC_VER)
         THROW_HR_MSG(E_UNEXPECTED, "Message size too large: %llu", MessageSize);

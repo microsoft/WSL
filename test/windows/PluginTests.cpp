@@ -16,10 +16,16 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslc.h"
+#include "WSLCContainerLauncher.h"
+#include "WSLCProcessLauncher.h"
+#include "wslc/e2e/WSLCE2EHelpers.h"
 
 using namespace wsl::windows::common::registry;
+using WSLCE2ETests::StartLocalRegistry;
 
 extern std::wstring g_testDistroPath;
+extern std::wstring g_testDataPath;
 
 class PluginTests
 {
@@ -83,7 +89,7 @@ class PluginTests
         return true;
     }
 
-    void ConfigurePlugin(PluginTestType testCase) const
+    void ConfigurePlugin(PluginTestType testCase, LPCWSTR mountFolder = L"") const
     {
         StopWslService();
         if (!DeleteFile(logFile.c_str()))
@@ -94,6 +100,7 @@ class PluginTests
         const auto testKey = OpenTestRegistryKey(KEY_SET_VALUE);
         WriteDword(testKey.get(), nullptr, c_testType, static_cast<DWORD>(testCase));
         WriteString(testKey.get(), nullptr, c_logFile, logFile.c_str());
+        WriteString(testKey.get(), nullptr, c_mountFolder, mountFolder);
 
         const auto lxssKey =
             CreateKey(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", KEY_SET_VALUE, nullptr, 0);
@@ -102,7 +109,7 @@ class PluginTests
         RestartWslService();
     }
 
-    static void StartWsl(int expectedExitCode, LPCWSTR ExpectedOutput = nullptr)
+    static void StartWsl(int expectedExitCode, const std::wstring& expectedOutput = {})
     {
         auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"echo -n OK", expectedExitCode);
         if (expectedExitCode == 0)
@@ -111,7 +118,7 @@ class PluginTests
         }
         else
         {
-            VERIFY_ARE_EQUAL(output, ExpectedOutput);
+            VERIFY_ARE_EQUAL(output, expectedOutput);
         }
     }
 
@@ -163,6 +170,59 @@ class PluginTests
 
         ConfigurePlugin(PluginTestType::Success);
         StartWsl(0);
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(MountFolderAccess)
+    {
+        const auto testFolder = std::filesystem::current_path() / "deny-write";
+        std::filesystem::remove_all(testFolder);
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder));
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testFolder / "allowed"));
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        const auto user = wil::get_token_information<TOKEN_USER>();
+        EXPLICIT_ACCESSW access{};
+        access.grfAccessPermissions = FILE_ADD_FILE;
+        access.grfAccessMode = DENY_ACCESS;
+        access.grfInheritance = NO_INHERITANCE;
+        access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        access.Trustee.ptstrName = static_cast<LPWSTR>(user->User.Sid);
+
+        PACL originalAcl = nullptr;
+        wil::unique_hlocal originalDescriptor;
+        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+            testFolder.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &originalAcl, nullptr, &originalDescriptor));
+
+        auto restoreAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, originalAcl, nullptr));
+        });
+
+        wsl::windows::common::security::unique_acl deniedAcl;
+        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &access, originalAcl, &deniedAcl));
+        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+            const_cast<LPWSTR>(testFolder.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, deniedAcl.get(), nullptr));
+
+        const auto testFile = testFolder / L"plugin-test.txt";
+        wil::unique_hfile deniedFile{CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_TRUE(!deniedFile);
+        VERIFY_ARE_EQUAL(ERROR_ACCESS_DENIED, GetLastError());
+
+        ConfigurePlugin(PluginTestType::MountFolderAccess, testFolder.c_str());
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=25
+                VM created (settings->CustomConfigurationFlags=0)
+                *Permission denied
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+                VM Stopping)";
+
+        StartWsl(0);
+        VERIFY_IS_TRUE(std::filesystem::exists(testFolder / "allowed" / "plugin-allowed.txt"));
+        VERIFY_IS_FALSE(std::filesystem::exists(testFile));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -236,8 +296,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::Success);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_ACCESSDENIED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_ACCESSDENIED"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -311,8 +372,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::PluginRequiresUpdate);
         StartWsl(
             -1,
-            L"The plugin 'TestPlugin' requires a newer version of WSL. Please run: wsl.exe --update\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/WSL_E_PLUGIN_REQUIRES_UPDATE\r\n");
+            FormatErrorMessage(
+                L"The plugin 'TestPlugin' requires a newer version of WSL. Please run: wsl.exe --update",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/WSL_E_PLUGIN_REQUIRES_UPDATE"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -350,8 +412,8 @@ class PluginTests
         ConfigurePlugin(PluginTestType::FailToLoad);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'", L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -377,8 +439,8 @@ class PluginTests
         ConfigurePlugin(PluginTestType::FailToStartVm);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'", L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -397,13 +459,15 @@ class PluginTests
 
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
 
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'Plugin error message'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_UNEXPECTED"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -432,12 +496,11 @@ class PluginTests
             OnDistroStarted: E_UNEXPECTED
             VM Stopping)";
 
-        constexpr auto ExpectedError =
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/Plugin/E_UNEXPECTED\r\n";
-
         ConfigurePlugin(PluginTestType::FailToStartDistro);
-        StartWsl(-1, ExpectedError);
+        StartWsl(
+            -1,
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'", L"Wsl/Service/CreateInstance/Plugin/E_UNEXPECTED"));
         ValidateLogFile(ExpectedOutput);
     }
 
@@ -467,8 +530,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::ErrorMessageStartVm);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartVm plugin error message'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_FAIL\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartVm plugin error message'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/E_FAIL"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -485,9 +549,9 @@ class PluginTests
         ConfigurePlugin(PluginTestType::ErrorMessageStartDistro);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartDistro plugin error message'\r\nError "
-            L"code: "
-            L"Wsl/Service/CreateInstance/Plugin/E_FAIL\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'. Error message: 'StartDistro plugin error message'",
+                L"Wsl/Service/CreateInstance/Plugin/E_FAIL"));
 
         ValidateLogFile(ExpectedOutput);
     }
@@ -592,6 +656,336 @@ class PluginTests
         StartWsl(0);
         ValidateLogFile(ExpectedOutput);
     }
+    static wil::com_ptr<IWSLCSessionManager> OpenWslcSessionManager()
+    {
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        return sessionManager;
+    }
+
+    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, WSLCNetworkingMode NetworkingMode = WSLCNetworkingModeNone, LPCWSTR StoragePath = nullptr)
+    {
+        WSLCSessionSettings settings{};
+        settings.DisplayName = Name;
+        settings.CpuCount = 4;
+        settings.MemoryMb = 4096;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.NetworkingMode = NetworkingMode;
+        settings.StoragePath = StoragePath;
+        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB, only used when StoragePath is set.
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateRunning);
+
+        return session;
+    }
+
+    WSL2_TEST_METHOD(WslcSuccess)
+    {
+        ConfigurePlugin(PluginTestType::WslcSuccess);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-test");
+
+            LoadTestImage(*session, "debian:latest");
+
+            // Create a container that will have a stuck process so it's still in a running state when the callback is made.
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-container", {"/bin/sh", "-c", "sleep 120"});
+
+            auto container = launcher.Launch(*session, WSLCContainerStartFlagsAttach);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            // Delete the image so we get an ImageDeleted notification before the session goes away.
+            WSLCDeleteImageOptions options{.Image = "debian:latest", .Flags = WSLCDeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+        }
+
+        const auto ExpectedOutput = std::format(
+            LR"(Plugin loaded. TestMode=18
+            WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
+            Command: 'echo -n stdout-ok && echo -n stderr-ok >&2', status=0, stdout: stdout-ok, stderr: stderr-ok
+            Command: 'cat', status=0, stdout: stdin-ok, stderr: 
+            Command: 'exit 12', status=12, stdout: , stderr: 
+            Command: 'echo -n $ENV', status=0, stdout: env-ok, stderr: 
+            WSLCCreateProcess(does-not-exist): {:x}, errno=2
+            WSLCProcessGetFd(999): {}
+            WSLCProcessGetExitCode(<running>): {}
+            WSLC RW folder mounted at: /mnt/wsl-plugin/plugin-rw-test
+            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/plugin-test.txt', status=0, stdout: Windows-content, stderr: 
+            Command: 'cat /mnt/wsl-plugin/plugin-rw-test/plugin-denied.txt', status=1, stdout: , stderr: *
+            WSLC RO folder mounted at: /mnt/wsl-plugin/plugin-ro-test
+            Command: 'echo fail > /mnt/wsl-plugin/plugin-ro-test/should-not-exist.txt', status=1, stdout: , stderr: *
+            WSLCMountFolder(nonexistent): {}
+            WSLCMountFolder(relative): {}
+            Test completed
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-container, image=debian:latest, state=*
+            WSLC Container stopping, session=*, id=*
+            WSLC Image deleted, session=*, id=*
+            WSLC Session stopping, name=plugin-wslc-test, id=*)",
+            static_cast<uint32_t>(E_FAIL),
+            E_INVALIDARG,
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+            E_INVALIDARG);
+
+        ValidateLogFile(ExpectedOutput.c_str());
+    }
+
+    WSL2_TEST_METHOD(WslcPullImageNotification)
+    {
+        ConfigurePlugin(PluginTestType::WslcImagePull);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-pull-test", WSLCNetworkingModeConsomme);
+
+            // Load the registry and debian images.
+            LoadTestImage(*session, "debian:latest");
+
+            // Start a local registry container.
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
+
+            // Tag debian:latest for the local registry and push it.
+            auto registryImage = std::format("{}/debian:latest", registryAddress);
+            auto registryRepo = std::format("{}/debian", registryAddress);
+            WSLCTagImageOptions tagOptions{};
+            tagOptions.Image = "debian:latest";
+            tagOptions.Repo = registryRepo.c_str();
+            tagOptions.Tag = "latest";
+            VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
+
+            auto emptyAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
+            VERIFY_SUCCEEDED(session->PushImage(registryImage.c_str(), emptyAuth.c_str(), nullptr, nullptr));
+
+            // Delete the local tagged copy so PullImage actually downloads it.
+            WSLCDeleteImageOptions deleteOpts{.Image = registryImage.c_str(), .Flags = WSLCDeleteImageFlagsNone};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&deleteOpts, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+
+            // Pull the image back — this should trigger the ImageCreated plugin callback.
+            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=21
+            WSLC Session created, name=plugin-wslc-pull-test, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Image created, session=*, id=sha256:*, name=wslc-registry:latest
+            WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
+            WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Container stopping, session=*, id=*
+            WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcSessionRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcSessionRejected);
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"plugin-wslc-rejected";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.MaximumStorageSizeMb = 1024 * 20;
+        settings.NetworkingMode = WSLCNetworkingModeNone;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session);
+        ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
+        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=19
+            WSLC Session created, name=plugin-wslc-rejected, id=*, pid=*, token=set, sid=set
+            OnWslcSessionCreated: ERROR_ACCESS_DENIED)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcContainerRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRejected);
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-rejected");
+
+            LoadTestImage(*session, "debian:latest");
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-rejected-container", {"/bin/sh", "-c", "echo nope"});
+
+            auto [hr, container] = launcher.LaunchNoThrow(*session, WSLCContainerStartFlagsAttach);
+            ValidateCOMErrorMessageContains(L"A fatal error was returned by plugin 'TestPlugin'");
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=20
+            WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=sha256:*, name=debian:latest
+            WSLC Container started, session=*, id=*, name=*, image=debian:latest, state=*
+            OnWslcContainerStarted: ERROR_ACCESS_DENIED
+            WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    // Validates the VM-lifecycle hooks: OnWslcVmStarted fires each time the VM is (re)created and
+    // OnWslcVmStopping each time it is torn down, decoupled from the once-per-session hooks. Also
+    // proves the started hook can call back into the session (WSLCCreateProcess) without deadlocking.
+    WSL2_TEST_METHOD(WslcVmRestart)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmRestart);
+
+        // Idle termination only tears down storage-backed sessions (tmpfs state is unrecoverable), so
+        // this restart lifecycle test needs a dedicated persistent storage directory.
+        const auto storageDir = std::filesystem::current_path() / "test-storage-wslc-vm-restart";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-restart", WSLCNetworkingModeNone, storageDir.c_str());
+
+            // First operation brings the VM up -> OnWslcVmStarted (which reentrantly runs a process).
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Force idle teardown of the running VM -> OnWslcVmStopping.
+            BOOL wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+
+            // Next operation lazily restarts the VM -> OnWslcVmStarted fires again.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // Session teardown tears the second VM down -> OnWslcVmStopping, then OnWslcSessionStopping.
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=22
+            WSLC Session created, name=plugin-wslc-vm-restart, id=*, pid=*, token=set, sid=set
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
+            WSLC VM stopping, session=*
+            WSLC VM stopping reentrant WSLCCreateProcess: ok
+            WSLC VM stopping mount+unmount: ok
+            WSLC VM started, session=*
+            WSLC VM started reentrant WSLCCreateProcess: ok
+            WSLC VM started mount+unmount: ok
+            WSLC VM stopping, session=*
+            WSLC VM stopping reentrant WSLCCreateProcess: failed
+            WSLC VM stopping mount+unmount: skipped
+            WSLC Session stopping, name=plugin-wslc-vm-restart, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    // Validates that an announced VM teardown always happens. The plugin leaves a process running when
+    // OnWslcVmStopping returns -- which under the previous design made the runtime abandon the
+    // teardown -- and starts a call from a thread of its own during the notification window. The VM
+    // must stop anyway, the leaked process must die with it, and the windowed call must be served by
+    // the stopping VM rather than blocking on the teardown it cannot influence.
+    WSL2_TEST_METHOD(WslcVmStopCommitted)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmStopCommitted);
+
+        // Idle termination only tears down storage-backed sessions (see WslcVmRestart).
+        const auto storageDir = std::filesystem::current_path() / "test-storage-wslc-vm-stop-committed";
+        std::error_code storageError;
+        std::filesystem::remove_all(storageDir, storageError);
+        std::filesystem::create_directories(storageDir);
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(storageDir, ec);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-stop-committed", WSLCNetworkingModeNone, storageDir.c_str());
+
+            // Bring the VM up -> OnWslcVmStarted.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+
+            // The teardown is announced and then carried out, even though the plugin's callback left a
+            // process running. The session is genuinely idle afterwards.
+            BOOL wasAlreadyIdle = TRUE;
+            VERIFY_SUCCEEDED(session->TriggerIdleTermination(&wasAlreadyIdle));
+            VERIFY_IS_FALSE(wasAlreadyIdle);
+
+            // The VM is gone, so this starts a fresh one -> a second OnWslcVmStarted.
+            {
+                wsl::windows::common::WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+                auto process = launcher.Launch(*session);
+            }
+        }
+
+        // "leaked process died: yes" is the assertion that the announced stop actually happened: the
+        // process the callback left running was killed by the teardown rather than keeping the VM
+        // alive. "stop-window caller: ok" shows a plugin call from another thread was served by the
+        // stopping VM instead of deadlocking against the teardown that callback was holding up. Both
+        // are reported when that thread is joined, at session teardown.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=23
+            WSLC Session created, name=plugin-wslc-vm-stop-committed, id=*, pid=*, token=set, sid=set
+            WSLC VM started, session=*
+            WSLC VM stopping, session=*
+            WSLC VM stopping leaked process: ok
+            WSLC VM started, session=*
+            WSLC stop-window caller: ok
+            WSLC leaked process died: yes
+            WSLC Session stopping, name=plugin-wslc-vm-stop-committed, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcVmNeverStarted)
+    {
+        ConfigurePlugin(PluginTestType::WslcVmNeverStarted);
+
+        // A session whose VM is never needed. VM bring-up is lazy, so creating and destroying the
+        // session must not produce either VM notification: OnWslcVmStopping is documented to fire
+        // exactly once per OnWslcVmStarted, and a stop for a VM that never existed would break the
+        // pairing every plugin relies on to track VM lifetime. The plugin also issues a call from
+        // OnWslcSessionCreated, which must be rejected rather than bring a VM up.
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-vm-never-started");
+            VERIFY_IS_NOT_NULL(session.get());
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=24
+            WSLC Session created, name=plugin-wslc-vm-never-started, id=*, pid=*, token=set, sid=set
+            WSLC no-vm caller: rejected
+            WSLC Session stopping, name=plugin-wslc-vm-never-started, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // This test must run last so it doesn't break test cases that depends on plugin signature.
     WSL2_TEST_METHOD(InvalidPluginSignature)
     {
@@ -614,7 +1008,8 @@ class PluginTests
         ConfigurePlugin(PluginTestType::ErrorMessageStartDistro);
         StartWsl(
             -1,
-            L"A fatal error was returned by plugin 'TestPlugin'\r\nError code: "
-            L"Wsl/Service/CreateInstance/CreateVm/Plugin/TRUST_E_NOSIGNATURE\r\n");
+            FormatErrorMessage(
+                L"A fatal error was returned by plugin 'TestPlugin'",
+                L"Wsl/Service/CreateInstance/CreateVm/Plugin/TRUST_E_NOSIGNATURE"));
     }
 };

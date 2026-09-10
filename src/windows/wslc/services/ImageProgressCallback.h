@@ -12,41 +12,37 @@ Abstract:
 
 --*/
 #pragma once
+#include "Terminal.h"
 #include "SessionService.h"
+#include "VTSupport.h"
+#include <map>
+#include <string>
 
 namespace wsl::windows::wslc::services {
-
-class ChangeTerminalMode
-{
-public:
-    NON_COPYABLE(ChangeTerminalMode);
-    NON_MOVABLE(ChangeTerminalMode);
-    ChangeTerminalMode(HANDLE console, bool cursorVisible);
-    ~ChangeTerminalMode();
-
-    bool IsConsole() const
-    {
-        return m_console != nullptr;
-    }
-
-private:
-    HANDLE m_console{};
-    CONSOLE_CURSOR_INFO m_originalCursorInfo{};
-};
 
 // TODO: Handle terminal resizes.
 class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") ImageProgressCallback
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
 {
 public:
-    auto MoveToLine(SHORT line);
+    // level selects the target stream: Output (stdout) for standalone pull/push, Info (stderr) for
+    // the implicit pull during run/create, matching Docker.
+    ImageProgressCallback(Terminal& terminal, Terminal::Level level) : m_terminal(terminal), m_level(level)
+    {
+    }
     HRESULT OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total) override;
 
 private:
-    static CONSOLE_SCREEN_BUFFER_INFO Info();
-    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
-    std::map<std::string, SHORT> m_statuses;
-    SHORT m_currentLine = 0;
-    ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
+    auto MoveToLine(int line);
+    std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, int visibleWidth);
+    Terminal& m_terminal;
+    // Declared before m_vtEnabled, whose initializer reads it.
+    const Terminal::Level m_level;
+    std::map<std::string, int> m_statuses;
+    // Last status text per id; used only when redirected to dedupe repeated byte-progress callbacks.
+    std::map<std::string, std::string> m_lastStatusById;
+    int m_currentLine = 0;
+    // The progress display only renders on a VT console.
+    bool m_vtEnabled = m_terminal.IsVTEnabled(m_level);
 };
 } // namespace wsl::windows::wslc::services

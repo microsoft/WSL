@@ -47,6 +47,7 @@ enum WslConfigEntry
     KernelPath,
     SystemDistroPath,
     KernelModulesPath,
+    InstanceIdleTimeout,
 };
 
 enum NetworkingConfiguration
@@ -55,7 +56,7 @@ enum NetworkingConfiguration
     Nat = 1,
     Bridged = 2,
     Mirrored = 3,
-    VirtioProxy = 4
+    Consomme = 4
 };
 
 enum MemoryReclaimConfiguration

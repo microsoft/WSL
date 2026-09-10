@@ -126,18 +126,12 @@ namespace anon {
     };
 } // namespace anon
 
-WindowsUpdateContext::WindowsUpdateContext() :
-    WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>(), WslProductIdentifier())
+WindowsUpdateContext::WindowsUpdateContext() : WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>())
 {
 }
 
-WindowsUpdateContext::WindowsUpdateContext(std::wstring product) :
-    WindowsUpdateContext(std::make_unique<anon::DefaultWindowsUpdateClassFactory>(), std::move(product))
-{
-}
-
-WindowsUpdateContext::WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFactory> factory, std::wstring product) :
-    m_factory(std::move(factory)), m_product(std::move(product))
+WindowsUpdateContext::WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFactory> factory) :
+    m_factory(std::move(factory)), m_product(WslProductIdentifier())
 {
     m_session = m_factory->CreateUpdateSession();
 
@@ -158,15 +152,23 @@ std::wstring WindowsUpdateContext::WslProductIdentifier()
     return STRING_TO_WIDE_STRING(DCAT_PRODUCT_NAME);
 }
 
-void WindowsUpdateContext::EnsureProductRegistryEntry() const
+void WindowsUpdateContext::EnsureProductRegistryEntry(bool reset) const
 {
-    wsl::windows::common::helpers::RegisterWithDcat(false);
+    if (reset || !wsl::windows::common::helpers::VersionRegisteredWithDcat())
+    {
+        wsl::windows::common::helpers::RegisterWithDcat(false);
+    }
 }
 
 size_t WindowsUpdateContext::SearchForUpdates()
 {
     TraceLoggingWriteTagged(
-        *m_activity, "SearchForUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+        *m_activity,
+        "SearchForUpdates",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingWideString(m_product.c_str(), "product"));
+
     THROW_IF_FAILED(m_session->CreateUpdateSearcher(&m_searcher));
 
     std::wstring queryString = std::format(L"Product='{}'", m_product);
@@ -217,7 +219,17 @@ size_t WindowsUpdateContext::SearchForUpdates()
     }
 
     THROW_IF_FAILED(searchResult->get_Updates(&m_updates));
-    return GetUpdateCount();
+    size_t result = GetUpdateCount();
+
+    TraceLoggingWriteTagged(
+        *m_activity,
+        "SearchForUpdatesResult",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingInt32(resultCode, "OperationResultCode"),
+        TraceLoggingLong(static_cast<LONG>(result), "updateCount"));
+
+    return result;
 }
 
 size_t WindowsUpdateContext::GetUpdateCount() const
@@ -232,8 +244,6 @@ size_t WindowsUpdateContext::GetUpdateCount() const
 
 void WindowsUpdateContext::DownloadUpdates(const std::function<void(uint32_t)>& progress) const
 {
-    TraceLoggingWriteTagged(
-        *m_activity, "DownloadUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
     // Collect all of the updates that are not currently downloaded
     wil::com_ptr<IUpdateCollection> toDownload = m_factory->CreateUpdateCollection();
 
@@ -252,6 +262,14 @@ void WindowsUpdateContext::DownloadUpdates(const std::function<void(uint32_t)>& 
     // All updates are already downloaded — nothing to do.
     LONG toDownloadCount{};
     THROW_IF_FAILED(toDownload->get_Count(&toDownloadCount));
+
+    TraceLoggingWriteTagged(
+        *m_activity,
+        "DownloadUpdates",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingLong(toDownloadCount, "downloadCount"));
+
     if (toDownloadCount == 0)
     {
         if (progress)
@@ -315,10 +333,14 @@ void WindowsUpdateContext::InstallUpdates(const std::function<void(uint32_t)>& p
     THROW_IF_FAILED(installationHResult);
 }
 
-void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, const std::function<void(uint32_t)>& progress)
+void WindowsUpdateContext::RunUpdateFlow(UpdateOptions options, const std::function<void(uint32_t)>& progress)
 {
     TraceLoggingWriteTagged(
-        *m_activity, "RunUpdateFlow", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+        *m_activity,
+        "RunUpdateFlow",
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingUInt32(static_cast<std::underlying_type_t<UpdateOptions>>(options), "options"));
 
     static_assert(
         DownloadProgressPercent + InstallProgressPercent == 100, "Download and Install progress values must add up to 100.");
@@ -328,9 +350,9 @@ void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, const std::function<
         progress(0);
     }
 
-    if (forceInstall)
+    if (options != UpdateOptions::None)
     {
-        EnsureProductRegistryEntry();
+        EnsureProductRegistryEntry(options == UpdateOptions::ResetProductRegistration);
     }
 
     size_t updateCount = SearchForUpdates();

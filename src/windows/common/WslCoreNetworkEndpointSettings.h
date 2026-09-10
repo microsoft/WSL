@@ -222,8 +222,8 @@ struct EndpointRoute
 
     bool IsDefault() const noexcept
     {
-        return (Family == AF_INET && DestinationPrefixString == LX_INIT_UNSPECIFIED_ADDRESS) ||
-               (Family == AF_INET6 && DestinationPrefixString == LX_INIT_UNSPECIFIED_V6_ADDRESS);
+        return DestinationPrefix.PrefixLength == 0 && ((Family == AF_INET && DestinationPrefixString == LX_INIT_UNSPECIFIED_ADDRESS) ||
+                                                       (Family == AF_INET6 && DestinationPrefixString == LX_INIT_UNSPECIFIED_V6_ADDRESS));
     }
 
     bool IsUnicastAddressRoute() const noexcept
@@ -360,8 +360,6 @@ struct NetworkSettings
 
         return {};
     }
-
-    std::wstring GetBestGatewayMacAddress(ADDRESS_FAMILY addressFamily) const;
 
     std::wstring IpAddressesString() const
     {
