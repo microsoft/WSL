@@ -48,6 +48,7 @@ _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, 
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
 _(Force,            "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,           "detach",               L"d",             Kind::Flag,       NoConversion, Localization::WSLCCLI_DetachArgDescription()) \
+_(Details,          "details",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DetailsArgDescription()) \
 _(DNS,              "dns",                  NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSArgDescription()) \
 /*_(DNSDomain,        "dns-domain",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSDomainArgDescription())*/ \
 _(DNSOption,        "dns-option",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSOptionArgDescription()) \
