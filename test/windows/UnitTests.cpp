@@ -7847,6 +7847,42 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
             VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }
+
+        // Scenario 9: Variable-length string fields must be terminated within the received message.
+        {
+            auto [a, b] = MakeSocketPair();
+            wsl::shared::SocketChannel sender{std::move(a), "sender"};
+            wsl::shared::SocketChannel receiver{std::move(b), "receiver"};
+
+            wsl::shared::MessageWriter<LX_INIT_GUEST_CAPABILITIES> message;
+            std::array<gsl::byte, 4> unterminated{
+                static_cast<gsl::byte>('1'), static_cast<gsl::byte>('.'), static_cast<gsl::byte>('2'), static_cast<gsl::byte>('3')};
+            message.WriteSpan(gsl::make_span(unterminated));
+            sender.SendMessage<LX_INIT_GUEST_CAPABILITIES>(message.Span());
+
+            gsl::span<gsl::byte> span;
+            receiver.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(&span);
+            const auto hr =
+                wil::ResultFromException([&]() { wsl::shared::string::FromMessageBuffer<LX_INIT_GUEST_CAPABILITIES>(span); });
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        {
+            auto [a, b] = MakeSocketPair();
+            wsl::shared::SocketChannel sender{std::move(a), "sender"};
+            wsl::shared::SocketChannel receiver{std::move(b), "receiver"};
+
+            wsl::shared::MessageWriter<WSLC_GET_DISK_RESULT> message;
+            std::array<gsl::byte, 4> unterminated{
+                static_cast<gsl::byte>('/'), static_cast<gsl::byte>('d'), static_cast<gsl::byte>('e'), static_cast<gsl::byte>('v')};
+            message.WriteSpan(gsl::make_span(unterminated));
+            sender.SendMessage<WSLC_GET_DISK_RESULT>(message.Span());
+
+            gsl::span<gsl::byte> span;
+            receiver.ReceiveMessage<WSLC_GET_DISK_RESULT>(&span);
+            const auto hr = wil::ResultFromException([&]() { wsl::shared::string::FromMessageBuffer<WSLC_GET_DISK_RESULT>(span); });
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
     }
 
     TEST_METHOD(DownloadToHiddenSystemTempFolder)
