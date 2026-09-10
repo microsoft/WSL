@@ -4,7 +4,9 @@ trigger:
     - master
   paths:
     include:
-    - 'localization/strings/en-US/Resources.resw'
+    - 'localization/strings/en-US/WSL.resw'
+    - 'localization/strings/en-US/WSLC.resw'
+    - 'tools/mergeLocalizationResources.ps1'
     - 'intune/en-US/WSL.adml'
 
 # Schedule nightly build
@@ -32,6 +34,13 @@ pool:
 steps:
 - checkout : self
   persistCredentials: true
+
+- powershell: |
+    .\tools\mergeLocalizationResources.ps1 `
+      -WslResource localization\strings\en-US\WSL.resw `
+      -WslcResource localization\strings\en-US\WSLC.resw `
+      -OutFile localization\strings\en-US\Resources.resw
+  displayName: Merge English localization resources
 
 - task: TouchdownBuildTask@5
   displayName: Touchdown Build Localization

@@ -180,8 +180,38 @@ def fix_comments(comments: dict, path: str, strings: dict):
 ADML_NS = '{http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions}'
 RESOURCE_FOLDER = 'localization/strings'
 BASELINE_LANGUAGE = 'en-US'
+BASELINE_RESOURCE_FILENAMES = ('WSL.resw', 'WSLC.resw')
 ADML_FOLDER = 'intune'
 ADML_FILENAME = 'WSL.adml'
+WSLC_RESOURCE_EXCEPTIONS = {
+    'MessageFailedToMapPort',
+    'MessageRegistryAllowlistPolicyInvalid',
+    'MessageRegistryBlockedByPolicy',
+    'MessageWSLContainerDisabled',
+}
+
+def is_wslc_resource(name: str) -> bool:
+    return (
+        name.startswith('WSLCCLI_')
+        or name.startswith('WSLCUserSettings_')
+        or re.match(r'^MessageWslc[A-Z]', name) is not None
+        or name in WSLC_RESOURCE_EXCEPTIONS
+    )
+
+def validate_resource_ownership(wsl_strings: dict, wslc_strings: dict) -> bool:
+    result = True
+
+    misplaced_wslc_strings = sorted(name for name in wsl_strings if is_wslc_resource(name))
+    if misplaced_wslc_strings:
+        print(f'error: WSLC resources found in WSL.resw: {misplaced_wslc_strings}')
+        result = False
+
+    misplaced_wsl_strings = sorted(name for name in wslc_strings if not is_wslc_resource(name))
+    if misplaced_wsl_strings:
+        print(f'error: WSL or common resources found in WSLC.resw: {misplaced_wsl_strings}')
+        result = False
+
+    return result
 
 def get_adml_entries(path: str) -> tuple[dict, set]:
     """Parse an .adml file.
@@ -291,21 +321,45 @@ def validate_adml(adml_folder: str, baseline_language: str) -> bool:
     return result
 
 def run(resource_folder: str, baseline_language: str, fix: bool, adml_folder: str):
-    baseline_file = f'{resource_folder}/{baseline_language}/Resources.resw'
+    baseline_files = [
+        f'{resource_folder}/{baseline_language}/{filename}'
+        for filename in BASELINE_RESOURCE_FILENAMES
+    ]
+    baseline_strings = {
+        path: get_strings_from_file(path, True)
+        for path in baseline_files
+    }
 
-    strings = get_strings_from_file(baseline_file, True)
-    baseline = get_file_string_inserts(strings)
+    result = validate_resource_ownership(
+        baseline_strings[baseline_files[0]],
+        baseline_strings[baseline_files[1]])
+    combined_strings = {}
+    comments_by_file = {}
+    for path, strings in baseline_strings.items():
+        duplicates = sorted(set(combined_strings) & set(strings))
+        if duplicates:
+            print(f'error: Duplicate strings across English resource files: {duplicates}')
+            result = False
 
-    result, comments = validate_comments(strings)
+        combined_strings.update(strings)
+        comments_result, comments_by_file[path] = validate_comments(strings)
+        result &= comments_result
+
+    baseline = get_file_string_inserts(combined_strings)
     for language in os.listdir(resource_folder):
+        if language == baseline_language:
+            continue
+
         path = f'{resource_folder}/{language}/Resources.resw'
         print(f'Validating inserts in {path}')
         result &= validate_resource(baseline, path)
 
     result &= validate_adml(adml_folder, baseline_language)
 
-    if fix and comments:
-        fix_comments(comments, baseline_file, strings)
+    if fix:
+        for path, comments in comments_by_file.items():
+            if comments:
+                fix_comments(comments, path, baseline_strings[path])
 
     sys.exit(0 if result else 1)
 

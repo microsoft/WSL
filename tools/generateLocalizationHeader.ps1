@@ -1,12 +1,28 @@
 # Script to generate Localization.h from resources.resw
 
 
-param( [Parameter(Mandatory=$true)] $OutFile)
+param(
+    [Parameter(Mandatory=$true)]
+    $OutFile,
+
+    $DefaultResourceFile
+)
 
 $ErrorActionPreference = "Stop"
 
 $resourceFolder = "$($PSScriptRoot)\..\localization\strings"
 $defaultLanguage = "en-US"
+if ([string]::IsNullOrEmpty($DefaultResourceFile))
+{
+    $defaultResourceFiles = @(
+        "$resourceFolder\$defaultLanguage\WSL.resw",
+        "$resourceFolder\$defaultLanguage\WSLC.resw")
+}
+else
+{
+    $defaultResourceFiles = @($DefaultResourceFile)
+}
+
 $languages = @($defaultLanguage) + (Get-ChildItem -Path $resourceFolder | % { $_.name} | Where { $_ -Ne $defaultLanguage })
 
 $content = @"
@@ -128,26 +144,30 @@ function generateEntry
 function loadStrings
 {
     param([string]$language)
-    $xml = [xml](Get-Content "$resourceFolder/$language/Resources.resw" -raw)
 
     $strings = @{}
+    $resourceFiles = if ($language -eq $defaultLanguage) { $defaultResourceFiles } else { @("$resourceFolder/$language/Resources.resw") }
 
-    foreach($entry in $xml.root.data)
+    foreach ($resourceFile in $resourceFiles)
     {
-        if ($strings.ContainsKey($entry.name))
+        $xml = [xml](Get-Content $resourceFile -raw)
+        foreach($entry in $xml.root.data)
         {
-            throw "Entry $($entry.name) duplicated in resource for: $language"
-        }
+            if ($strings.ContainsKey($entry.name))
+            {
+                throw "Entry $($entry.name) duplicated in resource for: $language"
+            }
 
-        # Skip generating strings intended for WSL Settings. These strings are
-        # unused in native C++ code. Further, their naming is incompatible with
-        # the function names generated for the localization header (contain '.').
-        if ($entry.name.StartsWith("Settings_"))
-        {
-            continue
-        }
+            # Skip generating strings intended for WSL Settings. These strings are
+            # unused in native C++ code. Further, their naming is incompatible with
+            # the function names generated for the localization header (contain '.').
+            if ($entry.name.StartsWith("Settings_"))
+            {
+                continue
+            }
 
-        $strings[$entry.name] = $entry.value
+            $strings[$entry.name] = $entry.value
+        }
     }
 
     return $strings

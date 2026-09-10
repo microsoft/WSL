@@ -31,7 +31,9 @@ file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBENetworkingIntegration.pn
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEVSCodeIntegration.png ${BIN}/${TargetApp}/Assets/SettingsOOBEVSCodeIntegration.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEVSIntegration.png ${BIN}/${TargetApp}/Assets/SettingsOOBEVSIntegration.png)
 
-file(GLOB STRINGS ${CMAKE_SOURCE_DIR}/localization/strings/**/*.resw)
+file(GLOB STRINGS ${CMAKE_SOURCE_DIR}/localization/strings/*/Resources.resw)
+list(APPEND STRINGS ${LOCALIZATION_EN_US_RESW})
+set_source_files_properties(${LOCALIZATION_EN_US_RESW} PROPERTIES GENERATED TRUE)
 
 add_executable(
   ${TargetApp} WIN32
@@ -246,5 +248,5 @@ configure_file(
   "${CMAKE_CURRENT_LIST_DIR}/Properties/AssemblyInfo.cs"
 )
 
-add_dependencies(wslsettings libwsl)
+add_dependencies(wslsettings libwsl localization)
 set_target_properties(wslsettings PROPERTIES FOLDER windows)

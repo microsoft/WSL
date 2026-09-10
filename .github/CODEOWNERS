@@ -2,6 +2,7 @@
 * @microsoft/wsl-maintainers
 
 # WSLC
+/localization/strings/en-US/WSLC.resw @microsoft/wsl-maintainers @microsoft/wslc-team
 /src/windows/wslc/         @microsoft/wsl-maintainers @microsoft/wslc-team
 /src/windows/wslcsession/  @microsoft/wsl-maintainers @microsoft/wslc-team
 /src/windows/WslcSDK/      @microsoft/wsl-maintainers @microsoft/wslc-team

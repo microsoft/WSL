@@ -253,6 +253,7 @@ file(MAKE_DIRECTORY ${BIN})
 
 set (GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
+set(LOCALIZATION_EN_US_RESW ${GENERATED_DIR}/localization/strings/en-US/Resources.resw)
 
 # Generate Source Link JSON so debuggers can fetch source from GitHub (pipeline builds only)
 if (DEFINED PIPELINE_BUILD_ID)

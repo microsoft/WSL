@@ -25,9 +25,31 @@ function(add_appx_target target binaries manifest_in output_package dependencies
         list(APPEND RESOURCES_DEPENDENCY ${PROJECT_SOURCE_DIR}/${e})
     endforeach()
 
-    # Localization. Note: these files aren't added to the resource map, so they aren't added to the package,
-    # but they are used by makepri to generate resources.pri
-    file(CREATE_LINK ${PROJECT_SOURCE_DIR}/localization/strings ${PACKAGE_LAYOUT}/Strings SYMBOLIC)
+    # Localization. These files are used by makepri to generate resources.pri,
+    # but they aren't added to the package as individual files.
+    if (IS_SYMLINK "${PACKAGE_LAYOUT}/Strings")
+        file(REMOVE "${PACKAGE_LAYOUT}/Strings")
+    endif()
+    file(MAKE_DIRECTORY ${PACKAGE_LAYOUT}/Strings)
+
+    foreach(LANG ${SUPPORTED_LANGS})
+        set(LANGUAGE_RESOURCE_DIRECTORY ${PACKAGE_LAYOUT}/Strings/${LANG})
+        set(PACKAGED_LANGUAGE_RESOURCE ${LANGUAGE_RESOURCE_DIRECTORY}/Resources.resw)
+        if (LANG STREQUAL "en-US")
+            set(LANGUAGE_RESOURCE ${LOCALIZATION_EN_US_RESW})
+        else()
+            set(LANGUAGE_RESOURCE ${PROJECT_SOURCE_DIR}/localization/strings/${LANG}/Resources.resw)
+        endif()
+
+        add_custom_command(
+            OUTPUT ${PACKAGED_LANGUAGE_RESOURCE}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${LANGUAGE_RESOURCE_DIRECTORY}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${LANGUAGE_RESOURCE}" "${PACKAGED_LANGUAGE_RESOURCE}"
+            DEPENDS ${LANGUAGE_RESOURCE}
+            VERBATIM
+        )
+        list(APPEND RESOURCES_DEPENDENCY ${PACKAGED_LANGUAGE_RESOURCE})
+    endforeach()
 
     foreach(binary ${binaries})
     set(BINARY_SRC "${BIN}/${binary}")
@@ -73,6 +95,7 @@ function(add_appx_target target binaries manifest_in output_package dependencies
     )
 
     add_custom_target(${target} DEPENDS ${output_package})
+    add_dependencies(${target} localization)
 
     foreach(e ${dependencies})
         add_dependencies(${target} ${e})
