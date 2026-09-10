@@ -2217,17 +2217,9 @@ Usage:
     <value>Required option not provided: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MisplacedGlobalOptionError" xml:space="preserve">
-    <value>Global option '{}' is defined for '{}'. Specify it after that command and before its subcommand.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
     <value>Global option '{}' must be specified after '{}' and before '{}'.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_MisplacedGlobalOptionMultipleScopesError" xml:space="preserve">
-    <value>Global option '{}' is not valid at this position. It is defined for these commands: {}. Specify it after the intended command and before its subcommand.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Shows help about the selected command</value>

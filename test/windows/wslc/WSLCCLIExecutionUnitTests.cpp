@@ -133,36 +133,6 @@ namespace {
         }
     };
 
-    struct MultipleTestRootCommand final : Command
-    {
-        MultipleTestRootCommand() : Command(L"root", L"")
-        {
-        }
-
-        std::wstring ShortDescription() const override
-        {
-            return L"Multiple scoped global root";
-        }
-
-        std::wstring LongDescription() const override
-        {
-            return ShortDescription();
-        }
-
-    protected:
-        std::vector<std::unique_ptr<Command>> CreateCommands() const override
-        {
-            std::vector<std::unique_ptr<Command>> commands;
-            commands.emplace_back(std::make_unique<TestComposeCommand>(L"compose", FullName()));
-            commands.emplace_back(std::make_unique<TestComposeCommand>(L"stack", FullName()));
-            return commands;
-        }
-
-        void ExecuteInternal(CLIExecutionContext&) const override
-        {
-        }
-    };
-
     struct TestPositionalCommand final : Command
     {
         TestPositionalCommand(const std::wstring& parent) : Command(L"show", parent)
@@ -205,6 +175,11 @@ namespace {
         std::wstring LongDescription() const override
         {
             return ShortDescription();
+        }
+
+        std::vector<Argument> GetGlobalArguments() const override
+        {
+            return {Argument::Create(ArgType::Progress)};
         }
 
     protected:
@@ -398,7 +373,7 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"wslc compose up"}, child.FormatInvocation());
     }
 
-    TEST_METHOD(ScopedGlobalArguments_DescendantGlobalAtRootReportsCorrectPlacement)
+    TEST_METHOD(ScopedGlobalArguments_DescendantGlobalAtRootIsUnknown)
     {
         CLIExecutionContext context;
 
@@ -409,8 +384,7 @@ class WSLCCLIExecutionUnitTests
         }
         catch (const ArgumentException& exception)
         {
-            VERIFY_ARE_EQUAL(
-                wsl::shared::Localization::WSLCCLI_MisplacedGlobalOptionError(L"--progress", L"wslc compose"), exception.Message());
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_InvalidNameError(L"--progress"), exception.Message());
         }
     }
 
@@ -448,11 +422,13 @@ class WSLCCLIExecutionUnitTests
         }
     }
 
-    TEST_METHOD(ScopedGlobalArguments_MultiplePossibleScopesReportAllOwners)
+    TEST_METHOD(ScopedGlobalArguments_SiblingGlobalIsUnknown)
     {
-        std::vector<std::wstring> arguments{L"--progress", L"plain", L"compose", L"up"};
+        size_t traversalCount = 0;
         CLIExecutionContext context;
-        CommandInvocation invocation{std::make_unique<MultipleTestRootCommand>(), std::move(arguments)};
+        CommandInvocation invocation{
+            std::make_unique<PositionalTestRootCommand>(traversalCount),
+            std::vector<std::wstring>{L"show", L"--progress", L"plain"}};
 
         try
         {
@@ -461,11 +437,10 @@ class WSLCCLIExecutionUnitTests
         }
         catch (const ArgumentException& exception)
         {
-            VERIFY_ARE_EQUAL(
-                wsl::shared::Localization::WSLCCLI_MisplacedGlobalOptionMultipleScopesError(
-                    L"--progress", L"'wslc compose', 'wslc stack'"),
-                exception.Message());
+            VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_InvalidNameError(L"--progress"), exception.Message());
         }
+
+        VERIFY_ARE_EQUAL(0u, traversalCount);
     }
 
     // Test: Verify EnumVariantMap on DataMap for Context Data
