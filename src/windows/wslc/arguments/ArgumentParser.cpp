@@ -65,9 +65,9 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     {
         const auto argument = Argument::Create(type);
         const auto inserted = m_unsupportedArguments.emplace(type).second;
-        WI_ASSERT(inserted);
-        WI_ASSERT(FindArgument(type) == nullptr);
-        WI_ASSERT(argument.IsOption());
+        WI_ASSERT(inserted);                      // Each unsupported type is declared once.
+        WI_ASSERT(FindArgument(type) == nullptr); // Unsupported types cannot also be command arguments.
+        WI_ASSERT(argument.IsOption());           // Only options can be unsupported.
         m_standardArgs.emplace_back(argument);
     }
 
@@ -80,15 +80,15 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
         const auto replacementArgument = FindArgument(replacementType);
 
         const auto inserted = deprecatedTypes.emplace(deprecatedType).second;
-        WI_ASSERT(inserted);
-        WI_ASSERT(deprecatedType != replacementType);
-        WI_ASSERT(FindArgument(deprecatedType) == nullptr);
-        WI_ASSERT(!m_unsupportedArguments.contains(deprecatedType));
-        WI_ASSERT(replacementArgument != nullptr);
-        WI_ASSERT(deprecatedArgument.IsOption() && deprecatedArgument.Kind() == replacementArgument->Kind());
+        WI_ASSERT(inserted);                                         // Each deprecated type has one replacement.
+        WI_ASSERT(deprecatedType != replacementType);                // An argument cannot replace itself.
+        WI_ASSERT(FindArgument(deprecatedType) == nullptr);          // Deprecated types cannot also be command arguments.
+        WI_ASSERT(!m_unsupportedArguments.contains(deprecatedType)); // An argument cannot be both deprecated and unsupported.
+        WI_ASSERT(replacementArgument != nullptr);                   // Replacements must be command arguments.
+        WI_ASSERT(deprecatedArgument.IsOption() && deprecatedArgument.Kind() == replacementArgument->Kind()); // Deprecated and replacement arguments must be compatible options.
         WI_ASSERT(!std::ranges::any_of(m_argumentDeprecations, [replacementType](const auto& candidate) {
             return candidate.DeprecatedType() == replacementType;
-        }));
+        })); // Replacements cannot themselves be deprecated.
 
         m_standardArgs.emplace_back(deprecatedArgument);
         m_executionArgs.RegisterArgumentDeprecation(deprecatedType, replacementType);
