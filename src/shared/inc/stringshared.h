@@ -140,6 +140,12 @@ inline const char* FromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
     return String.data();
 }
 
+template <typename T>
+inline const char* FromMessageBuffer(const gsl::span<gsl::byte>& Span)
+{
+    return FromSpan(Span, offsetof(T, Buffer));
+}
+
 constexpr auto c_defaultHostName = "localhost";
 
 inline std::string CleanHostname(const std::string_view Hostname)
