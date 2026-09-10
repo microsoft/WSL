@@ -215,7 +215,7 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_FALSE(args.Contains(ArgType::NoColor));
 
         // Position points at the first positional ("image1") so the next pass
-        // can resume from there via Invocation::consumeUntil.
+        // can resume from there by updating the invocation cursor position.
         auto pos = sm.Position();
         VERIFY_IS_TRUE(pos != inv.end());
         VERIFY_ARE_EQUAL(std::wstring(L"image1"), *pos);
@@ -342,8 +342,8 @@ class WSLCCLIParserUnitTests
         VERIFY_IS_TRUE(threw);
     }
 
-    // After options-only stops, Invocation::consumeUntil(Position()) hands the
-    // remaining tokens to a second parse pass — exactly what Main.cpp does.
+    // After options-only stops, the invocation cursor points at the remaining
+    // tokens for a second parse pass, matching the production parser flow.
     TEST_METHOD(OptionsOnly_TwoPassParseAcrossPositional)
     {
         auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose image1 --signal 9");
@@ -356,7 +356,7 @@ class WSLCCLIParserUnitTests
         {
             sm1.ThrowIfError();
         }
-        inv.consumeUntil(sm1.Position());
+        inv.SetPosition(sm1.Position());
 
         VERIFY_IS_TRUE(globals.Contains(ArgType::Verbose));
         VERIFY_IS_FALSE(globals.Contains(ArgType::Signal));

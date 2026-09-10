@@ -19,8 +19,8 @@ using namespace wsl::shared;
 namespace wsl::windows::wslc {
 
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
-    Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
-    m_invocation(inv),
+    InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
+    m_invocation(invocation),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
     m_invocationItr(m_invocation.begin()),
@@ -233,8 +233,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
     {
         if (m_optionsOnly)
         {
-            // Options-only mode: stop cleanly at the first positional token without
-            // consuming it so the caller can resume parsing (e.g. subcommand resolution).
+            // Options-only mode leaves the cursor at the first positional token so the
+            // caller can resume parsing, such as for subcommand resolution.
             return BackUpAndStop();
         }
 

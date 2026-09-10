@@ -163,12 +163,103 @@ namespace {
         }
     };
 
-    CommandTree ParseTestCommandLine(std::vector<std::wstring> arguments, CLIExecutionContext& context)
+    struct TestPositionalCommand final : Command
     {
-        Invocation invocation{std::move(arguments)};
-        CommandTree commandTree{std::make_unique<TestRootCommand>()};
-        ParseCommandLine(invocation, context, commandTree, /*applyEnvironmentOptions*/ false);
-        return commandTree;
+        TestPositionalCommand(const std::wstring& parent) : Command(L"show", parent)
+        {
+        }
+
+        std::vector<Argument> GetArguments() const override
+        {
+            return {Argument::Create(ArgType::ImageId, {.Required = true})};
+        }
+
+        std::wstring ShortDescription() const override
+        {
+            return L"Positional leaf";
+        }
+
+        std::wstring LongDescription() const override
+        {
+            return ShortDescription();
+        }
+
+    protected:
+        void ExecuteInternal(CLIExecutionContext&) const override
+        {
+        }
+    };
+
+    struct TraversalTrackingCommand final : Command
+    {
+        TraversalTrackingCommand(const std::wstring& parent, size_t& traversalCount) :
+            Command(L"unrelated", parent), m_traversalCount(traversalCount)
+        {
+        }
+
+        std::wstring ShortDescription() const override
+        {
+            return L"Tracks lazy subtree traversal";
+        }
+
+        std::wstring LongDescription() const override
+        {
+            return ShortDescription();
+        }
+
+    protected:
+        std::vector<std::unique_ptr<Command>> CreateCommands() const override
+        {
+            ++m_traversalCount;
+            return {};
+        }
+
+        void ExecuteInternal(CLIExecutionContext&) const override
+        {
+        }
+
+    private:
+        size_t& m_traversalCount;
+    };
+
+    struct PositionalTestRootCommand final : Command
+    {
+        PositionalTestRootCommand(size_t& traversalCount) : Command(L"root", L""), m_traversalCount(traversalCount)
+        {
+        }
+
+        std::wstring ShortDescription() const override
+        {
+            return L"Positional test root";
+        }
+
+        std::wstring LongDescription() const override
+        {
+            return ShortDescription();
+        }
+
+    protected:
+        std::vector<std::unique_ptr<Command>> CreateCommands() const override
+        {
+            std::vector<std::unique_ptr<Command>> commands;
+            commands.emplace_back(std::make_unique<TestPositionalCommand>(FullName()));
+            commands.emplace_back(std::make_unique<TraversalTrackingCommand>(FullName(), m_traversalCount));
+            return commands;
+        }
+
+        void ExecuteInternal(CLIExecutionContext&) const override
+        {
+        }
+
+    private:
+        size_t& m_traversalCount;
+    };
+
+    CommandInvocation ParseTestCommandLine(std::vector<std::wstring> arguments, CLIExecutionContext& context)
+    {
+        CommandInvocation invocation{std::make_unique<TestRootCommand>(), std::move(arguments)};
+        ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
+        return invocation;
     }
 } // namespace
 
@@ -240,23 +331,25 @@ class WSLCCLIExecutionUnitTests
     TEST_METHOD(ScopedGlobalArguments_AccumulateAcrossCommandScopes)
     {
         CLIExecutionContext context;
-        const auto commandTree =
+        const auto invocation =
             ParseTestCommandLine({L"--session", L"foo", L"compose", L"--progress", L"plain", L"up", L"--detach"}, context);
 
-        VERIFY_ARE_EQUAL(std::wstring_view{L"up"}, commandTree.Selected().Name());
+        VERIFY_ARE_EQUAL(std::wstring_view{L"up"}, invocation.Selected().Name());
         VERIFY_ARE_EQUAL(std::wstring{L"foo"}, context.GlobalArgs.GetValue<ArgType::Session>());
         VERIFY_IS_TRUE(context.GlobalArgs.Contains(ArgType::Progress));
         VERIFY_IS_TRUE(context.Args.GetValue<ArgType::Detach>());
         VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
         VERIFY_IS_FALSE(context.Args.Contains(ArgType::Progress));
 
-        const auto compose = commandTree.Selected().Parent();
+        const auto compose = invocation.Selected().Parent();
         VERIFY_IS_TRUE(compose.has_value());
         VERIFY_ARE_EQUAL(std::wstring_view{L"compose"}, compose->get().Name());
 
         const auto root = compose->get().Parent();
         VERIFY_IS_TRUE(root.has_value());
-        VERIFY_ARE_EQUAL(&commandTree.Root(), &root->get());
+        VERIFY_ARE_EQUAL(&invocation.Root(), &root->get());
+        VERIFY_ARE_EQUAL(7u, invocation.OriginalArguments().size());
+        VERIFY_ARE_EQUAL(invocation.OriginalArguments().size(), invocation.Position());
     }
 
     TEST_METHOD(ScopedGlobalArguments_PathPreservesOwningCommands)
@@ -281,6 +374,20 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(1u, scopes.size());
         VERIFY_ARE_EQUAL(std::wstring{L"wslc compose"}, scopes[0].CommandInvocation);
         VERIFY_ARE_EQUAL(ArgType::Progress, scopes[0].Arguments[0].Type());
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_PositionalDoesNotTraverseUnrelatedSubtrees)
+    {
+        size_t traversalCount = 0;
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<PositionalTestRootCommand>(traversalCount), std::vector<std::wstring>{L"show", L"image"}};
+
+        ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
+
+        VERIFY_ARE_EQUAL(std::wstring_view{L"show"}, invocation.Selected().Name());
+        VERIFY_ARE_EQUAL(std::wstring{L"image"}, context.Args.GetValue<ArgType::ImageId>());
+        VERIFY_ARE_EQUAL(0u, traversalCount);
     }
 
     TEST_METHOD(ScopedGlobalArguments_DetachedSubtreeFormatsChildInvocation)
@@ -343,13 +450,13 @@ class WSLCCLIExecutionUnitTests
 
     TEST_METHOD(ScopedGlobalArguments_MultiplePossibleScopesReportAllOwners)
     {
-        Invocation invocation{{L"--progress", L"plain", L"compose", L"up"}};
+        std::vector<std::wstring> arguments{L"--progress", L"plain", L"compose", L"up"};
         CLIExecutionContext context;
-        CommandTree commandTree{std::make_unique<MultipleTestRootCommand>()};
+        CommandInvocation invocation{std::make_unique<MultipleTestRootCommand>(), std::move(arguments)};
 
         try
         {
-            ParseCommandLine(invocation, context, commandTree, /*applyEnvironmentOptions*/ false);
+            ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
             VERIFY_FAIL(L"Expected ArgumentException");
         }
         catch (const ArgumentException& exception)
@@ -1007,13 +1114,12 @@ class WSLCCLIExecutionUnitTests
             bool succeeded = true;
             try
             {
-                Invocation invocation{std::move(args)};
-                CommandTree commandTree{std::make_unique<RootCommand>()};
+                CommandInvocation invocation{std::make_unique<RootCommand>(), std::move(args)};
                 CLIExecutionContext context;
-                ParseCommandLine(invocation, context, commandTree, /*applyEnvironmentOptions*/ false);
+                ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
 
                 // Ensure we found the expected command
-                VERIFY_ARE_EQUAL(testCase.expectedCommand, commandTree.Selected().Name());
+                VERIFY_ARE_EQUAL(testCase.expectedCommand, invocation.Selected().Name());
             }
             catch (const CommandException& ce)
             {

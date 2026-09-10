@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 
 #include "Argument.h"
+#include "Invocation.h"
 
 #include <functional>
 #include <memory>
@@ -23,7 +24,6 @@ Abstract:
 
 namespace wsl::windows::wslc {
 struct Command;
-struct Invocation;
 
 namespace execution {
     struct CLIExecutionContext;
@@ -47,20 +47,41 @@ public:
     CommandTree& operator=(CommandTree&&) noexcept;
 
     const Command& Root() const;
-    const Command& Selected() const;
 
 private:
+    std::unique_ptr<Command> m_root;
+};
+
+class CommandInvocation
+{
+public:
+    CommandInvocation(std::unique_ptr<Command> root, std::vector<std::wstring>&& arguments);
+    ~CommandInvocation();
+
+    CommandInvocation(const CommandInvocation&) = delete;
+    CommandInvocation& operator=(const CommandInvocation&) = delete;
+    CommandInvocation(CommandInvocation&& other) noexcept;
+    CommandInvocation& operator=(CommandInvocation&& other) noexcept;
+
+    const Command& Root() const;
+    const Command& Selected() const;
+    const std::vector<std::wstring>& OriginalArguments() const noexcept;
+    size_t Position() const noexcept;
+
+private:
+    InvocationCursor& Cursor() noexcept;
     void Select(const Command& command);
 
-    std::unique_ptr<Command> m_root;
+    CommandTree m_commands;
+    InvocationCursor m_cursor;
     std::optional<std::reference_wrapper<const Command>> m_selected;
 
-    friend void ParseCommandLine(Invocation& invocation, execution::CLIExecutionContext& context, CommandTree& commandTree, bool applyEnvironmentOptions);
+    friend void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context, bool applyEnvironmentOptions);
 };
 
 // Returns the global option scopes along target's path from the root.
 std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& target);
 
 // Parses scoped global options while selecting each command level in the persistent command tree.
-void ParseCommandLine(Invocation& invocation, execution::CLIExecutionContext& context, CommandTree& commandTree, bool applyEnvironmentOptions = true);
+void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context, bool applyEnvironmentOptions = true);
 } // namespace wsl::windows::wslc

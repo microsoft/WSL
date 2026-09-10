@@ -602,10 +602,10 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     }
 }
 
-std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Invocation& inv) const
+std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(InvocationCursor& invocation) const
 {
-    auto itr = inv.begin();
-    if (itr == inv.end() || (*itr)[0] == WSLC_CLI_ARG_ID_CHAR)
+    auto itr = invocation.begin();
+    if (itr == invocation.end() || (*itr)[0] == WSLC_CLI_ARG_ID_CHAR)
     {
         // No more command arguments to check, so no command to find
         return {};
@@ -621,7 +621,7 @@ std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Inv
     {
         if (wsl::shared::string::IsEqual(*itr, command->Name()))
         {
-            inv.consume(itr);
+            invocation.AdvancePast(itr);
             return std::cref(*command);
         }
 
@@ -629,7 +629,7 @@ std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Inv
         {
             if (wsl::shared::string::IsEqual(*itr, alias))
             {
-                inv.consume(itr);
+                invocation.AdvancePast(itr);
                 return std::cref(*command);
             }
         }
@@ -643,14 +643,14 @@ std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Inv
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
 // the argument data.
 void Command::ParseArguments(
-    Invocation& inv, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) const
+    InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) const
 {
     if (definedArgs.empty())
     {
         return;
     }
 
-    ParseArgumentsStateMachine stateMachine{inv, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults};
+    ParseArgumentsStateMachine stateMachine{invocation, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults};
 
     while (stateMachine.Step())
     {
@@ -658,11 +658,7 @@ void Command::ParseArguments(
     }
     stateMachine.ThrowIfError();
 
-    // Both modes leave the iterator at the first unconsumed token; sync inv.
-    if (optionsOnly || stopOnUnknown)
-    {
-        inv.consumeUntil(stateMachine.Position());
-    }
+    invocation.SetPosition(stateMachine.Position());
 }
 
 // Validates the ArgMap produced by ParseArguments. ArgMap is assumed to have

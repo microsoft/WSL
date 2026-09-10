@@ -207,7 +207,7 @@ namespace {
     }
 
     std::optional<std::reference_wrapper<const Command>> ParseGlobalArgumentsAndFindSubcommand(
-        Invocation& invocation, CLIExecutionContext& context, const Command& command, bool applyEnvironmentOptions)
+        InvocationCursor& invocation, CLIExecutionContext& context, const Command& command, bool applyEnvironmentOptions)
     {
         const auto globalAndEnvironmentArguments = command.GetGlobalsAndEnvArguments();
         if (applyEnvironmentOptions)
@@ -229,7 +229,7 @@ namespace {
         if (!subcommand)
         {
             const auto currentArgument = invocation.begin();
-            if (currentArgument != invocation.end())
+            if (currentArgument != invocation.end() && !currentArgument->empty() && currentArgument->front() == WSLC_CLI_ARG_ID_CHAR)
             {
                 ThrowIfMisplacedGlobalOption(*currentArgument, command);
             }
@@ -242,26 +242,11 @@ namespace {
 CommandTree::CommandTree(std::unique_ptr<Command> root) : m_root(std::move(root))
 {
     THROW_HR_IF(E_INVALIDARG, !m_root);
-    m_selected = std::cref(*m_root);
 }
 
 CommandTree::~CommandTree() = default;
-CommandTree::CommandTree(CommandTree&& other) noexcept : m_root(std::move(other.m_root)), m_selected(other.m_selected)
-{
-    other.m_selected.reset();
-}
-
-CommandTree& CommandTree::operator=(CommandTree&& other) noexcept
-{
-    if (this != &other)
-    {
-        m_root = std::move(other.m_root);
-        m_selected = other.m_selected;
-        other.m_selected.reset();
-    }
-
-    return *this;
-}
+CommandTree::CommandTree(CommandTree&&) noexcept = default;
+CommandTree& CommandTree::operator=(CommandTree&&) noexcept = default;
 
 const Command& CommandTree::Root() const
 {
@@ -269,14 +254,62 @@ const Command& CommandTree::Root() const
     return *m_root;
 }
 
-const Command& CommandTree::Selected() const
+CommandInvocation::CommandInvocation(std::unique_ptr<Command> root, std::vector<std::wstring>&& arguments) :
+    m_commands(std::move(root)), m_cursor(std::move(arguments)), m_selected(std::cref(m_commands.Root()))
+{
+}
+
+CommandInvocation::~CommandInvocation() = default;
+
+CommandInvocation::CommandInvocation(CommandInvocation&& other) noexcept :
+    m_commands(std::move(other.m_commands)), m_cursor(std::move(other.m_cursor)), m_selected(other.m_selected)
+{
+    other.m_selected.reset();
+}
+
+CommandInvocation& CommandInvocation::operator=(CommandInvocation&& other) noexcept
+{
+    if (this != &other)
+    {
+        m_commands = std::move(other.m_commands);
+        m_cursor = std::move(other.m_cursor);
+        m_selected = other.m_selected;
+        other.m_selected.reset();
+    }
+
+    return *this;
+}
+
+const Command& CommandInvocation::Root() const
+{
+    return m_commands.Root();
+}
+
+const Command& CommandInvocation::Selected() const
 {
     THROW_HR_IF(E_ILLEGAL_METHOD_CALL, !m_selected.has_value());
     return m_selected.value().get();
 }
 
-void CommandTree::Select(const Command& command)
+const std::vector<std::wstring>& CommandInvocation::OriginalArguments() const noexcept
 {
+    return m_cursor.OriginalArguments();
+}
+
+size_t CommandInvocation::Position() const noexcept
+{
+    return m_cursor.Position();
+}
+
+InvocationCursor& CommandInvocation::Cursor() noexcept
+{
+    return m_cursor;
+}
+
+void CommandInvocation::Select(const Command& command)
+{
+    const auto parent = command.Parent();
+    THROW_HR_IF(E_INVALIDARG, !parent.has_value() || &parent->get() != &Selected());
     m_selected = std::cref(command);
 }
 
@@ -296,29 +329,29 @@ std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& target)
     return path;
 }
 
-void ParseCommandLine(Invocation& invocation, CLIExecutionContext& context, CommandTree& commandTree, bool applyEnvironmentOptions)
+void ParseCommandLine(CommandInvocation& invocation, CLIExecutionContext& context, bool applyEnvironmentOptions)
 {
-    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation, context, commandTree.Selected(), applyEnvironmentOptions);
+    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected(), applyEnvironmentOptions);
     while (subcommand)
     {
-        commandTree.Select(subcommand->get());
-        subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation, context, commandTree.Selected(), applyEnvironmentOptions);
+        invocation.Select(subcommand->get());
+        subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected(), applyEnvironmentOptions);
     }
 
     try
     {
-        commandTree.Selected().ParseArguments(invocation, context.Args);
+        invocation.Selected().ParseArguments(invocation.Cursor(), context.Args);
     }
     catch (const ArgumentException& exception)
     {
         if (exception.UnknownOptionToken().has_value())
         {
-            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), commandTree.Selected());
+            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), invocation.Selected());
         }
 
         throw;
     }
 
-    commandTree.Selected().ValidateArguments(context.Args);
+    invocation.Selected().ValidateArguments(context.Args);
 }
 } // namespace wsl::windows::wslc

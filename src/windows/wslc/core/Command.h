@@ -127,10 +127,10 @@ struct Command
         const CommandException* exception = nullptr,
         std::span<const Argument> relevantArguments = {}) const;
 
-    std::optional<std::reference_wrapper<const Command>> FindSubCommand(Invocation& inv) const;
+    std::optional<std::reference_wrapper<const Command>> FindSubCommand(InvocationCursor& invocation) const;
 
-    // optionsOnly:          stop (without consuming) at the first positional token.
-    // stopOnUnknown:        stop (without consuming) at the first unknown option
+    // optionsOnly:          stop before the first positional token.
+    // stopOnUnknown:        stop before the first unknown option
     //                       token instead of throwing. Note: applies per-token; a
     //                       bundled short chain (e.g. "-Dv") whose leading alias
     //                       is recognized is treated as claimed, and an unknown
@@ -139,16 +139,16 @@ struct Command
     //                       as defaults (e.g. env-applied) and may be replaced
     //                       by the first CLI occurrence.
     void ParseArguments(
-        Invocation& inv,
+        InvocationCursor& invocation,
         ArgMap& target,
         std::vector<Argument> definedArgs,
         bool optionsOnly = false,
         bool stopOnUnknown = false,
         const std::vector<Argument>& overridableDefaults = {}) const;
 
-    void ParseArguments(Invocation& inv, ArgMap& target) const
+    void ParseArguments(InvocationCursor& invocation, ArgMap& target) const
     {
-        ParseArguments(inv, target, GetAllArguments());
+        ParseArguments(invocation, target, GetAllArguments());
     }
 
     void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;

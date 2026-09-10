@@ -16,93 +16,103 @@ Abstract:
 #include <vector>
 
 namespace wsl::windows::wslc {
-struct Invocation
+struct InvocationCursor
 {
-    Invocation(std::vector<std::wstring>&& args) : m_args(std::move(args))
+    InvocationCursor(std::vector<std::wstring>&& arguments) : m_arguments(std::move(arguments))
     {
     }
 
     struct iterator
     {
-        iterator(size_t arg, std::vector<std::wstring>& args) : m_arg(arg), m_args(args)
+        iterator(size_t argument, const std::vector<std::wstring>& arguments) : m_argument(argument), m_arguments(arguments)
         {
         }
 
         iterator(const iterator&) = default;
         iterator& operator=(const iterator&) = default;
 
-        iterator operator++()
+        iterator& operator++()
         {
-            return {++m_arg, m_args};
+            ++m_argument;
+            return *this;
         }
         iterator operator++(int)
         {
-            return {m_arg++, m_args};
+            auto previous = *this;
+            ++(*this);
+            return previous;
         }
-        iterator operator--()
+        iterator& operator--()
         {
-            return {--m_arg, m_args};
+            --m_argument;
+            return *this;
         }
         iterator operator--(int)
         {
-            return {m_arg--, m_args};
+            auto previous = *this;
+            --(*this);
+            return previous;
         }
 
         bool operator==(const iterator& other) const
         {
-            return m_arg == other.m_arg;
+            return m_argument == other.m_argument;
         }
         bool operator!=(const iterator& other) const
         {
-            return m_arg != other.m_arg;
+            return m_argument != other.m_argument;
         }
 
         const std::wstring& operator*() const
         {
-            return m_args[m_arg];
+            return m_arguments[m_argument];
         }
         const std::wstring* operator->() const
         {
-            return &(m_args[m_arg]);
+            return &m_arguments[m_argument];
         }
 
         size_t index() const
         {
-            return m_arg;
+            return m_argument;
         }
 
     private:
-        size_t m_arg;
-        std::vector<std::wstring>& m_args;
+        size_t m_argument;
+        const std::vector<std::wstring>& m_arguments;
     };
 
     size_t size() const
     {
-        return m_args.size();
+        return m_arguments.size();
     }
-    iterator begin()
+    const std::vector<std::wstring>& OriginalArguments() const noexcept
     {
-        return {m_currentFirstArg, m_args};
+        return m_arguments;
     }
-    iterator end()
+    size_t Position() const noexcept
     {
-        return {m_args.size(), m_args};
+        return m_position;
     }
-    // Marks i as consumed: the next begin() returns i + 1.
-    void consume(const iterator& i)
+    iterator begin() const
     {
-        m_currentFirstArg = i.index() + 1;
+        return {m_position, m_arguments};
     }
-    // Sets the start of the unconsumed range to i: the next begin() returns i.
-    // Use this when a parser stopped at an unconsumed token (e.g. options-only
-    // parsing that stopped on the first positional / subcommand token).
-    void consumeUntil(const iterator& i)
+    iterator end() const
     {
-        m_currentFirstArg = i.index();
+        return {m_arguments.size(), m_arguments};
+    }
+    void AdvancePast(const iterator& position)
+    {
+        m_position = position.index() + 1;
+    }
+    void SetPosition(const iterator& position)
+    {
+        m_position = position.index();
     }
 
 private:
-    std::vector<std::wstring> m_args;
-    size_t m_currentFirstArg = 0;
+    std::vector<std::wstring> m_arguments;
+    size_t m_position = 0;
 };
 } // namespace wsl::windows::wslc
