@@ -4,6 +4,7 @@ This site contains the developer documentation for the Windows Subsystem for Lin
 
 For user documentation, including installation and configuration, see [https://learn.microsoft.com/windows/wsl/](https://learn.microsoft.com/windows/wsl/).
 
+For the trust boundaries and security guarantees provided by WSL, see the [WSL security model](security.md).
 
 To get started developing (building, testing and deploying), see [Getting started](dev-loop.md).
 

@@ -39,3 +39,12 @@ We prefer all communications to be in English.
 Microsoft follows the principle of [Coordinated Vulnerability Disclosure](https://aka.ms/opensource/security/cvd).
 
 <!-- END MICROSOFT SECURITY.MD BLOCK -->
+
+## WSL security model
+
+WSL is an integrated development environment, not a security sandbox for running untrusted code. Configuration options that disable
+integration features do not establish a security boundary unless they are explicitly documented as security controls.
+
+Before reporting an issue, review the [WSL security model](./doc/docs/security.md). Reports should describe the unexpected security
+impact and any security boundary or documented security feature believed to be affected. MSRC determines whether an issue meets
+Microsoft's security servicing criteria.
