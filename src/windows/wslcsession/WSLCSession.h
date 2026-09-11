@@ -349,6 +349,32 @@ private:
 
     void OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept;
 
+    // Mutators wait for the Docker event thread to publish their event after committing state.
+    enum class PendingNetworkOperationType
+    {
+        Create,
+        Delete,
+        Prune
+    };
+
+    struct PendingNetworkOperation
+    {
+        wil::unique_event Completed{wil::EventOptions::ManualReset};
+        PendingNetworkOperationType Type{};
+        std::string NetworkId;
+    };
+
+    __requires_lock_held(m_networksLock) std::shared_ptr<PendingNetworkOperation> StartPendingNetworkOperation(
+        PendingNetworkOperationType Type, std::string NetworkId);
+
+    __requires_lock_held(m_networksLock) void CompletePendingNetworkOperation(const std::shared_ptr<PendingNetworkOperation>& Operation) noexcept;
+
+    void WaitForPendingNetworkOperationCompletion(const std::shared_ptr<PendingNetworkOperation>& Operation);
+
+    void WaitForConflictingNetworkOperationToComplete(std::unique_lock<std::mutex>& NetworksLock);
+
+    void OnNetworkEvent(const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept;
+
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
     void Ext4Format(const std::string& Device);
@@ -423,8 +449,19 @@ private:
 
     __guarded_by(m_containersLock) std::shared_ptr<PendingContainerCreate> m_pendingCreate;
 
+    __guarded_by(m_networksLock) std::shared_ptr<PendingNetworkOperation> m_pendingNetworkOperation;
+
+    // Events from rolled-back creates are not published.
+    __guarded_by(m_networksLock) std::deque<std::pair<std::string, NetworkEvent>> m_suppressedNetworkEvents;
+
+    // Blocks later prunes after a failed wait until the unkeyed event arrives or the VM restarts.
+    __guarded_by(m_networksLock) bool m_abandonedPruneEventPending {};
+
     // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_containerEventTracking;
+
+    // N.B. Declared after everything OnNetworkEvent() touches so the callback is unregistered first.
+    DockerEventTracker::EventTrackingReference m_networkEventTracking;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;

@@ -40,6 +40,15 @@ enum class VolumeEvent
     Destroy
 };
 
+enum class NetworkEvent
+{
+    Create,
+    Connect,
+    Disconnect,
+    Destroy,
+    Prune
+};
+
 class DockerEventTracker
 {
 public:
@@ -65,19 +74,20 @@ public:
 
     using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::int64_t)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
+    using NetworkEventCallback =
+        std::function<void(const std::string&, NetworkEvent, const std::map<std::string, std::string>&, std::int64_t)>;
     using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t Time)>;
 
     explicit DockerEventTracker(WSLCSession& session);
     ~DockerEventTracker();
 
-    // Binds the tracker to a VM's docker client and IO relay. Called on every VM start. Existing
-    // container/volume registrations are preserved across (re)connects so callers do not re-register
-    // when the VM is idle-terminated and later restarted.
+    // Rebinds the tracker on VM start without replacing callback registrations.
     void Connect(DockerHTTPClient& dockerClient, IORelay& relay);
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept;
+    EventTrackingReference RegisterNetworkUpdates(NetworkEventCallback&& Callback) noexcept;
 
     // Invoked for every container create event, after the per-container state callbacks. Unlike those,
     // this isn't keyed by container id, because the id isn't known until Docker assigns it.
@@ -89,6 +99,7 @@ private:
     void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime);
     void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
+    void OnNetworkEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
 
     // Callbacks are invoked without holding m_lock so that a callback can register or unregister callbacks, and so
     // that a callback taking its own lock can't invert with a thread that registers a callback under that same lock.
@@ -130,6 +141,15 @@ private:
         const VolumeEventCallback Callback;
     };
 
+    struct NetworkCallback : CallbackRegistration
+    {
+        NetworkCallback(size_t Id, NetworkEventCallback&& Callback) : CallbackRegistration(Id), Callback(std::move(Callback))
+        {
+        }
+
+        const NetworkEventCallback Callback;
+    };
+
     struct ContainerCreateCallbackEntry : CallbackRegistration
     {
         ContainerCreateCallbackEntry(size_t Id, ContainerCreateCallback&& Callback) :
@@ -142,6 +162,7 @@ private:
 
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCallback>> m_containerCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<VolumeCallback>> m_volumeCallbacks;
+    _Guarded_by_(m_lock) std::vector<std::shared_ptr<NetworkCallback>> m_networkCallbacks;
     _Guarded_by_(m_lock) std::vector<std::shared_ptr<ContainerCreateCallbackEntry>> m_containerCreateCallbacks;
 
     // Invokes a snapshot of callbacks taken under m_lock, skipping registrations that have since been unregistered.
