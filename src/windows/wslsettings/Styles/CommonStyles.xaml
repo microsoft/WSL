@@ -94,6 +94,27 @@
         <Setter Property="MinWidth" Value="{StaticResource BoxMinWidth}" />
     </Style>
 
+    <!--  Small pill-shaped badge used to call out new navigation items (e.g. "NEW")  -->
+    <Style x:Key="NewFeatureInfoBadgeStyle" TargetType="InfoBadge">
+        <Setter Property="Background" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="InfoBadge">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="8"
+                            Padding="6,2">
+                        <TextBlock x:Uid="Settings_Shell_WSLContainer_NewBadgeText"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   LineHeight="12" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="OobeSubtitleStyle" TargetType="TextBlock">
         <Setter Property="Margin" Value="0,0,0,-12" />
         <Setter Property="Foreground" Value="{ThemeResource DefaultTextForegroundThemeBrush}" />

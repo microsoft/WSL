@@ -25,6 +25,7 @@ file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBECrossOSFileAccess.gif ${
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEDistroManagement.png ${BIN}/${TargetApp}/Assets/SettingsOOBEDistroManagement.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEDockerDesktopIntegration.png ${BIN}/${TargetApp}/Assets/SettingsOOBEDockerDesktopIntegration.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEGeneral.png ${BIN}/${TargetApp}/Assets/SettingsOOBEGeneral.png)
+file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEWSLContainer.png ${BIN}/${TargetApp}/Assets/SettingsOOBEWSLContainer.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEGPUAcceleration.gif ${BIN}/${TargetApp}/Assets/SettingsOOBEGPUAcceleration.gif)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEGUIApps.png ${BIN}/${TargetApp}/Assets/SettingsOOBEGUIApps.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBENetworkingIntegration.png ${BIN}/${TargetApp}/Assets/SettingsOOBENetworkingIntegration.png)
@@ -87,6 +88,7 @@ add_executable(
   ViewModels/OOBE/VSCodeIntegrationViewModel.cs
   ViewModels/OOBE/VSIntegrationViewModel.cs
   ViewModels/OOBE/WorkingAcrossFileSystemsViewModel.cs
+  ViewModels/OOBE/WSLContainerViewModel.cs
   ViewModels/Settings/AboutViewModel.cs
   ViewModels/Settings/DeveloperViewModel.cs
   ViewModels/Settings/FileSystemViewModel.cs
@@ -115,6 +117,8 @@ add_executable(
   Views/OOBE/VSIntegrationPage.xaml.cs
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml.cs
+  Views/OOBE/WSLContainerPage.xaml
+  Views/OOBE/WSLContainerPage.xaml.cs
   Views/Settings/AboutPage.xaml
   Views/Settings/AboutPage.xaml.cs
   Views/Settings/DeveloperPage.xaml
@@ -168,6 +172,8 @@ csharp_set_xaml_cs_properties(
   Views/OOBE/VSIntegrationPage.xaml.cs
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml.cs
+  Views/OOBE/WSLContainerPage.xaml
+  Views/OOBE/WSLContainerPage.xaml.cs
   Views/Settings/AboutPage.xaml
   Views/Settings/AboutPage.xaml.cs
   Views/Settings/DeveloperPage.xaml
