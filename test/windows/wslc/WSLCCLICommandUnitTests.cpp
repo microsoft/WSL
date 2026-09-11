@@ -476,9 +476,8 @@ class WSLCCLICommandUnitTests
             std::unordered_map<std::wstring, argument::ArgType> seenNames;
             std::unordered_map<std::wstring, argument::ArgType> seenAliases;
 
-            auto configuredArguments = current.GetAllArguments();
+            const auto configuredArguments = current.GetAllArguments();
             const auto globalArguments = current.GetGlobalArguments();
-            configuredArguments.insert(configuredArguments.end(), globalArguments.begin(), globalArguments.end());
 
             for (const auto& arg : globalArguments)
             {
@@ -553,7 +552,7 @@ class WSLCCLICommandUnitTests
         {
             std::reference_wrapper<const Command> Command;
             std::vector<Argument> InheritedCliGlobals;
-            std::vector<Argument> InheritedGlobalStorage;
+            std::vector<Argument> InheritedGlobals;
         };
 
         RootCommand root;
@@ -567,13 +566,13 @@ class WSLCCLICommandUnitTests
             const auto& command = current.Command.get();
 
             const auto cliGlobals = command.GetGlobalArguments();
-            const auto globalStorage = command.GetGlobalsAndEnvArguments();
+            const auto globalArguments = command.GetArgumentsAndEnvironment(ArgumentScope::Global);
 
-            for (const auto& argument : globalStorage)
+            for (const auto& argument : globalArguments)
             {
-                const auto duplicateType = std::ranges::find(current.InheritedGlobalStorage, argument.Type(), &Argument::Type);
+                const auto duplicateType = std::ranges::find(current.InheritedGlobals, argument.Type(), &Argument::Type);
                 VERIFY_IS_TRUE(
-                    duplicateType == current.InheritedGlobalStorage.end(),
+                    duplicateType == current.InheritedGlobals.end(),
                     std::format(
                         L"Command '{}' reuses inherited global ArgType '{}'", command.FullName(), static_cast<size_t>(argument.Type()))
                         .c_str());
@@ -601,15 +600,15 @@ class WSLCCLICommandUnitTests
             }
 
             current.InheritedCliGlobals.insert(current.InheritedCliGlobals.end(), cliGlobals.begin(), cliGlobals.end());
-            current.InheritedGlobalStorage.insert(current.InheritedGlobalStorage.end(), globalStorage.begin(), globalStorage.end());
+            current.InheritedGlobals.insert(current.InheritedGlobals.end(), globalArguments.begin(), globalArguments.end());
 
-            for (const auto& argument : command.GetAllArguments())
+            for (const auto& argument : command.GetArgumentsAndEnvironment(ArgumentScope::Command))
             {
-                const auto duplicateType = std::ranges::find(current.InheritedGlobalStorage, argument.Type(), &Argument::Type);
+                const auto duplicateType = std::ranges::find(current.InheritedGlobals, argument.Type(), &Argument::Type);
                 VERIFY_IS_TRUE(
-                    duplicateType == current.InheritedGlobalStorage.end(),
+                    duplicateType == current.InheritedGlobals.end(),
                     std::format(
-                        L"Command '{}' registers ArgType '{}' in both GlobalArgs and Args",
+                        L"Command '{}' reuses inherited global ArgType '{}' as a command argument",
                         command.FullName(),
                         static_cast<size_t>(argument.Type()))
                         .c_str());
@@ -620,7 +619,7 @@ class WSLCCLICommandUnitTests
                 pending.emplace_back(PendingCommand{
                     .Command = std::cref(*subcommand),
                     .InheritedCliGlobals = current.InheritedCliGlobals,
-                    .InheritedGlobalStorage = current.InheritedGlobalStorage,
+                    .InheritedGlobals = current.InheritedGlobals,
                 });
             }
         }

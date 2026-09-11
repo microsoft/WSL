@@ -98,12 +98,10 @@ struct Command
         return args;
     }
 
-    // Options accepted after this command and before its subcommand. Parsed values are inherited
-    // by every descendant through CLIExecutionContext::GlobalArgs.
-    virtual std::vector<Argument> GetGlobalArguments() const
-    {
-        return {};
-    }
+    // Argument definitions declared by this command. Global arguments are created with
+    // CreateGlobalArgument and inherited by descendants.
+    std::vector<Argument> GetCommandArguments() const;
+    std::vector<Argument> GetGlobalArguments() const;
 
     // Args eligible for environment binding.
     virtual std::vector<Argument> GetEnvArguments() const
@@ -111,10 +109,9 @@ struct Command
         return {};
     }
 
-    // Union of GetGlobalArguments() and GetEnvArguments(), deduped by ArgType
-    // (globals win on conflict). Use this anywhere the two sets are combined
-    // so duplicates are not parsed/validated twice.
-    std::vector<Argument> GetGlobalsAndEnvArguments() const;
+    // Union of the requested command-line scope and environment arguments in that scope, deduped
+    // by ArgType. Command-line definitions win on conflict.
+    std::vector<Argument> GetArgumentsAndEnvironment(ArgumentScope scope) const;
 
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
@@ -146,19 +143,21 @@ struct Command
 
     void ParseArguments(InvocationCursor& invocation, ArgMap& target) const
     {
-        ParseArguments(invocation, target, GetAllArguments());
+        ParseArguments(invocation, target, GetCommandArguments());
     }
 
     void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
 
     void ValidateArguments(ArgMap& source) const
     {
-        ValidateArguments(source, GetAllArguments(), true);
+        ValidateArguments(source, GetCommandArguments(), true);
     }
 
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
+    Argument CreateGlobalArgument(ArgType type, ArgumentOverrides overrides = {}) const;
+
     virtual std::vector<std::unique_ptr<Command>> CreateCommands() const
     {
         return {};

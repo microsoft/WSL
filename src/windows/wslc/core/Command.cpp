@@ -14,7 +14,6 @@ Abstract:
 #include "precomp.h"
 #include "Argument.h"
 #include "Command.h"
-#include "CommandLineParser.h"
 #include "Invocation.h"
 #include "ArgumentParser.h"
 #include "TableOutput.h"
@@ -118,6 +117,26 @@ namespace {
 
         return invocations;
     }
+
+    std::vector<Argument> GetGlobalArgumentsForPath(const Command& target)
+    {
+        std::vector<std::reference_wrapper<const Command>> commandPath;
+        for (auto command = std::optional{std::cref(target)}; command.has_value(); command = command->get().Parent())
+        {
+            commandPath.emplace_back(*command);
+        }
+
+        std::ranges::reverse(commandPath);
+
+        std::vector<Argument> arguments;
+        for (const auto& command : commandPath)
+        {
+            const auto commandArguments = command.get().GetGlobalArguments();
+            arguments.insert(arguments.end(), commandArguments.begin(), commandArguments.end());
+        }
+
+        return arguments;
+    }
 } // namespace
 
 Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
@@ -207,6 +226,27 @@ const std::vector<std::unique_ptr<Command>>& Command::GetCommands() const
     return *m_commands;
 }
 
+Argument Command::CreateGlobalArgument(ArgType type, ArgumentOverrides overrides) const
+{
+    auto argument = Argument::Create(type, std::move(overrides));
+    argument.m_globalOwner = std::cref(*this);
+    return argument;
+}
+
+std::vector<Argument> Command::GetCommandArguments() const
+{
+    auto arguments = GetAllArguments();
+    std::erase_if(arguments, [](const auto& argument) { return argument.Scope() != ArgumentScope::Command; });
+    return arguments;
+}
+
+std::vector<Argument> Command::GetGlobalArguments() const
+{
+    auto arguments = GetAllArguments();
+    std::erase_if(arguments, [](const auto& argument) { return argument.Scope() != ArgumentScope::Global; });
+    return arguments;
+}
+
 void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const
 {
     constexpr size_t c_helpRowIndent = 2;
@@ -247,7 +287,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         commandAliases = GetCommandInvocations(*this);
     }
     const auto& commands = GetCommands();
-    auto arguments = GetAllArguments();
+    auto arguments = GetCommandArguments();
     std::vector<Argument> helpArguments;
     if (fullHelp)
     {
@@ -307,7 +347,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     const bool hasHelpForwardArgs = !helpForwardArgs.empty();
 
     const auto currentGlobalArguments = GetGlobalArguments();
-    const auto globalArgumentScopes = GetGlobalArgumentPath(*this);
+    const auto globalArguments = GetGlobalArgumentsForPath(*this);
 
     // Build usage line with Write calls for each segment.
     {
@@ -463,7 +503,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         return table;
     };
 
-    const auto AddArgumentRows = [](auto& table, const std::vector<Argument>& args) {
+    const auto AddArgumentRows = [](auto& table, std::span<const Argument> args) {
         for (const auto& arg : args)
         {
             FormattedCell aliasCell{L""};
@@ -557,7 +597,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
 
     // Options table: alias (emphasized) | long name (emphasized) | description
     // Global options are appended to the same table so column widths are shared.
-    if (fullHelp && (hasHelpOptions || !globalArgumentScopes.empty()))
+    if (fullHelp && (hasHelpOptions || !globalArguments.empty()))
     {
         if (hasHelpArguments || hasHelpForwardArgs)
         {
@@ -573,20 +613,38 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         if (hasHelpOptions)
         {
             table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingOptions(), HelpHeadingEmphasis));
-            AddArgumentRows(table, helpStandardArgs);
+            AddArgumentRows(table, std::span<const Argument>{helpStandardArgs});
         }
 
         bool hasPreviousOptionSection = hasHelpOptions;
-        for (const auto& scope : globalArgumentScopes)
+        size_t scopeStart = 0;
+        while (scopeStart < globalArguments.size())
         {
+            const auto& globalOwner = globalArguments[scopeStart].GlobalOwner();
+            THROW_HR_IF(E_UNEXPECTED, !globalOwner.has_value());
+
+            size_t scopeEnd = scopeStart + 1;
+            while (scopeEnd < globalArguments.size())
+            {
+                const auto& nextOwner = globalArguments[scopeEnd].GlobalOwner();
+                THROW_HR_IF(E_UNEXPECTED, !nextOwner.has_value());
+                if (&nextOwner->get() != &globalOwner->get())
+                {
+                    break;
+                }
+
+                ++scopeEnd;
+            }
+
             if (hasPreviousOptionSection)
             {
                 table.WriteLine();
             }
 
-            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingScopedGlobalOptions(scope.CommandInvocation), HelpHeadingEmphasis));
-            AddArgumentRows(table, scope.Arguments);
+            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingScopedGlobalOptions(globalOwner->get().FormatInvocation()), HelpHeadingEmphasis));
+            AddArgumentRows(table, std::span<const Argument>{globalArguments}.subspan(scopeStart, scopeEnd - scopeStart));
             hasPreviousOptionSection = true;
+            scopeStart = scopeEnd;
         }
 
         table.Complete();
@@ -670,7 +728,8 @@ void Command::ParseArguments(
 // Any defined validation for specific ArgTypes are also run.
 void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
 {
-    if (source.GetValue<ArgType::Help>())
+    const auto helpArgument = std::ranges::find(definedArgs, ArgType::Help, &Argument::Type);
+    if (helpArgument != definedArgs.end() && source.GetValue<ArgType::Help>())
     {
         return;
     }
@@ -741,13 +800,9 @@ void Command::ValidateArgumentsInternal(ArgMap&) const
 
 std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType> types) const
 {
-    auto arguments = GetAllArguments();
-    const auto globalArgumentScopes = GetGlobalArgumentPath(*this);
-
-    for (const auto& scope : globalArgumentScopes)
-    {
-        arguments.insert(arguments.end(), scope.Arguments.begin(), scope.Arguments.end());
-    }
+    auto arguments = GetCommandArguments();
+    const auto globalArguments = GetGlobalArgumentsForPath(*this);
+    arguments.insert(arguments.end(), globalArguments.begin(), globalArguments.end());
 
     std::vector<Argument> result;
     result.reserve(types.size());
@@ -762,21 +817,25 @@ std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType
     return result;
 }
 
-std::vector<Argument> Command::GetGlobalsAndEnvArguments() const
+std::vector<Argument> Command::GetArgumentsAndEnvironment(ArgumentScope scope) const
 {
-    auto merged = GetGlobalArguments();
-    auto envOnly = GetEnvArguments();
+    auto merged = scope == ArgumentScope::Global ? GetGlobalArguments() : GetCommandArguments();
+    auto environmentArguments = GetEnvArguments();
 
-    // Globals listed first, so the loop below treats them as the winners.
-    merged.reserve(merged.size() + envOnly.size());
-    for (auto& arg : envOnly)
+    merged.reserve(merged.size() + environmentArguments.size());
+    for (auto& argument : environmentArguments)
     {
-        const auto type = arg.Type();
+        if (argument.Scope() != scope)
+        {
+            continue;
+        }
+
+        const auto type = argument.Type();
         const bool alreadyPresent =
             std::any_of(merged.begin(), merged.end(), [type](const Argument& existing) { return existing.Type() == type; });
         if (!alreadyPresent)
         {
-            merged.emplace_back(std::move(arg));
+            merged.emplace_back(std::move(argument));
         }
     }
 

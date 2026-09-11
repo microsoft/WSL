@@ -72,22 +72,14 @@ std::vector<Argument> RootCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Version),
-    };
-}
-
-// Root global options apply to the overall invocation and appear before the
-// first subcommand (e.g. `wslc --session foo image list`).
-std::vector<Argument> RootCommand::GetGlobalArguments() const
-{
-    return {
-        Argument::Create(ArgType::Session),
+        CreateGlobalArgument(ArgType::Session),
     };
 }
 
 std::vector<Argument> RootCommand::GetEnvArguments() const
 {
     return {
-        Argument::Create(ArgType::NoColor),
+        CreateGlobalArgument(ArgType::NoColor),
     };
 }
 

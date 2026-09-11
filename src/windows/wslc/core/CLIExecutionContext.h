@@ -29,11 +29,8 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     NON_COPYABLE(CLIExecutionContext);
     NON_MOVABLE(CLIExecutionContext);
 
-    // Arguments owned by the resolved command.
+    // Arguments accumulated from the selected command path.
     argument::ArgMap Args;
-
-    // Global options accumulated from each command scope along the resolved command path.
-    argument::ArgMap GlobalArgs;
 
     // Map of data stored in the context.
     DataMap Data;

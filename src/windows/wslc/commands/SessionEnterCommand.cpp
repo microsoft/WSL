@@ -43,7 +43,7 @@ std::wstring SessionEnterCommand::LongDescription() const
 
 void SessionEnterCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    if (context.GlobalArgs.Contains(ArgType::Session))
+    if (context.Args.Contains(ArgType::Session))
     {
         throw ExecutionException(Localization::MessageWslcSessionOptionNotSupported());
     }

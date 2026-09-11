@@ -71,9 +71,9 @@ namespace {
         {
         }
 
-        std::vector<Argument> GetGlobalArguments() const override
+        std::vector<Argument> GetArguments() const override
         {
-            return {Argument::Create(ArgType::Progress)};
+            return {CreateGlobalArgument(ArgType::Progress)};
         }
 
         std::wstring ShortDescription() const override
@@ -105,9 +105,9 @@ namespace {
         {
         }
 
-        std::vector<Argument> GetGlobalArguments() const override
+        std::vector<Argument> GetArguments() const override
         {
-            return {Argument::Create(ArgType::Session)};
+            return {CreateGlobalArgument(ArgType::Session)};
         }
 
         std::wstring ShortDescription() const override
@@ -177,9 +177,9 @@ namespace {
             return ShortDescription();
         }
 
-        std::vector<Argument> GetGlobalArguments() const override
+        std::vector<Argument> GetArguments() const override
         {
-            return {Argument::Create(ArgType::Progress)};
+            return {CreateGlobalArgument(ArgType::Progress)};
         }
 
     protected:
@@ -285,19 +285,19 @@ class WSLCCLIExecutionUnitTests
             context.ApplyGlobalEnvironmentOptions();
             VERIFY_IS_FALSE(context.Terminal.IsNoColor());
 
-            VERIFY_THROWS_SPECIFIC(context.GlobalArgs.Add<ArgType::NoColor>(true), wil::ResultException, [](const wil::ResultException& e) {
+            VERIFY_THROWS_SPECIFIC(context.Args.Add<ArgType::NoColor>(true), wil::ResultException, [](const wil::ResultException& e) {
                 return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
             });
         }
 
         {
             CLIExecutionContext present;
-            present.GlobalArgs.Add<ArgType::NoColor>(true);
+            present.Args.Add<ArgType::NoColor>(true);
             present.ApplyGlobalEnvironmentOptions();
             VERIFY_IS_TRUE(present.Terminal.IsNoColor());
 
-            VERIFY_NO_THROW(Argument::Create(ArgType::NoColor).Validate(present.GlobalArgs));
-            VERIFY_THROWS_SPECIFIC(present.GlobalArgs.Remove(ArgType::NoColor), wil::ResultException, [](const wil::ResultException& e) {
+            VERIFY_NO_THROW(Argument::Create(ArgType::NoColor).Validate(present.Args));
+            VERIFY_THROWS_SPECIFIC(present.Args.Remove(ArgType::NoColor), wil::ResultException, [](const wil::ResultException& e) {
                 return e.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
             });
         }
@@ -310,11 +310,9 @@ class WSLCCLIExecutionUnitTests
             ParseTestCommandLine({L"--session", L"foo", L"compose", L"--progress", L"plain", L"up", L"--detach"}, context);
 
         VERIFY_ARE_EQUAL(std::wstring_view{L"up"}, invocation.Selected().Name());
-        VERIFY_ARE_EQUAL(std::wstring{L"foo"}, context.GlobalArgs.GetValue<ArgType::Session>());
-        VERIFY_IS_TRUE(context.GlobalArgs.Contains(ArgType::Progress));
+        VERIFY_ARE_EQUAL(std::wstring{L"foo"}, context.Args.GetValue<ArgType::Session>());
+        VERIFY_IS_TRUE(context.Args.Contains(ArgType::Progress));
         VERIFY_IS_TRUE(context.Args.GetValue<ArgType::Detach>());
-        VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
-        VERIFY_IS_FALSE(context.Args.Contains(ArgType::Progress));
 
         const auto compose = invocation.Selected().Parent();
         VERIFY_IS_TRUE(compose.has_value());
@@ -327,28 +325,42 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(invocation.OriginalArguments().size(), invocation.Position());
     }
 
-    TEST_METHOD(ScopedGlobalArguments_PathPreservesOwningCommands)
+    TEST_METHOD(ScopedGlobalArguments_PreserveOwningCommands)
     {
         const TestRootCommand root;
         const auto& compose = *root.GetCommands().front();
         const auto& up = *compose.GetCommands().front();
-        const auto scopes = GetGlobalArgumentPath(up);
+        const auto rootArguments = root.GetGlobalArguments();
+        const auto composeArguments = compose.GetGlobalArguments();
+        const auto commandArguments = up.GetCommandArguments();
 
-        VERIFY_ARE_EQUAL(2u, scopes.size());
-        VERIFY_ARE_EQUAL(std::wstring{L"wslc"}, scopes[0].CommandInvocation);
-        VERIFY_ARE_EQUAL(ArgType::Session, scopes[0].Arguments[0].Type());
-        VERIFY_ARE_EQUAL(std::wstring{L"wslc compose"}, scopes[1].CommandInvocation);
-        VERIFY_ARE_EQUAL(ArgType::Progress, scopes[1].Arguments[0].Type());
+        VERIFY_ARE_EQUAL(1u, rootArguments.size());
+        VERIFY_ARE_EQUAL(ArgumentScope::Global, rootArguments[0].Scope());
+        VERIFY_ARE_EQUAL(ArgType::Session, rootArguments[0].Type());
+        VERIFY_IS_TRUE(rootArguments[0].GlobalOwner().has_value());
+        VERIFY_ARE_EQUAL(&root, &rootArguments[0].GlobalOwner()->get());
+
+        VERIFY_ARE_EQUAL(1u, composeArguments.size());
+        VERIFY_ARE_EQUAL(ArgumentScope::Global, composeArguments[0].Scope());
+        VERIFY_ARE_EQUAL(ArgType::Progress, composeArguments[0].Type());
+        VERIFY_IS_TRUE(composeArguments[0].GlobalOwner().has_value());
+        VERIFY_ARE_EQUAL(&compose, &composeArguments[0].GlobalOwner()->get());
+
+        const auto detach = std::ranges::find(commandArguments, ArgType::Detach, &Argument::Type);
+        VERIFY_IS_TRUE(detach != commandArguments.end());
+        VERIFY_ARE_EQUAL(ArgumentScope::Command, detach->Scope());
+        VERIFY_IS_FALSE(detach->GlobalOwner().has_value());
     }
 
-    TEST_METHOD(ScopedGlobalArguments_PathIncludesStandaloneTarget)
+    TEST_METHOD(ScopedGlobalArguments_StandaloneArgumentOwnsItself)
     {
         const TestComposeCommand command{L"standalone"};
-        const auto scopes = GetGlobalArgumentPath(command);
+        const auto arguments = command.GetGlobalArguments();
 
-        VERIFY_ARE_EQUAL(1u, scopes.size());
-        VERIFY_ARE_EQUAL(std::wstring{L"wslc compose"}, scopes[0].CommandInvocation);
-        VERIFY_ARE_EQUAL(ArgType::Progress, scopes[0].Arguments[0].Type());
+        VERIFY_ARE_EQUAL(1u, arguments.size());
+        VERIFY_ARE_EQUAL(ArgumentScope::Global, arguments[0].Scope());
+        VERIFY_IS_TRUE(arguments[0].GlobalOwner().has_value());
+        VERIFY_ARE_EQUAL(&command, &arguments[0].GlobalOwner()->get());
     }
 
     TEST_METHOD(ScopedGlobalArguments_PositionalDoesNotTraverseUnrelatedSubtrees)

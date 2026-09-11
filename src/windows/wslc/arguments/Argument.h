@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "ArgMap.h"
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -28,6 +29,14 @@ Abstract:
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
+struct Command;
+
+enum class ArgumentScope
+{
+    Command,
+    Global,
+};
+
 struct ArgumentOverrides
 {
     std::optional<std::wstring> Name;
@@ -104,6 +113,16 @@ struct Argument
         return m_limit;
     }
 
+    ArgumentScope Scope() const noexcept
+    {
+        return m_globalOwner.has_value() ? ArgumentScope::Global : ArgumentScope::Command;
+    }
+
+    const std::optional<std::reference_wrapper<const Command>>& GlobalOwner() const noexcept
+    {
+        return m_globalOwner;
+    }
+
     // A single-value argument accepts one value (last-wins on repeats).
     bool IsSingle() const
     {
@@ -121,6 +140,8 @@ struct Argument
     void Validate(ArgMap& execArgs) const;
 
 private:
+    friend struct Command;
+
     ArgType m_argType;
     std::wstring m_name;
     std::wstring m_desc;
@@ -128,5 +149,6 @@ private:
     bool m_required = DefaultRequired;
     argument::Kind m_type = DefaultKind;
     argument::Limit m_limit = DefaultLimit;
+    std::optional<std::reference_wrapper<const Command>> m_globalOwner;
 };
 } // namespace wsl::windows::wslc

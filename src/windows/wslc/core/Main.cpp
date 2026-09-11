@@ -98,7 +98,7 @@ try
     // applied; keep just this and the noexcept env apply outside the try so a
     // throw can't reroute through the colored-help error path.
     const auto earlyEnvironmentArguments = invocation.Root().GetEnvArguments();
-    ApplyEnvironmentOptions(context.GlobalArgs, earlyEnvironmentArguments);
+    ApplyEnvironmentOptions(context.Args, earlyEnvironmentArguments);
     context.ApplyGlobalEnvironmentOptions();
 
     // Past this point, environment variable options are in effect.

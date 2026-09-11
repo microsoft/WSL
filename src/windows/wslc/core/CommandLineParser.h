@@ -13,7 +13,6 @@ Abstract:
 --*/
 #pragma once
 
-#include "Argument.h"
 #include "Invocation.h"
 #include "defs.h"
 
@@ -29,12 +28,6 @@ struct Command;
 namespace execution {
     struct CLIExecutionContext;
 }
-
-struct GlobalArgumentScope
-{
-    std::wstring CommandInvocation;
-    std::vector<Argument> Arguments;
-};
 
 class CommandTree
 {
@@ -79,9 +72,6 @@ private:
 
     friend void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context);
 };
-
-// Returns the global option scopes along target's path from the root.
-std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& target);
 
 // Parses scoped global options while selecting each command level in the persistent command tree.
 void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context);

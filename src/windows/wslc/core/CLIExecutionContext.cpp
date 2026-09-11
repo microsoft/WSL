@@ -23,7 +23,7 @@ void CLIExecutionContext::ApplyGlobalEnvironmentOptions()
 {
     // NoColor is environment-only and resolved before any output. Freezing it keeps the terminal
     // color state consistent for the entire invocation.
-    Terminal.SetNoColor(GlobalArgs.GetValue<ArgType::NoColor>());
+    Terminal.SetNoColor(Args.GetValue<ArgType::NoColor>());
 }
 
 void CLIExecutionContext::ReportError(HRESULT result)
