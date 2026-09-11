@@ -2238,6 +2238,9 @@ Usage:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>options</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>The following command aliases are available:</value>
   </data>
