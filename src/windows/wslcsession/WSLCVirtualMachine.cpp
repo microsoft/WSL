@@ -782,10 +782,11 @@ std::string WSLCVirtualMachine::GetVhdDevicePath(ULONG Lun)
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = WSLC_GET_DISK::Type;
     message.ScsiLun = Lun;
-    const auto& response = m_initChannel.Transaction(message, nullptr, m_initChannelTimeout);
+    gsl::span<gsl::byte> responseSpan;
+    const auto& response = m_initChannel.Transaction(message, &responseSpan, m_initChannelTimeout);
     THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to get disk path, init returned: %lu", response.Result);
 
-    return response.Buffer;
+    return std::string{wsl::shared::string::FromMessageBuffer<WSLC_GET_DISK_RESULT>(responseSpan)};
 }
 
 Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcess(

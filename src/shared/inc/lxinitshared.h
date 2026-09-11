@@ -1608,7 +1608,7 @@ struct WSLC_GET_DISK_RESULT
     unsigned int Result{};
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), BUFFER_FIELD(Buffer));
 };
 
 struct WSLC_GET_DISK
