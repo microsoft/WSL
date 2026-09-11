@@ -181,6 +181,8 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
     DeleteFileW(m_listenPath.c_str());
     DeleteFileW(m_virtioFsListenPath.c_str());
     DeleteFileW(m_vsockPath.c_str());
+    DeleteFileW(m_rpcSocketPath.c_str());
+    RemoveDirectoryW(m_rpcDirectory.c_str());
 
     WSL_LOG("OpenVmmTerminateVmStop", TraceLoggingValue(m_vmId, "VmId"));
 }
@@ -224,6 +226,8 @@ void OpenVmmWslCoreVm::Initialize()
 
         DeleteFileW(m_listenPath.c_str());
         DeleteFileW(m_vsockPath.c_str());
+        DeleteFileW(m_rpcSocketPath.c_str());
+        RemoveDirectoryW(m_rpcDirectory.c_str());
     });
 
     InitializeConfiguration();
@@ -358,7 +362,25 @@ void OpenVmmWslCoreVm::InitializeConfiguration()
     }
 
     const auto shortId = vmId.substr(0, 8);
-    m_rpcPipeName = wsl::windows::common::helpers::GetUniquePipeName();
+    const auto rpcDirectory = socketDirectory / std::format(L"wsl-{}.rpc", vmId);
+    const auto rpcSocketPath = rpcDirectory / L"s";
+    const auto narrowRpcPath = wsl::shared::string::WideToMultiByte(rpcSocketPath.wstring());
+    SOCKADDR_UN rpcAddress{};
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, narrowRpcPath.size() >= sizeof(rpcAddress.sun_path), "OpenVMM RPC socket path too long: %hs", narrowRpcPath.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, narrowRpcPath.find(',') != std::string::npos, "OpenVMM RPC socket path contains a comma");
+    {
+        const auto userSid = wsl::windows::common::wslutil::SidToString(&m_userSid.Sid);
+        const auto directorySddl = std::format(L"D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;{})", userSid.get());
+        wil::unique_hlocal_security_descriptor directorySecurityDescriptor;
+        THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            directorySddl.c_str(), SDDL_REVISION_1, &directorySecurityDescriptor, nullptr));
+        SECURITY_ATTRIBUTES attributes{sizeof(attributes), directorySecurityDescriptor.get(), FALSE};
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(rpcDirectory.c_str(), &attributes));
+    }
+    m_rpcDirectory = rpcDirectory;
+    m_rpcSocketPath = rpcSocketPath;
     m_vsockPath = socketDirectory / std::format(L"wsl-{}.v", shortId);
     DeleteFileW(m_vsockPath.c_str());
 
@@ -440,7 +462,7 @@ std::pair<wil::unique_socket, std::filesystem::path> OpenVmmWslCoreVm::CreateVso
 
 std::wstring OpenVmmWslCoreVm::BuildCommandLine() const
 {
-    return std::format(L"\"{}\" --rpc \"path={},transport=grpc,allow-sid=S-1-5-18\"", m_openVmmPath.wstring(), m_rpcPipeName);
+    return std::format(L"\"{}\" --rpc \"path={},transport=grpc\"", m_openVmmPath.wstring(), m_rpcSocketPath.wstring());
 }
 
 std::wstring OpenVmmWslCoreVm::BuildKernelCommandLine() const
@@ -563,7 +585,7 @@ void OpenVmmWslCoreVm::LaunchOpenVmm()
     THROW_LAST_ERROR_IF(!m_processWait);
     SetThreadpoolWait(m_processWait.get(), m_processHandle.get(), nullptr);
     THROW_IF_FAILED_MSG(
-        WslOpenVmmCreateVm(config.addressof(), m_rpcPipeName.c_str(), m_vmConfig.KernelBootTimeout, m_vm.put()),
+        WslOpenVmmCreateVm(config.addressof(), m_rpcSocketPath.c_str(), m_vmConfig.KernelBootTimeout, m_vm.put()),
         "Failed to create OpenVMM VM");
     THROW_IF_FAILED_MSG(WslOpenVmmVmResume(m_vm.get()), "Failed to resume OpenVMM VM");
 }
