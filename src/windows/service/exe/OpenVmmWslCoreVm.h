@@ -147,7 +147,8 @@ private:
     std::filesystem::path m_rootFsPath;
     std::filesystem::path m_initrdPath;
     std::filesystem::path m_openVmmPath;
-    std::wstring m_rpcPipeName;
+    std::filesystem::path m_rpcDirectory;
+    std::filesystem::path m_rpcSocketPath;
     wil::unique_any<WslOpenVmmVm*, decltype(&WslOpenVmmDestroyVm), WslOpenVmmDestroyVm> m_vm;
     std::filesystem::path m_vsockPath;
     std::filesystem::path m_listenPath;
