@@ -4,20 +4,19 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    CommandLineParser.cpp
+    Invocation.cpp
 
 Abstract:
 
-    Implementation of command-line resolution and scoped global option handling.
+    Implementation of command invocation parsing and execution.
 
 --*/
 #include "precomp.h"
-#include "CommandLineParser.h"
+#include "Invocation.h"
 
 #include "CLIExecutionContext.h"
 #include "Command.h"
 #include "EnvironmentOptions.h"
-#include "Invocation.h"
 
 #include <functional>
 #include <optional>
@@ -124,30 +123,17 @@ namespace {
     }
 } // namespace
 
-CommandTree::CommandTree(std::unique_ptr<Command> root) : m_root(std::move(root))
+CommandInvocation::CommandInvocation(std::unique_ptr<Command> root, std::vector<std::wstring>&& arguments) :
+    m_root(std::move(root)), m_cursor(std::move(arguments))
 {
     THROW_HR_IF(E_INVALIDARG, !m_root);
-}
-
-CommandTree::~CommandTree() = default;
-CommandTree::CommandTree(CommandTree&&) noexcept = default;
-CommandTree& CommandTree::operator=(CommandTree&&) noexcept = default;
-
-const Command& CommandTree::Root() const
-{
-    THROW_HR_IF(E_ILLEGAL_METHOD_CALL, !m_root);
-    return *m_root;
-}
-
-CommandInvocation::CommandInvocation(std::unique_ptr<Command> root, std::vector<std::wstring>&& arguments) :
-    m_commands(std::move(root)), m_cursor(std::move(arguments)), m_selected(std::cref(m_commands.Root()))
-{
+    m_selected = std::cref(*m_root);
 }
 
 CommandInvocation::~CommandInvocation() = default;
 
 CommandInvocation::CommandInvocation(CommandInvocation&& other) noexcept :
-    m_commands(std::move(other.m_commands)), m_cursor(std::move(other.m_cursor)), m_selected(other.m_selected)
+    m_root(std::move(other.m_root)), m_cursor(std::move(other.m_cursor)), m_selected(other.m_selected)
 {
     other.m_selected.reset();
 }
@@ -156,7 +142,7 @@ CommandInvocation& CommandInvocation::operator=(CommandInvocation&& other) noexc
 {
     if (this != &other)
     {
-        m_commands = std::move(other.m_commands);
+        m_root = std::move(other.m_root);
         m_cursor = std::move(other.m_cursor);
         m_selected = other.m_selected;
         other.m_selected.reset();
@@ -167,7 +153,8 @@ CommandInvocation& CommandInvocation::operator=(CommandInvocation&& other) noexc
 
 const Command& CommandInvocation::Root() const
 {
-    return m_commands.Root();
+    THROW_HR_IF(E_ILLEGAL_METHOD_CALL, !m_root);
+    return *m_root;
 }
 
 const Command& CommandInvocation::Selected() const
@@ -186,35 +173,28 @@ size_t CommandInvocation::Position() const noexcept
     return m_cursor.Position();
 }
 
-InvocationCursor& CommandInvocation::Cursor() noexcept
+void CommandInvocation::ApplyRootEnvironmentOptions(argument::ArgMap& arguments) const
 {
-    return m_cursor;
+    ApplyEnvironmentOptions(arguments, Root().GetEnvArguments());
 }
 
-void CommandInvocation::Select(const Command& command)
+void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
 {
-    const auto parent = command.Parent();
-    THROW_HR_IF(E_INVALIDARG, !parent.has_value() || &parent->get() != &Selected());
-    m_selected = std::cref(command);
-}
-
-void ParseCommandLine(CommandInvocation& invocation, CLIExecutionContext& context)
-{
-    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected());
+    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
     while (subcommand)
     {
-        invocation.Select(subcommand->get());
-        subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected());
+        Select(subcommand->get());
+        subcommand = ParseGlobalArgumentsAndFindSubcommand(m_cursor, context, Selected());
     }
 
     try
     {
-        const auto commandAndEnvironmentArguments = invocation.Selected().GetArgumentsAndEnvironment(ArgumentScope::Command);
+        const auto commandAndEnvironmentArguments = Selected().GetArgumentsAndEnvironment(ArgumentScope::Command);
         ApplyEnvironmentOptions(context.Args, commandAndEnvironmentArguments);
-        invocation.Selected().ParseArguments(
-            invocation.Cursor(),
+        Selected().ParseArguments(
+            m_cursor,
             context.Args,
-            invocation.Selected().GetCommandArguments(),
+            Selected().GetCommandArguments(),
             /*optionsOnly*/ false,
             /*stopOnUnknown*/ false,
             /*overridableDefaults*/ commandAndEnvironmentArguments);
@@ -223,13 +203,29 @@ void ParseCommandLine(CommandInvocation& invocation, CLIExecutionContext& contex
     {
         if (exception.UnknownOptionToken().has_value())
         {
-            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), invocation.Selected());
+            ThrowIfMisplacedGlobalOption(*exception.UnknownOptionToken(), Selected());
         }
 
         throw;
     }
 
-    invocation.Selected().ValidateArguments(
-        context.Args, invocation.Selected().GetArgumentsAndEnvironment(ArgumentScope::Command), /*runInternalHook*/ true);
+    Selected().ValidateArguments(context.Args, Selected().GetArgumentsAndEnvironment(ArgumentScope::Command), /*runInternalHook*/ true);
+}
+
+void CommandInvocation::Execute(CLIExecutionContext& context) const
+{
+    Selected().Execute(context);
+}
+
+void CommandInvocation::OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception, std::span<const Argument> relevantArguments) const
+{
+    Selected().OutputHelp(terminal, output, exception, relevantArguments);
+}
+
+void CommandInvocation::Select(const Command& command)
+{
+    const auto parent = command.Parent();
+    THROW_HR_IF(E_INVALIDARG, !parent.has_value() || &parent->get() != &Selected());
+    m_selected = std::cref(command);
 }
 } // namespace wsl::windows::wslc

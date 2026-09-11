@@ -46,8 +46,8 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     HANDLE CreateCancelEvent();
 
-    // Applies and freezes environment-only global options before command-line parsing reports errors.
-    void ApplyGlobalEnvironmentOptions();
+    // Applies terminal configuration from parsed arguments and freezes those values for the invocation.
+    void ApplyTerminalOptions();
 
     // Prints a caught error to stderr.
     void ReportError(HRESULT result);

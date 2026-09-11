@@ -18,8 +18,6 @@ Abstract:
 #include "wslutil.h"
 #include "Errors.h"
 #include "CLIExecutionContext.h"
-#include "CommandLineParser.h"
-#include "EnvironmentOptions.h"
 #include "Invocation.h"
 #include "RootCommand.h"
 
@@ -93,29 +91,26 @@ try
 
     CommandInvocation invocation{std::make_unique<RootCommand>(), std::move(args)};
 
-    // Environment variable scanning.
-    // The env-bound argument set is the only state needed before NO_COLOR is
-    // applied; keep just this and the noexcept env apply outside the try so a
-    // throw can't reroute through the colored-help error path.
-    const auto earlyEnvironmentArguments = invocation.Root().GetEnvArguments();
-    ApplyEnvironmentOptions(context.Args, earlyEnvironmentArguments);
-    context.ApplyGlobalEnvironmentOptions();
+    // Apply root environment options before any user-visible output. Keep this outside the try so
+    // a failure cannot reroute through the colored-help error path.
+    invocation.ApplyRootEnvironmentOptions(context.Args);
+    context.ApplyTerminalOptions();
 
     // Past this point, environment variable options are in effect.
 
     try
     {
-        ParseCommandLine(invocation, context);
-        invocation.Selected().Execute(context);
+        invocation.ParseCommandLine(context);
+        invocation.Execute(context);
     }
     catch (const ArgumentException& ae)
     {
-        invocation.Selected().OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
+        invocation.OutputHelp(context.Terminal, HelpOutput::Argument, &ae, ae.Arguments());
         return 1;
     }
     catch (const CommandException& ce)
     {
-        invocation.Selected().OutputHelp(context.Terminal, HelpOutput::Command, &ce);
+        invocation.OutputHelp(context.Terminal, HelpOutput::Command, &ce);
         return 1;
     }
     catch (const ExecutionException& ee)

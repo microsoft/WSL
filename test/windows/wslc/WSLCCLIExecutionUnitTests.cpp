@@ -20,7 +20,7 @@ Abstract:
 
 #include "AsyncExecution.h"
 #include "Command.h"
-#include "CommandLineParser.h"
+#include "Invocation.h"
 #include "RootCommand.h"
 #include "ArgumentValidation.h"
 #include "ContainerCommand.h"
@@ -233,7 +233,7 @@ namespace {
     CommandInvocation ParseTestCommandLine(std::vector<std::wstring> arguments, CLIExecutionContext& context)
     {
         CommandInvocation invocation{std::make_unique<TestRootCommand>(), std::move(arguments)};
-        ParseCommandLine(invocation, context);
+        invocation.ParseCommandLine(context);
         return invocation;
     }
 } // namespace
@@ -277,12 +277,12 @@ class WSLCCLIExecutionUnitTests
         }
     }
 
-    TEST_METHOD(GlobalEnvironmentOptions_NoColorIsAppliedAndFrozen)
+    TEST_METHOD(TerminalOptions_NoColorIsAppliedAndFrozen)
     {
         {
             CLIExecutionContext context;
 
-            context.ApplyGlobalEnvironmentOptions();
+            context.ApplyTerminalOptions();
             VERIFY_IS_FALSE(context.Terminal.IsNoColor());
 
             VERIFY_THROWS_SPECIFIC(context.Args.Add<ArgType::NoColor>(true), wil::ResultException, [](const wil::ResultException& e) {
@@ -293,7 +293,7 @@ class WSLCCLIExecutionUnitTests
         {
             CLIExecutionContext present;
             present.Args.Add<ArgType::NoColor>(true);
-            present.ApplyGlobalEnvironmentOptions();
+            present.ApplyTerminalOptions();
             VERIFY_IS_TRUE(present.Terminal.IsNoColor());
 
             VERIFY_NO_THROW(Argument::Create(ArgType::NoColor).Validate(present.Args));
@@ -385,7 +385,7 @@ class WSLCCLIExecutionUnitTests
         CommandInvocation invocation{
             std::make_unique<PositionalTestRootCommand>(traversalCount), std::vector<std::wstring>{L"show", L"image"}};
 
-        ParseCommandLine(invocation, context);
+        invocation.ParseCommandLine(context);
 
         VERIFY_ARE_EQUAL(std::wstring_view{L"show"}, invocation.Selected().Name());
         VERIFY_ARE_EQUAL(std::wstring{L"image"}, context.Args.GetValue<ArgType::ImageId>());
@@ -459,7 +459,7 @@ class WSLCCLIExecutionUnitTests
 
         try
         {
-            ParseCommandLine(invocation, context);
+            invocation.ParseCommandLine(context);
             VERIFY_FAIL(L"Expected ArgumentException");
         }
         catch (const ArgumentException& exception)
@@ -1131,7 +1131,7 @@ class WSLCCLIExecutionUnitTests
             {
                 CommandInvocation invocation{std::make_unique<RootCommand>(), std::move(args)};
                 CLIExecutionContext context;
-                ParseCommandLine(invocation, context);
+                invocation.ParseCommandLine(context);
 
                 // Ensure we found the expected command
                 VERIFY_ARE_EQUAL(testCase.expectedCommand, invocation.Selected().Name());

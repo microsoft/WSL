@@ -8,14 +8,42 @@ Module Name:
 
 Abstract:
 
-    Header file for walking through and processing a command line invocation.
+    Declares the command-line cursor and invocation lifecycle.
+
+    CommandInvocation owns the persistent command tree and mutable state for one invocation,
+    including the original arguments, parser position, and selected command. CLIExecutionContext
+    remains separate and owns the parsed values and execution services used by the selected command.
 
 --*/
 #pragma once
+
+#include "defs.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace wsl::windows::wslc {
+struct Argument;
+struct Command;
+struct CommandException;
+struct Terminal;
+
+enum class HelpOutput;
+
+namespace argument {
+    struct ArgMap;
+}
+
+namespace execution {
+    struct CLIExecutionContext;
+}
+
 struct InvocationCursor
 {
     InvocationCursor(std::vector<std::wstring>&& arguments) : m_arguments(std::move(arguments))
@@ -114,5 +142,36 @@ struct InvocationCursor
 private:
     std::vector<std::wstring> m_arguments;
     size_t m_position = 0;
+};
+
+// Owns command selection and parsing state for one CLI invocation. Execution state and services
+// remain in CLIExecutionContext and are supplied when parsing or executing the selected command.
+class CommandInvocation
+{
+public:
+    CommandInvocation(std::unique_ptr<Command> root, std::vector<std::wstring>&& arguments);
+    ~CommandInvocation();
+
+    NON_COPYABLE(CommandInvocation);
+
+    CommandInvocation(CommandInvocation&& other) noexcept;
+    CommandInvocation& operator=(CommandInvocation&& other) noexcept;
+
+    const Command& Root() const;
+    const Command& Selected() const;
+    const std::vector<std::wstring>& OriginalArguments() const noexcept;
+    size_t Position() const noexcept;
+
+    void ApplyRootEnvironmentOptions(argument::ArgMap& arguments) const;
+    void ParseCommandLine(execution::CLIExecutionContext& context);
+    void Execute(execution::CLIExecutionContext& context) const;
+    void OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception = nullptr, std::span<const Argument> relevantArguments = {}) const;
+
+private:
+    void Select(const Command& command);
+
+    std::unique_ptr<Command> m_root;
+    InvocationCursor m_cursor;
+    std::optional<std::reference_wrapper<const Command>> m_selected;
 };
 } // namespace wsl::windows::wslc
