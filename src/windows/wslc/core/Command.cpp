@@ -324,11 +324,12 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         {
             terminal.Write(
                 helpLevel,
-                L" {}[{}{}{}{}]{}",
+                L" {}[{}{}{}{}{}]{}",
                 HelpMetaEmphasis,
                 Format::Default,
                 HelpPlaceholderEmphasis,
                 Localization::WSLCCLI_GlobalOptions(),
+                Format::Default,
                 HelpMetaEmphasis,
                 Format::Default);
         }
@@ -364,7 +365,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         {
             terminal.Write(
                 helpLevel,
-                L" {}[<{}{}{}{}{}>]{}",
+                L" {}[{}{}{}{}{}]{}",
                 HelpMetaEmphasis,
                 Format::Default,
                 HelpPlaceholderEmphasis,

@@ -809,6 +809,12 @@ WslCoreVm::~WslCoreVm() noexcept
     // Close the handle to the VM. This will wait for any outstanding callbacks.
     m_system.reset();
 
+    if (m_pluginPlan9Server)
+    {
+        LOG_IF_FAILED(m_pluginPlan9Server->Teardown());
+        m_pluginPlan9Server.reset();
+    }
+
     // This loops helps against a potential crash in build <= Windows 11 22H2.
     for (const auto& e : m_plan9Servers)
     {
@@ -2101,7 +2107,21 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
     auto lock = m_lock.lock_exclusive();
 
     const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
-    wsl::windows::common::hcs::AddPlan9Share(m_system.get(), Name, Name, HostPath, LX_INIT_UTILITY_VM_PLAN9_PORT, flags);
+    wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
+
+    {
+        auto runAsUser = wil::impersonate_token(m_userToken.get());
+        if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
+        {
+            auto server =
+                wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(m_userToken.get());
+            THROW_IF_FAILED(server->Init(&m_runtimeId, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT));
+            THROW_IF_FAILED(server->Resume());
+            m_pluginPlan9Server = std::move(server);
+        }
+
+        THROW_IF_FAILED(m_pluginPlan9Server->AddSharePath(Name, HostPath, static_cast<UINT32>(flags)));
+    }
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
@@ -2360,14 +2380,15 @@ void WslCoreVm::OnExit(_In_opt_ PCWSTR ExitDetails)
 
 void WslCoreVm::ReadGuestCapabilities()
 {
-    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>();
+    gsl::span<gsl::byte> span;
+    const auto& info = m_miniInitChannel.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(&span);
+    const std::string input{wsl::shared::string::FromMessageBuffer<LX_INIT_GUEST_CAPABILITIES>(span)};
 
-    m_kernelVersionString = wsl::shared::string::MultiByteToWide(info.Buffer);
+    m_kernelVersionString = wsl::shared::string::MultiByteToWide(input);
 
     // Parse the version string.
     const std::regex pattern("(\\d+)\\.(\\d+)\\.(\\d+).*");
     std::smatch match;
-    const std::string input = info.Buffer;
     if (!std::regex_match(input, match, pattern) || match.size() != 4)
     {
         THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs'", input.c_str());
@@ -2381,7 +2402,7 @@ void WslCoreVm::ReadGuestCapabilities()
     }
     catch (const std::exception& e)
     {
-        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", info.Buffer, e.what());
+        THROW_HR_MSG(E_UNEXPECTED, "Failed to parse kernel version: '%hs', %hs", input.c_str(), e.what());
     }
 
     m_seccompAvailable = info.SeccompAvailable;

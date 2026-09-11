@@ -267,7 +267,7 @@ class WSLCTests
         auto cleanup = wil::scope_exit_log(
             WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsNone).first); });
 
-        VERIFY_SUCCEEDED(m_defaultSession->PushImage(registryImage.c_str(), registryAuth.c_str(), nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->PushImage(registryImage.c_str(), registryAuth.c_str(), FALSE, nullptr, nullptr));
 
         return registryImage;
     }
@@ -840,13 +840,13 @@ class WSLCTests
 
         // Validate that pushing a non-existent image fails.
         {
-            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), nullptr, nullptr), E_FAIL);
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), FALSE, nullptr, nullptr), E_FAIL);
             ValidateCOMErrorMessage(L"An image does not exist locally with the tag: does-not-exist");
         }
 
         // Validate passing empty auth string returns an appropriate error.
         {
-            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", "", nullptr, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", "", FALSE, nullptr, nullptr), E_INVALIDARG);
         }
 
         // Validate that PushImage() returns the appropriate error if the session is terminated.
@@ -854,7 +854,9 @@ class WSLCTests
             VERIFY_SUCCEEDED(m_defaultSession->Terminate());
             auto cleanup = wil::scope_exit([&]() { ResetTestSession(); });
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("hello-world:latest", emptyAuth.c_str(), nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PushImage("hello-world:latest", emptyAuth.c_str(), FALSE, nullptr, nullptr),
+                HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 
@@ -4103,6 +4105,51 @@ class WSLCTests
     WSLC_TEST_METHOD(WindowsMountsVirtioFs)
     {
         ValidateWindowsMounts(true);
+    }
+
+    // Validates that virtiofs mounts preserve file ownership for non-root users (regression test for #40719).
+    WSLC_TEST_METHOD(WindowsMountsVirtioFsFileOwnership)
+    {
+        auto settings = GetDefaultSessionSettings(L"virtiofs-ownership-test");
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+
+        auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
+        auto testFolder = std::filesystem::current_path() / "test-folder-virtiofs-ownership";
+        std::filesystem::create_directories(testFolder);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        static constexpr auto mountPoint = "/virtiofs-ownership-test";
+
+        VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), mountPoint, false, TRUE));
+
+        // Create a file and chown to uid 1000:100, then verify ownership is preserved.
+        // Without the 'metadata' option on the virtiofs share, chown appears to succeed but
+        // subsequent stat reports uid=0/gid=0 because ownership is not persisted.
+        auto result = ExpectCommandResult(
+            session.get(),
+            {"/bin/sh",
+             "-c",
+             "touch /virtiofs-ownership-test/owned.txt && chown 1000:100 /virtiofs-ownership-test/owned.txt"
+             " && stat -c '%u %g' /virtiofs-ownership-test/owned.txt"},
+            0);
+
+        VERIFY_ARE_EQUAL(result.Output[1], std::string("1000 100\n"));
+
+        // Verify that a file created by a non-root user retains the creator's ownership.
+        result = ExpectCommandResult(
+            session.get(),
+            {"/bin/sh",
+             "-c",
+             "rm -f /virtiofs-ownership-test/nonroot.txt"
+             " && su -s /bin/sh nobody -c 'touch /virtiofs-ownership-test/nonroot.txt'"
+             " && stat -c '%u' /virtiofs-ownership-test/nonroot.txt"},
+            0);
+
+        VERIFY_ARE_EQUAL(result.Output[1], std::string("65534\n"));
+
+        VERIFY_SUCCEEDED(session->UnmountWindowsFolder(mountPoint, TRUE));
     }
 
     // Validates that each mount owns an independent child on the shared aggregate device.
@@ -12021,7 +12068,7 @@ class WSLCTests
 
             COMOutputHandle stdoutHandle{};
             COMOutputHandle stderrHandle{};
-            VERIFY_ARE_EQUAL(container.Get().Logs(static_cast<WSLCLogsFlags>(0x4), &stdoutHandle, &stderrHandle, 0, 0, 0), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(container.Get().Logs(static_cast<WSLCLogsFlags>(0x8), &stdoutHandle, &stderrHandle, 0, 0, 0), E_INVALIDARG);
         }
     }
 
