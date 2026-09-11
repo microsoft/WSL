@@ -3,7 +3,7 @@
 #![expect(clippy::missing_safety_doc)]
 
 mod client;
-pub mod named_pipe;
+pub mod af_unix;
 
 pub mod vmservice {
     tonic::include_proto!("vmservice");
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn WslOpenVmmConfigSetVirtioConsolePath(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn WslOpenVmmCreateVm(
     config: *mut *mut WslOpenVmmConfig,
-    pipe_name: *const u16,
+    socket_path: *const u16,
     timeout_ms: u32,
     vm: *mut *mut WslOpenVmmVm,
 ) -> i32 {
@@ -215,13 +215,13 @@ pub unsafe extern "C" fn WslOpenVmmCreateVm(
     if config_handle.is_null() {
         return E_POINTER.0;
     }
-    let pipe_name = match unsafe { string_from_wide(pipe_name) } {
-        Ok(pipe_name) => pipe_name,
+    let socket_path = match unsafe { string_from_wide(socket_path) } {
+        Ok(socket_path) => socket_path,
         Err(error) => return error.0,
     };
 
     let config_box = unsafe { Box::from_raw(config_handle) };
-    let result = config_box.0.lock().create_vm(pipe_name, timeout_ms);
+    let result = config_box.0.lock().create_vm(socket_path, timeout_ms);
     let client = match result {
         Ok(client) => client,
         Err(error) => {

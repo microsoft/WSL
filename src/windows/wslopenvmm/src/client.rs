@@ -13,7 +13,7 @@ use windows::Win32::Foundation::{E_FAIL, E_INVALIDARG, ERROR_ALREADY_EXISTS, ERR
 use windows::core::{GUID, HRESULT};
 use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 
-use crate::{named_pipe, vmservice};
+use crate::{af_unix, vmservice};
 
 #[cfg(test)]
 mod tests;
@@ -40,7 +40,7 @@ impl VmConfigBuilder {
         }
     }
 
-    pub fn create_vm(&self, pipe_name: String, timeout_ms: u32) -> Result<VmHandle, HRESULT> {
+    pub fn create_vm(&self, socket_path: String, timeout_ms: u32) -> Result<VmHandle, HRESULT> {
         let runtime = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -49,7 +49,7 @@ impl VmConfigBuilder {
             Err(_) => return Err(E_FAIL),
         };
         let timeout = Duration::from_millis(u64::from(timeout_ms));
-        let channel = match runtime.block_on(named_pipe::connect_channel(pipe_name, timeout)) {
+        let channel = match runtime.block_on(af_unix::connect_channel(socket_path.into(), timeout)) {
             Ok(channel) => channel,
             Err(error) if error.to_string().contains("timed out") => {
                 return Err(HRESULT::from_win32(WAIT_TIMEOUT.0));
