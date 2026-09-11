@@ -228,22 +228,13 @@ const std::vector<std::unique_ptr<Command>>& Command::GetCommands() const
 
 Argument Command::CreateGlobalArgument(ArgType type, ArgumentOverrides overrides) const
 {
-    auto argument = Argument::Create(type, std::move(overrides));
-    argument.m_globalOwner = std::cref(*this);
-    return argument;
+    return Argument::CreateGlobal(type, *this, std::move(overrides));
 }
 
 std::vector<Argument> Command::GetCommandArguments() const
 {
-    auto arguments = GetAllArguments();
-    std::erase_if(arguments, [](const auto& argument) { return argument.Scope() != ArgumentScope::Command; });
-    return arguments;
-}
-
-std::vector<Argument> Command::GetGlobalArguments() const
-{
-    auto arguments = GetAllArguments();
-    std::erase_if(arguments, [](const auto& argument) { return argument.Scope() != ArgumentScope::Global; });
+    auto arguments = GetArguments();
+    arguments.emplace_back(Argument::Create(ArgType::Help));
     return arguments;
 }
 

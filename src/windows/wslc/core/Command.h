@@ -23,6 +23,7 @@ Abstract:
 
 #include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <span>
@@ -91,17 +92,22 @@ struct Command
         return {};
     }
 
-    virtual std::vector<Argument> GetAllArguments() const
+    virtual std::vector<Argument> GetGlobalArguments() const
+    {
+        return {};
+    }
+
+    std::vector<Argument> GetAllArguments() const
     {
         auto args = GetArguments();
+        auto globalArgs = GetGlobalArguments();
+        args.insert(args.end(), std::make_move_iterator(globalArgs.begin()), std::make_move_iterator(globalArgs.end()));
         args.emplace_back(Argument::Create(ArgType::Help));
         return args;
     }
 
-    // Argument definitions declared by this command. Global arguments are created with
-    // CreateGlobalArgument and inherited by descendants.
+    // Command-local argument definitions, including the shared help argument.
     std::vector<Argument> GetCommandArguments() const;
-    std::vector<Argument> GetGlobalArguments() const;
 
     // Args eligible for environment binding.
     virtual std::vector<Argument> GetEnvArguments() const

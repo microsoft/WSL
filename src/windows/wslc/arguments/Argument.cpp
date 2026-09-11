@@ -53,6 +53,13 @@ Argument Argument::Create(ArgType type, ArgumentOverrides overrides)
     }
 }
 
+Argument Argument::CreateGlobal(ArgType type, const Command& owner, ArgumentOverrides overrides)
+{
+    auto argument = Create(type, std::move(overrides));
+    argument.m_globalOwner = std::cref(owner);
+    return argument;
+}
+
 // Retrieves the usage string of the Argument, based on its Alias and Name.
 // The format is "-alias,--name" or just "--name" if no alias.
 std::wstring Argument::GetUsageString() const

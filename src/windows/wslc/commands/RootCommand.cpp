@@ -72,6 +72,12 @@ std::vector<Argument> RootCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Version),
+    };
+}
+
+std::vector<Argument> RootCommand::GetGlobalArguments() const
+{
+    return {
         CreateGlobalArgument(ArgType::Session),
     };
 }

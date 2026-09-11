@@ -71,7 +71,7 @@ namespace {
         {
         }
 
-        std::vector<Argument> GetArguments() const override
+        std::vector<Argument> GetGlobalArguments() const override
         {
             return {CreateGlobalArgument(ArgType::Progress)};
         }
@@ -105,7 +105,7 @@ namespace {
         {
         }
 
-        std::vector<Argument> GetArguments() const override
+        std::vector<Argument> GetGlobalArguments() const override
         {
             return {CreateGlobalArgument(ArgType::Session)};
         }
@@ -177,7 +177,7 @@ namespace {
             return ShortDescription();
         }
 
-        std::vector<Argument> GetArguments() const override
+        std::vector<Argument> GetGlobalArguments() const override
         {
             return {CreateGlobalArgument(ArgType::Progress)};
         }

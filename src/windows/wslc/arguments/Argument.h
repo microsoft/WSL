@@ -76,6 +76,9 @@ struct Argument
     // Creates an argument using its table defaults and any command-specific overrides.
     static Argument Create(ArgType type, ArgumentOverrides overrides = {});
 
+    // Creates a global argument owned by the command that declares it.
+    static Argument CreateGlobal(ArgType type, const Command& owner, ArgumentOverrides overrides = {});
+
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;
 
@@ -140,8 +143,6 @@ struct Argument
     void Validate(ArgMap& execArgs) const;
 
 private:
-    friend struct Command;
-
     ArgType m_argType;
     std::wstring m_name;
     std::wstring m_desc;
