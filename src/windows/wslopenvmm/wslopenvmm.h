@@ -26,7 +26,7 @@ __declspec(dllimport) HRESULT WslOpenVmmConfigSetConsommeNic(_Inout_ WslOpenVmmC
 __declspec(dllimport) HRESULT WslOpenVmmConfigAddSerialPort(_Inout_ WslOpenVmmConfig* Config, _In_ UINT32 Port, _In_ LPCWSTR PipeName);
 __declspec(dllimport) HRESULT WslOpenVmmConfigSetVirtioConsolePath(_Inout_ WslOpenVmmConfig* Config, _In_ LPCWSTR Path);
 // On success, this consumes Config and sets it to nullptr. On failure, Config remains valid and Vm is nullptr.
-__declspec(dllimport) HRESULT WslOpenVmmCreateVm(_Inout_ WslOpenVmmConfig** Config, _In_ LPCWSTR PipeName, _In_ UINT32 TimeoutMs, _Out_ WslOpenVmmVm** Vm);
+__declspec(dllimport) HRESULT WslOpenVmmCreateVm(_Inout_ WslOpenVmmConfig** Config, _In_ LPCWSTR SocketPath, _In_ UINT32 TimeoutMs, _Out_ WslOpenVmmVm** Vm);
 
 __declspec(dllimport) void WslOpenVmmDestroyVm(_In_opt_ WslOpenVmmVm* Vm);
 __declspec(dllimport) HRESULT WslOpenVmmVmResume(_Inout_ WslOpenVmmVm* Vm);
