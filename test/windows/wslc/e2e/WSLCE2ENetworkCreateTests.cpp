@@ -58,6 +58,7 @@ class WSLCE2ENetworkCreateTests
         VerifyNetworkIsListed(TestNetworkName);
         auto inspect = InspectNetwork(TestNetworkName);
         VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_FALSE(inspect.EnableIPv6);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_BridgeDriver_Success)
@@ -125,6 +126,23 @@ class WSLCE2ENetworkCreateTests
         auto inspect = InspectNetwork(TestNetworkName);
         VERIFY_ARE_EQUAL("bridge", inspect.Driver);
         VERIFY_IS_TRUE(inspect.Internal);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Network_Create_Ipv6_Success)
+    {
+        const std::wstring subnet = L"fd00:172:53::/64";
+        auto result = RunWslc(std::format(L"network create --ipv6 --subnet {} {}", subnet, TestNetworkName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestNetworkName, result.GetStdoutOneLine());
+
+        VerifyNetworkIsListed(TestNetworkName);
+        auto inspect = InspectNetwork(TestNetworkName);
+        VERIFY_ARE_EQUAL("bridge", inspect.Driver);
+        VERIFY_IS_TRUE(inspect.EnableIPv6);
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_IS_TRUE(std::ranges::any_of(*inspect.IPAM.Config, [&](const auto& config) {
+            return config.Subnet == wsl::shared::string::WideToMultiByte(subnet);
+        }));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Create_Subnet_Success)
