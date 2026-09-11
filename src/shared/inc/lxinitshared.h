@@ -1715,9 +1715,10 @@ struct WSLC_MOUNT_MODULES
 
     MESSAGE_HEADER Header{};
     unsigned int SourceIndex{};
+    bool LoadKvm{};
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), FIELD(LoadKvm));
 };
 
 struct WSLC_EXEC

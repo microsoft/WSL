@@ -198,6 +198,17 @@
       </disabledValue>
     </policy>
 
+    <policy name="AllowWSLContainerNestedVirtualization" class="Machine" displayName="$(string.AllowWSLContainerNestedVirtualization)" explainText="$(string.AllowWSLContainerNestedVirtualizationExplain)" key="Software\Policies\WSL" valueName="AllowWSLContainerNestedVirtualization">
+      <parentCategory ref="WSLContainer" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
     <policy name="WSLContainerRegistryAllowlist" class="Machine" displayName="$(string.WSLContainerRegistryAllowlist)" explainText="$(string.WSLContainerRegistryAllowlistExplain)" presentation="$(presentation.WSLContainerRegistryAllowlist)" key="Software\Policies\WSL">
       <parentCategory ref="WSLContainer" />
       <supportedOn ref="windows:SUPPORTED_Windows10" />

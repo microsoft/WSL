@@ -37,6 +37,8 @@ struct SessionSettings : SessionSettingsT<SessionSettings>
     void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value);
     bool EnableGpu();
     void EnableGpu(bool value);
+    bool EnableNestedVirtualization();
+    void EnableNestedVirtualization(bool value);
 
     WslcSessionSettings* ToStructPointer();
 
