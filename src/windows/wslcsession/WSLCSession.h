@@ -128,6 +128,7 @@ public:
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
@@ -358,6 +359,9 @@ private:
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
+
+    // Notifies plugins for every image in Repository, used by --all-tags pulls. Requires the VM lease.
+    void OnRepositoryImagesCreated(const wsl::windows::common::wslutil::RepositoryReference& Repository) noexcept;
 
     void OnImageDeleted(const std::string& ImageId) noexcept;
 

@@ -386,6 +386,28 @@ class WSLCCLICommandUnitTests
     }
 
     // --all-tags is exposed with the -a short alias.
+    TEST_METHOD(ImagePullCommand_HasAllTagsArgumentWithAlias)
+    {
+        auto cmd = ImagePullCommand(L"image");
+
+        bool found = false;
+        for (const auto& arg : cmd.GetArguments())
+        {
+            if (arg.Type() == argument::ArgType::AllTags)
+            {
+                found = true;
+                VERIFY_ARE_EQUAL(argument::Kind::Flag, arg.Kind());
+                VERIFY_IS_FALSE(arg.Required());
+                VERIFY_ARE_EQUAL(std::wstring(L"all-tags"), std::wstring(arg.Name()));
+                VERIFY_ARE_EQUAL(std::wstring(L"a"), std::wstring(arg.Alias()));
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"image pull does not register --all-tags");
+    }
+
+    // --all-tags is exposed with the -a short alias.
     TEST_METHOD(ImagePushCommand_HasAllTagsArgumentWithAlias)
     {
         auto cmd = ImagePushCommand(L"image");

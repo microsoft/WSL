@@ -914,6 +914,19 @@ try
 }
 CATCH_LOG()
 
+void WSLCSession::OnRepositoryImagesCreated(const wslutil::RepositoryReference& Repository) noexcept
+try
+{
+    // An --all-tags pull names a repository, so the images it created are enumerated rather than
+    // derived from the requested reference. Notifying per image (not per tag) keeps one notification
+    // per distinct image; the inspect payload already carries every tag pointing at it.
+    for (const auto& image : m_runtime.Docker().ListImages(false, false, {{"reference", {Repository.Name}}}))
+    {
+        OnImageCreated(image.Id);
+    }
+}
+CATCH_LOG()
+
 void WSLCSession::OnImageDeleted(const std::string& ImageId) noexcept
 try
 {
@@ -921,7 +934,7 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -931,15 +944,18 @@ try
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError(), AllTags && tagOrDigest.has_value());
+
+    if (!AllTags && !tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
     EnforceRegistryAllowlist(repo);
 
     auto runtime = m_runtime.Acquire();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
-
-    if (!tagOrDigest.has_value())
-    {
-        tagOrDigest = "latest";
-    }
 
     std::optional<std::string> registryAuth;
 
@@ -951,7 +967,14 @@ try
     auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
-    OnImageCreated(Image);
+    if (AllTags)
+    {
+        OnRepositoryImagesCreated(repo);
+    }
+    else
+    {
+        OnImageCreated(Image);
+    }
 
     return S_OK;
 }
@@ -3686,7 +3709,7 @@ HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+    return PullImage(Image, RegistryAuthenticationInformation, FALSE, progress.Get(), warning.Get());
 }
 
 HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback*, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
