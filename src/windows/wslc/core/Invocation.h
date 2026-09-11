@@ -8,101 +8,170 @@ Module Name:
 
 Abstract:
 
-    Header file for walking through and processing a command line invocation.
+    Declares the command-line cursor and invocation lifecycle.
+
+    CommandInvocation owns the persistent command tree and mutable state for one invocation,
+    including the original arguments, parser position, and selected command. CLIExecutionContext
+    remains separate and owns the parsed values and execution services used by the selected command.
 
 --*/
 #pragma once
+
+#include "defs.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace wsl::windows::wslc {
-struct Invocation
+struct Argument;
+struct Command;
+struct CommandException;
+struct Terminal;
+
+enum class HelpOutput;
+
+namespace argument {
+    struct ArgMap;
+}
+
+namespace execution {
+    struct CLIExecutionContext;
+}
+
+struct InvocationCursor
 {
-    Invocation(std::vector<std::wstring>&& args) : m_args(std::move(args))
+    InvocationCursor(std::vector<std::wstring>&& arguments) : m_arguments(std::move(arguments))
     {
     }
 
     struct iterator
     {
-        iterator(size_t arg, std::vector<std::wstring>& args) : m_arg(arg), m_args(args)
+        iterator(size_t argument, const std::vector<std::wstring>& arguments) : m_argument(argument), m_arguments(arguments)
         {
         }
 
         iterator(const iterator&) = default;
         iterator& operator=(const iterator&) = default;
 
-        iterator operator++()
+        iterator& operator++()
         {
-            return {++m_arg, m_args};
+            ++m_argument;
+            return *this;
         }
         iterator operator++(int)
         {
-            return {m_arg++, m_args};
+            auto previous = *this;
+            ++(*this);
+            return previous;
         }
-        iterator operator--()
+        iterator& operator--()
         {
-            return {--m_arg, m_args};
+            --m_argument;
+            return *this;
         }
         iterator operator--(int)
         {
-            return {m_arg--, m_args};
+            auto previous = *this;
+            --(*this);
+            return previous;
         }
 
         bool operator==(const iterator& other) const
         {
-            return m_arg == other.m_arg;
+            return m_argument == other.m_argument;
         }
         bool operator!=(const iterator& other) const
         {
-            return m_arg != other.m_arg;
+            return m_argument != other.m_argument;
         }
 
         const std::wstring& operator*() const
         {
-            return m_args[m_arg];
+            return m_arguments[m_argument];
         }
         const std::wstring* operator->() const
         {
-            return &(m_args[m_arg]);
+            return &m_arguments[m_argument];
         }
 
         size_t index() const
         {
-            return m_arg;
+            return m_argument;
         }
 
     private:
-        size_t m_arg;
-        std::vector<std::wstring>& m_args;
+        size_t m_argument;
+        const std::vector<std::wstring>& m_arguments;
     };
 
     size_t size() const
     {
-        return m_args.size();
+        return m_arguments.size();
     }
-    iterator begin()
+    const std::vector<std::wstring>& OriginalArguments() const noexcept
     {
-        return {m_currentFirstArg, m_args};
+        return m_arguments;
     }
-    iterator end()
+    size_t Position() const noexcept
     {
-        return {m_args.size(), m_args};
+        return m_position;
     }
-    // Marks i as consumed: the next begin() returns i + 1.
-    void consume(const iterator& i)
+    iterator begin() const
     {
-        m_currentFirstArg = i.index() + 1;
+        return {m_position, m_arguments};
     }
-    // Sets the start of the unconsumed range to i: the next begin() returns i.
-    // Use this when a parser stopped at an unconsumed token (e.g. options-only
-    // parsing that stopped on the first positional / subcommand token).
-    void consumeUntil(const iterator& i)
+    iterator end() const
     {
-        m_currentFirstArg = i.index();
+        return {m_arguments.size(), m_arguments};
+    }
+    void AdvancePast(const iterator& position)
+    {
+        m_position = position.index() + 1;
+    }
+    void SetPosition(const iterator& position)
+    {
+        m_position = position.index();
     }
 
 private:
-    std::vector<std::wstring> m_args;
-    size_t m_currentFirstArg = 0;
+    std::vector<std::wstring> m_arguments;
+    size_t m_position = 0;
+};
+
+// Owns command selection and parsing state for one CLI invocation. Execution state and services
+// remain in CLIExecutionContext and are supplied when parsing or executing the selected command.
+class CommandInvocation
+{
+public:
+    CommandInvocation(std::unique_ptr<Command> root, std::vector<std::wstring>&& arguments);
+    ~CommandInvocation();
+
+    NON_COPYABLE(CommandInvocation);
+
+    CommandInvocation(CommandInvocation&& other) noexcept;
+    CommandInvocation& operator=(CommandInvocation&& other) noexcept;
+
+    const Command& Root() const;
+    const Command& Selected() const;
+    const std::vector<std::wstring>& OriginalArguments() const noexcept;
+    size_t Position() const noexcept;
+
+    void ApplyRootEnvironmentOptions(argument::ArgMap& arguments) const;
+    void ParseCommandLine(execution::CLIExecutionContext& context);
+    void Execute(execution::CLIExecutionContext& context) const;
+    void OutputHelp(Terminal& terminal, HelpOutput output, const CommandException* exception = nullptr, std::span<const Argument> relevantArguments = {}) const;
+
+private:
+    void Select(const Command& command);
+
+    std::unique_ptr<Command> m_root;
+    InvocationCursor m_cursor;
+    std::optional<std::reference_wrapper<const Command>> m_selected;
 };
 } // namespace wsl::windows::wslc

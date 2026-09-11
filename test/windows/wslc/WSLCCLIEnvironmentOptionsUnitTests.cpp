@@ -98,6 +98,20 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
     }
 
+    TEST_METHOD(ApplyEnvironmentOptions_RepeatedApplicationIsIdempotent)
+    {
+        m_noColor->Set(L"");
+
+        ArgMap target;
+        ApplyEnvironmentOptions(target, NoColorDefs());
+        VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
+
+        ApplyEnvironmentOptions(target, NoColorDefs());
+        VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
+
+        VERIFY_ARE_EQUAL(1u, target.Count(ArgType::NoColor));
+    }
+
     // Env-derived defaults are lowest precedence and must not overwrite.
     TEST_METHOD(ApplyEnvironmentOptions_TargetAlreadyContainsArg_LeavesItUntouched)
     {
@@ -112,7 +126,7 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_FALSE(target.GetValue<ArgType::NoColor>());
     }
 
-    // Bindings outside definedArgs are ignored even if the env var is set.
+    // Bindings outside the declared environment arguments are ignored even if the env var is set.
     // Verbose isn't bound to any env var and isn't NoColor, so it stays a
     // valid "declared but unrelated" stand-in: declaring it alone must not
     // cause NO_COLOR to leak into target.
@@ -129,13 +143,23 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
     }
 
+    TEST_METHOD(ApplyEnvironmentOptions_BindingWithoutEnvironmentOnlyRestriction_IsIgnored)
+    {
+        m_noColor->Set(L"");
+
+        ArgMap target;
+        ApplyEnvironmentOptions(target, {Argument::Create(ArgType::NoColor)});
+
+        VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
+    }
+
 private:
     std::unique_ptr<ScopedEnvVariable> m_noColor;
 
     static std::vector<Argument> NoColorDefs()
     {
         std::vector<Argument> defs;
-        defs.push_back(Argument::Create(ArgType::NoColor));
+        defs.push_back(Argument::Create(ArgType::NoColor, {.Flags = Flags::EnvironmentOnly}));
         return defs;
     }
 };

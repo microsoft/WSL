@@ -19,7 +19,9 @@ Abstract:
 #include "Invocation.h"
 #include "ArgumentParser.h"
 #include "Terminal.h"
+#include "defs.h"
 
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -55,11 +57,8 @@ struct Command
 
     virtual ~Command() = default;
 
-    Command(const Command&) = default;
-    Command& operator=(const Command&) = default;
-
-    Command(Command&&) = default;
-    Command& operator=(Command&&) = default;
+    NON_COPYABLE(Command);
+    NON_MOVABLE(Command);
 
     std::wstring_view Name() const
     {
@@ -69,43 +68,37 @@ struct Command
     {
         return m_fullName;
     }
+    std::wstring FormatInvocation(std::wstring_view name) const;
+    std::wstring FormatInvocation() const
+    {
+        return FormatInvocation(Name());
+    }
     const std::vector<std::wstring_view>& Aliases() const
     {
         return m_aliases;
     }
 
-    virtual std::vector<std::unique_ptr<Command>> GetCommands() const
+    const Command& Root() const;
+    std::optional<std::reference_wrapper<const Command>> Parent() const noexcept
     {
-        return {};
+        return m_parent;
     }
+
+    const std::vector<std::unique_ptr<Command>>& GetCommands() const;
+
     virtual std::vector<Argument> GetArguments() const
     {
         return {};
     }
 
-    virtual std::vector<Argument> GetAllArguments() const
-    {
-        auto args = GetArguments();
-        args.emplace_back(Argument::Create(ArgType::Help));
-        return args;
-    }
-
-    // Options accepted before any subcommand on the command line.
     virtual std::vector<Argument> GetGlobalArguments() const
     {
         return {};
     }
 
-    // Args eligible for environment binding.
-    virtual std::vector<Argument> GetEnvArguments() const
-    {
-        return {};
-    }
-
-    // Union of GetGlobalArguments() and GetEnvArguments(), deduped by ArgType
-    // (globals win on conflict). Use this anywhere the two sets are combined
-    // so duplicates are not parsed/validated twice.
-    std::vector<Argument> GetGlobalsAndEnvArguments() const;
+    // Flags::All returns every argument in the scope. Flags::None returns unflagged
+    // arguments. Other values return arguments containing all requested flags.
+    std::vector<Argument> GetScopedArguments(Scope scope, Flags flags = Flags::All) const;
 
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
@@ -116,40 +109,38 @@ struct Command
         const CommandException* exception = nullptr,
         std::span<const Argument> relevantArguments = {}) const;
 
-    std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
+    std::optional<std::reference_wrapper<const Command>> FindSubCommand(InvocationCursor& invocation) const;
 
-    // optionsOnly:          stop (without consuming) at the first positional token.
-    // stopOnUnknown:        stop (without consuming) at the first unknown option
+    // optionsOnly:          stop before the first positional token.
+    // stopOnUnknown:        stop before the first unknown option
     //                       token instead of throwing. Note: applies per-token; a
     //                       bundled short chain (e.g. "-Dv") whose leading alias
     //                       is recognized is treated as claimed, and an unknown
     //                       alias later in the chain still throws.
-    // overridableDefaults:  args whose preloaded entries in target are treated
-    //                       as defaults (e.g. env-applied) and may be replaced
-    //                       by the first CLI occurrence.
-    void ParseArguments(
-        Invocation& inv,
-        ArgMap& target,
-        std::vector<Argument> definedArgs,
-        bool optionsOnly = false,
-        bool stopOnUnknown = false,
-        const std::vector<Argument>& overridableDefaults = {}) const;
+    void ParseArguments(InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly = false, bool stopOnUnknown = false) const;
 
-    void ParseArguments(Invocation& inv, ArgMap& target) const
+    void ParseArguments(InvocationCursor& invocation, ArgMap& target) const
     {
-        ParseArguments(inv, target, GetAllArguments());
+        ParseArguments(invocation, target, GetScopedArguments(Scope::Command, Flags::None));
     }
 
     void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
 
     void ValidateArguments(ArgMap& source) const
     {
-        ValidateArguments(source, GetAllArguments(), true);
+        ValidateArguments(source, GetScopedArguments(Scope::Command), true);
     }
 
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
+    Argument CreateGlobalArgument(ArgType type, ArgumentOverrides overrides = {}) const;
+
+    virtual std::vector<std::unique_ptr<Command>> CreateCommands() const
+    {
+        return {};
+    }
+
     // Command-specific validation hook, run after the shared per-argument Argument::Validate pass.
     // Override to enforce cross-argument rules that per-argument validation cannot express, such as
     // mutually-exclusive arguments or required argument combinations.
@@ -166,7 +157,7 @@ private:
     std::wstring_view m_name;
     std::vector<std::wstring_view> m_aliases;
     std::wstring m_fullName;
+    std::optional<std::reference_wrapper<const Command>> m_parent;
+    mutable std::optional<std::vector<std::unique_ptr<Command>>> m_commands;
 };
-
-void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
 } // namespace wsl::windows::wslc

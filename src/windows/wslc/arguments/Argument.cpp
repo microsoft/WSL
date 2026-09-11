@@ -43,7 +43,8 @@ Argument Argument::Create(ArgType type, ArgumentOverrides overrides)
             overrides.Desc.has_value() ? std::move(overrides.Desc.value()) : std::wstring(DefaultDesc), \
             ArgumentKind, \
             overrides.Required.value_or(Argument::DefaultRequired), \
-            overrides.Limit.value_or(Argument::DefaultLimit)};
+            overrides.Limit.value_or(Argument::DefaultLimit), \
+            overrides.Flags.value_or(Flags::None)};
 
         WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE
@@ -51,6 +52,13 @@ Argument Argument::Create(ArgType type, ArgumentOverrides overrides)
     default:
         THROW_HR(E_UNEXPECTED);
     }
+}
+
+Argument Argument::CreateGlobal(ArgType type, const Command& owner, ArgumentOverrides overrides)
+{
+    auto argument = Create(type, std::move(overrides));
+    argument.m_globalOwner = std::cref(owner);
+    return argument;
 }
 
 // Retrieves the usage string of the Argument, based on its Alias and Name.

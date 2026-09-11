@@ -33,7 +33,7 @@ Abstract:
 
 namespace WSLCTestHelpers {
 
-inline wsl::windows::wslc::Invocation CreateInvocationFromCommandLine(const std::wstring& commandLine)
+inline wsl::windows::wslc::InvocationCursor CreateInvocationFromCommandLine(const std::wstring& commandLine)
 {
     // Simulate creation of Arvc/Argc from command line as Windows does.
     int argc = 0;
@@ -42,15 +42,14 @@ inline wsl::windows::wslc::Invocation CreateInvocationFromCommandLine(const std:
     VERIFY_IS_NOT_NULL(argv.get());
     VERIFY_IS_GREATER_THAN(argc, 0);
 
-    // Convert to vector for Invocation, skipping argv[0] (executable path)
-    // This is what we do in wmain() to populate Invocation input vector.
+    // Convert to a cursor over argv, skipping argv[0] (executable path).
     std::vector<std::wstring> args;
     for (int i = 1; i < argc; ++i) // Skip argv[0]
     {
         args.push_back(argv[i]);
     }
 
-    return wsl::windows::wslc::Invocation(std::move(args));
+    return wsl::windows::wslc::InvocationCursor(std::move(args));
 }
 
 // Helper function to convert wstring to UTF-8 string for TAEF logging

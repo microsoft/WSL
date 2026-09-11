@@ -26,9 +26,8 @@ struct SystemCommand final : public Command
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
-
 protected:
+    std::vector<std::unique_ptr<Command>> CreateCommands() const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 

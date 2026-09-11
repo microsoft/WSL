@@ -56,9 +56,9 @@ void AttachToSession(CLIExecutionContext& context)
 
 void OpenSessionIfSpecified(CLIExecutionContext& context)
 {
-    if (context.GlobalArgs.Contains(ArgType::Session))
+    if (context.Args.Contains(ArgType::Session))
     {
-        const auto& sessionName = context.GlobalArgs.GetValue<ArgType::Session>();
+        const auto& sessionName = context.Args.GetValue<ArgType::Session>();
         context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
     }
 }
