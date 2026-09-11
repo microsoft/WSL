@@ -1,0 +1,43 @@
+# Publishes the artifacts produced by the wsl-github-release pipeline to production: DCAT PROD, Store,
+# and NuGet. This pipeline builds nothing; it only reads artifacts from a completed release build and
+# pushes them where they need to go. See wsl-publish-ppe.yml for the non-production counterpart.
+
+trigger: none
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: releaseBuild
+      source: '\OneBranch\wsl-github-release'
+      trigger: true
+
+  repositories:
+    - repository: 1ESPipelineTemplates
+      type: git
+      name: 1ESPipelineTemplates/1ESPipelineTemplates
+      ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    pool:
+      name: Azure-Pipelines-1ESPT-ExDShared
+      image: windows-2022
+      os: windows
+
+    settings:
+      networkIsolationPolicy: Permissive
+
+    stages:
+      - template: dcat-publish-stages.yml@self
+        parameters:
+          isProduction: true
+          dcat:
+            environment: PROD
+            serviceConnection: wsl-dcat-publish-prod
+            clientId: 9752ce08-bcf4-432b-ab86-d60856f646c0
+            tenantId: 33e01921-4d64-4f8c-a055-5bdaffd5e33d
+            publisher: WSL
+
+      - template: store-flight-stage.yml@self
+      - template: nuget-publish-stage.yml@self
