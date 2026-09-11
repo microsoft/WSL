@@ -69,7 +69,7 @@ private:
     std::vector<Argument> m_arguments;
 };
 
-// Specific exception for failures after command and argument validation
+// Specific exception for errors displayed without command help
 struct ExecutionException : CLIException
 {
     ExecutionException(std::wstring_view message) : CLIException(message)

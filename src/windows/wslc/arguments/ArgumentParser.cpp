@@ -17,12 +17,27 @@ Abstract:
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+namespace {
+    [[noreturn]] void ThrowUnsupportedArgument(const Argument& argument)
+    {
+        WI_ASSERT(argument.IsOption());
+        throw ArgumentException(Localization::WSLCCLI_UnsupportedOptionError(std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + argument.Name()));
+    }
+} // namespace
 
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
-    Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
+    Invocation& inv,
+    ArgMap& execArgs,
+    std::vector<Argument> arguments,
+    bool optionsOnly,
+    bool stopOnUnknown,
+    const std::vector<Argument>& overridableDefaults,
+    std::vector<ArgumentDeprecation> deprecations,
+    std::vector<ArgType> unsupportedArguments) :
     m_invocation(inv),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
+    m_argumentDeprecations(std::move(deprecations)),
     m_invocationItr(m_invocation.begin()),
     m_optionsOnly(optionsOnly),
     m_stopOnUnknown(stopOnUnknown)
@@ -44,6 +59,39 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
             m_forwardArgs.emplace_back(arg);
             break;
         }
+    }
+
+    for (const auto type : unsupportedArguments)
+    {
+        const auto argument = Argument::Create(type);
+        const auto inserted = m_unsupportedArguments.emplace(type).second;
+        WI_ASSERT(inserted);                      // Each unsupported type is declared once.
+        WI_ASSERT(FindArgument(type) == nullptr); // Unsupported types cannot also be command arguments.
+        WI_ASSERT(argument.IsOption());           // Only options can be unsupported.
+        m_standardArgs.emplace_back(argument);
+    }
+
+    std::set<ArgType> deprecatedTypes;
+    for (const auto& deprecation : m_argumentDeprecations)
+    {
+        const auto deprecatedType = deprecation.DeprecatedType();
+        const auto replacementType = deprecation.ReplacementType();
+        const auto deprecatedArgument = Argument::Create(deprecatedType);
+        const auto replacementArgument = FindArgument(replacementType);
+
+        const auto inserted = deprecatedTypes.emplace(deprecatedType).second;
+        WI_ASSERT(inserted);                                         // Each deprecated type has one replacement.
+        WI_ASSERT(deprecatedType != replacementType);                // An argument cannot replace itself.
+        WI_ASSERT(FindArgument(deprecatedType) == nullptr);          // Deprecated types cannot also be command arguments.
+        WI_ASSERT(!m_unsupportedArguments.contains(deprecatedType)); // An argument cannot be both deprecated and unsupported.
+        WI_ASSERT(replacementArgument != nullptr);                   // Replacements must be command arguments.
+        WI_ASSERT(deprecatedArgument.IsOption() && deprecatedArgument.Kind() == replacementArgument->Kind()); // Deprecated and replacement arguments must be compatible options.
+        WI_ASSERT(!std::ranges::any_of(m_argumentDeprecations, [replacementType](const auto& candidate) {
+            return candidate.DeprecatedType() == replacementType;
+        })); // Replacements cannot themselves be deprecated.
+
+        m_standardArgs.emplace_back(deprecatedArgument);
+        m_executionArgs.RegisterArgumentDeprecation(deprecatedType, replacementType);
     }
 
     m_positionalSearchItr = m_positionalArgs.begin();
@@ -180,6 +228,30 @@ const Argument* ParseArgumentsStateMachine::FindArgument(ArgType type) const
     }
 
     return nullptr;
+}
+
+const ArgumentDeprecation* ParseArgumentsStateMachine::FindArgumentDeprecation(ArgType type) const
+{
+    const auto deprecation =
+        std::ranges::find(m_argumentDeprecations, type, [](const auto& value) { return value.DeprecatedType(); });
+    return deprecation != m_argumentDeprecations.end() ? &*deprecation : nullptr;
+}
+
+bool ParseArgumentsStateMachine::IsUnsupportedArgument(ArgType type) const
+{
+    return m_unsupportedArguments.contains(type);
+}
+
+ArgType ParseArgumentsStateMachine::ResolveArgumentType(const Argument& argument)
+{
+    const auto deprecation = FindArgumentDeprecation(argument.Type());
+    if (deprecation == nullptr)
+    {
+        return argument.Type();
+    }
+
+    m_executionArgs.RecordDeprecatedArgumentUse(deprecation->DeprecatedType());
+    return deprecation->ReplacementType();
 }
 
 void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
@@ -382,6 +454,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
     }
 
+    if (IsUnsupportedArgument(firstArg->Type()))
+    {
+        ThrowUnsupportedArgument(*firstArg);
+    }
+
+    const auto firstType = ResolveArgumentType(*firstArg);
+
     // Position after the first alias
     size_t currentPos = 1 + aliasLength;
 
@@ -392,7 +471,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         if (currentPos >= currArg.length())
         {
             // No more characters - value should be in next argument
-            return {firstArg->Type(), currArg};
+            return {firstType, currArg};
         }
 
         if (currArg[currentPos] != WSLC_CLI_ARG_SPLIT_CHAR)
@@ -402,18 +481,18 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         }
 
         // Value is adjoined after '='
-        ProcessAdjoinedValue(firstArg->Type(), currArg.substr(currentPos + 1));
+        ProcessAdjoinedValue(firstType, currArg.substr(currentPos + 1));
         return {};
     }
 
     // Boolean flag - check for adjoined boolean value (e.g., -a=true or -a=false).
     if (currentPos < currArg.length() && currArg[currentPos] == WSLC_CLI_ARG_SPLIT_CHAR)
     {
-        return ApplyFlagValue(firstArg->Type(), currArg.substr(currentPos + 1), currArg);
+        return ApplyFlagValue(firstType, currArg.substr(currentPos + 1), currArg);
     }
 
     // No adjoined value — add the flag as true.
-    SetFlag(firstArg->Type(), true);
+    SetFlag(firstType, true);
 
     // Process remaining adjoined flags
     while (currentPos < currArg.length())
@@ -425,6 +504,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
         }
 
+        if (IsUnsupportedArgument(nextArg->Type()))
+        {
+            ThrowUnsupportedArgument(*nextArg);
+        }
+
+        const auto type = ResolveArgumentType(*nextArg);
+
         // Update position before checking Kind
         size_t nextPos = currentPos + aliasLength;
 
@@ -434,7 +520,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             if (nextPos >= currArg.length())
             {
                 // No more characters - value should be in next argument
-                return {nextArg->Type(), currArg};
+                return {type, currArg};
             }
 
             if (currArg[nextPos] != WSLC_CLI_ARG_SPLIT_CHAR)
@@ -444,17 +530,17 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             }
 
             // Value is adjoined after '='
-            ProcessAdjoinedValue(nextArg->Type(), currArg.substr(nextPos + 1));
+            ProcessAdjoinedValue(type, currArg.substr(nextPos + 1));
             return {};
         }
 
         // Boolean flag in chain — check for adjoined boolean value.
         if (nextPos < currArg.length() && currArg[nextPos] == WSLC_CLI_ARG_SPLIT_CHAR)
         {
-            return ApplyFlagValue(nextArg->Type(), currArg.substr(nextPos + 1), currArg);
+            return ApplyFlagValue(type, currArg.substr(nextPos + 1), currArg);
         }
 
-        SetFlag(nextArg->Type(), true);
+        SetFlag(type, true);
         currentPos = nextPos;
     }
 
@@ -500,27 +586,34 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
     {
         if (string::IsEqual(argName, arg.Name()))
         {
+            if (IsUnsupportedArgument(arg.Type()))
+            {
+                ThrowUnsupportedArgument(arg);
+            }
+
+            const auto type = ResolveArgumentType(arg);
+
             // Found a match, process by kind.
             if (arg.Kind() == Kind::Flag)
             {
                 if (hasAdjoinedValue)
                 {
-                    return ApplyFlagValue(arg.Type(), argValue, currArg);
+                    return ApplyFlagValue(type, argValue, currArg);
                 }
 
-                SetFlag(arg.Type(), true);
+                SetFlag(type, true);
                 return {};
             }
 
             // Not a Flag, must be a Value, and therefore must have a value provided.
             if (hasAdjoinedValue)
             {
-                ProcessAdjoinedValue(arg.Type(), argValue);
+                ProcessAdjoinedValue(type, argValue);
                 return {};
             }
 
             // The value should be the next argument.
-            return {arg.Type(), currArg};
+            return {type, currArg};
         }
     }
 

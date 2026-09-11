@@ -19,6 +19,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgMap.h"
 #include "ArgumentValidation.h"
+#include "Command.h"
 #include "ImageService.h"
 #include "JsonUtils.h"
 #include "Exceptions.h"
@@ -36,11 +37,65 @@ using namespace WEX::TestExecution;
 namespace WSLCCLIArgumentUnitTests {
 namespace mount = wsl::windows::common::mount;
 
-using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapInvalidateValidatedCache>;
+using RawArgMapBase = EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping, &ArgMapHandleAction>;
 
 static_assert(!std::is_convertible_v<ArgMap*, RawArgMapBase*>);
 static_assert(!std::is_copy_assignable_v<ArgMap>);
 static_assert(!std::is_move_assignable_v<ArgMap>);
+
+class DeprecatedArgumentCommand : public Command
+{
+public:
+    DeprecatedArgumentCommand() : Command(L"deprecated", L"")
+    {
+    }
+
+    std::vector<Argument> GetArguments() const override
+    {
+        return {
+            Argument::Create(ArgType::StopTimeout),
+            Argument::Create(ArgType::Quiet),
+            Argument::Create(ArgType::Env, {.Limit = Limit::Unlimited}),
+        };
+    }
+
+    std::vector<ArgType> GetUnsupportedArguments() const override
+    {
+        return {ArgType::Platform};
+    }
+
+    std::vector<ArgumentDeprecation> GetArgumentDeprecations() const override
+    {
+        return {
+            {ArgType::Time, ArgType::StopTimeout},
+            {ArgType::HealthTimeout, ArgType::StopTimeout},
+            {ArgType::Force, ArgType::Quiet},
+            {ArgType::EnvFile, ArgType::Env},
+        };
+    }
+
+    std::vector<Argument> GetGlobalArguments() const override
+    {
+        return {
+            Argument::Create(ArgType::Session),
+        };
+    }
+
+    std::wstring ShortDescription() const override
+    {
+        return L"Deprecated argument test command";
+    }
+
+    std::wstring LongDescription() const override
+    {
+        return ShortDescription();
+    }
+
+private:
+    void ExecuteInternal(CLIExecutionContext&) const override
+    {
+    }
+};
 
 class WSLCCLIArgumentUnitTests
 {
@@ -67,6 +122,188 @@ class WSLCCLIArgumentUnitTests
         const ArgumentException withArgument{L"error", argument};
         VERIFY_ARE_EQUAL(1u, withArgument.Arguments().size());
         VERIFY_ARE_EQUAL(ArgType::Verbose, withArgument.Arguments().front().Type());
+    }
+
+    TEST_METHOD(CommandArguments_SeparateUnsupportedOptions)
+    {
+        DeprecatedArgumentCommand command;
+
+        VERIFY_ARE_EQUAL(3u, command.GetArguments().size());
+        const auto unsupportedArguments = command.GetUnsupportedArguments();
+        VERIFY_ARE_EQUAL(1u, unsupportedArguments.size());
+        VERIFY_ARE_EQUAL(ArgType::Platform, unsupportedArguments.front());
+
+        const auto globalArguments = command.GetGlobalArguments();
+        VERIFY_ARE_EQUAL(1u, globalArguments.size());
+        VERIFY_ARE_EQUAL(ArgType::Session, globalArguments.front().Type());
+    }
+
+    TEST_METHOD(DeprecatedValueOption_ParsesAsReplacementAndWarns)
+    {
+        DeprecatedArgumentCommand command;
+        const auto expectedWarning =
+            wsl::shared::Localization::WSLCCLI_DeprecatedArgumentWarning(L"--time", L"--stop-timeout") + L"\n";
+
+        for (const auto commandLine : {L"wslc --time 10", L"wslc -t 10"})
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_NO_THROW(command.ValidateArguments(args));
+            const auto keys = args.GetKeys();
+            VERIFY_IS_TRUE(std::ranges::find(keys, ArgType::Time) == keys.end());
+            VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
+            VERIFY_THROWS_SPECIFIC(args.GetValue<ArgType::Time>(), wil::ResultException, [](const wil::ResultException& exception) {
+                return exception.GetErrorCode() == E_ILLEGAL_METHOD_CALL;
+            });
+
+            CaptureTerminal capture;
+            command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+            VERIFY_ARE_EQUAL(expectedWarning, capture.captured());
+        }
+    }
+
+    TEST_METHOD(DeprecatedFlag_ParsesAsReplacementAndWarns)
+    {
+        DeprecatedArgumentCommand command;
+        const auto expectedWarning = wsl::shared::Localization::WSLCCLI_DeprecatedArgumentWarning(L"--force", L"--quiet") + L"\n";
+
+        for (const auto commandLine : {L"wslc --force", L"wslc -f"})
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_NO_THROW(command.ValidateArguments(args));
+            VERIFY_IS_TRUE(args.GetValue<ArgType::Quiet>());
+
+            CaptureTerminal capture;
+            command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+            VERIFY_ARE_EQUAL(expectedWarning, capture.captured());
+        }
+    }
+
+    TEST_METHOD(ReplacementOption_DoesNotWarn)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --stop-timeout 10");
+        ArgMap args;
+
+        VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+        VERIFY_NO_THROW(command.ValidateArguments(args));
+        VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
+
+        CaptureTerminal capture;
+        command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+        VERIFY_IS_TRUE(capture.captured().empty());
+    }
+
+    TEST_METHOD(DeprecatedAndReplacementSingleValueOptions_UseLastValue)
+    {
+        DeprecatedArgumentCommand command;
+
+        for (const auto commandLine : {L"wslc --time 5 --stop-timeout 10", L"wslc --stop-timeout 5 --time 10"})
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
+        }
+    }
+
+    TEST_METHOD(DifferentDeprecatedSingleValueOptions_UseLastValue)
+    {
+        DeprecatedArgumentCommand command;
+
+        const std::array commandLines{
+            L"wslc --time 5 --health-timeout 10",
+            L"wslc --health-timeout 5 --time 10",
+        };
+
+        for (const auto commandLine : commandLines)
+        {
+            auto invocation = CreateInvocationFromCommandLine(commandLine);
+            ArgMap args;
+
+            VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+            VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
+        }
+    }
+
+    TEST_METHOD(RepeatedDeprecatedSingleValueOption_UsesLastValue)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --time 5 --time 10");
+        ArgMap args;
+
+        VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+        VERIFY_ARE_EQUAL(10, args.GetValue<ArgType::StopTimeout>());
+    }
+
+    TEST_METHOD(DeprecatedAndReplacementUnlimitedOptions_Accumulate)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --env-file one --env two --env-file=three");
+        ArgMap args;
+
+        VERIFY_NO_THROW(command.ParseArguments(invocation, args));
+        VERIFY_NO_THROW(command.ValidateArguments(args));
+        const auto values = args.GetAllValues<ArgType::Env>();
+        VERIFY_ARE_EQUAL(3u, values.size());
+        VERIFY_ARE_EQUAL(std::wstring{L"one"}, values[0]);
+        VERIFY_ARE_EQUAL(std::wstring{L"two"}, values[1]);
+        VERIFY_ARE_EQUAL(std::wstring{L"three"}, values[2]);
+
+        CaptureTerminal capture;
+        command.OutputDeprecatedArgumentWarnings(capture.terminal, args);
+        const auto expectedWarning = wsl::shared::Localization::WSLCCLI_DeprecatedArgumentWarning(L"--env-file", L"--env") + L"\n";
+        VERIFY_ARE_EQUAL(expectedWarning, capture.captured());
+    }
+
+    TEST_METHOD(DeprecatedAndUnsupportedArguments_AreHiddenFromHelp)
+    {
+        DeprecatedArgumentCommand command;
+        CaptureTerminal capture;
+
+        command.OutputHelp(capture.terminal);
+        const auto help = capture.captured();
+
+        VERIFY_IS_TRUE(help.find(L"--time") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--health-timeout") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--force") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--env-file") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--platform") == std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--stop-timeout") != std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--quiet") != std::wstring::npos);
+        VERIFY_IS_TRUE(help.find(L"--env") != std::wstring::npos);
+    }
+
+    TEST_METHOD(UnsupportedArgument_DisplaysShortHelpWithoutArgumentDetails)
+    {
+        DeprecatedArgumentCommand command;
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --platform linux/amd64");
+        ArgMap args;
+
+        try
+        {
+            command.ParseArguments(invocation, args);
+            VERIFY_FAIL(L"Expected unsupported argument to throw");
+        }
+        catch (const ArgumentException& exception)
+        {
+            CaptureTerminal capture;
+            command.OutputHelp(capture.terminal, HelpOutput::Argument, &exception, exception.Arguments());
+            const auto help = capture.captured();
+            const auto expectedError = wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform");
+
+            VERIFY_IS_TRUE(help.find(expectedError) != std::wstring::npos);
+            const auto argumentName = help.find(L"--platform");
+            VERIFY_IS_TRUE(argumentName != std::wstring::npos);
+            VERIFY_IS_TRUE(help.find(L"--platform", argumentName + 1) == std::wstring::npos);
+            VERIFY_IS_TRUE(help.find(wsl::shared::Localization::WSLCCLI_HeadingRelatedOptions()) == std::wstring::npos);
+        }
     }
 
     TEST_METHOD(ArgumentCreate_DefaultsAndOverrides)

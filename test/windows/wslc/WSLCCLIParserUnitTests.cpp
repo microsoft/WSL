@@ -49,6 +49,32 @@ class WSLCCLIParserUnitTests
         return true;
     }
 
+    TEST_METHOD(UnsupportedNamedOption_ThrowsSpecificException)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --platform linux/amd64");
+        ArgMap args;
+        ParseArgumentsStateMachine stateMachine{inv, args, {}, false, false, {}, {}, {ArgType::Platform}};
+
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--platform") &&
+                   exception.Arguments().empty();
+        });
+        VERIFY_IS_FALSE(args.Contains(ArgType::Platform));
+    }
+
+    TEST_METHOD(UnsupportedAliasOption_ThrowsSpecificException)
+    {
+        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc -f");
+        ArgMap args;
+        ParseArgumentsStateMachine stateMachine{inv, args, {}, false, false, {}, {}, {ArgType::Force}};
+
+        VERIFY_THROWS_SPECIFIC(stateMachine.Step(), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_UnsupportedOptionError(L"--force") &&
+                   exception.Arguments().empty();
+        });
+        VERIFY_IS_FALSE(args.Contains(ArgType::Force));
+    }
+
     TEST_METHOD(ParserTest_ParserCases)
     {
         std::vector<ParserTestCase> testCases = {
@@ -669,7 +695,10 @@ class WSLCCLIParserUnitTests
     // adjoined form. The inspect family depends on this for docker's `-f json`.
     TEST_METHOD(Value_AliasCarriesValue)
     {
-        std::vector<Argument> defs = {Argument::Create(ArgType::InspectFormat), Argument::Create(ArgType::ObjectId, {.Limit = Limit::Unlimited})};
+        std::vector<Argument> defs = {
+            Argument::Create(ArgType::InspectFormat),
+            Argument::Create(ArgType::ObjectId, {.Limit = Limit::Unlimited}),
+        };
 
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f json cont1", defs).GetValue<ArgType::InspectFormat>());
         VERIFY_ARE_EQUAL(wsl::shared::c_jsonCompactIndent, ParseFlags(L"wslc -f=json cont1", defs).GetValue<ArgType::InspectFormat>());

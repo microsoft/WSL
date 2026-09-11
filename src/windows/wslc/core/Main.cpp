@@ -131,6 +131,7 @@ try
         }
 
         command->ParseArguments(invocation, context.Args);
+        command->OutputDeprecatedArgumentWarnings(context.Terminal, context.Args);
         command->ValidateArguments(context.Args);
         command->Execute(context);
     }

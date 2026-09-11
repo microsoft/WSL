@@ -91,7 +91,7 @@ class WSLCE2EGlobalTests
     {
         auto result = RunWslc(L"--help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage: wslc"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Usage:  wslc"));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(c_copyrightPrefix));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
@@ -104,7 +104,7 @@ class WSLCE2EGlobalTests
         VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
         VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Unrecognized command: 'INVALID_CMD'"));
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage: wslc"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage:  wslc"));
         VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingCommands()));
         VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));
         VERIFY_IS_FALSE(result.StderrContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
@@ -118,7 +118,7 @@ class WSLCE2EGlobalTests
         VERIFY_ARE_NOT_EQUAL(0u, result.ExitCode.value_or(0));
         VERIFY_IS_TRUE(result.Stdout.has_value() && result.Stdout->empty());
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Required argument not provided: 'image'"));
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage: wslc container create"));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Usage:  wslc container create"));
         VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_HeadingRelatedArguments()));
         VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_ImageIdArgDescription()));
         VERIFY_IS_FALSE(result.StderrContainsSubstring(c_copyrightPrefix));

@@ -37,6 +37,28 @@ struct ArgumentOverrides
     std::optional<std::wstring> Desc;
 };
 
+struct ArgumentDeprecation
+{
+    ArgumentDeprecation(ArgType deprecatedType, ArgType replacementType) :
+        m_deprecatedType(deprecatedType), m_replacementType(replacementType)
+    {
+    }
+
+    ArgType DeprecatedType() const
+    {
+        return m_deprecatedType;
+    }
+
+    ArgType ReplacementType() const
+    {
+        return m_replacementType;
+    }
+
+private:
+    ArgType m_deprecatedType;
+    ArgType m_replacementType;
+};
+
 // An argument to a command.
 struct Argument
 {

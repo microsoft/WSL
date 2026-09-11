@@ -24,6 +24,11 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Save Command
+std::vector<ArgType> ImageSaveCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ImageSaveCommand::GetArguments() const
 {
     return {

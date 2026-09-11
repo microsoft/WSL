@@ -24,6 +24,11 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Run Command
+std::vector<ArgType> ContainerRunCommand::GetUnsupportedArguments() const
+{
+    return {ArgType::Platform};
+}
+
 std::vector<Argument> ContainerRunCommand::GetArguments() const
 {
     // clang-format off
