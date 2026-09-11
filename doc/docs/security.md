@@ -11,6 +11,11 @@ Windows host or from other distributions running for the same user.
 The Linux `root` user has full control of its distribution and can change its configuration. Linux `root` is not the same as a
 Windows administrator, but the distribution is not a security boundary from the associated Windows user.
 
+WSL 2 distributions and sessions for the same Windows user can share a utility virtual machine. Launching WSL from elevated and
+non-elevated Windows processes does not create separate guest security boundaries. Resources made available to the utility virtual
+machine by an elevated session can remain available for the lifetime of that virtual machine. Workloads that require separation
+between elevated and non-elevated activity should use separate Windows security contexts or separately managed virtual machines.
+
 Documented Windows security boundaries and security features continue to apply. Suspected violations of those boundaries or
 features should be reported to MSRC for assessment.
 
