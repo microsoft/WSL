@@ -26,7 +26,7 @@ class WSLCVolumeMountUnitTests
 
     TEST_METHOD(VolumeMount_Parse_ReturnExpectedResult)
     {
-        const auto cwd = std::filesystem::current_path();
+        const auto cwd = std::filesystem::canonical(std::filesystem::current_path());
 
         // Volume value => host, container, readonly
         std::vector<std::tuple<std::wstring, std::wstring, std::string, bool>> validVolumeArgs = {
