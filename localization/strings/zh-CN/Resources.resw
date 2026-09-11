@@ -2238,6 +2238,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>选项</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>以下命令别名可用：</value>
   </data>
@@ -3076,7 +3079,7 @@ Windows 版本: {}</value>
     <value>在分离模式下运行容器</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>显示日志的额外详细信息</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>指定容器初始化进程可执行文件</value>
@@ -3097,19 +3100,19 @@ Windows 版本: {}</value>
     <value>根据提供的条件筛选输出</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid value "{}" for the '--filter' option: bad format of filter (expected name=value)</value>
+    <value>'--filter' 选项的值 "{}" 无效: 筛选器格式错误(应为 name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>提供筛选值(例如 "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>提供筛选值(例如 "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>不提示确认</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>你确定要继续吗?</value>
@@ -3118,10 +3121,10 @@ Windows 版本: {}</value>
     <value>警告！这将删除所有已停止的容器。</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>警告！这将删除所有悬空图像。</value>
+    <value>警告!这将移除所有孤立映像。</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
-    <value>警告！这将删除所有映像，但没有与之关联的至少一个容器。</value>
+    <value>警告!这将移除所有没有至少一个关联容器的映像。</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
     <value>警告！这将删除至少一个容器未使用的匿名本地卷。</value>

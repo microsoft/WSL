@@ -2238,6 +2238,9 @@ Bruk:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>alternativer</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Følgende kommandoaliaser er tilgjengelig:</value>
   </data>
@@ -3031,10 +3034,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis alle uavhengig av tilstand.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Download all tagged images in the repository.</value>
+    <value>Last ned alle merkede bilder i repositoritet.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>merke kan ikke brukes med --all-tags/-a</value>
     <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
@@ -3077,7 +3080,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Kjør beholderen i frakoblet modus</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Vis ekstra detaljer for logger</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Angir kjørbar init-prosess for beholder</value>
@@ -3098,19 +3101,19 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Filtrer utdata basert på de angitte betingelsene</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Ugyldig verdi {} for alternativet --filter': ugyldig format for filter (forventet navn=verdi)</value>
+    <value>Ugyldig verdi «{}» for alternativet '--filter': ugyldig format for filter (forventet navn=verdi)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Angi filterverdier (f.eks. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Angi filterverdier (f.eks. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Ikke be om bekreftelse</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Er du sikker på at du vil fortsette?</value>
@@ -3119,10 +3122,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>ADVARSEL! Dette vil fjerne alle stoppede containere.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>ADVARSEL! Dette fjerner alle løse bilder.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all images without at least one container associated to them.</value>
+    <value>ADVARSEL! Dette vil fjerne alle bilder uten minst én tilknyttet beholder.</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
     <value>ADVARSEL! Dette vil fjerne anonyme lokale volumer som ikke brukes av minst én beholder.</value>
@@ -3376,7 +3379,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
-    <value>Push all tags of an image to the repository</value>
+    <value>Push alle merkene for bildet til repositoriet</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Returnerer kun beholder-ID-er</value>
@@ -3408,7 +3411,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Gjeldende eller eksisterende bildereferanse i bilde-navn[:merke]-format</value>
   </data>
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
-    <value>Display total file sizes</value>
+    <value>Vis totale filstørrelser</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Vis totalt antall filstørrelser hvis typen er beholder</value>
@@ -3814,7 +3817,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>PORTER</value>
   </data>
   <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
-    <value>SIZE</value>
+    <value>STØRRELSE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
@@ -3855,7 +3858,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
-    <value>{} (virtual {})</value>
+    <value>{} (virtuell {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">

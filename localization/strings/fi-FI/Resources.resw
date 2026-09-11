@@ -2238,6 +2238,9 @@ Käyttö:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>asetukset</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Seuraavat komentotunnukset ovat käytettävissä:</value>
   </data>
@@ -2776,7 +2779,7 @@ Esimerkki: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Tuo tarballin sisältö tiedostojärjestelmäkuvan luomiseksi. Voit myös liittää kuvaan arkiston nimen ja tunnisteen.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Näytä kaikki kuvat (oletus piilottaa välikuvat).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Listaa kuvat.</value>
@@ -3077,7 +3080,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Suorita säilö irrotetussa tilassa</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Näytä lokien lisätiedot</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Määrittää säilön init-prosessin suoritustiedoston</value>
@@ -3098,40 +3101,40 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Suodata tulos annettujen ehtojen perusteella</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid value "{}" for the '--filter' option: bad format of filter (expected name=value)</value>
+    <value>Virheellinen arvo {} asetukselle '--filter': suodattimen muoto on virheellinen (odotettu name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Anna suodatinarvot (esim. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Anna suodatinarvot (esim. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Älä pyydä vahvistusta</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Haluatko varmasti jatkaa?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>VAROITUS! Tämä poistaa kaikki pysäytetyt säilöt.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>VAROITUS! Tämä poistaa kaikki riippuvat kuvat.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>VAROITUS! Tämä poistaa kaikki kuvat, joihin ei ole liitetty vähintään yhtä säilöä.</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove anonymous local volumes not used by at least one container.</value>
+    <value>VAROITUS! Tämä poistaa anonyymit paikalliset asemat, joita vähintään yksi säilö ei käytä.</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all local volumes not used by at least one container.</value>
+    <value>VAROITUS! Tämä poistaa kaikki paikalliset asemat, joita vähintään yksi säilö ei käytä.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all custom networks not used by at least one container.</value>
+    <value>VAROITUS! Tämä poistaa kaikki mukautetut verkot, joita vähintään yksi säilö ei käytä.</value>
   </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Virheellinen argumentti "{}" '--mount'-asetukselle: {}</value>
