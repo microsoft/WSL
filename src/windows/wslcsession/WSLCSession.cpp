@@ -3510,10 +3510,7 @@ try
     WaitForConflictingNetworkOperationToComplete(networksLock);
 
     // Reject before calling Docker so the stale event cannot complete a new prune.
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_abandonedPruneEventPending,
-        "A previous network prune's event is still outstanding");
+    THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), Localization::MessageWslcNetworkPrunePending(), m_abandonedPruneEventPending);
 
     docker_schema::PruneNetworkResult pruneResult;
     try
