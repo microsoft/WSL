@@ -233,7 +233,7 @@ namespace {
     CommandInvocation ParseTestCommandLine(std::vector<std::wstring> arguments, CLIExecutionContext& context)
     {
         CommandInvocation invocation{std::make_unique<TestRootCommand>(), std::move(arguments)};
-        ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
+        ParseCommandLine(invocation, context);
         return invocation;
     }
 } // namespace
@@ -358,7 +358,7 @@ class WSLCCLIExecutionUnitTests
         CommandInvocation invocation{
             std::make_unique<PositionalTestRootCommand>(traversalCount), std::vector<std::wstring>{L"show", L"image"}};
 
-        ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
+        ParseCommandLine(invocation, context);
 
         VERIFY_ARE_EQUAL(std::wstring_view{L"show"}, invocation.Selected().Name());
         VERIFY_ARE_EQUAL(std::wstring{L"image"}, context.Args.GetValue<ArgType::ImageId>());
@@ -432,7 +432,7 @@ class WSLCCLIExecutionUnitTests
 
         try
         {
-            ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
+            ParseCommandLine(invocation, context);
             VERIFY_FAIL(L"Expected ArgumentException");
         }
         catch (const ArgumentException& exception)
@@ -1091,7 +1091,7 @@ class WSLCCLIExecutionUnitTests
             {
                 CommandInvocation invocation{std::make_unique<RootCommand>(), std::move(args)};
                 CLIExecutionContext context;
-                ParseCommandLine(invocation, context, /*applyEnvironmentOptions*/ false);
+                ParseCommandLine(invocation, context);
 
                 // Ensure we found the expected command
                 VERIFY_ARE_EQUAL(testCase.expectedCommand, invocation.Selected().Name());

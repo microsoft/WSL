@@ -101,13 +101,10 @@ namespace {
     }
 
     std::optional<std::reference_wrapper<const Command>> ParseGlobalArgumentsAndFindSubcommand(
-        InvocationCursor& invocation, CLIExecutionContext& context, const Command& command, bool applyEnvironmentOptions)
+        InvocationCursor& invocation, CLIExecutionContext& context, const Command& command)
     {
         const auto globalAndEnvironmentArguments = command.GetGlobalsAndEnvArguments();
-        if (applyEnvironmentOptions)
-        {
-            ApplyEnvironmentOptions(context.GlobalArgs, globalAndEnvironmentArguments);
-        }
+        ApplyEnvironmentOptions(context.GlobalArgs, globalAndEnvironmentArguments);
 
         auto globalArguments = command.GetGlobalArguments();
         command.ParseArguments(
@@ -223,13 +220,13 @@ std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& target)
     return path;
 }
 
-void ParseCommandLine(CommandInvocation& invocation, CLIExecutionContext& context, bool applyEnvironmentOptions)
+void ParseCommandLine(CommandInvocation& invocation, CLIExecutionContext& context)
 {
-    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected(), applyEnvironmentOptions);
+    auto subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected());
     while (subcommand)
     {
         invocation.Select(subcommand->get());
-        subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected(), applyEnvironmentOptions);
+        subcommand = ParseGlobalArgumentsAndFindSubcommand(invocation.Cursor(), context, invocation.Selected());
     }
 
     try

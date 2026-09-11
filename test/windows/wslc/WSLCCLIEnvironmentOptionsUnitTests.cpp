@@ -98,6 +98,20 @@ class WSLCCLIEnvironmentOptionsUnitTests
         VERIFY_IS_FALSE(target.Contains(ArgType::NoColor));
     }
 
+    TEST_METHOD(ApplyEnvironmentOptions_RepeatedApplicationIsIdempotent)
+    {
+        m_noColor->Set(L"");
+
+        ArgMap target;
+        ApplyEnvironmentOptions(target, NoColorDefs());
+        VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
+
+        ApplyEnvironmentOptions(target, NoColorDefs());
+        VERIFY_IS_TRUE(target.GetValue<ArgType::NoColor>());
+
+        VERIFY_ARE_EQUAL(1u, target.Count(ArgType::NoColor));
+    }
+
     // Env-derived defaults are lowest precedence and must not overwrite.
     TEST_METHOD(ApplyEnvironmentOptions_TargetAlreadyContainsArg_LeavesItUntouched)
     {

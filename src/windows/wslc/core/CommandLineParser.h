@@ -77,12 +77,12 @@ private:
     InvocationCursor m_cursor;
     std::optional<std::reference_wrapper<const Command>> m_selected;
 
-    friend void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context, bool applyEnvironmentOptions);
+    friend void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context);
 };
 
 // Returns the global option scopes along target's path from the root.
 std::vector<GlobalArgumentScope> GetGlobalArgumentPath(const Command& target);
 
 // Parses scoped global options while selecting each command level in the persistent command tree.
-void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context, bool applyEnvironmentOptions = true);
+void ParseCommandLine(CommandInvocation& invocation, execution::CLIExecutionContext& context);
 } // namespace wsl::windows::wslc
