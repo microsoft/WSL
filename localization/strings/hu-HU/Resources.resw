@@ -2238,6 +2238,9 @@ Usage:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>beállítások</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>globális lehetőségek</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>A következő parancs-aliasok érhetők el:</value>
   </data>
@@ -2776,7 +2779,7 @@ Példa: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Egy tarball tartalmát importálja egy fájlrendszerkép létrehozásához. Igény szerint a rendszerképet egy adattár- és címkenévvel is elláthatja.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Az összes kép megjelenítése (alapértelmezés szerint a köztes képek rejtve vannak).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Képek listázása.</value>
@@ -3077,7 +3080,7 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Tároló futtatása leválasztott módban</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>A naplók további részleteinek megjelenítése</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Megadja a tároló inicializálási folyamatának végrehajtható fájlját</value>
@@ -3102,24 +3105,24 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Adja meg a szűrőértékeket (pl. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Adja meg a szűrőértékeket (pl. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Ne kérjen megerősítést</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Biztosan folytatni kívánja?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>FIGYELMEZTETÉS! Ezzel eltávolítja az összes leállított tárolót.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>FIGYELMEZTETÉS! Ez eltávolítja az összes árva képet.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>FIGYELEM! Ezzel eltávolítja az összes olyan lemezképet, amelyhez nincs legalább egy tároló társítva.</value>

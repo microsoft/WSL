@@ -2245,6 +2245,9 @@ Uso:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>opções</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Os seguintes nomes alternativos de comando estão disponíveis:</value>
   </data>
@@ -3084,7 +3087,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Executar contêiner no modo desanexado</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Mostrar mais detalhes dos logs</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Especifica o executável do processo de inicialização do contêiner</value>
@@ -3109,24 +3112,24 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Forneça valores de filtro (por exemplo, "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Forneça valores de filtro (por exemplo, "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Não solicite confirmação</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Tem certeza de que deseja continuar?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>AVISO! Isso removerá todos os contêineres parados.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>AVISO! Isso removerá todas as imagens pendentes.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>ATENÇÃO! Isso removerá todas as imagens sem pelo menos um contêiner associado a elas.</value>
@@ -3415,7 +3418,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Referência de imagem atual ou existente no formato image-name[:tag]</value>
   </data>
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
-    <value>Display total file sizes</value>
+    <value>Exibir o tamanho total dos arquivos</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Exibir tamanhos totais de arquivo se o tipo for contêiner</value>
@@ -3821,7 +3824,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>PORTAS</value>
   </data>
   <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
-    <value>SIZE</value>
+    <value>TAMANHO</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>% DE CPU</value>
