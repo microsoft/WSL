@@ -1538,6 +1538,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"\n"
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
+        L"distributionStartTimeout=120000\n"
         L"debugConsoleLogFile=" +
         EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
