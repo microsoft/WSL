@@ -15,7 +15,6 @@ from github import Github
 
 
 USR_LIB_WSL = '/usr/lib/wsl'
-USR_SHARE_WSL = '/usr/share/wsl'
 USR_LIBEXEC_WSL = '/usr/libexec/wsl'
 USR_SHARE_WSL = '/usr/share/wsl'
 
