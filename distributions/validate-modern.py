@@ -15,6 +15,7 @@ from github import Github
 
 
 USR_LIB_WSL = '/usr/lib/wsl'
+USR_SHARE_WSL = '/usr/share/wsl'
 USR_LIBEXEC_WSL = '/usr/libexec/wsl'
 USR_SHARE_WSL = '/usr/share/wsl'
 
@@ -468,10 +469,10 @@ def read_tar(node, file, elf_magic: str):
                 warning(node, 'No shortcut.icon provided')
 
             if terminal_profile := config.get('windowsterminal.profiletemplate', None):
-                validate_mode(terminal_profile, [oct(0o660), oct(0o640)], 0, 0, 1024 * 1024)
+                validate_mode(terminal_profile, [oct(0o660), oct(0o640), oct(0o644),  oct(0o664)], 0, 0, 1024 * 1024)
 
-                if not terminal_profile.startswith(USR_LIB_WSL):
-                    warning(node, f'value for windowsterminal.profileTemplate is not under {USR_LIB_WSL}: "{terminal_profile}"')
+                if not terminal_profile.startswith(USR_LIB_WSL) and not terminal_profile.startswith(USR_SHARE_WSL):
+                    warning(node, f'value for windowsterminal.profileTemplate is not under {USR_LIB_WSL} or {USR_SHARE_WSL}: "{terminal_profile}"')
 
         if validate_mode('/etc/wsl.conf', [oct(0o664), oct(0o644)], 0, 0, optional=True, follow_symlink=True):
             config = validate_config('/etc/wsl.conf', WSL_CONF_KEYS)
