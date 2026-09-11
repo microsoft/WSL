@@ -355,6 +355,7 @@ void ContainerCp(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     const auto& source = context.Args.GetValue<ArgType::Source>();
     const auto& target = context.Args.GetValue<ArgType::Target>();
+    const bool followLink = context.Args.GetValue<ArgType::FollowLink>();
 
     // Determine copy direction by looking for CONTAINER:PATH patterns.
     // A single letter before ':' is a Windows drive path (e.g. C:\path), not a container reference.
@@ -423,6 +424,15 @@ void ContainerCp(CLIExecutionContext& context)
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), fsError || !pathExists);
 
             auto absPath = std::filesystem::absolute(source);
+
+            if (followLink)
+            {
+                std::error_code linkError;
+                auto resolved = std::filesystem::canonical(absPath, linkError);
+                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), !!linkError);
+                absPath = std::move(resolved);
+            }
+
             auto parentDir = absPath.parent_path().wstring();
             auto fileName = absPath.filename().wstring();
 
@@ -459,6 +469,15 @@ void ContainerCp(CLIExecutionContext& context)
         // container → local
         auto [containerId, srcPath] = parseContainerPath(source);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
+
+        if (followLink)
+        {
+            auto linkTarget = ContainerService::ResolveContainerSymlink(session, containerId, srcPath);
+            if (linkTarget.has_value())
+            {
+                srcPath = std::move(*linkTarget);
+            }
+        }
 
         // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
         std::error_code canonicalError;
