@@ -104,6 +104,7 @@ struct TestImage
 
 const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
+const TestImage& DockerfileFrontendTestImage();
 const TestImage& HelloWorldTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
