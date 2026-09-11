@@ -19,7 +19,7 @@ using namespace wsl::shared;
 namespace wsl::windows::wslc {
 
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
-    InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) :
+    InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown) :
     m_invocation(invocation),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
@@ -47,12 +47,6 @@ ParseArgumentsStateMachine::ParseArgumentsStateMachine(
     }
 
     m_positionalSearchItr = m_positionalArgs.begin();
-
-    m_overridableDefaults.reserve(overridableDefaults.size());
-    for (const auto& arg : overridableDefaults)
-    {
-        m_overridableDefaults.push_back(arg.Type());
-    }
 }
 
 bool ParseArgumentsStateMachine::Step()
@@ -111,25 +105,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::BackUpAndStop()
     return {};
 }
 
-bool ParseArgumentsStateMachine::ConsumeOverrideIfPresent(ArgType type)
-{
-    auto it = std::find(m_overridableDefaults.begin(), m_overridableDefaults.end(), type);
-    if (it == m_overridableDefaults.end())
-    {
-        return false;
-    }
-
-    m_executionArgs.Remove(type);
-    m_overridableDefaults.erase(it);
-    return true;
-}
-
 void ParseArgumentsStateMachine::ClearArgument(ArgType type)
 {
-    // Drop any preloaded overridable default and remove previously parsed entries so the
-    // argument is left absent. This is the single-value/last-wins primitive shared by
-    // SetFlag (which then stores the flag's explicit value) and AddValue (single-value args).
-    ConsumeOverrideIfPresent(type);
     m_executionArgs.Remove(type);
 }
 
@@ -187,14 +164,8 @@ void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
     const Argument* arg = FindArgument(type);
     WI_ASSERT(arg != nullptr);
 
-    // Unlimited value args accumulate; single-value args are last-wins. In both cases the
-    // first CLI value must displace a preloaded overridable default, which ClearArgument
-    // (single) and ConsumeOverrideIfPresent (unlimited) each handle.
-    if (arg != nullptr && arg->IsUnlimited())
-    {
-        ConsumeOverrideIfPresent(type);
-    }
-    else
+    // Unlimited value args accumulate; single-value args are last-wins.
+    if (arg == nullptr || arg->IsSingle())
     {
         ClearArgument(type);
     }

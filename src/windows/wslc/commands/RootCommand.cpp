@@ -79,13 +79,7 @@ std::vector<Argument> RootCommand::GetGlobalArguments() const
 {
     return {
         CreateGlobalArgument(ArgType::Session),
-    };
-}
-
-std::vector<Argument> RootCommand::GetEnvArguments() const
-{
-    return {
-        CreateGlobalArgument(ArgType::NoColor),
+        CreateGlobalArgument(ArgType::NoColor, {.Flags = Flags::EnvironmentOnly}),
     };
 }
 

@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "ArgMap.h"
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
@@ -26,16 +27,26 @@ Abstract:
 #define WSLC_CLI_HELP_ARG_STRING WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
 #define NO_ALIAS L""
 
-using namespace wsl::windows::wslc::argument;
+namespace wsl::windows::wslc::argument {
+enum class Flags : uint32_t
+{
+    None = 0x0,
+    EnvironmentOnly = 0x1,
+    All = 0xFFFFFFFF,
+};
+DEFINE_ENUM_FLAG_OPERATORS(Flags);
 
-namespace wsl::windows::wslc {
-struct Command;
-
-enum class ArgumentScope
+enum class Scope
 {
     Command,
     Global,
 };
+} // namespace wsl::windows::wslc::argument
+
+using namespace wsl::windows::wslc::argument;
+
+namespace wsl::windows::wslc {
+struct Command;
 
 struct ArgumentOverrides
 {
@@ -44,6 +55,7 @@ struct ArgumentOverrides
     std::optional<bool> Required;
     std::optional<argument::Limit> Limit;
     std::optional<std::wstring> Desc;
+    std::optional<argument::Flags> Flags;
 };
 
 // An argument to a command.
@@ -62,8 +74,16 @@ struct Argument
         std::wstring desc,
         argument::Kind kind = DefaultKind,
         bool required = DefaultRequired,
-        argument::Limit limit = DefaultLimit) :
-        m_argType(argType), m_name(std::move(name)), m_desc(std::move(desc)), m_alias(std::move(alias)), m_required(required), m_type(kind), m_limit(limit)
+        argument::Limit limit = DefaultLimit,
+        argument::Flags flags = argument::Flags::None) :
+        m_argType(argType),
+        m_name(std::move(name)),
+        m_desc(std::move(desc)),
+        m_alias(std::move(alias)),
+        m_required(required),
+        m_type(kind),
+        m_limit(limit),
+        m_flags(flags)
     {
     }
 
@@ -116,9 +136,24 @@ struct Argument
         return m_limit;
     }
 
-    ArgumentScope Scope() const noexcept
+    argument::Flags Flags() const noexcept
     {
-        return m_globalOwner.has_value() ? ArgumentScope::Global : ArgumentScope::Command;
+        return m_flags;
+    }
+
+    bool HasAllFlags(argument::Flags flags) const noexcept
+    {
+        return (m_flags & flags) == flags;
+    }
+
+    bool HasAnyFlag(argument::Flags flags) const noexcept
+    {
+        return (m_flags & flags) != argument::Flags::None;
+    }
+
+    argument::Scope Scope() const noexcept
+    {
+        return m_globalOwner.has_value() ? argument::Scope::Global : argument::Scope::Command;
     }
 
     const std::optional<std::reference_wrapper<const Command>>& GlobalOwner() const noexcept
@@ -150,6 +185,7 @@ private:
     bool m_required = DefaultRequired;
     argument::Kind m_type = DefaultKind;
     argument::Limit m_limit = DefaultLimit;
+    argument::Flags m_flags = argument::Flags::None;
     std::optional<std::reference_wrapper<const Command>> m_globalOwner;
 };
 } // namespace wsl::windows::wslc

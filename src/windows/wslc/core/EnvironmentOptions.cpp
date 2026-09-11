@@ -12,11 +12,16 @@ Module Name:
 
 namespace wsl::windows::wslc {
 
-void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs) noexcept
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& environmentArguments) noexcept
 try
 {
-    for (const auto& arg : definedArgs)
+    for (const auto& arg : environmentArguments)
     {
+        if (!arg.HasAnyFlag(Flags::EnvironmentOnly))
+        {
+            continue;
+        }
+
         // Lowest-precedence: skip args already set by the caller.
         if (target.Contains(arg.Type()))
         {

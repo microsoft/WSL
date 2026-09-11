@@ -23,7 +23,6 @@ Abstract:
 
 #include <functional>
 #include <initializer_list>
-#include <iterator>
 #include <memory>
 #include <optional>
 #include <span>
@@ -97,27 +96,9 @@ struct Command
         return {};
     }
 
-    std::vector<Argument> GetAllArguments() const
-    {
-        auto args = GetArguments();
-        auto globalArgs = GetGlobalArguments();
-        args.insert(args.end(), std::make_move_iterator(globalArgs.begin()), std::make_move_iterator(globalArgs.end()));
-        args.emplace_back(Argument::Create(ArgType::Help));
-        return args;
-    }
-
-    // Command-local argument definitions, including the shared help argument.
-    std::vector<Argument> GetCommandArguments() const;
-
-    // Args eligible for environment binding.
-    virtual std::vector<Argument> GetEnvArguments() const
-    {
-        return {};
-    }
-
-    // Union of the requested command-line scope and environment arguments in that scope, deduped
-    // by ArgType. Command-line definitions win on conflict.
-    std::vector<Argument> GetArgumentsAndEnvironment(ArgumentScope scope) const;
+    // Flags::All returns every argument in the scope. Flags::None returns unflagged
+    // arguments. Other values return arguments containing all requested flags.
+    std::vector<Argument> GetScopedArguments(Scope scope, Flags flags = Flags::All) const;
 
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
@@ -136,27 +117,18 @@ struct Command
     //                       bundled short chain (e.g. "-Dv") whose leading alias
     //                       is recognized is treated as claimed, and an unknown
     //                       alias later in the chain still throws.
-    // overridableDefaults:  args whose preloaded entries in target are treated
-    //                       as defaults (e.g. env-applied) and may be replaced
-    //                       by the first CLI occurrence.
-    void ParseArguments(
-        InvocationCursor& invocation,
-        ArgMap& target,
-        std::vector<Argument> definedArgs,
-        bool optionsOnly = false,
-        bool stopOnUnknown = false,
-        const std::vector<Argument>& overridableDefaults = {}) const;
+    void ParseArguments(InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly = false, bool stopOnUnknown = false) const;
 
     void ParseArguments(InvocationCursor& invocation, ArgMap& target) const
     {
-        ParseArguments(invocation, target, GetCommandArguments());
+        ParseArguments(invocation, target, GetScopedArguments(Scope::Command, Flags::None));
     }
 
     void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
 
     void ValidateArguments(ArgMap& source) const
     {
-        ValidateArguments(source, GetCommandArguments(), true);
+        ValidateArguments(source, GetScopedArguments(Scope::Command), true);
     }
 
     virtual void Execute(CLIExecutionContext& context) const;

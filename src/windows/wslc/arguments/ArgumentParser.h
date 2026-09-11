@@ -31,21 +31,7 @@ struct ParseArgumentsStateMachine
     // optionsOnly:          stop before the first positional token.
     // stopOnUnknown:        stop before the first unknown option
     //                       token instead of throwing.
-    // overridableDefaults:  ArgTypes whose existing entries in execArgs are
-    //                       treated as preloaded defaults (e.g. from environment
-    //                       variables). The first CLI Add for one of these types
-    //                       clears the preexisting entry first, so a preloaded
-    //                       default is replaced rather than appended to. Single-value
-    //                       args are last-wins regardless, so a later CLI duplicate
-    //                       simply overwrites; unlimited args accumulate once the
-    //                       preloaded default has been dropped.
-    ParseArgumentsStateMachine(
-        InvocationCursor& invocation,
-        ArgMap& execArgs,
-        std::vector<Argument> arguments,
-        bool optionsOnly = false,
-        bool stopOnUnknown = false,
-        const std::vector<Argument>& overridableDefaults = {});
+    ParseArgumentsStateMachine(InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly = false, bool stopOnUnknown = false);
 
     ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
     ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -145,25 +131,17 @@ private:
     // named-flag paths so all three treat "=value" identically.
     State ApplyFlagValue(ArgType type, std::wstring_view value, const std::wstring_view& currArg);
 
-    // Removes all entries for an argument and consumes any overridable-default slot,
-    // leaving the argument absent. This is the single-value (last-wins) primitive that
-    // SetFlag builds on; it is written to be reused for other single-value argument
-    // kinds in the future.
+    // Removes all entries for an argument. This is the single-value (last-wins)
+    // primitive that SetFlag builds on.
     void ClearArgument(ArgType type);
 
     // Stores a value for a Kind::Value argument. Single-value args are last-wins
-    // (any previous value, including a preloaded overridable default, is cleared
-    // first); unlimited args accumulate but still let the first CLI value replace a
-    // preloaded default.
+    // and unlimited args accumulate.
     void AddValue(ArgType type, std::wstring value);
 
     // Returns the defined argument for a type, or nullptr if it is not one of this
     // parser's arguments. Used to consult an argument's Limit while parsing values.
     const Argument* FindArgument(ArgType type) const;
-
-    // If type is in m_overridableDefaults, removes any existing entry and
-    // consumes the override slot. Returns true if an override was consumed.
-    bool ConsumeOverrideIfPresent(ArgType type);
 
     InvocationCursor& m_invocation;
     ArgMap& m_executionArgs;
@@ -189,10 +167,5 @@ private:
 
     // Set when m_optionsOnly or m_stopOnUnknown stopped processing.
     bool m_stopped = false;
-
-    // ArgTypes whose preloaded value should be replaced by the first CLI add.
-    // Empties as overrides are consumed so a single preload can only be
-    // overridden once per parse.
-    std::vector<ArgType> m_overridableDefaults;
 };
 } // namespace wsl::windows::wslc

@@ -131,7 +131,7 @@ namespace {
         std::vector<Argument> arguments;
         for (const auto& command : commandPath)
         {
-            const auto commandArguments = command.get().GetGlobalArguments();
+            const auto commandArguments = command.get().GetScopedArguments(Scope::Global, Flags::None);
             arguments.insert(arguments.end(), commandArguments.begin(), commandArguments.end());
         }
 
@@ -231,10 +231,21 @@ Argument Command::CreateGlobalArgument(ArgType type, ArgumentOverrides overrides
     return Argument::CreateGlobal(type, *this, std::move(overrides));
 }
 
-std::vector<Argument> Command::GetCommandArguments() const
+std::vector<Argument> Command::GetScopedArguments(Scope scope, Flags flags) const
 {
-    auto arguments = GetArguments();
-    arguments.emplace_back(Argument::Create(ArgType::Help));
+    auto arguments = scope == Scope::Global ? GetGlobalArguments() : GetArguments();
+    if (scope == Scope::Command)
+    {
+        arguments.emplace_back(Argument::Create(ArgType::Help));
+    }
+
+    if (flags != Flags::All)
+    {
+        std::erase_if(arguments, [flags](const auto& argument) {
+            return flags == Flags::None ? argument.Flags() != Flags::None : !argument.HasAllFlags(flags);
+        });
+    }
+
     return arguments;
 }
 
@@ -278,7 +289,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
         commandAliases = GetCommandInvocations(*this);
     }
     const auto& commands = GetCommands();
-    auto arguments = GetCommandArguments();
+    auto arguments = GetScopedArguments(Scope::Command, Flags::None);
     std::vector<Argument> helpArguments;
     if (fullHelp)
     {
@@ -337,7 +348,7 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
     const bool hasHelpOptions = !helpStandardArgs.empty();
     const bool hasHelpForwardArgs = !helpForwardArgs.empty();
 
-    const auto currentGlobalArguments = GetGlobalArguments();
+    const auto currentGlobalArguments = GetScopedArguments(Scope::Global, Flags::None);
     const auto globalArguments = GetGlobalArgumentsForPath(*this);
 
     // Build usage line with Write calls for each segment.
@@ -695,15 +706,14 @@ std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Inv
 // Argument map is based on the arguments that the command defines and are stored as
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
 // the argument data.
-void Command::ParseArguments(
-    InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown, const std::vector<Argument>& overridableDefaults) const
+void Command::ParseArguments(InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown) const
 {
     if (definedArgs.empty())
     {
         return;
     }
 
-    ParseArgumentsStateMachine stateMachine{invocation, target, std::move(definedArgs), optionsOnly, stopOnUnknown, overridableDefaults};
+    ParseArgumentsStateMachine stateMachine{invocation, target, std::move(definedArgs), optionsOnly, stopOnUnknown};
 
     while (stateMachine.Step())
     {
@@ -794,7 +804,7 @@ void Command::ValidateArgumentsInternal(ArgMap&) const
 
 std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType> types) const
 {
-    auto arguments = GetCommandArguments();
+    auto arguments = GetScopedArguments(Scope::Command, Flags::None);
     const auto globalArguments = GetGlobalArgumentsForPath(*this);
     arguments.insert(arguments.end(), globalArguments.begin(), globalArguments.end());
 
@@ -811,28 +821,4 @@ std::vector<Argument> Command::GetArgumentsForHelp(std::initializer_list<ArgType
     return result;
 }
 
-std::vector<Argument> Command::GetArgumentsAndEnvironment(ArgumentScope scope) const
-{
-    auto merged = scope == ArgumentScope::Global ? GetGlobalArguments() : GetCommandArguments();
-    auto environmentArguments = GetEnvArguments();
-
-    merged.reserve(merged.size() + environmentArguments.size());
-    for (auto& argument : environmentArguments)
-    {
-        if (argument.Scope() != scope)
-        {
-            continue;
-        }
-
-        const auto type = argument.Type();
-        const bool alreadyPresent =
-            std::any_of(merged.begin(), merged.end(), [type](const Argument& existing) { return existing.Type() == type; });
-        if (!alreadyPresent)
-        {
-            merged.emplace_back(std::move(argument));
-        }
-    }
-
-    return merged;
-}
 } // namespace wsl::windows::wslc

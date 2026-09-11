@@ -258,8 +258,7 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(Kind::Value, format.Kind());
         VERIFY_IS_FALSE(format.Required());
 
-        // GetAllArguments also includes the auto-added --help.
-        VERIFY_ARE_EQUAL(2u, cmd.GetAllArguments().size());
+        VERIFY_ARE_EQUAL(2u, cmd.GetScopedArguments(Scope::Command, Flags::None).size());
     }
 
     // Test: Verify RootCommand contains VersionCommand as a subcommand
@@ -308,8 +307,7 @@ class WSLCCLICommandUnitTests
         VERIFY_ARE_EQUAL(Kind::Value, format.Kind());
         VERIFY_IS_FALSE(format.Required());
 
-        // GetAllArguments also includes the auto-added --help.
-        VERIFY_ARE_EQUAL(2u, cmd.GetAllArguments().size());
+        VERIFY_ARE_EQUAL(2u, cmd.GetScopedArguments(Scope::Command, Flags::None).size());
     }
 
     // Test: Verify SystemCommand contains SystemInfoCommand as a subcommand
@@ -351,51 +349,45 @@ class WSLCCLICommandUnitTests
         VERIFY_IS_TRUE(found, L"RootCommand should contain SystemInfoCommand");
     }
 
-    // RootCommand exposes Session as the sole CLI global option. The override
-    // is the entry point for future globals; the test pins the current shape.
-    TEST_METHOD(RootCommand_GlobalArguments_OnlySession)
+    TEST_METHOD(RootCommand_GlobalCommandLineArguments_OnlySession)
     {
         auto root = RootCommand();
-        auto globals = root.GetGlobalArguments();
+        auto globals = root.GetScopedArguments(Scope::Global, Flags::None);
 
         VERIFY_ARE_EQUAL(1u, globals.size());
         VERIFY_ARE_EQUAL(ArgType::Session, globals[0].Type());
         VERIFY_ARE_EQUAL(Kind::Value, globals[0].Kind());
     }
 
-    // RootCommand exposes NoColor as the sole env-eligible global option.
-    TEST_METHOD(RootCommand_EnvArguments_OnlyNoColor)
+    TEST_METHOD(RootCommand_GlobalArguments_HaveExpectedRestrictions)
     {
         auto root = RootCommand();
-        auto envArgs = root.GetEnvArguments();
+        const auto arguments = root.GetGlobalArguments();
+        const auto allGlobalArguments = root.GetScopedArguments(Scope::Global);
+        const auto environmentArguments = root.GetScopedArguments(Scope::Global, Flags::EnvironmentOnly);
+        const auto session = std::ranges::find(arguments, ArgType::Session, &Argument::Type);
+        const auto noColor = std::ranges::find(arguments, ArgType::NoColor, &Argument::Type);
 
-        VERIFY_ARE_EQUAL(1u, envArgs.size());
-        VERIFY_ARE_EQUAL(ArgType::NoColor, envArgs[0].Type());
-        VERIFY_ARE_EQUAL(Kind::Flag, envArgs[0].Kind());
-    }
+        VERIFY_ARE_EQUAL(2u, arguments.size());
+        VERIFY_ARE_EQUAL(2u, allGlobalArguments.size());
+        VERIFY_ARE_EQUAL(1u, environmentArguments.size());
+        VERIFY_ARE_EQUAL(ArgType::NoColor, environmentArguments[0].Type());
+        VERIFY_IS_TRUE(session != arguments.end());
+        VERIFY_ARE_EQUAL(Flags::None, session->Flags());
+        VERIFY_IS_TRUE(session->HasAllFlags(Flags::None));
+        VERIFY_IS_FALSE(session->HasAnyFlag(Flags::All));
+        VERIFY_IS_TRUE(noColor != arguments.end());
+        VERIFY_ARE_EQUAL(Flags::EnvironmentOnly, noColor->Flags());
+        VERIFY_IS_TRUE(noColor->HasAllFlags(Flags::EnvironmentOnly));
+        VERIFY_IS_TRUE(noColor->HasAnyFlag(Flags::All));
+        VERIFY_IS_FALSE(noColor->HasAllFlags(Flags::All));
+        VERIFY_ARE_EQUAL(Scope::Global, noColor->Scope());
+        VERIFY_IS_TRUE(noColor->GlobalOwner().has_value());
+        VERIFY_ARE_EQUAL(&root, &noColor->GlobalOwner()->get());
 
-    // Every ArgType advertised by GetEnvArguments() must have at least one entry
-    // in c_envBindings; otherwise ApplyEnvironmentOptions() has nothing to apply
-    // and help output would lie about env support.
-    TEST_METHOD(RootCommand_EnvArguments_AllHaveBindings)
-    {
-        auto root = RootCommand();
-        auto envArgs = root.GetEnvArguments();
-
-        for (const auto& a : envArgs)
-        {
-            bool found = false;
-            for (const auto& b : c_envBindings)
-            {
-                if (b.Type == a.Type())
-                {
-                    found = true;
-                    break;
-                }
-            }
-
-            VERIFY_IS_TRUE(found, std::format(L"ArgType {} has no env binding", static_cast<size_t>(a.Type())).c_str());
-        }
+        const auto localArguments = root.GetScopedArguments(Scope::Command);
+        VERIFY_IS_TRUE(
+            std::ranges::none_of(localArguments, [](const auto& argument) { return argument.HasAnyFlag(Flags::EnvironmentOnly); }));
     }
 
     // --all-tags is exposed with the -a short alias.
@@ -440,8 +432,8 @@ class WSLCCLICommandUnitTests
         VerifyFormatAlias(VolumeInspectCommand(L"volume"));
     }
 
-    // Walk every command in the root tree and verify no argument collisions.
-    TEST_METHOD(AllCommands_NoAmbiguousArgumentNamesOrAliases)
+    // Walk every command in the root tree and verify declaration, source, name, and alias invariants.
+    TEST_METHOD(AllCommands_NoArgumentDeclarationCollisions)
     {
         // Build a lookup table from ArgType -> enum name string using the same X-macro.
         static constexpr const wchar_t* c_argTypeNames[] = {
@@ -465,6 +457,8 @@ class WSLCCLICommandUnitTests
         RootCommand root;
         std::vector<std::reference_wrapper<const Command>> commands;
         commands.emplace_back(std::cref(root));
+        std::unordered_set<size_t> commandLineTypes;
+        std::unordered_set<size_t> environmentTypes;
 
         while (!commands.empty())
         {
@@ -476,8 +470,36 @@ class WSLCCLICommandUnitTests
             std::unordered_map<std::wstring, argument::ArgType> seenNames;
             std::unordered_map<std::wstring, argument::ArgType> seenAliases;
 
-            const auto configuredArguments = current.GetAllArguments();
+            auto declaredArguments = current.GetArguments();
             const auto globalArguments = current.GetGlobalArguments();
+            declaredArguments.insert(declaredArguments.end(), globalArguments.begin(), globalArguments.end());
+            declaredArguments.emplace_back(Argument::Create(ArgType::Help));
+            auto commandLineArguments = current.GetScopedArguments(Scope::Command, Flags::None);
+            const auto globalCommandLineArguments = current.GetScopedArguments(Scope::Global, Flags::None);
+            commandLineArguments.insert(commandLineArguments.end(), globalCommandLineArguments.begin(), globalCommandLineArguments.end());
+
+            const auto VerifyUniqueType = [&](const Argument& argument) {
+                if (!seenTypes.emplace(static_cast<size_t>(argument.Type())).second)
+                {
+                    VERIFY_FAIL(
+                        std::format(
+                            L"Command '{}' registers ArgType '{}' more than once across command-line and environment arguments",
+                            commandFullName,
+                            ArgTypeName(argument.Type()))
+                            .c_str());
+                }
+            };
+
+            const auto VerifyEnvironmentBinding = [&](const Argument& argument) {
+                const auto binding = std::ranges::find(c_envBindings, argument.Type(), &EnvBinding::Type);
+                VERIFY_IS_TRUE(
+                    binding != std::end(c_envBindings),
+                    std::format(
+                        L"Command '{}' registers environment ArgType '{}' without a binding",
+                        commandFullName,
+                        ArgTypeName(argument.Type()))
+                        .c_str());
+            };
 
             for (const auto& arg : globalArguments)
             {
@@ -490,15 +512,27 @@ class WSLCCLICommandUnitTests
                         .c_str());
             }
 
-            for (const auto& arg : configuredArguments)
+            for (const auto& arg : declaredArguments)
             {
-                // Check for duplicate ArgType registration.
-                if (!seenTypes.emplace(static_cast<size_t>(arg.Type())).second)
-                {
-                    VERIFY_FAIL(std::format(L"Command '{}' registers ArgType '{}' more than once", commandFullName, ArgTypeName(arg.Type()))
-                                    .c_str());
-                }
+                VerifyUniqueType(arg);
 
+                if (arg.HasAnyFlag(Flags::EnvironmentOnly))
+                {
+                    VerifyEnvironmentBinding(arg);
+                    VERIFY_IS_TRUE(
+                        arg.IsOption(),
+                        std::format(L"Command '{}' configures non-option '{}' as environment-only", commandFullName, ArgTypeName(arg.Type()))
+                            .c_str());
+                    environmentTypes.emplace(static_cast<size_t>(arg.Type()));
+                }
+                else
+                {
+                    commandLineTypes.emplace(static_cast<size_t>(arg.Type()));
+                }
+            }
+
+            for (const auto& arg : commandLineArguments)
+            {
                 // Check name collision between distinct ArgTypes.
                 const auto& name = arg.Name();
                 if (name.size() < 2)
@@ -544,6 +578,14 @@ class WSLCCLICommandUnitTests
                 commands.emplace_back(std::cref(*subcommand));
             }
         }
+
+        for (const auto type : environmentTypes)
+        {
+            VERIFY_IS_FALSE(
+                commandLineTypes.contains(type),
+                std::format(L"Environment-only ArgType '{}' is also registered as a command-line argument", ArgTypeName(static_cast<ArgType>(type)))
+                    .c_str());
+        }
     }
 
     TEST_METHOD(AllCommands_NoInheritedGlobalArgumentCollisions)
@@ -565,8 +607,8 @@ class WSLCCLICommandUnitTests
             pending.pop_back();
             const auto& command = current.Command.get();
 
-            const auto cliGlobals = command.GetGlobalArguments();
-            const auto globalArguments = command.GetArgumentsAndEnvironment(ArgumentScope::Global);
+            const auto cliGlobals = command.GetScopedArguments(Scope::Global, Flags::None);
+            const auto globalArguments = command.GetScopedArguments(Scope::Global);
 
             for (const auto& argument : globalArguments)
             {
@@ -602,7 +644,7 @@ class WSLCCLICommandUnitTests
             current.InheritedCliGlobals.insert(current.InheritedCliGlobals.end(), cliGlobals.begin(), cliGlobals.end());
             current.InheritedGlobals.insert(current.InheritedGlobals.end(), globalArguments.begin(), globalArguments.end());
 
-            for (const auto& argument : command.GetArgumentsAndEnvironment(ArgumentScope::Command))
+            for (const auto& argument : command.GetScopedArguments(Scope::Command))
             {
                 const auto duplicateType = std::ranges::find(current.InheritedGlobals, argument.Type(), &Argument::Type);
                 VERIFY_IS_TRUE(

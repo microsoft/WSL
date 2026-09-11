@@ -452,72 +452,6 @@ class WSLCCLIParserUnitTests
         }
     }
 
-    // Preloaded env-style default can be replaced by a single CLI occurrence
-    // even though the arg's Limit is 1.
-    TEST_METHOD(OverridableDefaults_CliValueReplacesPreload)
-    {
-        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --signal 9");
-
-        std::vector<Argument> defs = {Argument::Create(ArgType::Signal)};
-
-        ArgMap args;
-        args.Add(ArgType::Signal, std::wstring(L"15")); // pretend env preloaded SIGTERM
-
-        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
-        while (sm.Step())
-        {
-            sm.ThrowIfError();
-        }
-        sm.ThrowIfError();
-
-        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
-        VERIFY_ARE_EQUAL(WSLCSignalSIGKILL, args.GetValue<ArgType::Signal>());
-    }
-
-    // A preloaded (env-style) default followed by multiple CLI values collapses to the
-    // final CLI value: the preload is dropped and single-value args are last-wins.
-    TEST_METHOD(PreloadedDefault_LastCliValueWins)
-    {
-        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --signal 9 --signal 1");
-
-        std::vector<Argument> defs = {Argument::Create(ArgType::Signal)};
-
-        ArgMap args;
-        args.Add(ArgType::Signal, std::wstring(L"15"));
-
-        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
-        while (sm.Step())
-        {
-            sm.ThrowIfError();
-        }
-        sm.ThrowIfError();
-
-        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Signal));
-        VERIFY_ARE_EQUAL(WSLCSignalSIGHUP, args.GetValue<ArgType::Signal>());
-    }
-
-    // Preloaded flag default plus CLI mention of the same flag stays a single
-    // entry (current flag value is always 'true').
-    TEST_METHOD(OverridableDefaults_FlagPreloadCoexistsWithCli)
-    {
-        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose");
-
-        std::vector<Argument> defs = {Argument::Create(ArgType::Verbose)};
-
-        ArgMap args;
-        args.Add(ArgType::Verbose, true); // pretend env preloaded it
-
-        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
-        while (sm.Step())
-        {
-            sm.ThrowIfError();
-        }
-        sm.ThrowIfError();
-
-        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
-        VERIFY_IS_TRUE(args.GetValue<ArgType::Verbose>());
-    }
-
     // Duplicate flag on the CLI (no env preload) folds to one entry: docker-style.
     TEST_METHOD(DuplicateFlagOnCli_IsIdempotent)
     {
@@ -759,29 +693,6 @@ class WSLCCLIParserUnitTests
 
         ArgMap duplicateTrue = ParseFlags(L"wslc --verbose --verbose=true", {Argument::Create(ArgType::Verbose)});
         VERIFY_ARE_EQUAL(1u, duplicateTrue.Count(ArgType::Verbose));
-    }
-
-    // "--flag=false" overrides a preloaded (env-style) default of true, replacing it with a
-    // single stored false rather than leaving a lingering true. GetValue() then reports false.
-    TEST_METHOD(Flag_FalseOverridesPreloadedDefault)
-    {
-        auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(L"wslc --verbose=false");
-
-        std::vector<Argument> defs = {Argument::Create(ArgType::Verbose)};
-
-        ArgMap args;
-        args.Add(ArgType::Verbose, true); // pretend env preloaded it to true
-
-        ParseArgumentsStateMachine sm{inv, args, defs, /*optionsOnly*/ false, /*stopOnUnknown*/ false, /*overridableDefaults*/ defs};
-        while (sm.Step())
-        {
-            sm.ThrowIfError();
-        }
-        sm.ThrowIfError();
-
-        VERIFY_IS_TRUE(args.Contains(ArgType::Verbose));
-        VERIFY_ARE_EQUAL(1u, args.Count(ArgType::Verbose));
-        VERIFY_IS_FALSE(args.GetValue<ArgType::Verbose>());
     }
 
     // A flag whose behavior is on by default is read with GetValue(true): absent yields the

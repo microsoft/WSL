@@ -66,8 +66,9 @@ namespace {
 
     void ThrowIfMisplacedGlobalOption(std::wstring_view token, const Command& currentCommand)
     {
-        const auto commandArguments = currentCommand.GetAllArguments();
-        if (FindOption(token, commandArguments).has_value())
+        const auto commandArguments = currentCommand.GetScopedArguments(Scope::Command, Flags::None);
+        const auto globalArguments = currentCommand.GetScopedArguments(Scope::Global, Flags::None);
+        if (FindOption(token, commandArguments).has_value() || FindOption(token, globalArguments).has_value())
         {
             return;
         }
@@ -75,8 +76,8 @@ namespace {
         std::reference_wrapper<const Command> nextCommand = std::cref(currentCommand);
         for (auto owner = currentCommand.Parent(); owner.has_value(); owner = owner->get().Parent())
         {
-            const auto globalArguments = owner->get().GetGlobalArguments();
-            if (const auto argument = FindOption(token, globalArguments); argument.has_value())
+            const auto ownerGlobalArguments = owner->get().GetScopedArguments(Scope::Global, Flags::None);
+            if (const auto argument = FindOption(token, ownerGlobalArguments); argument.has_value())
             {
                 const auto& globalOwner = argument->get().GlobalOwner();
                 THROW_HR_IF(E_UNEXPECTED, !globalOwner.has_value());
@@ -96,18 +97,16 @@ namespace {
     std::optional<std::reference_wrapper<const Command>> ParseGlobalArgumentsAndFindSubcommand(
         InvocationCursor& invocation, CLIExecutionContext& context, const Command& command)
     {
-        const auto globalAndEnvironmentArguments = command.GetArgumentsAndEnvironment(ArgumentScope::Global);
-        ApplyEnvironmentOptions(context.Args, globalAndEnvironmentArguments);
+        ApplyEnvironmentOptions(context.Args, command.GetScopedArguments(Scope::Global));
 
-        auto globalArguments = command.GetGlobalArguments();
+        auto globalArguments = command.GetScopedArguments(Scope::Global, Flags::None);
         command.ParseArguments(
             invocation,
             context.Args,
             globalArguments,
             /*optionsOnly*/ true,
-            /*stopOnUnknown*/ true,
-            /*overridableDefaults*/ globalAndEnvironmentArguments);
-        command.ValidateArguments(context.Args, globalAndEnvironmentArguments, /*runInternalHook*/ false);
+            /*stopOnUnknown*/ true);
+        command.ValidateArguments(context.Args, command.GetScopedArguments(Scope::Global), /*runInternalHook*/ false);
 
         auto subcommand = command.FindSubCommand(invocation);
         if (!subcommand)
@@ -175,7 +174,7 @@ size_t CommandInvocation::Position() const noexcept
 
 void CommandInvocation::ApplyRootEnvironmentOptions(argument::ArgMap& arguments) const
 {
-    ApplyEnvironmentOptions(arguments, Root().GetEnvArguments());
+    ApplyEnvironmentOptions(arguments, Root().GetScopedArguments(Scope::Global));
 }
 
 void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
@@ -189,15 +188,13 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
 
     try
     {
-        const auto commandAndEnvironmentArguments = Selected().GetArgumentsAndEnvironment(ArgumentScope::Command);
-        ApplyEnvironmentOptions(context.Args, commandAndEnvironmentArguments);
+        ApplyEnvironmentOptions(context.Args, Selected().GetScopedArguments(Scope::Command));
         Selected().ParseArguments(
             m_cursor,
             context.Args,
-            Selected().GetCommandArguments(),
+            Selected().GetScopedArguments(Scope::Command, Flags::None),
             /*optionsOnly*/ false,
-            /*stopOnUnknown*/ false,
-            /*overridableDefaults*/ commandAndEnvironmentArguments);
+            /*stopOnUnknown*/ false);
     }
     catch (const ArgumentException& exception)
     {
@@ -209,7 +206,7 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
         throw;
     }
 
-    Selected().ValidateArguments(context.Args, Selected().GetArgumentsAndEnvironment(ArgumentScope::Command), /*runInternalHook*/ true);
+    Selected().ValidateArguments(context.Args, Selected().GetScopedArguments(Scope::Command), /*runInternalHook*/ true);
 }
 
 void CommandInvocation::Execute(CLIExecutionContext& context) const
