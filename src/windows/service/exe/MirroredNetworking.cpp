@@ -440,7 +440,20 @@ void MirroredNetworking::AddNetworkEndpoint(const GUID& NetworkId) noexcept
         endpointInfo.NetworkId = NetworkId;
         endpointInfo.EndpointId = endpointId;
 
-        if (m_config.FirewallConfig.Enabled())
+        // Loopback networks don't support firewall policies - creating an endpoint with firewall
+        // policies on a loopback network will fail with HCN error 0x803B001B ("Invalid JSON document
+        // string"). This behavior changed in KB5074109. Additionally, loopback networks require
+        // HostComputeNetwork instead of VirtualNetwork in the endpoint settings.
+        // See: https://github.com/microsoft/WSL/issues/14080
+        const bool isLoopbackNetwork = properties.IsLoopback;
+        if (isLoopbackNetwork)
+        {
+            WSL_LOG(
+                "MirroredNetworking::AddNetworkEndpoint [Loopback network - using simplified endpoint settings]",
+                TraceLoggingValue(NetworkId, "networkId"));
+        }
+
+        if (m_config.FirewallConfig.Enabled() && !isLoopbackNetwork)
         {
             // Create HNS firewall policy object for the endpoint
             hns::HostComputeEndpoint hnsEndpoint{};
@@ -468,6 +481,15 @@ void MirroredNetworking::AddNetworkEndpoint(const GUID& NetworkId) noexcept
             endpointFirewallPolicy.Settings = std::move(firewallPolicyObject);
             endpointFirewallPolicy.Type = hns::EndpointPolicyType::Firewall;
             hnsEndpoint.Policies.emplace_back(std::move(endpointFirewallPolicy));
+            endpointSettings = ToJsonW(hnsEndpoint);
+        }
+        else if (m_config.FirewallConfig.Enabled() && isLoopbackNetwork)
+        {
+            // Loopback networks require HostComputeNetwork (not VirtualNetwork) and don't support policies
+            hns::HostComputeEndpoint hnsEndpoint{};
+            hnsEndpoint.HostComputeNetwork = NetworkId;
+            hnsEndpoint.SchemaVersion.Major = 2;
+            hnsEndpoint.SchemaVersion.Minor = 16;
             endpointSettings = ToJsonW(hnsEndpoint);
         }
         else
