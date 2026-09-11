@@ -30,14 +30,14 @@ class WSLCE2EImagePullTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--all-tags"));
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_AllTagsArgDescription()));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_PullAllTagsArgDescription()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Pull_AllTagsRejectsTaggedReference)
     {
         const auto result = RunWslc(L"image pull debian:latest --all-tags");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_PullAllTagsWithTagError()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_AllTagsWithTagError()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Pull_AllTagsRejectsDigestReference)
@@ -45,7 +45,7 @@ class WSLCE2EImagePullTests
         const auto result =
             RunWslc(L"image pull debian@sha256:0000000000000000000000000000000000000000000000000000000000000000 -a");
         result.Verify({.Stdout = L"", .ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_PullAllTagsWithTagError()));
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(Localization::WSLCCLI_AllTagsWithTagError()));
     }
 
     // Publishes one image under two tags in a single repository, drops the local copies, and verifies

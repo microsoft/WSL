@@ -270,7 +270,7 @@ void PullImage(CLIExecutionContext& context)
 
     if (allTags && reference.Format != EnumReferenceFormatNone)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_PullAllTagsWithTagError());
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
     }
 
     // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
