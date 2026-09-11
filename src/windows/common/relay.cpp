@@ -253,6 +253,8 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
 
     bool leftReadPending = false;
     bool rightReadPending = false;
+    bool leftReadClosed = (LeftHandle == nullptr);
+    bool rightReadClosed = (RightHandle == nullptr);
     auto cancelReads = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         DWORD bytes;
         if (leftReadPending)
@@ -272,13 +274,13 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
     const HANDLE waitObjects[] = {leftOverlapped.hEvent, rightOverlapped.hEvent};
     for (;;)
     {
-        if ((LeftHandle == nullptr) || (RightHandle == nullptr))
+        if (leftReadClosed && rightReadClosed)
         {
             break;
         }
 
         DWORD leftBytesRead = 0;
-        if (!leftReadPending && LeftHandle)
+        if (!leftReadPending && !leftReadClosed && LeftHandle)
         {
             if (!ReadFile(LeftHandle, leftReadSpan.data(), gsl::narrow_cast<DWORD>(leftReadSpan.size()), &leftBytesRead, &leftOverlapped))
             {
@@ -289,7 +291,7 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
         }
 
         DWORD rightBytesRead = 0;
-        if (!rightReadPending && RightHandle)
+        if (!rightReadPending && !rightReadClosed && RightHandle)
         {
             if (!ReadFile(RightHandle, rightReadSpan.data(), gsl::narrow_cast<DWORD>(rightReadSpan.size()), &rightBytesRead, &rightOverlapped))
             {
@@ -308,7 +310,7 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
             leftReadPending = false;
             if (leftBytesRead == 0)
             {
-                LeftHandle = nullptr;
+                leftReadClosed = true;
                 if (WI_IsFlagSet(Flags, RelayFlags::RightIsSocket))
                 {
                     LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(RightHandle), SD_SEND) == SOCKET_ERROR);
@@ -336,7 +338,7 @@ void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In
             rightReadPending = false;
             if (rightBytesRead == 0)
             {
-                RightHandle = nullptr;
+                rightReadClosed = true;
                 if (WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket))
                 {
                     LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(LeftHandle), SD_SEND) == SOCKET_ERROR);
