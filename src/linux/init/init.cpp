@@ -166,6 +166,8 @@ int WslInitWatcher(int Argc, char** Argv);
 
 int WslcGpuHookEntry();
 
+void MountDistroCgroupNamespace(int CgroupNamespaceFd);
+
 int WslEntryPoint(int Argc, char* Argv[])
 {
     //
@@ -1206,7 +1208,7 @@ try
                 SessionLeaderEntry(SessionLeaderFd.get(), TtyFd.get(), Config);
             },
             {},
-            Config.CgroupPath);
+            Config.CgroupNamespace.get());
     }
     else
     {
@@ -1266,7 +1268,7 @@ try
                 SessionLeaderEntryUtilityVm(channel, Config);
             },
             {},
-            Config.CgroupPath);
+            Config.CgroupNamespace.get());
     }
 
     if (SessionLeader < 0)
@@ -2328,22 +2330,31 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_INIT_PID);
     }
 
-    //
-    // Get the per-distro cgroup path.
-    //
-
-    const auto DistroCgroupPath = getenv(LX_WSL2_DISTRO_CGROUP_PATH);
-    if (DistroCgroupPath != nullptr)
+    Value = getenv(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD);
+    if (Value != nullptr)
     {
-        if (access(DistroCgroupPath, F_OK) == 0)
+        const int CgroupNamespaceFd = std::stoi(Value);
+        if (CgroupNamespaceFd < 0)
         {
-            Config.CgroupPath = DistroCgroupPath;
+            LOG_ERROR("Invalid cgroup namespace fd {}", CgroupNamespaceFd);
         }
         else
         {
-            LOG_ERROR("Cgroup path {} does not exist", DistroCgroupPath);
+            if (fcntl(CgroupNamespaceFd, F_SETFD, FD_CLOEXEC) < 0)
+            {
+                LOG_ERROR("Invalid cgroup namespace fd {}", CgroupNamespaceFd);
+            }
+            else
+            {
+                Config.CgroupNamespace.reset(CgroupNamespaceFd);
+            }
         }
-        unsetenv(LX_WSL2_DISTRO_CGROUP_PATH);
+        unsetenv(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD);
+    }
+
+    if (Config.CgroupNamespace)
+    {
+        MountDistroCgroupNamespace(Config.CgroupNamespace.get());
     }
 
     std::vector<gsl::byte> Buffer;
@@ -2366,6 +2377,13 @@ Return Value:
         else if (ChildPid != 0)
         {
             UtilSetThreadName("init-systemd");
+            Config.BootStartWriteSocket.reset();
+
+            if (Config.CgroupNamespace)
+            {
+                THROW_LAST_ERROR_IF(UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT, "systemd") < 0);
+                THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "systemd") < 0);
+            }
 
             //
             // Wait to boot the distro init process until the first session leader has been created.
@@ -2417,11 +2435,6 @@ Return Value:
             }
 
             CreateWslSystemdUnits(Config);
-
-            if (Config.CgroupPath.has_value())
-            {
-                UtilTryMoveSelfToDistroCgroup(Config.CgroupPath.value(), true, "systemd");
-            }
 
             const char* Argv[] = {INIT_PATH, nullptr};
             std::vector<const char*> Env;
@@ -2567,7 +2580,11 @@ Return Value:
             break;
 
             case LxInitCreateProcess:
-                ProcessCreateProcessMessage(transaction, Span, Config.CgroupPath);
+                ProcessCreateProcessMessage(
+                    transaction,
+                    Span,
+                    Config.CgroupNamespace ? std::optional<std::string>{CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR} : std::nullopt,
+                    Config.CgroupNamespace.get());
                 break;
 
             default:
@@ -3627,4 +3644,28 @@ int WslInitWatcher(int Argc, char** Argv)
     // Teardown the current PID namespace. Not shutting down the VM.
     reboot(RB_POWER_OFF);
     _exit(1);
+}
+
+void MountDistroCgroupNamespace(int CgroupNamespaceFd)
+{
+    wil::unique_fd OriginalCgroupNamespace{open("/proc/self/ns/cgroup", O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!OriginalCgroupNamespace);
+    THROW_LAST_ERROR_IF(UtilEnterCgroupNamespace(CgroupNamespaceFd, "cgroup namespace") < 0);
+    auto RestoreCgroupNamespace = wil::scope_exit([&]() {
+        if (setns(OriginalCgroupNamespace.get(), CLONE_NEWCGROUP) < 0)
+        {
+            LOG_ERROR("Failed to restore cgroup namespace {}", errno);
+        }
+    });
+
+    // Keep the replacement mount local to this distro's mount namespace. WSL init intentionally
+    // remains in the initial cgroup namespace, but shares this mount so it can place payload
+    // processes in the non-systemd leaf before they enter the distro cgroup namespace.
+    THROW_LAST_ERROR_IF(mount(nullptr, CGROUP_MOUNTPOINT, nullptr, MS_REC | MS_PRIVATE, nullptr) < 0);
+    THROW_LAST_ERROR_IF(umount2(CGROUP_MOUNTPOINT, MNT_DETACH) < 0);
+    THROW_LAST_ERROR_IF(
+        UtilMount(CGROUP2_DEVICE, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RELATIME, nullptr) < 0);
+
+    THROW_LAST_ERROR_IF(setns(OriginalCgroupNamespace.get(), CLONE_NEWCGROUP) < 0);
+    RestoreCgroupNamespace.release();
 }
