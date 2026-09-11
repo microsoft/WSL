@@ -2296,7 +2296,11 @@ class NetworkTests
                     int localAddrLength = sizeof(localAddr);
                     if (getsockname(sock.get(), reinterpret_cast<SOCKADDR*>(&localAddr), &localAddrLength) == SOCKET_ERROR)
                     {
-LogInfo("connect() to port %u failed with %d; getsockname() failed with %d", static_cast<unsigned int>(assignedPort), connectError, WSAGetLastError());
+                        LogInfo(
+                            "connect() to port %u failed with %d; getsockname() failed with %d",
+                            static_cast<unsigned int>(assignedPort),
+                            connectError,
+                            WSAGetLastError());
                     }
                     else
                     {
