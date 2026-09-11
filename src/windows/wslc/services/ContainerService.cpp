@@ -702,7 +702,7 @@ void ContainerService::Delete(Session& session, const std::string& id, bool forc
 }
 
 std::vector<ContainerInformation> ContainerService::List(
-    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters)
+    Session& session, bool all, int limit, const std::vector<std::pair<std::string, std::string>>& filters, bool size)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -713,6 +713,7 @@ std::vector<ContainerInformation> ContainerService::List(
 
     WSLCListContainersOptions options{};
     options.Flags = all ? WSLCListContainersFlagsAll : WSLCListContainersFlagsNone;
+    WI_SetFlagIf(options.Flags, WSLCListContainersFlagsSize, size);
     options.Limit = limit;
     options.Filters = filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
@@ -739,6 +740,8 @@ std::vector<ContainerInformation> ContainerService::List(
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
+        entry.SizeRw = current.SizeRw;
+        entry.SizeRootFs = current.SizeRootFs;
 
         for (const auto& port : ports)
         {
@@ -838,7 +841,7 @@ void ContainerService::CopyFromContainer(Session& session, const std::string& id
     THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
     wil::com_ptr<IWSLCContainer> container;
@@ -849,6 +852,7 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
     WI_SetFlagIf(flags, WSLCLogsFlagsTimestamps, timestamps);
+    WI_SetFlagIf(flags, WSLCLogsFlagsDetails, details);
 
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, since, until, tail));
 
@@ -880,10 +884,18 @@ wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Sess
     return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
 }
 
-PruneContainersResult ContainerService::Prune(Session& session)
+PruneContainersResult ContainerService::Prune(Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
 {
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filters.size());
+    for (const auto& [key, value] : filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
     PruneResult result;
-    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, &result.result));
+    THROW_IF_FAILED(session.Get()->PruneContainers(
+        filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &result.result));
 
     PruneContainersResult pruneResult;
     pruneResult.SpaceReclaimed = result.result.SpaceReclaimed;

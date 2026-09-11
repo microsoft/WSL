@@ -117,11 +117,13 @@ class WSLCE2EContainerInspectTests
         auto result = RunWslc(L"container inspect --help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes if the type is container"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes"));
+        VERIFY_IS_FALSE(result.StdoutContainsSubstring(L"if the type is container"));
 
         result = RunWslc(L"inspect --help");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--size"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"Display total file sizes if the type is container"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_FormatJson_IsSingleLine)
