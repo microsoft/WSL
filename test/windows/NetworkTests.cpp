@@ -2305,7 +2305,7 @@ class NetworkTests
                     else
                     {
                         LogInfo(
-                            "connect() to port %u failed with %d; local source port is %u",
+                            "connect() to port %u failed with %hu; local source port is %hu",
                             assignedPort,
                             connectError,
                             ntohs(localAddr.sin_port));
