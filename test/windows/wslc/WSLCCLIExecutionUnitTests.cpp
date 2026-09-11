@@ -363,6 +363,21 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(&command, &arguments[0].GlobalOwner()->get());
     }
 
+    TEST_METHOD(ScopedGlobalArguments_HelpGroupsOptionsByOwner)
+    {
+        const TestRootCommand root;
+        const auto& compose = *root.GetCommands().front();
+        const auto& up = *compose.GetCommands().front();
+        CaptureTerminal capture;
+
+        up.OutputHelp(capture.terminal);
+
+        const auto output = capture.captured();
+        VERIFY_IS_TRUE(output.find(wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc")) != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"compose")) != std::wstring::npos);
+        VERIFY_IS_FALSE(output.find(wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc compose")) != std::wstring::npos);
+    }
+
     TEST_METHOD(ScopedGlobalArguments_PositionalDoesNotTraverseUnrelatedSubtrees)
     {
         size_t traversalCount = 0;

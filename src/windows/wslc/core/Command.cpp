@@ -641,7 +641,10 @@ void Command::OutputHelp(Terminal& terminal, HelpOutput output, const CommandExc
                 table.WriteLine();
             }
 
-            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingScopedGlobalOptions(globalOwner->get().FormatInvocation()), HelpHeadingEmphasis));
+            const auto globalOwnerInvocation = globalOwner->get().FormatInvocation();
+            const auto globalScopeName =
+                globalOwnerInvocation == s_ExecutableName ? globalOwnerInvocation : std::wstring{globalOwner->get().Name()};
+            table.WriteLine(FormattedCell(Localization::WSLCCLI_HeadingScopedGlobalOptions(globalScopeName), HelpHeadingEmphasis));
             AddArgumentRows(table, std::span<const Argument>{globalArguments}.subspan(scopeStart, scopeEnd - scopeStart));
             hasPreviousOptionSection = true;
             scopeStart = scopeEnd;

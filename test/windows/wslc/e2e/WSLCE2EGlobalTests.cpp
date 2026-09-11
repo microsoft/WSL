@@ -95,7 +95,7 @@ class WSLCE2EGlobalTests
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(c_copyrightPrefix));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_RootCommandLongDesc()));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingOptions()));
-        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingGlobalOptions()));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc")));
         VERIFY_IS_FALSE(result.StdoutContainsSubstring(Localization::WSLCCLI_RunHelpForMoreInformation(L"wslc")));
     }
 
