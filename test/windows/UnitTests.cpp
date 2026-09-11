@@ -1275,7 +1275,17 @@ class UnitTests
 
         VERIFY_ARE_EQUAL(
             out, FormatErrorMessage(L"Importing the distribution failed.", L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED"));
-        VERIFY_ARE_EQUAL(err, L"bsdtar: Error opening archive: Unrecognized archive format\n");
+
+        constexpr auto expectedError = L"bsdtar: Error opening archive: Unrecognized archive format\n";
+        if (LxsstuVmMode())
+        {
+            VERIFY_ARE_EQUAL(err, expectedError);
+        }
+        else
+        {
+            // lxcore.sys can close the stderr pipe before bsdtar has finished writing.
+            VERIFY_IS_TRUE(std::wstring_view{expectedError}.starts_with(err));
+        }
     }
 
     TEST_METHOD(AppxDistroDeletion)
@@ -2485,6 +2495,10 @@ Usage:
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:/tmp/.X11-unix/X0 < /dev/null"), 0L);
 
+            // Validate that distro-provided tmpfiles rules cannot modify the read-only X11 mount.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/tmpfiles.d/x11.conf"), 0L);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemd-tmpfiles --create --boot x11.conf"), 0L);
+
             // Validate the runtime dir exists and the wayland-0 socket is in the expected location.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep XDG_RUNTIME_DIR="), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d $XDG_RUNTIME_DIR"), 0L);
@@ -2498,6 +2512,7 @@ Usage:
             auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"echo ok");
             VERIFY_ARE_EQUAL(L"ok\n", output);
             VERIFY_ARE_EQUAL(L"", warnings);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test ! -e /run/tmpfiles.d/x11.conf"), 0L);
 
             // Validate that WSLg-related environment variables are not present.
             //
@@ -7831,6 +7846,42 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
             VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+        }
+
+        // Scenario 9: Variable-length string fields must be terminated within the received message.
+        {
+            auto [a, b] = MakeSocketPair();
+            wsl::shared::SocketChannel sender{std::move(a), "sender"};
+            wsl::shared::SocketChannel receiver{std::move(b), "receiver"};
+
+            wsl::shared::MessageWriter<LX_INIT_GUEST_CAPABILITIES> message;
+            std::array<gsl::byte, 4> unterminated{
+                static_cast<gsl::byte>('1'), static_cast<gsl::byte>('.'), static_cast<gsl::byte>('2'), static_cast<gsl::byte>('3')};
+            message.WriteSpan(gsl::make_span(unterminated));
+            sender.SendMessage<LX_INIT_GUEST_CAPABILITIES>(message.Span());
+
+            gsl::span<gsl::byte> span;
+            receiver.ReceiveMessage<LX_INIT_GUEST_CAPABILITIES>(&span);
+            const auto hr =
+                wil::ResultFromException([&]() { wsl::shared::string::FromMessageBuffer<LX_INIT_GUEST_CAPABILITIES>(span); });
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        {
+            auto [a, b] = MakeSocketPair();
+            wsl::shared::SocketChannel sender{std::move(a), "sender"};
+            wsl::shared::SocketChannel receiver{std::move(b), "receiver"};
+
+            wsl::shared::MessageWriter<WSLC_GET_DISK_RESULT> message;
+            std::array<gsl::byte, 4> unterminated{
+                static_cast<gsl::byte>('/'), static_cast<gsl::byte>('d'), static_cast<gsl::byte>('e'), static_cast<gsl::byte>('v')};
+            message.WriteSpan(gsl::make_span(unterminated));
+            sender.SendMessage<WSLC_GET_DISK_RESULT>(message.Span());
+
+            gsl::span<gsl::byte> span;
+            receiver.ReceiveMessage<WSLC_GET_DISK_RESULT>(&span);
+            const auto hr = wil::ResultFromException([&]() { wsl::shared::string::FromMessageBuffer<WSLC_GET_DISK_RESULT>(span); });
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
     }
 

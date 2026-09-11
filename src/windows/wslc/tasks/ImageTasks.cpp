@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentConvertedTypes.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
@@ -184,7 +185,7 @@ void GetImages(CLIExecutionContext& context)
     const bool containerCounts =
         context.Args.GetValue<ArgType::Format>(FormatType::Table) == FormatType::Json && !context.Args.GetValue<ArgType::Quiet>();
 
-    auto images = ImageService::List(session, filters, containerCounts);
+    auto images = ImageService::List(session, filters, containerCounts, context.Args.GetValue<ArgType::All>());
     context.Data.Add<Data::Images>(std::move(images));
 }
 
@@ -292,18 +293,26 @@ void PushImage(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
+    const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
+    const bool allTags = context.Args.GetValue<ArgType::AllTags>();
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
 
     const auto reference = ImageReference::Parse(image);
 
-    // A name-only reference resolves to the "latest" tag. Pinning it here keeps the operation scoped to that one
-    // tag; a reference carrying no tag reaches the registry as a request to push every tag in the repository.
-    if (reference.Format == EnumReferenceFormatNone)
+    if (allTags && reference.Format != EnumReferenceFormatNone)
     {
-        image += ":latest";
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
     }
 
+    // For a name-only reference the tag defaults to "latest", reported on stdout before contacting the registry.
+    // Quiet mode suppresses that notice, and an --all-tags push has no single tag to resolve.
+    if (!quiet && !allTags && reference.Format == EnumReferenceFormatNone)
+    {
+        context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
+    }
+
+    // In quiet mode, suppress progress output by passing no progress callback. Warnings are unaffected because the
+    // warning callback is built internally by ImageService::Push from the Terminal.
     std::optional<ImageProgressCallback> callback;
     if (!quiet)
     {
@@ -311,11 +320,12 @@ void PushImage(CLIExecutionContext& context)
     }
 
     IProgressCallback* progress = callback ? &*callback : nullptr;
-    services::ImageService::Push(context.Terminal, session, image, progress);
+    services::ImageService::Push(context.Terminal, session, image, progress, allTags);
 
     if (quiet)
     {
-        context.Terminal.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
+        // An --all-tags push names a repository, so the reference printed carries no tag.
+        context.Terminal.Output(L"{}\n", MultiByteToWide(allTags ? reference.Repository.GetCanonical() : reference.GetCanonical()));
     }
 }
 
@@ -444,6 +454,11 @@ void TagImage(CLIExecutionContext& context)
 
 void PruneImages(CLIExecutionContext& context)
 {
+    context.Data.Add<Data::ConfirmWarning>(
+        context.Args.GetValue<ArgType::All>() ? Localization::WSLCCLI_ImagePruneAllConfirm() : Localization::WSLCCLI_ImagePruneConfirm());
+    context.Data.Add<Data::ConfirmMessage>(Localization::WSLCCLI_PruneConfirmPrompt());
+    ConfirmAction(context);
+
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
 

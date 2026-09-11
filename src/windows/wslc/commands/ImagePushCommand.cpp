@@ -28,6 +28,7 @@ std::vector<Argument> ImagePushCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, {.Required = true}),
+        Argument::Create(ArgType::AllTags, {.Desc = Localization::WSLCCLI_PushAllTagsArgDescription()}),
         Argument::Create(ArgType::Quiet, {.Desc = Localization::WSLCCLI_ImagePushQuietArgDescription()}),
     };
 }

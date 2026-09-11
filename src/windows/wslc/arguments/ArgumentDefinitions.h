@@ -35,6 +35,7 @@ Abstract:
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(All,              "all",                  L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AllArgDescription()) \
+_(AllTags,          "all-tags",             L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AllTagsArgDescription()) \
 _(Archive,          "archive",              L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ArchiveArgDescription()) \
 _(Attach,           "attach",               L"a",             Kind::Flag,       NoConversion, Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,         "build-arg",            NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_BuildArgDescription()) \
@@ -48,6 +49,7 @@ _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, 
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
 _(Force,            "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,           "detach",               L"d",             Kind::Flag,       NoConversion, Localization::WSLCCLI_DetachArgDescription()) \
+_(Details,          "details",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DetailsArgDescription()) \
 _(DNS,              "dns",                  NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSArgDescription()) \
 /*_(DNSDomain,        "dns-domain",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSDomainArgDescription())*/ \
 _(DNSOption,        "dns-option",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSOptionArgDescription()) \
@@ -122,6 +124,7 @@ _(Session,          "session",              NO_ALIAS,         Kind::Value,      
 _(ShmSize,          "shm-size",             NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_ShmSizeArgDescription()) \
 _(StoragePath,      "storage-path",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_StoragePathArgDescription()) \
 _(Signal,           "signal",               L"s",             Kind::Value,      WSLCSignal,   Localization::WSLCCLI_SignalArgDescription()) \
+_(Size,             "size",                 L"s",             Kind::Flag,       NoConversion, Localization::WSLCCLI_SizeArgDescription()) \
 _(Source,           "source",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_SourceArgDescription()) \
 _(StopSignal,       "stop-signal",          NO_ALIAS,         Kind::Value,      WSLCSignal,   Localization::WSLCCLI_StopSignalArgDescription()) \
 _(StopTimeout,      "stop-timeout",         NO_ALIAS,         Kind::Value,      int,          Localization::WSLCCLI_StopTimeoutArgDescription()) \
@@ -130,6 +133,7 @@ _(Tail,             "tail",                 L"n",             Kind::Value,      
 _(Tag,              "tag",                  L"t",             Kind::Value,      NoConversion, Localization::WSLCCLI_TagArgDescription()) \
 _(Target,           "target",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,             "time",                 L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
+_(Timeout,          "timeout",              L"t",             Kind::Value,      LONG,         Localization::WSLCCLI_TimeArgDescription()) \
 _(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      ParsedMount,  Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,              "tty",                  L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,             "type",                 L"t",             Kind::Value,      InspectType,  Localization::WSLCCLI_TypeArgDescription()) \
