@@ -360,6 +360,9 @@ private:
 
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
 
+    // Notifies plugins for every image in Repository, used by --all-tags pulls. Requires the VM lease.
+    void OnRepositoryImagesCreated(const wsl::windows::common::wslutil::RepositoryReference& Repository) noexcept;
+
     void OnImageDeleted(const std::string& ImageId) noexcept;
 
     void OnContainerdExited();

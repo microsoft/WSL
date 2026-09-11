@@ -914,6 +914,19 @@ try
 }
 CATCH_LOG()
 
+void WSLCSession::OnRepositoryImagesCreated(const wslutil::RepositoryReference& Repository) noexcept
+try
+{
+    // An --all-tags pull names a repository, so the images it created are enumerated rather than
+    // derived from the requested reference. Notifying per image (not per tag) keeps one notification
+    // per distinct image; the inspect payload already carries every tag pointing at it.
+    for (const auto& image : m_runtime.Docker().ListImages(false, false, {{"reference", {Repository.Name}}}))
+    {
+        OnImageCreated(image.Id);
+    }
+}
+CATCH_LOG()
+
 void WSLCSession::OnImageDeleted(const std::string& ImageId) noexcept
 try
 {
@@ -954,7 +967,14 @@ try
     auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
-    OnImageCreated(Image);
+    if (AllTags)
+    {
+        OnRepositoryImagesCreated(repo);
+    }
+    else
+    {
+        OnImageCreated(Image);
+    }
 
     return S_OK;
 }

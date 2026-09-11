@@ -773,6 +773,23 @@ class PluginTests
 
             // Pull the image back — this should trigger the ImageCreated plugin callback.
             VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, FALSE, nullptr, nullptr));
+
+            // Publish the same image into a repository whose only tag is "v1". An --all-tags pull of
+            // that repository has no tag to resolve, so the notification can only come from
+            // enumerating the repository's images.
+            const auto versionedRepo = std::format("{}/debian-versioned", registryAddress);
+            const auto versionedImage = std::format("{}:v1", versionedRepo);
+            tagOptions.Repo = versionedRepo.c_str();
+            tagOptions.Tag = "v1";
+            VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
+            VERIFY_SUCCEEDED(session->PushImage(versionedImage.c_str(), emptyAuth.c_str(), FALSE, nullptr, nullptr));
+
+            WSLCDeleteImageOptions versionedDeleteOpts{.Image = versionedImage.c_str(), .Flags = WSLCDeleteImageFlagsNone};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> versionedDeletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(
+                &versionedDeleteOpts, versionedDeletedImages.addressof(), versionedDeletedImages.size_address<ULONG>()));
+
+            VERIFY_SUCCEEDED(session->PullImage(versionedRepo.c_str(), nullptr, TRUE, nullptr, nullptr));
         }
 
         constexpr auto ExpectedOutput =
@@ -782,6 +799,7 @@ class PluginTests
             WSLC Image created, session=*, id=sha256:*, name=wslc-registry:latest
             WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
             WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Image created, session=*, id=sha256:*, name=*
             WSLC Container stopping, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
 
