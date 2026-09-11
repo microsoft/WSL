@@ -2781,6 +2781,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>tarball의 콘텐츠를 가져와서 파일 시스템 이미지를 만듭니다. 필요에 따라 리포지토리 및 태그 이름으로 이미지에 태그를 지정합니다.</value>
   </data>
+  <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
+    <value>모든 이미지를 표시합니다. 기본 설정에서는 중간 이미지를 숨깁니다.</value>
+  </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>이미지를 나열합니다.</value>
   </data>
@@ -3033,6 +3036,13 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>상태에 관계없이 모두 표시합니다.</value>
   </data>
+  <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
+    <value>리포지토리에서 태그가 지정된 모든 이미지를 다운로드합니다.</value>
+  </data>
+  <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
+    <value>태그는 --all-tags/-a와 함께 사용할 수 없습니다.</value>
+    <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
     <value>아카이브 모드(Docker CLI 호환성을 위해 허용됨)</value>
     <comment>{Locked="Docker"}</comment>
@@ -3072,6 +3082,9 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
     <value>분리된 모드에서 컨테이너 실행</value>
   </data>
+  <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
+    <value>로그에 대한 추가 세부 정보 표시</value>
+  </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>컨테이너 초기화 프로세스 실행 파일을 지정합니다.</value>
   </data>
@@ -3091,8 +3104,41 @@ Windows 버전: {}</value>
     <value>제공된 조건에 따라 출력 필터링</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>'-f, --filter' 옵션에 대한 잘못된 값 "{}": 필터 형식이 잘못되었습니다(name=value 형식 필요).</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+    <value>'--filter' 옵션에 대한 "{}" 값이 유효하지 않음: 필터 형식이 잘못됨(name=value 형식 필요)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
+    <value>필터 값 제공(예: "until=&lt;timestamp&gt;")</value>
+    <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
+    <value>필터 값 제공(예: "label=&lt;label&gt;")</value>
+    <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
+    <value>확인 메시지를 표시하지 않음</value>
+  </data>
+  <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
+    <value>계속하시겠습니까?</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
+    <value>경고! 이 작업은 중지된 모든 컨테이너를 제거합니다.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
+    <value>경고! 이렇게 하면 모든 잔여 이미지를 제거합니다.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
+    <value>경고! 이렇게 하면 하나 이상의 컨테이너가 연결되지 않은 모든 이미지가 제거됩니다.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
+    <value>경고! 이렇게 하면 하나 이상의 컨테이너에서 사용되지 않는 익명 로컬 볼륨이 제거됩니다.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
+    <value>경고! 이는 최소한 하나 이상의 컨테이너에서 사용하지 않는 모든 로컬 볼륨을 제거합니다.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
+    <value>경고! 이렇게 하면 하나 이상의 컨테이너에서 사용되지 않는 모든 사용자 지정 네트워크가 제거됩니다.</value>
+  </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>'--mount' 옵션에 대한 잘못된 인수 "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3335,6 +3381,9 @@ Windows 버전: {}</value>
     <value>기본 태그 사용: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
+    <value>이미지의 모든 태그를 리포지토리로 푸시합니다.</value>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>컨테이너 ID만 출력합니다.</value>
   </data>
@@ -3363,6 +3412,9 @@ Windows 버전: {}</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] 형식의 현재 또는 기존 이미지 참조</value>
+  </data>
+  <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
+    <value>총 파일 크기 표시</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>유형이 컨테이너인 경우 총 파일 크기 표시</value>
@@ -3767,6 +3819,9 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
     <value>포트</value>
   </data>
+  <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
+    <value>크기</value>
+  </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
@@ -3804,6 +3859,10 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
     <value>유효하지 않음</value>
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
+    <value>{}(가상 {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>1초 미만 전</value>

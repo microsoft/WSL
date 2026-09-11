@@ -2782,6 +2782,9 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importa o conteúdo de um tarball para criar uma imagem do sistema de arquivos. Opcionalmente, marque a imagem com um repositório e um nome de marca.</value>
   </data>
+  <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
+    <value>Mostrar todas as imagens (padrão oculta imagens intermediárias).</value>
+  </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Liste imagens.</value>
   </data>
@@ -3034,6 +3037,13 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Mostrar tudo independentemente do estado.</value>
   </data>
+  <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
+    <value>Baixar todas as imagens marcadas no repositório.</value>
+  </data>
+  <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
+    <value>tag can't be used with --all-tags/-a</value>
+    <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
     <value>Modo de arquivo (aceito para compatibilidade com a CLI do Docker)</value>
     <comment>{Locked="Docker"}</comment>
@@ -3073,6 +3083,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
     <value>Executar contêiner no modo desanexado</value>
   </data>
+  <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
+    <value>Show extra details for logs</value>
+  </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Especifica o executável do processo de inicialização do contêiner</value>
   </data>
@@ -3092,8 +3105,41 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Filtrar saída com base nas condições fornecidas</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Valor inválido "{}" para a opção '-f, --filter': formato incorreto do filtro (nome esperado = valor)</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+    <value>Valor inválido "{}" para a opção '--filter': formato incorreto do filtro (nome esperado=valor)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
+    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
+    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
+    <value>Do not prompt for confirmation</value>
+  </data>
+  <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
+    <value>Tem certeza de que deseja continuar?</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
+    <value>WARNING! This will remove all stopped containers.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
+    <value>WARNING! This will remove all dangling images.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
+    <value>ATENÇÃO! Isso removerá todas as imagens sem pelo menos um contêiner associado a elas.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
+    <value>ATENÇÃO! Isso removerá volumes locais anônimos não usados por pelo menos um contêiner.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
+    <value>ATENÇÃO! Isso removerá todos os volumes locais não usados por pelo menos um contêiner.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
+    <value>ATENÇÃO! Isso removerá todas as redes personalizadas não usadas por pelo menos um contêiner.</value>
+  </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Argumento inválido "{}" para a opção '--mount': {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3336,6 +3382,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Usando a marca padrão: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
+    <value>Enviar por push todas as marcas de uma imagem para o repositório</value>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Saída somente das IDs de contêiner</value>
   </data>
@@ -3364,6 +3413,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Referência de imagem atual ou existente no formato image-name[:tag]</value>
+  </data>
+  <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
+    <value>Display total file sizes</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Exibir tamanhos totais de arquivo se o tipo for contêiner</value>
@@ -3768,6 +3820,9 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
     <value>PORTAS</value>
   </data>
+  <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
+    <value>SIZE</value>
+  </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>% DE CPU</value>
   </data>
@@ -3805,6 +3860,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
     <value>inválido</value>
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
+    <value>{} (virtual {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>Menos de um segundo atrás</value>
