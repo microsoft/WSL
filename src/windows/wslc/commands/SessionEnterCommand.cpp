@@ -45,7 +45,10 @@ void SessionEnterCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (context.GlobalArgs.Contains(ArgType::Session))
     {
-        throw ExecutionException(Localization::MessageWslcSessionOptionNotSupported());
+        const auto message = context.GlobalArgs.GetSource(ArgType::Session) == argument::ArgumentValueSource::Environment
+                                 ? Localization::MessageWslcSessionEnvironmentVariableNotSupported()
+                                 : Localization::MessageWslcSessionOptionNotSupported();
+        throw ExecutionException(message);
     }
 
     context << EnterSession;
