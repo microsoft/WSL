@@ -283,18 +283,18 @@ try
     }
 
     WSLCHandle handle{};
-    auto result = wrapper->Process->GetStdHandle(wslcFd, &handle);
+    auto result = wrapper->Process->GetStdHandle(wslcFd, WSLCStdHandleFlagEnforceHandle, &handle);
 
     WSL_LOG(
         "WslcPluginProcessGetFd",
         TraceLoggingValue(static_cast<int>(Fd), "Fd"),
-        TraceLoggingValue(handle.Handle.Socket, "Handle"),
+        TraceLoggingValue(handle.Handle.Pipe, "Handle"),
         TraceLoggingValue(result, "Result"));
 
     RETURN_IF_FAILED(result);
-    WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
+    RETURN_HR_IF_MSG(E_UNEXPECTED, handle.Type != WSLCHandleTypePipe, "Unexpected WSLC plugin handle type: %i", handle.Type);
 
-    *Handle = handle.Handle.Socket;
+    *Handle = handle.Handle.Pipe;
     return S_OK;
 }
 CATCH_RETURN();

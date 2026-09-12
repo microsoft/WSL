@@ -182,6 +182,7 @@ public:
         _In_ ULONG TtyRows = 0,
         _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
+        IORelay* Relay = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
@@ -249,6 +250,7 @@ private:
         _In_ ULONG TtyRows = 0,
         _In_ ULONG TtyColumns = 0,
         int* Errno = nullptr,
+        IORelay* Relay = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(

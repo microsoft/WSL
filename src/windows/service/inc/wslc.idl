@@ -415,6 +415,16 @@ typedef struct _WSLCHandle
     } Handle;
 } WSLCHandle;
 
+typedef enum _WSLCStdHandleFlag
+{
+    WSLCStdHandleFlagNone = 0,
+    WSLCStdHandleFlagEnforceHandle = 1,
+} WSLCStdHandleFlag;
+
+cpp_quote("#define WSLCStdHandleFlagValid WSLCStdHandleFlagEnforceHandle")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCStdHandleFlag);")
+
 [
     uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
     pointer_default(unique),
@@ -424,7 +434,7 @@ interface IWSLCProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
     HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
-    HRESULT GetStdHandle([in] WSLCFD Fd, [out] WSLCHandle* Handle);
+    HRESULT GetStdHandle([in] WSLCFD Fd, [in] WSLCStdHandleFlag Flag, [out] WSLCHandle* Handle);
     HRESULT GetFlags([out] WSLCProcessFlags* Flags);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] WSLCProcessState* State, [out] int* Code);

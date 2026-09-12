@@ -1103,7 +1103,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
     {
         std::lock_guard processesLock{m_processesLock};
         m_initProcessControl = control.get();
-        m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
+        m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags, m_runtime.Relay());
     }
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable {
@@ -2027,7 +2027,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
 
         } while (!control->GetExitEvent().wait(100));
 
-        auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options->Flags);
+        auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options->Flags, m_runtime.Relay());
 
         // The exec'd process wrapper is handed to the client and is not retained internally, so its
         // lifetime tracks the client's proxy. Bind a keep-alive token to it so the idle worker does

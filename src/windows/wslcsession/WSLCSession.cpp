@@ -2856,7 +2856,7 @@ try
     auto runtime = m_runtime.Acquire(LeasePolicyFor(AcquireVmLease));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    auto process = runtime.Vm().CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno);
+    auto process = runtime.Vm().CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno, runtime.Relay());
 
     // The VmLease above is released when this call returns, but the process keeps running in the
     // VM and the client holds the returned proxy. A root-namespace process is not tracked as a
