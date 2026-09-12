@@ -713,4 +713,14 @@ wil::com_ptr<IWSLCSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
     return result;
 }
 
+wil::com_ptr<IWSLCSessionReference> WSLCSessionManagerImpl::FindSessionReference(ULONG Id)
+{
+    std::lock_guard lock(m_wslcSessionsLock);
+
+    const auto entry = std::ranges::find(m_sessions, Id, &SessionEntry::SessionId);
+    THROW_HR_IF_MSG(WSLC_E_SESSION_NOT_FOUND, entry == m_sessions.end(), "WSLC session %lu not found", Id);
+
+    return entry->Ref;
+}
+
 } // namespace wsl::windows::service::wslc

@@ -2879,6 +2879,38 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::RelaySocket(HANDLE Socket, WSLCFD Fd, HANDLE* Pipe)
+try
+{
+    WSLCExecutionContext context(this);
+
+    THROW_HR_IF_NULL(E_POINTER, Socket);
+    THROW_HR_IF_NULL(E_POINTER, Pipe);
+    *Pipe = nullptr;
+
+    THROW_HR_IF(E_INVALIDARG, Fd != WSLCFDStdin && Fd != WSLCFDStdout && Fd != WSLCFDStderr);
+
+    auto runtime = m_runtime.Acquire(WSLCSessionRuntime::VmLeasePolicy::ExistingOnly);
+    auto socket = wil::unique_socket{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(Socket))};
+    auto [readPipe, writePipe] = wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+
+    if (Fd == WSLCFDStdin)
+    {
+        runtime.Relay()->AddHandle(
+            std::make_unique<io::RelayHandle<io::ReadHandle>>(std::move(readPipe), io::HandleWrapper{std::move(socket)}));
+        *Pipe = writePipe.release();
+    }
+    else
+    {
+        runtime.Relay()->AddHandle(
+            std::make_unique<io::RelayHandle<io::ReadHandle>>(io::HandleWrapper{std::move(socket)}, std::move(writePipe)));
+        *Pipe = readPipe.release();
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 void WSLCSession::Ext4Format(const std::string& Device)
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";

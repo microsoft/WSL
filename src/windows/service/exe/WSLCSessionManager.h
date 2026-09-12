@@ -94,6 +94,7 @@ public:
 
     // Resolves a session by ID for plugin->API calls. Throws ERROR_NOT_FOUND if no session matches.
     wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
+    wil::com_ptr<IWSLCSessionReference> FindSessionReference(ULONG Id);
 
     static WSLCSessionManagerImpl* Instance() noexcept;
 

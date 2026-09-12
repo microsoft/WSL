@@ -183,6 +183,7 @@ public:
         _In_ BOOL AcquireVmLease,
         _Out_ IWSLCProcess** VirtualMachine,
         _Out_ int* Errno) override;
+    IFACEMETHOD(RelaySocket)(_In_ HANDLE Socket, _In_ WSLCFD Fd, _Out_ HANDLE* Pipe) override;
 
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
