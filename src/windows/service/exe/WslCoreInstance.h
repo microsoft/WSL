@@ -139,6 +139,6 @@ private:
     DWORD m_socketTimeout{};
     HANDLE m_jobObject{};
     std::thread m_oobeThread;
-    wil::unique_event m_destroyingEvent{wil::EventOptions::ManualReset};
-    wil::unique_event m_oobeCompleteEvent;
+    wil::shared_event m_destroyingEvent{wil::EventOptions::ManualReset};
+    wil::shared_event m_oobeCompleteEvent;
 };

@@ -175,13 +175,22 @@ void WslCoreInstance::CreateLxProcess(
 
     // Ensure the instance is still running.
 
-    std::lock_guard lock(m_lock);
+    std::unique_lock lock(m_lock);
     THROW_HR_IF(HCS_E_TERMINATED, (!m_initChannel || !m_consoleManager));
 
     if (m_oobeCompleteEvent && !m_oobeCompleteEvent.is_signaled())
     {
         EMIT_USER_WARNING(wsl::shared::Localization::MessageWaitingForOobe(m_configuration.Name.c_str()));
-        m_oobeCompleteEvent.wait();
+
+        const auto oobeCompleteEvent = m_oobeCompleteEvent;
+        const auto destroyingEvent = m_destroyingEvent;
+        const HANDLE waitHandles[] = {oobeCompleteEvent.get(), destroyingEvent.get()};
+        lock.unlock();
+        const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, INFINITE);
+        THROW_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+        lock.lock();
+        THROW_HR_IF(HCS_E_TERMINATED, waitResult == WAIT_OBJECT_0 + 1 || !m_initChannel || !m_consoleManager);
+        THROW_HR_IF(E_UNEXPECTED, waitResult != WAIT_OBJECT_0);
     }
 
     // Initialize the create process message.
