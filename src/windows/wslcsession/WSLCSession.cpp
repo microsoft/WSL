@@ -796,8 +796,15 @@ catch (...)
     EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed(wslutil::GetErrorString(wil::ResultFromCaughtException())));
 }
 
-void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
+void WSLCSession::StreamImageOperation(
+    DockerHTTPClient::HTTPRequestContext& requestContext,
+    LPCSTR Image,
+    LPCSTR OperationName,
+    IProgressCallback* ProgressCallback,
+    std::vector<std::string>* PulledDigests)
 {
+    constexpr std::string_view c_digestStatusPrefix = "Digest: ";
+
     auto io = CreateIOContext();
 
     struct Response
@@ -860,6 +867,15 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
             return;
         }
 
+        // A pull reports the digest each tag resolved to on its own status line. This and the
+        // "Pulling from" line are the only per-tag messages both the graphdriver and containerd image
+        // stores emit identically; the trailing "Status:" line is per-pull on one and per-tag on the
+        // other, so it is not usable to enumerate what was pulled.
+        if (PulledDigests != nullptr && parsed.status.starts_with(c_digestStatusPrefix))
+        {
+            PulledDigests->emplace_back(parsed.status.substr(c_digestStatusPrefix.size()));
+        }
+
         if (ProgressCallback != nullptr)
         {
             THROW_IF_FAILED(ProgressCallback->OnProgress(
@@ -914,15 +930,23 @@ try
 }
 CATCH_LOG()
 
-void WSLCSession::OnRepositoryImagesCreated(const wslutil::RepositoryReference& Repository) noexcept
+void WSLCSession::OnRepositoryImagesCreated(const wslutil::RepositoryReference& Repository, const std::vector<std::string>& Digests) noexcept
 try
 {
-    // An --all-tags pull names a repository, so the images it created are enumerated rather than
-    // derived from the requested reference. Notifying per image (not per tag) keeps one notification
-    // per distinct image; the inspect payload already carries every tag pointing at it.
-    for (const auto& image : m_runtime.Docker().ListImages(false, false, {{"reference", {Repository.Name}}}))
+    // An --all-tags pull names a repository, so the images it created are identified by the digests the
+    // pull itself reported rather than by enumerating the repository afterwards: enumerating observes
+    // whatever the repository holds once the pull has finished, which is both wider than what this pull
+    // created and open to being changed in between. Notifying by digest reference rather than by tag
+    // keeps each notification bound to the artifact that was pulled even if its tags move, and the
+    // inspect payload already carries every tag pointing at it.
+    std::vector<std::string> notified;
+    for (const auto& digest : Digests)
     {
-        OnImageCreated(image.Id);
+        if (std::ranges::find(notified, digest) == notified.end())
+        {
+            notified.emplace_back(digest);
+            OnImageCreated(std::format("{}@{}", Repository.Name, digest));
+        }
     }
 }
 CATCH_LOG()
@@ -965,11 +989,13 @@ try
     }
 
     auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
-    StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
+
+    std::vector<std::string> pulledDigests;
+    StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback, AllTags ? &pulledDigests : nullptr);
 
     if (AllTags)
     {
-        OnRepositoryImagesCreated(repo);
+        OnRepositoryImagesCreated(repo, pulledDigests);
     }
     else
     {

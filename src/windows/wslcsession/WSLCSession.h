@@ -360,8 +360,9 @@ private:
 
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
 
-    // Notifies plugins for every image in Repository, used by --all-tags pulls. Requires the VM lease.
-    void OnRepositoryImagesCreated(const wsl::windows::common::wslutil::RepositoryReference& Repository) noexcept;
+    // Notifies plugins for each image created by an --all-tags pull, identified by the manifest digests
+    // the pull reported. Requires the VM lease.
+    void OnRepositoryImagesCreated(const wsl::windows::common::wslutil::RepositoryReference& Repository, const std::vector<std::string>& Digests) noexcept;
 
     void OnImageDeleted(const std::string& ImageId) noexcept;
 
@@ -379,7 +380,14 @@ private:
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
-    void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
+    // PulledDigests, when supplied, receives the manifest digest each pulled tag resolved to, in the
+    // order the daemon reported them.
+    void StreamImageOperation(
+        DockerHTTPClient::HTTPRequestContext& requestContext,
+        LPCSTR Image,
+        LPCSTR OperationName,
+        IProgressCallback* ProgressCallback,
+        std::vector<std::string>* PulledDigests = nullptr);
 
     // The VM factory is a cross-process proxy supplied by the SYSTEM service at Initialize() time
     // but first used later (on demand) from a different thread/apartment. A directly stored proxy
