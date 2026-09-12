@@ -130,7 +130,7 @@ namespace {
 // Opaque wrapper around IWSLCProcess, handed out as WSLCProcessHandle to plugins.
 struct WslcProcessWrapper
 {
-    wil::com_ptr<IWSLCSession> Session;
+    wil::com_ptr<IWSLCSessionReference> Session;
     wil::com_ptr<IWSLCProcess> Process;
 };
 
@@ -242,7 +242,7 @@ try
     }
 
     auto wrapper = std::make_unique<WslcProcessWrapper>();
-    wrapper->Session = std::move(session);
+    wrapper->Session = wsl::windows::service::wslc::WSLCSessionManagerImpl::Instance()->FindSessionReference(static_cast<ULONG>(Session));
     wrapper->Process = std::move(process);
     *Process = wrapper.release();
 
@@ -305,7 +305,9 @@ try
     case WSLCHandleTypeSocket:
     {
         wil::unique_socket socket{reinterpret_cast<SOCKET>(handle.Handle.Socket)};
-        RETURN_IF_FAILED(wrapper->Session->RelaySocket(reinterpret_cast<HANDLE>(socket.get()), wslcFd, Handle));
+        wil::com_ptr<IWSLCSession> session;
+        RETURN_IF_FAILED(wrapper->Session->OpenSession(&session));
+        RETURN_IF_FAILED(session->RelaySocket(reinterpret_cast<HANDLE>(socket.get()), wslcFd, Handle));
         break;
     }
 
