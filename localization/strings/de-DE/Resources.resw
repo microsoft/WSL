@@ -2645,6 +2645,9 @@ Verwendung: wslc container cp [OPTIONEN] QUELLE ZIEL
     <value>Ziel: lokaler Pfad oder CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during copy</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Ungültiges Zielformat. Erwartet wurde CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2799,6 +2802,9 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Lädt Images.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during load</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Images abrufen.</value>
   </data>
@@ -2835,6 +2841,9 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Ein Image in eine Registrierung hochladen.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Gelöscht: {}</value>

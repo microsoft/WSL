@@ -2239,7 +2239,7 @@ Kullanım:
     <value>seçenekler</value>
   </data>
   <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
-    <value>global-options</value>
+    <value>genel seçenekler</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Aşağıdaki komut diğer adları kullanılabilir:</value>
@@ -2639,6 +2639,9 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Hedef: yerel yol veya CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during copy</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Geçersiz hedef biçimi. Beklenen biçim CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2793,6 +2796,9 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Görüntüleri yükler.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during load</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Görüntüleri getir.</value>
   </data>
@@ -2829,6 +2835,9 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Bir görüntüyü kayıt defterine yükleyin.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Silindi: {}</value>
@@ -3109,7 +3118,7 @@ Windows sürümü: {}</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Filtre değerlerini girin (ör. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">

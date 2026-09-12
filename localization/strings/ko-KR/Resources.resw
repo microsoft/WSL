@@ -2645,6 +2645,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>대상: 로컬 경로 또는 CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during copy</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>잘못된 대상 형식입니다. 예상 형식: CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2799,6 +2802,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>이미지를 로드합니다.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during load</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>이미지를 끌어옵니다.</value>
   </data>
@@ -2835,6 +2841,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>레지스트리에 이미지를 업로드합니다.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>삭제함: {}</value>

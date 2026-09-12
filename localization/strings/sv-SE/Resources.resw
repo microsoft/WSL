@@ -2639,6 +2639,9 @@ Användning: wslc container cp [ALTERNATIV] SOURCE DEST
     <value>Destination: lokal sökväg eller CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during copy</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Ogiltigt målformat.
  Förväntat format: CONTAINER:PATH</value>
@@ -2794,6 +2797,9 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Läser in bilder.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during load</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Hämta bilder.</value>
   </data>
@@ -2830,6 +2836,9 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Ladda upp en bild till ett register.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Borttagen: {}</value>
@@ -3081,7 +3090,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Kör containern i frånkopplat läge</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Visa extra information för loggar</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Anger den körbara filen för containerns init-process</value>

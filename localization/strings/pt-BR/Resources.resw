@@ -2246,7 +2246,7 @@ Uso:
     <value>opções</value>
   </data>
   <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
-    <value>global-options</value>
+    <value>opções globais</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Os seguintes nomes alternativos de comando estão disponíveis:</value>
@@ -2646,6 +2646,9 @@ Uso: wslc container cp [OPÇÕES] ORIGEM DESTINO
     <value>Destino: caminho local ou CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during copy</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Formato de destino inválido. Esperado CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2800,6 +2803,9 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Carrega imagens.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Suppress progress output during load</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Efetuar pull de imagens.</value>
   </data>
@@ -2836,6 +2842,9 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Enviar uma imagem para um registro.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Suppress verbose output</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Excluído: {}</value>
@@ -3044,7 +3053,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Baixar todas as imagens marcadas no repositório.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>marca não pode ser usada com --all-tags/-a</value>
     <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
