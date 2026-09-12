@@ -2723,7 +2723,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     registration.Write(Property::OsVersion, distributionInfo->Version);
                 }
 
-                // This needs to be done before plugins are notifed because they might try to run a command inside the distribution.
+                // This needs to be done before plugins are notified because they might try to run a command inside the distribution.
                 m_runningInstances[registration.Id()] = instance;
 
                 if (version == LXSS_WSL_VERSION_2)

@@ -136,7 +136,7 @@ __forceinline gsl::span<const ByteType> struct_as_bytes(const T& structure)
 }
 
 //
-// Convert a struct to a writeable span of bytes.
+// Convert a struct to a writable span of bytes.
 // Accepts alternate single byte types but defaults to gsl::byte.
 //
 

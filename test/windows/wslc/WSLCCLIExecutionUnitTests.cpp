@@ -719,7 +719,7 @@ class WSLCCLIExecutionUnitTests
 
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
     // This test verifies the command line parsing logic used by the CLI and executes the same
-    // code as the CLI up to the point of command execution, including parsing and argument validtion.
+    // code as the CLI up to the point of command execution, including parsing and argument validation.
     // It does not actually verify the execution of the command, just that the correct command is
     // found and the provided command line parsed correctly according to the command's defined arguments,
     // and the argument validation rules are correctly applied. The test cases are defined in

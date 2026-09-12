@@ -1109,7 +1109,7 @@ void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
 
     DWORD bytesTransfered{};
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(m_portRelayChannelWrite.get(), &message, sizeof(message), &bytesTransfered, nullptr));
-    THROW_HR_IF_MSG(E_UNEXPECTED, bytesTransfered != sizeof(message), "%u bytes transfered", bytesTransfered);
+    THROW_HR_IF_MSG(E_UNEXPECTED, bytesTransfered != sizeof(message), "%u bytes transferred", bytesTransfered);
 
     HRESULT result = E_UNEXPECTED;
     THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
