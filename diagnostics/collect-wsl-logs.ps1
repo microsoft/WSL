@@ -9,6 +9,11 @@ Param (
 
 Set-StrictMode -Version Latest
 
+# Make wsl.exe emit UTF-8 (instead of UTF-16) and have the console decode it as
+# such, so output captured from wsl.exe below is saved to log files readably.
+$env:WSL_UTF8 = "1"
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+
 function Test-WslApplication {
     param (
         $Name
@@ -123,6 +128,20 @@ else
         Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp" -OutFile $wprpFile
     }
 }
+
+# Record how these logs were collected so that whoever analyzes the archive
+# knows which profile was used (a networking-only capture, for example, will not
+# contain the WSL core trace providers).
+$logProfileDisplay = if ($LogProfile -eq $null) { "default" } else { $LogProfile }
+$wprpProfileDisplay = if ($wprpProfile -ne $null) { $wprpProfile } else { "(default profile in $wprpFile)" }
+@"
+LogProfile          : $logProfileDisplay
+WPRP profile        : $wprpProfileDisplay
+WPRP file           : $wprpFile
+Dump                : $Dump
+RestartWslReproMode : $RestartWslReproMode
+Collected           : $(Get-Date -Format "yyyy-MM-dd HH:mm:ss K")
+"@ | Out-File -FilePath "$folder/collection-info.txt" -Encoding utf8
 
 # Networking-specific setup
 if ($LogProfile -eq "networking")
@@ -413,6 +432,9 @@ if ($Dump)
         if (-not $Result)
         {
             Write-Host "Failed to write dump for: $($dumpFile)"
+            # Remove the empty file so the archive isn't littered with 0-byte
+            # dumps that look like real (but truncated) captures.
+            Remove-Item $dumpFile -ErrorAction Ignore
         }
     }
 }
