@@ -828,32 +828,22 @@ void ContainerService::CopyToContainer(Session& session, const std::string& id, 
     THROW_IF_FAILED(container->UploadArchive(ToCOMInputHandle(inputHandle), destPath.c_str(), contentSize));
 }
 
-void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle)
+std::optional<std::string> ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
 
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), ToCOMInputHandle(outputHandle)));
-}
+    wil::unique_cotaskmem_ansistring resolvedPath;
+    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), followLink, ToCOMInputHandle(outputHandle), &resolvedPath));
 
-std::optional<std::string> ContainerService::ResolveContainerSymlink(Session& session, const std::string& id, const std::string& srcPath)
-{
-    [[maybe_unused]] auto operation = session.BeginContainerOperation();
-
-    wil::com_ptr<IWSLCContainer> container;
-    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-
-    wil::unique_cotaskmem_ansistring target;
-    THROW_IF_FAILED(container->ResolveArchiveSymlink(srcPath.c_str(), &target));
-
-    if (!target)
+    if (!resolvedPath)
     {
         return std::nullopt;
     }
 
-    return std::string(target.get());
+    return std::string(resolvedPath.get());
 }
 
 void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)

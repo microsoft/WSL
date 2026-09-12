@@ -1839,11 +1839,37 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     }
 }
 
-void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) const
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle, LPSTR* ResolvedPath) const
 {
     auto lock = m_lock.lock_shared();
 
-    auto [statusCode, socket, isChunked] = m_runtime.Docker().GetArchive(m_id, SrcPath);
+    *ResolvedPath = nullptr;
+
+    std::string effectivePath(SrcPath);
+    wil::unique_cotaskmem_ansistring resolvedPath;
+
+    if (FollowLink)
+    {
+        const auto stat = m_runtime.Docker().StatArchivePath(m_id, effectivePath);
+        if (stat.has_value() && stat->IsSymlink() && !stat->linkTarget.empty())
+        {
+            // Container paths are POSIX. A relative link target is resolved against the directory holding the link.
+            std::string resolved = stat->linkTarget;
+            if (resolved.front() != '/')
+            {
+                const auto separator = effectivePath.find_last_of('/');
+                if (separator != std::string::npos)
+                {
+                    resolved = effectivePath.substr(0, separator + 1) + resolved;
+                }
+            }
+
+            resolvedPath = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(resolved.c_str());
+            effectivePath = std::move(resolved);
+        }
+    }
+
+    auto [statusCode, socket, isChunked] = m_runtime.Docker().GetArchive(m_id, effectivePath);
 
     auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
@@ -1885,6 +1911,8 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle) co
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), errorMessage, statusCode == 404);
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
+
+    *ResolvedPath = resolvedPath.release();
 }
 
 void WSLCContainerImpl::GetState(WSLCContainerState* Result)
@@ -2866,33 +2894,6 @@ std::string WSLCContainerImpl::InspectLockHeld(bool Size) const
     return wsl::shared::ToJson(wslcInspect);
 }
 
-void WSLCContainerImpl::ResolveArchiveSymlink(LPCSTR SrcPath, LPSTR* Target) const
-{
-    auto lock = m_lock.lock_shared();
-
-    *Target = nullptr;
-
-    const auto stat = m_runtime.Docker().StatArchivePath(m_id, SrcPath);
-    if (!stat.has_value() || !stat->IsSymlink() || stat->linkTarget.empty())
-    {
-        return;
-    }
-
-    // Container paths are POSIX. A relative link target is resolved against the directory holding the link.
-    std::string resolved = stat->linkTarget;
-    if (resolved.front() != '/')
-    {
-        const std::string source(SrcPath);
-        const auto separator = source.find_last_of('/');
-        if (separator != std::string::npos)
-        {
-            resolved = source.substr(0, separator + 1) + resolved;
-        }
-    }
-
-    *Target = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(resolved.c_str()).release();
-}
-
 void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, LONGLONG Since, LONGLONG Until, ULONGLONG Tail) const
 {
     auto lock = m_lock.lock_shared();
@@ -3407,32 +3408,19 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, WSLCHandle OutHandle)
+HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle, LPSTR* ResolvedPath)
 try
 {
     WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
+    RETURN_HR_IF(E_POINTER, ResolvedPath == nullptr);
     RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
 
-    auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, OutHandle);
-}
-CATCH_RETURN();
-
-HRESULT WSLCContainer::ResolveArchiveSymlink(LPCSTR SrcPath, LPSTR* Target)
-try
-{
-    WSLCExecutionContext context(&m_session);
-
-    RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
-    RETURN_HR_IF(E_POINTER, Target == nullptr);
-    RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
-
-    *Target = nullptr;
+    *ResolvedPath = nullptr;
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::ResolveArchiveSymlink, SrcPath, Target);
+    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, FollowLink, OutHandle, ResolvedPath);
 }
 CATCH_RETURN();
 

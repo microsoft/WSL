@@ -56,6 +56,32 @@ std::string FormatStatsIo(uint64_t Bytes)
     return WideToMultiByte(FormatHumanReadableSize(Bytes, c_statsIoPrecision));
 }
 
+// Container paths are POSIX. Returns the last path component, ignoring trailing separators.
+std::string PosixBaseName(std::string_view Path)
+{
+    while (Path.size() > 1 && Path.back() == '/')
+    {
+        Path.remove_suffix(1);
+    }
+
+    const auto separator = Path.find_last_of('/');
+    return std::string(separator == std::string_view::npos ? Path : Path.substr(separator + 1));
+}
+
+void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To)
+{
+    std::error_code error;
+    std::filesystem::rename(From, To, error);
+    if (!error)
+    {
+        return;
+    }
+
+    // The destination is occupied, so the entry is merged over it instead.
+    std::filesystem::copy(From, To, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, error);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to copy to: %ls", To.c_str());
+}
+
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
 {
     // Calculate CPU %
@@ -400,14 +426,6 @@ void ContainerCp(CLIExecutionContext& context)
 
             auto absPath = std::filesystem::absolute(source);
 
-            if (followLink)
-            {
-                std::error_code linkError;
-                auto resolved = std::filesystem::canonical(absPath, linkError);
-                THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), !!linkError);
-                absPath = std::move(resolved);
-            }
-
             auto parentDir = absPath.parent_path().wstring();
             auto fileName = absPath.filename().wstring();
 
@@ -421,8 +439,9 @@ void ContainerCp(CLIExecutionContext& context)
             filesystem::TempFile tarFile(
                 GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, filesystem::TempFileFlags::DeleteOnClose | filesystem::TempFileFlags::InheritHandle);
 
-            // Run tar.exe writing to stdout, redirected to our temp file handle
-            auto tarCmd = std::format(L"tar.exe -cf - -C \"{}\" \"{}\"", parentDir, fileName);
+            // Run tar.exe writing to stdout, redirected to our temp file handle. -h archives what a
+            // symbolic link points at while keeping the link's own name for the archived entry.
+            auto tarCmd = std::format(L"tar.exe -c{}f - -C \"{}\" \"{}\"", followLink ? L"h" : L"", parentDir, fileName);
             SubProcess process(nullptr, tarCmd.c_str());
             process.SetStdHandles(nullptr, tarFile.Handle.get(), nullptr);
             auto exitCode = process.Run();
@@ -445,15 +464,6 @@ void ContainerCp(CLIExecutionContext& context)
         auto [containerId, srcPath] = parseContainerPath(source);
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpInvalidSourceError(), containerId.empty() || srcPath.empty());
 
-        if (followLink)
-        {
-            auto linkTarget = ContainerService::ResolveContainerSymlink(session, containerId, srcPath);
-            if (linkTarget.has_value())
-            {
-                srcPath = std::move(*linkTarget);
-            }
-        }
-
         // Resolve any symlinks in the target path since tar.exe refuses to extract through a symlink.
         std::error_code canonicalError;
         auto absTarget = wsl::windows::common::filesystem::GetCanonicalPath(target, canonicalError);
@@ -473,8 +483,33 @@ void ContainerCp(CLIExecutionContext& context)
             std::filesystem::create_directories(absTarget, dirError);
             THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", absTarget.c_str());
 
+            // A followed link produces an archive named after the link's target, but the copy keeps the name that
+            // was asked for. The resolved name is only known once the download completes, so the extraction goes
+            // to a staging directory and the entries are moved up under the requested name afterwards.
+            std::filesystem::path stagingDir;
+            auto stagingCleanup = wil::scope_exit([&] {
+                if (!stagingDir.empty())
+                {
+                    std::error_code cleanupError;
+                    std::filesystem::remove_all(stagingDir, cleanupError);
+                }
+            });
+
+            auto extractRoot = absTarget;
+            if (followLink)
+            {
+                GUID stagingId{};
+                THROW_IF_FAILED(CoCreateGuid(&stagingId));
+                stagingDir =
+                    absTarget /
+                    std::format(L".wslc-cp-{}", wsl::shared::string::GuidToString<wchar_t>(stagingId, wsl::shared::string::GuidToStringFlags::None));
+                std::filesystem::create_directory(stagingDir, dirError);
+                THROW_HR_IF_MSG(HRESULT_FROM_WIN32(dirError.value()), !!dirError, "Failed to create directory: %ls", stagingDir.c_str());
+                extractRoot = stagingDir;
+            }
+
             // Strip trailing separator to avoid the CRT parsing a trailing '\"' as an escaped quote.
-            auto targetDir = absTarget.wstring();
+            auto targetDir = extractRoot.wstring();
             while (targetDir.size() > 1 && (targetDir.back() == L'\\' || targetDir.back() == L'/'))
             {
                 targetDir.pop_back();
@@ -489,11 +524,24 @@ void ContainerCp(CLIExecutionContext& context)
             auto processHandle = process.Start();
             pipeRead.reset();
 
-            ContainerService::CopyFromContainer(session, containerId, srcPath, pipeWrite.get());
+            auto resolvedPath = ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, pipeWrite.get());
             pipeWrite.reset();
 
             auto exitCode = SubProcess::GetExitCode(processHandle.get());
             THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "tar.exe exited with code %u", exitCode);
+
+            if (followLink)
+            {
+                const auto archiveName = MultiByteToWide(PosixBaseName(resolvedPath.value_or(srcPath)));
+                const auto requestedName = MultiByteToWide(PosixBaseName(srcPath));
+
+                for (const auto& entry : std::filesystem::directory_iterator(stagingDir))
+                {
+                    const auto name = entry.path().filename();
+                    const auto rebase = !requestedName.empty() && name == archiveName;
+                    MoveOver(entry.path(), absTarget / (rebase ? requestedName : name.wstring()));
+                }
+            }
         }
         else
         {
@@ -504,7 +552,7 @@ void ContainerCp(CLIExecutionContext& context)
             // the exclusive write handle, preventing other processes from tampering.
             filesystem::TempFile tarFile(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS);
 
-            ContainerService::CopyFromContainer(session, containerId, srcPath, tarFile.Handle.get());
+            ContainerService::CopyFromContainer(session, containerId, srcPath, followLink, tarFile.Handle.get());
 
             // Step 1: Pipe tar -t output and read just enough lines to classify the archive.
             auto [listStdoutRead, listStdoutWrite] = OpenAnonymousPipe(0, true, false);
