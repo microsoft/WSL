@@ -54,3 +54,8 @@ extends:
     - template: nuget-stage.yml@self
       parameters:
         isNightly: true
+
+    - template: asa-stage.yml@self
+      # Non-gating for now: ASA publishes findings without failing the build
+      # (controlled by ASA_FAIL_ON_NEW in cloudtest/CMakeLists.txt). Flip that to
+      # "$true" once the allowlist in tools/devops/asa-expected-findings.json is stable.

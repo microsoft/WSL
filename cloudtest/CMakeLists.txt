@@ -51,6 +51,28 @@ function(add_test_group image version suffix filter)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup.xml.in ${DIR}/TestGroup.xml)
 endfunction()
 
+# Attack Surface Analyzer install-diff group. Runs on a single clean client image
+# and is generated only for nightly/release builds that publish the wsl.msi bundle.
+# Map ALLOW_UNSIGNED_PACKAGE (0/1) straight through; the runbook switches accept 1/0.
+# (A literal "$true" cannot be bound to a [switch] when passed on a command line.)
+if (ALLOW_UNSIGNED_PACKAGE STREQUAL "1")
+    set(ASA_ALLOW_UNSIGNED "1")
+else()
+    set(ASA_ALLOW_UNSIGNED "0")
+endif()
+
+# Non-gating to start: report net-new findings without failing the run.
+# Flip to "1" once the allowlist has been validated against a few nightly runs.
+set(ASA_FAIL_ON_NEW "0")
+
+function(add_asa_group image)
+    set(DIR ${OUT}/asa-${image})
+    file(MAKE_DIRECTORY ${DIR})
+
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestMapAsa.xml.in ${DIR}/TestMap.xml)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroupAsa.xml.in ${DIR}/TestGroup.xml)
+endfunction()
+
 foreach(image ${CLOUDTEST_IMAGES})
     add_test_group("${image}" "1" "wsl1" "not (@TestCategory='WSLC')")
     add_test_group("${image}" "2" "wsl2" "not (@TestCategory='WSLC')")
@@ -58,3 +80,9 @@ foreach(image ${CLOUDTEST_IMAGES})
         add_test_group("${image}" "2" "wslc" "@TestCategory='WSLC'")
     endif()
 endforeach()
+
+# The MSI bundle is only staged for nightly/release builds (INCLUDE_PACKAGE_STAGE),
+# so only generate the ASA group when that bundle will be present in drop_wsl_build.
+if (INCLUDE_PACKAGE_STAGE AND CLOUDTEST_IMAGES)
+    add_asa_group("wsl-test-image-win11-23h2-ent-2024-11-18")
+endif()
