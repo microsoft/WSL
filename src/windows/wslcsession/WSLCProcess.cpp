@@ -14,15 +14,14 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLCProcess.h"
-#include "IORelay.h"
 #include "WSLCVirtualMachine.h"
 #include "APICompat.h"
 
 using wsl::windows::service::wslc::WSLCProcess;
 namespace apicompat = wsl::windows::common::apicompat;
 
-WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags, IORelay* Relay) :
-    m_flags(Flags), m_control(std::move(Control)), m_io(std::move(Io)), m_ioRelay(Relay)
+WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags) :
+    m_control(std::move(Control)), m_io(std::move(Io)), m_flags(Flags)
 {
 }
 
@@ -44,35 +43,15 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcess::GetStdHandle(WSLCFD Fd, WSLCStdHandleFlag Flag, WSLCHandle* Handle)
+HRESULT WSLCProcess::GetStdHandle(WSLCFD Fd, WSLCHandle* Handle)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Handle);
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_io, "Process IO not attached");
-    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flag, ~WSLCStdHandleFlagValid), "Invalid flags: 0x%x", Flag);
 
     auto typedHandle = m_io->OpenFd(Fd);
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !typedHandle.is_valid());
-
-    if (WI_IsFlagSet(Flag, WSLCStdHandleFlagEnforceHandle) && typedHandle.Type == WSLCHandleTypeSocket)
-    {
-        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_ioRelay == nullptr);
-
-        auto [readPipe, writePipe] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
-        if (Fd == WSLCFDStdin)
-        {
-            m_ioRelay->AddHandle(
-                std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(std::move(readPipe), std::move(typedHandle.Handle)));
-            typedHandle = TypedHandle{std::move(writePipe), WSLCHandleTypePipe};
-        }
-        else
-        {
-            m_ioRelay->AddHandle(
-                std::make_unique<common::io::RelayHandle<common::io::ReadHandle>>(std::move(typedHandle.Handle), std::move(writePipe)));
-            typedHandle = TypedHandle{std::move(readPipe), WSLCHandleTypePipe};
-        }
-    }
 
     DWORD Access = SYNCHRONIZE;
 
@@ -153,7 +132,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Handle);
 
     WSLCHandle handle{};
-    RETURN_IF_FAILED(GetStdHandle(Fd, WSLCStdHandleFlagNone, &handle));
+    RETURN_IF_FAILED(GetStdHandle(Fd, &handle));
 
     *Handle = apicompat::Convert(handle);
     return S_OK;

@@ -415,16 +415,6 @@ typedef struct _WSLCHandle
     } Handle;
 } WSLCHandle;
 
-typedef enum _WSLCStdHandleFlag
-{
-    WSLCStdHandleFlagNone = 0,
-    WSLCStdHandleFlagEnforceHandle = 1,
-} WSLCStdHandleFlag;
-
-cpp_quote("#define WSLCStdHandleFlagValid WSLCStdHandleFlagEnforceHandle")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCStdHandleFlag);")
-
 [
     uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
     pointer_default(unique),
@@ -434,7 +424,7 @@ interface IWSLCProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
     HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
-    HRESULT GetStdHandle([in] WSLCFD Fd, [in] WSLCStdHandleFlag Flag, [out] WSLCHandle* Handle);
+    HRESULT GetStdHandle([in] WSLCFD Fd, [out] WSLCHandle* Handle);
     HRESULT GetFlags([out] WSLCProcessFlags* Flags);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] WSLCProcessState* State, [out] int* Code);
@@ -772,6 +762,7 @@ interface IWSLCSession : IUnknown
     // plugin do last-minute work from its OnVmStopping handler without deadlocking against the
     // teardown it is blocking -- and fails with WSLC_E_VM_NOT_RUNNING when there is no VM.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [in] BOOL AcquireVmLease, [out] IWSLCProcess** Process, [out] int* Errno);
+    HRESULT RelaySocket([in] SOCKET_HANDLE Socket, [in] WSLCFD Fd, [out] PIPE_HANDLE* Pipe);
 
     // TODO: an OpenProcess() method can be added later if needed.
 

@@ -2856,7 +2856,7 @@ try
     auto runtime = m_runtime.Acquire(LeasePolicyFor(AcquireVmLease));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    auto process = runtime.Vm().CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno, runtime.Relay());
+    auto process = runtime.Vm().CreateLinuxProcess(Executable, *Options, TtyRows, TtyColumns, Errno);
 
     // The VmLease above is released when this call returns, but the process keeps running in the
     // VM and the client holds the returned proxy. A root-namespace process is not tracked as a
@@ -2874,6 +2874,38 @@ try
     }
 
     THROW_IF_FAILED(process.CopyTo(Process));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::RelaySocket(HANDLE Socket, WSLCFD Fd, HANDLE* Pipe)
+try
+{
+    WSLCExecutionContext context(this);
+
+    THROW_HR_IF_NULL(E_POINTER, Socket);
+    THROW_HR_IF_NULL(E_POINTER, Pipe);
+    *Pipe = nullptr;
+
+    THROW_HR_IF(E_INVALIDARG, Fd != WSLCFDStdin && Fd != WSLCFDStdout && Fd != WSLCFDStderr);
+
+    auto runtime = m_runtime.Acquire(WSLCSessionRuntime::VmLeasePolicy::ExistingOnly);
+    auto socket = wil::unique_socket{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(Socket))};
+    auto [readPipe, writePipe] = wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+
+    if (Fd == WSLCFDStdin)
+    {
+        runtime.Relay()->AddHandle(
+            std::make_unique<io::RelayHandle<io::ReadHandle>>(std::move(readPipe), io::HandleWrapper{std::move(socket)}));
+        *Pipe = writePipe.release();
+    }
+    else
+    {
+        runtime.Relay()->AddHandle(
+            std::make_unique<io::RelayHandle<io::ReadHandle>>(io::HandleWrapper{std::move(socket)}, std::move(writePipe)));
+        *Pipe = readPipe.release();
+    }
 
     return S_OK;
 }

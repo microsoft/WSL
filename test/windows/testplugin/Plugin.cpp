@@ -438,9 +438,16 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
             THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStderr, &stderrHandle));
             THROW_IF_FAILED(g_api->WSLCProcessGetExitEvent(process, &exitEvent));
 
-            THROW_HR_IF(E_UNEXPECTED, GetFileType(stdinHandle.get()) != FILE_TYPE_PIPE);
-            THROW_HR_IF(E_UNEXPECTED, GetFileType(stdoutHandle.get()) != FILE_TYPE_PIPE);
-            THROW_HR_IF(E_UNEXPECTED, GetFileType(stderrHandle.get()) != FILE_TYPE_PIPE);
+            const auto verifyPipe = [](HANDLE handle) {
+                WSASetLastError(ERROR_SUCCESS);
+                THROW_HR_IF(E_UNEXPECTED, closesocket(reinterpret_cast<SOCKET>(handle)) != SOCKET_ERROR);
+                THROW_HR_IF(E_UNEXPECTED, WSAGetLastError() != WSAENOTSOCK);
+                THROW_HR_IF(E_UNEXPECTED, GetFileType(handle) != FILE_TYPE_PIPE);
+            };
+
+            verifyPipe(stdinHandle.get());
+            verifyPipe(stdoutHandle.get());
+            verifyPipe(stderrHandle.get());
 
             std::string out;
             std::string err;

@@ -130,6 +130,7 @@ namespace {
 // Opaque wrapper around IWSLCProcess, handed out as WSLCProcessHandle to plugins.
 struct WslcProcessWrapper
 {
+    wil::com_ptr<IWSLCSession> Session;
     wil::com_ptr<IWSLCProcess> Process;
 };
 
@@ -241,6 +242,7 @@ try
     }
 
     auto wrapper = std::make_unique<WslcProcessWrapper>();
+    wrapper->Session = std::move(session);
     wrapper->Process = std::move(process);
     *Process = wrapper.release();
 
@@ -283,18 +285,41 @@ try
     }
 
     WSLCHandle handle{};
-    auto result = wrapper->Process->GetStdHandle(wslcFd, WSLCStdHandleFlagEnforceHandle, &handle);
+    auto result = wrapper->Process->GetStdHandle(wslcFd, &handle);
+    if (FAILED(result))
+    {
+        WSL_LOG("WslcPluginProcessGetFd", TraceLoggingValue(static_cast<int>(Fd), "Fd"), TraceLoggingValue(result, "Result"));
+        return result;
+    }
+
+    switch (handle.Type)
+    {
+    case WSLCHandleTypeFile:
+        *Handle = handle.Handle.File;
+        break;
+
+    case WSLCHandleTypePipe:
+        *Handle = handle.Handle.Pipe;
+        break;
+
+    case WSLCHandleTypeSocket:
+    {
+        wil::unique_socket socket{reinterpret_cast<SOCKET>(handle.Handle.Socket)};
+        RETURN_IF_FAILED(wrapper->Session->RelaySocket(reinterpret_cast<HANDLE>(socket.get()), wslcFd, Handle));
+        break;
+    }
+
+    default:
+        RETURN_HR_MSG(E_UNEXPECTED, "Unexpected WSLC plugin handle type: %i", handle.Type);
+    }
 
     WSL_LOG(
         "WslcPluginProcessGetFd",
         TraceLoggingValue(static_cast<int>(Fd), "Fd"),
-        TraceLoggingValue(handle.Handle.Pipe, "Handle"),
-        TraceLoggingValue(result, "Result"));
+        TraceLoggingValue(*Handle, "Handle"),
+        TraceLoggingValue(static_cast<int>(handle.Type), "SourceType"),
+        TraceLoggingValue(S_OK, "Result"));
 
-    RETURN_IF_FAILED(result);
-    RETURN_HR_IF_MSG(E_UNEXPECTED, handle.Type != WSLCHandleTypePipe, "Unexpected WSLC plugin handle type: %i", handle.Type);
-
-    *Handle = handle.Handle.Pipe;
     return S_OK;
 }
 CATCH_RETURN();

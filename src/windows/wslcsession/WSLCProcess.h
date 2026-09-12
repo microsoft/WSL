@@ -20,20 +20,19 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
-class IORelay;
 class WSLCVirtualMachine;
 
 class DECLSPEC_UUID("AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B") WSLCProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCProcess, IWSLCCompatProcess, IFastRundown>
 {
 public:
-    WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags, IORelay* Relay);
+    WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags);
     WSLCProcess(const WSLCProcess&) = delete;
     WSLCProcess& operator=(const WSLCProcess&) = delete;
 
     IFACEMETHOD(Signal)(_In_ int Signal) override;
     IFACEMETHOD(GetExitEvent)(_Out_ HANDLE* Event) override;
-    IFACEMETHOD(GetStdHandle)(_In_ WSLCFD Fd, _In_ WSLCStdHandleFlag Flag, _Out_ WSLCHandle* Handle) override;
+    IFACEMETHOD(GetStdHandle)(_In_ WSLCFD Fd, _Out_ WSLCHandle* Handle) override;
     IFACEMETHOD(GetFlags)(_Out_ WSLCProcessFlags* Flags) override;
     IFACEMETHOD(GetPid)(_Out_ int* Pid) override;
     IFACEMETHOD(GetState)(_Out_ WSLCProcessState* State, _Out_ int* Code) override;
@@ -59,7 +58,6 @@ private:
     WSLCProcessFlags m_flags;
     std::shared_ptr<WSLCProcessControl> m_control;
     std::unique_ptr<WSLCProcessIO> m_io;
-    IORelay* m_ioRelay{};
     Microsoft::WRL::ComPtr<IUnknown> m_keepAliveToken;
 };
 } // namespace wsl::windows::service::wslc

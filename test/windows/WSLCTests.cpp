@@ -4517,7 +4517,7 @@ class WSLCTests
 
             // Validate that a null out handle is rejected.
 
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, WSLCStdHandleFlagNone, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
 
             // Validate that every IWSLCProcess output pointer is rejected when null.
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), process.Get().GetExitEvent(nullptr));
@@ -4575,18 +4575,14 @@ class WSLCTests
             WSLCProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, WSLCProcessFlagsStdin);
 
             auto process = launcher.Launch(*m_defaultSession);
-            COMOutputHandle dummyHandle;
-
-            // Validate that invalid std handle flags are rejected without consuming the handle.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, static_cast<WSLCStdHandleFlag>(~WSLCStdHandleFlagValid), &dummyHandle), E_INVALIDARG);
-
             auto stdoutHandle = process.GetStdHandle(1);
 
+            COMOutputHandle dummyHandle;
             // Verify that the same handle can only be acquired once.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, WSLCStdHandleFlagNone, &dummyHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, &dummyHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that trying to acquire a std handle that doesn't exist fails as expected.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(static_cast<WSLCFD>(3), WSLCStdHandleFlagNone, &dummyHandle), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(static_cast<WSLCFD>(3), &dummyHandle), E_INVALIDARG);
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             ResetTestSession();
@@ -12581,9 +12577,9 @@ class WSLCTests
 
             auto initProcess = container.GetInitProcess();
             WSLCHandle dummy{};
-            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStdin, WSLCStdHandleFlagNone, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
-            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStdout, WSLCStdHandleFlagNone, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
-            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStderr, WSLCStdHandleFlagNone, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStdin, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStdout, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStderr, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
 
             // Verify that the container can be attached to.
             COMOutputHandle attachedStdin{};

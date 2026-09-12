@@ -459,7 +459,7 @@ void WSLCVirtualMachine::ConfigureNetworking()
         options.CommandLine = {.Values = cmd.data(), .Count = static_cast<ULONG>(cmd.size())};
     };
 
-    auto process = CreateLinuxProcessImpl("/init", options, fds, 0, 0, nullptr, nullptr, prepareCommandLine);
+    auto process = CreateLinuxProcessImpl("/init", options, fds, 0, 0, nullptr, prepareCommandLine);
 
     // Call back to the service to configure the networking engine.
     auto gnsHandle = process->GetStdHandle(gnsChannelFd);
@@ -790,7 +790,7 @@ std::string WSLCVirtualMachine::GetVhdDevicePath(ULONG Lun)
 }
 
 Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcess(
-    _In_ LPCSTR Executable, _In_ const WSLCProcessOptions& Options, ULONG TtyRows, ULONG TtyColumns, int* Errno, IORelay* Relay, const TPrepareCommandLine& PrepareCommandLine)
+    _In_ LPCSTR Executable, _In_ const WSLCProcessOptions& Options, ULONG TtyRows, ULONG TtyColumns, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // Check if this is a tty or not
     std::vector<WSLCProcessFd> fds;
@@ -810,18 +810,11 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcess(
         fds.emplace_back(WSLCProcessFd{.Fd = WSLCFDStderr, .Type = WSLCFdType::WSLCFdTypeDefault});
     }
 
-    return CreateLinuxProcessImpl(Executable, Options, fds, TtyRows, TtyColumns, Errno, Relay, PrepareCommandLine);
+    return CreateLinuxProcessImpl(Executable, Options, fds, TtyRows, TtyColumns, Errno, PrepareCommandLine);
 }
 
 Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
-    LPCSTR Executable,
-    const WSLCProcessOptions& Options,
-    const std::vector<WSLCProcessFd>& Fds,
-    ULONG TtyRows,
-    ULONG TtyColumns,
-    int* Errno,
-    IORelay* Relay,
-    const TPrepareCommandLine& PrepareCommandLine)
+    LPCSTR Executable, const WSLCProcessOptions& Options, const std::vector<WSLCProcessFd>& Fds, ULONG TtyRows, ULONG TtyColumns, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // N.B This check is there to prevent processes from being started before the VM is done initializing.
     // to avoid potential deadlocks, since the processExitThread is required to signal the process exit events.
@@ -943,7 +936,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
 
-    auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options.Flags, Relay);
+    auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options.Flags);
 
     setErrno(0);
 
