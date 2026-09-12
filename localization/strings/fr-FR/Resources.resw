@@ -2646,6 +2646,9 @@ Utilisation : wslc container cp [OPTIONS] SOURCE DEST
     <value>Destination : chemin d’accès local ou CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Masquer l’affichage de la progression pendant la copie</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Format de destination non valide. CONTAINER:PATH attendu</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2786,7 +2789,7 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Importe le contenu d’un tarball pour créer une image du système de fichiers. Vous pouvez également étiqueter l’image avec un nom de référentiel et une balise.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Affichez toutes les images (les images intermédiaires sont masquées par défaut).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Lister les images.</value>
@@ -2799,6 +2802,9 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Charge les images.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Masquer l’affichage de la progression pendant le chargement</value>
   </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Extraire les images.</value>
@@ -2836,6 +2842,9 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Chargez une image dans un registre.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Masquer le résultat détaillé</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Supprimé : {}</value>
@@ -3041,10 +3050,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Affichez tout, quel que soit l’état.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Download all tagged images in the repository.</value>
+    <value>Télécharger toutes les images marquées dans le référentiel.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>La balise ne peut pas être utilisée avec l’option --all-tags/-a</value>
     <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
@@ -3087,7 +3096,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Exécutez le conteneur en mode détaché</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Affichez des détails supplémentaires pour les journaux</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Spécifie l’exécutable du processus d’initialisation du conteneur</value>
@@ -3112,15 +3121,15 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Fournir des valeurs de filtre (par exemple, « until=&lt;timestamp&gt; »)</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Fournir des valeurs de filtre (par exemple, « label=&lt;label&gt; »)</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Ne demandez pas de confirmation</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Voulez-vous vraiment continuer ?</value>
@@ -3129,7 +3138,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>ATTENTION ! Cela supprimera tous les conteneurs arrêtés.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>AVERTISSEMENT! Cela supprimera toutes les images non taguées.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>AVERTISSEMENT! Cette opération supprimera toutes les images qui n’ont pas au moins un conteneur associé.</value>
@@ -3386,7 +3395,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
-    <value>Push all tags of an image to the repository</value>
+    <value>Envoyer tous les tags d’une image vers le dépôt</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Affiche uniquement les ID des conteneurs</value>
@@ -3418,7 +3427,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Référence d’image actuelle ou existante au format nom_image[ :tag]</value>
   </data>
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
-    <value>Display total file sizes</value>
+    <value>Afficher la taille totale des fichiers</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Afficher la taille totale des fichiers si le type est conteneur</value>
@@ -3824,7 +3833,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>PORTS</value>
   </data>
   <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
-    <value>SIZE</value>
+    <value>TAILLE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>Pourcentage UC</value>
@@ -3865,7 +3874,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
-    <value>{} (virtual {})</value>
+    <value>{} (virtuel {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">

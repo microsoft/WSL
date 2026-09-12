@@ -2239,7 +2239,7 @@ Bruk:
     <value>alternativer</value>
   </data>
   <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
-    <value>global-options</value>
+    <value>globale alternativer</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Følgende kommandoaliaser er tilgjengelig:</value>
@@ -2639,6 +2639,9 @@ Bruk: wslc container cp [ALTERNATIVER] KILDE DEST
     <value>Mål: lokal bane eller CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Skjul fremdriftsutdata under kopiering</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Ugyldig målformat. Forventet CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2793,6 +2796,9 @@ Eksempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Laster avbildninger.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Skjul fremdriftsutdata under innlesing</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Hent avbildninger.</value>
   </data>
@@ -2829,6 +2835,9 @@ Eksempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Last opp en avbildning til et register.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Skjul detaljert utdata</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Slettet: {}</value>
@@ -3034,7 +3043,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis alle uavhengig av tilstand.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Last ned alle merkede bilder i repositoritet.</value>
+    <value>Last ned alle merkede bilder i repositoriet.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>merke kan ikke brukes med --all-tags/-a</value>

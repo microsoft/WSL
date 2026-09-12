@@ -2645,6 +2645,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>宛先: ローカル パスまたは CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>コピー中の進行状況の出力を抑制する</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>宛先の形式が無効です。CONTAINER:PATH 形式を使用してください</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2799,6 +2802,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>イメージを読み込みます。</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>読み込み中の進行状況の出力を抑制する</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>イメージをプルします。</value>
   </data>
@@ -2835,6 +2841,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>イメージをレジストリにアップロードします。</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>詳細出力を抑制する</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>削除済み: {}</value>
