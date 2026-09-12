@@ -95,13 +95,13 @@ void wsl::windows::common::security::ConfigureForCOMImpersonation(IUnknown* Inst
     THROW_IF_FAILED(Instance->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
 
     // Get the current proxy blanket settings.
-    DWORD authnSvc, authzSvc, authnLvl, capabilites;
-    THROW_IF_FAILED(clientSecurity->QueryBlanket(Instance, &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilites));
+    DWORD authnSvc, authzSvc, authnLvl, capabilities;
+    THROW_IF_FAILED(clientSecurity->QueryBlanket(Instance, &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilities));
 
     // Make sure that dynamic cloaking is used.
-    WI_ClearFlag(capabilites, EOAC_STATIC_CLOAKING);
-    WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
-    THROW_IF_FAILED(clientSecurity->SetBlanket(Instance, authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
+    WI_ClearFlag(capabilities, EOAC_STATIC_CLOAKING);
+    WI_SetFlag(capabilities, EOAC_DYNAMIC_CLOAKING);
+    THROW_IF_FAILED(clientSecurity->SetBlanket(Instance, authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilities));
 }
 
 LUID wsl::windows::common::security::EnableTokenPrivilege(_Inout_ HANDLE token, _In_ LPCWSTR privilegeName)

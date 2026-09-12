@@ -82,7 +82,7 @@ try
 {
     WSL_LOG("NatNetworking::TelemetryConnectionCallback");
 
-    // if this is the inital callback for checking container connectivity, push this through as telemetry, so we can observe the time-to-connect
+    // if this is the initial callback for checking container connectivity, push this through as telemetry, so we can observe the time-to-connect
     if ((telemetryCounter == 1) || (hostConnectivity & NLM_CONNECTIVITY_IPV4_INTERNET))
     {
         int returnedIPv4Value{};

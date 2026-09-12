@@ -4011,7 +4011,7 @@ class WSLCTests
         std::filesystem::create_directories(testFolder);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
 
-        // Validate writeable mount.
+        // Validate writable mount.
         {
             VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(false));
@@ -4019,7 +4019,7 @@ class WSLCTests
             // Validate that mount can't be stacked on each other
             VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false, TRUE), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
-            // Validate that folder is writeable from linux
+            // Validate that folder is writable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt && sync"}, 0);
             VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
 
@@ -4032,14 +4032,14 @@ class WSLCTests
             VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
-            // Validate that folder is not writeable from linux
+            // Validate that folder is not writable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
             VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
             ExpectMount(session.get(), "/win-path", {});
         }
 
-        // Validate that a read-only share cannot be made writeable via mount -o remount,rw.
+        // Validate that a read-only share cannot be made writable via mount -o remount,rw.
         {
             VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true, TRUE));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
@@ -4047,7 +4047,7 @@ class WSLCTests
             // Attempt an in-place remount to read-write from the guest.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "mount -o remount,rw /win-path"}, 0);
 
-            // Verify the folder is still not writeable.
+            // Verify the folder is still not writable.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
             VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path", TRUE));
@@ -4071,7 +4071,7 @@ class WSLCTests
                  "findmnt -n -o VFS-OPTIONS /win-path-rw | grep -qE '(^|,)rw(,|$)'"},
                 0);
 
-            // Verify the folder is still not writeable through the read-write bind.
+            // Verify the folder is still not writable through the read-write bind.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path-rw/file.txt"}, 1);
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "umount /win-path-rw && rmdir /win-path-rw"}, 0);
 
@@ -4352,7 +4352,7 @@ class WSLCTests
                 "/usr/lib/wsl/lib",
                 "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
 
-            // Validate that the mount points are not writeable.
+            // Validate that the mount points are not writable.
             VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 1L);
             VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 1L);
         }
