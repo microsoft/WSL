@@ -2193,6 +2193,16 @@ Usage:
             VERIFY_ARE_EQUAL(out, L"foo\n");
             VERIFY_ARE_EQUAL(err, L"");
         }
+
+        // Validate that an escaped CRLF is handled as a line continuation
+        {
+            configChange.SetContent(L"[network]\r\nhostname=f\\\r\noo\r\n");
+            TerminateDistribution();
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"hostname");
+            VERIFY_ARE_EQUAL(out, L"foo\n");
+            VERIFY_ARE_EQUAL(err, L"");
+        }
     }
 
     WSL2_TEST_METHOD(Warnings)

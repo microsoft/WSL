@@ -710,6 +710,23 @@ ParseKeyValue:
                 break;
 
             case '\r':
+                // Line continuation with CRLF. Also skip the '\n', otherwise the
+                // value would end here and the next line would be parsed as a key.
+                ch2 = fgetwc(file);
+                if (ch2 == '\n')
+                {
+                    if (updateConfigFile && !firstMatchedKey && !matchedKey)
+                    {
+                        configFileOutput += ch2;
+                    }
+
+                    line++;
+                }
+                else if (ch2 != WEOF)
+                {
+                    ungetwc(ch2, file);
+                }
+
                 break;
 
             case '\n':
