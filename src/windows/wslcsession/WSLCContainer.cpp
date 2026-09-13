@@ -2518,12 +2518,29 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     });
 
-    if (containerOptions.UsbDevices.Count > 0)
+    // Privileged containers get every device the VM has, which is docker's own
+    // behaviour, and implies passing through everything usbipd is sharing so
+    // that there is something to see.
+    const auto privileged = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPrivileged);
+    request.HostConfig.Privileged = privileged;
+
+    std::vector<std::string> requested;
+    for (ULONG i = 0; i < containerOptions.UsbDevices.Count; i++)
+    {
+        requested.emplace_back(containerOptions.UsbDevices.Values[i]);
+    }
+
+    if (privileged && requested.empty())
+    {
+        requested.emplace_back("all");
+    }
+
+    if (!requested.empty())
     {
         std::vector<common::docker_schema::DeviceMapping> devices;
-        for (ULONG i = 0; i < containerOptions.UsbDevices.Count; i++)
+        for (const auto& busId : requested)
         {
-            auto attached = virtualMachine.AttachUsbDevice(containerOptions.UsbDevices.Values[i]);
+            auto attached = virtualMachine.AttachUsbDevice(busId);
             usbDevices.insert(usbDevices.end(), attached.BusIds.begin(), attached.BusIds.end());
 
             for (const auto& node : attached.DeviceNodes)
@@ -2532,24 +2549,29 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             }
         }
 
-        // Class nodes such as /dev/ttyUSB0 are mapped individually, because
-        // programs expect them at a fixed path.
-        if (!devices.empty())
+        // A privileged container already has all of /dev, so none of the mapping
+        // below applies to it.
+        if (!privileged)
         {
-            request.HostConfig.Devices = std::move(devices);
-        }
+            // Class nodes such as /dev/ttyUSB0 are mapped individually, because
+            // programs expect them at a fixed path.
+            if (!devices.empty())
+            {
+                request.HostConfig.Devices = std::move(devices);
+            }
 
-        // Raw USB access instead goes through a bind mount of /dev/bus/usb with a
-        // cgroup rule for major 189 (usb_device). A device that is unplugged and
-        // reconnected comes back under a new device number, which a fixed mapping
-        // could not follow, so libusb-based tools need the whole directory.
-        if (!request.HostConfig.Binds.has_value())
-        {
-            request.HostConfig.Binds.emplace();
-        }
+            // Raw USB access instead goes through a bind mount of /dev/bus/usb with a
+            // cgroup rule for major 189 (usb_device). A device that is unplugged and
+            // reconnected comes back under a new device number, which a fixed mapping
+            // could not follow, so libusb-based tools need the whole directory.
+            if (!request.HostConfig.Binds.has_value())
+            {
+                request.HostConfig.Binds.emplace();
+            }
 
-        request.HostConfig.Binds->emplace_back("/dev/bus/usb:/dev/bus/usb");
-        request.HostConfig.DeviceCgroupRules = std::vector<std::string>{"c 189:* rwm"};
+            request.HostConfig.Binds->emplace_back("/dev/bus/usb:/dev/bus/usb");
+            request.HostConfig.DeviceCgroupRules = std::vector<std::string>{"c 189:* rwm"};
+        }
     }
 
     // Prepare port mappings from container options.

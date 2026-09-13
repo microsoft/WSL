@@ -74,6 +74,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsRm, options.Remove);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsPrivileged, options.Privileged);
 
     std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front().Name;
 

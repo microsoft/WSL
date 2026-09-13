@@ -384,6 +384,9 @@ struct HostConfig
     // Docker wire type is int64. 0 means "use daemon default" — same as omitting
     // the field — so we don't bother with std::optional here.
     std::int64_t ShmSize{};
+    // Grants the container access to every device on the host, as docker's own
+    // --privileged does.
+    bool Privileged{};
     std::optional<std::vector<DeviceMapping>> Devices;
     std::optional<std::vector<DeviceRequest>> DeviceRequests;
     // Cgroup device rules, in the same form as docker's --device-cgroup-rule
@@ -397,7 +400,7 @@ struct HostConfig
     std::optional<std::vector<Ulimit>> Ulimits;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, DeviceCgroupRules, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Privileged, Devices, DeviceRequests, DeviceCgroupRules, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct InspectEndpointIPAMConfig

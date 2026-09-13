@@ -762,6 +762,8 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Gpu = true;
     }
 
+    options.Privileged = context.Args.GetValue<ArgType::Privileged>();
+
     if (context.Args.Contains(ArgType::Usb))
     {
         auto usbDevices = context.Args.GetAllValues<ArgType::Usb>();

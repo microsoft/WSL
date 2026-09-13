@@ -4011,6 +4011,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Add a USB device to the container by bus ID ('all' to pass all shared devices)</value>
     <comment>{Locked="all"}</comment>
   </data>
+  <data name="WSLCCLI_PrivilegedArgDescription" xml:space="preserve">
+    <value>Give the container access to all devices, including every USB device shared with usbipd</value>
+    <comment>{Locked="usbipd"}</comment>
+  </data>
   <data name="WSLCCLI_UsbInvalidValue" xml:space="preserve">
     <value>Invalid {} value: '{}'. Expected a bus ID such as '1-2' or 'all'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

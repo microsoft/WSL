@@ -102,6 +102,7 @@ typedef enum _WSLCContainerFlags
     WSLCContainerFlagsStopTimeout = 16, // The StopTimeout field is set and should be honored (otherwise StopTimeout is ignored).
     WSLCContainerFlagsHealthCheck = 32, // The Health* fields are set and should be honored (otherwise they are ignored).
     WSLCContainerFlagsNoHealthCheck = 64, // Disable any container/image-specified health check.
+    WSLCContainerFlagsPrivileged = 128, // Give the container access to every device, and pass through all shared USB devices.
 } WSLCContainerFlags;
 
 cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll | WSLCContainerFlagsStopTimeout | WSLCContainerFlagsHealthCheck | WSLCContainerFlagsNoHealthCheck)")

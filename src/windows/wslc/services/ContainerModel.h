@@ -75,6 +75,8 @@ struct ContainerOptions
     std::optional<int> HealthRetries{};
     bool NoHealthcheck = false;
     bool Gpu = false;
+    // Grants access to every device, and passes through all shared USB devices.
+    bool Privileged = false;
     // USB bus IDs to pass through, or a single "all" entry.
     std::vector<std::string> UsbDevices;
     std::vector<std::string> Ports;
