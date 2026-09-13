@@ -64,6 +64,9 @@ constexpr auto c_watchInterval = std::chrono::seconds(2);
 constexpr auto c_importTimeout = std::chrono::seconds(5);
 constexpr auto c_importRetryInterval = std::chrono::milliseconds(250);
 
+// How many times to try handing a port back before giving up on it.
+constexpr int c_detachAttempts = 3;
+
 // How far below a device's sysfs directory to look for its character device
 // nodes. The deepest layout in use is usb-serial's
 // "<interface>/ttyUSB0/tty/ttyUSB0", so four is enough with room to spare.
@@ -402,9 +405,12 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
     // as "snd/pcmC0D0p" and "input/event0", and the directory name alone would
     // name something that does not exist.
     //
-    // Symlinks are not followed, so this cannot wander out of the device. The
-    // device's own "dev" file is passed over on its own: it names the usbfs
-    // entry, for which no /dev/<busid> exists.
+    // Symlinks are not followed, so this cannot wander out of the device.
+    //
+    // The device's own "dev" file is skipped. It names the usbfs node,
+    // "bus/usb/001/002", which is reached through the /dev/bus/usb bind mount
+    // instead. Mapping it here would pin the device number it had at the time,
+    // and a replug changes that.
     std::set<std::string> found;
     std::filesystem::recursive_directory_iterator entry{devicePath, error};
     const std::filesystem::recursive_directory_iterator last;
@@ -422,6 +428,11 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
         }
 
         const auto directory = entry->path().parent_path();
+        if (directory == devicePath)
+        {
+            continue;
+        }
+
         auto name = DeviceName(directory);
         if (name.empty())
         {
@@ -536,13 +547,21 @@ std::vector<std::string> WaitForDevice(int Port)
     return {};
 }
 
-// Hands a vhci port back, which returns the device to Windows.
+// Hands a vhci port back, which returns the device to Windows. Tries more than
+// once: the caller has no way to undo a failure, and a port left attached holds
+// the device away from Windows with nothing left to retry it.
 void DetachPort(int Port)
 {
     const auto port = std::to_string(Port);
-    if (WriteToFile(std::format("{}/detach", c_vhciPath).c_str(), port.c_str(), O_WRONLY | O_CLOEXEC) < 0)
+    for (int attempt = 0; attempt < c_detachAttempts; attempt += 1)
     {
+        if (WriteToFile(std::format("{}/detach", c_vhciPath).c_str(), port.c_str(), O_WRONLY | O_CLOEXEC) >= 0)
+        {
+            return;
+        }
+
         LOG_ERROR("Failed to detach USB port {}, {}", Port, errno);
+        std::this_thread::sleep_for(c_importRetryInterval);
     }
 }
 
