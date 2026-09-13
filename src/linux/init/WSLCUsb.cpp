@@ -58,6 +58,17 @@ constexpr auto c_enumerationTimeout = std::chrono::seconds(10);
 // How often the watcher checks whether a device needs importing again.
 constexpr auto c_watchInterval = std::chrono::seconds(2);
 
+// How long to keep asking for a device that is not available yet, and how long
+// to wait between tries. This covers the gap while Windows enumerates a device
+// another container has just given back.
+constexpr auto c_importTimeout = std::chrono::seconds(5);
+constexpr auto c_importRetryInterval = std::chrono::milliseconds(250);
+
+// How far below a device's sysfs directory to look for its character device
+// nodes. The deepest layout in use is usb-serial's
+// "<interface>/ttyUSB0/tty/ttyUSB0", so four is enough with room to spare.
+constexpr int c_maxNodeDepth = 4;
+
 #pragma pack(push, 1)
 
 // Every USB/IP message starts with this header. All fields are big-endian.
@@ -103,6 +114,13 @@ std::map<std::string, Attachment> g_attachments;
 // WSLCInit.cpp), so the table is locked. Holding the lock across a whole attach
 // also stops two of them picking the same free vhci port.
 std::mutex g_attachmentLock;
+
+// When this VM last handed a device back to Windows, so that a request for
+// everything shared can tell "nothing is bound" from "not enumerated yet".
+// Guarded by g_attachmentLock. The clock counts from boot, so "never" has to be
+// stated rather than left as a default, which would read as recent on a VM that
+// has only just started.
+auto g_lastRelease = std::chrono::steady_clock::time_point::min();
 
 void WriteAll(int Socket, const void* Buffer, size_t Size)
 {
@@ -340,47 +358,42 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
     std::vector<std::string> nodes;
     std::error_code error;
 
-    // Adds /dev/<name> for every entry that is a device node's own sysfs
-    // directory. Those are the ones holding a "dev" file, which is what marks
-    // them rather than their name, so cameras, hidraw and sound nodes are found
-    // the same way serial ones are.
-    const auto collect = [&nodes, &error](const std::filesystem::path& Directory) {
-        for (const auto& entry : std::filesystem::directory_iterator{Directory, error})
-        {
-            if (!std::filesystem::exists(entry.path() / "dev", error))
-            {
-                continue;
-            }
+    // A character device appears in sysfs as a directory holding a "dev" file
+    // and named after its node in /dev. How deep that sits varies by class:
+    // cdc_acm uses "<interface>/tty/ttyACM0", usb-serial adds a port level
+    // ("<interface>/ttyUSB0/tty/ttyUSB0"), and uvcvideo uses
+    // "<interface>/video4linux/video0". Rather than encode every layout, walk
+    // the device's own subtree and let the "dev" file mark them, which picks up
+    // camera, hidraw and sound nodes as readily as serial ones.
+    //
+    // Symlinks are not followed, so this cannot wander out of the device. The
+    // device's own "dev" file is passed over on its own: it names the usbfs
+    // entry, for which no /dev/<busid> exists.
+    std::set<std::string> found;
+    std::filesystem::recursive_directory_iterator entry{devicePath, error};
+    const std::filesystem::recursive_directory_iterator last;
 
-            auto node = std::format("/dev/{}", entry.path().filename().native());
-            if (std::filesystem::exists(node, error))
-            {
-                nodes.push_back(std::move(node));
-            }
-        }
-    };
-
-    // Drivers bind to an interface and put their node either straight into the
-    // interface directory (ch341, ftdi_sio) or one level down in a class
-    // directory such as "tty", "video4linux" or "hidraw" (cdc_acm, uvcvideo),
-    // so both layouts are searched.
-    for (const auto& iface : std::filesystem::directory_iterator{devicePath, error})
+    for (; !error && entry != last; entry.increment(error))
     {
-        if (!std::filesystem::is_directory(iface.path(), error))
+        if (entry.depth() >= c_maxNodeDepth)
+        {
+            entry.disable_recursion_pending();
+        }
+
+        if (entry->path().filename() != "dev")
         {
             continue;
         }
 
-        collect(iface.path());
-
-        for (const auto& sub : std::filesystem::directory_iterator{iface.path(), error})
+        std::error_code exists;
+        auto node = std::format("/dev/{}", entry->path().parent_path().filename().native());
+        if (std::filesystem::exists(node, exists))
         {
-            if (std::filesystem::is_directory(sub.path(), error) && !std::filesystem::exists(sub.path() / "dev", error))
-            {
-                collect(sub.path());
-            }
+            found.insert(std::move(node));
         }
     }
+
+    nodes.assign(found.begin(), found.end());
 
     return nodes;
 }
@@ -398,9 +411,33 @@ int Import(const std::string& Host, uint16_t Port, const std::string& BusId, std
     // happen first, or a failure here would strand the device away from Windows.
     const auto vhciPort = VhciPort.has_value() ? VhciPort.value() : FindFreePort();
 
-    auto socketFd = Connect(Host, Port);
-    SendRequest(socketFd.get(), c_opRequestImport, &BusId);
-    ReadReplyHeader(socketFd.get(), c_opReplyImport);
+    // A device released by another container is briefly unavailable while
+    // Windows enumerates it again, so a container started right after one
+    // exits would otherwise fail for no reason the user can see. Keep asking
+    // for a short while before giving up. A device that is genuinely not shared
+    // simply fails a little later.
+    const auto deadline = std::chrono::steady_clock::now() + c_importTimeout;
+
+    wil::unique_fd socketFd;
+    for (;;)
+    {
+        try
+        {
+            socketFd = Connect(Host, Port);
+            SendRequest(socketFd.get(), c_opRequestImport, &BusId);
+            ReadReplyHeader(socketFd.get(), c_opReplyImport);
+            break;
+        }
+        catch (...)
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                throw;
+            }
+
+            std::this_thread::sleep_for(c_importRetryInterval);
+        }
+    }
 
     OpDevice device{};
     ReadAll(socketFd.get(), &device, sizeof(device));
@@ -557,6 +594,7 @@ void DetachOne(const std::string& BusId)
     }
 
     DetachPort(attachment->second.Port);
+    g_lastRelease = std::chrono::steady_clock::now();
 
     g_attachments.erase(attachment);
 }
@@ -575,6 +613,8 @@ AttachResult Attach(const std::string& Host, uint16_t Port, const std::string& B
     // USB/IP support never takes the device away from Windows.
     THROW_ERRNO_IF(ENODEV, !std::filesystem::exists(std::format("{}/status", c_vhciPath)));
 
+    std::lock_guard lock{g_attachmentLock};
+
     AttachResult result;
 
     if (BusId == "all")
@@ -583,13 +623,22 @@ AttachResult Attach(const std::string& Host, uint16_t Port, const std::string& B
         // it is left to the service to decide whether that is an error. A
         // privileged container on a host with no bound device still starts.
         result.BusIds = ListDevices(Host, Port);
+
+        // A device this VM gave back moments ago is missing from that list until
+        // Windows has enumerated it again, and "nothing shared" looks identical
+        // to "not back yet" from here. Wait only when we know we released one,
+        // so a host that has never bound anything still starts straight away.
+        const auto deadline = g_lastRelease + c_importTimeout;
+        while (result.BusIds.empty() && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(c_importRetryInterval);
+            result.BusIds = ListDevices(Host, Port);
+        }
     }
     else
     {
         result.BusIds.push_back(BusId);
     }
-
-    std::lock_guard lock{g_attachmentLock};
 
     // 'all' imports several devices under one request. If a later one fails,
     // give back the ones already taken, or they stay claimed by a VM that never
