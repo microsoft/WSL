@@ -75,6 +75,8 @@ struct ContainerOptions
     std::optional<int> HealthRetries{};
     bool NoHealthcheck = false;
     bool Gpu = false;
+    // USB bus IDs to pass through, or a single "all" entry.
+    std::vector<std::string> UsbDevices;
     std::vector<std::string> Ports;
     std::vector<mount::Spec> Mounts;
     std::string WorkingDirectory;

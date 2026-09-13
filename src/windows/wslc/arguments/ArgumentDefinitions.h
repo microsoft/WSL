@@ -138,6 +138,7 @@ _(TMPFS,            "tmpfs",                NO_ALIAS,         Kind::Value,      
 _(TTY,              "tty",                  L"t",             Kind::Flag,       NoConversion, Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,             "type",                 L"t",             Kind::Value,      InspectType,  Localization::WSLCCLI_TypeArgDescription()) \
 _(Ulimit,           "ulimit",               NO_ALIAS,         Kind::Value,      UlimitValue,  Localization::WSLCCLI_UlimitArgDescription()) \
+_(Usb,              "usb",                  NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_UsbArgDescription()) \
 _(User,             "user",                 L"u",             Kind::Value,      NoConversion, Localization::WSLCCLI_UserArgDescription()) \
 _(Username,         "username",             L"u",             Kind::Value,      NoConversion, Localization::WSLCCLI_LoginUsernameArgDescription()) \
 _(Verbose,          "verbose",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_VerboseArgDescription()) \

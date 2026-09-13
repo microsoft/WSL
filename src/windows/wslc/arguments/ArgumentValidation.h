@@ -78,4 +78,6 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
 
 void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName);
 
+void ValidateUsb(const std::vector<std::wstring>& values, const std::wstring& argName);
+
 } // namespace wsl::windows::wslc::validation

@@ -71,6 +71,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::TMPFS, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::Ulimit, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::Usb, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, {.Limit = Limit::Unlimited}),
         // Argument::Create(ArgType::Virtual),

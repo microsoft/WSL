@@ -762,6 +762,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Gpu = true;
     }
 
+    if (context.Args.Contains(ArgType::Usb))
+    {
+        auto usbDevices = context.Args.GetAllValues<ArgType::Usb>();
+        options.UsbDevices.reserve(usbDevices.size());
+        for (const auto& device : usbDevices)
+        {
+            options.UsbDevices.emplace_back(WideToMultiByte(device));
+        }
+    }
+
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAllValues<ArgType::Volume>();

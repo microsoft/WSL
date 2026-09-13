@@ -236,6 +236,10 @@ void Argument::Validate(ArgMap& execArgs) const
         validation::ValidateGpus(RawArgMapAccess::GetAll<ArgType::Gpus>(execArgs), m_name);
         break;
 
+    case ArgType::Usb:
+        validation::ValidateUsb(RawArgMapAccess::GetAll<ArgType::Usb>(execArgs), m_name);
+        break;
+
     case ArgType::Volume:
         CacheConverted<ArgType::Volume>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
             try
@@ -381,6 +385,47 @@ void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& a
         if (!IsEqual(value, L"all"))
         {
             throw ArgumentException(Localization::WSLCCLI_GpusInvalidValue(argName, value));
+        }
+    }
+}
+
+// A USB bus ID is '<bus>-<port>', with extra '.<port>' sections for a device
+// behind a hub (for example '1-2' or '1-2.3'). This is the same identifier that
+// 'usbipd list' reports on Windows.
+static bool IsUsbBusId(const std::wstring& value)
+{
+    bool afterSeparator = false;
+    size_t digits = 0;
+
+    for (const auto c : value)
+    {
+        if (c >= L'0' && c <= L'9')
+        {
+            digits += 1;
+            continue;
+        }
+
+        // A separator is only valid once digits have been seen, '-' only once,
+        // and '.' only after the '-'.
+        if (digits == 0 || (c == L'-' && afterSeparator) || (c == L'.' && !afterSeparator) || (c != L'-' && c != L'.'))
+        {
+            return false;
+        }
+
+        afterSeparator = true;
+        digits = 0;
+    }
+
+    return afterSeparator && digits > 0;
+}
+
+void ValidateUsb(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        if (!IsEqual(value, L"all") && !IsUsbBusId(value))
+        {
+            throw ArgumentException(Localization::WSLCCLI_UsbInvalidValue(argName, value));
         }
     }
 }
