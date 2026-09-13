@@ -27,8 +27,8 @@ Abstract:
 #include <chrono>
 #include <filesystem>
 #include <map>
-#include <sstream>
 #include <mutex>
+#include <sstream>
 #include <thread>
 
 namespace {
@@ -484,6 +484,37 @@ std::vector<std::string> AttachOne(const std::string& Host, uint16_t Port, const
     return nodes;
 }
 
+// Callers hold g_attachmentLock.
+void DetachOne(const std::string& BusId)
+{
+    auto attachment = g_attachments.find(BusId);
+    if (attachment == g_attachments.end())
+    {
+        return;
+    }
+
+    attachment->second.References -= 1;
+    if (attachment->second.References > 0)
+    {
+        return;
+    }
+
+    // The watcher has to go first, or it races this and imports the device again.
+    if (attachment->second.WatcherPid > 0)
+    {
+        kill(attachment->second.WatcherPid, SIGKILL);
+        waitpid(attachment->second.WatcherPid, nullptr, 0);
+    }
+
+    const auto detach = std::to_string(attachment->second.Port);
+    if (WriteToFile(std::format("{}/detach", c_vhciPath).c_str(), detach.c_str(), O_WRONLY | O_CLOEXEC) < 0)
+    {
+        LOG_ERROR("Failed to detach USB device {} from port {}, {}", BusId.c_str(), attachment->second.Port, errno);
+    }
+
+    g_attachments.erase(attachment);
+}
+
 } // namespace
 
 namespace wsl::linux::usb {
@@ -515,11 +546,25 @@ AttachResult Attach(const std::string& Host, uint16_t Port, const std::string& B
 
     std::lock_guard lock{g_attachmentLock};
 
+    // 'all' imports several devices under one request. If a later one fails,
+    // give back the ones already taken, or they stay claimed by a VM that never
+    // got a container and Windows cannot see them again.
+    std::vector<std::string> attached;
+    auto undo = wil::scope_exit([&]() {
+        for (const auto& busId : attached)
+        {
+            DetachOne(busId);
+        }
+    });
+
     for (const auto& busId : result.BusIds)
     {
         auto nodes = AttachOne(Host, Port, busId);
+        attached.push_back(busId);
         result.DeviceNodes.insert(result.DeviceNodes.end(), nodes.begin(), nodes.end());
     }
+
+    undo.release();
 
     return result;
 }
@@ -528,32 +573,7 @@ void Detach(const std::string& BusId)
 {
     std::lock_guard lock{g_attachmentLock};
 
-    auto attachment = g_attachments.find(BusId);
-    if (attachment == g_attachments.end())
-    {
-        return;
-    }
-
-    attachment->second.References -= 1;
-    if (attachment->second.References > 0)
-    {
-        return;
-    }
-
-    // The watcher has to go first, or it races this and imports the device again.
-    if (attachment->second.WatcherPid > 0)
-    {
-        kill(attachment->second.WatcherPid, SIGKILL);
-        waitpid(attachment->second.WatcherPid, nullptr, 0);
-    }
-
-    const auto detach = std::to_string(attachment->second.Port);
-    if (WriteToFile(std::format("{}/detach", c_vhciPath).c_str(), detach.c_str(), O_WRONLY | O_CLOEXEC) < 0)
-    {
-        LOG_ERROR("Failed to detach USB device {} from port {}, {}", BusId.c_str(), attachment->second.Port, errno);
-    }
-
-    g_attachments.erase(attachment);
+    DetachOne(BusId);
 }
 
 } // namespace wsl::linux::usb
