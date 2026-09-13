@@ -413,7 +413,11 @@ Arguments for running Linux binaries:
         Execute the specified command with the provided shell type.
 
     --
-        Pass the remaining command line as-is.
+        Pass the remaining command line as-is. Unless --exec/-e or
+        --shell-type none is also specified, this command line is still
+        handed to the default Linux shell for interpretation, so shell
+        metacharacters in it (quotes, $, ;) are evaluated an additional
+        time by that shell. Use --exec/-e to run it directly instead.
 
 Options:
     --cd &lt;Directory&gt;
@@ -685,7 +689,10 @@ Arguments:
         Display usage information.
 
     --
-        Pass the remaining command line as-is.</value>
+        Pass the remaining command line as-is. Unless --shell-type none is
+        also specified, this command line is still handed to the default
+        Linux shell for interpretation, so shell metacharacters in it
+        (quotes, $, ;) are evaluated an additional time by that shell.</value>
     <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
