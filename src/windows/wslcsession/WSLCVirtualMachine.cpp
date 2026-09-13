@@ -36,9 +36,11 @@ namespace wslutil = wsl::windows::common::wslutil;
 
 constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
 
-// usbipd-win listens on the standard USB/IP port. The container VM mirrors the
-// host's network, so the loopback address reaches it. The host resolves this and
-// passes it to the guest, so the guest makes no assumption about network mode.
+// usbipd-win listens on the standard USB/IP port, on the host. The guest reaches
+// it on the loopback address through Consomme's localhost relay, which is set up
+// unless the session runs the wslrelay-based port relay instead
+// (WslcFeatureFlagsPortRelayWslRelay). The address is decided here rather than in
+// the guest, so there is one place to change when that is no longer true.
 constexpr auto USBIP_HOST = "127.0.0.1";
 constexpr uint16_t USBIP_PORT = 3240;
 

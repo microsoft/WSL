@@ -305,6 +305,37 @@ bool IsPortFree(int Port)
     return false;
 }
 
+// Returns a device node's path relative to /dev, as the kernel reports it in
+// DEVNAME. That is usually just the directory's name, but not always: sound and
+// input nodes sit in subdirectories, so the name alone would be wrong. Returns
+// an empty string for a directory that names no node.
+std::string DeviceName(const std::filesystem::path& Directory)
+{
+    constexpr std::string_view prefix = "DEVNAME=";
+
+    try
+    {
+
+        std::istringstream uevent{UtilReadFileContent((Directory / "uevent").native())};
+        for (std::string line; std::getline(uevent, line);)
+        {
+            if (line.starts_with(prefix))
+            {
+                line.erase(0, prefix.size());
+                while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back())))
+                {
+                    line.pop_back();
+                }
+
+                return line;
+            }
+        }
+    }
+    CATCH_LOG()
+
+    return {};
+}
+
 // The VM runs no udev, so the driver a device needs is loaded here instead.
 // Using modalias keeps this working for every device type, not just serial ones.
 void LoadDeviceDriver(const std::string& LocalBusId)
@@ -366,6 +397,11 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
     // the device's own subtree and let the "dev" file mark them, which picks up
     // camera, hidraw and sound nodes as readily as serial ones.
     //
+    // The node's path under /dev comes from DEVNAME in the entry's "uevent",
+    // because /dev is not flat: sound and input nodes live in subdirectories,
+    // as "snd/pcmC0D0p" and "input/event0", and the directory name alone would
+    // name something that does not exist.
+    //
     // Symlinks are not followed, so this cannot wander out of the device. The
     // device's own "dev" file is passed over on its own: it names the usbfs
     // entry, for which no /dev/<busid> exists.
@@ -385,8 +421,15 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
             continue;
         }
 
+        const auto directory = entry->path().parent_path();
+        auto name = DeviceName(directory);
+        if (name.empty())
+        {
+            continue;
+        }
+
         std::error_code exists;
-        auto node = std::format("/dev/{}", entry->path().parent_path().filename().native());
+        auto node = std::format("/dev/{}", name);
         if (std::filesystem::exists(node, exists))
         {
             found.insert(std::move(node));

@@ -2597,6 +2597,18 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             request.HostConfig.DeviceCgroupRules = std::vector<std::string>{"c 189:* rwm"};
         }
     }
+    else if (privileged)
+    {
+        // Nothing was shared when this container was created, but the mount is
+        // still what a privileged container is promised, and a device bound
+        // later shows up through it.
+        if (!request.HostConfig.Binds.has_value())
+        {
+            request.HostConfig.Binds.emplace();
+        }
+
+        request.HostConfig.Binds->emplace_back("/dev/bus/usb:/dev/bus/usb");
+    }
 
     // Prepare port mappings from container options.
     std::vector<_WSLCPortMapping> ports;
@@ -3208,6 +3220,12 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
         {
             volume.Mounted = false;
         }
+
+        // The VM took its USB/IP connections with it, so those references are
+        // gone whether or not anyone asks. Forgetting them matters: kept around,
+        // they would be released against whatever VM comes next, taking a device
+        // away from a container that legitimately holds it.
+        m_usbDevicesHeld.clear();
     }
     else
     {
