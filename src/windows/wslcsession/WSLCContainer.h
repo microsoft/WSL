@@ -84,6 +84,10 @@ public:
         std::vector<WSLCVolumeMount>&& volumes,
         std::vector<std::string>&& namedVolumes,
         std::vector<std::string>&& usbDevices,
+        // True when the caller has already imported usbDevices and is handing
+        // those references over, as Create does. A container rebuilt from stored
+        // metadata holds nothing yet and passes false.
+        bool usbDevicesHeld,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
@@ -293,6 +297,11 @@ private:
 
     // usbipd bus IDs to import while this container holds runtime resources.
     std::vector<std::string> m_usbDevices;
+
+    // The subset of m_usbDevices this container currently holds a reference to.
+    // Imports are reference counted VM-wide, so releasing one this container
+    // never took would take it from another container.
+    _Guarded_by_(m_lock) std::vector<std::string> m_usbDevicesHeld;
 
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;

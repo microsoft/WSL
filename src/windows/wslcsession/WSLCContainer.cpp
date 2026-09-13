@@ -25,6 +25,7 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "APICompat.h"
 #include "MountSpecParsing.h"
+#include "wslpolicies.h"
 #include <unordered_set>
 
 namespace apicompat = wsl::windows::common::apicompat;
@@ -827,6 +828,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::vector<WSLCVolumeMount>&& volumes,
     std::vector<std::string>&& namedVolumes,
     std::vector<std::string>&& usbDevices,
+    bool usbDevicesHeld,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
@@ -845,6 +847,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_mountedVolumes(std::move(volumes)),
     m_namedVolumes(std::move(namedVolumes)),
     m_usbDevices(std::move(usbDevices)),
+    m_usbDevicesHeld(usbDevicesHeld ? m_usbDevices : std::vector<std::string>{}),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, std::move(onDeleted))),
@@ -2522,14 +2525,28 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // behaviour, and implies passing through everything usbipd is sharing so
     // that there is something to see.
     const auto privileged = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPrivileged);
-    request.HostConfig.Privileged = privileged;
 
-    std::vector<std::string> requested;
-    for (ULONG i = 0; i < containerOptions.UsbDevices.Count; i++)
+    // Group policy: AllowWSLContainerPrivileged. Checked here at the service
+    // boundary so it covers every caller, not just wslc.exe.
+    if (privileged)
     {
-        requested.emplace_back(containerOptions.UsbDevices.Values[i]);
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_PRIVILEGED_BLOCKED_BY_POLICY,
+            Localization::MessagePrivilegedBlockedByPolicy(),
+            !wsl::windows::policies::IsFeatureAllowed(
+                wsl::windows::policies::OpenPoliciesKey().get(), wsl::windows::policies::c_allowWSLContainerPrivileged));
     }
 
+    request.HostConfig.Privileged = privileged;
+
+    auto requested = StringArrayToVector(containerOptions.UsbDevices);
+
+    // Privileged implies every device usbipd is sharing, so a privileged
+    // container sees what it would outside one. Asking for USB explicitly is
+    // different from getting it implicitly: if the caller named devices and
+    // none turn up, say so, but a privileged container on a host with nothing
+    // shared is ordinary and must still start.
+    const auto usbRequestedExplicitly = !requested.empty();
     if (privileged && requested.empty())
     {
         requested.emplace_back("all");
@@ -2548,6 +2565,11 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 devices.push_back({node, node, "rwm"});
             }
         }
+
+        // Only reachable for an explicit '--usb all', since a named bus ID that
+        // is not shared fails in the guest.
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NO_USB_DEVICES_SHARED, Localization::MessageNoUsbDevicesShared(), usbRequestedExplicitly && usbDevices.empty());
 
         // Raw USB access goes through a bind mount of /dev/bus/usb. A device that
         // is unplugged and reconnected comes back under a new device number, and
@@ -2784,6 +2806,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(volumes),
         std::move(namedVolumes),
         std::move(usbDevices),
+        true, // Create imported them just above; the container takes over those references.
         std::move(mappedPorts),
         std::move(mergedLabels),
         std::move(OnDeleted),
@@ -2878,6 +2901,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::move(metadata.Volumes),
         std::move(namedVolumes),
         std::move(metadata.UsbDevices),
+        false, // Rebuilt from metadata: nothing is imported yet.
         std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
@@ -3096,15 +3120,20 @@ void WSLCContainerImpl::AttachUsbDevices()
     // the container's config are reused as-is: a device normally enumerates under
     // the same name, and raw USB access goes through the /dev/bus/usb bind mount,
     // which follows the device wherever it reappears.
+    // Record each import as it lands. If a later one fails, the caller's cleanup
+    // runs DetachUsbDevices, and it must give back only what was taken here:
+    // releasing the whole of m_usbDevices would drop references this start never
+    // took, and a shared device would go out from under another container.
     for (const auto& busId : m_usbDevices)
     {
         m_runtime.Vm().AttachUsbDevice(busId);
+        m_usbDevicesHeld.push_back(busId);
     }
 }
 
 void WSLCContainerImpl::DetachUsbDevices()
 {
-    for (const auto& busId : m_usbDevices)
+    for (const auto& busId : m_usbDevicesHeld)
     {
         try
         {
@@ -3112,6 +3141,8 @@ void WSLCContainerImpl::DetachUsbDevices()
         }
         CATCH_LOG();
     }
+
+    m_usbDevicesHeld.clear();
 }
 
 void WSLCContainerImpl::UnmapPorts()

@@ -54,7 +54,10 @@ struct FlagsTraits<WslcContainerFlags>
     constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLCContainerFlagsRm);
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLCContainerFlagsGpu);
-    // TODO: WSLC_CONTAINER_FLAG_PRIVILEGED has no associated runtime value
+    // WSLC_CONTAINER_FLAG_PRIVILEGED is deliberately absent from the mask.
+    // Its value (0x4) is WSLCContainerFlagsInit at runtime, so masking it
+    // through would ask for the wrong thing. ConvertContainerFlags translates
+    // it instead, which keeps the published SDK value unchanged.
 };
 
 template <>
@@ -78,6 +81,19 @@ typename FlagsTraits<Flags>::WslcType ConvertFlags(Flags flags)
 {
     using traits = FlagsTraits<Flags>;
     return static_cast<typename traits::WslcType>(flags & traits::Mask);
+}
+
+// Container flags are not a straight cast: the SDK and the runtime disagree on
+// the value of the privileged bit, so it is mapped by hand.
+WSLCContainerFlags ConvertContainerFlags(WslcContainerFlags flags)
+{
+    auto result = ConvertFlags(flags);
+    if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
+    {
+        WI_SetFlag(result, WSLCContainerFlagsPrivileged);
+    }
+
+    return result;
 }
 
 WSLCSignal Convert(WslcSignal signal)
@@ -779,7 +795,7 @@ try
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
     containerOptions.DomainName = internalContainerSettings->DomainName;
-    containerOptions.Flags = ConvertFlags(internalContainerSettings->containerFlags);
+    containerOptions.Flags = ConvertContainerFlags(internalContainerSettings->containerFlags);
 
     CopyProcessSettingsToRuntime(containerOptions.InitProcessOptions, internalContainerSettings->initProcessOptions);
 

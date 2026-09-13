@@ -4007,6 +4007,13 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Failed to install host trusted root certificates into the VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessagePrivilegedBlockedByPolicy" xml:space="preserve">
+    <value>Privileged containers are disabled by the computer policy.</value>
+  </data>
+  <data name="MessageNoUsbDevicesShared" xml:space="preserve">
+    <value>No USB devices are shared. Run 'usbipd bind --busid &lt;busid&gt;' as an administrator first.</value>
+    <comment>{Locked="usbipd bind --busid"}</comment>
+  </data>
   <data name="WSLCCLI_UsbArgDescription" xml:space="preserve">
     <value>Add a USB device to the container by bus ID ('all' to pass all shared devices)</value>
     <comment>{Locked="all"}</comment>

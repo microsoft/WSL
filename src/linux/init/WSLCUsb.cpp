@@ -28,6 +28,7 @@ Abstract:
 #include <filesystem>
 #include <map>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <thread>
 
@@ -227,11 +228,24 @@ std::vector<std::array<std::string, 7>> ReadPortTable()
     return rows;
 }
 
+// Callers hold g_attachmentLock, because the choice is only good until someone
+// else makes it.
 int FindFreePort()
 {
+    // A port belonging to an existing attachment is not up for grabs even while
+    // it reads as free. Each attachment has a watcher process re-importing on
+    // that exact port whenever the device comes back, and being a forked
+    // process it shares neither this lock nor the table, so the sysfs state
+    // alone cannot be trusted for those.
+    std::set<int> owned;
+    for (const auto& [_, attachment] : g_attachments)
+    {
+        owned.insert(attachment.Port);
+    }
+
     for (const auto& row : ReadPortTable())
     {
-        if (std::stoi(row[2]) == c_portFree)
+        if (std::stoi(row[2]) == c_portFree && !owned.contains(std::stoi(row[1])))
         {
             return std::stoi(row[1]);
         }
@@ -326,17 +340,19 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
     std::vector<std::string> nodes;
     std::error_code error;
 
-    // Adds /dev/<name> for every entry naming a device node that exists.
+    // Adds /dev/<name> for every entry that is a device node's own sysfs
+    // directory. Those are the ones holding a "dev" file, which is what marks
+    // them rather than their name, so cameras, hidraw and sound nodes are found
+    // the same way serial ones are.
     const auto collect = [&nodes, &error](const std::filesystem::path& Directory) {
         for (const auto& entry : std::filesystem::directory_iterator{Directory, error})
         {
-            const auto name = entry.path().filename().native();
-            if (!name.starts_with("tty"))
+            if (!std::filesystem::exists(entry.path() / "dev", error))
             {
                 continue;
             }
 
-            auto node = std::format("/dev/{}", name);
+            auto node = std::format("/dev/{}", entry.path().filename().native());
             if (std::filesystem::exists(node, error))
             {
                 nodes.push_back(std::move(node));
@@ -344,9 +360,10 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
         }
     };
 
-    // Drivers bind to an interface, and put their node either straight into the
-    // interface directory (ch341, ftdi_sio) or into a "tty" directory inside it
-    // (cdc_acm), so both layouts are searched.
+    // Drivers bind to an interface and put their node either straight into the
+    // interface directory (ch341, ftdi_sio) or one level down in a class
+    // directory such as "tty", "video4linux" or "hidraw" (cdc_acm, uvcvideo),
+    // so both layouts are searched.
     for (const auto& iface : std::filesystem::directory_iterator{devicePath, error})
     {
         if (!std::filesystem::is_directory(iface.path(), error))
@@ -355,7 +372,14 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
         }
 
         collect(iface.path());
-        collect(iface.path() / "tty");
+
+        for (const auto& sub : std::filesystem::directory_iterator{iface.path(), error})
+        {
+            if (std::filesystem::is_directory(sub.path(), error) && !std::filesystem::exists(sub.path() / "dev", error))
+            {
+                collect(sub.path());
+            }
+        }
     }
 
     return nodes;
@@ -432,6 +456,16 @@ std::vector<std::string> WaitForDevice(int Port)
     return {};
 }
 
+// Hands a vhci port back, which returns the device to Windows.
+void DetachPort(int Port)
+{
+    const auto port = std::to_string(Port);
+    if (WriteToFile(std::format("{}/detach", c_vhciPath).c_str(), port.c_str(), O_WRONLY | O_CLOEXEC) < 0)
+    {
+        LOG_ERROR("Failed to detach USB port {}, {}", Port, errno);
+    }
+}
+
 // Re-imports a device after it is unplugged and plugged back in. Without this a
 // device that resets itself, as boards do while being flashed, would stay gone.
 void WatchDevice(const std::string& Host, uint16_t Port, const std::string& BusId, int VhciPort)
@@ -450,7 +484,16 @@ void WatchDevice(const std::string& Host, uint16_t Port, const std::string& BusI
             }
 
             std::ignore = Import(Host, Port, BusId, VhciPort);
+
+            // The import has already taken the device from Windows. If it never
+            // finishes coming up, the port has to go back, otherwise the check
+            // above sees it as busy from here on and the device is lost to both
+            // sides.
+            auto undo = wil::scope_exit([&]() { DetachPort(VhciPort); });
+
             std::ignore = WaitForDevice(VhciPort);
+
+            undo.release();
 
             LOG_INFO("Re-imported USB device {} on port {}", BusId.c_str(), VhciPort);
         }
@@ -471,6 +514,12 @@ std::vector<std::string> AttachOne(const std::string& Host, uint16_t Port, const
     }
 
     const auto vhciPort = Import(Host, Port, BusId);
+
+    // Past this point the device is this VM's. Anything that fails has to give
+    // the port back, or the device is left attached to nothing: gone from
+    // Windows and absent from the container.
+    auto undo = wil::scope_exit([&]() { DetachPort(vhciPort); });
+
     auto nodes = WaitForDevice(vhciPort);
 
     Attachment attachment{vhciPort, 0, nodes, 1};
@@ -480,6 +529,7 @@ std::vector<std::string> AttachOne(const std::string& Host, uint16_t Port, const
     });
 
     g_attachments.emplace(BusId, std::move(attachment));
+    undo.release();
 
     return nodes;
 }
@@ -506,11 +556,7 @@ void DetachOne(const std::string& BusId)
         waitpid(attachment->second.WatcherPid, nullptr, 0);
     }
 
-    const auto detach = std::to_string(attachment->second.Port);
-    if (WriteToFile(std::format("{}/detach", c_vhciPath).c_str(), detach.c_str(), O_WRONLY | O_CLOEXEC) < 0)
-    {
-        LOG_ERROR("Failed to detach USB device {} from port {}, {}", BusId.c_str(), attachment->second.Port, errno);
-    }
+    DetachPort(attachment->second.Port);
 
     g_attachments.erase(attachment);
 }
@@ -533,11 +579,10 @@ AttachResult Attach(const std::string& Host, uint16_t Port, const std::string& B
 
     if (BusId == "all")
     {
+        // An empty set is a truthful answer to "everything that is shared", so
+        // it is left to the service to decide whether that is an error. A
+        // privileged container on a host with no bound device still starts.
         result.BusIds = ListDevices(Host, Port);
-
-        // Nothing shared means the user has not run 'usbipd bind' yet, which is
-        // worth reporting rather than starting a container with no devices.
-        THROW_ERRNO_IF(ENODEV, result.BusIds.empty());
     }
     else
     {

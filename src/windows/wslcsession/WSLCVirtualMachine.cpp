@@ -693,6 +693,12 @@ std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Pa
 
 UsbAttachResult WSLCVirtualMachine::AttachUsbDevice(const std::string& BusId)
 {
+    // Containers start and stop independently, so these can be called at once
+    // for different containers. SocketChannel orders individual sends and
+    // receives but not a whole exchange, so without this one call could read
+    // another's reply. The lock covers the request and its response together.
+    std::lock_guard lock(m_lock);
+
     wsl::shared::MessageWriter<WSLC_USB_ATTACH> message;
     message->Port = USBIP_PORT;
     message.WriteString(message->HostIndex, USBIP_HOST);
@@ -710,6 +716,9 @@ UsbAttachResult WSLCVirtualMachine::AttachUsbDevice(const std::string& BusId)
 
 void WSLCVirtualMachine::DetachUsbDevice(const std::string& BusId)
 {
+    // Serialized against AttachUsbDevice for the reason given there.
+    std::lock_guard lock(m_lock);
+
     wsl::shared::MessageWriter<WSLC_USB_DETACH> message;
     message.WriteString(message->BusIdIndex, BusId.c_str());
 
