@@ -1695,7 +1695,7 @@ class UnitTests
         VerifyInvalidUsage(L"--manage " LXSS_DISTRO_NAME_TEST_L L" --compact --resize 10GB");
     }
 
-    // This test validates that the help messages for wsl.exe and wsl.config are correctly displayed.
+    // This test validates that the help messages for wsl.exe, wslg.exe, and wslconfig.exe are correctly displayed.
     // Notes:
     // - This test will fail if the help messages are changed. If that's the case, simply update the below strings
     // - This test assumes that English is the configured language.
@@ -1920,6 +1920,37 @@ Arguments for managing distributions in Windows Subsystem for Linux:
         Unregisters the distribution and deletes the root filesystem.
 )""";
 
+        const std::wstring WslgHelpMessage =
+            LR"""(Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.
+
+Usage: wslg.exe [Argument] [Options...] [CommandLine]
+
+Arguments:
+    --cd <Directory>
+        Sets the specified directory as the current working directory.
+        If ~ is used the Linux user's home path will be used. If the path begins
+        with a / character, it will be interpreted as an absolute Linux path.
+        Otherwise, the value must be an absolute Windows path.
+
+    --distribution, -d <Distro>
+        Run the specified distribution.
+
+    --user, -u <UserName>
+        Run as the specified user.
+
+    --shell-type <standard|login|none>
+        Execute the specified command with the provided shell type.
+
+    --help
+        Display usage information.
+
+    --
+        Pass the remaining command line as-is. Unless --shell-type none is
+        also specified, this command line is still handed to the default
+        Linux shell for interpretation, so shell metacharacters in it
+        (quotes, $, ;) are evaluated an additional time by that shell.)""";
+
         const std::wstring WslConfigHelpMessage =
             LR"""(Performs administrative operations on Windows Subsystem for Linux
 
@@ -1956,8 +1987,11 @@ Usage:
             return MessageWithCrlf;
         };
 
-        // Note: There is no easy way to validate wslg's help message, since it displays a blocking
-        // message box before exiting.
+        // wslg.exe displays its help in a blocking message box, so validate the
+        // localized usage resource directly instead of launching the executable.
+        VERIFY_ARE_EQUAL(
+            std::wstring{wsl::shared::Localization::MessageWslgUsage()},
+            WslgHelpMessage);
 
         VerifyOutput(L"--help", AddCrlf(WslHelpMessage), -1);
         VerifyOutput(L"--help", AddCrlf(WslConfigHelpMessage), -1, L"wslconfig.exe");
