@@ -613,7 +613,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 
     --unregister &lt;Distro&gt;
         Unregisters the distribution and deletes the root filesystem.</value>
-  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--exec/"}{Locked="--shell-type "}{Locked="--exec/"}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
@@ -694,7 +694,7 @@ Arguments:
         Linux shell for interpretation, so shell metacharacters in it
         (quotes, $, ;) are evaluated an additional time by that shell.</value>
     <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
-"}Command line arguments, file names and string inserts should not be translated</comment>
+"}{Locked="--shell-type "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
     <value>Press any key to continue...</value>
