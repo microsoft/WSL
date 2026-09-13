@@ -2549,8 +2549,20 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             }
         }
 
-        // A privileged container already has all of /dev, so none of the mapping
-        // below applies to it.
+        // Raw USB access goes through a bind mount of /dev/bus/usb. A device that
+        // is unplugged and reconnected comes back under a new device number, and
+        // only a bind mount follows that: a privileged container is given its own
+        // /dev when it starts, which does not gain nodes created afterwards, so
+        // this is needed there too. libusb based tools depend on it.
+        if (!request.HostConfig.Binds.has_value())
+        {
+            request.HostConfig.Binds.emplace();
+        }
+
+        request.HostConfig.Binds->emplace_back("/dev/bus/usb:/dev/bus/usb");
+
+        // A privileged container is already allowed every device, and has the
+        // class nodes, so only the narrow case needs these.
         if (!privileged)
         {
             // Class nodes such as /dev/ttyUSB0 are mapped individually, because
@@ -2560,16 +2572,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 request.HostConfig.Devices = std::move(devices);
             }
 
-            // Raw USB access instead goes through a bind mount of /dev/bus/usb with a
-            // cgroup rule for major 189 (usb_device). A device that is unplugged and
-            // reconnected comes back under a new device number, which a fixed mapping
-            // could not follow, so libusb-based tools need the whole directory.
-            if (!request.HostConfig.Binds.has_value())
-            {
-                request.HostConfig.Binds.emplace();
-            }
-
-            request.HostConfig.Binds->emplace_back("/dev/bus/usb:/dev/bus/usb");
             request.HostConfig.DeviceCgroupRules = std::vector<std::string>{"c 189:* rwm"};
         }
     }
