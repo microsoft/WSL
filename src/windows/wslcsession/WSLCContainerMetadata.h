@@ -59,7 +59,11 @@ struct WSLCContainerMetadataV1
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes);
+    // usbipd bus IDs passed with --usb. Kept so the devices can be imported
+    // again when the container is started after the VM has been torn down.
+    std::vector<std::string> UsbDevices;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes, UsbDevices);
 };
 
 struct WSLCContainerMetadata

@@ -118,6 +118,17 @@ private:
     WSLCVirtualMachine* Vm{};
 };
 
+struct UsbAttachResult
+{
+    // The devices that were imported. Requesting "all" resolves to the set of
+    // devices the host was sharing at that moment.
+    std::vector<std::string> BusIds;
+
+    // Class device nodes that appeared, such as "/dev/ttyUSB0". Devices used
+    // through libusb have none and are reached through /dev/bus/usb instead.
+    std::vector<std::string> DeviceNodes;
+};
+
 class WSLCVirtualMachine
 {
 public:
@@ -190,6 +201,12 @@ public:
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void RemoveDirectory(_In_ const std::string& Path);
     std::vector<std::string> ListDirectory(_In_ const std::string& Path);
+
+    // Imports a USB device into the VM over USB/IP. BusId may be "all", in which
+    // case the result reports which devices that resolved to, so the caller can
+    // release exactly the ones it took.
+    UsbAttachResult AttachUsbDevice(_In_ const std::string& BusId);
+    void DetachUsbDevice(_In_ const std::string& BusId);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);

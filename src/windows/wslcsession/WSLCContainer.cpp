@@ -826,6 +826,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::string NetworkMode,
     std::vector<WSLCVolumeMount>&& volumes,
     std::vector<std::string>&& namedVolumes,
+    std::vector<std::string>&& usbDevices,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
@@ -843,6 +844,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_namedVolumes(std::move(namedVolumes)),
+    m_usbDevices(std::move(usbDevices)),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, std::move(onDeleted))),
@@ -1137,6 +1139,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
     if (!m_runtimeResourcesHeld)
     {
         MountVolumes(m_mountedVolumes, m_runtime.Vm()).release();
+        AttachUsbDevices();
         MapPorts();
         m_runtimeResourcesHeld = true;
     }
@@ -2499,6 +2502,56 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.DeviceRequests = std::vector<common::docker_schema::DeviceRequest>{{"cdi", {LX_WSLC_GPU_CDI_DEVICE}}};
     }
 
+    // Configure USB passthrough if requested. Unlike the GPU there is no session
+    // feature to gate on: importing a device needs nothing from the VM's config,
+    // only a usbipd server on the host that is already sharing the device.
+    //
+    // The bus IDs are the ones the guest reports rather than the ones asked for,
+    // because "all" resolves to a set only the guest can enumerate. An imported
+    // device is taken away from Windows, so anything that fails between here and
+    // a created container has to give it back.
+    std::vector<std::string> usbDevices;
+    auto usbCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&usbDevices, &virtualMachine]() {
+        for (const auto& busId : usbDevices)
+        {
+            virtualMachine.DetachUsbDevice(busId);
+        }
+    });
+
+    if (containerOptions.UsbDevices.Count > 0)
+    {
+        std::vector<common::docker_schema::DeviceMapping> devices;
+        for (ULONG i = 0; i < containerOptions.UsbDevices.Count; i++)
+        {
+            auto attached = virtualMachine.AttachUsbDevice(containerOptions.UsbDevices.Values[i]);
+            usbDevices.insert(usbDevices.end(), attached.BusIds.begin(), attached.BusIds.end());
+
+            for (const auto& node : attached.DeviceNodes)
+            {
+                devices.push_back({node, node, "rwm"});
+            }
+        }
+
+        // Class nodes such as /dev/ttyUSB0 are mapped individually, because
+        // programs expect them at a fixed path.
+        if (!devices.empty())
+        {
+            request.HostConfig.Devices = std::move(devices);
+        }
+
+        // Raw USB access instead goes through a bind mount of /dev/bus/usb with a
+        // cgroup rule for major 189 (usb_device). A device that is unplugged and
+        // reconnected comes back under a new device number, which a fixed mapping
+        // could not follow, so libusb-based tools need the whole directory.
+        if (!request.HostConfig.Binds.has_value())
+        {
+            request.HostConfig.Binds.emplace();
+        }
+
+        request.HostConfig.Binds->emplace_back("/dev/bus/usb:/dev/bus/usb");
+        request.HostConfig.DeviceCgroupRules = std::vector<std::string>{"c 189:* rwm"};
+    }
+
     // Prepare port mappings from container options.
     std::vector<_WSLCPortMapping> ports;
     for (ULONG i = 0; i < containerOptions.PortsCount; i++)
@@ -2615,6 +2668,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
+    metadata.UsbDevices = usbDevices;
 
     for (const auto& e : mappedPorts)
     {
@@ -2705,6 +2759,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(networkMode),
         std::move(volumes),
         std::move(namedVolumes),
+        std::move(usbDevices),
         std::move(mappedPorts),
         std::move(mergedLabels),
         std::move(OnDeleted),
@@ -2713,6 +2768,9 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         createdAt,
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
+
+    // The container now owns the imported devices and releases them itself.
+    usbCleanup.release();
 
     container->Initialize();
 
@@ -2795,6 +2853,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::move(networkMode),
         std::move(metadata.Volumes),
         std::move(namedVolumes),
+        std::move(metadata.UsbDevices),
         std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
@@ -3007,6 +3066,30 @@ void WSLCContainerImpl::MapPorts()
     }
 }
 
+void WSLCContainerImpl::AttachUsbDevices()
+{
+    // Re-import the devices after an idle teardown. The device nodes recorded in
+    // the container's config are reused as-is: a device normally enumerates under
+    // the same name, and raw USB access goes through the /dev/bus/usb bind mount,
+    // which follows the device wherever it reappears.
+    for (const auto& busId : m_usbDevices)
+    {
+        m_runtime.Vm().AttachUsbDevice(busId);
+    }
+}
+
+void WSLCContainerImpl::DetachUsbDevices()
+{
+    for (const auto& busId : m_usbDevices)
+    {
+        try
+        {
+            m_runtime.Vm().DetachUsbDevice(busId);
+        }
+        CATCH_LOG();
+    }
+}
+
 void WSLCContainerImpl::UnmapPorts()
 {
     for (auto& e : m_mappedPorts)
@@ -3074,6 +3157,10 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
     else
     {
         UnmountVolumes(m_mountedVolumes, m_runtime.Vm());
+
+        // A dead VM has already dropped its USB/IP connections, which returns the
+        // devices to Windows on its own, so this is only needed while it is alive.
+        DetachUsbDevices();
     }
 }
 

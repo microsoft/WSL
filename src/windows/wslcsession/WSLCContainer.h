@@ -83,6 +83,7 @@ public:
         std::string NetworkMode,
         std::vector<WSLCVolumeMount>&& volumes,
         std::vector<std::string>&& namedVolumes,
+        std::vector<std::string>&& usbDevices,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
@@ -236,6 +237,8 @@ private:
 
     void MapPorts();
     void UnmapPorts();
+    void AttachUsbDevices();
+    void DetachUsbDevices();
 
     // Acquires or releases the activity hold so it is held exactly while the container is Running,
     // keeping the session's VM alive across idle teardown.
@@ -287,6 +290,9 @@ private:
     std::vector<WSLCVolumeMount> m_mountedVolumes;
 
     std::vector<std::string> m_namedVolumes;
+
+    // usbipd bus IDs to import while this container holds runtime resources.
+    std::vector<std::string> m_usbDevices;
 
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;

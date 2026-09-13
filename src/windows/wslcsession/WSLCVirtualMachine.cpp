@@ -27,6 +27,7 @@ Abstract:
 using namespace wsl::windows::common;
 using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::service::wslc::TypedHandle;
+using wsl::windows::service::wslc::UsbAttachResult;
 using wsl::windows::service::wslc::VmPortAllocation;
 using wsl::windows::service::wslc::VMPortMapping;
 using wsl::windows::service::wslc::WSLCProcess;
@@ -34,6 +35,12 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 namespace wslutil = wsl::windows::common::wslutil;
 
 constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
+
+// usbipd-win listens on the standard USB/IP port. The container VM mirrors the
+// host's network, so the loopback address reaches it. The host resolves this and
+// passes it to the guest, so the guest makes no assumption about network mode.
+constexpr auto USBIP_HOST = "127.0.0.1";
+constexpr uint16_t USBIP_PORT = 3240;
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
@@ -682,6 +689,35 @@ std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Pa
     THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
 
     return wsl::shared::string::ArrayFromSpan(responseSpan, response.EntriesIndex);
+}
+
+UsbAttachResult WSLCVirtualMachine::AttachUsbDevice(const std::string& BusId)
+{
+    wsl::shared::MessageWriter<WSLC_USB_ATTACH> message;
+    message->Port = USBIP_PORT;
+    message.WriteString(message->HostIndex, USBIP_HOST);
+    message.WriteString(message->BusIdIndex, BusId.c_str());
+
+    gsl::span<gsl::byte> responseSpan;
+    const auto& response = m_initChannel.Transaction<WSLC_USB_ATTACH>(message.Span(), &responseSpan, m_initChannelTimeout);
+
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to attach USB device '%hs', init returned: %d", BusId.c_str(), response.Result);
+
+    return {
+        wsl::shared::string::ArrayFromSpan(responseSpan, response.BusIdsIndex),
+        wsl::shared::string::ArrayFromSpan(responseSpan, response.DeviceNodesIndex)};
+}
+
+void WSLCVirtualMachine::DetachUsbDevice(const std::string& BusId)
+{
+    wsl::shared::MessageWriter<WSLC_USB_DETACH> message;
+    message.WriteString(message->BusIdIndex, BusId.c_str());
+
+    const auto& response = m_initChannel.Transaction<WSLC_USB_DETACH>(message.Span(), nullptr, m_initChannelTimeout);
+
+    // A container is going away either way, so a failed detach is logged rather
+    // than thrown. The device is released when the VM shuts down regardless.
+    LOG_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to detach USB device '%hs', init returned: %d", BusId.c_str(), response.Result);
 }
 
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)
