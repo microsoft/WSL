@@ -105,7 +105,7 @@ typedef enum _WSLCContainerFlags
     WSLCContainerFlagsPrivileged = 128, // Give the container access to every device, and pass through all shared USB devices.
 } WSLCContainerFlags;
 
-cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll | WSLCContainerFlagsStopTimeout | WSLCContainerFlagsHealthCheck | WSLCContainerFlagsNoHealthCheck)")
+cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll | WSLCContainerFlagsStopTimeout | WSLCContainerFlagsHealthCheck | WSLCContainerFlagsNoHealthCheck | WSLCContainerFlagsPrivileged)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
 
