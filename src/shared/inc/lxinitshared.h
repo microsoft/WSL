@@ -419,6 +419,9 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageTrimDistribution,
     LxMiniInitMessageTrimDistributionResponse,
     LxMessageWSLCMountModules,
+    LxMessageWSLCUsbAttach,
+    LxMessageWSLCUsbAttachResult,
+    LxMessageWSLCUsbDetach,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -538,6 +541,9 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageTrimDistribution)
         X(LxMiniInitMessageTrimDistributionResponse)
         X(LxMessageWSLCMountModules)
+        X(LxMessageWSLCUsbAttach)
+        X(LxMessageWSLCUsbAttachResult)
+        X(LxMessageWSLCUsbDetach)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1718,6 +1724,64 @@ struct WSLC_MOUNT_MODULES
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex));
+};
+
+struct WSLC_USB_ATTACH_RESULT
+{
+    static inline auto Type = LxMessageWSLCUsbAttachResult;
+
+    DECLARE_MESSAGE_CTOR(WSLC_USB_ATTACH_RESULT);
+
+    MESSAGE_HEADER Header{};
+    int Result{};
+
+    // The devices that were imported. When "all" was requested this is the list
+    // it resolved to, so the caller can release exactly what it took.
+    unsigned int BusIdsIndex{};
+
+    // Class device nodes created for the imported devices, such as "/dev/ttyUSB0".
+    // Nodes under /dev/bus/usb are not listed: those are reached through a bind
+    // mount, so they keep working when the device is unplugged and reconnected
+    // under a new device number.
+    unsigned int DeviceNodesIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), STRING_ARRAY_FIELD(BusIdsIndex), STRING_ARRAY_FIELD(DeviceNodesIndex));
+};
+
+struct WSLC_USB_ATTACH
+{
+    static inline auto Type = LxMessageWSLCUsbAttach;
+    using TResponse = WSLC_USB_ATTACH_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_USB_ATTACH);
+
+    MESSAGE_HEADER Header{};
+
+    // USB/IP server to import from. The host decides this, because it knows the
+    // session's network mode; the guest just connects where it is told.
+    unsigned short Port{};
+    unsigned int HostIndex{};
+
+    // usbipd bus ID such as "1-2", or "all" for every device the server shares.
+    unsigned int BusIdIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Port), STRING_FIELD(HostIndex), STRING_FIELD(BusIdIndex));
+};
+
+struct WSLC_USB_DETACH
+{
+    static inline auto Type = LxMessageWSLCUsbDetach;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(WSLC_USB_DETACH);
+
+    MESSAGE_HEADER Header{};
+    unsigned int BusIdIndex{};
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(BusIdIndex));
 };
 
 struct WSLC_EXEC

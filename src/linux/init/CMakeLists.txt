@@ -21,7 +21,8 @@ set(SOURCES
     WslDistributionConfig.cpp
     wslinfo.cpp
     wslpath.cpp
-    WSLCInit.cpp)
+    WSLCInit.cpp
+    WSLCUsb.cpp)
 
 set(HEADERS
     ../inc/lxwil.h
@@ -44,7 +45,8 @@ set(HEADERS
     util.h
     WslDistributionConfig.h
     wslinfo.h
-    wslpath.h)
+    wslpath.h
+    WSLCUsb.h)
 
 set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil")
 set(INIT_LIBRARIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)

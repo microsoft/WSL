@@ -38,6 +38,7 @@ Abstract:
 #include "JsonUtils.h"
 #include "cdi_schema.h"
 #include "lxfsshares.h"
+#include "WSLCUsb.h"
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
 
@@ -246,6 +247,54 @@ void HandleMessageImpl(
     }
 
     Transaction.Send<WSLC_LISTDIR::TResponse>(writer.Span());
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_USB_ATTACH& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    wsl::shared::MessageWriter<WSLC_USB_ATTACH_RESULT> writer;
+
+    try
+    {
+        const auto* host = wsl::shared::string::FromSpan(Buffer, Message.HostIndex);
+        const auto* busId = wsl::shared::string::FromSpan(Buffer, Message.BusIdIndex);
+        THROW_ERRNO_IF(EINVAL, host == nullptr || busId == nullptr);
+
+        const auto attached = wsl::linux::usb::Attach(host, Message.Port, busId);
+
+        auto busIds = wsl::shared::string::StringPointersFromArray(attached.BusIds, false);
+        writer.WriteStringArray(writer->BusIdsIndex, busIds.data(), busIds.size());
+
+        auto nodes = wsl::shared::string::StringPointersFromArray(attached.DeviceNodes, false);
+        writer.WriteStringArray(writer->DeviceNodesIndex, nodes.data(), nodes.size());
+        writer->Result = 0;
+    }
+    catch (...)
+    {
+        writer->Result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.Send<WSLC_USB_ATTACH::TResponse>(writer.Span());
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_USB_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    int result = 0;
+
+    try
+    {
+        const auto* busId = wsl::shared::string::FromSpan(Buffer, Message.BusIdIndex);
+        THROW_ERRNO_IF(EINVAL, busId == nullptr);
+
+        wsl::linux::usb::Detach(busId);
+    }
+    catch (...)
+    {
+        result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.SendResultMessage<int32_t>(result);
 }
 
 void HandleMessageImpl(
@@ -1104,7 +1153,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE, WSLC_USB_ATTACH, WSLC_USB_DETACH>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)
