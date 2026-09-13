@@ -28,6 +28,7 @@ Abstract:
 #include <filesystem>
 #include <map>
 #include <sstream>
+#include <mutex>
 #include <thread>
 
 namespace {
@@ -96,6 +97,11 @@ struct Attachment
 };
 
 std::map<std::string, Attachment> g_attachments;
+
+// Messages can be handled on more than one thread (see WSLC_FORK::Thread in
+// WSLCInit.cpp), so the table is locked. Holding the lock across a whole attach
+// also stops two of them picking the same free vhci port.
+std::mutex g_attachmentLock;
 
 void WriteAll(int Socket, const void* Buffer, size_t Size)
 {
@@ -507,6 +513,8 @@ AttachResult Attach(const std::string& Host, uint16_t Port, const std::string& B
         result.BusIds.push_back(BusId);
     }
 
+    std::lock_guard lock{g_attachmentLock};
+
     for (const auto& busId : result.BusIds)
     {
         auto nodes = AttachOne(Host, Port, busId);
@@ -518,6 +526,8 @@ AttachResult Attach(const std::string& Host, uint16_t Port, const std::string& B
 
 void Detach(const std::string& BusId)
 {
+    std::lock_guard lock{g_attachmentLock};
+
     auto attachment = g_attachments.find(BusId);
     if (attachment == g_attachments.end())
     {
