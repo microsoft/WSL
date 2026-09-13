@@ -364,6 +364,10 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
     ULONG MountsCount;
+
+    // USB devices to pass through, as usbipd bus IDs (for example "1-2"), or a
+    // single "all" entry to pass through every device shared with usbipd.
+    WSLCStringArray UsbDevices;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;

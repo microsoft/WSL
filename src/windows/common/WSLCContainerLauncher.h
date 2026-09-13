@@ -93,6 +93,7 @@ public:
     void SetDnsServers(std::vector<std::string>&& DnsServers);
     void SetDnsSearchDomains(std::vector<std::string>&& DnsSearchDomains);
     void SetDnsOptions(std::vector<std::string>&& DnsOptions);
+    void SetUsbDevices(std::vector<std::string>&& UsbDevices);
     void SetMemoryLimit(std::int64_t Bytes);
     void SetNanoCpus(std::int64_t NanoCpus);
     void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
@@ -132,6 +133,7 @@ private:
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
+    std::vector<std::string> m_usbDevices;
     std::vector<NetworkConnection> m_additionalNetworks;
     std::vector<std::string> m_primaryNetworkAliases;
     std::optional<std::string> m_primaryNetworkIpAddress;

@@ -272,6 +272,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
     }
 
+    if (!options.UsbDevices.empty())
+    {
+        containerLauncher.SetUsbDevices(std::vector<std::string>(options.UsbDevices));
+    }
+
     for (const auto& [key, value] : options.Labels)
     {
         containerLauncher.AddLabel(key, value);

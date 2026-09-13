@@ -199,6 +199,11 @@ void WSLCContainerLauncher::SetDnsSearchDomains(std::vector<std::string>&& DnsSe
     m_dnsSearchDomains = std::move(DnsSearchDomains);
 }
 
+void WSLCContainerLauncher::SetUsbDevices(std::vector<std::string>&& UsbDevices)
+{
+    m_usbDevices = std::move(UsbDevices);
+}
+
 void WSLCContainerLauncher::SetDnsOptions(std::vector<std::string>&& DnsOptions)
 {
     m_dnsOptions = std::move(DnsOptions);
@@ -437,6 +442,17 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     if (!dnsOptionsStorage.empty())
     {
         options.DnsOptions = {dnsOptionsStorage.data(), static_cast<ULONG>(dnsOptionsStorage.size())};
+    }
+
+    std::vector<const char*> usbDevicesStorage;
+    for (const auto& e : m_usbDevices)
+    {
+        usbDevicesStorage.push_back(e.c_str());
+    }
+
+    if (!usbDevicesStorage.empty())
+    {
+        options.UsbDevices = {usbDevicesStorage.data(), static_cast<ULONG>(usbDevicesStorage.size())};
     }
 
     if (!m_workingDirectory.empty())
