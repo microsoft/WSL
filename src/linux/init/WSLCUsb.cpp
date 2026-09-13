@@ -35,6 +35,10 @@ namespace {
 constexpr auto c_vhciPath = "/sys/devices/platform/vhci_hcd.0";
 constexpr auto c_usbDevicesPath = "/sys/bus/usb/devices";
 
+// Commands are run through popen, which uses a shell, and init's environment has
+// no useful PATH, so these are named in full.
+constexpr auto c_modprobe = "/sbin/modprobe";
+
 constexpr uint16_t c_usbipVersion = 0x0111;
 constexpr uint16_t c_opRequestImport = 0x8003;
 constexpr uint16_t c_opReplyImport = 0x0003;
@@ -270,10 +274,17 @@ void LoadDeviceDriver(const std::string& LocalBusId)
     const std::filesystem::path devicePath{std::format("{}/{}", c_usbDevicesPath, LocalBusId)};
 
     std::vector<std::string> modaliases;
-    modaliases.push_back(UtilReadFileContent((devicePath / "modalias").native()));
-
-    // Drivers usually bind to an interface rather than to the device itself.
     std::error_code error;
+
+    // Drivers usually bind to an interface rather than to the device itself, and
+    // a device commonly exposes no modalias of its own, so every one of these is
+    // optional.
+    const auto deviceAlias = devicePath / "modalias";
+    if (std::filesystem::exists(deviceAlias, error))
+    {
+        modaliases.push_back(UtilReadFileContent(deviceAlias.native()));
+    }
+
     for (const auto& entry : std::filesystem::directory_iterator{devicePath, error})
     {
         const auto alias = entry.path() / "modalias";
@@ -295,7 +306,7 @@ void LoadDeviceDriver(const std::string& LocalBusId)
         {
             // A device with no driver in the image is expected, so failure here
             // is not fatal: /dev/bus/usb access still works without one.
-            UtilExecCommandLine(std::format("modprobe -q {}", alias).c_str(), nullptr, 0, false);
+            UtilExecCommandLine(std::format("{} -q {}", c_modprobe, alias).c_str(), nullptr, 0, false);
         }
     }
 }
@@ -307,11 +318,19 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
     const std::filesystem::path devicePath{std::format("{}/{}", c_usbDevicesPath, LocalBusId)};
 
     std::vector<std::string> nodes;
-    const auto collect = [&nodes](const std::filesystem::path& Directory) {
-        std::error_code error;
+    std::error_code error;
+
+    // Adds /dev/<name> for every entry naming a device node that exists.
+    const auto collect = [&nodes, &error](const std::filesystem::path& Directory) {
         for (const auto& entry : std::filesystem::directory_iterator{Directory, error})
         {
-            auto node = std::format("/dev/{}", entry.path().filename().native());
+            const auto name = entry.path().filename().native();
+            if (!name.starts_with("tty"))
+            {
+                continue;
+            }
+
+            auto node = std::format("/dev/{}", name);
             if (std::filesystem::exists(node, error))
             {
                 nodes.push_back(std::move(node));
@@ -319,23 +338,18 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
         }
     };
 
-    std::error_code error;
+    // Drivers bind to an interface, and put their node either straight into the
+    // interface directory (ch341, ftdi_sio) or into a "tty" directory inside it
+    // (cdc_acm), so both layouts are searched.
     for (const auto& iface : std::filesystem::directory_iterator{devicePath, error})
     {
-        // Serial drivers expose either <interface>/ttyUSB0 or <interface>/tty/ttyACM0.
-        if (std::filesystem::is_directory(iface.path() / "tty", error))
+        if (!std::filesystem::is_directory(iface.path(), error))
         {
-            collect(iface.path() / "tty");
+            continue;
         }
 
-        if (iface.path().filename().native().starts_with("tty"))
-        {
-            auto node = std::format("/dev/{}", iface.path().filename().native());
-            if (std::filesystem::exists(node, error))
-            {
-                nodes.push_back(std::move(node));
-            }
-        }
+        collect(iface.path());
+        collect(iface.path() / "tty");
     }
 
     return nodes;
@@ -349,14 +363,17 @@ std::vector<std::string> FindClassDeviceNodes(const std::string& LocalBusId)
 // later would release whatever else had taken its place.
 int Import(const std::string& Host, uint16_t Port, const std::string& BusId, std::optional<int> VhciPort = {})
 {
+    // The port is chosen before the device is requested. The server hands the
+    // device over as soon as it is asked for it, so anything that can fail must
+    // happen first, or a failure here would strand the device away from Windows.
+    const auto vhciPort = VhciPort.has_value() ? VhciPort.value() : FindFreePort();
+
     auto socketFd = Connect(Host, Port);
     SendRequest(socketFd.get(), c_opRequestImport, &BusId);
     ReadReplyHeader(socketFd.get(), c_opReplyImport);
 
     OpDevice device{};
     ReadAll(socketFd.get(), &device, sizeof(device));
-
-    const auto vhciPort = VhciPort.has_value() ? VhciPort.value() : FindFreePort();
     const auto deviceId = (ntohl(device.BusNum) << 16) | ntohl(device.DevNum);
 
     const auto attach = std::format("{} {} {} {}", vhciPort, socketFd.get(), deviceId, ntohl(device.Speed));
@@ -385,7 +402,13 @@ std::vector<std::string> WaitForDevice(int Port)
 
     THROW_ERRNO_IF(ENODEV, localBusId.empty());
 
-    LoadDeviceDriver(localBusId);
+    // Best effort: a device with no driver in the image is still usable through
+    // /dev/bus/usb, so a failure to load one must not fail the whole attach.
+    try
+    {
+        LoadDeviceDriver(localBusId);
+    }
+    CATCH_LOG()
 
     // A class driver creates its node shortly after binding. Devices without one
     // are normal, so this waits only until something shows up or time runs out.
@@ -461,8 +484,13 @@ namespace wsl::linux::usb {
 
 AttachResult Attach(const std::string& Host, uint16_t Port, const std::string& BusId)
 {
-    // vhci-hcd is not loaded until something needs it.
-    UtilExecCommandLine("modprobe vhci-hcd", nullptr, 0, false);
+    // vhci-hcd is not loaded until something needs it. init runs with a minimal
+    // environment, so modprobe is named by full path rather than found on PATH.
+    UtilExecCommandLine(std::format("{} vhci-hcd", c_modprobe).c_str(), nullptr, 0, false);
+
+    // Fail here rather than part way through an import, so that a guest without
+    // USB/IP support never takes the device away from Windows.
+    THROW_ERRNO_IF(ENODEV, !std::filesystem::exists(std::format("{}/status", c_vhciPath)));
 
     AttachResult result;
 
