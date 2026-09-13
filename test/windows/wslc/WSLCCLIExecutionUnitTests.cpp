@@ -381,6 +381,87 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
     }
 
+    TEST_METHOD(RunCommand_ParseUsb_SetsUsbDevicesOption)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --usb 5-1 ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), options.UsbDevices.size());
+        VERIFY_ARE_EQUAL(std::string("5-1"), options.UsbDevices.front());
+        VERIFY_IS_FALSE(options.Privileged);
+    }
+
+    TEST_METHOD(RunCommand_ParseUsbRepeated_KeepsEveryDevice)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --usb 5-1 --usb 1-2.3 ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), options.UsbDevices.size());
+        VERIFY_ARE_EQUAL(std::string("5-1"), options.UsbDevices[0]);
+        VERIFY_ARE_EQUAL(std::string("1-2.3"), options.UsbDevices[1]);
+    }
+
+    TEST_METHOD(RunCommand_ParseUsbInvalid_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --usb invalid ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    TEST_METHOD(RunCommand_ParsePrivileged_SetsPrivilegedOption)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --privileged ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.Privileged);
+
+        // --privileged on its own names no device; the guest resolves what "all"
+        // means, so nothing is added here.
+        VERIFY_IS_TRUE(options.UsbDevices.empty());
+    }
+
+    TEST_METHOD(CreateCommand_ParseUsb_SetsUsbDevicesOption)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --usb all ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), options.UsbDevices.size());
+        VERIFY_ARE_EQUAL(std::string("all"), options.UsbDevices.front());
+    }
+
     TEST_METHOD(CreateCommand_ParseGpusAll_SetsGpuOption)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus all ubuntu sh");

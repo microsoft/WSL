@@ -218,6 +218,25 @@ class WSLCCLIArgumentUnitTests
         VERIFY_THROWS(validation::ValidateGpus({L"0"}, L"gpusArg"), ArgumentException);
         VERIFY_THROWS(validation::ValidateGpus({L"gpu0"}, L"gpusArg"), ArgumentException);
         VERIFY_THROWS(validation::ValidateGpus({L""}, L"gpusArg"), ArgumentException);
+
+        // Verify USB device argument. Values are usbipd bus IDs, with extra
+        // sections for a device behind a hub, or "all".
+        VERIFY_NO_THROW(validation::ValidateUsb({L"all"}, L"usbArg"));
+        VERIFY_NO_THROW(validation::ValidateUsb({L"5-1"}, L"usbArg"));
+        VERIFY_NO_THROW(validation::ValidateUsb({L"12-34"}, L"usbArg"));
+        VERIFY_NO_THROW(validation::ValidateUsb({L"1-2.3"}, L"usbArg"));
+        VERIFY_NO_THROW(validation::ValidateUsb({L"1-2.3.4"}, L"usbArg"));
+        VERIFY_NO_THROW(validation::ValidateUsb({L"5-1", L"1-2.3"}, L"usbArg"));
+        VERIFY_THROWS(validation::ValidateUsb({L""}, L"usbArg"), ArgumentException);
+        VERIFY_THROWS(validation::ValidateUsb({L"5"}, L"usbArg"), ArgumentException);    // no port
+        VERIFY_THROWS(validation::ValidateUsb({L"5-"}, L"usbArg"), ArgumentException);   // trailing separator
+        VERIFY_THROWS(validation::ValidateUsb({L"-1"}, L"usbArg"), ArgumentException);   // no bus
+        VERIFY_THROWS(validation::ValidateUsb({L"5.1"}, L"usbArg"), ArgumentException);  // '.' before '-'
+        VERIFY_THROWS(validation::ValidateUsb({L"5--1"}, L"usbArg"), ArgumentException); // repeated '-'
+        VERIFY_THROWS(validation::ValidateUsb({L"5-1."}, L"usbArg"), ArgumentException); // trailing '.'
+        VERIFY_THROWS(validation::ValidateUsb({L"5-1a"}, L"usbArg"), ArgumentException); // not a number
+        VERIFY_THROWS(validation::ValidateUsb({L"ALL"}, L"usbArg"), ArgumentException);  // case sensitive
+        VERIFY_THROWS(validation::ValidateUsb({L"5-1", L"bogus"}, L"usbArg"), ArgumentException);
     }
 
     // Test: Verify EnumVariantMap behavior with ArgTypes.
