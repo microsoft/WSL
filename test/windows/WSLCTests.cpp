@@ -7482,6 +7482,69 @@ class WSLCTests
         VERIFY_ARE_EQUAL("0", testEvents[4].Actor.Attributes.at("reclaimed"));
     }
 
+    // Verify the destroy-before-prune ordering used to correlate unkeyed aggregate events.
+    WSLC_TEST_METHOD(NetworkPruneEventSequenceWithExternalPrune)
+    {
+        const std::string firstNetwork = "wslc-test-prune-unrelated-a";
+        const std::string secondNetwork = "wslc-test-prune-unrelated-b";
+        const std::string pruneLabel = "wslc-test-prune-unrelated";
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+        });
+
+        const auto sinceTime = floor<seconds>(system_clock::now()) + 1s;
+        std::this_thread::sleep_until(sinceTime);
+        const LONGLONG since = sinceTime.time_since_epoch().count();
+
+        // Generate an unkeyed aggregate event without changing WSLC network state.
+        ExpectCommandResult(
+            m_defaultSession.get(),
+            {"/usr/bin/docker", "network", "prune", "-f", "--filter", "label=wslc-test-prune-matches-nothing"},
+            0);
+
+        CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
+        CreateNamedNetwork(secondNetwork, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter pruneFilter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), deleted.size());
+
+        cleanup.release();
+
+        WSLCFilter filter{"type", "network"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, &filter, 1, &stream));
+
+        const auto events = DrainEventStream(stream.get());
+
+        std::vector<std::string> actions;
+        for (const auto& e : events)
+        {
+            const auto name = e.Actor.Attributes.find("name");
+            if (e.Action == "prune" || (name != e.Actor.Attributes.end() && (name->second == firstNetwork || name->second == secondNetwork)))
+            {
+                actions.push_back(e.Action);
+            }
+        }
+
+        // The external aggregate precedes this request's ordered destroy and prune events.
+        const std::vector<std::string> expected{"prune", "create", "create", "destroy", "destroy", "prune"};
+        VERIFY_ARE_EQUAL(expected, actions);
+
+        // A no-op prune does not require an event-publication barrier.
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+    }
+
     // Verify callback registration survives Docker event-stream reconnection after VM restart.
     WSLC_TEST_METHOD(NetworkEventsSurviveVmRestart)
     {

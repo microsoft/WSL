@@ -466,7 +466,7 @@ try
         // Network metadata is rebuilt from dockerd on every VM start, so it is always dropped.
         m_networks.clear();
         m_suppressedNetworkEvents.clear();
-        m_abandonedPruneEventPending = false;
+        m_abandonedPrune.reset();
 
         // Container wrappers are kept alive across idle teardown (only cleared on permanent shutdown)
         // so client COM references stay valid; RecoverState reattaches them to the restarted VM.
@@ -2520,11 +2520,17 @@ try
 
     m_eventStore.Record("network", std::string{actions.at(Event)}, NetworkId, Attributes, Time);
 
-    if (Event == NetworkEvent::Prune && m_abandonedPruneEventPending)
+    if (m_abandonedPrune)
     {
-        // Consume the delayed event from the abandoned prune.
-        m_abandonedPruneEventPending = false;
-        return;
+        if (Event == NetworkEvent::Destroy)
+        {
+            m_abandonedPrune->RemainingDestroyIds.erase(NetworkId);
+        }
+        else if (Event == NetworkEvent::Prune && m_abandonedPrune->RemainingDestroyIds.empty())
+        {
+            m_abandonedPrune.reset();
+            return;
+        }
     }
 
     if (!m_pendingNetworkOperation)
@@ -2542,8 +2548,14 @@ try
             return Event == NetworkEvent::Destroy && NetworkId == m_pendingNetworkOperation->NetworkId;
 
         case PendingNetworkOperationType::Prune:
-            // Docker emits the aggregate prune event after per-network destroys and without a network ID.
-            return Event == NetworkEvent::Prune;
+            if (Event == NetworkEvent::Destroy)
+            {
+                m_pendingNetworkOperation->ExpectedDestroyIds.erase(NetworkId);
+                return false;
+            }
+
+            // Docker serializes prunes and emits the aggregate event after all destroy events.
+            return Event == NetworkEvent::Prune && m_pendingNetworkOperation->ExpectedDestroyIds.empty();
         }
 
         return false;
@@ -2559,13 +2571,14 @@ try
 CATCH_LOG()
 
 __requires_lock_held(m_networksLock) std::shared_ptr<WSLCSession::PendingNetworkOperation> WSLCSession::StartPendingNetworkOperation(
-    PendingNetworkOperationType Type, std::string NetworkId)
+    PendingNetworkOperationType Type, std::string NetworkId, std::unordered_set<std::string> ExpectedDestroyIds)
 {
     WI_ASSERT(!m_pendingNetworkOperation);
 
     m_pendingNetworkOperation = std::make_shared<PendingNetworkOperation>();
     m_pendingNetworkOperation->Type = Type;
     m_pendingNetworkOperation->NetworkId = std::move(NetworkId);
+    m_pendingNetworkOperation->ExpectedDestroyIds = std::move(ExpectedDestroyIds);
 
     return m_pendingNetworkOperation;
 }
@@ -2600,7 +2613,7 @@ void WSLCSession::WaitForPendingNetworkOperationCompletion(const std::shared_ptr
 
         if (Operation->Type == PendingNetworkOperationType::Prune)
         {
-            m_abandonedPruneEventPending = true;
+            m_abandonedPrune.emplace(AbandonedPrune{std::move(Operation->ExpectedDestroyIds)});
         }
 
         CompletePendingNetworkOperation(Operation);
@@ -3515,8 +3528,8 @@ try
     std::unique_lock networksLock(m_networksLock);
     WaitForConflictingNetworkOperationToComplete(networksLock);
 
-    // Reject before calling Docker so the stale event cannot complete a new prune.
-    THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), Localization::MessageWslcNetworkPrunePending(), m_abandonedPruneEventPending);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE), Localization::MessageWslcNetworkPrunePending(), m_abandonedPrune.has_value());
 
     docker_schema::PruneNetworkResult pruneResult;
     try
@@ -3526,16 +3539,20 @@ try
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune networks");
 
     std::vector<std::string> deleted;
+    std::unordered_set<std::string> deletedIds;
     if (pruneResult.NetworksDeleted.has_value())
     {
         deleted.reserve(pruneResult.NetworksDeleted->size());
         for (const auto& name : *pruneResult.NetworksDeleted)
         {
-            if (!m_networks.contains(name))
+            const auto network = m_networks.find(name);
+            if (network == m_networks.end())
             {
                 WSL_LOG("PrunedUnknownNetwork", TraceLoggingValue(name.c_str(), "NetworkName"));
                 continue;
             }
+
+            deletedIds.insert(network->second.Id);
             deleted.push_back(name);
         }
     }
@@ -3546,22 +3563,19 @@ try
         m_networks.erase(name);
     }
 
-    if (!deleted.empty())
+    if (deleted.empty())
     {
-        WSL_LOG("NetworksPruned", TraceLoggingValue(static_cast<ULONG>(deleted.size()), "Count"));
+        // No committed state change requires an event-publication barrier.
+        return S_OK;
     }
 
-    // Docker emits the aggregate prune event even when nothing matched, so this waits either way.
-    auto pendingOperation = StartPendingNetworkOperation(PendingNetworkOperationType::Prune, {});
+    WSL_LOG("NetworksPruned", TraceLoggingValue(static_cast<ULONG>(deleted.size()), "Count"));
+
+    auto pendingOperation = StartPendingNetworkOperation(PendingNetworkOperationType::Prune, {}, std::move(deletedIds));
 
     networksLock.unlock();
 
     WaitForPendingNetworkOperationCompletion(pendingOperation);
-
-    if (deleted.empty())
-    {
-        return S_OK;
-    }
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkName[]>(deleted.size());
     for (size_t i = 0; i < deleted.size(); ++i)

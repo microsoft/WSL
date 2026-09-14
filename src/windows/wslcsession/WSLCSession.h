@@ -30,6 +30,7 @@ Abstract:
 #include <list>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace wsl::windows::service::wslc {
 
@@ -362,10 +363,19 @@ private:
         wil::unique_event Completed{wil::EventOptions::ManualReset};
         PendingNetworkOperationType Type{};
         std::string NetworkId;
+
+        // Docker publishes these destroy IDs before the request's unkeyed aggregate prune event.
+        std::unordered_set<std::string> ExpectedDestroyIds;
+    };
+
+    // Tracks a timed-out prune until its ordered event sequence drains.
+    struct AbandonedPrune
+    {
+        std::unordered_set<std::string> RemainingDestroyIds;
     };
 
     __requires_lock_held(m_networksLock) std::shared_ptr<PendingNetworkOperation> StartPendingNetworkOperation(
-        PendingNetworkOperationType Type, std::string NetworkId);
+        PendingNetworkOperationType Type, std::string NetworkId, std::unordered_set<std::string> ExpectedDestroyIds = {});
 
     __requires_lock_held(m_networksLock) void CompletePendingNetworkOperation(const std::shared_ptr<PendingNetworkOperation>& Operation) noexcept;
 
@@ -456,8 +466,8 @@ private:
     // Events from rolled-back creates are not published.
     __guarded_by(m_networksLock) std::deque<std::pair<std::string, NetworkEvent>> m_suppressedNetworkEvents;
 
-    // Blocks later prunes after a failed wait until the unkeyed event arrives or the VM restarts.
-    __guarded_by(m_networksLock) bool m_abandonedPruneEventPending {};
+    // Timed-out prune events must drain before another prune starts.
+    __guarded_by(m_networksLock) std::optional<AbandonedPrune> m_abandonedPrune;
 
     // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_containerEventTracking;
