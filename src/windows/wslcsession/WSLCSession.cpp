@@ -1920,9 +1920,7 @@ try
     std::vector<ImageRow> rows;
     for (const auto& e : images)
     {
-        // RepoDigests format: "repo@sha256:digest". A repository can be referenced by several digests.
-        // References the daemon reports for an unnamed image are not parseable, and are skipped so that
-        // one of them cannot fail the whole listing.
+        // RepoDigests format: "repo@sha256:digest", or a bare "sha256:digest" when no manifest is present locally.
         std::map<std::string, std::vector<std::string>> digestsByRepo;
         for (const auto& repoDigest : e.RepoDigests)
         {
@@ -1949,7 +1947,7 @@ try
 
             auto repoName = reference->Repository.Name;
             const auto it = digestsByRepo.find(repoName);
-            taggedRepos.insert(std::move(repoName));
+            taggedRepos.emplace(std::move(repoName));
 
             // The digest is only reported when it was requested.
             if (it == digestsByRepo.end() || !digests)
@@ -1996,16 +1994,17 @@ try
 
     auto output = wil::make_unique_cotaskmem<WSLCImageInformation[]>(rows.size());
 
-    for (size_t index = 0; index < rows.size(); ++index)
+    auto* entry = output.get();
+    for (const auto& row : rows)
     {
-        const auto& row = rows[index];
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, row.Image.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, row.Source->Id.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, row.Digest.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, row.Source->ParentId.c_str()) != 0);
-        output[index].Size = row.Source->Size;
-        output[index].Created = row.Source->Created;
-        output[index].Containers = containersForImage(row.Source->Id);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry->Image, row.Image.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry->Hash, row.Source->Id.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry->Digest, row.Digest.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry->ParentId, row.Source->ParentId.c_str()) != 0);
+        entry->Size = row.Source->Size;
+        entry->Created = row.Source->Created;
+        entry->Containers = containersForImage(row.Source->Id);
+        ++entry;
     }
 
     *Count = static_cast<ULONG>(rows.size());
