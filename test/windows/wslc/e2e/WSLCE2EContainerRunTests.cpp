@@ -295,7 +295,8 @@ class WSLCE2EContainerRunTests
                 THROW_HR_IF(E_FAIL, !std::filesystem::exists(EnvTestFile2));
                 const auto content = ReadFileContent(EnvTestFile2.wstring());
                 THROW_HR_IF(E_FAIL, std::count(content.begin(), content.end(), L'\n') < 6);
-                THROW_HR_IF(E_FAIL, InspectContainer(WslcContainerName).State.Status != "restarting");
+                const auto inspect = InspectContainer(WslcContainerName);
+                THROW_HR_IF(E_FAIL, inspect.State.Status != "restarting" || !inspect.State.Restarting);
             },
             std::chrono::milliseconds(100),
             std::chrono::seconds(30)));
@@ -305,6 +306,7 @@ class WSLCE2EContainerRunTests
 
         const auto inspect = InspectContainer(WslcContainerName);
         VERIFY_IS_FALSE(inspect.State.Running);
+        VERIFY_IS_FALSE(inspect.State.Restarting);
         VERIFY_ARE_EQUAL(std::string("exited"), inspect.State.Status);
     }
 

@@ -2274,6 +2274,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     // Map container state.
     wslcInspect.State.Status = dockerInspect.State.Status;
     wslcInspect.State.Running = dockerInspect.State.Running;
+    wslcInspect.State.Restarting = dockerInspect.State.Restarting;
     wslcInspect.State.ExitCode = dockerInspect.State.ExitCode;
     wslcInspect.State.StartedAt = dockerInspect.State.StartedAt;
     wslcInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
