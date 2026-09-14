@@ -220,6 +220,8 @@ private:
     // restart they are part of.
     void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+    __requires_exclusive_lock_held(m_lock) void AcquireRuntimeResourcesLockHeld();
+    __requires_exclusive_lock_held(m_lock) void ReplaceInitProcessLockHeld(std::unique_ptr<WSLCProcessIO>&& io);
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
@@ -239,6 +241,8 @@ private:
 
     __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime);
     __requires_exclusive_lock_held(m_lock) void ArmPolicyRestartLockHeld();
+    __requires_exclusive_lock_held(m_lock) void ReconcilePolicyRestartStartedLockHeld(
+        const common::docker_schema::InspectContainer& dockerInspect, std::int64_t startTime) noexcept;
     __requires_exclusive_lock_held(m_lock) void ResolvePolicyRestartLockHeld(bool releaseResources) noexcept;
     __requires_exclusive_lock_held(m_lock) void StartPolicyRestartMonitor();
     static void CALLBACK PolicyRestartTimerCallback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) noexcept;
