@@ -4754,7 +4754,38 @@ VERSION_ID="Invalid|Format"
             distributionconf.SetContent(
                 L"[oobe]\ncommand = /bin/bash -c 'echo OOBE && useradd -u 1010 -m -s /bin/bash user'\n defaultUid = 1010\n");
 
+            constexpr auto userMountPoint = L"/run/wsl-oobe-user-mount";
+            const auto userMountIdCommand = std::format(L"findmnt -n -o ID -M {}", userMountPoint);
+            const auto userMountOwnerCommand = std::format(L"stat -c %u:%g {}", userMountPoint);
+            std::wstring originalUserMountId;
+            std::optional<DistroFileChange> fstab;
+            auto cleanupUserMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                if (fstab.has_value())
+                {
+                    fstab.reset();
+                    TerminateDistribution();
+                }
+            });
+
+            if (LxsstuVmMode())
+            {
+                fstab.emplace(L"/etc/fstab");
+                fstab->SetContent(
+                    std::format(L"{} {} drvfs uid=2000,gid=2001,x-mount.mkdir 0 0\n", drvFsTestPath.root_path().generic_wstring(), userMountPoint)
+                        .c_str());
+            }
+
             TerminateDistribution();
+
+            if (LxsstuVmMode())
+            {
+                auto [mountId, warnings] = LxsstuLaunchWslAndCaptureOutput(userMountIdCommand);
+                VERIFY_IS_FALSE(mountId.empty());
+                VERIFY_ARE_EQUAL(L"", warnings);
+                originalUserMountId = std::move(mountId);
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                VERIFY_ARE_EQUAL(1, runOOBE.Get());
+            }
 
             validateOutput(nullptr, L"OOBE\n");
             VERIFY_ARE_EQUAL(runOOBE.Get(), 0);
@@ -4774,6 +4805,9 @@ VERSION_ID="Invalid|Format"
                         drvFsTestPath.wstring())
                         .c_str(),
                     L"");
+
+                validateOutput(userMountOwnerCommand.c_str(), L"2000:2001\n");
+                validateOutput(userMountIdCommand.c_str(), originalUserMountId.c_str());
             }
 
             // New file should be created with the correct uid.
