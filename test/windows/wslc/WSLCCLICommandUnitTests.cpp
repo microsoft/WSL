@@ -588,12 +588,18 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    TEST_METHOD(AllCommands_NoInheritedGlobalArgumentCollisions)
+    // Command boundaries are namespaces for option spellings, so long names and aliases may be
+    // reused across scopes. Docker and Docker Compose rely on placement-based reuse, for example:
+    //   docker --config ~/.docker service create --config app-config nginx
+    //   docker -c production run -c 512 alpine
+    //   docker compose -f compose.yaml logs -f
+    //   docker compose -p demo run -p 8080:80 web
+    // ArgType values share one ArgMap and must remain unique across the effective command path.
+    TEST_METHOD(AllCommands_NoInheritedGlobalArgumentTypeCollisions)
     {
         struct PendingCommand
         {
             std::reference_wrapper<const Command> Command;
-            std::vector<Argument> InheritedCliGlobals;
             std::vector<Argument> InheritedGlobals;
         };
 
@@ -607,7 +613,6 @@ class WSLCCLICommandUnitTests
             pending.pop_back();
             const auto& command = current.Command.get();
 
-            const auto cliGlobals = command.GetScopedArguments(Scope::Global, Flags::None);
             const auto globalArguments = command.GetScopedArguments(Scope::Global);
 
             for (const auto& argument : globalArguments)
@@ -620,31 +625,10 @@ class WSLCCLICommandUnitTests
                         .c_str());
             }
 
-            for (const auto& argument : cliGlobals)
-            {
-                const auto duplicateName = std::ranges::find_if(current.InheritedCliGlobals, [&](const auto& inherited) {
-                    return wsl::shared::string::IsEqual(argument.Name(), inherited.Name());
-                });
-                VERIFY_IS_TRUE(
-                    duplicateName == current.InheritedCliGlobals.end(),
-                    std::format(L"Command '{}' reuses inherited global option name '--{}'", command.FullName(), argument.Name()).c_str());
-
-                if (!argument.Alias().empty())
-                {
-                    const auto duplicateAlias = std::ranges::find_if(current.InheritedCliGlobals, [&](const auto& inherited) {
-                        return !inherited.Alias().empty() && wsl::shared::string::IsEqual(argument.Alias(), inherited.Alias());
-                    });
-                    VERIFY_IS_TRUE(
-                        duplicateAlias == current.InheritedCliGlobals.end(),
-                        std::format(L"Command '{}' reuses inherited global option alias '-{}'", command.FullName(), argument.Alias())
-                            .c_str());
-                }
-            }
-
-            current.InheritedCliGlobals.insert(current.InheritedCliGlobals.end(), cliGlobals.begin(), cliGlobals.end());
             current.InheritedGlobals.insert(current.InheritedGlobals.end(), globalArguments.begin(), globalArguments.end());
 
-            for (const auto& argument : command.GetScopedArguments(Scope::Command))
+            const auto commandArguments = command.GetScopedArguments(Scope::Command);
+            for (const auto& argument : commandArguments)
             {
                 const auto duplicateType = std::ranges::find(current.InheritedGlobals, argument.Type(), &Argument::Type);
                 VERIFY_IS_TRUE(
@@ -660,7 +644,6 @@ class WSLCCLICommandUnitTests
             {
                 pending.emplace_back(PendingCommand{
                     .Command = std::cref(*subcommand),
-                    .InheritedCliGlobals = current.InheritedCliGlobals,
                     .InheritedGlobals = current.InheritedGlobals,
                 });
             }

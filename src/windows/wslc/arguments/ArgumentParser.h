@@ -31,7 +31,13 @@ struct ParseArgumentsStateMachine
     // optionsOnly:          stop before the first positional token.
     // stopOnUnknown:        stop before the first unknown option
     //                       token instead of throwing.
-    ParseArgumentsStateMachine(InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly = false, bool stopOnUnknown = false);
+    ParseArgumentsStateMachine(
+        InvocationCursor& invocation,
+        ArgMap& execArgs,
+        std::vector<Argument> arguments,
+        bool optionsOnly = false,
+        bool stopOnUnknown = false,
+        std::vector<Argument> inheritedGlobalArguments = {});
 
     ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
     ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -105,6 +111,7 @@ private:
     State ProcessAliasArgument(const std::wstring_view& currArg);
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
+    const Argument* FindInheritedGlobalOption(std::wstring_view token) const;
 
     // Strips a single pair of surrounding double quotes from an adjoined value if present
     // (e.g. --name="value" or --flag="true"). Shared by the value and flag adjoined-value
@@ -146,6 +153,7 @@ private:
     InvocationCursor& m_invocation;
     ArgMap& m_executionArgs;
     std::vector<Argument> m_arguments;
+    std::vector<Argument> m_inheritedGlobalArguments;
 
     InvocationCursor::iterator m_invocationItr;
     std::vector<Argument>::iterator m_positionalSearchItr;

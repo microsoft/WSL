@@ -203,6 +203,11 @@ namespace {
         {
         }
 
+        std::vector<Argument> GetGlobalArguments() const override
+        {
+            return {CreateGlobalArgument(ArgType::Session)};
+        }
+
         std::wstring ShortDescription() const override
         {
             return L"Positional test root";
@@ -250,6 +255,98 @@ namespace {
         void ExecuteInternal(CLIExecutionContext&) const override
         {
         }
+    };
+
+    struct ValidationTestLeafCommand final : Command
+    {
+        ValidationTestLeafCommand(const std::wstring& parent, size_t& validationCount, bool& sawDetach) :
+            Command(L"leaf", parent), m_validationCount(validationCount), m_sawDetach(sawDetach)
+        {
+        }
+
+        std::vector<Argument> GetArguments() const override
+        {
+            return {
+                Argument::Create(ArgType::Name, {.Name = L"session", .Alias = L"s"}),
+                Argument::Create(ArgType::Detach),
+            };
+        }
+
+        std::wstring ShortDescription() const override
+        {
+            return L"Validation test leaf";
+        }
+
+        std::wstring LongDescription() const override
+        {
+            return ShortDescription();
+        }
+
+    protected:
+        void ValidateArgumentsInternal(ArgMap& arguments) const override
+        {
+            ++m_validationCount;
+            m_sawDetach = arguments.GetValue<ArgType::Detach>();
+        }
+
+        void ExecuteInternal(CLIExecutionContext&) const override
+        {
+        }
+
+    private:
+        size_t& m_validationCount;
+        bool& m_sawDetach;
+    };
+
+    struct ValidationTestRootCommand final : Command
+    {
+        ValidationTestRootCommand(size_t& rootValidationCount, bool& sawSession, size_t& leafValidationCount, bool& sawDetach) :
+            Command(L"root", L""),
+            m_rootValidationCount(rootValidationCount),
+            m_sawSession(sawSession),
+            m_leafValidationCount(leafValidationCount),
+            m_sawDetach(sawDetach)
+        {
+        }
+
+        std::vector<Argument> GetGlobalArguments() const override
+        {
+            return {CreateGlobalArgument(ArgType::Session, {.Alias = L"s"})};
+        }
+
+        std::wstring ShortDescription() const override
+        {
+            return L"Validation test root";
+        }
+
+        std::wstring LongDescription() const override
+        {
+            return ShortDescription();
+        }
+
+    protected:
+        std::vector<std::unique_ptr<Command>> CreateCommands() const override
+        {
+            std::vector<std::unique_ptr<Command>> commands;
+            commands.emplace_back(std::make_unique<ValidationTestLeafCommand>(FullName(), m_leafValidationCount, m_sawDetach));
+            return commands;
+        }
+
+        void ValidateArgumentsInternal(ArgMap& arguments) const override
+        {
+            ++m_rootValidationCount;
+            m_sawSession = arguments.GetValue<ArgType::Session>() == L"foo";
+        }
+
+        void ExecuteInternal(CLIExecutionContext&) const override
+        {
+        }
+
+    private:
+        size_t& m_rootValidationCount;
+        bool& m_sawSession;
+        size_t& m_leafValidationCount;
+        bool& m_sawDetach;
     };
 
     struct LocalEnvironmentTestRootCommand final : Command
@@ -358,7 +455,7 @@ class WSLCCLIExecutionUnitTests
 
         try
         {
-            command.ValidateArguments(args, definitions, false);
+            command.ValidateArguments(args, definitions);
             VERIFY_FAIL(L"Expected ArgumentException");
         }
         catch (const ArgumentException& exception)
@@ -540,6 +637,21 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(0u, traversalCount);
     }
 
+    TEST_METHOD(ScopedGlobalArguments_BareSpecifiersRemainPositional)
+    {
+        for (const auto token : {L"-", L"--"})
+        {
+            size_t traversalCount = 0;
+            CLIExecutionContext context;
+            CommandInvocation invocation{std::make_unique<PositionalTestRootCommand>(traversalCount), std::vector<std::wstring>{L"show", token}};
+
+            invocation.ParseCommandLine(context);
+
+            VERIFY_ARE_EQUAL(std::wstring{token}, context.Args.GetValue<ArgType::ImageId>());
+            VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
+        }
+    }
+
     TEST_METHOD(ScopedGlobalArguments_DetachedSubtreeFormatsChildInvocation)
     {
         const TestComposeCommand command{L"root"};
@@ -594,6 +706,94 @@ class WSLCCLIExecutionUnitTests
             VERIFY_ARE_EQUAL(
                 wsl::shared::Localization::WSLCCLI_MisplacedInheritedGlobalOptionError(L"--progress", L"wslc compose", L"up"),
                 exception.Message());
+        }
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_GlobalAfterUnlimitedPositionalReportsCorrectPlacement)
+    {
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"image", L"inspect", L"foo", L"--session", L"bar"}};
+
+        try
+        {
+            invocation.ParseCommandLine(context);
+            VERIFY_FAIL(L"Expected ArgumentException");
+        }
+        catch (const ArgumentException& exception)
+        {
+            VERIFY_ARE_EQUAL(
+                wsl::shared::Localization::WSLCCLI_MisplacedInheritedGlobalOptionError(L"--session", L"wslc", L"image"), exception.Message());
+        }
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_GlobalTokenAfterRunImageIsCommandArgument)
+    {
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<RootCommand>(), std::vector<std::wstring>{L"run", L"debian", L"--session", L"foo"}};
+
+        invocation.ParseCommandLine(context);
+
+        VERIFY_ARE_EQUAL(std::wstring{L"debian"}, context.Args.GetValue<ArgType::ImageId>());
+        VERIFY_ARE_EQUAL(std::wstring{L"--session"}, context.Args.GetValue<ArgType::Command>());
+        const auto& forwardArguments = context.Args.GetValue<ArgType::ForwardArgs>();
+        VERIFY_ARE_EQUAL(1u, forwardArguments.size());
+        VERIFY_ARE_EQUAL(std::wstring{L"foo"}, forwardArguments[0]);
+        VERIFY_IS_FALSE(context.Args.Contains(ArgType::Session));
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_ValidatesEveryOwnerOnSelectedPath)
+    {
+        size_t rootValidationCount = 0;
+        size_t leafValidationCount = 0;
+        bool rootSawSession = false;
+        bool leafSawDetach = false;
+        CLIExecutionContext context;
+        CommandInvocation invocation{
+            std::make_unique<ValidationTestRootCommand>(rootValidationCount, rootSawSession, leafValidationCount, leafSawDetach),
+            std::vector<std::wstring>{L"--session", L"foo", L"leaf", L"--detach"}};
+
+        invocation.ParseCommandLine(context);
+
+        VERIFY_ARE_EQUAL(1u, rootValidationCount);
+        VERIFY_ARE_EQUAL(1u, leafValidationCount);
+        VERIFY_IS_TRUE(rootSawSession);
+        VERIFY_IS_TRUE(leafSawDetach);
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_NamesAndAliasesCanBeReusedAcrossScopes)
+    {
+        {
+            size_t rootValidationCount = 0;
+            size_t leafValidationCount = 0;
+            bool rootSawSession = false;
+            bool leafSawDetach = false;
+            CLIExecutionContext context;
+            CommandInvocation invocation{
+                std::make_unique<ValidationTestRootCommand>(rootValidationCount, rootSawSession, leafValidationCount, leafSawDetach),
+                std::vector<std::wstring>{L"--session", L"global", L"leaf", L"--session", L"local"}};
+
+            invocation.ParseCommandLine(context);
+
+            VERIFY_ARE_EQUAL(std::wstring{L"global"}, context.Args.GetValue<ArgType::Session>());
+            VERIFY_ARE_EQUAL(std::wstring{L"local"}, context.Args.GetValue<ArgType::Name>());
+        }
+
+        {
+            size_t rootValidationCount = 0;
+            size_t leafValidationCount = 0;
+            bool rootSawSession = false;
+            bool leafSawDetach = false;
+            CLIExecutionContext context;
+            CommandInvocation invocation{
+                std::make_unique<ValidationTestRootCommand>(rootValidationCount, rootSawSession, leafValidationCount, leafSawDetach),
+                std::vector<std::wstring>{L"-s", L"global", L"leaf", L"-s", L"local"}};
+
+            invocation.ParseCommandLine(context);
+
+            VERIFY_ARE_EQUAL(std::wstring{L"global"}, context.Args.GetValue<ArgType::Session>());
+            VERIFY_ARE_EQUAL(std::wstring{L"local"}, context.Args.GetValue<ArgType::Name>());
         }
     }
 

@@ -706,14 +706,15 @@ std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Inv
 // Argument map is based on the arguments that the command defines and are stored as
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
 // the argument data.
-void Command::ParseArguments(InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown) const
+void Command::ParseArguments(
+    InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown, std::vector<Argument> inheritedGlobalArgs) const
 {
     if (definedArgs.empty())
     {
         return;
     }
 
-    ParseArgumentsStateMachine stateMachine{invocation, target, std::move(definedArgs), optionsOnly, stopOnUnknown};
+    ParseArgumentsStateMachine stateMachine{invocation, target, std::move(definedArgs), optionsOnly, stopOnUnknown, std::move(inheritedGlobalArgs)};
 
     while (stateMachine.Step())
     {
@@ -730,7 +731,7 @@ void Command::ParseArguments(InvocationCursor& invocation, ArgMap& target, std::
 // that all required arguments are present. Count limits are enforced during parsing
 // (single-value args are last-wins), so they are not re-checked here.
 // Any defined validation for specific ArgTypes are also run.
-void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const
+void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs) const
 {
     const auto helpArgument = std::ranges::find(definedArgs, ArgType::Help, &Argument::Type);
     if (helpArgument != definedArgs.end() && source.GetValue<ArgType::Help>())
@@ -776,11 +777,11 @@ void Command::ValidateArguments(ArgMap& source, const std::vector<Argument>& def
             }
         }
     }
+}
 
-    if (runInternalHook)
-    {
-        ValidateArgumentsInternal(source);
-    }
+void Command::ValidateArgumentRelationships(ArgMap& source) const
+{
+    ValidateArgumentsInternal(source);
 }
 
 void Command::Execute(CLIExecutionContext& context) const

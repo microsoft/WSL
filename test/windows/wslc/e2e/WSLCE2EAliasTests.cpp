@@ -67,13 +67,17 @@ class WSLCE2EAliasTests
 
         // Help output should be identical after normalizing executable-name references.
         auto wslcOutput = wslcResult.Stdout.value();
-        constexpr std::wstring_view c_wslcName = L"wslc";
-        constexpr std::wstring_view c_containerName = L"container";
-        auto position = wslcOutput.find(c_wslcName);
-        while (position != std::wstring::npos)
+        const std::pair<std::wstring, std::wstring> executableReferences[] = {
+            {L"Usage: wslc", L"Usage: container"},
+            {wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc"),
+             wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"container")},
+        };
+
+        for (const auto& [source, replacement] : executableReferences)
         {
-            wslcOutput.replace(position, c_wslcName.size(), c_containerName.data(), c_containerName.size());
-            position = wslcOutput.find(c_wslcName, position + c_containerName.size());
+            const auto position = wslcOutput.find(source);
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, position);
+            wslcOutput.replace(position, source.size(), replacement);
         }
 
         VERIFY_ARE_EQUAL(wslcOutput, containerResult.Stdout.value());

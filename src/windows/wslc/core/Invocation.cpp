@@ -18,6 +18,7 @@ Abstract:
 #include "Command.h"
 #include "EnvironmentOptions.h"
 
+#include <algorithm>
 #include <functional>
 #include <optional>
 #include <span>
@@ -27,48 +28,43 @@ using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
 namespace {
-    std::optional<std::reference_wrapper<const Argument>> FindOption(std::wstring_view token, std::span<const Argument> arguments)
+    std::vector<Argument> GetInheritedGlobalArguments(const Command& command)
     {
-        if (token.length() < 2 || token.front() != WSLC_CLI_ARG_ID_CHAR)
+        std::vector<Argument> arguments;
+        for (auto ancestor = command.Parent(); ancestor.has_value(); ancestor = ancestor->get().Parent())
         {
-            return std::nullopt;
+            auto ancestorArguments = ancestor->get().GetScopedArguments(Scope::Global, Flags::None);
+            arguments.insert(arguments.end(), ancestorArguments.begin(), ancestorArguments.end());
         }
 
-        const bool longName = token[1] == WSLC_CLI_ARG_ID_CHAR;
-        const auto optionStart = longName ? token.find_first_not_of(WSLC_CLI_ARG_ID_CHAR) : 1;
-        if (optionStart == std::wstring_view::npos)
+        return arguments;
+    }
+
+    void ValidateArgumentRelationships(const Command& selected, ArgMap& arguments)
+    {
+        std::vector<std::reference_wrapper<const Command>> commandPath;
+        for (auto command = std::optional{std::cref(selected)}; command.has_value(); command = command->get().Parent())
         {
-            return std::nullopt;
+            commandPath.emplace_back(*command);
         }
 
-        auto optionName = token.substr(optionStart);
-        if (const auto separator = optionName.find_first_of(WSLC_CLI_ARG_SPLIT_CHAR); separator != std::wstring_view::npos)
+        for (auto command = commandPath.rbegin(); command != commandPath.rend(); ++command)
         {
-            optionName = optionName.substr(0, separator);
+            command->get().ValidateArgumentRelationships(arguments);
         }
-
-        for (const auto& argument : arguments)
-        {
-            if (!argument.IsOption())
-            {
-                continue;
-            }
-
-            const auto& configuredName = longName ? argument.Name() : argument.Alias();
-            if (!configuredName.empty() && wsl::shared::string::IsEqual(optionName, configuredName))
-            {
-                return std::cref(argument);
-            }
-        }
-
-        return std::nullopt;
     }
 
     void ThrowIfMisplacedGlobalOption(std::wstring_view token, const Command& currentCommand)
     {
+        const auto findOption = [token](std::span<const Argument> arguments) -> std::optional<std::reference_wrapper<const Argument>> {
+            const auto argument =
+                std::ranges::find_if(arguments, [token](const auto& candidate) { return candidate.MatchesOption(token); });
+            return argument != arguments.end() ? std::optional{std::cref(*argument)} : std::nullopt;
+        };
+
         const auto commandArguments = currentCommand.GetScopedArguments(Scope::Command, Flags::None);
         const auto globalArguments = currentCommand.GetScopedArguments(Scope::Global, Flags::None);
-        if (FindOption(token, commandArguments).has_value() || FindOption(token, globalArguments).has_value())
+        if (findOption(commandArguments).has_value() || findOption(globalArguments).has_value())
         {
             return;
         }
@@ -77,7 +73,7 @@ namespace {
         for (auto owner = currentCommand.Parent(); owner.has_value(); owner = owner->get().Parent())
         {
             const auto ownerGlobalArguments = owner->get().GetScopedArguments(Scope::Global, Flags::None);
-            if (const auto argument = FindOption(token, ownerGlobalArguments); argument.has_value())
+            if (const auto argument = findOption(ownerGlobalArguments); argument.has_value())
             {
                 const auto& globalOwner = argument->get().GlobalOwner();
                 THROW_HR_IF(E_UNEXPECTED, !globalOwner.has_value());
@@ -106,7 +102,7 @@ namespace {
             globalArguments,
             /*optionsOnly*/ true,
             /*stopOnUnknown*/ true);
-        command.ValidateArguments(context.Args, command.GetScopedArguments(Scope::Global), /*runInternalHook*/ false);
+        command.ValidateArguments(context.Args, command.GetScopedArguments(Scope::Global));
 
         auto subcommand = command.FindSubCommand(invocation);
         if (!subcommand)
@@ -194,7 +190,8 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
             context.Args,
             Selected().GetScopedArguments(Scope::Command, Flags::None),
             /*optionsOnly*/ false,
-            /*stopOnUnknown*/ false);
+            /*stopOnUnknown*/ false,
+            GetInheritedGlobalArguments(Selected()));
     }
     catch (const ArgumentException& exception)
     {
@@ -206,7 +203,11 @@ void CommandInvocation::ParseCommandLine(CLIExecutionContext& context)
         throw;
     }
 
-    Selected().ValidateArguments(context.Args, Selected().GetScopedArguments(Scope::Command), /*runInternalHook*/ true);
+    Selected().ValidateArguments(context.Args, Selected().GetScopedArguments(Scope::Command));
+    if (!context.Args.GetValue<ArgType::Help>())
+    {
+        ValidateArgumentRelationships(Selected(), context.Args);
+    }
 }
 
 void CommandInvocation::Execute(CLIExecutionContext& context) const

@@ -14,15 +14,17 @@ Abstract:
 #include "ArgumentParser.h"
 #include "Localization.h"
 
+#include <algorithm>
+
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-
 ParseArgumentsStateMachine::ParseArgumentsStateMachine(
-    InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown) :
+    InvocationCursor& invocation, ArgMap& execArgs, std::vector<Argument> arguments, bool optionsOnly, bool stopOnUnknown, std::vector<Argument> inheritedGlobalArguments) :
     m_invocation(invocation),
     m_executionArgs(execArgs),
     m_arguments(std::move(arguments)),
+    m_inheritedGlobalArguments(std::move(inheritedGlobalArguments)),
     m_invocationItr(m_invocation.begin()),
     m_optionsOnly(optionsOnly),
     m_stopOnUnknown(stopOnUnknown)
@@ -178,9 +180,9 @@ void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
 //     a. Value: '-a=VALUE' / '-ab=VALUE' / '-a VALUE' / '-ab VALUE'
 //     b. Flag:  trailing chars are additional flags; fails if any is non-flag.
 //  2. Token starting with '--' is the full name: '--arg=VALUE' or '--arg VALUE'.
-//  3. Anything else is the next positional.
-//  4. Once a positional is seen, everything after stays positional.
-//  5. If only one positional is defined, everything after it is forwarded.
+//  3. A bare '-' or '--' is positional when a positional is available.
+//  4. Anything else is the next positional.
+//  5. Commands with forward arguments treat everything after the first positional as positional or forwarded.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 {
     auto currArg = std::wstring_view{*m_invocationItr};
@@ -193,10 +195,20 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
         return {};
     }
 
-    // Anchored: remaining tokens are positional or forwarded.
-    if (!m_forwardArgs.empty() && m_anchorPositional.has_value())
+    const bool matchesCommandOption =
+        std::ranges::any_of(m_arguments, [currArg](const auto& argument) { return argument.MatchesOption(currArg); });
+    const auto inheritedGlobalOption = matchesCommandOption ? nullptr : FindInheritedGlobalOption(currArg);
+
+    if (m_anchorPositional.has_value() && !m_forwardArgs.empty())
     {
         return ProcessAnchoredPositionals(currArg);
+    }
+
+    if (inheritedGlobalOption != nullptr)
+    {
+        const auto message = currArg.starts_with(L"--") ? Localization::WSLCCLI_InvalidNameError(currArg)
+                                                        : Localization::WSLCCLI_InvalidAliasError(currArg);
+        return ArgumentException::CreateUnknownOption(message, currArg);
     }
 
     // Arg does not begin with '-' so it is neither an alias nor a named value, must be positional.
@@ -212,13 +224,16 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
         return ProcessPositionalArgument(currArg);
     }
 
-    // The currentArg is non-empty, and starts with a -.
-    if (currArg.length() == 1)
+    // Bare option specifiers may be positional values such as stdin.
+    if (currArg == L"-" || currArg == L"--")
     {
         if (HasNextPositional())
         {
-            // The '-' character may be a valid positional argument value (ex: stdin), so treat this
-            // as a positional argument if there are any positionals left to fill.
+            if (m_optionsOnly)
+            {
+                return BackUpAndStop();
+            }
+
             return ProcessPositionalArgument(currArg);
         }
 
@@ -229,7 +244,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
             return BackUpAndStop();
         }
 
-        return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
+        return currArg.length() == 1 ? ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg))
+                                     : ArgumentException(Localization::WSLCCLI_MissingArgumentNameError(currArg));
     }
 
     // Single '-' that is 2 characters or more means this must be an alias or collection of alias flags.
@@ -312,6 +328,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     return {};
 }
 
+const Argument* ParseArgumentsStateMachine::FindInheritedGlobalOption(std::wstring_view token) const
+{
+    const auto argument =
+        std::ranges::find_if(m_inheritedGlobalArguments, [token](const auto& candidate) { return candidate.MatchesOption(token); });
+    return argument != m_inheritedGlobalArguments.end() ? &*argument : nullptr;
+}
+
 // Assumes argument begins with '-' and is at least 2 characters.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgument(const std::wstring_view& currArg)
 {
@@ -350,7 +373,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return BackUpAndStop();
         }
 
-        return ArgumentException::CreateUnknownOption(Localization::WSLCCLI_InvalidAliasError(currArg), currArg);
+        const auto message = Localization::WSLCCLI_InvalidAliasError(currArg);
+        return m_anchorPositional.has_value() ? ArgumentException(message) : ArgumentException::CreateUnknownOption(message, currArg);
     }
 
     // Position after the first alias
@@ -501,7 +525,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgume
         return BackUpAndStop();
     }
 
-    return ArgumentException::CreateUnknownOption(Localization::WSLCCLI_InvalidNameError(currArg), currArg);
+    const auto message = Localization::WSLCCLI_InvalidNameError(currArg);
+    return m_anchorPositional.has_value() ? ArgumentException(message) : ArgumentException::CreateUnknownOption(message, currArg);
 }
 
 void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring_view value)

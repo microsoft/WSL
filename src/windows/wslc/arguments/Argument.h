@@ -102,6 +102,8 @@ struct Argument
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;
 
+    bool MatchesOption(std::wstring_view token) const;
+
     // Arguments are not localized, but the description is.
     const std::wstring& Name() const
     {

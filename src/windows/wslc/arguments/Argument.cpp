@@ -74,4 +74,28 @@ std::wstring Argument::GetUsageString() const
     strstr << WSLC_CLI_ARG_ID_CHAR << WSLC_CLI_ARG_ID_CHAR << m_name;
     return strstr.str();
 }
+
+bool Argument::MatchesOption(std::wstring_view token) const
+{
+    if (!IsOption() || token.length() < 2 || token.front() != WSLC_CLI_ARG_ID_CHAR)
+    {
+        return false;
+    }
+
+    const bool longName = token[1] == WSLC_CLI_ARG_ID_CHAR;
+    const size_t optionStart = longName ? 2 : 1;
+    if (token.length() == optionStart || token[optionStart] == WSLC_CLI_ARG_ID_CHAR)
+    {
+        return false;
+    }
+
+    auto optionName = token.substr(optionStart);
+    if (const auto separator = optionName.find_first_of(WSLC_CLI_ARG_SPLIT_CHAR); separator != std::wstring_view::npos)
+    {
+        optionName = optionName.substr(0, separator);
+    }
+
+    const auto& configuredName = longName ? Name() : Alias();
+    return !configuredName.empty() && string::IsEqual(optionName, configuredName);
+}
 } // namespace wsl::windows::wslc

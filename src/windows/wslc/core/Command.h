@@ -117,18 +117,30 @@ struct Command
     //                       bundled short chain (e.g. "-Dv") whose leading alias
     //                       is recognized is treated as claimed, and an unknown
     //                       alias later in the chain still throws.
-    void ParseArguments(InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly = false, bool stopOnUnknown = false) const;
+    void ParseArguments(
+        InvocationCursor& invocation,
+        ArgMap& target,
+        std::vector<Argument> definedArgs,
+        bool optionsOnly = false,
+        bool stopOnUnknown = false,
+        std::vector<Argument> inheritedGlobalArgs = {}) const;
 
     void ParseArguments(InvocationCursor& invocation, ArgMap& target) const
     {
         ParseArguments(invocation, target, GetScopedArguments(Scope::Command, Flags::None));
     }
 
-    void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs, bool runInternalHook) const;
+    void ValidateArguments(ArgMap& source, const std::vector<Argument>& definedArgs) const;
+    void ValidateArgumentRelationships(ArgMap& source) const;
 
     void ValidateArguments(ArgMap& source) const
     {
-        ValidateArguments(source, GetScopedArguments(Scope::Command), true);
+        const auto arguments = GetScopedArguments(Scope::Command);
+        ValidateArguments(source, arguments);
+        if (!source.GetValue<ArgType::Help>())
+        {
+            ValidateArgumentRelationships(source);
+        }
     }
 
     virtual void Execute(CLIExecutionContext& context) const;
