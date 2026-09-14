@@ -369,6 +369,8 @@ private:
 
     __requires_lock_held(m_networksLock) void CompletePendingNetworkOperation(const std::shared_ptr<PendingNetworkOperation>& Operation) noexcept;
 
+    void WaitForNetworkOperationEvent(const std::shared_ptr<PendingNetworkOperation>& Operation);
+
     void WaitForPendingNetworkOperationCompletion(const std::shared_ptr<PendingNetworkOperation>& Operation);
 
     void WaitForConflictingNetworkOperationToComplete(std::unique_lock<std::mutex>& NetworksLock);

@@ -2578,12 +2578,19 @@ __requires_lock_held(m_networksLock) void WSLCSession::CompletePendingNetworkOpe
     Operation->Completed.SetEvent();
 }
 
-void WSLCSession::WaitForPendingNetworkOperationCompletion(const std::shared_ptr<PendingNetworkOperation>& Operation)
+void WSLCSession::WaitForNetworkOperationEvent(const std::shared_ptr<PendingNetworkOperation>& Operation)
 {
     auto io = CreateIOContext();
     io.AddHandle(std::make_unique<io::EventHandle>(Operation->Completed.get()));
 
-    // Clear the slot if the wait fails; an abandoned prune remains blocked until its unkeyed event arrives.
+    io.Run(c_networkEventTimeout);
+
+    WI_ASSERT(Operation->Completed.is_signaled());
+}
+
+void WSLCSession::WaitForPendingNetworkOperationCompletion(const std::shared_ptr<PendingNetworkOperation>& Operation)
+{
+    // Registered before the wait is set up so a throw there cannot strand the slot.
     auto abandonOnFailure = wil::scope_exit([&]() {
         std::lock_guard networksLock{m_networksLock};
         if (m_pendingNetworkOperation != Operation)
@@ -2599,11 +2606,9 @@ void WSLCSession::WaitForPendingNetworkOperationCompletion(const std::shared_ptr
         CompletePendingNetworkOperation(Operation);
     });
 
-    io.Run(c_networkEventTimeout);
+    WaitForNetworkOperationEvent(Operation);
 
     abandonOnFailure.release();
-
-    WI_ASSERT(Operation->Completed.is_signaled());
 }
 
 void WSLCSession::WaitForConflictingNetworkOperationToComplete(std::unique_lock<std::mutex>& NetworksLock)
@@ -2613,7 +2618,8 @@ void WSLCSession::WaitForConflictingNetworkOperationToComplete(std::unique_lock<
         auto operation = m_pendingNetworkOperation;
         NetworksLock.unlock();
 
-        WaitForPendingNetworkOperationCompletion(operation);
+        // Only the owner may abandon its operation, so this waits without touching the slot.
+        WaitForNetworkOperationEvent(operation);
 
         NetworksLock.lock();
     }
