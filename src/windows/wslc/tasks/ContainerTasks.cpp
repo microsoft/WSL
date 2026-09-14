@@ -82,11 +82,10 @@ void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To
     std::error_code statusError;
     const auto fromStatus = std::filesystem::status(From, statusError);
     const auto toStatus = std::filesystem::status(To, statusError);
-    THROW_HR_IF_MSG(
+    THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
-        std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus),
-        "Cannot overwrite: %ls",
-        To.c_str());
+        Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
+        std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
 
     std::error_code copyError;
     std::filesystem::copy(From, To, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, copyError);
