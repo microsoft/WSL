@@ -55,6 +55,10 @@ void wsl::windows::common::security::ApplyProcessMitigationPolicies()
     PROCESS_MITIGATION_IMAGE_LOAD_POLICY loadPolicy{};
     loadPolicy.PreferSystem32Images = true;
     LOG_IF_WIN32_BOOL_FALSE(SetProcessMitigationPolicy(ProcessImageLoadPolicy, &loadPolicy, sizeof(loadPolicy)));
+
+    PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY redirectionTrustPolicy{};
+    redirectionTrustPolicy.EnforceRedirectionTrust = true;
+    LOG_IF_WIN32_BOOL_FALSE(SetProcessMitigationPolicy(ProcessRedirectionTrustPolicy, &redirectionTrustPolicy, sizeof(redirectionTrustPolicy)));
 }
 
 SECURITY_DESCRIPTOR wsl::windows::common::security::CreateSecurityDescriptor(_In_ PSID userSid)

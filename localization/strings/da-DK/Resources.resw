@@ -2238,6 +2238,9 @@ Brug:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>indstillinger</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>globale indstillinger</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Følgende kommandoaliasser er tilgængelige:</value>
   </data>
@@ -2636,6 +2639,9 @@ Format: wslc container cp [INDSTILLINGER] KILDEDESTINATION
     <value>Destination: lokal sti eller CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Undertryk statusoutput under kopiering</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Ugyldigt destinationsformat. Forventet CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2790,6 +2796,9 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Indlæser billeder.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Undertryk statusoutput under belastning</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Hent billeder.</value>
   </data>
@@ -2826,6 +2835,9 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Upload et billede til en registreringsdatabase.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Undertryk detaljeret output</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Slettet: {}</value>

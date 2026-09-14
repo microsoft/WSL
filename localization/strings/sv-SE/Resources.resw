@@ -2238,6 +2238,9 @@ Användning:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>alternativ</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>globala alternativ</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Följande kommandoalias är tillgängliga:</value>
   </data>
@@ -2636,6 +2639,9 @@ Användning: wslc container cp [ALTERNATIV] SOURCE DEST
     <value>Destination: lokal sökväg eller CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Utelämna förloppsutdata under kopiering</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Ogiltigt målformat.
  Förväntat format: CONTAINER:PATH</value>
@@ -2791,6 +2797,9 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Läser in bilder.</value>
   </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Utelämna förloppsutdata under inläsning</value>
+  </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Hämta bilder.</value>
   </data>
@@ -2827,6 +2836,9 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Ladda upp en bild till ett register.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Dölj utförlig utdata</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Borttagen: {}</value>
@@ -3078,7 +3090,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Kör containern i frånkopplat läge</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Visa extra information för loggar</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Anger den körbara filen för containerns init-process</value>
@@ -3099,19 +3111,19 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Filtrera utdata baserat på angivna villkor</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid value "{}" for the '--filter' option: bad format of filter (expected name=value)</value>
+    <value>Ogiltigt värde ''{} för alternativet' --filter': felaktigt format för filtret (förväntat namn=värde)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Ange filtervärden (t.ex. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Ange filtervärden (t.ex. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Fråga inte efter bekräftelse</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Vill du fortsätta?</value>
@@ -3120,7 +3132,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>VARNING! Detta kommer att ta bort alla stoppade containrar.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>VARNING! Detta tar bort alla hängande bilder.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>VARNING! Detta kommer att ta bort alla bilder som inte har minst en behållare associerad med dem.</value>

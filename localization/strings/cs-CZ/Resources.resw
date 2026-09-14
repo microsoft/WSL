@@ -2238,6 +2238,9 @@ Využití:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>Možnosti</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>globální možnosti</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>K dispozici jsou následující aliasy příkazů:</value>
   </data>
@@ -2636,6 +2639,9 @@ Použití: wslc container cp [OPTIONS] SOURCE DEST
     <value>Cíl: místní cesta nebo CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Potlačit výstup průběhu během kopírování</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Neplatný formát cíle. Očekávaný formát: CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2776,7 +2782,7 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Importuje obsah tarballu a vytvoří obrázek souborového systému. Volitelně můžete obrázek označit názvem úložiště a značky.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Zobrazit všechny obrázky (ve výchozím nastavení se skrývají mezilehlé obrázky).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Vypsat image.</value>
@@ -2789,6 +2795,9 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Načte image.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Potlačit výstup průběhu během načítání</value>
   </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Stáhnout image.</value>
@@ -2826,6 +2835,9 @@ Příklad: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Nahrajte imagi do registru.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Potlačit podrobný výstup</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Odstraněno: {}</value>
@@ -3034,7 +3046,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Stáhněte všechny označené obrázky v úložišti.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>tag nelze použít s --all-tags/-a</value>
     <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
@@ -3077,7 +3089,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Spustit kontejner v odpojeném režimu</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Zobrazit další podrobnosti o protokolech</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Určuje spustitelný soubor procesu init kontejneru</value>
@@ -3098,40 +3110,40 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Filtrovat výstup na základě zadaných podmínek</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid value "{}" for the '--filter' option: bad format of filter (expected name=value)</value>
+    <value>Neplatná hodnota {} pro možnost '--filter': nesprávný formát filtru (očekává se name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Zadejte hodnoty filtru (např. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Zadejte hodnoty filtru (např. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Nevyžadovat potvrzení</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Opravdu chcete pokračovat?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>Upozornění! Tímto se odeberou všechny zastavené kontejnery.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>Upozornění! Tímto se odeberou všechny nepoužívané image.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all images without at least one container associated to them.</value>
+    <value>Upozornění! Tímto se odeberou všechny image, ke kterým není přidružený alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove anonymous local volumes not used by at least one container.</value>
+    <value>Upozornění! Tímto se odeberou anonymní místní svazky, které nepoužívá alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all local volumes not used by at least one container.</value>
+    <value>Upozornění! Tímto se odeberou všechny místní svazky, které nepoužívá alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all custom networks not used by at least one container.</value>
+    <value>Upozornění! Tímto se odeberou všechny vlastní sítě, které nepoužívá alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Neplatný argument "{}" pro možnost '--mount': {}</value>
@@ -3376,7 +3388,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
-    <value>Push all tags of an image to the repository</value>
+    <value>Odeslat do repozitáře všechny tagy image</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Vypíše pouze ID kontejnerů</value>
@@ -3408,7 +3420,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Aktuální nebo existující odkaz na obrázek ve formátu image-name[:tag]</value>
   </data>
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
-    <value>Display total file sizes</value>
+    <value>Zobrazte celkové velikosti souborů</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Zobrazte celkové velikosti souborů, pokud je typem kontejner</value>
@@ -3814,7 +3826,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>PORTY</value>
   </data>
   <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
-    <value>SIZE</value>
+    <value>VELIKOST</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>PROCESOR (%)</value>
@@ -3855,7 +3867,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
-    <value>{} (virtual {})</value>
+    <value>{} (virtuální {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
