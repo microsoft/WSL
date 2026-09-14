@@ -1920,7 +1920,7 @@ try
     std::vector<ImageRow> rows;
     for (const auto& e : images)
     {
-        // RepoDigests format: "repo@sha256:digest", or a bare "sha256:digest" when no manifest is present locally.
+        // RepoDigests format: "repo@sha256:digest". A bare "sha256:digest" has no repository to group by and is skipped.
         std::map<std::string, std::vector<std::string>> digestsByRepo;
         for (const auto& repoDigest : e.RepoDigests)
         {
