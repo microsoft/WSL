@@ -475,6 +475,16 @@ WSLCContainerState DockerStateToWSLCState(ContainerState state)
     }
 }
 
+std::int64_t GetContainerStartTime(const DockerInspectContainer& inspect)
+{
+    if (inspect.State.StartedAt.empty() || inspect.State.StartedAt == c_unsetTimestamp)
+    {
+        return std::time(nullptr);
+    }
+
+    return wsl::windows::common::timestamp::Rfc3339ToEpoch(inspect.State.StartedAt);
+}
+
 std::string WSLCStateToEventAction(WSLCContainerState state)
 {
     switch (state)
@@ -1748,11 +1758,8 @@ try
 
     const auto inspectJson = wsl::shared::ToJson(BuildInspectContainer(dockerInspect));
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
-    if (FAILED(pluginResult))
-    {
-        LOG_HR_MSG(pluginResult, "Plugin rejected policy restart of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
-        THROW_HR(pluginResult);
-    }
+    LOG_IF_FAILED_MSG(pluginResult, "Plugin rejected policy restart of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
+    THROW_IF_FAILED(pluginResult);
 
     ReplaceInitProcessLockHeld(nullptr);
     CommitState(WslcContainerStateRunning, startTime);
@@ -1875,7 +1882,7 @@ void CALLBACK WSLCContainerImpl::PolicyRestartTimerCallback(PTP_CALLBACK_INSTANC
 
         if (inspect.State.Running)
         {
-            container.ReconcilePolicyRestartStartedLockHeld(inspect, std::time(nullptr));
+            container.ReconcilePolicyRestartStartedLockHeld(inspect, GetContainerStartTime(inspect));
             return;
         }
 
@@ -3136,13 +3143,7 @@ try
 
     if (inspect.State.Running)
     {
-        auto startTime = std::time(nullptr);
-        if (!inspect.State.StartedAt.empty() && inspect.State.StartedAt != c_unsetTimestamp)
-        {
-            startTime = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspect.State.StartedAt);
-        }
-
-        ReconcilePolicyRestartStartedLockHeld(inspect, startTime);
+        ReconcilePolicyRestartStartedLockHeld(inspect, GetContainerStartTime(inspect));
         return;
     }
 
