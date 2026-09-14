@@ -2536,12 +2536,24 @@ __requires_lock_held(m_networkEventDispatchLock) void WSLCSession::ProcessNetwor
     // Mutators hold m_networksLock until their state changes are committed.
     std::lock_guard networksLock{m_networksLock};
 
-    // Rollback events can be interleaved with unrelated events, so search the full queue.
-    const auto suppressed = std::ranges::find(m_suppressedNetworkEvents, std::make_pair(NetworkId, Event));
+    const auto suppressed = m_suppressedNetworkEvents.find(NetworkId);
     if (suppressed != m_suppressedNetworkEvents.end())
     {
-        m_suppressedNetworkEvents.erase(suppressed);
-        return;
+        if (suppressed->second == RollbackNetworkEventSuppression::AllUntilDestroy)
+        {
+            if (Event == NetworkEvent::Destroy)
+            {
+                m_suppressedNetworkEvents.erase(suppressed);
+            }
+
+            return;
+        }
+
+        if (Event == NetworkEvent::Create)
+        {
+            m_suppressedNetworkEvents.erase(suppressed);
+            return;
+        }
     }
 
     m_eventStore.Record("network", std::string{actions.at(Event)}, NetworkId, Attributes, Time);
@@ -3300,10 +3312,9 @@ try
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
     }
 
-    // Suppress create and destroy before rollback; removal may commit despite a failed response.
+    // Docker may enqueue any network event while callbacks wait for m_networksLock.
     auto removeNetworkCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name, &createResult]() {
-        m_suppressedNetworkEvents.emplace_back(createResult.Id, NetworkEvent::Create);
-        m_suppressedNetworkEvents.emplace_back(createResult.Id, NetworkEvent::Destroy);
+        m_suppressedNetworkEvents.insert_or_assign(createResult.Id, RollbackNetworkEventSuppression::AllUntilDestroy);
 
         try
         {
@@ -3314,12 +3325,7 @@ try
             // Only a network dockerd still reports can be proven undeleted; anything else may yet emit destroy.
             if (IsNetworkConfirmedPresent(createResult.Id))
             {
-                const auto suppressed = std::make_pair(createResult.Id, NetworkEvent::Destroy);
-                const auto destroy = std::ranges::find(m_suppressedNetworkEvents, suppressed);
-                if (destroy != m_suppressedNetworkEvents.end())
-                {
-                    m_suppressedNetworkEvents.erase(destroy);
-                }
+                m_suppressedNetworkEvents.insert_or_assign(createResult.Id, RollbackNetworkEventSuppression::CreateOnly);
             }
 
             throw;

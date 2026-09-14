@@ -375,6 +375,12 @@ private:
         std::unordered_set<std::string> RemainingDestroyIds;
     };
 
+    enum class RollbackNetworkEventSuppression
+    {
+        AllUntilDestroy,
+        CreateOnly
+    };
+
     __requires_lock_held(m_networksLock) std::shared_ptr<PendingNetworkOperation> StartPendingNetworkOperation(
         PendingNetworkOperationType Type, std::string NetworkId, std::unordered_set<std::string> ExpectedDestroyIds = {});
 
@@ -470,8 +476,8 @@ private:
 
     __guarded_by(m_networksLock) std::shared_ptr<PendingNetworkOperation> m_pendingNetworkOperation;
 
-    // Events from rolled-back creates are not published.
-    __guarded_by(m_networksLock) std::deque<std::pair<std::string, NetworkEvent>> m_suppressedNetworkEvents;
+    // Rollback events are suppressed by Docker network ID through their terminal destroy.
+    __guarded_by(m_networksLock) std::unordered_map<std::string, RollbackNetworkEventSuppression> m_suppressedNetworkEvents;
 
     // Timed-out prune events must drain before another prune starts.
     __guarded_by(m_networksLock) std::optional<AbandonedPrune> m_abandonedPrune;
@@ -490,8 +496,8 @@ private:
 
     // Serializes dispatch so replayed events stay ahead of the callbacks that followed them.
     std::mutex m_networkEventDispatchLock;
-    __guarded_by(m_networkEventDispatchLock) bool m_dropNetworkEventsForTest{};
-    __guarded_by(m_networkEventDispatchLock) bool m_deferNetworkEventsForTest{};
+    __guarded_by(m_networkEventDispatchLock) bool m_dropNetworkEventsForTest {};
+    __guarded_by(m_networkEventDispatchLock) bool m_deferNetworkEventsForTest {};
     __guarded_by(m_networkEventDispatchLock) std::vector<DeferredNetworkEvent> m_deferredNetworkEvents;
 
     // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.

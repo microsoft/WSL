@@ -144,6 +144,13 @@ class WSLCTests
         return wil::scope_exit([this]() { m_defaultSession = CreateSession(m_defaultSessionSettings); });
     }
 
+    static LONGLONG WaitForNextEventSecond()
+    {
+        const auto nextSecond = floor<seconds>(system_clock::now()) + 1s;
+        std::this_thread::sleep_until(nextSecond);
+        return nextSecond.time_since_epoch().count();
+    }
+
     static wil::com_ptr<IWSLCSessionManager> OpenSessionManager()
     {
         wil::com_ptr<IWSLCSessionManager> sessionManager;
@@ -7309,7 +7316,7 @@ class WSLCTests
 
         auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
 
-        const LONGLONG since = now();
+        const LONGLONG since = WaitForNextEventSecond();
         std::string networkId;
         std::string containerId;
 
@@ -7433,9 +7440,7 @@ class WSLCTests
             LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
         });
 
-        const auto sinceTime = floor<seconds>(system_clock::now()) + 1s;
-        std::this_thread::sleep_until(sinceTime);
-        const LONGLONG since = sinceTime.time_since_epoch().count();
+        const LONGLONG since = WaitForNextEventSecond();
 
         // The label scopes this prune to the test networks.
         CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
@@ -7500,9 +7505,7 @@ class WSLCTests
             LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
         });
 
-        const auto sinceTime = floor<seconds>(system_clock::now()) + 1s;
-        std::this_thread::sleep_until(sinceTime);
-        const LONGLONG since = sinceTime.time_since_epoch().count();
+        const LONGLONG since = WaitForNextEventSecond();
 
         // Generate an unkeyed aggregate event without changing WSLC network state.
         ExpectCommandResult(
@@ -7556,10 +7559,7 @@ class WSLCTests
 
         auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
 
-        // The window is inclusive at second resolution, so start it past the cleanup above.
-        const auto sinceTime = floor<seconds>(system_clock::now()) + 1s;
-        std::this_thread::sleep_until(sinceTime);
-        const LONGLONG since = sinceTime.time_since_epoch().count();
+        const LONGLONG since = WaitForNextEventSecond();
 
         auto cleanup = wil::scope_exit([&]() {
             LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
@@ -7692,7 +7692,7 @@ class WSLCTests
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-        const LONGLONG since = now();
+        const LONGLONG since = WaitForNextEventSecond();
 
         CreateNamedNetwork(networkName);
 
