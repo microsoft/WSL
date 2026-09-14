@@ -68,7 +68,7 @@ class WSLCE2EAliasTests
         // Help output should be identical after normalizing executable-name references.
         auto wslcOutput = wslcResult.Stdout.value();
         const std::pair<std::wstring, std::wstring> executableReferences[] = {
-            {L"Usage: wslc", L"Usage: container"},
+            {wsl::shared::Localization::WSLCCLI_Usage(L"wslc", L""), wsl::shared::Localization::WSLCCLI_Usage(L"container", L"")},
             {wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc"),
              wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"container")},
         };
