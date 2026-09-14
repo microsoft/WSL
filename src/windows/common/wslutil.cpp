@@ -107,7 +107,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_VM_CRASHED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
     X(WSLC_E_CONTAINER_DISABLED),
-    X(WSLC_E_PRIVILEGED_CONTAINER_DISABLED),
+    X(WSLC_E_PRIVILEGED_BLOCKED_BY_POLICY),
     X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
     X(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS),
     X(E_ACCESSDENIED),
@@ -914,7 +914,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSLC_E_CONTAINER_DISABLED:
         return Localization::MessageWSLContainerDisabled();
 
-    case WSLC_E_PRIVILEGED_CONTAINER_DISABLED:
+    case WSLC_E_PRIVILEGED_BLOCKED_BY_POLICY:
         return Localization::MessageWSLContainerPrivilegedDisabled();
 
     case WSL_E_INVALID_USAGE:

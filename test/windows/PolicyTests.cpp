@@ -479,7 +479,7 @@ class PolicyTest
         VERIFY_ARE_EQUAL(L"", stdoutText);
 
         const auto expected = FormatErrorMessage(
-            wsl::shared::Localization::MessageWSLContainerPrivilegedDisabled(), L"WSLC_E_PRIVILEGED_CONTAINER_DISABLED");
+            wsl::shared::Localization::MessageWSLContainerPrivilegedDisabled(), L"WSLC_E_PRIVILEGED_BLOCKED_BY_POLICY");
         VERIFY_ARE_EQUAL(expected, stderrText);
     }
 

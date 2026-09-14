@@ -3242,7 +3242,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Process);
     RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
     THROW_HR_WITH_USER_ERROR_IF(
-        WSLC_E_PRIVILEGED_CONTAINER_DISABLED,
+        WSLC_E_PRIVILEGED_BLOCKED_BY_POLICY,
         Localization::MessageWSLContainerPrivilegedDisabled(),
         WI_IsFlagSet(Options->Flags, WSLCProcessFlagsPrivileged) &&
             !policies::IsFeatureAllowed(policies::OpenPoliciesKey().get(), policies::c_allowWSLContainerPrivileged));

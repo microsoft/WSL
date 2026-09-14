@@ -2285,7 +2285,7 @@ try
         "Invalid container flags: 0x%x",
         containerOptions->Flags);
     THROW_HR_WITH_USER_ERROR_IF(
-        WSLC_E_PRIVILEGED_CONTAINER_DISABLED,
+        WSLC_E_PRIVILEGED_BLOCKED_BY_POLICY,
         Localization::MessageWSLContainerPrivilegedDisabled(),
         WI_IsFlagSet(containerOptions->Flags, WSLCContainerFlagsPrivileged) &&
             !policies::IsFeatureAllowed(policies::OpenPoliciesKey().get(), policies::c_allowWSLContainerPrivileged));
