@@ -413,11 +413,11 @@ Arguments for running Linux binaries:
         Execute the specified command with the provided shell type.
 
     --
-        Pass the remaining command line as-is. Unless --exec/-e or
-        --shell-type none is also specified, this command line is still
-        handed to the default Linux shell for interpretation, so shell
-        metacharacters in it (quotes, $, ;) are evaluated an additional
-        time by that shell. Use --exec/-e to run it directly instead.
+        Pass the remaining command line as-is. Without --exec/-e or
+        --shell-type none, this command line is still handed to the default
+        Linux shell for interpretation, so shell metacharacters in it
+        (quotes, $, ;) are evaluated an additional time by that shell.
+        Use --exec/-e to run it directly instead.
 
 Options:
     --cd &lt;Directory&gt;
