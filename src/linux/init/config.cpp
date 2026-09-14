@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include <bitset>
+#include <unordered_map>
 #include <sys/mount.h>
 #include <sys/utsname.h>
 #include <sys/socket.h>
@@ -242,10 +243,11 @@ const INIT_STARTUP_ANY LxssStartupWsl[] = {
 
 int g_ElevatedMountNamespace = -1;
 int g_NonElevatedMountNamespace = -1;
-static std::bitset<32> g_ElevatedAutomountedDrvFsVolumes;
-static std::bitset<32> g_NonElevatedAutomountedDrvFsVolumes;
 
-static std::bitset<32>& ConfigGetAutomountedDrvFsVolumes(bool Admin)
+static std::unordered_map<unsigned int, std::pair<uid_t, gid_t>> g_ElevatedAutomountedDrvFsVolumes;
+static std::unordered_map<unsigned int, std::pair<uid_t, gid_t>> g_NonElevatedAutomountedDrvFsVolumes;
+
+static std::unordered_map<unsigned int, std::pair<uid_t, gid_t>>& ConfigGetAutomountedDrvFsVolumes(bool Admin)
 {
     return Admin ? g_ElevatedAutomountedDrvFsVolumes : g_NonElevatedAutomountedDrvFsVolumes;
 }
@@ -2078,7 +2080,7 @@ try
         }
         else if (Admin.has_value())
         {
-            ConfigGetAutomountedDrvFsVolumes(Admin.value()).set(Index);
+            ConfigGetAutomountedDrvFsVolumes(Admin.value())[Index] = {OwnerUid, OwnerGid};
         }
     }
 }
@@ -2243,7 +2245,7 @@ try
 {
     const auto TargetNamespace = Admin ? g_ElevatedMountNamespace : g_NonElevatedMountNamespace;
     auto& AutomountedVolumes = ConfigGetAutomountedDrvFsVolumes(Admin);
-    if (!Config.AutoMount || TargetNamespace == -1 || AutomountedVolumes.none())
+    if (!Config.AutoMount || TargetNamespace == -1 || AutomountedVolumes.empty())
     {
         return 0;
     }
@@ -2268,36 +2270,46 @@ try
     }
 
     const auto MountedVolumes = ConfigGetMountedDrvFsVolumes();
-    auto VolumesToRemount = AutomountedVolumes;
-    AutomountedVolumes.reset();
+    const auto* PasswordEntry = getpwuid(OwnerUid);
+    const std::pair<uid_t, gid_t> Owner{OwnerUid, PasswordEntry ? PasswordEntry->pw_gid : ROOT_GID};
+    std::bitset<32> VolumesToRemount;
     int Result = 0;
-    for (size_t Index = 0; Index < VolumesToRemount.size(); Index += 1)
+    for (auto Iterator = AutomountedVolumes.begin(); Iterator != AutomountedVolumes.end();)
     {
-        if (!VolumesToRemount[Index])
+        const auto Index = Iterator->first;
+        const auto Target = std::format("{}{:c}", Config.DrvFsPrefix, 'a' + Index);
+        if (!MountedVolumes.contains(std::make_pair(Index, Target)))
         {
+            Iterator = AutomountedVolumes.erase(Iterator);
             continue;
         }
 
-        const auto Target = std::format("{}{:c}", Config.DrvFsPrefix, 'a' + Index);
-        if (!MountedVolumes.contains(std::make_pair(static_cast<unsigned int>(Index), Target)))
+        if (Iterator->second == Owner)
         {
-            VolumesToRemount.reset(Index);
+            ++Iterator;
             continue;
         }
 
         if (umount2(Target.c_str(), MNT_DETACH) < 0)
         {
             LOG_ERROR("umount2({}) failed {}", Target, errno);
-            AutomountedVolumes.set(Index);
-            VolumesToRemount.reset(Index);
             Result = -1;
+            ++Iterator;
+            continue;
         }
+
+        VolumesToRemount.set(Index);
+        Iterator = AutomountedVolumes.erase(Iterator);
     }
 
     ConfigMountDrvFsVolumes(VolumesToRemount.to_ulong(), OwnerUid, Admin, Config);
-    if ((VolumesToRemount & ~AutomountedVolumes).any())
+    for (unsigned int Index = 0; Index < VolumesToRemount.size(); Index += 1)
     {
-        Result = -1;
+        if (VolumesToRemount[Index] && !AutomountedVolumes.contains(Index))
+        {
+            Result = -1;
+            break;
+        }
     }
 
     return Result;
@@ -2420,7 +2432,7 @@ try
 
     const auto SourceAutomountedVolumes = ConfigGetAutomountedDrvFsVolumes(!Message->Admin);
     auto& DestinationAutomountedVolumes = ConfigGetAutomountedDrvFsVolumes(Message->Admin);
-    DestinationAutomountedVolumes.reset();
+    DestinationAutomountedVolumes.clear();
 
     if (Message->Admin)
     {
@@ -2598,12 +2610,12 @@ try
     }
 
     const auto MountedVolumes = ConfigGetMountedDrvFsVolumes();
-    for (size_t Index = 0; Index < SourceAutomountedVolumes.size(); Index += 1)
+    for (const auto& [Index, Owner] : SourceAutomountedVolumes)
     {
         const auto Target = std::format("{}{:c}", Config.DrvFsPrefix, 'a' + Index);
-        if (SourceAutomountedVolumes[Index] && MountedVolumes.contains(std::make_pair(static_cast<unsigned int>(Index), Target)))
+        if (MountedVolumes.contains(std::make_pair(Index, Target)))
         {
-            DestinationAutomountedVolumes.set(Index);
+            DestinationAutomountedVolumes.try_emplace(Index, Owner);
         }
     }
 
