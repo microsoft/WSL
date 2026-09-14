@@ -55,6 +55,38 @@ class SimpleTests
         VERIFY_ARE_EQUAL(output, cdExpected);
     }
 
+    WSL2_TEST_METHOD(VmBackendShutdownAndReconnect)
+    {
+        WslConfigChange config(LxssGenerateTestConfig());
+        VERIFY_IS_TRUE(WslShutdown());
+
+        auto readBootId = []() {
+            auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"--exec cat /proc/sys/kernel/random/boot_id");
+            VERIFY_IS_TRUE(std::regex_match(output, std::wregex(L"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\n")));
+            VERIFY_ARE_EQUAL(warnings, L"");
+            return output;
+        };
+
+        std::wstring previousBootId;
+        for (int iteration = 0; iteration < 2; ++iteration)
+        {
+            {
+                WslKeepAlive keepAlive;
+                const auto bootId = readBootId();
+                VERIFY_ARE_NOT_EQUAL(bootId, previousBootId);
+                ValidateOutput(
+                    L"--exec sh -c \"printf backend-stdout; printf backend-stderr >&2; exit 17\"",
+                    L"backend-stdout",
+                    L"backend-stderr",
+                    17);
+                VERIFY_ARE_EQUAL(readBootId(), bootId);
+                previousBootId = bootId;
+            }
+
+            VERIFY_IS_TRUE(WslShutdown());
+        }
+    }
+
     TEST_METHOD(Daemonize)
     {
         WslConfigChange config(LxssGenerateTestConfig({.vmIdleTimeout = 0}));

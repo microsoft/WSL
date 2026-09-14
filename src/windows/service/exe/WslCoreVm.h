@@ -38,7 +38,8 @@ Abstract:
 namespace wrl = Microsoft::WRL;
 
 /// <summary>
-/// This object tracks a running WSL Core VM.
+/// HCS implementation of the service-facing VM contract. HCS configuration, lifecycle, and guest-device
+/// orchestration stay together here so adding another backend does not change existing HCS behavior.
 /// </summary>
 class WslCoreVm final : public IWslCoreVm
 {

@@ -5,6 +5,9 @@
 #include "LxssCreateProcess.h"
 #include "WslCoreConfig.h"
 
+// Service-facing VM backend contract. LxssUserSession owns session policy and selects the implementation;
+// each implementation owns VM initialization, guest devices and communication, and shutdown.
+// WslCoreVm is the HCS implementation, not a shared facade over another backend interface.
 class IWslCoreVm
 {
 public:
