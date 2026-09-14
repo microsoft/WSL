@@ -54,7 +54,6 @@ struct FlagsTraits<WslcContainerFlags>
     constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLCContainerFlagsRm);
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLCContainerFlagsGpu);
-    // TODO: WSLC_CONTAINER_FLAG_PRIVILEGED has no associated runtime value
 };
 
 template <>
@@ -78,6 +77,15 @@ typename FlagsTraits<Flags>::WslcType ConvertFlags(Flags flags)
 {
     using traits = FlagsTraits<Flags>;
     return static_cast<typename traits::WslcType>(flags & traits::Mask);
+}
+
+WSLCContainerFlags ConvertContainerFlags(WslcContainerFlags flags)
+{
+    auto converted = ConvertFlags(flags);
+
+    // The public privileged flag predates the internal init flag, so both use bit 4.
+    WI_SetFlagIf(converted, WSLCContainerFlagsPrivileged, WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED));
+    return converted;
 }
 
 WSLCSignal Convert(WslcSignal signal)
@@ -779,7 +787,7 @@ try
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
     containerOptions.DomainName = internalContainerSettings->DomainName;
-    containerOptions.Flags = ConvertFlags(internalContainerSettings->containerFlags);
+    containerOptions.Flags = ConvertContainerFlags(internalContainerSettings->containerFlags);
 
     CopyProcessSettingsToRuntime(containerOptions.InitProcessOptions, internalContainerSettings->initProcessOptions);
 

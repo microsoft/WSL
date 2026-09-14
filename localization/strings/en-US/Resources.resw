@@ -1005,6 +1005,9 @@ Falling back to NAT networking.</value>
   <data name="MessageWSLContainerDisabled" xml:space="preserve">
     <value>WSL container is disabled by the computer policy.</value>
   </data>
+  <data name="MessageWSLContainerPrivilegedDisabled" xml:space="preserve">
+    <value>Your administrator has disabled privileged WSL container operations.</value>
+  </data>
   <data name="MessageRegistryBlockedByPolicy" xml:space="preserve">
     <value>The container image registry '{}' is blocked by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3512,6 +3515,9 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Set type of progress output (auto, tty, plain, quiet) (default: auto)</value>
     <comment>{Locked="auto"}{Locked="tty"}{Locked="plain"}{Locked="quiet"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_PrivilegedArgDescription" xml:space="preserve">
+    <value>Give extended privileges to this container</value>
+  </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
     <value>Image pull policy (always|missing|never) (default: missing)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
@@ -3540,6 +3546,9 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Arguments to pass to the command being executed inside the container</value>
+  </data>
+  <data name="WSLCCLI_ContainerExecPrivilegedArgDescription" xml:space="preserve">
+    <value>Give extended privileges to the command</value>
   </data>
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
     <value>Show detailed information about the listed sessions.</value>

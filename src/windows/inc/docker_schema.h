@@ -376,6 +376,7 @@ struct HostConfig
     std::map<std::string, std::vector<PortMapping>> PortBindings;
     std::string NetworkMode;
     bool Init{};
+    bool Privileged{};
     std::optional<std::vector<std::string>> Dns;
     std::optional<std::vector<std::string>> DnsSearch;
     std::optional<std::vector<std::string>> DnsOptions;
@@ -393,7 +394,7 @@ struct HostConfig
     std::optional<std::vector<Ulimit>> Ulimits;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Privileged, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, DeviceRequests, ShmSize, Memory, NanoCpus, Ulimits);
 };
 
 struct InspectEndpointIPAMConfig
@@ -688,6 +689,7 @@ struct CreateExec
     bool AttachStdout{};
     bool AttachStderr{};
     bool Tty{};
+    bool Privileged{};
     // Docker wire type is *[2]uint64. Sending an empty array on a TTY exec yields
     // a 0x0 console; the field must be omitted entirely when the caller didn't set it.
     std::vector<ULONG> ConsoleSize;
@@ -705,6 +707,7 @@ inline void to_json(nlohmann::json& j, const CreateExec& v)
         {"AttachStdout", v.AttachStdout},
         {"AttachStderr", v.AttachStderr},
         {"Tty", v.Tty},
+        {"Privileged", v.Privileged},
         {"Cmd", v.Cmd},
         {"Env", v.Env},
         {"WorkingDir", v.WorkingDir},

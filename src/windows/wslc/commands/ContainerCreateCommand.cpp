@@ -60,6 +60,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::NoHealthcheck),
+        Argument::Create(ArgType::Privileged),
         Argument::Create(ArgType::Publish, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::PublishAll),
         Argument::Create(ArgType::Pull),

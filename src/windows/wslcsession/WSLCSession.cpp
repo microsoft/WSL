@@ -38,6 +38,8 @@ using wsl::windows::service::wslc::WSLCExecutionContext;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
+namespace policies = wsl::windows::policies;
+
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr uint32_t c_progressPrecision = 4;
@@ -2282,6 +2284,11 @@ try
         WI_IsAnyFlagSet(containerOptions->Flags, ~WSLCContainerFlagsValid),
         "Invalid container flags: 0x%x",
         containerOptions->Flags);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_PRIVILEGED_CONTAINER_DISABLED,
+        Localization::MessageWSLContainerPrivilegedDisabled(),
+        WI_IsFlagSet(containerOptions->Flags, WSLCContainerFlagsPrivileged) &&
+            !policies::IsFeatureAllowed(policies::OpenPoliciesKey().get(), policies::c_allowWSLContainerPrivileged));
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         WI_IsAnyFlagSet(containerOptions->InitProcessOptions.Flags, ~WSLCProcessFlagsValid),

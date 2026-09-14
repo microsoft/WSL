@@ -2733,6 +2733,20 @@ class WslcSdkTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerPrivileged)
+    {
+        const char* initArgv[] = {"/bin/grep", "CapEff", "/proc/self/status"};
+        const auto output =
+            RunContainerAndCapture(m_defaultSession, "debian:latest", {initArgv[0], initArgv[1], initArgv[2]}, WSLC_CONTAINER_FLAG_PRIVILEGED);
+
+        const auto separator = output.stdoutOutput.find_last_of("\t ");
+        VERIFY_IS_TRUE(separator != std::string::npos);
+        const auto capabilities = std::stoull(output.stdoutOutput.substr(separator + 1), nullptr, 16);
+
+        constexpr uint64_t c_capSysAdmin = uint64_t{1} << 21;
+        VERIFY_IS_TRUE((capabilities & c_capSysAdmin) != 0);
+    }
+
     WSLC_TEST_METHOD(ContainerAutoRemove)
     {
         WslcProcessSettings procSettings;

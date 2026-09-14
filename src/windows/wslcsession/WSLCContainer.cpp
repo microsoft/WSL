@@ -25,6 +25,7 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "APICompat.h"
 #include "MountSpecParsing.h"
+#include "wslpolicies.h"
 #include <unordered_set>
 
 namespace apicompat = wsl::windows::common::apicompat;
@@ -66,6 +67,7 @@ using namespace std::chrono_literals;
 using wsl::shared::Localization;
 
 namespace wslc_schema = wsl::windows::common::wslc_schema;
+namespace policies = wsl::windows::policies;
 
 using DockerInspectContainer = wsl::windows::common::docker_schema::InspectContainer;
 using WslcInspectContainer = wsl::windows::common::wslc_schema::InspectContainer;
@@ -1929,6 +1931,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, const WSLCProces
     common::docker_schema::CreateExec request{};
     request.AttachStdout = true;
     request.AttachStderr = true;
+    request.Privileged = WI_IsFlagSet(Options->Flags, WSLCProcessFlagsPrivileged);
 
     request.Cmd = StringArrayToVector(Options->CommandLine);
     request.Env = StringArrayToVector(Options->Environment);
@@ -2075,6 +2078,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     }
 
     wslcInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
+    wslcInspect.HostConfig.Privileged = dockerInspect.HostConfig.Privileged;
     wslcInspect.HostConfig.Memory = dockerInspect.HostConfig.Memory;
     wslcInspect.HostConfig.NanoCpus = dockerInspect.HostConfig.NanoCpus;
 
@@ -2338,6 +2342,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsInit);
+    request.HostConfig.Privileged = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPrivileged);
 
     request.HostConfig.Memory = containerOptions.MemoryBytes;
     request.HostConfig.NanoCpus = containerOptions.NanoCpus;
@@ -3236,6 +3241,11 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Process);
     RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Options->Flags, ~WSLCProcessFlagsValid), "Invalid flags: 0x%x", Options->Flags);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_PRIVILEGED_CONTAINER_DISABLED,
+        Localization::MessageWSLContainerPrivilegedDisabled(),
+        WI_IsFlagSet(Options->Flags, WSLCProcessFlagsPrivileged) &&
+            !policies::IsFeatureAllowed(policies::OpenPoliciesKey().get(), policies::c_allowWSLContainerPrivileged));
 
     *Process = nullptr;
 

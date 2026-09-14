@@ -762,6 +762,8 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Gpu = true;
     }
 
+    options.Privileged = context.Args.GetValue<ArgType::Privileged>();
+
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAllValues<ArgType::Volume>();

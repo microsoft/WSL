@@ -34,6 +34,7 @@ std::vector<Argument> ContainerExecCommand::GetArguments() const
         Argument::Create(ArgType::Env, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::EnvFile, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Interactive),
+        Argument::Create(ArgType::Privileged, {.Desc = Localization::WSLCCLI_ContainerExecPrivilegedArgDescription()}),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::WorkDir),

@@ -102,6 +102,26 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stdout = L"hello\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_Privileged)
+    {
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto getEffectiveCapabilities = [&](std::wstring_view options) {
+            auto execResult = RunWslc(std::format(L"container exec {}{} grep CapEff /proc/self/status", options, WslcContainerName));
+            execResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+            const auto output = execResult.GetStdoutOneLine();
+            const auto separator = output.find_last_of(L"\t ");
+            VERIFY_IS_TRUE(separator != std::wstring::npos);
+            return std::stoull(output.substr(separator + 1), nullptr, 16);
+        };
+
+        constexpr uint64_t c_capSysAdmin = uint64_t{1} << 21;
+        VERIFY_IS_FALSE((getEffectiveCapabilities(L"") & c_capSysAdmin) != 0);
+        VERIFY_IS_TRUE((getEffectiveCapabilities(L"--privileged ") & c_capSysAdmin) != 0);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_InteractiveTTY)
     {
         VerifyContainerIsNotListed(WslcContainerName);

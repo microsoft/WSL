@@ -75,6 +75,7 @@ struct ContainerOptions
     std::optional<int> HealthRetries{};
     bool NoHealthcheck = false;
     bool Gpu = false;
+    bool Privileged = false;
     std::vector<std::string> Ports;
     std::vector<mount::Spec> Mounts;
     std::string WorkingDirectory;

@@ -74,6 +74,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsRm, options.Remove);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsPrivileged, options.Privileged);
 
     std::string networkMode = options.Networks.empty() ? std::string("bridge") : options.Networks.front().Name;
 
@@ -766,6 +767,7 @@ int ContainerService::Exec(Terminal& terminal, Session& session, const std::stri
     auto execFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(execFlags, WSLCProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
+    WI_SetFlagIf(execFlags, WSLCProcessFlagsPrivileged, options.Privileged);
 
     auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
 

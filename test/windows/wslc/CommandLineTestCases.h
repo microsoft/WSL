@@ -115,7 +115,7 @@ COMMAND_LINE_TEST_CASE(L"container run --pull never ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --pull invalid ubuntu", L"run", false)
 COMMAND_LINE_TEST_CASE(L"container run --cidfile C:\\temp\\cidfile ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run -it --name foo ubuntu", L"run", true)
-COMMAND_LINE_TEST_CASE(L"container run --rm -it --name foo ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --rm -it --privileged --name foo ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"stop", L"stop", false)           // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container stop", L"stop", false) // Missing required container-id positional
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal 9", L"stop", true)
@@ -137,7 +137,7 @@ COMMAND_LINE_TEST_CASE(L"container start cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"container start --attach cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"container start -a cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"create ubuntu:latest", L"create", true)
-COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --privileged --name foo ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --pull=always ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --pull missing ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --pull never ubuntu", L"create", true)
@@ -207,8 +207,8 @@ COMMAND_LINE_TEST_CASE(L"create --health-start-period 500ms ubuntu", L"create", 
 COMMAND_LINE_TEST_CASE(L"create --health-timeout invalid ubuntu", L"create", false) // Invalid duration
 COMMAND_LINE_TEST_CASE(L"create --health-retries 2.5 ubuntu", L"create", false)     // Non-integer retries
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
-COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
-COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
+COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false) // Missing required command argument
+COMMAND_LINE_TEST_CASE(L"container exec --privileged -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
 COMMAND_LINE_TEST_CASE(L"exec --workdir /app cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec -w /app cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"container exec --workdir /app cont1 sh", L"exec", true)

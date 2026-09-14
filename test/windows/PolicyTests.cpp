@@ -467,6 +467,22 @@ class PolicyTest
         VERIFY_ARE_EQUAL(expected, stderrText);
     }
 
+    WSLC_TEST_METHOD(ContainerPrivilegedDisabled)
+    {
+        auto revert = SetPolicy(c_allowWSLContainerPrivileged, 0);
+
+        std::wstring cmd =
+            L"\"" + GetWslcExePath() + L"\" container create --pull=never --privileged policy-test-image-does-not-exist";
+        auto [stdoutText, stderrText, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data(), nullptr, nullptr);
+
+        VERIFY_ARE_EQUAL(1, exitCode);
+        VERIFY_ARE_EQUAL(L"", stdoutText);
+
+        const auto expected = FormatErrorMessage(
+            wsl::shared::Localization::MessageWSLContainerPrivilegedDisabled(), L"WSLC_E_PRIVILEGED_CONTAINER_DISABLED");
+        VERIFY_ARE_EQUAL(expected, stderrText);
+    }
+
     // Verifies the WSLContainerRegistryAllowlist denies image pulls from registries not in the
     // allowlist.
     WSLC_TEST_METHOD(RegistryAllowlistDenies)

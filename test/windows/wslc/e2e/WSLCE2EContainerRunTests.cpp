@@ -92,6 +92,15 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsListed(WslcContainerName, L"exited");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Privileged)
+    {
+        auto result = RunWslc(std::format(L"container run --privileged --name {} {} true", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_IS_TRUE(inspect.HostConfig.Privileged);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PullPolicy)
     {
         auto session = OpenDefaultElevatedSession();
