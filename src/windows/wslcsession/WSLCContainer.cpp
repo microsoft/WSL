@@ -865,6 +865,8 @@ WSLCContainerImpl::WSLCContainerImpl(
 
 WSLCContainerImpl::~WSLCContainerImpl()
 {
+    m_policyRestartTimer.reset();
+
     // Destructors are implicitly noexcept, so any escaping exception terminates the session host.
     // Everything below touches VM-scoped state that may already be gone.
     try
@@ -1052,7 +1054,10 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
     // A Delete() that raced a restart may have already moved the container to the Deleted state.
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_DELETED, Localization::MessageWslcContainerDeleted(m_id), m_state == WslcContainerStateDeleted);
 
-    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_IS_RUNNING,
+        Localization::MessageWslcContainerIsRunning(m_id),
+        m_state == WslcContainerStateRunning || PolicyRestartPendingLockHeld());
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
@@ -1200,8 +1205,9 @@ void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
 {
     while (true)
     {
-        // A restart spans two transitions, so waiting on the one in flight is not enough.
-        if (waitForRestart && m_restart)
+        // An explicit restart spans two transitions, so waiting on the one in flight is not enough.
+        // Docker policy restarts are handled by the lifecycle operation that observed them.
+        if (waitForRestart && m_restart && m_restart->Source == RestartSource::Explicit)
         {
             auto restart = m_restart;
             lock.reset();
@@ -1309,13 +1315,53 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
         if (event == ContainerEvent::Start)
         {
-            // Only WSLC should start the container, so if we receive a start event, it must be expected by a transition.
-            // Otherwise the container was started externally. Log if the container was started externally.
             if (transition && transition->ExpectedEvent == ContainerEvent::Start)
             {
                 WI_ASSERT(m_state == WslcContainerStateCreated || m_state == WslcContainerStateExited);
                 CommitState(WslcContainerStateRunning, eventTime);
+
+                // Restart() retains the explicit transaction object and signals it after StartPhase returns.
+                // Clear the container's reference once the replacement run is committed so later exits
+                // perform normal resource cleanup and --rm handling.
+                m_restart.reset();
                 CompleteTransition(transition);
+            }
+            else if (PolicyRestartPendingLockHeld())
+            {
+                bool accepted = false;
+                try
+                {
+                    const auto inspectJson = InspectLockHeld();
+                    const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
+                    if (FAILED(pluginResult))
+                    {
+                        LOG_HR_MSG(pluginResult, "Plugin rejected policy restart of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
+                    }
+                    else
+                    {
+                        accepted = true;
+                    }
+                }
+                CATCH_LOG_MSG("Failed to reconcile policy restart of container '%hs'", m_id.c_str());
+
+                if (accepted)
+                {
+                    CommitState(WslcContainerStateRunning, eventTime);
+
+                    // Policy resolution also disarms the abandonment monitor, signals lifecycle
+                    // waiters, and updates the VM activity hold.
+                    ResolvePolicyRestartLockHeld(false);
+                }
+                else
+                {
+                    try
+                    {
+                        m_runtime.Docker().StopContainer(m_id, {}, {});
+                    }
+                    CATCH_LOG_MSG("Failed to stop rejected policy restart of container '%hs'", m_id.c_str());
+
+                    ResolvePolicyRestartLockHeld(true);
+                }
             }
             else
             {
@@ -1331,6 +1377,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         {
             if (m_state != WslcContainerStateDeleted)
             {
+                ResolvePolicyRestartLockHeld(false);
                 CommitState(WslcContainerStateDeleted, eventTime);
                 comWrapper = ReleaseResources();
             }
@@ -1384,7 +1431,10 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         // There can be an active stop transition post observing the exited state for cases where additional work needs to be done
         // after the container stopped: e.g. auto remove, restart, etc. Therefore, if there is an active stop transition, we still
         // need to attach to it below. This check simply skips creating a new transition once the state is already exited.
-        if (!transition && m_state != WslcContainerStateRunning)
+        const auto policyRestart = PolicyRestartPendingLockHeld() ? m_restart : nullptr;
+        const bool cancelPolicyRestart = policyRestart || (RestartPhase && m_restart && m_restart->CancelPolicy);
+
+        if (!transition && m_state != WslcContainerStateRunning && !cancelPolicyRestart)
         {
             if (m_state == WslcContainerStateExited && !Kill)
             {
@@ -1400,7 +1450,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
         }
         // This check ensures WSLC does not call into docker if it has already observed the exited state. This prevents
         // conflicting with scenarios where work needs to be done after the container exits.
-        else if (m_state == WslcContainerStateRunning)
+        else if (m_state == WslcContainerStateRunning || cancelPolicyRestart)
         {
             std::optional<WSLCSignal> SignalArg;
 
@@ -1413,7 +1463,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
 
             // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
             // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
-            bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
+            bool waitForStop = cancelPolicyRestart || !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
             const auto generation = m_stateGeneration;
 
             lock.reset();
@@ -1421,7 +1471,7 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
 
             try
             {
-                if (Kill)
+                if (Kill && !cancelPolicyRestart)
                 {
                     m_runtime.Docker().SignalContainer(m_id, SignalArg);
                 }
@@ -1429,7 +1479,12 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                 {
                     std::optional<LONG> TimeoutArg;
 
-                    if (TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT)
+                    if (Kill)
+                    {
+                        SignalArg = SignalArg.value_or(WSLCSignalSIGKILL);
+                        TimeoutArg = 0;
+                    }
+                    else if (TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT)
                     {
                         TimeoutArg = TimeoutSeconds;
                     }
@@ -1459,14 +1514,31 @@ void WSLCContainerImpl::StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool K
                 lock = m_lock.lock_exclusive();
                 transition = m_transition;
 
+                if (policyRestart && m_restart == policyRestart)
+                {
+                    ResolvePolicyRestartLockHeld(true);
+                    transition.reset();
+                }
+                else if (cancelPolicyRestart && m_restart && m_restart->Source == RestartSource::Explicit && m_restart->CancelPolicy)
+                {
+                    transition.reset();
+                }
+                else if (policyRestart && m_restart != policyRestart && m_state != WslcContainerStateRunning)
+                {
+                    transition.reset();
+                }
                 // The container can exit and start again while the locks are released, so an unchanged generation is
                 // the only proof that the stop event this call is waiting for is still to come.
-                if (m_stateGeneration == generation)
+                else if (m_stateGeneration == generation)
                 {
                     if (!transition)
                     {
                         transition = StartTransition(TransitionKind::Stop, ContainerEvent::Stop);
                     }
+                }
+                else if (!transition && m_state == WslcContainerStateRunning)
+                {
+                    transition = StartTransition(TransitionKind::Stop, ContainerEvent::Stop);
                 }
                 // The run already ended: keep waiting on the work it triggered (e.g. auto-remove), never on a start
                 // that raced in behind it.
@@ -1494,14 +1566,21 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
     ValidateStopTimeout(TimeoutSeconds, true);
 
     bool wasRunning{};
-    auto restart = std::make_shared<RestartTransaction>();
+    std::shared_ptr<RestartTransaction> restart;
 
     {
         auto lifecycleLock = m_lifecycleLock.lock_shared();
         auto lock = m_lock.lock_exclusive();
         WaitForConflictingTransitionToComplete(lock, lifecycleLock);
 
-        wasRunning = m_state == WslcContainerStateRunning;
+        const bool cancelPolicyRestart = PolicyRestartPendingLockHeld();
+        wasRunning = m_state == WslcContainerStateRunning || cancelPolicyRestart;
+        restart = std::make_shared<RestartTransaction>(RestartSource::Explicit, cancelPolicyRestart);
+
+        if (cancelPolicyRestart)
+        {
+            ResolvePolicyRestartLockHeld(false);
+        }
 
         // N.B. Stop() and Start() each take m_lock, so it cannot be held across both phases. m_restart
         // stands them down until the start phase commits Running instead.
@@ -1521,7 +1600,7 @@ void WSLCContainerImpl::Restart(WSLCSignal Signal, LONG TimeoutSeconds)
             auto lifecycleLock = m_lifecycleLock.lock_shared();
             auto lock = m_lock.lock_exclusive();
 
-            // CommitState() clears this once the start phase lands, so a later restart may already own it.
+            // The start event clears this once the start phase lands, so a later restart may already own it.
             if (m_restart == restart)
             {
                 m_restart.reset();
@@ -1590,6 +1669,26 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
 
     SetExitCode(exitCode);
 
+    bool policyRestartPending = false;
+    if (m_state == WslcContainerStateRunning && !transition && !m_restart)
+    {
+        try
+        {
+            const auto inspect = m_runtime.Docker().InspectContainer(m_id);
+            policyRestartPending = inspect.State.Restarting || inspect.State.Running;
+        }
+        CATCH_LOG_MSG("Failed to inspect restart state for container '%hs'", m_id.c_str());
+    }
+
+    if (policyRestartPending)
+    {
+        try
+        {
+            ArmPolicyRestartLockHeld();
+        }
+        CATCH_LOG_MSG("Failed to start policy restart monitor for container '%hs'", m_id.c_str());
+    }
+
     // Notify plugin manager that the container is stopping. Errors are ignored.
     if (m_state == WslcContainerStateRunning)
     {
@@ -1655,6 +1754,119 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 }
 
+__requires_lock_held(m_lock) bool WSLCContainerImpl::PolicyRestartPendingLockHeld() const noexcept
+{
+    return m_restart && m_restart->Source == RestartSource::Policy;
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ArmPolicyRestartLockHeld()
+{
+    WI_ASSERT(!m_restart);
+
+    auto restart = std::make_shared<RestartTransaction>(RestartSource::Policy);
+    StartPolicyRestartMonitor();
+    m_restart = std::move(restart);
+    UpdateActivityHoldLockHeld();
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ResolvePolicyRestartLockHeld(bool releaseResources) noexcept
+{
+    if (!PolicyRestartPendingLockHeld())
+    {
+        return;
+    }
+
+    auto restart = std::exchange(m_restart, nullptr);
+    if (m_policyRestartTimer)
+    {
+        SetThreadpoolTimer(m_policyRestartTimer.get(), nullptr, 0, 0);
+    }
+
+    auto signalCompletion = wil::scope_exit([&restart]() { restart->Completed.SetEvent(); });
+
+    if (releaseResources && m_runtimeResourcesHeld)
+    {
+        ReleaseRuntimeResources();
+    }
+
+    UpdateActivityHoldLockHeld();
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::StartPolicyRestartMonitor()
+{
+    if (!m_policyRestartTimer)
+    {
+        m_policyRestartTimer.reset(CreateThreadpoolTimer(PolicyRestartTimerCallback, this, nullptr));
+        THROW_LAST_ERROR_IF(!m_policyRestartTimer);
+    }
+
+    constexpr auto c_pollInterval = 200ms;
+    auto dueTime =
+        wil::filetime::from_int64(static_cast<ULONGLONG>(-1 * wil::filetime_duration::one_millisecond * c_pollInterval.count()));
+    SetThreadpoolTimer(m_policyRestartTimer.get(), &dueTime, gsl::narrow<DWORD>(c_pollInterval.count()), 0);
+}
+
+void CALLBACK WSLCContainerImpl::PolicyRestartTimerCallback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) noexcept
+{
+    auto& container = *static_cast<WSLCContainerImpl*>(context);
+    try
+    {
+        const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+        auto runtimeLock = container.m_runtime.TryLockShared();
+        if (!runtimeLock)
+        {
+            return;
+        }
+
+        std::string id;
+        std::shared_ptr<RestartTransaction> restart;
+        {
+            auto lock = container.m_lock.lock_shared();
+            if (!container.PolicyRestartPendingLockHeld())
+            {
+                SetThreadpoolTimer(container.m_policyRestartTimer.get(), nullptr, 0, 0);
+                return;
+            }
+
+            restart = container.m_restart;
+            id = container.m_id;
+        }
+
+        if (!container.m_runtime.HasDocker() || container.m_runtime.VmExited())
+        {
+            auto lifecycleLock = container.m_lifecycleLock.lock_exclusive();
+            auto lock = container.m_lock.lock_exclusive();
+            if (container.m_restart == restart)
+            {
+                container.ResolvePolicyRestartLockHeld(true);
+            }
+            return;
+        }
+
+        const auto inspect = container.m_runtime.Docker().InspectContainer(id);
+
+        auto lifecycleLock = container.m_lifecycleLock.lock_exclusive();
+        auto lock = container.m_lock.lock_exclusive();
+        if (container.m_restart != restart)
+        {
+            if (!container.PolicyRestartPendingLockHeld())
+            {
+                SetThreadpoolTimer(container.m_policyRestartTimer.get(), nullptr, 0, 0);
+            }
+
+            return;
+        }
+
+        if (inspect.State.Restarting || inspect.State.Running)
+        {
+            return;
+        }
+
+        container.ResolvePolicyRestartLockHeld(true);
+    }
+    CATCH_LOG_MSG("Failed to monitor policy restart of container '%hs'", container.m_id.c_str());
+}
+
 void WSLCContainerImpl::RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer)
 {
     auto lock = m_lock.lock_exclusive();
@@ -1716,7 +1928,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::RequestDeleteExcl
     THROW_HR_WITH_USER_ERROR_IF(
         WSLC_E_CONTAINER_IS_RUNNING,
         Localization::MessageWslcCannotRemoveRunningContainer(m_id),
-        m_state == WslcContainerStateRunning && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
+        (m_state == WslcContainerStateRunning || PolicyRestartPendingLockHeld()) && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_state == WslcContainerStateDeleted, "Container %hs is already deleted", m_id.c_str());
@@ -2077,6 +2289,8 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
     wslcInspect.HostConfig.Memory = dockerInspect.HostConfig.Memory;
     wslcInspect.HostConfig.NanoCpus = dockerInspect.HostConfig.NanoCpus;
+    wslcInspect.HostConfig.RestartPolicy.Name = dockerInspect.HostConfig.RestartPolicy.Name;
+    wslcInspect.HostConfig.RestartPolicy.MaximumRetryCount = dockerInspect.HostConfig.RestartPolicy.MaximumRetryCount;
 
     if (dockerInspect.HostConfig.Ulimits.has_value())
     {
@@ -2282,6 +2496,18 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         ValidateStopTimeout(containerOptions.StopTimeout, false);
 
         request.StopTimeout = static_cast<int>(containerOptions.StopTimeout);
+    }
+
+    if (containerOptions.RestartPolicy != nullptr)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"),
+            WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsRm) && containerOptions.RestartPolicy[0] != '\0' &&
+                std::string_view{containerOptions.RestartPolicy} != "no");
+
+        request.HostConfig.RestartPolicy.Name = containerOptions.RestartPolicy;
+        request.HostConfig.RestartPolicy.MaximumRetryCount = containerOptions.RestartMaximumRetryCount;
     }
 
     if (containerOptions.InitProcessOptions.CurrentDirectory != nullptr)
@@ -3124,22 +3350,17 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
 
     RecordEvent(WSLCStateToEventAction(State), Time, ExitCode);
 
-    if (State == WslcContainerStateRunning)
-    {
-        // The restart's start phase landed, so a later exit must auto-delete an --rm container again.
-        m_restart.reset();
-    }
-
-    // Keep the VM alive while this container is Running and release the hold once it leaves that
-    // state, even when no client holds the wrapper (e.g. a detached `run -d` container). Dropping
-    // the hold on the transition out of Running is what lets an otherwise-idle VM be torn down; a
-    // Created or Exited container does not pin the VM, since its metadata survives teardown.
+    // Restart transactions are resolved by the start-event path that owns them. Policy resolution
+    // includes monitor and waiter cleanup in addition to publishing the Running state.
+    //
+    // Running containers and Docker policy backoff retain VM-scoped resources. Explicit Restart()
+    // holds a VM lease across its stop and start phases.
     UpdateActivityHoldLockHeld();
 }
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::UpdateActivityHoldLockHeld() noexcept
 {
-    const bool active = (m_state == WslcContainerStateRunning);
+    const bool active = (m_state == WslcContainerStateRunning || PolicyRestartPendingLockHeld());
     if (active && !m_activityHold)
     {
         m_activityHold = ActivityRef(m_wslcSession.Runtime().IdleStateShared());

@@ -115,6 +115,11 @@ bool WSLCSessionRuntime::HasVolumes() const noexcept
     return m_volumes.has_value();
 }
 
+wil::rwlock_release_shared_scope_exit WSLCSessionRuntime::TryLockShared() noexcept
+{
+    return m_lock.try_lock_shared();
+}
+
 wil::rwlock_release_exclusive_scope_exit WSLCSessionRuntime::TryLockExclusive() noexcept
 {
     return m_lock.try_lock_exclusive();

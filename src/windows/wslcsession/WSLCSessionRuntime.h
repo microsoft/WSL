@@ -160,6 +160,7 @@ public:
     bool HasEvents() const noexcept;
     WSLCVolumes& Volumes();
     bool HasVolumes() const noexcept;
+    [[nodiscard]] wil::rwlock_release_shared_scope_exit TryLockShared() noexcept;
     [[nodiscard]] wil::rwlock_release_exclusive_scope_exit TryLockExclusive() noexcept;
     IdleState& Idle() noexcept;
     std::shared_ptr<IdleState> IdleStateShared() const noexcept;

@@ -195,6 +195,35 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(pullPolicy, PullPolicy::Never);
         VERIFY_THROWS(validation::GetPullPolicyFromString(L"invalid"), ArgumentException);
 
+        // Verify container restart policy.
+        auto restartPolicy = validation::GetRestartPolicyFromString(L"");
+        VERIFY_ARE_EQUAL(std::string("no"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(0LL, restartPolicy.MaximumRetryCount);
+
+        restartPolicy = validation::GetRestartPolicyFromString(L"always");
+        VERIFY_ARE_EQUAL(std::string("always"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(0LL, restartPolicy.MaximumRetryCount);
+
+        restartPolicy = validation::GetRestartPolicyFromString(L"on-failure:3");
+        VERIFY_ARE_EQUAL(std::string("on-failure"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(3LL, restartPolicy.MaximumRetryCount);
+
+        restartPolicy = validation::GetRestartPolicyFromString(L"unless-stopped");
+        VERIFY_ARE_EQUAL(std::string("unless-stopped"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(0LL, restartPolicy.MaximumRetryCount);
+
+        VERIFY_NO_THROW(validation::GetRestartPolicyFromString(L"on-failure"));
+        VERIFY_NO_THROW(validation::GetRestartPolicyFromString(L"on-failure:+3"));
+        VERIFY_NO_THROW(validation::GetRestartPolicyFromString(L"always:0"));
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L"invalid"), ArgumentException);
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L"Always"), ArgumentException);
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L":3"), ArgumentException);
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L"on-failure:-1"), ArgumentException);
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L"always:1"), ArgumentException);
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L"on-failure:abc"), ArgumentException);
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L"on-failure:1:2"), ArgumentException);
+        VERIFY_THROWS(validation::GetRestartPolicyFromString(L"on-failure:9223372036854775808"), ArgumentException);
+
         // Verify build progress mode
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"auto"), ProgressMode::Auto);
         VERIFY_ARE_EQUAL(validation::GetProgressModeFromString(L"tty"), ProgressMode::Tty);
@@ -402,6 +431,11 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"missing"), PullPolicy::Missing);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"always"), PullPolicy::Always);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Pull>(L"never"), PullPolicy::Never);
+
+        // string -> RestartPolicy
+        const auto restartPolicy = ValidateAndGetCached<ArgType::Restart>(L"on-failure:5");
+        VERIFY_ARE_EQUAL(std::string("on-failure"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(5LL, restartPolicy.MaximumRetryCount);
 
         // string -> WSLCSignal (Signal and StopSignal share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Signal>(L"SIGTERM"), WSLCSignalSIGTERM);
