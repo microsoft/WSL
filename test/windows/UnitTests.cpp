@@ -2148,7 +2148,11 @@ Usage:
     {
         DistroFileChange configChange(L"/etc/wsl.conf", false);
 
-        auto validateWarnings = [&configChange](const std::wstring& config, const std::wstring& expectedWarnings) {
+        auto validateWarnings = [&configChange](
+                                    const std::wstring& config,
+                                    const std::wstring& expectedWarnings,
+                                    const std::wstring& command = L"-u root echo ok",
+                                    const std::wstring& expectedOutput = L"ok\n") {
             configChange.SetContent(config.c_str());
 
             TerminateDistribution();
@@ -2162,8 +2166,8 @@ Usage:
 
             while (std::chrono::steady_clock::now() < deadline)
             {
-                auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"-u root echo ok");
-                VERIFY_ARE_EQUAL(L"ok\n", output);
+                auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(command);
+                VERIFY_ARE_EQUAL(expectedOutput, output);
 
                 if (!warnings.empty() || expectedWarnings.empty())
                 {
@@ -2182,6 +2186,8 @@ Usage:
         validateWarnings(L"[foo]\na=b", L"wsl: Unknown key 'foo.a' in /etc/wsl.conf:2\r\n");
         validateWarnings(L"a=a\\m", L"wsl: Invalid escaped character: 'm' in /etc/wsl.conf:1\r\n");
         validateWarnings(L"[=b", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n");
+        validateWarnings(
+            L"[=b\n[network]\nhostname=foo", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n", L"hostname", L"foo\n");
         validateWarnings(L"\r\n\r\n[foo]\r\na=b", L"wsl: Unknown key 'foo.a' in /etc/wsl.conf:5\r\n");
 
         // Validate that CRLF is correctly handled
@@ -2247,17 +2253,17 @@ Usage:
 
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
 
-        validateWarnings(L"a=b", std::format(L"wsl: Unknown key 'wsl2.a' in {}:21\r\n", wslConfigPath));
-        validateWarnings(L"[=b", std::format(L"wsl: Invalid section name in {}:21\r\n", wslConfigPath));
+        validateWarnings(L"a=b", std::format(L"wsl: Unknown key 'wsl2.a' in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"[=b", std::format(L"wsl: Invalid section name in {}:22\r\n", wslConfigPath));
 
         validateWarnings(
             L"dhcpTimeout=NotANumber",
-            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'wsl2.dhcpTimeout' in {}:21\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'wsl2.dhcpTimeout' in {}:22\r\n", wslConfigPath));
 
-        validateWarnings(L"ipv6=NotABoolean", std::format(L"wsl: Invalid boolean value 'NotABoolean' for key 'wsl2.ipv6' in {}:21\r\n", wslConfigPath));
+        validateWarnings(L"ipv6=NotABoolean", std::format(L"wsl: Invalid boolean value 'NotABoolean' for key 'wsl2.ipv6' in {}:22\r\n", wslConfigPath));
 
-        validateWarnings(L"[sectionNotComplete", std::format(L"wsl: Expected ']' in {}:21\r\n", wslConfigPath));
-        validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:21\r\n", wslConfigPath));
+        validateWarnings(L"[sectionNotComplete", std::format(L"wsl: Expected ']' in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:22\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=InvalidMode",
             std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
@@ -2270,20 +2276,20 @@ Usage:
             L"wsl: Failed to create the swap disk in 'C:\\DoesNotExist\\swap.vhdx': The system cannot find the path "
             L"specified. \r\n");
 
-        validateWarnings(L"\nswap=/", std::format(L"wsl: Invalid memory string '/' for .wslconfig entry 'wsl2.swap' in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"\nswap=/", std::format(L"wsl: Invalid memory string '/' for .wslconfig entry 'wsl2.swap' in {}:23\r\n", wslConfigPath));
         validateWarnings(L"\nswap=0GB", L"");
-        validateWarnings(L"\nswap=0foo", std::format(L"wsl: Invalid memory string '0foo' for .wslconfig entry 'wsl2.swap' in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"\nswap=0foo", std::format(L"wsl: Invalid memory string '0foo' for .wslconfig entry 'wsl2.swap' in {}:23\r\n", wslConfigPath));
         validateWarnings(L"safeMode=true", L"wsl: SAFE MODE ENABLED - many features will be disabled\r\n", L"[wsl2]\n");
-        validateWarnings(L"processors=", std::format(L"wsl: Invalid integer value '' for key 'wsl2.processors' in {}:21\r\n", wslConfigPath));
-        validateWarnings(L"memory=", std::format(L"wsl: Invalid memory string '' for .wslconfig entry 'wsl2.memory' in {}:21\r\n", wslConfigPath));
-        validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:21\r\n", wslConfigPath));
+        validateWarnings(L"processors=", std::format(L"wsl: Invalid integer value '' for key 'wsl2.processors' in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"memory=", std::format(L"wsl: Invalid memory string '' for .wslconfig entry 'wsl2.memory' in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:22\r\n", wslConfigPath));
         validateWarnings(
             L"networkingMode=",
-            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:21 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:22 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
 
         validateWarnings(
             L"ipv6=true\nipv6=false",
-            std::format(L"wsl: Duplicated config key 'wsl2.ipv6' in {}:22 (Conflicting key: 'wsl2.ipv6' in {}:21)\r\n", wslConfigPath, wslConfigPath));
+            std::format(L"wsl: Duplicated config key 'wsl2.ipv6' in {}:23 (Conflicting key: 'wsl2.ipv6' in {}:22)\r\n", wslConfigPath, wslConfigPath));
 
         validateWarnings(
             L"networkingMode=NAT\n[experimental]\nnetworkingMode=Mirrored",
@@ -2336,17 +2342,17 @@ Usage:
 
                 validateWarnings(
                     L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=1.2.3",
-                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:23\r\n", wslConfigPath));
+                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:24\r\n", wslConfigPath));
             }
         }
 
         validateWarnings(
             L"[experimental]\nignoredPorts=NotANumber",
-            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'experimental.ignoredPorts' in {}:22\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'experimental.ignoredPorts' in {}:23\r\n", wslConfigPath));
 
         validateWarnings(
             L"[experimental]\nignoredPorts=65536",
-            std::format(L"wsl: Invalid integer value '65536' for key 'experimental.ignoredPorts' in {}:22\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid integer value '65536' for key 'experimental.ignoredPorts' in {}:23\r\n", wslConfigPath));
 
         // Verify experimental.swiotlb parsing and validation.
         //
@@ -2364,7 +2370,7 @@ Usage:
         // Malformed values are rejected by the parser; only the parser warning is reported.
         validateWarnings(
             L"[experimental]\nswiotlb=garbage",
-            std::format(L"wsl: Invalid memory string 'garbage' for .wslconfig entry 'experimental.swiotlb' in {}:22\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid memory string 'garbage' for .wslconfig entry 'experimental.swiotlb' in {}:23\r\n", wslConfigPath));
 
         // Verify that the vhdSize setting is parsed correctly.
         validateWarnings(L"[wsl2]\ndefaultVhdSize=64GB\n", L"");

@@ -28,12 +28,22 @@ class WSLCE2EImageBuildTests
     {
         DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
         TestImageRegistry::Instance().EnsureLoaded(DebianTestImage());
+        TestImageRegistry::Instance().EnsureLoaded(DockerfileFrontendTestImage());
+
+        auto session = OpenDefaultElevatedSession();
+        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", c_registryPort);
+        s_registryAddress = string::MultiByteToWide(registryAddress);
+        s_dockerfileFrontend = TagImageForRegistry(DockerfileFrontendTestImage().NameAndTag(), s_registryAddress);
+        RunWslcAndVerify(std::format(L"push {}", s_dockerfileFrontend), {.Stderr = L"", .ExitCode = 0});
+        s_registryContainer.emplace(std::move(registryContainer));
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         DeleteImagesWithRepositoryPrefix(c_builtImagePrefix);
+        RunWslc(std::format(L"image delete --force {}", s_dockerfileFrontend));
+        s_registryContainer.reset();
         return true;
     }
 
@@ -44,6 +54,14 @@ class WSLCE2EImageBuildTests
 
     // Port for the local registry backing the --pull test; distinct from the other test classes.
     static constexpr USHORT c_registryPort = 15005;
+    static inline std::optional<wsl::windows::common::RunningWSLCContainer> s_registryContainer;
+    static inline std::wstring s_registryAddress;
+    static inline std::wstring s_dockerfileFrontend;
+
+    static std::string SecretDockerfile(std::string_view dockerfile)
+    {
+        return std::format("# syntax={}\n{}", string::WideToMultiByte(s_dockerfileFrontend), dockerfile);
+    }
 
     // Returns an RAII guard that best-effort deletes the given image when it goes out of scope. It is
     // deliberately non-throwing (no VERIFY) because it may run while the stack unwinds after a test
@@ -189,10 +207,7 @@ class WSLCE2EImageBuildTests
         // A local registry acts as the private image source that --pull re-resolves the base image from.
         TestImageRegistry::Instance().EnsureLoaded(AlpineTestImage());
 
-        auto session = OpenDefaultElevatedSession();
-        auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", c_registryPort);
-
-        auto registryImage = TagImageForRegistry(AlpineTestImage().NameAndTag(), string::MultiByteToWide(registryAddress));
+        auto registryImage = TagImageForRegistry(AlpineTestImage().NameAndTag(), s_registryAddress);
         auto registryImageCleanup = DeleteImageOnExit(registryImage);
 
         RunWslcAndVerify(std::format(L"push {}", registryImage), {.Stderr = L"", .ExitCode = 0});
@@ -339,11 +354,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(cat /run/secrets/mysecret)\" = \"expected-secret-content-12345\" ]\n"
-            "CMD [\"echo\", \"secret-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(cat /run/secrets/mysecret)\" = \"expected-secret-content-12345\" ]\n"
+                             "CMD [\"echo\", \"secret-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_VALUE",
@@ -373,11 +387,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=WSLC_E2E_BARE_SECRET "
-            "[ \"$(cat /run/secrets/WSLC_E2E_BARE_SECRET)\" = \"bare-id-secret-content-67890\" ]\n"
-            "CMD [\"echo\", \"secret-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=WSLC_E2E_BARE_SECRET "
+                             "[ \"$(cat /run/secrets/WSLC_E2E_BARE_SECRET)\" = \"bare-id-secret-content-67890\" ]\n"
+                             "CMD [\"echo\", \"secret-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=WSLC_E2E_BARE_SECRET",
@@ -430,10 +443,9 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret [ -z \"$(cat /run/secrets/mysecret)\" ]\n"
-            "CMD [\"echo\", \"secret-empty-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret [ -z \"$(cat /run/secrets/mysecret)\" ]\n"
+                             "CMD [\"echo\", \"secret-empty-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_SECRET_UNSET_VAR",
@@ -466,11 +478,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(cat /run/secrets/mysecret)\" = \"file-secret-content-67890\" ]\n"
-            "CMD [\"echo\", \"secret-src-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(cat /run/secrets/mysecret)\" = \"file-secret-content-67890\" ]\n"
+                             "CMD [\"echo\", \"secret-src-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
@@ -511,11 +522,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(cat /run/secrets/mysecret)\" = \"symlinked-secret-content-44444\" ]\n"
-            "CMD [\"echo\", \"secret-symlink-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(cat /run/secrets/mysecret)\" = \"symlinked-secret-content-44444\" ]\n"
+                             "CMD [\"echo\", \"secret-symlink-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
@@ -572,11 +582,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(cat /run/secrets/mysecret)\" = \"env-wins-content-55555\" ]\n"
-            "CMD [\"echo\", \"secret-env-wins-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(cat /run/secrets/mysecret)\" = \"env-wins-content-55555\" ]\n"
+                             "CMD [\"echo\", \"secret-env-wins-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,env=WSLC_E2E_ENV_WINS_VALUE,src=\"{}\"",
@@ -605,11 +614,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-content-11111\" ]\n"
-            "CMD [\"echo\", \"secret-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-content-11111\" ]\n"
+                             "CMD [\"echo\", \"secret-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,env=WSLC_E2E_TYPE_ENV_VALUE",
@@ -638,11 +646,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-src-content-22222\" ]\n"
-            "CMD [\"echo\", \"secret-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(cat /run/secrets/mysecret)\" = \"type-env-src-content-22222\" ]\n"
+                             "CMD [\"echo\", \"secret-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret type=env,id=mysecret,src=WSLC_E2E_TYPE_ENV_SRC_VALUE",
@@ -669,11 +676,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(cat /run/secrets/mysecret)\" = \"type-file-content-33333\" ]\n"
-            "CMD [\"echo\", \"secret-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(cat /run/secrets/mysecret)\" = \"type-file-content-33333\" ]\n"
+                             "CMD [\"echo\", \"secret-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
@@ -705,12 +711,11 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ \"$(wc -c < /run/secrets/mysecret)\" = \"13\" ] && "
-            "[ \"$(tr -d '\\000' < /run/secrets/mysecret | tr -d '\\377')\" = \"beforeafter\" ]\n"
-            "CMD [\"echo\", \"secret-binary-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ \"$(wc -c < /run/secrets/mysecret)\" = \"13\" ] && "
+                             "[ \"$(tr -d '\\000' < /run/secrets/mysecret | tr -d '\\377')\" = \"beforeafter\" ]\n"
+                             "CMD [\"echo\", \"secret-binary-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret type=file,id=mysecret,src=\"{}\"",
@@ -741,14 +746,13 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            std::format(
-                "# syntax=docker/dockerfile:1\n"
+            SecretDockerfile(std::format(
                 "FROM debian:latest\n"
                 "RUN --mount=type=secret,id=mysecret "
                 "[ \"$(wc -c < /run/secrets/mysecret)\" = \"{}\" ] && "
                 "[ -z \"$(tr -d 'A' < /run/secrets/mysecret)\" ]\n"
                 "CMD [\"echo\", \"secret-size-ok\"]\n",
-                size));
+                size)));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
@@ -777,11 +781,10 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret "
-            "[ -f /run/secrets/mysecret ] && [ \"$(wc -c < /run/secrets/mysecret)\" = \"0\" ]\n"
-            "CMD [\"echo\", \"secret-empty-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret "
+                             "[ -f /run/secrets/mysecret ] && [ \"$(wc -c < /run/secrets/mysecret)\" = \"0\" ]\n"
+                             "CMD [\"echo\", \"secret-empty-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=mysecret,src=\"{}\"",
@@ -822,10 +825,9 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret > /dev/null\n"
-            "CMD [\"echo\", \"secret-oversize\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret > /dev/null\n"
+                             "CMD [\"echo\", \"secret-oversize\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" --secret id=mysecret,src=\"{}\"", contextDir.wstring(), dockerfilePath.wstring(), secretFile.wstring()));
@@ -862,13 +864,12 @@ class WSLCE2EImageBuildTests
         auto dockerfilePath = testRoot / L"Dockerfile";
         WriteTestFileContent(
             dockerfilePath,
-            "# syntax=docker/dockerfile:1\n"
-            "FROM debian:latest\n"
-            "RUN --mount=type=secret,id=s1 --mount=type=secret,id=s2 --mount=type=secret,id=s3 "
-            "[ \"$(cat /run/secrets/s1)\" = \"multi-secret-one-11111\" ] && "
-            "[ \"$(cat /run/secrets/s2)\" = \"multi-secret-two-22222\" ] && "
-            "[ \"$(cat /run/secrets/s3)\" = \"multi-secret-three-33333\" ]\n"
-            "CMD [\"echo\", \"secret-multi-ok\"]\n");
+            SecretDockerfile("FROM debian:latest\n"
+                             "RUN --mount=type=secret,id=s1 --mount=type=secret,id=s2 --mount=type=secret,id=s3 "
+                             "[ \"$(cat /run/secrets/s1)\" = \"multi-secret-one-11111\" ] && "
+                             "[ \"$(cat /run/secrets/s2)\" = \"multi-secret-two-22222\" ] && "
+                             "[ \"$(cat /run/secrets/s3)\" = \"multi-secret-three-33333\" ]\n"
+                             "CMD [\"echo\", \"secret-multi-ok\"]\n"));
 
         auto buildResult = RunWslc(std::format(
             L"build \"{}\" -f \"{}\" -t {} --secret id=s1,src=\"{}\" --secret id=s2,src=\"{}\" --secret id=s3,src=\"{}\"",
