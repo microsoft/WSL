@@ -1724,11 +1724,11 @@ Take a moment to preview some of the community’s favorite features or view our
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Easily run Linux containers on Windows as a first-class experience.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
     <value>WSL container</value>
