@@ -2986,6 +2986,10 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     {
         result /= L"wslc-registry.tar";
     }
+    else if (imageName == "docker/dockerfile:1")
+    {
+        result /= L"dockerfile-frontend.tar";
+    }
     else
     {
         THROW_HR_MSG(E_INVALIDARG, "Unknown test image: %hs", imageName.data());

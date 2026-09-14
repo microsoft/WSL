@@ -2238,6 +2238,9 @@ Kullanım:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>seçenekler</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Aşağıdaki komut diğer adları kullanılabilir:</value>
   </data>
@@ -2776,7 +2779,7 @@ Kullanım: wslc container cp [OPTIONS] SOURCE DEST
     <value>Bir dosya sistemi görüntüsü oluşturmak için bir tar dosyasının içeriğini içe aktarır. İsteğe bağlı olarak, görüntüyü bir depo ve etiket adıyla etiketleyin.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Tüm görüntüleri göster (varsayılan olarak ara görüntüler gizlenir).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Görüntüleri listele.</value>
@@ -3034,7 +3037,7 @@ Windows sürümü: {}</value>
     <value>Depodaki tüm etiketlenmiş resimleri indir.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>etiket --all-tags/-a ile kullanılamaz</value>
     <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
@@ -3077,7 +3080,7 @@ Windows sürümü: {}</value>
     <value>Kapsayıcıyı ayrık modda çalıştır</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Günlükler için ek ayrıntıları göster</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Kapsayıcı başlatma işlemi yürütülebilir dosyasını belirtir</value>
@@ -3102,7 +3105,7 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Filtre değerlerini girin (ör. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
@@ -3110,16 +3113,16 @@ Windows sürümü: {}</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Onay istemeyin</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Devam etmek istediğinize emin misiniz?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>UYARI! Bu işlem durdurulmuş tüm kapsayıcıları kaldırır.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>UYARI! Bu işlem tüm bağlantısız görüntüleri kaldırır.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>UYARI! Bu işlem, en az bir kapsayıcıyla ilişkilendirilmemiş tüm görüntüleri kaldırır.</value>
@@ -3376,7 +3379,7 @@ Windows sürümü: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
-    <value>Push all tags of an image to the repository</value>
+    <value>Bir görüntünün tüm etiketlerini depoya gönderin</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Yalnızca kapsayıcı kimliklerini çıktı olarak verir</value>
@@ -3408,7 +3411,7 @@ Windows sürümü: {}</value>
     <value>image-name[:tag] biçiminde geçerli veya mevcut resim referansı</value>
   </data>
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
-    <value>Display total file sizes</value>
+    <value>Dosyaların toplam boyutunu görüntüle</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Tür kapsayıcıysa toplam dosya boyutlarını görüntüle</value>
@@ -3814,7 +3817,7 @@ Windows sürümü: {}</value>
     <value>BAĞLANTI NOKTALARI</value>
   </data>
   <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
-    <value>SIZE</value>
+    <value>BOYUT</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
@@ -3855,7 +3858,7 @@ Windows sürümü: {}</value>
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
-    <value>{} (virtual {})</value>
+    <value>{} (sanal {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">

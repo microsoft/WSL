@@ -2244,6 +2244,9 @@ Verwendung:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>Optionen</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Die folgenden Befehlsaliase sind verfügbar:</value>
   </data>
@@ -2782,7 +2785,7 @@ Beispiel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Importiert den Inhalt eines Tarballs, um ein Dateisystem-Image zu erstellen. Markieren Sie das Image optional mit einem Repository und einem Tagnamen.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Alle Bilder anzeigen (standardmäßig werden Zwischenbilder ausgeblendet).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Bilder auflisten.</value>
@@ -3037,10 +3040,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Alle anzeigen, unabhängig vom Zustand.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Download all tagged images in the repository.</value>
+    <value>Laden Sie alle markierten Images im Repository herunter.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>Tag kann nicht mit --all-tags/-a verwendet werden</value>
     <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
@@ -3083,7 +3086,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Container im getrennten Modus ausführen</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Zusätzliche Details für Protokolle anzeigen</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Gibt die ausführbare Datei des Container-Init-Prozesses an.</value>
@@ -3108,15 +3111,15 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Filterwerte angeben (z. B. „until=&lt;timestamp&gt;“)</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Filterwerte angeben (z. B. „label=&lt;label&gt;“)</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Keine Bestätigungsaufforderung</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Möchten Sie den Vorgang fortsetzen?</value>
@@ -3134,7 +3137,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>WARNUNG! Hierdurch werden anonyme lokale Volumes entfernt, die von mindestens einem Container nicht verwendet werden.</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all local volumes not used by at least one container.</value>
+    <value>WARNUNG! Dadurch werden alle lokalen Volumes entfernt, die nicht von mindestens einem Container verwendet werden.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
     <value>WARNUNG! Dadurch werden alle benutzerdefinierten Netzwerke entfernt, die nicht von mindestens einem Container verwendet werden.</value>
@@ -3382,7 +3385,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
-    <value>Push all tags of an image to the repository</value>
+    <value>Alle Tags eines Images in das Repository übertragen</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Gibt nur die Container-IDs aus.</value>
@@ -3414,7 +3417,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Aktuelle oder vorhandene Bildreferenz im Format image-name[:tag]</value>
   </data>
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
-    <value>Display total file sizes</value>
+    <value>Gesamtdateigrößen anzeigen</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Gesamtdateigrößen anzeigen, wenn der Typ Container ist</value>
@@ -3820,7 +3823,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>PORTS</value>
   </data>
   <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
-    <value>SIZE</value>
+    <value>GRÖSSE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
@@ -3861,7 +3864,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
   </data>
   <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
-    <value>{} (virtual {})</value>
+    <value>{} (virtuell {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">

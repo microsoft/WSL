@@ -2238,6 +2238,9 @@ Użycie:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>opcje</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Dostępne są następujące aliasy poleceń:</value>
   </data>
@@ -2776,7 +2779,7 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Importuje zawartość pliku tarball w celu utworzenia obrazu systemu plików. Opcjonalnie oznacz obraz tagiem z nazwą repozytorium i tagu.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Pokaż wszystkie obrazy (domyślnie obrazy pośrednie są ukryte).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Wyświetl listę obrazów.</value>
@@ -3077,7 +3080,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Uruchom kontener w trybie odłączonym</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Pokaż dodatkowe szczegóły dzienników</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Określa plik wykonywalny procesu init kontenera</value>
@@ -3102,24 +3105,24 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Podaj wartości filtrów (np. „until=&lt;timestamp&gt;”)</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Podaj wartości filtrów (np. „label=&lt;label&gt;”)</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Nie proś o potwierdzenie</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Czy na pewno chcesz kontynuować?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>OSTRZEŻENIE! Spowoduje to usunięcie wszystkich zatrzymanych kontenerów.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>OSTRZEŻENIE! Spowoduje to usunięcie wszystkich niepowiązanych obrazów.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>OSTRZEŻENIE! Spowoduje to usunięcie wszystkich obrazów bez skojarzonego z nimi co najmniej jednego kontenera.</value>

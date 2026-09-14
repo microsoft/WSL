@@ -2238,6 +2238,9 @@ Gebruik:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>opties</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>De volgende opdrachtaliassen zijn beschikbaar:</value>
   </data>
@@ -2776,7 +2779,7 @@ Voorbeeld: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Importeert de inhoud van een tarball om een bestandssysteeminstallatiekopie te maken. Optioneel kun je de installatiekopie labelen met een opslagplaats- en labelnaam.</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>Alle afbeeldingen weergeven (standaard worden tussenafbeeldingen verborgen).</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Afbeeldingen weergeven.</value>
@@ -3077,7 +3080,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Container uitvoeren in gedetacheerde modus</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Extra details voor logboeken tonen</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Specificeert het uitvoerbare bestand van het container-init-proces</value>
@@ -3102,15 +3105,15 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Geef filterwaarden op (bijv. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Geef filterwaarden op (bijv. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Niet vragen om bevestiging</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Weet u zeker dat u wilt doorgaan?</value>
@@ -3119,13 +3122,13 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>WAARSCHUWING! Dit zal alle gestopte containers verwijderen.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>WAARSCHUWING! Hiermee worden alle zwevende afbeeldingen verwijderd.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
-    <value>WAARSCHUWING! Hiermee worden alle installatiekopieën verwijderd waaraan ten minste één container is gekoppeld.</value>
+    <value>WAARSCHUWING! Hiermee worden alle afbeeldingen verwijderd waaraan niet ten minste één container is gekoppeld.</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove anonymous local volumes not used by at least one container.</value>
+    <value>WAARSCHUWING! Hiermee worden anonieme lokale volumes verwijderd die niet door ten minste één container worden gebruikt.</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
     <value>WAARSCHUWING! Dit zal alle lokale volumes verwijderen die niet door ten minste één container worden gebruikt.</value>

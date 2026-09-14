@@ -2238,6 +2238,9 @@ Využití:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>Možnosti</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>K dispozici jsou následující aliasy příkazů:</value>
   </data>
@@ -3098,40 +3101,40 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Filtrovat výstup na základě zadaných podmínek</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid value "{}" for the '--filter' option: bad format of filter (expected name=value)</value>
+    <value>Neplatná hodnota {} pro možnost '--filter': nesprávný formát filtru (očekává se name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Zadejte hodnoty filtru (např. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Zadejte hodnoty filtru (např. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Nevyžadovat potvrzení</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Opravdu chcete pokračovat?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>Upozornění! Tímto se odeberou všechny zastavené kontejnery.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>Upozornění! Tímto se odeberou všechny nepoužívané image.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all images without at least one container associated to them.</value>
+    <value>Upozornění! Tímto se odeberou všechny image, ke kterým není přidružený alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove anonymous local volumes not used by at least one container.</value>
+    <value>Upozornění! Tímto se odeberou anonymní místní svazky, které nepoužívá alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all local volumes not used by at least one container.</value>
+    <value>Upozornění! Tímto se odeberou všechny místní svazky, které nepoužívá alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all custom networks not used by at least one container.</value>
+    <value>Upozornění! Tímto se odeberou všechny vlastní sítě, které nepoužívá alespoň jeden kontejner.</value>
   </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Neplatný argument "{}" pro možnost '--mount': {}</value>

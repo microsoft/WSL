@@ -2244,6 +2244,9 @@ Utilizzo:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>Opzioni</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Sono disponibili gli alias di comando seguenti:</value>
   </data>
@@ -3037,10 +3040,10 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Visualizza tutto indipendentemente dallo stato.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Download all tagged images in the repository.</value>
+    <value>Scarica tutte le immagini con tag nel repository.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
-    <value>tag can't be used with --all-tags/-a</value>
+    <value>tag non può essere usato con --all-tags/-a</value>
     <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
@@ -3083,7 +3086,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Esegui il contenitore in modalità staccata</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Visualizza dettagli aggiuntivi per i log</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Specifica l'eseguibile del processo di init del contenitore</value>
@@ -3108,24 +3111,24 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Fornisci valori filtro (ad esempio "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Fornisci valori filtro (ad esempio "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Non chiedere conferma</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
-    <value>Continuare?</value>
+    <value>Vuoi continuare?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>AVVISO! Verranno rimossi tutti i contenitori arrestati.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>AVVISO! Verranno rimosse tutte le immagini sospese.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>ATTENZIONE! Verranno rimosse tutte le immagini a cui non è associato almeno un contenitore.</value>
@@ -3382,7 +3385,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
-    <value>Push all tags of an image to the repository</value>
+    <value>Esegui il push di tutti i tag di un'immagine nel repository</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Mostra solo gli ID dei contenitori</value>
@@ -3414,7 +3417,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Riferimento all'immagine corrente o esistente nel formato nome-immagine[:tag]</value>
   </data>
   <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
-    <value>Display total file sizes</value>
+    <value>Visualizza le dimensioni totali dei file</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Visualizza le dimensioni totali dei file se il tipo è contenitore</value>
@@ -3820,7 +3823,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>PORTE</value>
   </data>
   <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
-    <value>SIZE</value>
+    <value>DIMENSIONI</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>% CPU</value>

@@ -2238,6 +2238,9 @@ Brug:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>indstillinger</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>globale indstillinger</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Følgende kommandoaliasser er tilgængelige:</value>
   </data>

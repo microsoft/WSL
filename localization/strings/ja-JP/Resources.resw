@@ -2244,6 +2244,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>オプション</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>次のコマンド エイリアスを使用できます:</value>
   </data>
@@ -2782,7 +2785,7 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>tarball の内容をインポートして、ファイルシステム イメージを作成します。必要に応じて、イメージにリポジトリとタグ名のタグを付けます。</value>
   </data>
   <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
-    <value>Show all images (default hides intermediate images).</value>
+    <value>すべての画像を表示します (既定では中間画像は非表示です)。</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>イメージを一覧表示します。</value>
@@ -3083,7 +3086,7 @@ Windows バージョン: {}</value>
     <value>コンテナーをデタッチ モードで実行します</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>ログの詳細をさらに表示する</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>コンテナー初期化プロセスの実行可能ファイルを指定します</value>
@@ -3108,36 +3111,36 @@ Windows バージョン: {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>フィルター値を指定してください (例: "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>フィルター値を指定してください (例: "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>確認を求めないでください</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>続行しますか?</value>
   </data>
   <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all stopped containers.</value>
+    <value>警告!これにより、停止したすべてのコンテナーが削除されます。</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>警告!これにより、すべての未使用のイメージが削除されます。</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all images without at least one container associated to them.</value>
+    <value>警告!これにより、少なくとも 1 つのコンテナーに関連付けられていないすべてのイメージが削除されます。</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove anonymous local volumes not used by at least one container.</value>
+    <value>警告!これにより、少なくとも 1 つのコンテナーで使用されていない匿名のローカル ボリュームが削除されます。</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all local volumes not used by at least one container.</value>
+    <value>警告!これにより、少なくとも 1 つのコンテナーで使用されていないすべてのローカル ボリュームが削除されます。</value>
   </data>
   <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all custom networks not used by at least one container.</value>
+    <value>警告!これにより、少なくとも 1 つのコンテナーで使用されていないすべてのカスタム ネットワークが削除されます。</value>
   </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>'--mount' オプションの引数 "{}" が無効です: {}</value>

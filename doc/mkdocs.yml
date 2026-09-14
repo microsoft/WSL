@@ -3,6 +3,7 @@ site_description: Windows Subsystem for Linux developer and architecture documen
 
 nav:
     - 'Home': 'index.md'
+    - 'Security model': 'security.md'
     - 'Getting started':
        - 'Building and testing WSL': 'dev-loop.md'
        - 'Debugging WSL': 'debugging.md'

@@ -2238,6 +2238,9 @@ Utilização:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>opções</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Estão disponíveis os seguintes aliases de comando:</value>
   </data>
@@ -3077,7 +3080,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Executar contentor em modo desanexado</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
-    <value>Show extra details for logs</value>
+    <value>Mostrar detalhes extra dos registos</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Especifica o executável do processo de inicialização do contentor</value>
@@ -3102,15 +3105,15 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Forneça valores de filtro (por exemplo, "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Forneça valores de filtro (por exemplo, "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Não pedir confirmação</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Tem a certeza de que pretende continuar?</value>
@@ -3119,19 +3122,19 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>AVISO! Isso removerá todos os contêineres parados.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>AVISO! Isto irá remover todas as imagens sem referência.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all images without at least one container associated to them.</value>
+    <value>AVISO! Isto irá remover todas as imagens sem pelo menos um contentor associado.</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove anonymous local volumes not used by at least one container.</value>
+    <value>AVISO! Isto irá remover os volumes locais anónimos que não sejam utilizados por, pelo menos, um contentor.</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all local volumes not used by at least one container.</value>
+    <value>AVISO! Isto irá remover todos os volumes locais que não sejam utilizados por, pelo menos, um contentor.</value>
   </data>
   <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all custom networks not used by at least one container.</value>
+    <value>AVISO! Isto irá remover todas as redes personalizadas que não sejam utilizadas por, pelo menos, um contentor.</value>
   </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Argumento "{}" inválido para a opção '--mount': {}</value>

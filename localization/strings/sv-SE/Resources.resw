@@ -2238,6 +2238,9 @@ Användning:
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>alternativ</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Följande kommandoalias är tillgängliga:</value>
   </data>
@@ -3099,19 +3102,19 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Filtrera utdata baserat på angivna villkor</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Invalid value "{}" for the '--filter' option: bad format of filter (expected name=value)</value>
+    <value>Ogiltigt värde ''{} för alternativet' --filter': felaktigt format för filtret (förväntat namn=värde)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "until=&lt;timestamp&gt;")</value>
+    <value>Ange filtervärden (t.ex. "until=&lt;timestamp&gt;")</value>
     <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
-    <value>Provide filter values (e.g. "label=&lt;label&gt;")</value>
+    <value>Ange filtervärden (t.ex. "label=&lt;label&gt;")</value>
     <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
-    <value>Do not prompt for confirmation</value>
+    <value>Fråga inte efter bekräftelse</value>
   </data>
   <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
     <value>Vill du fortsätta?</value>
@@ -3120,7 +3123,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>VARNING! Detta kommer att ta bort alla stoppade containrar.</value>
   </data>
   <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
-    <value>WARNING! This will remove all dangling images.</value>
+    <value>VARNING! Detta tar bort alla hängande bilder.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
     <value>VARNING! Detta kommer att ta bort alla bilder som inte har minst en behållare associerad med dem.</value>

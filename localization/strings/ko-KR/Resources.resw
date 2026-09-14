@@ -2244,6 +2244,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>옵션</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>다음 명령 별칭을 사용할 수 있습니다.</value>
   </data>

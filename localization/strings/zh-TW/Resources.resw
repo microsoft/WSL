@@ -2244,6 +2244,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>選項</value>
   </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>global-options</value>
+  </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>以下命令別名可用:</value>
   </data>
@@ -3131,13 +3134,13 @@ Windows 版本：{}</value>
     <value>警告！這會移除所有沒有至少一個容器關聯的映像。</value>
   </data>
   <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
-    <value>警告！這會移除至少有一個容器未使用的匿名本機磁碟區。</value>
+    <value>警告!這會移除至少一個容器未使用的匿名本機磁碟區。</value>
   </data>
   <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
-    <value>警告！這會移除至少有一個容器未使用的所有本機磁碟區。</value>
+    <value>警告!這會移除至少一個容器未使用的所有本機磁碟區。</value>
   </data>
   <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
-    <value>警告！這會移除至少有一個容器未使用的所有自訂網路。</value>
+    <value>警告!這會移除至少一個容器未使用的所有自訂網路。</value>
   </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>'--mount' 選項的引數 "{}" 無效: {}</value>
