@@ -7263,6 +7263,15 @@ class WSLCTests
         verifyEventFilter("stop");
         verifyEventFilter("destroy");
 
+        // Image filters match the image attribute carried by container events.
+        {
+            WSLCFilter filter{"image", c_imageName};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+            verifyEvents(drain(stream.get()), id, {"create", "start", "kill", "stop", "destroy"});
+        }
+
         // Values sharing a filter key are OR'd.
         {
             WSLCFilter filters[]{{"container", id.c_str()}, {"event", "create"}, {"event", "destroy"}};

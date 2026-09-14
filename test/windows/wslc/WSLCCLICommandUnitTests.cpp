@@ -21,6 +21,7 @@ Abstract:
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
+#include "EventsCommand.h"
 #include "ImageCommand.h"
 #include "InspectCommand.h"
 #include "NetworkCommand.h"
@@ -69,6 +70,34 @@ class WSLCCLICommandUnitTests
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
         }
+    }
+
+    TEST_METHOD(RootCommand_ContainsEventsCommand)
+    {
+        auto root = RootCommand();
+        auto subcommands = root.GetCommands();
+        const auto events = std::ranges::find_if(
+            subcommands, [](const auto& subcommand) { return subcommand->Name() == EventsCommand::CommandName; });
+
+        VERIFY_IS_TRUE(events != subcommands.end());
+    }
+
+    TEST_METHOD(EventsCommand_HasExpectedArguments)
+    {
+        const auto arguments = EventsCommand(L"root").GetArguments();
+
+        VERIFY_ARE_EQUAL(3u, arguments.size());
+
+        VERIFY_ARE_EQUAL(ArgType::Since, arguments[0].Type());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsSinceArgDescription(), arguments[0].Description());
+        VERIFY_IS_TRUE(arguments[0].IsSingle());
+
+        VERIFY_ARE_EQUAL(ArgType::Until, arguments[1].Type());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsUntilArgDescription(), arguments[1].Description());
+        VERIFY_IS_TRUE(arguments[1].IsSingle());
+
+        VERIFY_ARE_EQUAL(ArgType::Filter, arguments[2].Type());
+        VERIFY_IS_TRUE(arguments[2].IsUnlimited());
     }
 
     // Test: Verify SystemCommand has subcommands

@@ -39,6 +39,12 @@ struct SessionService
     static wsl::windows::wslc::models::Session OpenOrCreateDefaultSession(Terminal& terminal);
     // Runs the given command and arguments in a session without a TTY, resolving the executable from PATH.
     static int Run(Terminal& terminal, const wsl::windows::wslc::models::Session& session, const std::vector<std::string>& arguments);
+    static void StreamEvents(
+        const wsl::windows::wslc::models::Session& session,
+        LONGLONG since,
+        LONGLONG until,
+        const std::vector<std::pair<std::string, std::string>>& filters,
+        HANDLE cancelEvent);
     static int TerminateSession(Terminal& terminal, const wsl::windows::wslc::models::Session& session);
 
 private:

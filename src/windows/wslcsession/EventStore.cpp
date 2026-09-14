@@ -91,7 +91,12 @@ namespace {
             }
             else if (key == "image")
             {
-                if (event.Type != "image" || !std::ranges::any_of(values, [&](const std::string& v) { return event.Actor.ID == v; }))
+                const auto image = event.Actor.Attributes.find("image");
+                const bool matches = std::ranges::any_of(values, [&](const std::string& value) {
+                    return (event.Type == "image" && event.Actor.ID == value) ||
+                           (event.Type == "container" && image != event.Actor.Attributes.end() && image->second == value);
+                });
+                if (!matches)
                 {
                     return false;
                 }

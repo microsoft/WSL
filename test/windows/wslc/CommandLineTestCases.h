@@ -25,6 +25,16 @@ COMMAND_LINE_TEST_CASE(L"-?", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
 COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
+// Events command tests
+COMMAND_LINE_TEST_CASE(L"events", L"events", true)
+COMMAND_LINE_TEST_CASE(L"events --help", L"events", true)
+COMMAND_LINE_TEST_CASE(L"events --since 0", L"events", true)
+COMMAND_LINE_TEST_CASE(L"events --until 2025-01-01T00:00:00Z", L"events", true)
+COMMAND_LINE_TEST_CASE(L"events --filter type=container -f event=start -f event=stop", L"events", true)
+COMMAND_LINE_TEST_CASE(L"events --filter invalid", L"events", false)
+COMMAND_LINE_TEST_CASE(L"events --format json", L"events", false)
+COMMAND_LINE_TEST_CASE(L"events extra", L"events", false)
+
 // Global options (RootCommand::GetGlobalArguments). These must be accepted by
 // the root-level options-only pass before any subcommand is resolved. A
 // non-exhaustive sampling — the parser-level matrix lives in ParserTestCases.h.

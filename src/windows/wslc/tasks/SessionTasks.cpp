@@ -97,6 +97,29 @@ void ListSessions(CLIExecutionContext& context)
     WriteSessionTable(context.Terminal, sessions);
 }
 
+void StreamEvents(CLIExecutionContext& context)
+{
+    using namespace std::chrono;
+
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    LONGLONG since = floor<seconds>(system_clock::now()).time_since_epoch().count();
+    if (context.Args.Contains(ArgType::Since))
+    {
+        since = context.Args.GetValue<ArgType::Since>();
+    }
+
+    LONGLONG until = 0;
+    if (context.Args.Contains(ArgType::Until))
+    {
+        until = context.Args.GetValue<ArgType::Until>();
+    }
+
+    auto filters = context.Args.GetAllValues<ArgType::Filter>();
+    SessionService::StreamEvents(session, since, until, filters, context.CreateCancelEvent());
+}
+
 static std::wstring FormatManagerVersion(const WSLCVersion& version)
 {
     return std::format(L"{}.{}.{}", version.Major, version.Minor, version.Revision);
