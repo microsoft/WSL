@@ -80,7 +80,8 @@ class WSLCCLIParserUnitTests
                 // into a thrown ArgumentException.
                 stateMachine.ThrowIfError();
 
-                if (!args.Contains(ArgType::Help))
+                const bool helpRequested = args.Contains(ArgType::Help) && args.GetValue<ArgType::Help>();
+                if (!helpRequested)
                 {
                     for (const auto& arg : GetArgumentsForSet(testCase.argumentSet))
                     {
@@ -102,7 +103,7 @@ class WSLCCLIParserUnitTests
 
                 succeeded = true;
 
-                if (testCase.commandLine.find(L"image1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
+                if (!helpRequested && testCase.commandLine.find(L"image1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ImageId));
                     auto imageId = args.GetValue<ArgType::ImageId>();

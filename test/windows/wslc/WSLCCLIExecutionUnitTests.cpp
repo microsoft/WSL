@@ -570,6 +570,16 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(invocation.OriginalArguments().size(), invocation.Position());
     }
 
+    TEST_METHOD(ScopedGlobalArguments_HelpStopsParsingAtRequestedScope)
+    {
+        CLIExecutionContext context;
+        const auto invocation = ParseTestCommandLine({L"compose", L"--help", L"--progress", L"plain"}, context);
+
+        VERIFY_ARE_EQUAL(std::wstring_view{L"compose"}, invocation.Selected().Name());
+        VERIFY_IS_TRUE(context.Args.GetValue<ArgType::Help>());
+        VERIFY_IS_FALSE(context.Args.Contains(ArgType::Progress));
+    }
+
     TEST_METHOD(ScopedGlobalArguments_PreserveOwningCommands)
     {
         const TestRootCommand root;
@@ -621,6 +631,18 @@ class WSLCCLIExecutionUnitTests
         VERIFY_IS_TRUE(output.find(wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc")) != std::wstring::npos);
         VERIFY_IS_TRUE(output.find(wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"compose")) != std::wstring::npos);
         VERIFY_IS_FALSE(output.find(wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc compose")) != std::wstring::npos);
+    }
+
+    TEST_METHOD(ScopedGlobalArguments_HelpExcludesEnvironmentOnlyOptions)
+    {
+        const RootCommand root;
+        CaptureTerminal capture;
+
+        root.OutputHelp(capture.terminal);
+
+        const auto output = capture.captured();
+        VERIFY_IS_TRUE(output.find(L"--session") != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(L"--no-color") == std::wstring::npos);
     }
 
     TEST_METHOD(ScopedGlobalArguments_PositionalDoesNotTraverseUnrelatedSubtrees)

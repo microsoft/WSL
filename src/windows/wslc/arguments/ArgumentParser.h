@@ -173,7 +173,7 @@ private:
     // When true, stop before the first unknown option token.
     bool m_stopOnUnknown = false;
 
-    // Set when m_optionsOnly or m_stopOnUnknown stopped processing.
+    // Set when parsing reaches a configured stopping boundary or a true help flag.
     bool m_stopped = false;
 };
 } // namespace wsl::windows::wslc

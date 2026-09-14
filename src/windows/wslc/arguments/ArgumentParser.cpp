@@ -121,6 +121,11 @@ void ParseArgumentsStateMachine::SetFlag(ArgType type, bool value)
     // folds the presence check and the stored value into one test, rather than a bare Contains().
     ClearArgument(type);
     m_executionArgs.Add(type, value);
+
+    if (type == ArgType::Help && value)
+    {
+        m_stopped = true;
+    }
 }
 
 std::wstring_view ParseArgumentsStateMachine::StripSurroundingQuotes(std::wstring_view value)
