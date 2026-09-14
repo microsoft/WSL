@@ -77,9 +77,41 @@ void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To
         return;
     }
 
-    // The destination is occupied, so the entry is merged over it instead.
-    std::filesystem::copy(From, To, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, error);
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error.value()), !!error, "Failed to copy to: %ls", To.c_str());
+    // An occupied destination is merged over, but a file and a directory cannot stand in for one another.
+    // std::filesystem::copy would place a file underneath a directory carrying the same name.
+    std::error_code statusError;
+    const auto fromStatus = std::filesystem::status(From, statusError);
+    const auto toStatus = std::filesystem::status(To, statusError);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+        std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus),
+        "Cannot overwrite: %ls",
+        To.c_str());
+
+    std::error_code copyError;
+    std::filesystem::copy(From, To, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, copyError);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
+}
+
+// The ps SIZE column: the writable layer on its own, and the total including the read-only image
+// layers in parentheses. The suffix is guarded on 'SizeRootFs > 0', so a zero total renders as the
+// writable size alone; the daemon reports zero both when the size was not requested and when there
+// is no parent layer to measure. The table is localized while json keeps the invariant form.
+std::wstring FormatContainerSize(LONGLONG SizeRw, LONGLONG SizeRootFs, FormatType format)
+{
+    const auto writable = FormatHumanReadableSize(static_cast<uint64_t>(std::max<LONGLONG>(SizeRw, 0)), c_statsIoPrecision);
+    if (SizeRootFs <= 0)
+    {
+        return writable;
+    }
+
+    const auto total = FormatHumanReadableSize(static_cast<uint64_t>(SizeRootFs), c_statsIoPrecision);
+    if (format == FormatType::Json)
+    {
+        return std::format(L"{} (virtual {})", writable, total);
+    }
+
+    return Localization::WSLCCLI_ContainerSizeWithVirtual(writable, total);
 }
 
 nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_schema::ContainerStats& stats)
@@ -154,8 +186,8 @@ nlohmann::json ComputeContainerStatsJson(const wsl::windows::common::docker_sche
 
 // Builds the representation of a container, shared by the table and json output so the two cannot
 // drift. Every value is emitted as a string apart from the platform object, and the id is truncated
-// unless --no-trunc is passed. RunningFor and Status are the only fields that vary with the format:
-// docker renders them in invariant English, so json keeps that while the table is localized.
+// unless --no-trunc is passed. RunningFor, Size and Status are the only fields that vary with the
+// format: docker renders them in invariant English, so json keeps that while the table is localized.
 ContainerOutputInformation ToContainerOutput(const ContainerInformation& container, bool truncate, FormatType format)
 {
     ContainerOutputInformation entry;
@@ -176,8 +208,9 @@ ContainerOutputInformation ToContainerOutput(const ContainerInformation& contain
     entry.Ports = WideToMultiByte(ContainerService::FormatPorts(container.State, container.Ports));
     entry.RunningFor = WideToMultiByte(
         format == FormatType::Json ? FormatInvariantRelativeTime(container.CreatedAt) : FormatRelativeTime(container.CreatedAt));
-    // Container sizes are only computed when docker is passed --size, which wslc does not support.
-    entry.Size = WideToMultiByte(FormatHumanReadableSize(0));
+    // The daemon only computes container sizes when the listing request asks for them, so this is a
+    // formatted zero unless --size was passed.
+    entry.Size = WideToMultiByte(FormatContainerSize(container.SizeRw, container.SizeRootFs, format));
     entry.State = WideToMultiByte(ContainerService::ContainerStateName(container.State));
     entry.Status = WideToMultiByte(ContainerService::FormatStatus(container.Status, container.State, container.StateChangedAt, format));
 
@@ -281,7 +314,10 @@ void GetContainers(CLIExecutionContext& context)
     // Filter values are parsed and cached during argument validation.
     auto filters = context.Args.GetAllValues<ArgType::Filter>();
 
-    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters));
+    // `container stats` reuses this task and does not register --size.
+    const bool size = context.Args.Contains(ArgType::Size) && context.Args.GetValue<ArgType::Size>();
+
+    context.Data.Add<Data::Containers>(ContainerService::List(session, context.Args.GetValue<ArgType::All>(), limit, filters, size));
 }
 
 void InspectContainers(CLIExecutionContext& context)
@@ -688,8 +724,13 @@ void ListContainers(CLIExecutionContext& context)
     {
         using enum ColumnOverflow;
 
+        // SIZE trails the other columns. It is always declared, and is left empty and hidden unless
+        // --size was passed.
+        constexpr size_t c_sizeColumn = 7;
+        const bool showSize = context.Args.GetValue<ArgType::Size>();
+
         // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<7>(
+        auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
                                  context.Terminal,
                                  {{{Localization::WSLCCLI_TableHeaderContainerId(), {.MaxWidth = 12, .Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderImage(), {.MaxWidth = 20, .Overflow = Shrink}},
@@ -697,9 +738,10 @@ void ListContainers(CLIExecutionContext& context)
                                    {Localization::WSLCCLI_TableHeaderCreated(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderStatus(), {.Overflow = Shrink}},
                                    {Localization::WSLCCLI_TableHeaderPorts(), {.Overflow = Shrink}},
-                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}}}},
+                                   {Localization::WSLCCLI_TableHeaderNames(), {.MaxWidth = 20, .Overflow = Shrink}},
+                                   {Localization::WSLCCLI_TableHeaderSize(), {.Overflow = Shrink}}}},
                                  containers.size())
-                           : wsl::windows::wslc::TableOutput<7>(
+                           : wsl::windows::wslc::TableOutput<8>(
                                  context.Terminal,
                                  {Localization::WSLCCLI_TableHeaderContainerId(),
                                   Localization::WSLCCLI_TableHeaderImage(),
@@ -707,9 +749,11 @@ void ListContainers(CLIExecutionContext& context)
                                   Localization::WSLCCLI_TableHeaderCreated(),
                                   Localization::WSLCCLI_TableHeaderStatus(),
                                   Localization::WSLCCLI_TableHeaderPorts(),
-                                  Localization::WSLCCLI_TableHeaderNames()});
+                                  Localization::WSLCCLI_TableHeaderNames(),
+                                  Localization::WSLCCLI_TableHeaderSize()});
 
-        // Add each container as a row
+        table.SetColumnHidden(c_sizeColumn, !showSize);
+
         for (const auto& container : containers)
         {
             const auto entry = ToContainerOutput(container, trunc, FormatType::Table);
@@ -721,10 +765,12 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(entry.Status),
                 MultiByteToWide(entry.Ports),
                 MultiByteToWide(entry.Names),
+                showSize ? MultiByteToWide(entry.Size) : std::wstring{},
             });
         }
 
         table.Complete();
+
         break;
     }
     default:
