@@ -22,7 +22,7 @@ nav:
        - 'localhost': technical-documentation/localhost.md
        - 'plan9': technical-documentation/plan9.md
     - 'Technical documentation':
-       - 'Security model': security.md
+       - 'Security model': technical-documentation/security.md
        - 'Boot process': technical-documentation/boot-process.md
        - 'Interop': technical-documentation/interop.md
        - 'Drvfs & Plan9': technical-documentation/drvfs.md
