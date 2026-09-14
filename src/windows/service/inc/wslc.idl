@@ -583,9 +583,8 @@ interface IWSLCContainer : IUnknown
     HRESULT ConnectToNetwork([in] const WSLCNetworkConnectionOptions* Options);
     HRESULT DisconnectFromNetwork([in] LPCSTR NetworkName);
     HRESULT UploadArchive([in] WSLCHandle TarHandle, [in, string] LPCSTR DestPath, [in] ULONGLONG ContentSize);
-    // When FollowLink is set and SrcPath names a symbolic link, the archive is taken from the link's target and
-    // *ResolvedPath receives that target. *ResolvedPath is NULL when no link was followed.
-    HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] BOOL FollowLink, [in] WSLCHandle OutHandle, [out] LPSTR* ResolvedPath);
+    // When FollowLink is set and SrcPath names a symbolic link, the archive is taken from the link's target.
+    HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] BOOL FollowLink, [in] WSLCHandle OutHandle);
     HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
 }
 

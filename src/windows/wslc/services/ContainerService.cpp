@@ -831,22 +831,14 @@ void ContainerService::CopyToContainer(Session& session, const std::string& id, 
     THROW_IF_FAILED(container->UploadArchive(ToCOMInputHandle(inputHandle), destPath.c_str(), contentSize));
 }
 
-std::optional<std::string> ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle)
+void ContainerService::CopyFromContainer(Session& session, const std::string& id, const std::string& srcPath, bool followLink, HANDLE outputHandle)
 {
     [[maybe_unused]] auto operation = session.BeginContainerOperation();
 
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    wil::unique_cotaskmem_ansistring resolvedPath;
-    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), followLink, ToCOMInputHandle(outputHandle), &resolvedPath));
-
-    if (!resolvedPath)
-    {
-        return std::nullopt;
-    }
-
-    return std::string(resolvedPath.get());
+    THROW_IF_FAILED(container->DownloadArchive(srcPath.c_str(), followLink, ToCOMInputHandle(outputHandle)));
 }
 
 void ContainerService::Logs(Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail)

@@ -1839,14 +1839,11 @@ void WSLCContainerImpl::UploadArchive(WSLCHandle TarHandle, LPCSTR DestPath, ULO
     }
 }
 
-void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle, LPSTR* ResolvedPath) const
+void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle) const
 {
     auto lock = m_lock.lock_shared();
 
-    *ResolvedPath = nullptr;
-
     std::string effectivePath(SrcPath);
-    wil::unique_cotaskmem_ansistring resolvedPath;
 
     if (FollowLink)
     {
@@ -1864,7 +1861,6 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHan
                 }
             }
 
-            resolvedPath = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(resolved.c_str());
             effectivePath = std::move(resolved);
         }
     }
@@ -1911,8 +1907,6 @@ void WSLCContainerImpl::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHan
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), errorMessage, statusCode == 404);
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
-
-    *ResolvedPath = resolvedPath.release();
 }
 
 void WSLCContainerImpl::GetState(WSLCContainerState* Result)
@@ -3408,19 +3402,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle, LPSTR* ResolvedPath)
+HRESULT WSLCContainer::DownloadArchive(LPCSTR SrcPath, BOOL FollowLink, WSLCHandle OutHandle)
 try
 {
     WSLCExecutionContext context(&m_session);
 
     RETURN_HR_IF(E_POINTER, SrcPath == nullptr);
-    RETURN_HR_IF(E_POINTER, ResolvedPath == nullptr);
     RETURN_HR_IF(E_INVALIDARG, SrcPath[0] == '\0');
 
-    *ResolvedPath = nullptr;
-
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, FollowLink, OutHandle, ResolvedPath);
+    return CallImpl(&WSLCContainerImpl::DownloadArchive, SrcPath, FollowLink, OutHandle);
 }
 CATCH_RETURN();
 
