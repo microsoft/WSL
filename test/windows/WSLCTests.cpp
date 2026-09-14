@@ -7545,6 +7545,142 @@ class WSLCTests
         VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
     }
 
+    // A create that fails after dockerd made the network must roll it back without publishing events.
+    WSLC_TEST_METHOD(NetworkCreateRollbackSuppressesEvents)
+    {
+        const std::string rolledBack = "wslc-test-network-rollback";
+        const std::string barrier = "wslc-test-network-rollback-barrier";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(rolledBack.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        // The window is inclusive at second resolution, so start it past the cleanup above.
+        const auto sinceTime = floor<seconds>(system_clock::now()) + 1s;
+        std::this_thread::sleep_until(sinceTime);
+        const LONGLONG since = sinceTime.time_since_epoch().count();
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(rolledBack.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+        });
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(TRUE, FALSE, FALSE, 0));
+
+        WSLCNetworkOptions options{};
+        options.Name = rolledBack.c_str();
+        options.Driver = "bridge";
+        VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->CreateNetwork(&options, nullptr));
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+
+        // The rollback removed the network from dockerd, not just from the session's metadata.
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(rolledBack.c_str(), &output));
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "network", "inspect", rolledBack.c_str()}, 1);
+
+        // Docker delivers events in order, so the barrier's events cannot be published before the
+        // rolled-back network's create and destroy were handled.
+        CreateNamedNetwork(barrier);
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        WSLCFilter filter{"type", "network"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, &filter, 1, &stream));
+
+        for (const auto& e : DrainEventStream(stream.get()))
+        {
+            const auto name = e.Actor.Attributes.find("name");
+            VERIFY_IS_TRUE(name == e.Actor.Attributes.end() || name->second != rolledBack);
+        }
+    }
+
+    // A prune whose events never arrive must fence later prunes until the VM restarts.
+    WSLC_TEST_METHOD(NetworkPruneAbandonedAfterEventTimeout)
+    {
+        const std::string networkName = "wslc-test-prune-abandoned";
+        const std::string pruneLabel = "wslc-test-prune-abandoned";
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        });
+
+        CreateNamedNetwork(networkName, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter filter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+
+        // Drop the events this prune commits against so its publication wait times out.
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, TRUE, FALSE, 2000));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+
+        // The dropped events can never drain, so the fence rejects the next prune.
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcNetworkPrunePending());
+
+        BOOL wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+
+        // The restarted VM clears the abandoned sequence, so prune is accepted again.
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+    }
+
+    // An abandoned prune must drain once its delayed events finally arrive, without a VM restart.
+    WSLC_TEST_METHOD(NetworkPruneAbandonedDrainsDelayedEvents)
+    {
+        const std::string firstNetwork = "wslc-test-prune-delayed-a";
+        const std::string secondNetwork = "wslc-test-prune-delayed-b";
+        const std::string barrier = "wslc-test-prune-delayed-barrier";
+        const std::string pruneLabel = "wslc-test-prune-delayed";
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+        });
+
+        // Two networks so the fence only clears after both destroys precede the aggregate event.
+        CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
+        CreateNamedNetwork(secondNetwork, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter filter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+
+        // Withhold the events this prune waits for so its publication wait times out.
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, TRUE, 2000));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+
+        // Releasing replays whatever was buffered; the barrier's create event then guarantees any
+        // aggregate event still in flight has also been processed.
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+        CreateNamedNetwork(barrier);
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+    }
+
     // Verify callback registration survives Docker event-stream reconnection after VM restart.
     WSLC_TEST_METHOD(NetworkEventsSurviveVmRestart)
     {

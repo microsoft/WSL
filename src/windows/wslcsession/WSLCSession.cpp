@@ -434,6 +434,14 @@ try
 
     WSLCSessionRuntime::RuntimeHooks hooks;
     hooks.BringUp = [this]() {
+        {
+            // Cleared here rather than at teardown: the previous relay has been joined, so a network
+            // callback blocked on m_networksLock can no longer land after the state is dropped.
+            std::lock_guard networksLock(m_networksLock);
+            m_suppressedNetworkEvents.clear();
+            m_abandonedPrune.reset();
+        }
+
         // Configure storage.
         ConfigureStorage(m_settings, m_userSid.empty() ? nullptr : reinterpret_cast<PSID>(m_userSid.data()));
 
@@ -465,8 +473,6 @@ try
 
         // Network metadata is rebuilt from dockerd on every VM start, so it is always dropped.
         m_networks.clear();
-        m_suppressedNetworkEvents.clear();
-        m_abandonedPrune.reset();
 
         // Container wrappers are kept alive across idle teardown (only cleared on permanent shutdown)
         // so client COM references stay valid; RecoverState reattaches them to the restarted VM.
@@ -2500,6 +2506,26 @@ CATCH_LOG()
 void WSLCSession::OnNetworkEvent(const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept
 try
 {
+    std::lock_guard dispatchLock{m_networkEventDispatchLock};
+
+    if (m_dropNetworkEventsForTest)
+    {
+        return;
+    }
+
+    if (m_deferNetworkEventsForTest)
+    {
+        m_deferredNetworkEvents.emplace_back(NetworkId, Event, Attributes, Time);
+        return;
+    }
+
+    ProcessNetworkEventDispatchLockHeld(NetworkId, Event, Attributes, Time);
+}
+CATCH_LOG()
+
+__requires_lock_held(m_networkEventDispatchLock) void WSLCSession::ProcessNetworkEventDispatchLockHeld(
+    const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time)
+{
     static const std::map<NetworkEvent, std::string> actions{
         {NetworkEvent::Create, "create"},
         {NetworkEvent::Connect, "connect"},
@@ -2568,7 +2594,6 @@ try
         CompletePendingNetworkOperation(operation);
     }
 }
-CATCH_LOG()
 
 __requires_lock_held(m_networksLock) std::shared_ptr<WSLCSession::PendingNetworkOperation> WSLCSession::StartPendingNetworkOperation(
     PendingNetworkOperationType Type, std::string NetworkId, std::unordered_set<std::string> ExpectedDestroyIds)
@@ -2596,7 +2621,8 @@ void WSLCSession::WaitForNetworkOperationEvent(const std::shared_ptr<PendingNetw
     auto io = CreateIOContext();
     io.AddHandle(std::make_unique<io::EventHandle>(Operation->Completed.get()));
 
-    io.Run(c_networkEventTimeout);
+    const auto timeoutOverrideMs = m_networkEventTimeoutMsForTest.load();
+    io.Run(timeoutOverrideMs > 0 ? std::chrono::milliseconds{timeoutOverrideMs} : std::chrono::milliseconds{c_networkEventTimeout});
 
     WI_ASSERT(Operation->Completed.is_signaled());
 }
@@ -3278,7 +3304,26 @@ try
     auto removeNetworkCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name, &createResult]() {
         m_suppressedNetworkEvents.emplace_back(createResult.Id, NetworkEvent::Create);
         m_suppressedNetworkEvents.emplace_back(createResult.Id, NetworkEvent::Destroy);
-        m_runtime.Docker().RemoveNetwork(name);
+
+        try
+        {
+            m_runtime.Docker().RemoveNetwork(name);
+        }
+        catch (...)
+        {
+            // Only a network dockerd still reports can be proven undeleted; anything else may yet emit destroy.
+            if (IsNetworkConfirmedPresent(createResult.Id))
+            {
+                const auto suppressed = std::make_pair(createResult.Id, NetworkEvent::Destroy);
+                const auto destroy = std::ranges::find(m_suppressedNetworkEvents, suppressed);
+                if (destroy != m_suppressedNetworkEvents.end())
+                {
+                    m_suppressedNetworkEvents.erase(destroy);
+                }
+            }
+
+            throw;
+        }
     });
 
     if (!createResult.Warning.empty())
@@ -3291,6 +3336,8 @@ try
     docker_schema::Network full;
     try
     {
+        THROW_HR_IF(E_FAIL, m_failCreateInspectForTest.exchange(false));
+
         full = m_runtime.Docker().InspectNetwork(name);
     }
     catch (const DockerHTTPException& e)
@@ -3857,6 +3904,54 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLCSession::SetNetworkFaultsForTest(BOOL FailCreateInspect, BOOL DropEvents, BOOL DeferEvents, ULONG EventTimeoutMs)
+try
+{
+    WSLCExecutionContext context(this);
+
+    THROW_HR_IF(E_INVALIDARG, DropEvents != FALSE && DeferEvents != FALSE);
+
+    m_failCreateInspectForTest.store(FailCreateInspect != FALSE);
+    m_networkEventTimeoutMsForTest.store(EventTimeoutMs);
+
+    // Held across the replay so newer Docker callbacks cannot overtake the deferred events.
+    std::lock_guard dispatchLock{m_networkEventDispatchLock};
+
+    m_dropNetworkEventsForTest = DropEvents != FALSE;
+    m_deferNetworkEventsForTest = DeferEvents != FALSE;
+
+    if (!m_dropNetworkEventsForTest && !m_deferNetworkEventsForTest)
+    {
+        for (const auto& event : std::exchange(m_deferredNetworkEvents, {}))
+        {
+            ProcessNetworkEventDispatchLockHeld(event.NetworkId, event.Event, event.Attributes, event.Time);
+        }
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+bool WSLCSession::IsNetworkConfirmedPresent(const std::string& NetworkId) noexcept
+{
+    try
+    {
+        m_runtime.Docker().InspectNetwork(NetworkId);
+        return true;
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // A 404 is the expected answer once the removal has committed.
+        if (e.StatusCode() != 404)
+        {
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to inspect network: %hs", NetworkId.c_str());
+        }
+    }
+    CATCH_LOG_MSG("Failed to inspect network: %hs", NetworkId.c_str())
+
+    return false;
+}
 
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {

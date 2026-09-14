@@ -229,6 +229,7 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort) override;
     IFACEMETHOD(TriggerIdleTermination)(_Out_ BOOL* WasAlreadyIdle) override;
+    IFACEMETHOD(SetNetworkFaultsForTest)(_In_ BOOL FailCreateInspect, _In_ BOOL DropEvents, _In_ BOOL DeferEvents, _In_ ULONG EventTimeoutMs) override;
 
     // IWSLCCompatSession - converts the WSLCCompat types to the wslc.idl types and forwards to the methods above.
     // Methods that have an identical signature in both interfaces (Terminate, DeleteVolume, Authenticate,
@@ -387,6 +388,12 @@ private:
 
     void OnNetworkEvent(const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept;
 
+    __requires_lock_held(m_networkEventDispatchLock) void ProcessNetworkEventDispatchLockHeld(
+        const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time);
+
+    // False also covers "could not confirm", so callers must treat it as ambiguous.
+    bool IsNetworkConfirmedPresent(const std::string& NetworkId) noexcept;
+
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
     void Ext4Format(const std::string& Device);
@@ -468,6 +475,24 @@ private:
 
     // Timed-out prune events must drain before another prune starts.
     __guarded_by(m_networksLock) std::optional<AbandonedPrune> m_abandonedPrune;
+
+    // Test-only fault injection, see SetNetworkFaultsForTest.
+    std::atomic<bool> m_failCreateInspectForTest{false};
+    std::atomic<ULONG> m_networkEventTimeoutMsForTest{0};
+
+    struct DeferredNetworkEvent
+    {
+        std::string NetworkId;
+        NetworkEvent Event{};
+        std::map<std::string, std::string> Attributes;
+        std::int64_t Time{};
+    };
+
+    // Serializes dispatch so replayed events stay ahead of the callbacks that followed them.
+    std::mutex m_networkEventDispatchLock;
+    __guarded_by(m_networkEventDispatchLock) bool m_dropNetworkEventsForTest{};
+    __guarded_by(m_networkEventDispatchLock) bool m_deferNetworkEventsForTest{};
+    __guarded_by(m_networkEventDispatchLock) std::vector<DeferredNetworkEvent> m_deferredNetworkEvents;
 
     // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.
     DockerEventTracker::EventTrackingReference m_containerEventTracking;
