@@ -78,13 +78,16 @@ namespace {
     // Builds the representation of an image, shared by the table and json output so the two cannot
     // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,
     // and the id is truncated unless --no-trunc is passed, in which case it keeps the algorithm prefix.
-    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
+    // CreatedSince is the only field that varies with the format: docker renders it in invariant
+    // English, so json keeps that while the table is localized.
+    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate, FormatType format)
     {
         ImageOutputInformation entry;
         entry.Containers = image.Containers < 0 ? std::string{c_imageNotAvailable} : std::to_string(image.Containers);
 
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
-        entry.CreatedSince = WideToMultiByte(FormatRelativeTime(image.Created));
+        entry.CreatedSince =
+            WideToMultiByte(format == FormatType::Json ? FormatInvariantRelativeTime(image.Created) : FormatRelativeTime(image.Created));
         entry.Digest = c_none;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
@@ -214,7 +217,7 @@ void ListImages(CLIExecutionContext& context)
     {
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc), c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
         }
 
         break;
@@ -239,7 +242,7 @@ void ListImages(CLIExecutionContext& context)
 
         for (const auto& image : images)
         {
-            const auto entry = ToImageOutput(image, trunc);
+            const auto entry = ToImageOutput(image, trunc, format);
             table.WriteRow({
                 MultiByteToWide(entry.Repository),
                 MultiByteToWide(entry.Tag),
