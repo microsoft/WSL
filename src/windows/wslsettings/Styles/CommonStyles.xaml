@@ -97,7 +97,7 @@
     <!--  Small pill-shaped badge used to call out new navigation items (e.g. "NEW")  -->
     <Style x:Key="NewFeatureInfoBadgeStyle" TargetType="InfoBadge">
         <Setter Property="Background" Value="{ThemeResource SystemFillColorSuccessBrush}" />
-        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Foreground" Value="{ThemeResource DefaultTextForegroundThemeBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="InfoBadge">
