@@ -1318,11 +1318,14 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             }
             else if (PolicyRestartPendingLockHeld())
             {
-                try
+                if (!m_deferPolicyRestartReconciliation)
                 {
-                    ReconcilePolicyRestartStartedLockHeld(m_runtime.Docker().InspectContainer(m_id), eventTime);
+                    try
+                    {
+                        ReconcilePolicyRestartStartedLockHeld(m_runtime.Docker().InspectContainer(m_id), eventTime);
+                    }
+                    CATCH_LOG_MSG("Failed to reconcile policy restart of container '%hs'", m_id.c_str());
                 }
-                CATCH_LOG_MSG("Failed to reconcile policy restart of container '%hs'", m_id.c_str());
             }
             else
             {
@@ -1779,6 +1782,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ResolvePolicyRest
     }
 
     auto restart = std::exchange(m_restart, nullptr);
+    m_deferPolicyRestartReconciliation = false;
     if (m_policyRestartTimer)
     {
         SetThreadpoolTimer(m_policyRestartTimer.get(), nullptr, 0, 0);
@@ -1832,6 +1836,11 @@ void CALLBACK WSLCContainerImpl::PolicyRestartTimerCallback(PTP_CALLBACK_INSTANC
 
             restart = container.m_restart;
             id = container.m_id;
+
+            if (container.m_deferPolicyRestartReconciliation)
+            {
+                return;
+            }
         }
 
         if (!container.m_runtime.HasDocker() || container.m_runtime.VmExited())
@@ -3077,25 +3086,16 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
         // Register for Docker events while holding m_lock, then arm the policy transaction before an
         // already-queued start event can be processed.
+        container->m_deferPolicyRestartReconciliation = true;
         container->Initialize();
         container->ArmPolicyRestartLockHeld();
 
         try
         {
             const auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
-            if (inspectData.State.Restarting)
+            if (inspectData.State.Restarting || inspectData.State.Running)
             {
-                // The monitor will reconcile the eventual running or terminal state.
-            }
-            else if (inspectData.State.Running)
-            {
-                auto startTime = std::time(nullptr);
-                if (!inspectData.State.StartedAt.empty() && inspectData.State.StartedAt != c_unsetTimestamp)
-                {
-                    startTime = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspectData.State.StartedAt);
-                }
-
-                container->ReconcilePolicyRestartStartedLockHeld(inspectData, startTime);
+                // CompleteRecovery reconciles after session startup releases its recovery locks.
             }
             else
             {
@@ -3111,6 +3111,45 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
     return container;
 }
+
+void WSLCContainerImpl::CompleteRecovery() noexcept
+try
+{
+    auto lifecycleLock = m_lifecycleLock.lock_exclusive();
+    auto lock = m_lock.lock_exclusive();
+    if (!m_deferPolicyRestartReconciliation)
+    {
+        return;
+    }
+
+    m_deferPolicyRestartReconciliation = false;
+    if (!PolicyRestartPendingLockHeld())
+    {
+        return;
+    }
+
+    const auto inspect = m_runtime.Docker().InspectContainer(m_id);
+    if (inspect.State.Restarting)
+    {
+        return;
+    }
+
+    if (inspect.State.Running)
+    {
+        auto startTime = std::time(nullptr);
+        if (!inspect.State.StartedAt.empty() && inspect.State.StartedAt != c_unsetTimestamp)
+        {
+            startTime = wsl::windows::common::timestamp::Rfc3339ToEpoch(inspect.State.StartedAt);
+        }
+
+        ReconcilePolicyRestartStartedLockHeld(inspect, startTime);
+        return;
+    }
+
+    ResolvePolicyRestartLockHeld(false);
+    [[maybe_unused]] const auto transition = OnFailedRestartExclusiveLockHeld();
+}
+CATCH_LOG_MSG("Failed to complete recovery of container '%hs'", m_id.c_str());
 
 const std::string& WSLCContainerImpl::ID() const noexcept
 {

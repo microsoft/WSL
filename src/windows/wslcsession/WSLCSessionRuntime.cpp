@@ -272,6 +272,13 @@ void WSLCSessionRuntime::EnsureVmRunning()
         generation = m_vmGeneration.load();
     }
 
+    // Recovery completion may invoke external plugins. Run it after releasing the runtime lock;
+    // VmLease holds an activity reference across this call.
+    if (started && m_hooks.CompleteRecovery && !m_terminating->load() && m_vmState.load() == VmState::Running && m_vmGeneration.load() == generation)
+    {
+        m_hooks.CompleteRecovery();
+    }
+
     // Notify plugins that a VM has started, outside the exclusive lock: the handler forwards to the
     // plugin, which may call back into the session (e.g. WSLCCreateProcess acquires a VM lease and
     // the exclusive lock), so firing under the lock would deadlock. EnsureVmRunning's only caller
@@ -431,7 +438,6 @@ void WSLCSessionRuntime::StartVmLockHeld()
 
     m_vmState.store(VmState::Running);
     startCleanup.release();
-
     WSL_LOG("WslcVmStarted", TraceLoggingValue(m_id, "SessionId"));
 }
 

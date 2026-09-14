@@ -454,6 +454,7 @@ try
         RecoverExistingNetworks();
         RecoverExistingContainers();
     };
+    hooks.CompleteRecovery = [this]() { CompleteExistingContainerRecovery(); };
 
     hooks.TearDownSessionState = [this](bool permanent) {
         std::lock_guard containersLock(m_containersLock);
@@ -467,6 +468,7 @@ try
         if (permanent)
         {
             m_containers.clear();
+            m_pendingContainerRecovery.clear();
         }
     };
 
@@ -4056,6 +4058,7 @@ void WSLCSession::RecoverExistingContainers()
     auto containers = m_runtime.Docker().ListContainers(true); // all=true to include stopped containers
 
     std::lock_guard containersLock(m_containersLock);
+    m_pendingContainerRecovery.clear();
     for (const auto& dockerContainer : containers)
     {
         // Keep existing wrappers and their client COM references in place, then re-register their
@@ -4082,6 +4085,7 @@ void WSLCSession::RecoverExistingContainers()
             auto container = WSLCContainerImpl::Open(
                 dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
 
+            m_pendingContainerRecovery.emplace_back(container);
             auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
             WI_ASSERT(inserted);
         }
@@ -4097,6 +4101,20 @@ void WSLCSession::RecoverExistingContainers()
         "ContainersRecovered",
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_containers.size(), "ContainerCount"));
+}
+
+void WSLCSession::CompleteExistingContainerRecovery() noexcept
+{
+    std::vector<std::shared_ptr<WSLCContainerImpl>> containers;
+    {
+        std::lock_guard containersLock(m_containersLock);
+        containers.swap(m_pendingContainerRecovery);
+    }
+
+    for (const auto& container : containers)
+    {
+        container->CompleteRecovery();
+    }
 }
 
 void WSLCSession::RecoverExistingNetworks()

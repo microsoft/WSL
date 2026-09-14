@@ -58,6 +58,8 @@ public:
     {
         std::function<void()> BringUp;
         std::function<void()> RecoverState;
+        // Runs after RecoverState completes and the runtime lock is released.
+        std::function<void()> CompleteRecovery;
         // Invoked while tearing down the VM, with the VM-scoped state still alive. The argument is
         // true only for a permanent session shutdown (not an idle teardown): on idle teardown the
         // container wrappers must be kept alive so client COM references stay valid and are reused

@@ -125,6 +125,7 @@ public:
 
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
+    void CompleteRecovery() noexcept;
 
     __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
 
@@ -283,6 +284,10 @@ private:
     // Non-null between a container exit and its replacement start. OnStopped() keeps the container's
     // runtime resources mapped, and policy transactions also keep the VM active while Docker waits.
     _Guarded_by_(m_lock) std::shared_ptr<RestartTransaction> m_restart;
+
+    // Active-container recovery sets this while session startup owns the runtime and container-list
+    // locks. CompleteRecovery clears it after startup releases those locks.
+    _Guarded_by_(m_lock) bool m_deferPolicyRestartReconciliation = false;
 
     // True between a successful StartPhase() and the release of the container's ports and mounts. A
     // restart leaves this set across the two phases, which is what tells the start phase they are still
