@@ -58,7 +58,7 @@ class WSLCE2EImagePullTests
         auto session = OpenDefaultElevatedSession();
 
         {
-            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15006);
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15009);
 
             const auto repository = std::format(L"{}/{}", string::MultiByteToWide(registryAddress), testImage.Name);
             const auto firstTag = std::format(L"{}:v1", repository);
