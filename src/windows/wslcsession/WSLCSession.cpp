@@ -796,14 +796,12 @@ catch (...)
     EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed(wslutil::GetErrorString(wil::ResultFromCaughtException())));
 }
 
-void WSLCSession::StreamImageOperation(
-    DockerHTTPClient::HTTPRequestContext& requestContext,
-    LPCSTR Image,
-    LPCSTR OperationName,
-    IProgressCallback* ProgressCallback,
-    std::vector<std::string>* PulledDigests)
+std::vector<std::string> WSLCSession::StreamImageOperation(
+    DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
 {
     constexpr std::string_view c_digestStatusPrefix = "Digest: ";
+
+    std::vector<std::string> pulledDigests;
 
     auto io = CreateIOContext();
 
@@ -871,9 +869,9 @@ void WSLCSession::StreamImageOperation(
         // "Pulling from" line are the only per-tag messages both the graphdriver and containerd image
         // stores emit identically; the trailing "Status:" line is per-pull on one and per-tag on the
         // other, so it is not usable to enumerate what was pulled.
-        if (PulledDigests != nullptr && parsed.status.starts_with(c_digestStatusPrefix))
+        if (parsed.status.starts_with(c_digestStatusPrefix))
         {
-            PulledDigests->emplace_back(parsed.status.substr(c_digestStatusPrefix.size()));
+            pulledDigests.emplace_back(parsed.status.substr(c_digestStatusPrefix.size()));
         }
 
         if (ProgressCallback != nullptr)
@@ -921,6 +919,8 @@ void WSLCSession::StreamImageOperation(
         // Can happen if an error is returned during progress after receiving an OK status.
         THROW_HR_WITH_USER_ERROR(E_FAIL, reportedError.value().c_str());
     }
+
+    return pulledDigests;
 }
 
 void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
@@ -990,8 +990,7 @@ try
 
     auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
 
-    std::vector<std::string> pulledDigests;
-    StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback, AllTags ? &pulledDigests : nullptr);
+    const auto pulledDigests = StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
     if (AllTags)
     {

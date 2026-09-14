@@ -380,14 +380,9 @@ private:
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
-    // PulledDigests, when supplied, receives the manifest digest each pulled tag resolved to, in the
-    // order the daemon reported them.
-    void StreamImageOperation(
-        DockerHTTPClient::HTTPRequestContext& requestContext,
-        LPCSTR Image,
-        LPCSTR OperationName,
-        IProgressCallback* ProgressCallback,
-        std::vector<std::string>* PulledDigests = nullptr);
+    // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
+    std::vector<std::string> StreamImageOperation(
+        DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
 
     // The VM factory is a cross-process proxy supplied by the SYSTEM service at Initialize() time
     // but first used later (on demand) from a different thread/apartment. A directly stored proxy
