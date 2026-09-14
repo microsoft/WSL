@@ -2245,6 +2245,9 @@ Usage:
             std::format(L"wsl: Invalid integer value 'NotANumber' for key 'wsl2.dhcpTimeout' in {}:21\r\n", wslConfigPath));
 
         validateWarnings(L"ipv6=NotABoolean", std::format(L"wsl: Invalid boolean value 'NotABoolean' for key 'wsl2.ipv6' in {}:21\r\n", wslConfigPath));
+        validateWarnings(
+            L"[experimental]\nopenVmm=NotABoolean",
+            std::format(L"wsl: Invalid boolean value 'NotABoolean' for key 'experimental.openVmm' in {}:22\r\n", wslConfigPath));
 
         validateWarnings(L"[sectionNotComplete", std::format(L"wsl: Expected ']' in {}:21\r\n", wslConfigPath));
         validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:21\r\n", wslConfigPath));

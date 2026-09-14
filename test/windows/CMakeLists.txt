@@ -1,5 +1,6 @@
 set(SOURCES
     SimpleTests.cpp
+    VmBackendTests.cpp
     UnitTests.cpp
     MountTests.cpp
     NetworkTests.cpp
@@ -24,6 +25,7 @@ set(HEADERS
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
+target_compile_definitions(wsltests PRIVATE WSL_INCLUDE_OPENVMM=$<BOOL:${INCLUDE_OPENVMM}>)
 
 if (DEFINED WSL_UNITY_BATCH_SIZE AND WSL_UNITY_BATCH_SIZE GREATER 0)
     set_target_properties(wsltests PROPERTIES
@@ -41,6 +43,7 @@ target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests
                       common
+                      configfile
                       wslclib
                       wslcsdk
                       ${TAEF_LINK_LIBRARIES}
