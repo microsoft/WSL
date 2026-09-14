@@ -2148,7 +2148,11 @@ Usage:
     {
         DistroFileChange configChange(L"/etc/wsl.conf", false);
 
-        auto validateWarnings = [&configChange](const std::wstring& config, const std::wstring& expectedWarnings) {
+        auto validateWarnings = [&configChange](
+                                    const std::wstring& config,
+                                    const std::wstring& expectedWarnings,
+                                    const std::wstring& command = L"-u root echo ok",
+                                    const std::wstring& expectedOutput = L"ok\n") {
             configChange.SetContent(config.c_str());
 
             TerminateDistribution();
@@ -2162,8 +2166,8 @@ Usage:
 
             while (std::chrono::steady_clock::now() < deadline)
             {
-                auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"-u root echo ok");
-                VERIFY_ARE_EQUAL(L"ok\n", output);
+                auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(command);
+                VERIFY_ARE_EQUAL(expectedOutput, output);
 
                 if (!warnings.empty() || expectedWarnings.empty())
                 {
@@ -2182,6 +2186,8 @@ Usage:
         validateWarnings(L"[foo]\na=b", L"wsl: Unknown key 'foo.a' in /etc/wsl.conf:2\r\n");
         validateWarnings(L"a=a\\m", L"wsl: Invalid escaped character: 'm' in /etc/wsl.conf:1\r\n");
         validateWarnings(L"[=b", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n");
+        validateWarnings(
+            L"[=b\n[network]\nhostname=foo", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n", L"hostname", L"foo\n");
         validateWarnings(L"\r\n\r\n[foo]\r\na=b", L"wsl: Unknown key 'foo.a' in /etc/wsl.conf:5\r\n");
 
         // Validate that CRLF is correctly handled

@@ -280,7 +280,7 @@ int GenerateUserSystemdUnits(int Argc, char** Argv)
                 ConfigKey(wsl::linux::c_ConfigAutoMountRoot, automountRoot),
 
             };
-            ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
             File.reset();
         }
 
@@ -340,7 +340,7 @@ int GenerateSystemdUnits(int Argc, char** Argv)
                 ConfigKey(wsl::linux::c_ConfigAutoMountRoot, automountRoot),
 
             };
-            ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
             File.reset();
         }
 
@@ -628,7 +628,7 @@ try
 
         {
             wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-            ParseConfigFile(keys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
         }
 
         int32_t OobeResult = 0;
