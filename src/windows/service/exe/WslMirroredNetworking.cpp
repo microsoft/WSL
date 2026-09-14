@@ -1397,7 +1397,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             switch (trackedRoute.SyncStatus)
             {
             // Use ModifyRequestType::Add rather than ModifyRequestType::Update for PendingUpdate.
-            // An Update in GNS uses NLM_F_REPLACE and replaces by
+            // A route update in Linux uses
             // (destination prefix, tos, metric) key alone and would silently overwrite a same-key route
             // belonging to a *different* interface (e.g. another interface's default at the same metric).
             // An ModifyRequestType::Add plumbs a new route or leaves an existing one in place (EEXIST is ignored),
