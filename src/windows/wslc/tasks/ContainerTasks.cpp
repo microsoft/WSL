@@ -87,8 +87,14 @@ void MoveOver(const std::filesystem::path& From, const std::filesystem::path& To
         Localization::WSLCCLI_CpDestinationTypeMismatchError(To.wstring()),
         std::filesystem::exists(toStatus) && std::filesystem::is_directory(fromStatus) != std::filesystem::is_directory(toStatus));
 
+    // Symlinks are recreated rather than followed, so an entry pointing outside the staging tree
+    // cannot pull unrelated content into the destination.
     std::error_code copyError;
-    std::filesystem::copy(From, To, std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, copyError);
+    std::filesystem::copy(
+        From,
+        To,
+        std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::copy_symlinks,
+        copyError);
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(copyError.value()), !!copyError, "Failed to copy to: %ls", To.c_str());
 }
 
