@@ -12,6 +12,8 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
+    constexpr auto c_cancellationPollInterval = std::chrono::milliseconds{100};
+
     std::optional<std::chrono::sys_seconds> ToTimeBound(int64_t TimeSeconds)
     {
         if (TimeSeconds == 0)
@@ -142,16 +144,29 @@ bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t Seque
     // Eviction while parked wakes us too, so the caller reports the gap on its next pass.
     const auto ready = [&] { return m_terminating || SequenceNumber < m_firstSequenceNumber + m_events.size(); };
 
-    if (Until.has_value())
+    while (!ready())
     {
-        if (!m_updated.wait_until(Lock, Until.value(), ready))
+        if (Until.has_value())
+        {
+            const auto wakeTime =
+                std::min<std::chrono::system_clock::time_point>(Until.value(), std::chrono::system_clock::now() + c_cancellationPollInterval);
+            m_updated.wait_until(Lock, wakeTime);
+        }
+        else
+        {
+            m_updated.wait_for(Lock, c_cancellationPollInterval);
+        }
+
+        const auto cancellationResult = CoTestCancel();
+        if (cancellationResult != RPC_S_CALLPENDING)
+        {
+            THROW_IF_FAILED(cancellationResult);
+        }
+
+        if (Until.has_value() && std::chrono::system_clock::now() >= Until.value() && !ready())
         {
             return false;
         }
-    }
-    else
-    {
-        m_updated.wait(Lock, ready);
     }
 
     THROW_HR_IF(E_ABORT, m_terminating);

@@ -7455,6 +7455,40 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_ABORT, future.get());
     }
 
+    WSLC_TEST_METHOD(EventStreamCancellationAbortsReader)
+    {
+        WSLCFilter filter{"type", "container"};
+        const LONGLONG since = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 0, &filter, 1, &stream));
+
+        std::promise<HRESULT> getNextResult;
+        wil::unique_event readerStarted{wil::EventOptions::ManualReset};
+        DWORD readerThreadId{};
+        std::thread readerThread([&]() {
+            const auto coInitialize = wil::CoInitializeEx();
+            THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
+            const auto disableCallCancellation =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { CoDisableCallCancellation(nullptr); });
+
+            readerThreadId = GetCurrentThreadId();
+            readerStarted.SetEvent();
+
+            wil::unique_cotaskmem_ansistring eventJson;
+            getNextResult.set_value(stream->GetNext(&eventJson));
+        });
+        auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { readerThread.join(); });
+
+        VERIFY_IS_TRUE(readerStarted.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readerThread.native_handle(), 100));
+        VERIFY_SUCCEEDED(CoCancelCall(readerThreadId, 0));
+
+        auto future = getNextResult.get_future();
+        FAIL_FAST_IF_MSG(
+            future.wait_for(10s) != std::future_status::ready, "event stream reader did not abort after COM cancellation");
+        VERIFY_ARE_EQUAL(RPC_E_CALL_CANCELED, future.get());
+    }
+
     WSLC_TEST_METHOD(OpenContainer)
     {
         auto expectOpen = [&](const char* Id, HRESULT expectedResult = S_OK) {
