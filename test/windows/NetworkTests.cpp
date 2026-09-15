@@ -2359,7 +2359,11 @@ class NetworkTests
                 SOCKADDR_IN addr{};
                 addr.sin_family = AF_INET;
                 addr.sin_port = htons(assignedPort);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+                THROW_HR_IF_MSG(
+                    E_FAIL,
+                    bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR,
+                    "Failed to bind port %u",
+                    assignedPort);
             },
             std::chrono::seconds(1),
             std::chrono::minutes(2)));
@@ -5510,6 +5514,17 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        originalRange = wsl::shared::string::Trim(originalRange);
+
+        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&originalRange] {
+            LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange));
+        });
+
+        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
+        // would prevent consomme from forwarding the selected port.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
 
         NetworkTests::VerifyPortZeroBindIsTracked();
 
