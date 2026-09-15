@@ -913,7 +913,8 @@ HRESULT LxssUserSessionImpl::MountDisk(
     return wil::ResultFromException([&]() {
         _CreateVm();
         ExecutionContext context(Context::MountDisk);
-        const auto MountDiskType = WI_IsFlagSet(Flags, LXSS_ATTACH_MOUNT_FLAGS_VHD) ? IWslCoreVm::DiskType::VHD : IWslCoreVm::DiskType::PassThrough;
+        const auto MountDiskType =
+            WI_IsFlagSet(Flags, LXSS_ATTACH_MOUNT_FLAGS_VHD) ? IWslCoreVm::DiskType::VHD : IWslCoreVm::DiskType::PassThrough;
         const auto MountResult = m_utilityVm->MountDisk(Disk, MountDiskType, PartitionIndex, Name, Type, Options);
         const auto MountNameWide = wsl::shared::string::MultiByteToWide(MountResult.MountPointName);
         *Result = MountResult.Result;
