@@ -1013,7 +1013,7 @@ try
                 LOG_ERROR("execl() failed, {}", errno);
             },
             {},
-            Config.CgroupPath);
+            Config.CgroupNamespace.get());
     }
 
     return 0;
@@ -1824,6 +1824,12 @@ try
 
     if (UtilIsUtilityVm())
     {
+        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1 && getenv(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD) != nullptr)
+        {
+            Config.CGroup = WslDistributionConfig::CGroupVersion::v2;
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageCgroupV1IncompatibleWithDistroIsolation());
+        }
+
         if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1)
         {
             auto commandLine = UtilReadFileContent("/proc/cmdline");
@@ -1847,11 +1853,6 @@ try
                     DisabledControllers = wsl::shared::string::Split(list, ',');
                 }
             }
-        }
-
-        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1 && getenv(LX_WSL2_DISTRO_CGROUP_PATH) != nullptr)
-        {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageCgroupV1IncompatibleWithDistroIsolation());
         }
 
         if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1)
@@ -2766,6 +2767,16 @@ try
     else if (Result == 0)
     {
         Unlock.reset();
+
+        if (Config.CgroupNamespace)
+        {
+            if (UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, "login") < 0 ||
+                UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "login") < 0)
+            {
+                _exit(1);
+            }
+        }
+
         _exit(execl("/bin/login", "/bin/login", "-f", Username, nullptr));
     }
 
