@@ -1724,24 +1724,24 @@ Poświęć chwilę, aby zapoznać się z niektórymi ulubionymi funkcjami społe
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Z łatwością uruchamiaj kontenery systemu Linux w systemie Windows jako środowisko najwyższej klasy.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Za pomocą pliku wslc.exe możesz kompilować, uruchamiać, wypychać, pobierać i zarządzać kontenerami systemu Linux bezpośrednio w systemie Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Możesz także użyć interfejsu API WSLC do tworzenia aplikacji systemu Windows, których logika środowiska uruchomieniowego jest oparta na kontenerach systemu Linux, co ułatwia osadzanie ich bezpośrednio w aplikacjach na potrzeby przepływów pracy z chmury do środowiska lokalnego, aplikacji AI i izolacji.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Kontener WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Dowiedz się więcej o kontenerze WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Dokumentacja interfejsu API kontenera WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -1909,10 +1909,10 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
     <value>Ogólne</value>
   </data>
   <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Kontener WSL</value>
   </data>
   <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
-    <value>NEW</value>
+    <value>NOWY</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>Przyspieszanie procesora GPU</value>
@@ -3108,7 +3108,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Pokaż wszystko bez względu na stan.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>All tags in the repository.</value>
+    <value>Wszystkie tagi w repozytorium.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>tagu nie można używać z opcją --all-tags/-a</value>

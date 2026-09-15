@@ -1730,24 +1730,24 @@ Prenditi un momento per visualizzare in anteprima alcune delle funzionalità pre
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Esegui con facilità i contenitori Linux in Windows e ottieni un'esperienza di prima classe.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Puoi usare wslc.exe per compilare, eseguire, eseguire il push, eseguire il pull e gestire i contenitori Linux direttamente in Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Puoi anche usare l'API WSLC per creare applicazioni Windows la cui logica di runtime è basata su contenitori Linux, semplificando l'incorporamento di contenitori Linux direttamente nell'app per flussi di lavoro da cloud a locale, applicazioni di intelligenza artificiale e isolamento.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Contenitore di WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Altre informazioni sul contenitore di WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Riferimento API per contenitore di WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -1915,10 +1915,10 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
     <value>Generale</value>
   </data>
   <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Contenitore di WSL</value>
   </data>
   <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
-    <value>NEW</value>
+    <value>NUOVO</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>Accelerazione GPU</value>
@@ -2246,11 +2246,11 @@ Utilizzo:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
-    <value>The option '{}' is not supported.</value>
+    <value>L'opzione '{}' non è supportata.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
-    <value>'{}' is deprecated. Use {} instead.</value>
+    <value>'{}' è deprecato. Usa invece {}.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
@@ -2277,7 +2277,7 @@ Utilizzo:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage:  {} {}</value>
+    <value>Utilizzo: {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2324,7 +2324,7 @@ Utilizzo:
     <value>Opzioni globali:</value>
   </data>
   <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
-    <value>Global Options for '{}':</value>
+    <value>Opzioni globali per '{}':</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
@@ -2511,7 +2511,7 @@ Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkPrunePending" xml:space="preserve">
-    <value>A previous network prune is still being processed. Try again later.</value>
+    <value>È ancora in corso una precedente operazione di eliminazione della rete è ancora in corso. Riprova più tardi.</value>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Modalità di rete non supportata: '{}'</value>
@@ -2815,16 +2815,16 @@ Esempio: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitor container events.</value>
+    <value>Monitora gli eventi del contenitore.</value>
   </data>
   <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitor real-time events from containers.</value>
+    <value>Monitora gli eventi in tempo reale dai contenitori.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
-    <value>Show all events created since the timestamp</value>
+    <value>Visualizza tutti gli eventi creati dal timestamp</value>
   </data>
   <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
-    <value>Stream events until the timestamp</value>
+    <value>Trasmetti gli eventi fino al timestamp</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Gestisci immagini.</value>
@@ -3114,7 +3114,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Visualizza tutto indipendentemente dallo stato.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>All tags in the repository.</value>
+    <value>Tutti i tag nel repository.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>tag non può essere usato con --all-tags/-a</value>
@@ -3163,7 +3163,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Visualizza dettagli aggiuntivi per i log</value>
   </data>
   <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
-    <value>Show image digests</value>
+    <value>Visualizza i digest delle immagini</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Specifica l'eseguibile del processo di init del contenitore</value>
@@ -3313,7 +3313,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Segui l'output del log</value>
   </data>
   <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
-    <value>Always follow symlinks in SRC_PATH</value>
+    <value>Segui sempre i collegamenti simbolici in SRC_PATH</value>
     <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
@@ -3730,7 +3730,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Limita l'accesso esterno alla rete</value>
   </data>
   <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
-    <value>Enable IPv6 networking</value>
+    <value>Abilita il networking IPv6</value>
     <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">

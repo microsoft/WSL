@@ -3313,7 +3313,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Protokollausgabe verfolgen</value>
   </data>
   <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
-    <value>Symlinks im SRC_PATH immer folgen</value>
+    <value>Symlinks in SRC_PATH immer folgen</value>
     <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">

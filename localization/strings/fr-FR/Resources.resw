@@ -1731,24 +1731,24 @@ Prenez un moment pour prévisualiser certaines des fonctionnalités préférées
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Exécutez facilement des conteneurs Linux sur Windows en tant qu’expérience de premier ordre.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Vous pouvez utiliser wslc.exe pour générer, exécuter, envoyer (push), extraire et gérer des conteneurs Linux directement sur Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Vous pouvez également utiliser l’API WSLC pour créer des applications Windows dont la logique d’exécution repose sur des conteneurs Linux, ce qui facilite l’intégration directe de conteneurs Linux dans votre application pour des flux de travail du cloud vers le local, des applications d’IA et l’isolation.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Conteneur WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>En savoir plus sur le conteneur WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Référence API de conteneur WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -1916,10 +1916,10 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
     <value>Général</value>
   </data>
   <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Conteneur WSL</value>
   </data>
   <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
-    <value>NEW</value>
+    <value>NOUVEAU</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>Accélération GPU</value>
@@ -3115,7 +3115,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Affichez tout, quel que soit l’état.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>All tags in the repository.</value>
+    <value>Toutes les étiquettes du référentiel.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>La balise ne peut pas être utilisée avec l’option --all-tags/-a</value>
