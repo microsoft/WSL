@@ -5,8 +5,7 @@
 #include <Windows.h>
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 typedef struct WslOpenVmmConfig WslOpenVmmConfig;
@@ -23,14 +22,16 @@ __declspec(dllimport) HRESULT WslOpenVmmConfigSetKernelCmdLine(_Inout_ WslOpenVm
 __declspec(dllimport) HRESULT WslOpenVmmConfigSetMemoryMb(_Inout_ WslOpenVmmConfig* Config, _In_ UINT64 MemoryMb);
 __declspec(dllimport) HRESULT WslOpenVmmConfigSetProcessorCount(_Inout_ WslOpenVmmConfig* Config, _In_ UINT32 Count);
 __declspec(dllimport) HRESULT WslOpenVmmConfigSetHvSocketPath(_Inout_ WslOpenVmmConfig* Config, _In_ LPCWSTR Path);
-__declspec(dllimport) HRESULT WslOpenVmmConfigAddBootDisk(_Inout_ WslOpenVmmConfig* Config, _In_ UINT32 Controller, _In_ UINT32 Lun, _In_ LPCWSTR HostPath, _In_ BOOL ReadOnly);
+__declspec(dllimport) HRESULT WslOpenVmmConfigAddBootDisk(
+    _Inout_ WslOpenVmmConfig* Config, _In_ UINT32 Controller, _In_ UINT32 Lun, _In_ LPCWSTR HostPath, _In_ BOOL ReadOnly);
 __declspec(dllimport) HRESULT WslOpenVmmConfigSetConsommeNic(_Inout_ WslOpenVmmConfig* Config, _In_ LPCWSTR NicId, _In_ LPCWSTR MacAddress);
 __declspec(dllimport) HRESULT WslOpenVmmConfigAddSerialPort(_Inout_ WslOpenVmmConfig* Config, _In_ UINT32 Port, _In_ LPCWSTR PipeName);
 __declspec(dllimport) HRESULT WslOpenVmmConfigSetVirtioConsolePath(_Inout_ WslOpenVmmConfig* Config, _In_ LPCWSTR Path);
 // On success, this consumes Config and sets it to nullptr. On failure, Config remains valid and Vm is nullptr.
 // TimeoutMs must be nonzero and bounds lock acquisition, connection establishment, and CreateVm together.
 // After an ambiguous CreateVm failure, discard both the config and the owning process before retrying.
-__declspec(dllimport) HRESULT WslOpenVmmCreateVm(_Inout_ WslOpenVmmConfig** Config, _In_ LPCWSTR SocketPath, _In_ UINT32 TimeoutMs, _Out_ WslOpenVmmVm** Vm);
+__declspec(dllimport) HRESULT
+WslOpenVmmCreateVm(_Inout_ WslOpenVmmConfig** Config, _In_ LPCWSTR SocketPath, _In_ UINT32 TimeoutMs, _Out_ WslOpenVmmVm** Vm);
 
 // Destroys *Vm and sets it to nullptr. Null Vm and null *Vm are both accepted.
 __declspec(dllimport) void WslOpenVmmDestroyVm(_Inout_opt_ WslOpenVmmVm** Vm);
@@ -41,7 +42,8 @@ __declspec(dllimport) HRESULT WslOpenVmmVmCancelRequests(_Inout_ WslOpenVmmVm* V
 __declspec(dllimport) HRESULT WslOpenVmmVmResume(_Inout_ WslOpenVmmVm* Vm);
 __declspec(dllimport) HRESULT WslOpenVmmVmTeardown(_Inout_ WslOpenVmmVm* Vm);
 __declspec(dllimport) HRESULT WslOpenVmmVmQuit(_Inout_ WslOpenVmmVm* Vm);
-__declspec(dllimport) HRESULT WslOpenVmmVmAttachScsiDisk(_Inout_ WslOpenVmmVm* Vm, _In_ UINT32 Controller, _In_ UINT32 Lun, _In_ LPCWSTR HostPath, _In_ BOOL ReadOnly);
+__declspec(dllimport) HRESULT WslOpenVmmVmAttachScsiDisk(
+    _Inout_ WslOpenVmmVm* Vm, _In_ UINT32 Controller, _In_ UINT32 Lun, _In_ LPCWSTR HostPath, _In_ BOOL ReadOnly);
 __declspec(dllimport) HRESULT WslOpenVmmVmDetachScsiDisk(_Inout_ WslOpenVmmVm* Vm, _In_ UINT32 Controller, _In_ UINT32 Lun);
 __declspec(dllimport) HRESULT WslOpenVmmVmBindPort(_Inout_ WslOpenVmmVm* Vm, _In_ UINT16 HostPort, _In_ UINT16 GuestPort, _In_ BOOL Tcp, _In_ INT32 Family);
 __declspec(dllimport) HRESULT WslOpenVmmVmUnbindPort(_Inout_ WslOpenVmmVm* Vm, _In_ UINT16 HostPort, _In_ UINT16 GuestPort, _In_ BOOL Tcp, _In_ INT32 Family);

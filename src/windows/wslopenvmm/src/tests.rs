@@ -968,6 +968,14 @@ mod config_builder {
                 DiskType::ScsiDiskTypeVhdx,
                 true,
             ),
+            (
+                4,
+                2,
+                r"C:\disks\archive.vhdx\",
+                0,
+                DiskType::ScsiDiskTypeVhdx,
+                false,
+            ),
         ] {
             let host_path = wide(path);
             // SAFETY: The fixture owns a live config and host_path is null-terminated
