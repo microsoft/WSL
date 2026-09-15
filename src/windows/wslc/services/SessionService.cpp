@@ -16,13 +16,108 @@ Abstract:
 #include "SessionService.h"
 #include "ConsoleService.h"
 #include "WarningCallback.h"
+#include "wslc_schema.h"
+
 #include <wslc.h>
 #include <WSLCProcessLauncher.h>
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
+using namespace wsl::shared::string;
+using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
+
+namespace {
+
+    constexpr std::array<std::string_view, 4> c_eventFilterKeys{"type", "event", "container", "image"};
+
+    std::string FormatEventTimestamp(std::int64_t timestamp)
+    {
+        using namespace std::chrono;
+
+        const sys_seconds time{seconds{timestamp}};
+        try
+        {
+            auto output = std::format("{:%FT%T.000000000%z}", zoned_time{current_zone(), time});
+            output.insert(output.size() - 2, ":");
+            return output;
+        }
+        catch (...)
+        {
+            // The time zone database is unavailable, so report UTC rather than failing the stream.
+            LOG_CAUGHT_EXCEPTION();
+            return std::format("{:%FT%T.000000000+00:00}", time);
+        }
+    }
+
+    std::string FormatEvent(const wslc_schema::Event& event)
+    {
+        auto output = std::format("{} {} {} {}", FormatEventTimestamp(event.time), event.Type, event.Action, event.Actor.ID);
+        if (!event.Actor.Attributes.empty())
+        {
+            output.append(" (");
+            bool first = true;
+            for (const auto& [key, value] : event.Actor.Attributes)
+            {
+                if (!first)
+                {
+                    output.append(", ");
+                }
+
+                output.append(std::format("{}={}", key, value));
+                first = false;
+            }
+
+            output.push_back(')');
+        }
+
+        return output;
+    }
+
+    void WriteOutput(HANDLE outputHandle, std::string_view output)
+    {
+        while (!output.empty())
+        {
+            DWORD bytesWritten{};
+            THROW_LAST_ERROR_IF(!WriteFile(outputHandle, output.data(), gsl::narrow_cast<DWORD>(output.size()), &bytesWritten, nullptr));
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), bytesWritten == 0);
+            output.remove_prefix(bytesWritten);
+        }
+    }
+
+    void CancelCallWhenSignaled(HANDLE cancelEvent, HANDLE completedEvent, DWORD threadId) noexcept
+    {
+        const std::array handles{cancelEvent, completedEvent};
+        const auto waitResult = WaitForMultipleObjects(static_cast<DWORD>(handles.size()), handles.data(), FALSE, INFINITE);
+        if (waitResult != WAIT_OBJECT_0)
+        {
+            LOG_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+            return;
+        }
+
+        while (WaitForSingleObject(completedEvent, 0) != WAIT_OBJECT_0)
+        {
+            const auto result = CoCancelCall(threadId, 0);
+            if (SUCCEEDED(result))
+            {
+                return;
+            }
+
+            if (result != RPC_E_CALL_COMPLETE && result != E_NOINTERFACE)
+            {
+                LOG_IF_FAILED(result);
+                return;
+            }
+
+            if (WaitForSingleObject(completedEvent, 10) == WAIT_OBJECT_0)
+            {
+                return;
+            }
+        }
+    }
+
+} // namespace
 
 static wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
 {
@@ -186,6 +281,58 @@ int SessionService::Run(Terminal& terminal, const Session& session, const std::v
 
     wsl::windows::common::ConsoleState console{};
     return ConsoleService::AttachToCurrentConsole(terminal, console, std::move(process.value()));
+}
+
+void SessionService::StreamEvents(
+    const Session& session, LONGLONG since, LONGLONG until, const std::vector<std::pair<std::string, std::string>>& filterValues, HANDLE cancelEvent)
+{
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(filterValues.size());
+    for (const auto& [key, value] : filterValues)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            Localization::MessageWslcInvalidFilter(MultiByteToWide(key)),
+            std::ranges::find(c_eventFilterKeys, key) == c_eventFilterKeys.end());
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
+    wil::com_ptr<IWSLCEventStream> stream;
+    THROW_IF_FAILED(session.Get()->GetEvents(
+        since, until, filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &stream));
+
+    // Event output is UTF-8.
+    wsl::windows::common::ConsoleState console;
+    console.SetOutputCodePageUtf8();
+    const auto outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
+    const auto disableCallCancellation = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { CoDisableCallCancellation(nullptr); });
+
+    wil::unique_event completedEvent(wil::EventOptions::ManualReset);
+    std::thread cancellationThread{CancelCallWhenSignaled, cancelEvent, completedEvent.get(), GetCurrentThreadId()};
+    const auto cancellationCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        completedEvent.SetEvent();
+        cancellationThread.join();
+    });
+
+    while (true)
+    {
+        wil::unique_cotaskmem_ansistring eventJson;
+        const auto result = stream->GetNext(&eventJson);
+        if (result == WSLC_E_EVENT_STREAM_FINISHED)
+        {
+            return;
+        }
+
+        THROW_IF_FAILED(result);
+
+        auto line = FormatEvent(nlohmann::json::parse(eventJson.get()).get<wslc_schema::Event>());
+        line.push_back('\n');
+        WriteOutput(outputHandle, line);
+    }
 }
 
 int SessionService::TerminateSession(Terminal& terminal, const Session& session)

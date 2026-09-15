@@ -45,8 +45,8 @@ private:
     void Append(wsl::windows::common::wslc_schema::Event Event);
 
     // Blocks until the event at SequenceNumber is buffered, its slot is evicted, or the session
-    // terminates. Returns false only when Until elapsed with no event ready. Throws E_ABORT if the
-    // session terminated while waiting.
+    // terminates or the COM call is canceled. Returns false only when Until elapsed with no event
+    // ready. Throws E_ABORT if the session terminated while waiting.
     bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until);
 
     std::optional<wsl::windows::common::wslc_schema::Event> GetLockHeld(uint64_t SequenceNumber);
