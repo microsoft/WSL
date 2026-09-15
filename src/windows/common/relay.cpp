@@ -19,6 +19,7 @@ Abstract:
 using wsl::windows::common::io::InitializeFileOffset;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
+namespace io = wsl::windows::common::io;
 
 std::thread wsl::windows::common::relay::CreateThread(_In_ HANDLE InputHandle, _In_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
 {
@@ -237,130 +238,25 @@ wsl::windows::common::relay::InterruptableWrite(
 
 void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In_ HANDLE RightHandle, _In_ size_t BufferSize, _In_ RelayFlags Flags)
 {
-    std::vector<gsl::byte> leftBuffer(BufferSize);
-    const auto leftReadSpan = gsl::make_span(leftBuffer);
-    OVERLAPPED leftOverlapped = {0};
-    const wil::unique_event leftOverlappedEvent(wil::EventOptions::None);
-    leftOverlapped.hEvent = leftOverlappedEvent.get();
-    LARGE_INTEGER leftOffset{};
+    io::MultiHandleWait ioWait;
 
-    std::vector<gsl::byte> rightBuffer(BufferSize);
-    const auto rightReadSpan = gsl::make_span(rightBuffer);
-    OVERLAPPED rightOverlapped = {0};
-    const wil::unique_event rightOverlappedEvent(wil::EventOptions::None);
-    rightOverlapped.hEvent = rightOverlappedEvent.get();
-    LARGE_INTEGER rightOffset{};
-
-    bool leftReadPending = false;
-    bool rightReadPending = false;
-    auto cancelReads = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        DWORD bytes;
-        if (leftReadPending)
+    auto addRelay = [&](HANDLE Input, HANDLE Output, bool OutputIsSocket) {
+        std::unique_ptr<io::OverlappedIOHandle> relay;
+        if (OutputIsSocket)
         {
-            CancelIoEx(LeftHandle, &leftOverlapped);
-            GetOverlappedResult(LeftHandle, &leftOverlapped, &bytes, TRUE);
-        }
-
-        if (rightReadPending)
-        {
-            CancelIoEx(RightHandle, &rightOverlapped);
-            GetOverlappedResult(RightHandle, &rightOverlapped, &bytes, TRUE);
-        }
-    });
-
-    DWORD bytesWritten;
-    const HANDLE waitObjects[] = {leftOverlapped.hEvent, rightOverlapped.hEvent};
-    for (;;)
-    {
-        if ((LeftHandle == nullptr) || (RightHandle == nullptr))
-        {
-            break;
-        }
-
-        DWORD leftBytesRead = 0;
-        if (!leftReadPending && LeftHandle)
-        {
-            if (!ReadFile(LeftHandle, leftReadSpan.data(), gsl::narrow_cast<DWORD>(leftReadSpan.size()), &leftBytesRead, &leftOverlapped))
-            {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
-            }
-
-            leftReadPending = true;
-        }
-
-        DWORD rightBytesRead = 0;
-        if (!rightReadPending && RightHandle)
-        {
-            if (!ReadFile(RightHandle, rightReadSpan.data(), gsl::narrow_cast<DWORD>(rightReadSpan.size()), &rightBytesRead, &rightOverlapped))
-            {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
-            }
-
-            rightReadPending = true;
-        }
-
-        const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitObjects), waitObjects, FALSE, INFINITE);
-        if (waitResult == WAIT_OBJECT_0)
-        {
-            LOG_LAST_ERROR_IF_MSG(
-                !GetOverlappedResult(LeftHandle, &leftOverlapped, &leftBytesRead, FALSE), "WSAGetLastError %d", WSAGetLastError());
-
-            leftReadPending = false;
-            if (leftBytesRead == 0)
-            {
-                LeftHandle = nullptr;
-                if (WI_IsFlagSet(Flags, RelayFlags::RightIsSocket))
-                {
-                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(RightHandle), SD_SEND) == SOCKET_ERROR);
-                }
-            }
-            else if (RightHandle != nullptr)
-            {
-                auto writeSpan = leftReadSpan.first(leftBytesRead);
-                bytesWritten = InterruptableWrite(RightHandle, writeSpan, {}, &leftOverlapped);
-                if (bytesWritten == 0)
-                {
-                    break;
-                }
-
-                leftOffset.QuadPart += leftBytesRead;
-                leftOverlapped.Offset = leftOffset.LowPart;
-                leftOverlapped.OffsetHigh = leftOffset.HighPart;
-            }
-        }
-        else if (waitResult == (WAIT_OBJECT_0 + 1))
-        {
-            LOG_LAST_ERROR_IF_MSG(
-                !GetOverlappedResult(RightHandle, &rightOverlapped, &rightBytesRead, FALSE), "WSAGetLastError %d", WSAGetLastError());
-
-            rightReadPending = false;
-            if (rightBytesRead == 0)
-            {
-                RightHandle = nullptr;
-                if (WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket))
-                {
-                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(LeftHandle), SD_SEND) == SOCKET_ERROR);
-                }
-            }
-            else if (LeftHandle != nullptr)
-            {
-                auto writeSpan = rightReadSpan.first(rightBytesRead);
-                bytesWritten = InterruptableWrite(LeftHandle, writeSpan, {}, &rightOverlapped);
-                if (bytesWritten == 0)
-                {
-                    break;
-                }
-
-                rightOffset.QuadPart += rightBytesRead;
-                rightOverlapped.Offset = rightOffset.LowPart;
-                rightOverlapped.OffsetHigh = rightOffset.HighPart;
-            }
+            relay = std::make_unique<io::HalfCloseRelayHandle>(io::HandleWrapper{Input}, reinterpret_cast<SOCKET>(Output), BufferSize);
         }
         else
         {
-            THROW_HR_MSG(E_FAIL, "WaitForMultipleObjects %d", waitResult);
+            relay = std::make_unique<io::RelayHandle<io::ReadHandle>>(io::HandleWrapper{Input}, io::HandleWrapper{Output}, BufferSize);
         }
-    }
+
+        ioWait.AddHandle(std::move(relay));
+    };
+
+    addRelay(LeftHandle, RightHandle, WI_IsFlagSet(Flags, RelayFlags::RightIsSocket));
+    addRelay(RightHandle, LeftHandle, WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket));
+    ioWait.Run(std::nullopt);
 }
 
 bool wsl::windows::common::relay::StandardInputRelay(HANDLE ConsoleHandle, HANDLE OutputHandle, std::function<void()>&& UpdateTerminalSize, HANDLE ExitEvent)
