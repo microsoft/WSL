@@ -762,6 +762,7 @@ interface IWSLCSession : IUnknown
     // plugin do last-minute work from its OnVmStopping handler without deadlocking against the
     // teardown it is blocking -- and fails with WSLC_E_VM_NOT_RUNNING when there is no VM.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [in] ULONG TtyRows, [in] ULONG TtyColumns, [in] BOOL AcquireVmLease, [out] IWSLCProcess** Process, [out] int* Errno);
+    HRESULT RelaySocket([in] SOCKET_HANDLE Socket, [in] WSLCFD Fd, [out] PIPE_HANDLE* Pipe);
 
     // TODO: an OpenProcess() method can be added later if needed.
 

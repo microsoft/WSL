@@ -438,6 +438,17 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
             THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStderr, &stderrHandle));
             THROW_IF_FAILED(g_api->WSLCProcessGetExitEvent(process, &exitEvent));
 
+            const auto verifyPipe = [](HANDLE handle) {
+                WSASetLastError(ERROR_SUCCESS);
+                THROW_HR_IF(E_UNEXPECTED, closesocket(reinterpret_cast<SOCKET>(handle)) != SOCKET_ERROR);
+                THROW_HR_IF(E_UNEXPECTED, WSAGetLastError() != WSAENOTSOCK);
+                THROW_HR_IF(E_UNEXPECTED, GetFileType(handle) != FILE_TYPE_PIPE);
+            };
+
+            verifyPipe(stdinHandle.get());
+            verifyPipe(stdoutHandle.get());
+            verifyPipe(stderrHandle.get());
+
             std::string out;
             std::string err;
 
@@ -472,6 +483,7 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
         {
             runCommand("echo -n stdout-ok && echo -n stderr-ok >&2");
             runCommand("cat", "stdin-ok");
+            runCommand("read value || echo -n stdin-closed");
             runCommand("exit 12");
             runCommand("echo -n $ENV", {}, {"ENV=env-ok", nullptr});
         }

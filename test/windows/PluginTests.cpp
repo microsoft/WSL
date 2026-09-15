@@ -714,6 +714,7 @@ class PluginTests
             WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
             Command: 'echo -n stdout-ok && echo -n stderr-ok >&2', status=0, stdout: stdout-ok, stderr: stderr-ok
             Command: 'cat', status=0, stdout: stdin-ok, stderr: 
+            Command: 'read value || echo -n stdin-closed', status=0, stdout: stdin-closed, stderr: *
             Command: 'exit 12', status=12, stdout: , stderr: 
             Command: 'echo -n $ENV', status=0, stdout: env-ok, stderr: 
             WSLCCreateProcess(does-not-exist): {:x}, errno=2
