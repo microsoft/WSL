@@ -39,10 +39,14 @@ pub async fn execute<T>(
     // This also bounds peers that ignore grpc-timeout.
     tokio::select! {
         biased;
-        _ = tokio::time::sleep_until(deadline.into()) =>
-            Err(RpcFailure { result: TIMEOUT, uncertain: true }),
-        _ = cancellation =>
-            Err(RpcFailure { result: E_ABORT, uncertain: true }),
+        _ = tokio::time::sleep_until(deadline.into()) => {
+            tracing::warn!(target: "wslopenvmm::rpc", "RPC deadline expired; outcome is uncertain");
+            Err(RpcFailure { result: TIMEOUT, uncertain: true })
+        },
+        _ = cancellation => {
+            tracing::info!(target: "wslopenvmm::rpc", "RPC cancelled; outcome is uncertain");
+            Err(RpcFailure { result: E_ABORT, uncertain: true })
+        },
         result = operation => result.map_err(failure_from_status),
     }
 }
@@ -52,6 +56,7 @@ fn failure_from_status(status: tonic::Status) -> RpcFailure {
     while let Some(error) = source {
         // Tonic reports its local request timeout with Code::Cancelled.
         if error.is::<tonic::TimeoutExpired>() {
+            tracing::warn!(target: "wslopenvmm::rpc", "Tonic request timed out; outcome is uncertain");
             return RpcFailure {
                 result: TIMEOUT,
                 uncertain: true,
@@ -59,6 +64,12 @@ fn failure_from_status(status: tonic::Status) -> RpcFailure {
         }
         source = error.source();
     }
+    tracing::warn!(
+        target: "wslopenvmm::rpc",
+        "RPC returned gRPC status {:?}; outcome uncertain: {}",
+        status.code(),
+        !is_definite_rejection(status.code())
+    );
     RpcFailure {
         result: status_to_hresult(status.code()),
         uncertain: !is_definite_rejection(status.code()),
