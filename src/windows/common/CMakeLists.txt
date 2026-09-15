@@ -3,6 +3,7 @@ set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
+    ContainerModel.cpp
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
@@ -18,6 +19,13 @@ set(SOURCES
     hcs.cpp
     helpers.cpp
     hvsocket.cpp
+    ICredentialStorage.cpp
+    FileCredStorage.cpp
+    WinCredStorage.cpp
+    InputChannel.cpp
+    OutputChannel.cpp
+    Terminal.cpp
+    TableOutput.cpp
     interop.cpp
     HandleIO.cpp
     Localization.cpp
@@ -90,6 +98,7 @@ set(HEADERS
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
     ConsoleState.h
+    ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
     Distribution.h
@@ -106,6 +115,13 @@ set(HEADERS
     hcs_schema.h
     helpers.hpp
     hvsocket.hpp
+    ICredentialStorage.h
+    FileCredStorage.h
+    WinCredStorage.h
+    InputChannel.h
+    OutputChannel.h
+    Terminal.h
+    TableOutput.h
     INetworkingEngine.h
     interop.hpp
     HandleIO.h
