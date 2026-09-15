@@ -289,9 +289,6 @@ else()
 endif()
 
 
-# Generate local test script
-configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
-
 # Common build flags
 set(CMAKE_CXX_STANDARD 20)
 
@@ -572,6 +569,12 @@ set(TAEF_LINK_LIBRARIES
     Wex.Common.lib
     Wex.Logger.lib)
 
+# Only enable OpenVMM when its Rust toolchain is available.
+find_program(CARGO_EXECUTABLE cargo)
+if (NOT CARGO_EXECUTABLE)
+    message(WARNING "Cargo was not found; wslopenvmm will not be built or tested.")
+endif()
+
 # Subprojects
 add_subdirectory(nuget)
 add_subdirectory(msixgluepackage)
@@ -592,6 +595,9 @@ add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
+if (CARGO_EXECUTABLE)
+    add_subdirectory(src/windows/wslopenvmm)
+endif()
 add_subdirectory(src/windows/WslcSDK)
 
 if (WSL_BUILD_WSL_SETTINGS)
@@ -606,6 +612,9 @@ add_subdirectory(src/linux/init)
 add_subdirectory(localization)
 
 add_subdirectory(test/windows)
+
+# Generate local test script after subprojects have registered their test commands.
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
 
 if (DEFINED PIPELINE_BUILD_ID)
     add_subdirectory(cloudtest)
