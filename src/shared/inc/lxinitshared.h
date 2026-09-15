@@ -118,6 +118,7 @@ Abstract:
 #define LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT (50003)
 #define LX_INIT_UTILITY_VM_VIRTIOFS_PORT (50004)
 #define LX_INIT_UTILITY_VM_CRASH_DUMP_PORT (50005)
+#define LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT (50006)
 
 //
 // HvSocket buffer size for 9p connections.
@@ -1607,7 +1608,7 @@ struct WSLC_GET_DISK_RESULT
     unsigned int Result{};
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), BUFFER_FIELD(Buffer));
 };
 
 struct WSLC_GET_DISK

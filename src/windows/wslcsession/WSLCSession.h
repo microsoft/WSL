@@ -128,6 +128,7 @@ public:
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
@@ -150,6 +151,7 @@ public:
     IFACEMETHOD(PushImage)(
         _In_ LPCSTR Image,
         _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
@@ -358,6 +360,10 @@ private:
 
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
 
+    // Notifies plugins for each image created by an --all-tags pull, identified by the manifest digests
+    // the pull reported. Requires the VM lease.
+    void OnRepositoryImagesCreated(const wsl::windows::common::wslutil::RepositoryReference& Repository, const std::vector<std::string>& Digests) noexcept;
+
     void OnImageDeleted(const std::string& ImageId) noexcept;
 
     void OnContainerdExited();
@@ -374,7 +380,9 @@ private:
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
-    void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
+    // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
+    std::vector<std::string> StreamImageOperation(
+        DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
 
     // The VM factory is a cross-process proxy supplied by the SYSTEM service at Initialize() time
     // but first used later (on demand) from a different thread/apartment. A directly stored proxy

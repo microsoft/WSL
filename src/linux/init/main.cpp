@@ -191,7 +191,7 @@ int MountSystemDistro(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int De
 
 int MountInit(const char* Target);
 
-int MountPlan9(const char* Name, const char* Target, bool ReadOnly, std::optional<int> BufferSize = {});
+int MountPlan9(const char* Name, const char* Target, bool ReadOnly, unsigned int HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT, std::optional<int> BufferSize = {});
 
 int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
 
@@ -1002,7 +1002,8 @@ Return Value:
         //
 
         std::string Config = std::format(
-            "option subnet_mask, routers, broadcast, domain_name, domain_name_servers, domain_search, host_name, interface_mtu\n"
+            "option subnet_mask, routers, broadcast_address, domain_name, domain_name_servers, domain_search, host_name, "
+            "interface_mtu\n"
             "noarp\n"
             "timeout {}\n",
             DhcpTimeout);
@@ -1903,7 +1904,7 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-int MountPlan9(const char* Name, const char* Target, bool ReadOnly, std::optional<int> BufferSize)
+int MountPlan9(const char* Name, const char* Target, bool ReadOnly, unsigned int HostPort, std::optional<int> BufferSize)
 
 /*++
 
@@ -1919,6 +1920,8 @@ Arguments:
 
     ReadOnly - Supplies a boolean specifying if the share should be mounted as read-only.
 
+    HostPort - Supplies the host Plan 9 server port.
+
     BufferSize - Optionally supplies a buffer size to use for the hvsocket send / receive buffers and 9p msize.
 
 Return Value:
@@ -1930,7 +1933,7 @@ Return Value:
 try
 {
     int Size = BufferSize.value_or(LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE);
-    wil::unique_fd Fd{UtilConnectVsock(LX_INIT_UTILITY_VM_PLAN9_PORT, true, Size)};
+    wil::unique_fd Fd{UtilConnectVsock(HostPort, true, Size)};
     if (!Fd)
     {
         return -1;
@@ -2253,7 +2256,7 @@ void ProcessLaunchInitMessage(
             if (File)
             {
                 std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+                ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
             }
         }
 
@@ -2453,7 +2456,7 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
 
     {
         wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-        ParseConfigFile(keys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
+        ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
     }
 
     if (!defaultName.empty())
@@ -2640,7 +2643,7 @@ Return Value:
         return -1;
     }
 
-    int Result = MountPlan9(Name, Target, Message->ReadOnly);
+    int Result = MountPlan9(Name, Target, Message->ReadOnly, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT);
     Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }
@@ -4298,8 +4301,6 @@ int main(int Argc, char* Argv[])
                     auto CgroupDir = UtilGetDistroCgroupPath(Result);
                     if (access(CgroupDir.c_str(), F_OK) == 0)
                     {
-                        LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
-
                         //
                         // Recursively rmdir the cgroup subtree.
                         //

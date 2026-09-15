@@ -144,6 +144,8 @@ struct ContainerInformation
     WSLCContainerState State;
     LONGLONG StateChangedAt{};
     LONGLONG CreatedAt{};
+    LONGLONG SizeRw{};
+    LONGLONG SizeRootFs{};
     std::vector<PortInformation> Ports;
 };
 

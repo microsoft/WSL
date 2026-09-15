@@ -58,7 +58,7 @@ struct ContainerService
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force, bool deleteVolumes = false);
     static std::vector<models::ContainerInformation> List(
-        models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {});
+        models::Session& session, bool all = false, int limit = -1, const std::vector<std::pair<std::string, std::string>>& filters = {}, bool size = false);
 
     static int Exec(Terminal& terminal, models::Session& session, const std::string& id, models::ContainerOptions options);
     static void Export(models::Session& session, const std::string& id, const std::wstring& outputPath);
@@ -66,8 +66,8 @@ struct ContainerService
     static void CopyToContainer(models::Session& session, const std::string& id, const std::string& destPath, HANDLE inputHandle, ULONGLONG contentSize);
     static void CopyFromContainer(models::Session& session, const std::string& id, const std::string& srcPath, HANDLE outputHandle);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id, bool size = false);
-    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, LONGLONG since, LONGLONG until, ULONGLONG tail = 0);
+    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps, bool details, LONGLONG since, LONGLONG until, ULONGLONG tail = 0);
     static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);
-    static models::PruneContainersResult Prune(models::Session& session);
+    static models::PruneContainersResult Prune(models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters);
 };
 } // namespace wsl::windows::wslc::services

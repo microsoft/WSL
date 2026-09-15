@@ -160,6 +160,16 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::NetworkEndpointOptions>(std::move(endpointOptions));
                 handled = true;
             }
+            else if (dataType == Data::ConfirmWarning)
+            {
+                dataMap.Add<Data::ConfirmWarning>(std::wstring{L"warning"});
+                handled = true;
+            }
+            else if (dataType == Data::ConfirmMessage)
+            {
+                dataMap.Add<Data::ConfirmMessage>(std::wstring{L"message"});
+                handled = true;
+            }
 
             if (!handled)
             {
@@ -176,6 +186,9 @@ class WSLCCLIExecutionUnitTests
 
         auto& containers = dataMap.Get<Data::Containers>();
         VERIFY_ARE_EQUAL(0u, containers.size());
+
+        auto& confirmMessage = dataMap.Get<Data::ConfirmMessage>();
+        VERIFY_ARE_EQUAL(std::wstring{L"message"}, confirmMessage);
 
         // Other more complex EnumVariantMap tests are in the Args unit tests.
         // This one will just verify all the data types in the Data Map work as expected.
@@ -706,7 +719,7 @@ class WSLCCLIExecutionUnitTests
 
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
     // This test verifies the command line parsing logic used by the CLI and executes the same
-    // code as the CLI up to the point of command execution, including parsing and argument validtion.
+    // code as the CLI up to the point of command execution, including parsing and argument validation.
     // It does not actually verify the execution of the command, just that the correct command is
     // found and the provided command line parsed correctly according to the command's defined arguments,
     // and the argument validation rules are correctly applied. The test cases are defined in
