@@ -1,6 +1,5 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-use std::error::Error;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -15,33 +14,14 @@ use tower::service_fn;
 pub async fn connect_channel(
     socket_path: PathBuf,
     timeout: Duration,
-) -> Result<Channel, io::Error> {
-    let endpoint = Endpoint::from_static("http://[::]:50051").connect_timeout(timeout);
-    let connection = endpoint.connect_with_connector(service_fn(move |_| {
-        let socket_path = socket_path.clone();
-        async move { open_socket(&socket_path, timeout).await.map(TokioIo::new) }
-    }));
-    tokio::time::timeout(timeout, connection)
+) -> Result<Channel, tonic::transport::Error> {
+    Endpoint::from_static("http://[::]:50051")
+        .connect_timeout(timeout)
+        .connect_with_connector(service_fn(move |_| {
+            let socket_path = socket_path.clone();
+            async move { open_socket(&socket_path, timeout).await.map(TokioIo::new) }
+        }))
         .await
-        .map_err(|_| {
-            io::Error::new(
-                io::ErrorKind::TimedOut,
-                "OpenVMM connection deadline expired",
-            )
-        })?
-        .map_err(|error| {
-            let mut source = error.source();
-            while let Some(cause) = source {
-                if let Some(error) = cause.downcast_ref::<io::Error>() {
-                    return match error.raw_os_error() {
-                        Some(code) => io::Error::from_raw_os_error(code),
-                        None => io::Error::new(error.kind(), error.to_string()),
-                    };
-                }
-                source = cause.source();
-            }
-            io::Error::new(io::ErrorKind::ConnectionAborted, error)
-        })
 }
 
 async fn open_socket(path: &Path, timeout: Duration) -> io::Result<TcpStream> {

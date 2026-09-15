@@ -1,168 +1,80 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 use std::collections::BTreeMap;
-use std::future::Future;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use parking_lot::Mutex;
 use tokio::runtime::Runtime;
-use tokio::sync::watch;
 use tonic::Request;
 use vmservice::{
     ConsommeBackend, CreateVmRequest, DirectBoot, DiskType, ModifyResourceRequest, ModifyType,
     NicConfig, PortConfig, ScsiDisk, VirtioConsoleConfig, VmConfig, vm_client::VmClient,
 };
-use windows::Win32::Foundation::{
-    E_FAIL, E_INVALIDARG, ERROR_ALREADY_EXISTS, ERROR_NOT_FOUND, S_OK,
-};
+use windows::Win32::Foundation::{E_FAIL, E_INVALIDARG, ERROR_ALREADY_EXISTS, ERROR_CONNECTION_ABORTED, ERROR_NOT_FOUND, S_OK, WAIT_TIMEOUT};
 use windows::core::{GUID, HRESULT};
 use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 
-use crate::{af_unix, rpc, vmservice};
+use crate::{af_unix, vmservice};
 
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, PartialEq, Eq)]
-enum VmConfigStatus {
-    Ready,
-    CreationOutcomeUnknown,
-}
-
 pub struct VmConfigBuilder {
-    config: VmConfig,
-    status: VmConfigStatus,
-}
-
-pub struct VmConfigHandle {
-    builder: Mutex<VmConfigBuilder>,
-}
-
-impl VmConfigHandle {
-    pub fn new() -> Self {
-        crate::diagnostics::ensure_tracing_init();
-        Self {
-            builder: Mutex::new(VmConfigBuilder::new()),
-        }
-    }
-
-    pub fn update(&self, operation: impl FnOnce(&mut VmConfigBuilder) -> HRESULT) -> HRESULT {
-        operation(&mut self.builder.lock())
-    }
-
-    pub fn create_vm(&self, socket_path: String, timeout_ms: u32) -> Result<VmHandle, HRESULT> {
-        if timeout_ms == 0 {
-            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm requires a nonzero timeout");
-            return Err(E_INVALIDARG);
-        }
-        let timeout = Duration::from_millis(u64::from(timeout_ms));
-        let started = Instant::now();
-        let deadline = started + timeout;
-        tracing::info!(target: "wslopenvmm::rpc", "CreateVm starting with timeout {timeout_ms} ms");
-        let Some(mut builder) = self.builder.try_lock_until(deadline) else {
-            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm timed out waiting for the configuration lock; no request sent");
-            return Err(rpc::TIMEOUT);
-        };
-        let result = builder.create_vm(socket_path, timeout, deadline);
-        match &result {
-            Ok(_) => {
-                tracing::info!(target: "wslopenvmm::rpc", "CreateVm completed in {:?}", started.elapsed())
-            }
-            Err(error) => tracing::warn!(
-                target: "wslopenvmm::rpc",
-                "CreateVm failed with HRESULT {:#010x} after {:?}; configuration status: {:?}",
-                error.0, started.elapsed(), builder.status
-            ),
-        }
-        result
-    }
+    inner: VmConfig,
 }
 
 pub struct VmHandle {
-    inner: Mutex<VmHandleInner>,
-    timeout: Duration,
-    cancellation: watch::Sender<bool>,
+    inner: VmHandleInner,
 }
 
 struct VmHandleInner {
     runtime: Runtime,
     client: VmClient<tonic::transport::Channel>,
+    timeout: Duration,
     shares: BTreeMap<String, String>,
-    status: VmStatus,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum VmStatus {
-    Active,
-    RecoveryRequired,
 }
 
 impl VmConfigBuilder {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            config: VmConfig::default(),
-            status: VmConfigStatus::Ready,
+            inner: VmConfig::default(),
         }
     }
 
-    fn create_vm(
-        &mut self,
-        socket_path: String,
-        timeout: Duration,
-        deadline: Instant,
-    ) -> Result<VmHandle, HRESULT> {
-        if self.status == VmConfigStatus::CreationOutcomeUnknown {
-            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm rejected: previous creation outcome is unknown");
-            return Err(rpc::INVALID_STATE);
-        }
+    pub fn create_vm(&self, socket_path: String, timeout_ms: u32) -> Result<VmHandle, HRESULT> {
         let runtime = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
         {
             Ok(runtime) => runtime,
-            Err(_) => {
-                tracing::error!(target: "wslopenvmm::rpc", "CreateVm could not initialize the RPC runtime");
-                return Err(E_FAIL);
-            }
+            Err(_) => return Err(E_FAIL),
         };
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm deadline expired before connecting");
-            return Err(rpc::TIMEOUT);
-        }
-        let channel = match runtime
-            .block_on(af_unix::connect_channel(socket_path.into(), remaining))
-        {
+        let timeout = Duration::from_millis(u64::from(timeout_ms));
+        let channel = match runtime.block_on(af_unix::connect_channel(socket_path.into(), timeout)) {
             Ok(channel) => channel,
-            Err(error) => {
-                let result = rpc::io_error_to_hresult(&error);
-                tracing::warn!(target: "wslopenvmm::rpc", "CreateVm connection failed with HRESULT {:#010x}; no creation request sent", result.0);
-                return Err(result);
+            Err(error) if error.to_string().contains("timed out") => {
+                return Err(HRESULT::from_win32(WAIT_TIMEOUT.0));
             }
+            Err(_) => return Err(HRESULT::from_win32(ERROR_CONNECTION_ABORTED.0)),
         };
         let mut client = VmClient::new(channel);
         let request = CreateVmRequest {
-            config: Some(self.config.clone()),
+            config: Some(self.inner.clone()),
             log_id: String::new(),
         };
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm deadline expired before dispatch");
-            return Err(rpc::TIMEOUT);
-        }
-        match runtime.block_on(rpc::execute(
-            deadline,
-            None,
-            client.create_vm(request_with_timeout(request, remaining)),
-        )) {
-            Ok(_) => Ok(VmHandle::new(runtime, client, timeout)),
-            Err(error) => {
-                if error.uncertain {
-                    self.status = VmConfigStatus::CreationOutcomeUnknown;
-                    tracing::warn!(target: "wslopenvmm::rpc", "CreateVm outcome is unknown; discard the configuration and process before retrying");
-                }
-                Err(error.result)
-            }
+        match runtime.block_on(async {
+            let mut request = Request::new(request);
+            request.set_timeout(timeout);
+            client.create_vm(request).await
+        }) {
+            Ok(_) => Ok(VmHandle {
+                inner: VmHandleInner {
+                    runtime,
+                    client,
+                    timeout,
+                    shares: BTreeMap::new(),
+                },
+            }),
+            Err(error) => Err(rpc_status_to_hresult(error)),
         }
     }
 
@@ -182,12 +94,12 @@ impl VmConfigBuilder {
     }
 
     pub fn set_memory_mb(&mut self, memory_mb: u64) -> HRESULT {
-        self.config.memory_config.get_or_insert_default().memory_mb = memory_mb;
+        self.inner.memory_config.get_or_insert_default().memory_mb = memory_mb;
         S_OK
     }
 
     pub fn set_processor_count(&mut self, count: u32) -> HRESULT {
-        self.config
+        self.inner
             .processor_config
             .get_or_insert_default()
             .processor_count = count;
@@ -195,7 +107,7 @@ impl VmConfigBuilder {
     }
 
     pub fn set_hvsocket_path(&mut self, path: String) -> HRESULT {
-        self.config.hvsocket_config.get_or_insert_default().path = path;
+        self.inner.hvsocket_config.get_or_insert_default().path = path;
         S_OK
     }
 
@@ -206,7 +118,7 @@ impl VmConfigBuilder {
         host_path: String,
         read_only: bool,
     ) -> HRESULT {
-        self.config
+        self.inner
             .devices_config
             .get_or_insert_default()
             .scsi_disks
@@ -221,7 +133,7 @@ impl VmConfigBuilder {
     }
 
     pub fn set_consomme_nic(&mut self, nic_id: String, mac_address: String) -> HRESULT {
-        self.config
+        self.inner
             .devices_config
             .get_or_insert_default()
             .nic_config
@@ -237,20 +149,18 @@ impl VmConfigBuilder {
     }
 
     pub fn add_serial_port(&mut self, port: u32, pipe_name: String) -> HRESULT {
-        self.config
-            .serial_config
-            .get_or_insert_default()
-            .ports
-            .push(vmservice::serial_config::Config {
+        self.inner.serial_config.get_or_insert_default().ports.push(
+            vmservice::serial_config::Config {
                 port,
                 socket_path: pipe_name,
                 connect: true,
-            });
+            },
+        );
         S_OK
     }
 
     pub fn set_virtio_console_path(&mut self, path: String) -> HRESULT {
-        self.config
+        self.inner
             .devices_config
             .get_or_insert_default()
             .virtio_console = Some(VirtioConsoleConfig {
@@ -261,7 +171,7 @@ impl VmConfigBuilder {
     }
 
     fn direct_boot(&mut self) -> &mut DirectBoot {
-        let boot_config = self.config.boot_config.get_or_insert_with(|| {
+        let boot_config = self.inner.boot_config.get_or_insert_with(|| {
             vmservice::vm_config::BootConfig::DirectBoot(DirectBoot::default())
         });
         match boot_config {
@@ -272,118 +182,24 @@ impl VmConfigBuilder {
 }
 
 impl VmHandle {
-    fn new(
-        runtime: Runtime,
-        client: VmClient<tonic::transport::Channel>,
-        timeout: Duration,
-    ) -> Self {
-        Self {
-            inner: Mutex::new(VmHandleInner {
-                runtime,
-                client,
-                shares: BTreeMap::new(),
-                status: VmStatus::Active,
-            }),
-            timeout,
-            cancellation: watch::channel(false).0,
-        }
+    pub fn resume_vm(&mut self) -> HRESULT {
+        self.empty_rpc(|client, request| Box::pin(async move { client.resume_vm(request).await }))
     }
 
-    pub fn cancel_requests(&self) -> HRESULT {
-        self.cancellation.send_replace(true);
-        tracing::info!(target: "wslopenvmm::rpc", "VM request cancellation signalled");
-        S_OK
-    }
-
-    fn with_operation(
-        &self,
-        name: &'static str,
-        cleanup: bool,
-        operation: impl FnOnce(&mut VmHandleInner, Instant, Option<watch::Receiver<bool>>) -> HRESULT,
-    ) -> HRESULT {
-        let started = Instant::now();
-        let deadline = started + self.timeout;
-        tracing::info!(target: "wslopenvmm::rpc", "{name} starting");
-        let Some(mut inner) = self.inner.try_lock_until(deadline) else {
-            // No request was sent, so lock contention alone does not invalidate the VM.
-            tracing::warn!(target: "wslopenvmm::rpc", "{name} timed out waiting for the VM lock; no request sent");
-            return rpc::TIMEOUT;
-        };
-        if *self.cancellation.borrow() {
-            inner.status = VmStatus::RecoveryRequired;
-        }
-        if !cleanup && inner.status == VmStatus::RecoveryRequired {
-            tracing::warn!(target: "wslopenvmm::rpc", "{name} rejected: VM requires recovery");
-            return rpc::INVALID_STATE;
-        }
-        let cancellation = if cleanup {
-            None
-        } else {
-            Some(self.cancellation.subscribe())
-        };
-        let result = operation(&mut inner, deadline, cancellation);
-        // Cancellation can race a successful response, including during cleanup.
-        if *self.cancellation.borrow() {
-            inner.status = VmStatus::RecoveryRequired;
-        }
-        if result.is_err() {
-            tracing::warn!(
-                target: "wslopenvmm::rpc",
-                "{name} failed with HRESULT {:#010x} after {:?}; VM status: {:?}",
-                result.0, started.elapsed(), inner.status
-            );
-        } else {
-            tracing::info!(
-                target: "wslopenvmm::rpc",
-                "{name} completed in {:?}; VM status: {:?}",
-                started.elapsed(), inner.status
-            );
+    pub fn teardown_vm(&mut self) -> HRESULT {
+        let result = self.empty_rpc(|client, request| Box::pin(async move { client.teardown_vm(request).await }));
+        if result.is_ok() {
+            self.inner.shares.clear();
         }
         result
     }
 
-    pub fn resume_vm(&self) -> HRESULT {
-        self.with_operation("ResumeVm", false, |inner, deadline, cancellation| {
-            self.rpc(
-                inner,
-                deadline,
-                cancellation,
-                (),
-                |mut client, request| async move { client.resume_vm(request).await },
-            )
-        })
-    }
-
-    pub fn teardown_vm(&self) -> HRESULT {
-        self.with_operation("TeardownVm", true, |inner, deadline, cancellation| {
-            let result = self.rpc(
-                inner,
-                deadline,
-                cancellation,
-                (),
-                |mut client, request| async move { client.teardown_vm(request).await },
-            );
-            if result.is_ok() {
-                inner.shares.clear();
-            }
-            result
-        })
-    }
-
-    pub fn quit(&self) -> HRESULT {
-        self.with_operation("Quit", true, |inner, deadline, cancellation| {
-            self.rpc(
-                inner,
-                deadline,
-                cancellation,
-                (),
-                |mut client, request| async move { client.quit(request).await },
-            )
-        })
+    pub fn quit(&mut self) -> HRESULT {
+        self.empty_rpc(|client, request| Box::pin(async move { client.quit(request).await }))
     }
 
     pub fn attach_scsi_disk(
-        &self,
+        &mut self,
         controller: u32,
         lun: u32,
         host_path: String,
@@ -392,199 +208,155 @@ impl VmHandle {
         self.modify_disk(ModifyType::Add, controller, lun, host_path, read_only)
     }
 
-    pub fn detach_scsi_disk(&self, controller: u32, lun: u32) -> HRESULT {
+    pub fn detach_scsi_disk(&mut self, controller: u32, lun: u32) -> HRESULT {
         self.modify_disk(ModifyType::Remove, controller, lun, String::new(), false)
     }
 
-    pub fn bind_port(&self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
+    pub fn bind_port(&mut self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
         self.modify_port(ModifyType::Update, host_port, guest_port, tcp, family)
     }
 
-    pub fn unbind_port(&self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
+    pub fn unbind_port(&mut self, host_port: u16, guest_port: u16, tcp: bool, family: i32) -> HRESULT {
         self.modify_port(ModifyType::Remove, host_port, guest_port, tcp, family)
     }
 
-    pub fn add_share(&self, tag: String, host_path: String, read_only: bool) -> HRESULT {
-        self.with_operation("AddShare", false, |inner, deadline, cancellation| {
-            if inner.shares.contains_key(&tag) {
-                return HRESULT::from_win32(ERROR_ALREADY_EXISTS.0);
-            }
-            let instance_id = match GUID::new() {
-                Ok(instance_id) => format!("{instance_id:?}"),
-                Err(error) => return error.code(),
-            };
-            let request = vmservice::AddVpciDeviceRequest {
-                instance_id: instance_id.clone(),
-                device: Some(vmservice::PcieDeviceKind {
-                    kind: Some(vmservice::pcie_device_kind::Kind::Virtio(
-                        vmservice::VirtioDevice {
-                            kind: Some(vmservice::virtio_device::Kind::Fs(vmservice::VirtioFs {
-                                tag: tag.clone(),
-                                root_path: host_path,
-                                read_only,
-                            })),
-                        },
-                    )),
-                }),
-            };
-            let result = self.rpc(
-                inner,
-                deadline,
-                cancellation,
-                request,
-                |mut client, request| async move { client.add_vpci_device(request).await },
-            );
-            if result.is_ok() {
-                inner.shares.insert(tag, instance_id);
-            }
-            result
-        })
-    }
-
-    pub fn remove_share(&self, tag: &str) -> HRESULT {
-        self.with_operation("RemoveShare", false, |inner, deadline, cancellation| {
-            let Some(instance_id) = inner.shares.get(tag) else {
-                return HRESULT::from_win32(ERROR_NOT_FOUND.0);
-            };
-            let request = vmservice::RemoveVpciDeviceRequest {
-                instance_id: instance_id.clone(),
-            };
-            let result = self.rpc(
-                inner,
-                deadline,
-                cancellation,
-                request,
-                |mut client, request| async move { client.remove_vpci_device(request).await },
-            );
-            if result.is_ok() {
-                inner.shares.remove(tag);
-            }
-            result
-        })
-    }
-
-    fn rpc<T, F, R>(
-        &self,
-        inner: &mut VmHandleInner,
-        deadline: Instant,
-        cancellation: Option<watch::Receiver<bool>>,
-        message: T,
-        operation: F,
-    ) -> HRESULT
-    where
-        F: FnOnce(VmClient<tonic::transport::Channel>, Request<T>) -> R,
-        R: Future<Output = Result<tonic::Response<()>, tonic::Status>>,
-    {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            tracing::warn!(target: "wslopenvmm::rpc", "RPC deadline expired before dispatch; no request sent");
-            return rpc::TIMEOUT;
+    pub fn add_share(&mut self, tag: String, host_path: String, read_only: bool) -> HRESULT {
+        if self.inner.shares.contains_key(&tag) {
+            return HRESULT::from_win32(ERROR_ALREADY_EXISTS.0);
         }
-        let result = inner.runtime.block_on(rpc::execute(
-            deadline,
-            cancellation,
-            operation(
-                inner.client.clone(),
-                request_with_timeout(message, remaining),
-            ),
-        ));
-        match result {
-            Ok(_) => S_OK,
-            Err(error) => {
-                if error.uncertain {
-                    inner.status = VmStatus::RecoveryRequired;
-                    tracing::warn!(target: "wslopenvmm::rpc", "Uncertain RPC outcome; VM requires teardown and recreation");
-                }
-                error.result
+        let instance_id = match GUID::new() {
+            Ok(instance_id) => format!("{instance_id:?}"),
+            Err(error) => return error.code(),
+        };
+        let request = vmservice::AddVpciDeviceRequest {
+            instance_id: instance_id.clone(),
+            device: Some(vmservice::PcieDeviceKind {
+                kind: Some(vmservice::pcie_device_kind::Kind::Virtio(vmservice::VirtioDevice {
+                    kind: Some(vmservice::virtio_device::Kind::Fs(vmservice::VirtioFs {
+                        tag: tag.clone(),
+                        root_path: host_path,
+                        read_only,
+                    })),
+                })),
+            }),
+        };
+        match self.inner.runtime.block_on(self.inner.client.add_vpci_device(
+            request_with_timeout(request, self.inner.timeout),
+        )) {
+            Ok(_) => {
+                self.inner.shares.insert(tag, instance_id);
+                S_OK
             }
+            Err(error) => rpc_status_to_hresult(error),
+        }
+    }
+
+    pub fn remove_share(&mut self, tag: &str) -> HRESULT {
+        let Some(instance_id) = self.inner.shares.get(tag) else {
+            return HRESULT::from_win32(ERROR_NOT_FOUND.0);
+        };
+        let request = vmservice::RemoveVpciDeviceRequest {
+            instance_id: instance_id.clone(),
+        };
+        match self.inner.runtime.block_on(self.inner.client.remove_vpci_device(
+            request_with_timeout(request, self.inner.timeout),
+        )) {
+            Ok(_) => {
+                self.inner.shares.remove(tag);
+                S_OK
+            }
+            Err(error) => rpc_status_to_hresult(error),
+        }
+    }
+
+    fn empty_rpc<F>(&mut self, operation: F) -> HRESULT
+    where
+        F: for<'a> FnOnce(
+            &'a mut VmClient<tonic::transport::Channel>,
+            Request<()>,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<tonic::Response<()>, tonic::Status>> + 'a>,
+        >,
+    {
+        match self.inner.runtime.block_on(operation(
+            &mut self.inner.client,
+            request_with_timeout((), self.inner.timeout),
+        )) {
+            Ok(_) => S_OK,
+            Err(error) => rpc_status_to_hresult(error),
         }
     }
 
     fn modify_disk(
-        &self,
+        &mut self,
         modify_type: ModifyType,
         controller: u32,
         lun: u32,
         host_path: String,
         read_only: bool,
     ) -> HRESULT {
-        let name = if modify_type == ModifyType::Add {
-            "AttachScsiDisk"
-        } else {
-            "DetachScsiDisk"
+        let request = ModifyResourceRequest {
+            r#type: modify_type as i32,
+            resource: Some(vmservice::modify_resource_request::Resource::ScsiDisk(
+                ScsiDisk {
+                    controller,
+                    lun,
+                    r#type: disk_type(&host_path),
+                    host_path,
+                    read_only,
+                },
+            )),
         };
-        self.with_operation(name, false, |inner, deadline, cancellation| {
-            let request = ModifyResourceRequest {
-                r#type: modify_type as i32,
-                resource: Some(vmservice::modify_resource_request::Resource::ScsiDisk(
-                    ScsiDisk {
-                        controller,
-                        lun,
-                        r#type: disk_type(&host_path),
-                        host_path,
-                        read_only,
-                    },
-                )),
-            };
-            self.rpc(
-                inner,
-                deadline,
-                cancellation,
-                request,
-                |mut client, request| async move { client.modify_resource(request).await },
-            )
-        })
+        self.modify_resource(request)
     }
 
     fn modify_port(
-        &self,
+        &mut self,
         modify_type: ModifyType,
         host_port: u16,
         guest_port: u16,
         tcp: bool,
         family: i32,
     ) -> HRESULT {
-        let name = if modify_type == ModifyType::Update {
-            "BindPort"
-        } else {
-            "UnbindPort"
+        let host_address = match family {
+            family if family == i32::from(AF_INET) => "127.0.0.1",
+            family if family == i32::from(AF_INET6) => "::1",
+            _ => return E_INVALIDARG,
         };
-        self.with_operation(name, false, |inner, deadline, cancellation| {
-            let host_address = match family {
-                family if family == i32::from(AF_INET) => "127.0.0.1",
-                family if family == i32::from(AF_INET6) => "::1",
-                _ => return E_INVALIDARG,
-            };
-            let protocol = if tcp {
-                vmservice::IpProtocol::Tcp
-            } else {
-                vmservice::IpProtocol::Udp
-            };
-            let request = ModifyResourceRequest {
-                r#type: modify_type as i32,
-                resource: Some(vmservice::modify_resource_request::Resource::NicConfig(
-                    NicConfig {
-                        backend: Some(vmservice::nic_config::Backend::Consomme(ConsommeBackend {
-                            cidr: String::new(),
-                            ports: vec![PortConfig {
-                                host_port: u32::from(host_port),
-                                guest_port: u32::from(guest_port),
-                                protocol: protocol as i32,
-                                host_address: host_address.to_string(),
-                            }],
-                        })),
-                        ..Default::default()
-                    },
-                )),
-            };
-            self.rpc(
-                inner,
-                deadline,
-                cancellation,
-                request,
-                |mut client, request| async move { client.modify_resource(request).await },
-            )
-        })
+        let protocol = if tcp {
+            vmservice::IpProtocol::Tcp
+        } else {
+            vmservice::IpProtocol::Udp
+        };
+        let request = ModifyResourceRequest {
+            r#type: modify_type as i32,
+            resource: Some(vmservice::modify_resource_request::Resource::NicConfig(
+                NicConfig {
+                    backend: Some(vmservice::nic_config::Backend::Consomme(ConsommeBackend {
+                        cidr: String::new(),
+                        ports: vec![PortConfig {
+                            host_port: u32::from(host_port),
+                            guest_port: u32::from(guest_port),
+                            protocol: protocol as i32,
+                            host_address: host_address.to_string(),
+                        }],
+                    })),
+                    ..Default::default()
+                },
+            )),
+        };
+        self.modify_resource(request)
+    }
+
+    fn modify_resource(&mut self, request: ModifyResourceRequest) -> HRESULT {
+        match self.inner.runtime.block_on(
+            self.inner
+                .client
+                .modify_resource(request_with_timeout(request, self.inner.timeout)),
+        ) {
+            Ok(_) => S_OK,
+            Err(error) => rpc_status_to_hresult(error),
+        }
     }
 }
 
@@ -599,5 +371,13 @@ fn disk_type(path: &str) -> i32 {
         DiskType::ScsiDiskTypeVhdx as i32
     } else {
         DiskType::ScsiDiskTypeVhd1 as i32
+    }
+}
+
+fn rpc_status_to_hresult(error: tonic::Status) -> HRESULT {
+    if error.code() == tonic::Code::DeadlineExceeded {
+        HRESULT::from_win32(WAIT_TIMEOUT.0)
+    } else {
+        HRESULT::from_win32(ERROR_CONNECTION_ABORTED.0)
     }
 }
