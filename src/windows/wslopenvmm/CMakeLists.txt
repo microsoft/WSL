@@ -1,7 +1,5 @@
 # Copyright (C) Microsoft Corporation. All rights reserved.
 
-find_program(CARGO_EXECUTABLE cargo REQUIRED)
-
 if ("${TARGET_PLATFORM}" STREQUAL "x64")
     set(RUST_TARGET x86_64-pc-windows-msvc)
 elseif ("${TARGET_PLATFORM}" STREQUAL "arm64")
@@ -32,3 +30,9 @@ add_custom_command(
 
 add_custom_target(wslopenvmm ALL DEPENDS ${WSLOPENVMM_DLL})
 set_target_properties(wslopenvmm PROPERTIES FOLDER windows SOURCES "Cargo.toml;src/client.rs;src/lib.rs;wslopenvmm.h")
+
+string(CONCAT WSLOPENVMM_TEST_COMMAND
+    "\"${CMAKE_COMMAND}\" -E env \"VM_SERVICE_PROTO=${VM_SERVICE_PROTO}\" "
+    "\"${CARGO_EXECUTABLE}\" test --manifest-path \"${CMAKE_CURRENT_LIST_DIR}/Cargo.toml\" "
+    "--target ${RUST_TARGET} --target-dir \"${CARGO_TARGET_DIR}\" ${CARGO_BUILD_ARGUMENTS} || goto fail")
+set(WSLOPENVMM_TEST_COMMAND "${WSLOPENVMM_TEST_COMMAND}" PARENT_SCOPE)
