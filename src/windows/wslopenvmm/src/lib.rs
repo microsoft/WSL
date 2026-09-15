@@ -11,6 +11,9 @@ mod vmservice {
     tonic::include_proto!("vmservice");
 }
 
+#[cfg(test)]
+mod tests;
+
 use client::{VmConfigBuilder, VmConfigHandle, VmHandle};
 use windows::Win32::Foundation::{E_INVALIDARG, E_POINTER, S_OK};
 use windows::core::{HRESULT, PCWSTR};
@@ -65,9 +68,13 @@ pub unsafe extern "C" fn WslOpenVmmCreateConfig(config: *mut *mut WslOpenVmmConf
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn WslOpenVmmDestroyConfig(config: *mut WslOpenVmmConfig) {
-    if !config.is_null() {
-        unsafe { drop(Box::from_raw(config)) };
+pub unsafe extern "C" fn WslOpenVmmDestroyConfig(config: *mut *mut WslOpenVmmConfig) {
+    let Some(config) = (unsafe { config.as_mut() }) else {
+        return;
+    };
+    let handle = std::mem::replace(config, std::ptr::null_mut());
+    if !handle.is_null() {
+        unsafe { drop(Box::from_raw(handle)) };
     }
 }
 
@@ -233,17 +240,20 @@ pub unsafe extern "C" fn WslOpenVmmCreateVm(
     };
 
     unsafe {
-        *config = std::ptr::null_mut();
-        drop(Box::from_raw(config_handle));
+        WslOpenVmmDestroyConfig(config);
         *vm = Box::into_raw(Box::new(WslOpenVmmVm::new(client)));
     }
     S_OK.0
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn WslOpenVmmDestroyVm(vm: *mut WslOpenVmmVm) {
-    if !vm.is_null() {
-        unsafe { drop(Box::from_raw(vm)) };
+pub unsafe extern "C" fn WslOpenVmmDestroyVm(vm: *mut *mut WslOpenVmmVm) {
+    let Some(vm) = (unsafe { vm.as_mut() }) else {
+        return;
+    };
+    let handle = std::mem::replace(vm, std::ptr::null_mut());
+    if !handle.is_null() {
+        unsafe { drop(Box::from_raw(handle)) };
     }
 }
 
