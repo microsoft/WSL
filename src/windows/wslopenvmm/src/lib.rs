@@ -2,20 +2,27 @@
 
 #![expect(clippy::missing_safety_doc)]
 
+mod af_unix;
 mod client;
-pub mod af_unix;
+mod diagnostics;
+mod rpc;
 
-pub mod vmservice {
+mod vmservice {
     tonic::include_proto!("vmservice");
 }
 
-use client::{VmConfigBuilder, VmHandle};
-use parking_lot::Mutex;
+use client::{VmConfigBuilder, VmConfigHandle, VmHandle};
 use windows::Win32::Foundation::{E_INVALIDARG, E_POINTER, S_OK};
 use windows::core::{HRESULT, PCWSTR};
 
-pub struct WslOpenVmmConfig(Mutex<VmConfigBuilder>);
-pub struct WslOpenVmmVm(Mutex<VmHandle>);
+pub struct WslOpenVmmConfig(VmConfigHandle);
+pub struct WslOpenVmmVm(VmHandle);
+
+impl WslOpenVmmVm {
+    fn new(client: VmHandle) -> Self {
+        Self(client)
+    }
+}
 
 unsafe fn string_from_wide(value: *const u16) -> Result<String, HRESULT> {
     if value.is_null() {
@@ -32,17 +39,17 @@ unsafe fn with_config(
     let Some(config) = (unsafe { handle.as_ref() }) else {
         return E_POINTER;
     };
-    operation(&mut config.0.lock())
+    config.0.update(operation)
 }
 
 unsafe fn with_vm(
     handle: *mut WslOpenVmmVm,
-    operation: impl FnOnce(&mut VmHandle) -> HRESULT,
+    operation: impl FnOnce(&VmHandle) -> HRESULT,
 ) -> HRESULT {
     let Some(vm) = (unsafe { handle.as_ref() }) else {
         return E_POINTER;
     };
-    operation(&mut vm.0.lock())
+    operation(&vm.0)
 }
 
 #[unsafe(no_mangle)]
@@ -52,9 +59,7 @@ pub unsafe extern "C" fn WslOpenVmmCreateConfig(config: *mut *mut WslOpenVmmConf
     }
 
     unsafe {
-        *config = Box::into_raw(Box::new(WslOpenVmmConfig(Mutex::new(
-            VmConfigBuilder::new(),
-        ))));
+        *config = Box::into_raw(Box::new(WslOpenVmmConfig(VmConfigHandle::new())));
     }
     S_OK.0
 }
@@ -220,21 +225,17 @@ pub unsafe extern "C" fn WslOpenVmmCreateVm(
         Err(error) => return error.0,
     };
 
-    let config_box = unsafe { Box::from_raw(config_handle) };
-    let result = config_box.0.lock().create_vm(socket_path, timeout_ms);
+    let config_ref = unsafe { &*config_handle };
+    let result = config_ref.0.create_vm(socket_path, timeout_ms);
     let client = match result {
         Ok(client) => client,
-        Err(error) => {
-            unsafe {
-                *config = Box::into_raw(config_box);
-            }
-            return error.0;
-        }
+        Err(error) => return error.0,
     };
 
     unsafe {
         *config = std::ptr::null_mut();
-        *vm = Box::into_raw(Box::new(WslOpenVmmVm(Mutex::new(client))));
+        drop(Box::from_raw(config_handle));
+        *vm = Box::into_raw(Box::new(WslOpenVmmVm::new(client)));
     }
     S_OK.0
 }
@@ -244,6 +245,11 @@ pub unsafe extern "C" fn WslOpenVmmDestroyVm(vm: *mut WslOpenVmmVm) {
     if !vm.is_null() {
         unsafe { drop(Box::from_raw(vm)) };
     }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn WslOpenVmmVmCancelRequests(vm: *mut WslOpenVmmVm) -> i32 {
+    unsafe { with_vm(vm, VmHandle::cancel_requests).0 }
 }
 
 #[unsafe(no_mangle)]
@@ -298,7 +304,12 @@ pub unsafe extern "C" fn WslOpenVmmVmBindPort(
     tcp: i32,
     family: i32,
 ) -> i32 {
-    unsafe { with_vm(vm, |vm| vm.bind_port(host_port, guest_port, tcp != 0, family)).0 }
+    unsafe {
+        with_vm(vm, |vm| {
+            vm.bind_port(host_port, guest_port, tcp != 0, family)
+        })
+        .0
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -309,7 +320,12 @@ pub unsafe extern "C" fn WslOpenVmmVmUnbindPort(
     tcp: i32,
     family: i32,
 ) -> i32 {
-    unsafe { with_vm(vm, |vm| vm.unbind_port(host_port, guest_port, tcp != 0, family)).0 }
+    unsafe {
+        with_vm(vm, |vm| {
+            vm.unbind_port(host_port, guest_port, tcp != 0, family)
+        })
+        .0
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -331,10 +347,7 @@ pub unsafe extern "C" fn WslOpenVmmVmAddShare(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn WslOpenVmmVmRemoveShare(
-    vm: *mut WslOpenVmmVm,
-    tag: *const u16,
-) -> i32 {
+pub unsafe extern "C" fn WslOpenVmmVmRemoveShare(vm: *mut WslOpenVmmVm, tag: *const u16) -> i32 {
     let tag = match unsafe { string_from_wide(tag) } {
         Ok(tag) => tag,
         Err(error) => return error.0,
