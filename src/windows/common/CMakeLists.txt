@@ -3,6 +3,7 @@ set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
+    ContainerModel.cpp
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
@@ -18,6 +19,13 @@ set(SOURCES
     hcs.cpp
     helpers.cpp
     hvsocket.cpp
+    ICredentialStorage.cpp
+    FileCredStorage.cpp
+    WinCredStorage.cpp
+    InputChannel.cpp
+    OutputChannel.cpp
+    Terminal.cpp
+    TableOutput.cpp
     interop.cpp
     HandleIO.cpp
     Localization.cpp
@@ -90,6 +98,7 @@ set(HEADERS
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
     ConsoleState.h
+    ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
     Distribution.h
@@ -106,6 +115,13 @@ set(HEADERS
     hcs_schema.h
     helpers.hpp
     hvsocket.hpp
+    ICredentialStorage.h
+    FileCredStorage.h
+    WinCredStorage.h
+    InputChannel.h
+    OutputChannel.h
+    Terminal.h
+    TableOutput.h
     INetworkingEngine.h
     interop.hpp
     HandleIO.h
@@ -161,7 +177,9 @@ target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/
 # common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
 # the config file parser, so anything linking common needs those libraries too.
 # PUBLIC propagates them instead of making each consumer restate them.
-target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile)
+# yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
+# WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib)
 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 # The per-source include path and definition below only apply when the file is
