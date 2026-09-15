@@ -130,24 +130,24 @@ private:
         ActivePortSet PortProtocolPairs; // Always populated, but only used in mirrored mode
     };
 
-    struct PortRefreshResult
+    struct ListPortsResult
     {
         ActivePorts Ports;
         time_t Timestamp;
     };
 
-    using TrackerEvent = std::variant<seccomp_notif, PortRefreshResult>;
+    using TrackerEvent = std::variant<seccomp_notif, ListPortsResult>;
 
     bool IsMirroredMode() const
     {
         return m_networkingMode == LxMiniInitNetworkingModeMirrored;
     }
 
-    void OnRefreshAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
+    void ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
 
-    void RunPortRefresh();
+    void RunPortListing();
 
-    ActivePorts ListAllocatedPorts();
+    ActivePorts ListBoundPorts();
 
     BindCall ReadRequest(const seccomp_notif& Notification);
 
@@ -171,9 +171,9 @@ private:
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
 
-    WaitableValue<TrackerEvent> m_events;
+    WaitableValue<TrackerEvent> m_eventQueue;
     WaitableValue<int> m_reply;
-    WaitableValue<bool> m_portRefreshResume;
+    WaitableValue<bool> m_portListingResume;
 
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
 

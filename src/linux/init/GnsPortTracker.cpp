@@ -22,7 +22,7 @@
 #endif
 
 constexpr size_t c_bind_timeout_seconds = 60;
-constexpr auto c_sock_diag_refresh_delay = std::chrono::milliseconds(500);
+constexpr auto c_sock_diag_listing_delay = std::chrono::milliseconds(500);
 
 GnsPortTracker::GnsPortTracker(
     std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
@@ -38,7 +38,7 @@ GnsPortTracker::GnsPortTracker(
     GNS_LOG_INFO("GnsPortTracker initialized with networking mode ({})", static_cast<int>(m_networkingMode));
 }
 
-void GnsPortTracker::RunPortRefresh()
+void GnsPortTracker::RunPortListing()
 {
     UtilSetThreadName("GnsPortTracker");
 
@@ -52,10 +52,10 @@ void GnsPortTracker::RunPortRefresh()
         // Netlink will sometimes return EBUSY. Don't fail for that
         try
         {
-            auto result = PortRefreshResult{ListAllocatedPorts(), time(nullptr)};
-            m_events.post(TrackerEvent{std::move(result)});
+            auto result = ListPortsResult{ListBoundPorts(), time(nullptr)};
+            m_eventQueue.post(TrackerEvent{std::move(result)});
 
-            m_portRefreshResume.get();
+            m_portListingResume.get();
         }
         catch (const NetlinkTransactionError& e)
         {
@@ -65,13 +65,13 @@ void GnsPortTracker::RunPortRefresh()
             }
         }
 
-        std::this_thread::sleep_for(c_sock_diag_refresh_delay);
+        std::this_thread::sleep_for(c_sock_diag_listing_delay);
     }
 }
 
 int GnsPortTracker::ProcessSecCompNotification(seccomp_notif* notification)
 {
-    m_events.post(TrackerEvent{*notification});
+    m_eventQueue.post(TrackerEvent{*notification});
     return m_reply.get();
 }
 
@@ -82,29 +82,33 @@ void GnsPortTracker::Run()
     // After dealing with a notification it also looks at the bound ports list to check
     // for port deallocation
 
-    std::thread{std::bind(&GnsPortTracker::RunPortRefresh, this)}.detach();
+    std::thread{std::bind(&GnsPortTracker::RunPortListing, this)}.detach();
 
-    bool portRefreshAwaitingAcknowledgement = false;
+    bool portListingAwaitingAcknowledgement = false;
 
     for (;;)
     {
         try
         {
-            auto resumeRefresh = wil::scope_exit([&]() {
+            auto resumeListing = wil::scope_exit([&]() {
                 try
                 {
-                    if (portRefreshAwaitingAcknowledgement && !m_allocatedPorts.empty())
+                    if (portListingAwaitingAcknowledgement && !m_allocatedPorts.empty())
                     {
-                        m_portRefreshResume.post(true);
-                        portRefreshAwaitingAcknowledgement = false;
+                        m_portListingResume.post(true);
+                        portListingAwaitingAcknowledgement = false;
                     }
                 }
                 CATCH_LOG()
             });
 
-            auto event = m_events.get();
+            // This single-slot queue blocks producers while occupied, so concurrent seccomp notifications
+            // and port-listing results are serialized instead of overwriting one another.
+            auto event = m_eventQueue.get();
             if (const auto* notification = std::get_if<seccomp_notif>(&event))
             {
+                // Default to denying the syscall if processing throws before establishing a result.
+                // A zero result allows the syscall to continue in the kernel.
                 int result = EIO;
                 auto replyGuard = wil::scope_exit([&]() {
                     try
@@ -121,8 +125,7 @@ void GnsPortTracker::Run()
                 if (bindCall.Request.has_value())
                 {
                     PortAllocation& allocationRequest = bindCall.Request.value();
-                    const auto requestResult = HandleRequest(allocationRequest);
-                    result = requestResult;
+                    result = HandleRequest(allocationRequest);
                     if (result == 0)
                     {
                         TrackPort(allocationRequest);
@@ -172,17 +175,17 @@ void GnsPortTracker::Run()
             }
             else
             {
-                auto refreshResult = std::get<PortRefreshResult>(std::move(event));
-                portRefreshAwaitingAcknowledgement = true;
+                auto listPortsResult = std::get<ListPortsResult>(std::move(event));
+                portListingAwaitingAcknowledgement = true;
 
-                OnRefreshAllocatedPorts(refreshResult.Ports, refreshResult.Timestamp);
+                ReconcileAllocatedPorts(listPortsResult.Ports, listPortsResult.Timestamp);
             }
         }
         CATCH_LOG()
     }
 }
 
-GnsPortTracker::ActivePorts GnsPortTracker::ListAllocatedPorts()
+GnsPortTracker::ActivePorts GnsPortTracker::ListBoundPorts()
 {
     ActivePorts ports;
 
@@ -241,7 +244,7 @@ GnsPortTracker::ActivePorts GnsPortTracker::ListAllocatedPorts()
     return ports;
 }
 
-void GnsPortTracker::OnRefreshAllocatedPorts(const ActivePorts& Ports, time_t Timestamp)
+void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Timestamp)
 {
     // Because there's no way to get notified when the bind() call actually completes, it' possible
     // that this method is called before the bind() completion and so the port allocation may not be visible yet.
