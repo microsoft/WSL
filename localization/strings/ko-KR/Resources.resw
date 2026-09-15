@@ -1729,6 +1729,30 @@ WSL과 함께 Docker Desktop을 사용할 경우의 이점은 다음과 같습�
     <value>https://aka.ms/wsldocs</value>
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
+  <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
+    <value>Windows에서 최고 수준의 환경으로 Linux 컨테이너를 손쉽게 실행하세요.
+    
+wslc.exe를 사용하여 Windows에서 직접 Linux 컨테이너를 빌드, 실행, 푸시, 풀 및 관리할 수 있습니다.
+
+또한 WSLC API를 사용하여 런타임 로직이 Linux 컨테이너로 구동되는 Windows 애플리케이션을 빌드할 수 있으며, 이로써 클라우드-로컬 워크플로, AI 애플리케이션 및 격리를 위해 Linux 컨테이너를 앱에 직접 포함하기가 한층 수월해집니다.</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
+    <value>WSL 컨테이너</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
+    <value>WSL 컨테이너에 대해 자세히 알아보기</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslc</value>
+    <comment>{Locked}Uri to the WSL container documentation</comment>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
+    <value>WSL 컨테이너 API 참조</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
+    <value>https://wsl.dev/api-reference/</value>
+    <comment>{Locked}Uri to the WSL container API reference</comment>
+  </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
     <value>Alt-tab, 시작 메뉴 실행, 작업 표시줄 고정 및 잘라내기 및 붙여넣기 지원과 같은 기본 Windows 상호 작용과 함께 그래픽 기반 Linux 애플리케이션을 사용할 수 있습니다.</value>
   </data>
@@ -1889,6 +1913,12 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="Settings_Shell_General.Content" xml:space="preserve">
     <value>일반</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
+    <value>WSL container</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
+    <value>NEW</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>GPU 가속</value>
@@ -2215,6 +2245,14 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>인식할 수 없는 명령: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
+    <value>'{}' 옵션은 지원되지 않습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
+    <value>'{}'은(는) 더 이상 사용되지 않습니다. 대신 {}을(를) 사용하세요.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>필수 인수가 제공 되지 않음: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2222,6 +2260,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
     <value>필수 옵션이 제공되지 않았습니다. '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
+    <value>전역 옵션 '{}'는 '{}' 이후와 '{}' 앞에 지정해야 합니다.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>선택한 명령에 대한 도움말을 표시</value>
@@ -2235,7 +2277,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>사용량: {} {}</value>
+    <value>사용법: {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2280,6 +2322,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
     <value>전역 옵션:</value>
+  </data>
+  <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
+    <value>'{}'에 대한 전역 옵션:</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
     <value>별칭:</value>
@@ -2463,6 +2509,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
     <value>네트워크 '{}'이(가) 이미 있습니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkPrunePending" xml:space="preserve">
+    <value>이전 네트워크 정리가 아직 처리되고 있습니다. 나중에 다시 시도하세요.</value>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>지원되지 않는 네트워크 모드: '{}'</value>
@@ -2681,6 +2730,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>디렉터리를 파일 경로에 복사할 수 없습니다. 대신 디렉터리 대상(후행 구분 기호 포함)을 사용하세요.</value>
     <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
+  <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
+    <value>복사된 항목과 유형이 다르므로 '{0}' 덮어쓸 수 없습니다.</value>
+    <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>컨테이너를 검사합니다.</value>
   </data>
@@ -2760,6 +2813,18 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
     <value>보낼 신호(기본값: 컨테이너의 구성된 STOPSIGNAL 또는 구성되지 않은 경우 SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
+    <value>컨테이너 이벤트를 모니터링하세요.</value>
+  </data>
+  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
+    <value>컨테이너에서 실시간 이벤트를 모니터링합니다.</value>
+  </data>
+  <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
+    <value>타임스탬프 이후 생성된 모든 이벤트 표시</value>
+  </data>
+  <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
+    <value>타임스탬프까지 이벤트 스트리밍</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>이미지를 관리합니다.</value>
@@ -3049,7 +3114,7 @@ Windows 버전: {}</value>
     <value>상태에 관계없이 모두 표시합니다.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>리포지토리에서 태그가 지정된 모든 이미지를 다운로드합니다.</value>
+    <value>All tags in the repository.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>태그는 --all-tags/-a와 함께 사용할 수 없습니다.</value>
@@ -3096,6 +3161,9 @@ Windows 버전: {}</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
     <value>로그에 대한 추가 세부 정보 표시</value>
+  </data>
+  <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
+    <value>이미지 다이제스트 표시</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>컨테이너 초기화 프로세스 실행 파일을 지정합니다.</value>
@@ -3244,6 +3312,10 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>로그 출력 따라가기</value>
   </data>
+  <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
+    <value>항상 SRC_PATH symlinks 팔로우</value>
+    <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>출력 형식(json 또는 table) (기본값: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
@@ -3386,6 +3458,9 @@ Windows 버전: {}</value>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>모든 노출된 포트를 임의 호스트 포트에 게시</value>
   </data>
+  <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
+    <value>리포지토리에서 태그가 지정된 모든 이미지를 다운로드합니다.</value>
+  </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>자세한 정보 표시 출력 숨기기</value>
   </data>
@@ -3401,6 +3476,13 @@ Windows 버전: {}</value>
   </data>
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>중지된 후 컨테이너 제거</value>
+  </data>
+  <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
+    <value>컨테이너가 종료될 때 적용할 정책 다시 시작</value>
+  </data>
+  <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
+    <value>충돌하는 옵션: {} 및 {}을(를) 모두 지정할 수 없습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>컨테이너를 중지하라는 신호</value>
@@ -3558,6 +3640,10 @@ Windows 버전: {}</value>
     <value>잘못된 {} 값: {}은(는) 인식된 끌어오기 정책이 아닙니다. 지원되는 풀 정책은 {}입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
+    <value>잘못된 {} 값 '{}'입니다. 허용되는 값은 no, always, on-failure[:max-retries], unless-stopped입니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>잘못된 {} 값: {}은(는) 인식할 수 있는 진행 유형이 아닙니다. 지원되는 진행 유형은 {}입니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3642,6 +3728,10 @@ Windows 버전: {}</value>
   </data>
   <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
     <value>네트워크에 대한 외부 액세스를 제한합니다</value>
+  </data>
+  <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
+    <value>IPv6 네트워킹 사용</value>
+    <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
     <value>네트워크 세그먼트를 나타내는 CIDR 형식의 서브넷</value>
