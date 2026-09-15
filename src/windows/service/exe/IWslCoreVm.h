@@ -37,12 +37,7 @@ public:
 
     virtual ~IWslCoreVm() = default;
 
-    virtual ULONG AttachDisk(
-        _In_ PCWSTR Disk,
-        _In_ DiskType Type,
-        _In_ std::optional<ULONG> Lun,
-        _In_ bool IsUserDisk,
-        _In_ HANDLE UserToken) = 0;
+    virtual ULONG AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken) = 0;
 
     // Connects to a guest endpoint returned by another operation on this VM, such as CreateInstance().
     virtual wil::unique_socket ConnectToGuest(_In_ ULONG Port) const = 0;
@@ -76,20 +71,13 @@ public:
     virtual bool IsVhdAttached(_In_ PCWSTR VhdPath) = 0;
 
     virtual DiskMountResult MountDisk(
-        _In_ PCWSTR Disk,
-        _In_ DiskType MountDiskType,
-        _In_ ULONG PartitionIndex,
-        _In_opt_ PCWSTR Name,
-        _In_opt_ PCWSTR Type,
-        _In_opt_ PCWSTR Options) = 0;
+        _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options) = 0;
 
-    virtual void MountRootNamespaceFolder(
-        _In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name) = 0;
+    virtual void MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name) = 0;
 
     // Registered callbacks may run on implementation-owned threads.
     virtual void RegisterCallbacks(
-        _In_ const std::function<void(ULONG)>& DistroExitCallback = {},
-        _In_ const std::function<void(GUID)>& TerminationCallback = {}) = 0;
+        _In_ const std::function<void(ULONG)>& DistroExitCallback = {}, _In_ const std::function<void(GUID)>& TerminationCallback = {}) = 0;
 
     virtual void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize) = 0;
 

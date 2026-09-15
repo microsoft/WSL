@@ -58,8 +58,7 @@ public:
 
     wil::unique_socket AcceptConnection(_In_ DWORD ReceiveTimeout = 0, _In_ const std::source_location& Location = std::source_location::current()) const;
 
-    ULONG AttachDisk(
-        _In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken) override;
+    ULONG AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken) override;
 
     std::shared_ptr<LxssRunningInstance> CreateInstance(
         _In_ const GUID& InstanceId,
@@ -92,12 +91,7 @@ public:
     bool IsVhdAttached(_In_ PCWSTR VhdPath) override;
 
     DiskMountResult MountDisk(
-        _In_ PCWSTR Disk,
-        _In_ DiskType MountDiskType,
-        _In_ ULONG PartitionIndex,
-        _In_opt_ PCWSTR Name,
-        _In_opt_ PCWSTR Type,
-        _In_opt_ PCWSTR Options) override;
+        _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options) override;
 
     enum MountFlags
     {
@@ -108,12 +102,9 @@ public:
     ULONG
     MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly);
 
-    void MountRootNamespaceFolder(
-        _In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name) override;
+    void MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name) override;
 
-    void RegisterCallbacks(
-        _In_ const std::function<void(ULONG)>& DistroExitCallback = {},
-        _In_ const std::function<void(GUID)>& TerminationCallback = {}) override;
+    void RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroExitCallback = {}, _In_ const std::function<void(GUID)>& TerminationCallback = {}) override;
 
     void ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize) override;
 
