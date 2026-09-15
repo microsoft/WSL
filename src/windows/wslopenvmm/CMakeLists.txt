@@ -26,7 +26,7 @@ add_custom_command(
     OUTPUT ${WSLOPENVMM_DLL}
     COMMAND ${CMAKE_COMMAND} -E env "VM_SERVICE_PROTO=${VM_SERVICE_PROTO}" ${CARGO_EXECUTABLE} build --manifest-path ${CMAKE_CURRENT_LIST_DIR}/Cargo.toml --target ${RUST_TARGET} --target-dir ${CARGO_TARGET_DIR} ${CARGO_BUILD_ARGUMENTS}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CARGO_OUTPUT} ${WSLOPENVMM_DLL}
-    DEPENDS ${VM_SERVICE_PROTO} Cargo.lock Cargo.toml build.rs src/client.rs src/lib.rs src/af_unix.rs src/rpc.rs src/diagnostics.rs wslopenvmm.h
+    DEPENDS ${VM_SERVICE_PROTO} Cargo.lock Cargo.toml build.rs src/client.rs src/lib.rs src/af_unix.rs wslopenvmm.h
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM)
 
