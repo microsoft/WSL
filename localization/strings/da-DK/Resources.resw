@@ -1723,6 +1723,30 @@ Brug et øjeblik på at få vist nogle af communityets favoritfunktioner, eller 
     <value>https://aka.ms/wsldocs</value>
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
+  <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
+    <value>Kør nemt Linux-containere på Windows som en førsteklasses oplevelse.
+    
+Du kan bruge wslc.exe til at bygge, køre, pushe, trække og administrere Linux-objektbeholdere direkte på Windows.
+
+Du kan også bruge WSLC-API'en til at bygge Windows-applikationer, hvis kørselslogik drives af Linux-objektbeholdere, hvilket gør det lettere at indlejre Linux-objektbeholdere direkte i din app til cloud-til-lokal-arbejdsprocesser, AI-programmer og isolation.</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
+    <value>WSL-objektbeholder</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
+    <value>Få mere at vide om en WSL-objektbeholder</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslc</value>
+    <comment>{Locked}Uri to the WSL container documentation</comment>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
+    <value>API-reference for WSL-objektbeholder</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
+    <value>https://wsl.dev/api-reference/</value>
+    <comment>{Locked}Uri to the WSL container API reference</comment>
+  </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
     <value>Du kan bruge grafiske baserede Linux-programmer med oprindelige Windows-interaktioner som f.eks. alt-Tabulator, start af menuen, fastgørelse af proceslinjen og understøttelse af klip og sæt ind.</value>
   </data>
@@ -1883,6 +1907,12 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   </data>
   <data name="Settings_Shell_General.Content" xml:space="preserve">
     <value>Generelt</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
+    <value>WSL-objektbeholder</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
+    <value>NY</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>GPU-acceleration</value>
@@ -2209,6 +2239,14 @@ Brug:
     <value>Ukendt kommando: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
+    <value>Indstillingen "{}" understøttes ikke.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
+    <value>"{}" er udfaset. Brug {} i stedet.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>Det påkrævede argument er ikke angivet: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2216,6 +2254,10 @@ Brug:
   <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
     <value>Påkrævet indstilling ikke angivet: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
+    <value>Den globale indstilling '{}' skal angives efter '{}' og før '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Viser hjælp til den markerede kommando</value>
@@ -2229,7 +2271,7 @@ Brug:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Brug: {} {}</value>
+    <value>Brug:  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2237,6 +2279,9 @@ Brug:
   </data>
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>indstillinger</value>
+  </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>globale indstillinger</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Følgende kommandoaliasser er tilgængelige:</value>
@@ -2271,6 +2316,10 @@ Brug:
   </data>
   <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
     <value>Globale indstillinger:</value>
+  </data>
+  <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
+    <value>Globale indstillinger for "{}":</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
     <value>Aliasser:</value>
@@ -2455,6 +2504,9 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Netværket '{}' findes allerede.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcNetworkPrunePending" xml:space="preserve">
+    <value>En tidligere fjernelse af netværket behandles stadig. Prøv igen senere.</value>
+  </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Ikke-understøttet netværkstilstand: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2636,6 +2688,9 @@ Format: wslc container cp [INDSTILLINGER] KILDEDESTINATION
     <value>Destination: lokal sti eller CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Undertryk statusoutput under kopiering</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Ugyldigt destinationsformat. Forventet CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2668,6 +2723,10 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
     <value>En mappe kan ikke kopieres til en filsti. Brug et mappemål (med efterstillet separator) i stedet.</value>
     <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
+  </data>
+  <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
+    <value>'{0}' kan ikke overskrives, fordi det er en anden type end den kopierede post.</value>
+    <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Undersøg en objektbeholder.</value>
@@ -2749,6 +2808,18 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
     <value>Signal, der skal sendes (standard: objektbeholderens konfigurerede STOPSIGNAL eller SIGTERM, hvis der ikke er konfigureret nogen)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
+    <value>Overvåg objektbeholderhændelser.</value>
+  </data>
+  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
+    <value>Overvåg hændelser i realtid fra objektbeholdere.</value>
+  </data>
+  <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
+    <value>Vis alle hændelser, der er oprettet siden tidsstemplet</value>
+  </data>
+  <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
+    <value>Stream hændelser indtil tidsstemplet</value>
+  </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Administrer billeder.</value>
   </data>
@@ -2775,6 +2846,9 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importerer indholdet af en tarball for at oprette en filsystemafbildning. Mærk eventuelt billedet med et lager- og mærkenavn.</value>
   </data>
+  <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
+    <value>Vis alle billeder (standard skjuler mellemliggende billeder).</value>
+  </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Angiv billeder.</value>
   </data>
@@ -2786,6 +2860,9 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Indlæser billeder.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Undertryk statusoutput under belastning</value>
   </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Hent billeder.</value>
@@ -2823,6 +2900,9 @@ Eksempel: tar -cf - filer | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Upload et billede til en registreringsdatabase.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Undertryk detaljeret output</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Slettet: {}</value>
@@ -3027,6 +3107,13 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Vis alle uanset tilstand.</value>
   </data>
+  <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
+    <value>Alle mærker i lageret.</value>
+  </data>
+  <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
+    <value>mærket kan ikke bruges med --all-tags/-a</value>
+    <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
     <value>Arkivtilstand (accepteret FOR Docker CLI-kompatibilitet)</value>
     <comment>{Locked="Docker"}</comment>
@@ -3066,6 +3153,12 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
     <value>Kør objektbeholder i frakoblet tilstand</value>
   </data>
+  <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
+    <value>Vis ekstra oplysninger om logfiler</value>
+  </data>
+  <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
+    <value>Vis billedoversigt</value>
+  </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Angiver objektbeholderens initialiseringsproces eksekverbar fil</value>
   </data>
@@ -3085,8 +3178,41 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Filtrer output baseret på de angivne betingelser</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Ugyldig værdi "{}" for '-f, --filter' indstilling: forkert format af filter (forventet navn=værdi)</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+    <value>Ugyldig værdi "{}" for indstillingen '--filter': forkert format af filter (forventet navn=værdi)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
+    <value>Angiv filterværdier (f.eks. "until=&lt;timestamp&gt;")</value>
+    <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
+    <value>Angiv filterværdier (f.eks. "label=&lt;label&gt;")</value>
+    <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
+    <value>Spørg ikke om bekræftelse</value>
+  </data>
+  <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
+    <value>Er du sikker på, at du vil fortsætte?</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
+    <value>ADVARSEL! Dette vil fjerne alle stoppede containere.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
+    <value>ADVARSEL! Dette fjerner alle løse billeder.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
+    <value>ADVARSEL! Dette fjerner alle billeder uden mindst én beholder tilknyttet.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
+    <value>ADVARSEL! Dette fjerner anonyme lokale diskenheder, der ikke bruges af mindst én objektbeholder.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
+    <value>ADVARSEL! Dette fjerner alle lokale diskenheder, der ikke bruges af mindst én beholder.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
+    <value>ADVARSEL! Dette fjerner alle brugerdefinerede netværk, der ikke bruges af mindst én objektbeholder.</value>
+  </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Invalid argument "{}" for '--mount' option: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3179,6 +3305,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Følg logoutput</value>
+  </data>
+  <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
+    <value>Følg altid symlinks i SRC_PATH</value>
+    <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Outputformatering (json eller table) (Standard: table)</value>
@@ -3322,6 +3452,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publicer alle eksponerede porte til tilfældige værtsporte</value>
   </data>
+  <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
+    <value>Download alle mærkede billeder i laget.</value>
+  </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Undertryk detaljeret output</value>
   </data>
@@ -3329,11 +3462,21 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Bruger standardmærket: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
+    <value>Push alle mærket for et billede til lageret</value>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Udlæser kun objektbeholder-id'er</value>
   </data>
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Fjern objektbeholderen, når den stopper</value>
+  </data>
+  <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
+    <value>Genstartspolitik, der skal anvendes, når en objektbeholder afsluttes</value>
+  </data>
+  <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
+    <value>Modstridende indstillinger: kan ikke angive både {} og {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal om at stoppe objektbeholderen</value>
@@ -3357,6 +3500,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuel eller eksisterende billedreference i formatet image-name[:tag]</value>
+  </data>
+  <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
+    <value>Vis samlede filstørrelser</value>
   </data>
   <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
     <value>Vis filstørrelser i alt, hvis typen er objektbeholder</value>
@@ -3488,6 +3634,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Ugyldig {}-værdi: {} er ikke en kendt pull-politik. Understøttede pull-politikker er: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
+    <value>Ugyldig {}-værdi '{}'. Forventede nej, altid, ved fejl[:max-genforsøg] eller medmindre det er stoppet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ugyldig {}-værdi: {} er ikke en genkendt statustype. Understøttede statustyper er: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3572,6 +3722,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   </data>
   <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
     <value>Begræns ekstern adgang til netværket</value>
+  </data>
+  <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
+    <value>Aktivér IPv6-netværk</value>
+    <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
     <value>Undernet i CIDR format, der repræsenterer et netværkssegment</value>
@@ -3761,6 +3915,9 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
     <value>PORTE</value>
   </data>
+  <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
+    <value>STØRRELSE</value>
+  </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
   </data>
@@ -3798,6 +3955,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
     <value>ugyldig</value>
     <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
+    <value>{} (virtuel {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>For mindre end et sekund siden</value>

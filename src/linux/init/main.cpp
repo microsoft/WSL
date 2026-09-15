@@ -2250,7 +2250,7 @@ void ProcessLaunchInitMessage(
             if (File)
             {
                 std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit), ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+                ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
             }
         }
 
@@ -2451,7 +2451,7 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
 
     {
         wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-        ParseConfigFile(keys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
+        ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
     }
 
     if (!defaultName.empty())
@@ -4253,8 +4253,6 @@ int main(int Argc, char* Argv[])
                     auto CgroupDir = UtilGetDistroCgroupPath(Result);
                     if (access(CgroupDir.c_str(), F_OK) == 0)
                     {
-                        LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
-
                         //
                         // Recursively rmdir the cgroup subtree.
                         //

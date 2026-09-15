@@ -280,7 +280,7 @@ int GenerateUserSystemdUnits(int Argc, char** Argv)
                 ConfigKey(wsl::linux::c_ConfigAutoMountRoot, automountRoot),
 
             };
-            ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
             File.reset();
         }
 
@@ -340,7 +340,7 @@ int GenerateSystemdUnits(int Argc, char** Argv)
                 ConfigKey(wsl::linux::c_ConfigAutoMountRoot, automountRoot),
 
             };
-            ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
             File.reset();
         }
 
@@ -628,7 +628,7 @@ try
 
         {
             wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-            ParseConfigFile(keys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+            ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
         }
 
         int32_t OobeResult = 0;
@@ -2253,6 +2253,7 @@ Return Value:
 
 {
     UtilSetThreadName("init-distro");
+    const auto distroName = UtilGetEnvironmentVariable(LX_WSL2_DISTRO_NAME_ENV);
 
     //
     // Set the close-on-exec flag on the socket file descriptor inherited from mini_init.
@@ -2489,7 +2490,7 @@ Return Value:
         auto WaitResult = waitpid(distroInitPid.value(), &Status, WNOHANG);
         if (WaitResult > 0 || (WaitResult < 0 && errno == ECHILD))
         {
-            LOG_ERROR("Init has exited. Terminating distribution");
+            LOG_INFO("Distribution {} init process {} exited", distroName, distroInitPid.value());
             InitTerminateInstanceInternal(Config);
             return;
         }
@@ -2614,7 +2615,7 @@ Return Value:
 
             if (distroInitExited)
             {
-                LOG_ERROR("Init has exited. Terminating distribution");
+                LOG_INFO("Distribution {} init process {} exited", distroName, distroInitPid.value());
                 break;
             }
         }

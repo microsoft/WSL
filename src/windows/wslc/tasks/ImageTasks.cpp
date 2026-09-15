@@ -78,13 +78,16 @@ namespace {
     // Builds the representation of an image, shared by the table and json output so the two cannot
     // drift. Every value is emitted as a string, "<none>" is used for missing repository/tag data,
     // and the id is truncated unless --no-trunc is passed, in which case it keeps the algorithm prefix.
-    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate)
+    // CreatedSince is the only field that varies with the format: docker renders it in invariant
+    // English, so json keeps that while the table is localized.
+    ImageOutputInformation ToImageOutput(const ImageInformation& image, bool truncate, FormatType format)
     {
         ImageOutputInformation entry;
         entry.Containers = image.Containers < 0 ? std::string{c_imageNotAvailable} : std::to_string(image.Containers);
 
         entry.CreatedAt = EpochToLocalDisplayTime(image.Created);
-        entry.CreatedSince = WideToMultiByte(FormatRelativeTime(image.Created));
+        entry.CreatedSince =
+            WideToMultiByte(format == FormatType::Json ? FormatInvariantRelativeTime(image.Created) : FormatRelativeTime(image.Created));
         entry.Digest = image.Digest.empty() ? std::string{c_none} : image.Digest;
         entry.ID = truncate ? TruncateId(image.Id, true) : image.Id;
         entry.Repository = image.Repository.value_or(std::string{c_none});
@@ -215,7 +218,7 @@ void ListImages(CLIExecutionContext& context)
     {
         for (const auto& image : images)
         {
-            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc), c_jsonCompactIndent));
+            context.Terminal.Output(L"{}\n", ToJsonW(ToImageOutput(image, trunc, format), c_jsonCompactIndent));
         }
 
         break;
@@ -249,7 +252,7 @@ void ListImages(CLIExecutionContext& context)
 
         for (const auto& image : images)
         {
-            const auto entry = ToImageOutput(image, trunc);
+            const auto entry = ToImageOutput(image, trunc, format);
             table.WriteRow({
                 MultiByteToWide(entry.Repository),
                 MultiByteToWide(entry.Tag),
@@ -275,11 +278,18 @@ void PullImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     const bool quiet = context.Args.GetValue<ArgType::Quiet>();
+    const bool allTags = context.Args.GetValue<ArgType::AllTags>();
+
+    const auto reference = ImageReference::Parse(image);
+
+    if (allTags && reference.Format != EnumReferenceFormatNone)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError());
+    }
 
     // Match `docker pull`: for a name-only reference (no tag or digest) the tag defaults to "latest". Unless quiet,
     // the client reports this on stdout before contacting the registry.
-    const auto reference = ImageReference::Parse(image);
-    if (!quiet && reference.Format == EnumReferenceFormatNone)
+    if (!quiet && !allTags && reference.Format == EnumReferenceFormatNone)
     {
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
     }
@@ -293,10 +303,10 @@ void PullImage(CLIExecutionContext& context)
     }
 
     IProgressCallback* progress = callback ? &*callback : nullptr;
-    services::ImageService::Pull(context.Terminal, session, image, progress);
+    services::ImageService::Pull(context.Terminal, session, image, progress, allTags);
 
-    // Match `docker pull`: always print the resolved canonical image reference as the final line.
-    context.Terminal.Output(L"{}\n", MultiByteToWide(reference.GetCanonical()));
+    const auto resolved = allTags ? reference.Repository.GetCanonical() : reference.GetCanonical();
+    context.Terminal.Output(L"{}\n", MultiByteToWide(resolved));
 }
 
 void PushImage(CLIExecutionContext& context)
@@ -306,6 +316,7 @@ void PushImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     const auto image = WideToMultiByte(context.Args.GetValue<ArgType::ImageId>());
     const bool allTags = context.Args.GetValue<ArgType::AllTags>();
+    const bool quiet = context.Args.GetValue<ArgType::Quiet>();
 
     const auto reference = ImageReference::Parse(image);
 
@@ -315,13 +326,28 @@ void PushImage(CLIExecutionContext& context)
     }
 
     // For a name-only reference the tag defaults to "latest", reported on stdout before contacting the registry.
-    if (!allTags && reference.Format == EnumReferenceFormatNone)
+    // Quiet mode suppresses that notice, and an --all-tags push has no single tag to resolve.
+    if (!quiet && !allTags && reference.Format == EnumReferenceFormatNone)
     {
         context.Terminal.Output(L"{}\n", Localization::WSLCCLI_PullUsingDefaultTag(L"latest"));
     }
 
-    ImageProgressCallback callback(context.Terminal, Terminal::Level::Output);
-    services::ImageService::Push(context.Terminal, session, image, &callback, allTags);
+    // In quiet mode, suppress progress output by passing no progress callback. Warnings are unaffected because the
+    // warning callback is built internally by ImageService::Push from the Terminal.
+    std::optional<ImageProgressCallback> callback;
+    if (!quiet)
+    {
+        callback.emplace(context.Terminal, Terminal::Level::Output);
+    }
+
+    IProgressCallback* progress = callback ? &*callback : nullptr;
+    services::ImageService::Push(context.Terminal, session, image, progress, allTags);
+
+    if (quiet)
+    {
+        // An --all-tags push names a repository, so the reference printed carries no tag.
+        context.Terminal.Output(L"{}\n", MultiByteToWide(allTags ? reference.Repository.GetCanonical() : reference.GetCanonical()));
+    }
 }
 
 void DeleteImage(CLIExecutionContext& context)

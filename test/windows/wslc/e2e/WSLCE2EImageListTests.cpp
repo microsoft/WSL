@@ -264,6 +264,7 @@ class WSLCE2EImageListTests
     {
         // The table and json output must report the same values, formatted the way docker formats
         // them: SI sizes ("120MB", not "119.86 MB") and "<none>" for missing repository/tag data.
+        // CREATED is excluded because the table localizes it while json does not.
         const auto jsonResult = RunWslc(L"image list --format json");
         jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -288,8 +289,7 @@ class WSLCE2EImageListTests
                 return line.find(wsl::shared::string::MultiByteToWide(image.ID)) != std::wstring::npos &&
                        line.find(wsl::shared::string::MultiByteToWide(image.Repository)) != std::wstring::npos &&
                        line.find(wsl::shared::string::MultiByteToWide(image.Tag)) != std::wstring::npos &&
-                       line.find(wsl::shared::string::MultiByteToWide(image.Size)) != std::wstring::npos &&
-                       line.find(wsl::shared::string::MultiByteToWide(image.CreatedSince)) != std::wstring::npos;
+                       line.find(wsl::shared::string::MultiByteToWide(image.Size)) != std::wstring::npos;
             });
 
             VERIFY_IS_TRUE(found, std::format(L"Table output has no row matching json values: {}", row).c_str());
