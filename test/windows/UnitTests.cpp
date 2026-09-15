@@ -24,6 +24,7 @@ Abstract:
 #include "registry.hpp"
 #include "helpers.hpp"
 #include "svccomm.hpp"
+#include "relay.hpp"
 #include "ConsoleState.h"
 #include "lxfsshares.h"
 #include <userenv.h>
@@ -3525,6 +3526,42 @@ Usage:
         auto [output, _] = LxsstuLaunchCommandAndCaptureOutput(cmd.data());
 
         VERIFY_ARE_EQUAL(output, L"previous content\r\nok\n");
+    }
+
+    WSL2_TEST_METHOD(MergedOutputFileOffsets)
+    {
+        constexpr auto c_outputPath = L"merged-output.txt";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(c_outputPath); });
+        constexpr int c_lineCount = 100;
+        const auto command = std::format(
+            L"cmd.exe /d /s /c \"wsl.exe -d {} --exec /bin/sh -c "
+            L"\"for index in $(seq 1 {}); do echo OUT-$index; echo ERR-$index >&2; done\" > {} 2>&1\"",
+            LXSS_DISTRO_NAME_TEST_L,
+            c_lineCount,
+            c_outputPath);
+        wsl::windows::common::SubProcess process(nullptr, command.c_str());
+        VERIFY_ARE_EQUAL(process.Run(), 0L);
+
+        std::ifstream file(c_outputPath, std::ios::binary);
+        VERIFY_IS_TRUE(file.good());
+        std::vector<std::string> actual;
+        for (std::string line; std::getline(file, line);)
+        {
+            actual.push_back(line);
+        }
+
+        std::vector<std::string> expected;
+        for (int index = 1; index <= c_lineCount; ++index)
+        {
+            expected.push_back(std::format("OUT-{}", index));
+            expected.push_back(std::format("ERR-{}", index));
+        }
+
+        // Sort because the relative order of stdout and stderr output is not guaranteed.
+        std::sort(actual.begin(), actual.end());
+        std::sort(expected.begin(), expected.end());
+        VERIFY_ARE_EQUAL(expected.size(), actual.size());
+        VERIFY_IS_TRUE(expected == actual);
     }
 
     TEST_METHOD(GlobalFlagsOverride)
