@@ -421,6 +421,8 @@ int ConfigRegisterBinfmtInterpreter(void);
 
 int ConfigSetMountNamespace(bool Elevated);
 
+int ConfigRefreshDrvFsOwner(uid_t OwnerUid, bool Admin, const wsl::linux::WslDistributionConfig& Config);
+
 int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::Transaction& Transaction, const wsl::linux::WslDistributionConfig& Config);
 
 int ConfigRemountDrvFsImpl(gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config);

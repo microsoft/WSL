@@ -547,16 +547,20 @@ Return Value:
 try
 {
     //
-    // Print any errors that occurred.
+    // Print any warnings that occurred.
     //
 
-    for (const auto& e : wsl::shared::string::Split<char>(wil::ScopedWarningsCollector::ConsumeWarnings(), '\n'))
-    {
-        if (!e.empty())
+    const auto printWarnings = []() {
+        for (const auto& e : wsl::shared::string::Split<char>(wil::ScopedWarningsCollector::ConsumeWarnings(), '\n'))
         {
-            fprintf(stderr, "wsl: %s\n", e.c_str());
+            if (!e.empty())
+            {
+                fprintf(stderr, "wsl: %s\n", e.c_str());
+            }
         }
-    }
+    };
+
+    printWarnings();
 
     //
     // Restore default signal dispositions and clear the signal mask for the child process.
@@ -653,6 +657,23 @@ try
                 fprintf(stderr, "OOBE command \"%s\" failed, exiting\n", OobeCommand.c_str());
             }
         }
+
+        if ((OobeResult == 0) && (defaultUidPresent == ConfigKeyPresence::Present) && (defaultUid >= 0) && UtilIsUtilityVm())
+        {
+            for (const auto Admin : {false, true})
+            {
+                if (ConfigRefreshDrvFsOwner(defaultUid, Admin, Config) < 0)
+                {
+                    LOG_ERROR("Failed to refresh the {} DrvFs mount namespace after OOBE", Admin ? "elevated" : "non-elevated");
+                }
+            }
+        }
+
+        //
+        // Print warnings collected during OOBE.
+        //
+
+        printWarnings();
 
         LX_INIT_OOBE_RESULT result{};
         result.Header.MessageType = LxInitOobeResult;
