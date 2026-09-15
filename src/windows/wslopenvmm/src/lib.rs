@@ -4,6 +4,7 @@
 
 mod af_unix;
 mod client;
+mod diagnostics;
 mod rpc;
 
 mod vmservice {
