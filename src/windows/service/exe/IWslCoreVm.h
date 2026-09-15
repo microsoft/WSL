@@ -13,6 +13,14 @@ class IWslCoreVm
 public:
     using InitializeDrvFsCallback = std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>;
 
+    // Backend creation must synchronously publish this operation before potentially blocking initialization.
+    // It targets one VM incarnation, owns its state independently of IWslCoreVm, and must be safe
+    // to invoke concurrently with initialization, destruction, or another force-termination request.
+    // It must not acquire session/VM lifecycle locks. Failures are reported by throwing.
+    using ForceTerminateCallback = std::function<void()>;
+    // Invoked during creation only; the backend must not retain the publisher.
+    using PublishForceTerminateCallback = std::function<void(ForceTerminateCallback)>;
+
     enum class DiskType
     {
         Invalid = 0x0,

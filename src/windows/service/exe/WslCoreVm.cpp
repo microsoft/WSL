@@ -100,9 +100,20 @@ WslCoreVm::WslCoreVm(_In_ wsl::core::Config&& VmConfig, _In_ InitializeDrvFsCall
 }
 
 std::unique_ptr<WslCoreVm> WslCoreVm::Create(
-    _In_ const wil::shared_handle& UserToken, _In_ wsl::core::Config&& VmConfig, _In_ const GUID& VmId, _In_ InitializeDrvFsCallback InitializeDrvFs)
+    _In_ const wil::shared_handle& UserToken,
+    _In_ wsl::core::Config&& VmConfig,
+    _In_ const GUID& VmId,
+    _In_ InitializeDrvFsCallback InitializeDrvFs,
+    _In_ const PublishForceTerminateCallback& PublishForceTerminate)
 {
     THROW_HR_IF(E_INVALIDARG, !InitializeDrvFs);
+    THROW_HR_IF(E_INVALIDARG, !PublishForceTerminate);
+
+    PublishForceTerminate([VmId]() {
+        const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+        auto computeSystem = wsl::windows::common::hcs::OpenComputeSystem(vmId.c_str(), GENERIC_ALL);
+        wsl::windows::common::hcs::TerminateComputeSystem(computeSystem.get());
+    });
 
     auto newInstance = std::unique_ptr<WslCoreVm>{new WslCoreVm{std::move(VmConfig), std::move(InitializeDrvFs)}};
     try
@@ -160,13 +171,6 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
     }
 
     return newInstance;
-}
-
-void WslCoreVm::ForceTerminate(_In_ const GUID& VmId)
-{
-    const auto vmId = wsl::shared::string::GuidToString<wchar_t>(VmId, wsl::shared::string::GuidToStringFlags::Uppercase);
-    auto computeSystem = wsl::windows::common::hcs::OpenComputeSystem(vmId.c_str(), GENERIC_ALL);
-    wsl::windows::common::hcs::TerminateComputeSystem(computeSystem.get());
 }
 
 void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken)

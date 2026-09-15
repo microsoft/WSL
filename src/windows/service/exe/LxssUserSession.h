@@ -826,7 +826,8 @@ private:
     ///
     _Guarded_by_(m_instanceLock) std::unique_ptr<IWslCoreVm> m_utilityVm;
 
-    std::atomic<GUID> m_vmId{GUID_NULL};
+    // Available without m_instanceLock, including while the backend is being initialized or destroyed.
+    std::atomic<std::shared_ptr<const IWslCoreVm::ForceTerminateCallback>> m_forceTerminate;
 
     /// <summary>
     /// True when the VM termination callback should not perform session cleanup.

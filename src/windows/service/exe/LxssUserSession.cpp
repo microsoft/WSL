@@ -2206,12 +2206,12 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
         auto resetVmTerminationCallback = wil::scope_exit([&]() { m_suppressVmTerminationCallback.store(false); });
 
         auto forceTerminate = [this]() {
-            auto vmId = m_vmId.load();
-            if (!IsEqualGUID(vmId, GUID_NULL))
+            const auto terminate = m_forceTerminate.load();
+            if (terminate)
             {
                 m_suppressVmTerminationCallback.store(true);
 
-                auto result = wil::ResultFromException([&]() { WslCoreVm::ForceTerminate(vmId); });
+                auto result = wil::ResultFromException([&]() { (*terminate)(); });
 
                 WSL_LOG("ForceTerminateVm", TraceLoggingValue(result, "Result"));
             }
@@ -2975,15 +2975,19 @@ void LxssUserSessionImpl::_CreateVm()
         GUID vmId{};
         THROW_IF_FAILED(CoCreateGuid(&vmId));
 
-        m_vmId.store(vmId);
-
         const auto weakSession = weak_from_this();
         auto initializeDrvFs = [weakSession, vmId](HANDLE userToken) noexcept {
             return s_InitializeDrvFs(weakSession, vmId, userToken);
         };
 
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId, std::move(initializeDrvFs));
+        auto clearForceTerminateOnFailure = wil::scope_exit([&]() { m_forceTerminate.store(nullptr); });
+        m_utilityVm = WslCoreVm::Create(
+            m_userToken, std::move(config), vmId, std::move(initializeDrvFs), [this](IWslCoreVm::ForceTerminateCallback terminate) {
+                THROW_HR_IF(E_INVALIDARG, !terminate);
+                m_forceTerminate.store(std::make_shared<const IWslCoreVm::ForceTerminateCallback>(std::move(terminate)));
+            });
+        clearForceTerminateOnFailure.release();
 
         if (m_httpProxyStateTracker)
         {
@@ -4034,7 +4038,7 @@ void LxssUserSessionImpl::_VmTerminate()
     }
 
     m_utilityVm.reset();
-    m_vmId.store(GUID_NULL);
+    m_forceTerminate.store(nullptr);
 
     // Reset the user's token since its lifetime is tied to the VM.
     m_userToken.reset();
