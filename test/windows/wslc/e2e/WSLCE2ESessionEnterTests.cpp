@@ -130,5 +130,17 @@ class WSLCE2ESessionEnterTests
             .ExitCode = 1,
         });
     }
+
+    WSLC_TEST_METHOD(WSLCE2E_SessionEnter_EnvironmentSessionReportsSource)
+    {
+        ScopedEnvVariable sessionEnvironmentVariable(L"WSLC_SESSION", L"unsupported");
+
+        const auto result = RunWslc(L"system session enter ignored");
+        result.Verify({
+            .Stdout = L"",
+            .Stderr = wsl::shared::Localization::MessageWslcSessionEnvironmentVariableNotSupported() + L"\r\n",
+            .ExitCode = 1,
+        });
+    }
 };
 } // namespace WSLCE2ETests
