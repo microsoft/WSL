@@ -254,7 +254,7 @@ void MirroredNetworking::Initialize()
     m_gnsRpcServer = GnsRpcServer::GetOrCreate();
     m_guestNetworkService.CreateGuestNetworkService(
         m_config.FirewallConfig.Enabled(), m_config.IgnoredPorts, m_runtimeId, m_gnsRpcServer->GetServerUuid(), s_GuestNetworkServiceCallback, this);
-    m_ephemeralPortRange = m_guestNetworkService.AllocateEphemeralPortRange();
+    m_ephemeralPortRange = m_guestNetworkService.AllocateEphemeralPortRange(m_config.EphemeralPortRangeSize);
 
     networking::ConfigureHyperVFirewall(m_config.FirewallConfig, wsl::windows::common::wslutil::c_vmOwner);
 
