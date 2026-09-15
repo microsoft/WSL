@@ -40,6 +40,7 @@ pub struct VmConfigHandle {
 
 impl VmConfigHandle {
     pub fn new() -> Self {
+        crate::diagnostics::ensure_tracing_init();
         Self {
             builder: Mutex::new(VmConfigBuilder::new()),
         }
@@ -51,12 +52,29 @@ impl VmConfigHandle {
 
     pub fn create_vm(&self, socket_path: String, timeout_ms: u32) -> Result<VmHandle, HRESULT> {
         if timeout_ms == 0 {
+            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm requires a nonzero timeout");
             return Err(E_INVALIDARG);
         }
         let timeout = Duration::from_millis(u64::from(timeout_ms));
-        let deadline = Instant::now() + timeout;
-        let mut builder = self.builder.try_lock_until(deadline).ok_or(rpc::TIMEOUT)?;
-        builder.create_vm(socket_path, timeout, deadline)
+        let started = Instant::now();
+        let deadline = started + timeout;
+        tracing::info!(target: "wslopenvmm::rpc", "CreateVm starting with timeout {timeout_ms} ms");
+        let Some(mut builder) = self.builder.try_lock_until(deadline) else {
+            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm timed out waiting for the configuration lock; no request sent");
+            return Err(rpc::TIMEOUT);
+        };
+        let result = builder.create_vm(socket_path, timeout, deadline);
+        match &result {
+            Ok(_) => {
+                tracing::info!(target: "wslopenvmm::rpc", "CreateVm completed in {:?}", started.elapsed())
+            }
+            Err(error) => tracing::warn!(
+                target: "wslopenvmm::rpc",
+                "CreateVm failed with HRESULT {:#010x} after {:?}; configuration status: {:?}",
+                error.0, started.elapsed(), builder.status
+            ),
+        }
+        result
     }
 }
 
@@ -94,6 +112,7 @@ impl VmConfigBuilder {
         deadline: Instant,
     ) -> Result<VmHandle, HRESULT> {
         if self.status == VmConfigStatus::CreationOutcomeUnknown {
+            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm rejected: previous creation outcome is unknown");
             return Err(rpc::INVALID_STATE);
         }
         let runtime = match tokio::runtime::Builder::new_current_thread()
@@ -101,17 +120,26 @@ impl VmConfigBuilder {
             .build()
         {
             Ok(runtime) => runtime,
-            Err(_) => return Err(E_FAIL),
+            Err(_) => {
+                tracing::error!(target: "wslopenvmm::rpc", "CreateVm could not initialize the RPC runtime");
+                return Err(E_FAIL);
+            }
         };
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
+            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm deadline expired before connecting");
             return Err(rpc::TIMEOUT);
         }
-        let channel =
-            match runtime.block_on(af_unix::connect_channel(socket_path.into(), remaining)) {
-                Ok(channel) => channel,
-                Err(error) => return Err(rpc::io_error_to_hresult(&error)),
-            };
+        let channel = match runtime
+            .block_on(af_unix::connect_channel(socket_path.into(), remaining))
+        {
+            Ok(channel) => channel,
+            Err(error) => {
+                let result = rpc::io_error_to_hresult(&error);
+                tracing::warn!(target: "wslopenvmm::rpc", "CreateVm connection failed with HRESULT {:#010x}; no creation request sent", result.0);
+                return Err(result);
+            }
+        };
         let mut client = VmClient::new(channel);
         let request = CreateVmRequest {
             config: Some(self.config.clone()),
@@ -119,6 +147,7 @@ impl VmConfigBuilder {
         };
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
+            tracing::warn!(target: "wslopenvmm::rpc", "CreateVm deadline expired before dispatch");
             return Err(rpc::TIMEOUT);
         }
         match runtime.block_on(rpc::execute(
@@ -130,6 +159,7 @@ impl VmConfigBuilder {
             Err(error) => {
                 if error.uncertain {
                     self.status = VmConfigStatus::CreationOutcomeUnknown;
+                    tracing::warn!(target: "wslopenvmm::rpc", "CreateVm outcome is unknown; discard the configuration and process before retrying");
                 }
                 Err(error.result)
             }
@@ -261,23 +291,29 @@ impl VmHandle {
 
     pub fn cancel_requests(&self) -> HRESULT {
         self.cancellation.send_replace(true);
+        tracing::info!(target: "wslopenvmm::rpc", "VM request cancellation signalled");
         S_OK
     }
 
     fn with_operation(
         &self,
+        name: &'static str,
         cleanup: bool,
         operation: impl FnOnce(&mut VmHandleInner, Instant, Option<watch::Receiver<bool>>) -> HRESULT,
     ) -> HRESULT {
-        let deadline = Instant::now() + self.timeout;
+        let started = Instant::now();
+        let deadline = started + self.timeout;
+        tracing::info!(target: "wslopenvmm::rpc", "{name} starting");
         let Some(mut inner) = self.inner.try_lock_until(deadline) else {
             // No request was sent, so lock contention alone does not invalidate the VM.
+            tracing::warn!(target: "wslopenvmm::rpc", "{name} timed out waiting for the VM lock; no request sent");
             return rpc::TIMEOUT;
         };
         if *self.cancellation.borrow() {
             inner.status = VmStatus::RecoveryRequired;
         }
         if !cleanup && inner.status == VmStatus::RecoveryRequired {
+            tracing::warn!(target: "wslopenvmm::rpc", "{name} rejected: VM requires recovery");
             return rpc::INVALID_STATE;
         }
         let cancellation = if cleanup {
@@ -290,11 +326,24 @@ impl VmHandle {
         if *self.cancellation.borrow() {
             inner.status = VmStatus::RecoveryRequired;
         }
+        if result.is_err() {
+            tracing::warn!(
+                target: "wslopenvmm::rpc",
+                "{name} failed with HRESULT {:#010x} after {:?}; VM status: {:?}",
+                result.0, started.elapsed(), inner.status
+            );
+        } else {
+            tracing::info!(
+                target: "wslopenvmm::rpc",
+                "{name} completed in {:?}; VM status: {:?}",
+                started.elapsed(), inner.status
+            );
+        }
         result
     }
 
     pub fn resume_vm(&self) -> HRESULT {
-        self.with_operation(false, |inner, deadline, cancellation| {
+        self.with_operation("ResumeVm", false, |inner, deadline, cancellation| {
             self.rpc(
                 inner,
                 deadline,
@@ -306,7 +355,7 @@ impl VmHandle {
     }
 
     pub fn teardown_vm(&self) -> HRESULT {
-        self.with_operation(true, |inner, deadline, cancellation| {
+        self.with_operation("TeardownVm", true, |inner, deadline, cancellation| {
             let result = self.rpc(
                 inner,
                 deadline,
@@ -322,7 +371,7 @@ impl VmHandle {
     }
 
     pub fn quit(&self) -> HRESULT {
-        self.with_operation(true, |inner, deadline, cancellation| {
+        self.with_operation("Quit", true, |inner, deadline, cancellation| {
             self.rpc(
                 inner,
                 deadline,
@@ -356,7 +405,7 @@ impl VmHandle {
     }
 
     pub fn add_share(&self, tag: String, host_path: String, read_only: bool) -> HRESULT {
-        self.with_operation(false, |inner, deadline, cancellation| {
+        self.with_operation("AddShare", false, |inner, deadline, cancellation| {
             if inner.shares.contains_key(&tag) {
                 return HRESULT::from_win32(ERROR_ALREADY_EXISTS.0);
             }
@@ -393,7 +442,7 @@ impl VmHandle {
     }
 
     pub fn remove_share(&self, tag: &str) -> HRESULT {
-        self.with_operation(false, |inner, deadline, cancellation| {
+        self.with_operation("RemoveShare", false, |inner, deadline, cancellation| {
             let Some(instance_id) = inner.shares.get(tag) else {
                 return HRESULT::from_win32(ERROR_NOT_FOUND.0);
             };
@@ -428,6 +477,7 @@ impl VmHandle {
     {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
+            tracing::warn!(target: "wslopenvmm::rpc", "RPC deadline expired before dispatch; no request sent");
             return rpc::TIMEOUT;
         }
         let result = inner.runtime.block_on(rpc::execute(
@@ -443,6 +493,7 @@ impl VmHandle {
             Err(error) => {
                 if error.uncertain {
                     inner.status = VmStatus::RecoveryRequired;
+                    tracing::warn!(target: "wslopenvmm::rpc", "Uncertain RPC outcome; VM requires teardown and recreation");
                 }
                 error.result
             }
@@ -457,7 +508,12 @@ impl VmHandle {
         host_path: String,
         read_only: bool,
     ) -> HRESULT {
-        self.with_operation(false, |inner, deadline, cancellation| {
+        let name = if modify_type == ModifyType::Add {
+            "AttachScsiDisk"
+        } else {
+            "DetachScsiDisk"
+        };
+        self.with_operation(name, false, |inner, deadline, cancellation| {
             let request = ModifyResourceRequest {
                 r#type: modify_type as i32,
                 resource: Some(vmservice::modify_resource_request::Resource::ScsiDisk(
@@ -488,7 +544,12 @@ impl VmHandle {
         tcp: bool,
         family: i32,
     ) -> HRESULT {
-        self.with_operation(false, |inner, deadline, cancellation| {
+        let name = if modify_type == ModifyType::Update {
+            "BindPort"
+        } else {
+            "UnbindPort"
+        };
+        self.with_operation(name, false, |inner, deadline, cancellation| {
             let host_address = match family {
                 family if family == i32::from(AF_INET) => "127.0.0.1",
                 family if family == i32::from(AF_INET6) => "::1",
