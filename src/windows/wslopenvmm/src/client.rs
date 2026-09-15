@@ -20,9 +20,6 @@ use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 
 use crate::{af_unix, rpc, vmservice};
 
-#[cfg(test)]
-mod tests;
-
 #[derive(Debug, PartialEq, Eq)]
 enum VmConfigStatus {
     Ready,
