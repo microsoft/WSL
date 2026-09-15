@@ -459,13 +459,13 @@ class NetworkTests
         route.NextHop = L"192.168.0.12";
         route.DestinationPrefix = L"192.168.2.0/24";
         route.Family = AF_INET;
-        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
         wsl::shared::hns::Route v6Route;
         v6Route.NextHop = L"fc00::12";
         v6Route.DestinationPrefix = L"fc00:abcd::/80";
         v6Route.Family = AF_INET6;
-        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
         // Check that the routes are there
         const bool v4CustomRouteExists = RouteExists({L"192.168.0.12", L"eth0", L"192.168.2.0/24"});
@@ -496,14 +496,14 @@ class NetworkTests
         route.DestinationPrefix = L"192.168.2.0/24";
         route.Family = AF_INET;
         route.Metric = 12;
-        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
         wsl::shared::hns::Route v6Route;
         v6Route.NextHop = L"fc00::12";
         v6Route.DestinationPrefix = L"fc00:abcd::/64";
         v6Route.Family = AF_INET6;
         v6Route.Metric = 12;
-        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
         // Check that the routes are there
         const bool v4CustomRouteExists = RouteExists({L"192.168.0.12", L"eth0", L"192.168.2.0/24", 12});
@@ -533,13 +533,13 @@ class NetworkTests
         route.NextHop = L"192.168.0.12";
         route.DestinationPrefix = L"192.168.2.0/24";
         route.Family = AF_INET;
-        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
         wsl::shared::hns::Route v6Route;
         v6Route.NextHop = L"fc00::12";
         v6Route.DestinationPrefix = L"fc00:abcd::/80";
         v6Route.Family = AF_INET6;
-        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
         // Check that the custom routes are there
         bool v4RouteExists = RouteExists({L"192.168.0.12", L"eth0", L"192.168.2.0/24"});
@@ -559,15 +559,15 @@ class NetworkTests
         bool v6GwGoneAfterReset = !v6State.DefaultRoute.has_value();
 
         // Add the custom and default routes back
-        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
         route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
         route.NextHop = L"192.168.0.1";
-        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
-        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
         v6Route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
         v6Route.NextHop = L"fc00::1";
-        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Update, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
         // Verify that all the routes are there
         bool v4RouteRestored = RouteExists({L"192.168.0.12", L"eth0", L"192.168.2.0/24"});
@@ -3241,8 +3241,10 @@ class NetworkTests
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"ip route show");
         LogInfo("Ip route output:\r\n%ls", FixLineEndings(out).c_str());
 
-        std::wregex defaultRoutePattern(L"default via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
-        std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
+        // The (?:.*(metric N))? skip tokens that precede the metric (e.g. "proto kernel",
+        // "scope link");
+        std::wregex defaultRoutePattern(L"default via ([0-9,.]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
+        std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
 
         return GetRoutingTableState(out, defaultRoutePattern, routePattern);
     }
@@ -3271,8 +3273,10 @@ class NetworkTests
         LogInfo("Ip -6 route output:\r\n%ls", FixLineEndings(out).c_str());
 
         RoutingTableState state;
-        std::wregex defaultRoutePattern(L"default via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
-        std::wregex routePattern(L"([a-f,A-F,0-9,:,/]+) via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
+        // The (?:.*(metric N))? skip tokens that precede the metric (e.g. "proto kernel",
+        // "scope link");
+        std::wregex defaultRoutePattern(L"default via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
+        std::wregex routePattern(L"([a-f,A-F,0-9,:,/]+) via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
 
         return GetRoutingTableState(out, defaultRoutePattern, routePattern);
     }
@@ -3501,24 +3505,40 @@ class NetworkTests
 
             if (state.Gateway.has_value())
             {
+                // Gateway is part of the default route's identity, so a change is applied as remove + add.
+                if (currentInterfaceState.Gateway.has_value() && currentInterfaceState.Gateway != state.Gateway)
+                {
+                    wsl::shared::hns::Route oldRoute;
+                    oldRoute.NextHop = currentInterfaceState.Gateway.value();
+                    oldRoute.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+                    oldRoute.Family = AF_INET;
+                    SendDeviceSettingsRequest(state.Name, oldRoute, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+                }
+
                 wsl::shared::hns::Route route;
                 route.NextHop = state.Gateway.value();
                 route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
                 route.Family = AF_INET;
-                bool updateGw = currentInterfaceState.Gateway.has_value();
-                SendDeviceSettingsRequest(
-                    state.Name, route, updateGw ? ModifyRequestType::Update : ModifyRequestType::Add, GuestEndpointResourceType::Route);
+                SendDeviceSettingsRequest(state.Name, route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
             }
 
             if (state.V6Gateway.has_value())
             {
+                // Gateway is part of the default route's identity, so a change is applied as remove + add.
+                if (currentInterfaceState.V6Gateway.has_value() && currentInterfaceState.V6Gateway != state.V6Gateway)
+                {
+                    wsl::shared::hns::Route oldRoute;
+                    oldRoute.NextHop = currentInterfaceState.V6Gateway.value();
+                    oldRoute.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
+                    oldRoute.Family = AF_INET6;
+                    SendDeviceSettingsRequest(state.Name, oldRoute, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+                }
+
                 wsl::shared::hns::Route route;
                 route.NextHop = state.V6Gateway.value();
                 route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
                 route.Family = AF_INET6;
-                bool updateGw = currentInterfaceState.V6Gateway.has_value();
-                SendDeviceSettingsRequest(
-                    state.Name, route, updateGw ? ModifyRequestType::Update : ModifyRequestType::Add, GuestEndpointResourceType::Route);
+                SendDeviceSettingsRequest(state.Name, route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
             }
         }
 
@@ -3723,6 +3743,27 @@ class NetworkTests
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"ip route get from 127.0.0.1 127.0.0.1 | awk 'FNR <= 1 {print $7}'");
         out.pop_back();
         return out;
+    }
+
+    static DWORD GetBestInterfaceIndex(ADDRESS_FAMILY family)
+    {
+        DWORD bestIndex = 0;
+        if (family == AF_INET)
+        {
+            SOCKADDR_IN dest{};
+            dest.sin_family = AF_INET;
+            InetPtonW(AF_INET, L"8.8.8.8", &dest.sin_addr);
+            VERIFY_ARE_EQUAL(NO_ERROR, GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex));
+        }
+        else
+        {
+            SOCKADDR_IN6 dest{};
+            dest.sin6_family = AF_INET6;
+            InetPtonW(AF_INET6, L"2001:4860:4860::8888", &dest.sin6_addr);
+            VERIFY_ARE_EQUAL(NO_ERROR, GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex));
+        }
+
+        return bestIndex;
     }
 
     static bool HostHasInternetConnectivity(ADDRESS_FAMILY family)
@@ -4244,6 +4285,38 @@ class MirroredTests
         }
 
         NetworkTests::GuestClient(L"tcp6-connect:bing.com:80");
+    }
+
+    WSL2_TEST_METHOD(HostRouteMirroringV4)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
+        {
+            LogSkipped("Host does not have IPv4 internet connectivity. Skipping...");
+            return;
+        }
+
+        VerifyHostRouteMirroring(AF_INET);
+    }
+
+    WSL2_TEST_METHOD(HostRouteMirroringV6)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        VerifyHostRouteMirroring(AF_INET6);
     }
 
     WSL2_TEST_METHOD(LoopbackLocal)
@@ -5168,6 +5241,109 @@ class MirroredTests
         } while (Sleep(1000), !Watchdog.IsExpired());
 
         VERIFY_IS_FALSE(Watchdog.IsExpired());
+    }
+
+    static void AddHostRoute(DWORD ifIndex, const std::wstring& destination, const std::wstring& gateway, int metric)
+    {
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"New-NetRoute -InterfaceIndex {} -DestinationPrefix {} -NextHop {} -RouteMetric {} -PolicyStore ActiveStore -Confirm:$false", ifIndex, destination, gateway, metric),
+            0);
+    }
+
+    static void SetHostRouteMetric(const std::wstring& destination, const std::wstring& gateway, int metric)
+    {
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"Set-NetRoute -DestinationPrefix {} -NextHop {} -RouteMetric {} -PolicyStore ActiveStore -Confirm:$false", destination, gateway, metric),
+            0);
+    }
+
+    static void RemoveHostRoute(const std::wstring& destination)
+    {
+        // Best-effort cleanup: the route may not exist
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"try {{ Remove-NetRoute -DestinationPrefix {} -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue }} catch {{}}; exit 0", destination),
+            0);
+    }
+
+    static bool HostRouteExists(const std::wstring& destination)
+    {
+        auto [out, _] = LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"@(Get-NetRoute -DestinationPrefix {} -PolicyStore ActiveStore -ErrorAction SilentlyContinue).Count -gt 0", destination),
+            0);
+        return out.find(L"True") != std::wstring::npos;
+    }
+
+    static std::optional<NetworkTests::Route> FindMirroredRoute(
+        ADDRESS_FAMILY family, const std::wstring& destination, const std::wstring& gateway, std::optional<int> metric = std::nullopt)
+    {
+        const auto state = family == AF_INET ? NetworkTests::GetIpv4RoutingTableState() : NetworkTests::GetIpv6RoutingTableState();
+        for (const auto& route : state.Routes)
+        {
+            if (route.Prefix == destination && route.Via == gateway && (!metric.has_value() || route.Metric == metric.value()))
+            {
+                return route;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    static bool WaitForMirroredRoute(
+        ADDRESS_FAMILY family, const std::wstring& destination, const std::wstring& gateway, bool shouldExist, std::optional<int> metric = std::nullopt)
+    {
+        Stopwatch<std::chrono::seconds> Watchdog(std::chrono::seconds(10));
+        do
+        {
+            if (FindMirroredRoute(family, destination, gateway, metric).has_value() == shouldExist)
+            {
+                return true;
+            }
+        } while (Sleep(1000), !Watchdog.IsExpired());
+
+        return false;
+    }
+
+    // Adds a host route using RFC 5737 / RFC 3849 documentation ranges (safe to add without
+    // affecting host connectivity), then updates its metric, gateway, and destination, verifying each change mirrors into Linux.
+    static void VerifyHostRouteMirroring(ADDRESS_FAMILY family)
+    {
+        const bool v4 = family == AF_INET;
+        const DWORD ifIndex = NetworkTests::GetBestInterfaceIndex(family);
+
+        const std::wstring destinationA = v4 ? L"192.0.2.0/24" : L"2001:db8:1::/64";
+        const std::wstring destinationB = v4 ? L"198.51.100.0/24" : L"2001:db8:2::/64";
+        const std::wstring gatewayA = v4 ? L"192.0.2.1" : L"2001:db8:1::1";
+        const std::wstring gatewayB = v4 ? L"192.0.2.2" : L"2001:db8:1::2";
+        constexpr int metricA = 100;
+        constexpr int metricB = 500;
+
+        VERIFY_IS_FALSE(HostRouteExists(destinationA));
+        VERIFY_IS_FALSE(HostRouteExists(destinationB));
+
+        auto cleanup = wil::scope_exit([&] {
+            RemoveHostRoute(destinationA);
+            RemoveHostRoute(destinationB);
+        });
+
+        AddHostRoute(ifIndex, destinationA, gatewayA, metricA);
+        // The mirrored metric is the host route metric plus the interface metric, so its absolute value
+        // isn't known up front. Capture the baseline without a metric filter, then assert relative changes.
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true));
+        const auto initialRoute = FindMirroredRoute(family, destinationA, gatewayA);
+        VERIFY_IS_TRUE(initialRoute.has_value());
+
+        SetHostRouteMetric(destinationA, gatewayA, metricB);
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true, initialRoute->Metric + (metricB - metricA)));
+
+        RemoveHostRoute(destinationA);
+        AddHostRoute(ifIndex, destinationA, gatewayB, metricB);
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayB, true));
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, false));
+
+        RemoveHostRoute(destinationA);
+        AddHostRoute(ifIndex, destinationB, gatewayB, metricB);
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationB, gatewayB, true));
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayB, false));
     }
 
     WSL2_TEST_METHOD(DnsResolutionBasic)

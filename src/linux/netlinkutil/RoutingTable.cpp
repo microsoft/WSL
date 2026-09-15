@@ -73,7 +73,7 @@ void RoutingTable::ModifyRoute(const Route& route, Operation action)
         throw RuntimeErrorWithSourceLocation(std::format("Unexpected address family: {}", route.family));
     }
 
-    assert(action == Operation::Create || action == Operation::Update || action == Operation::Remove);
+    assert(action == Operation::Create || action == Operation::Remove);
 
     if (route.family == AF_INET)
     {
@@ -90,12 +90,7 @@ void RoutingTable::ModifyRouteImpl(const Route& route, Operation action)
 {
     int flags = 0;
     int operation = 0;
-    if (action == Update)
-    {
-        flags = NLM_F_CREATE | NLM_F_REPLACE;
-        operation = RTM_NEWROUTE;
-    }
-    else if (action == Create)
+    if (action == Create)
     {
         flags = NLM_F_CREATE;
         operation = RTM_NEWROUTE;
