@@ -23,10 +23,79 @@ enum Event {
 #[derive(Default)]
 struct State {
     events: Vec<Event>,
+    remote: RemoteState,
     fail_next: bool,
     next_status: Option<tonic::Code>,
     hang_next: bool,
+    lose_response_next: bool,
     observed: Option<std::sync::mpsc::Sender<()>>,
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct RemoteState {
+    created: bool,
+    shares: BTreeMap<String, (String, vmservice::VirtioFs)>,
+    disks: BTreeMap<(u32, u32), ScsiDisk>,
+    ports: Vec<PortConfig>,
+}
+
+impl RemoteState {
+    fn commit(&mut self, event: &Event) {
+        match event {
+            Event::Create => self.created = true,
+            Event::Teardown | Event::Quit => *self = Self::default(),
+            Event::Resume => {}
+            Event::Add(request) => {
+                let Some(vmservice::pcie_device_kind::Kind::Virtio(device)) =
+                    &request.device.as_ref().unwrap().kind
+                else {
+                    panic!("expected virtio")
+                };
+                let Some(vmservice::virtio_device::Kind::Fs(fs)) = &device.kind else {
+                    panic!("expected filesystem")
+                };
+                assert!(
+                    self.shares
+                        .insert(fs.tag.clone(), (request.instance_id.clone(), fs.clone()))
+                        .is_none(),
+                    "share mutation was replayed"
+                );
+            }
+            Event::Remove(request) => {
+                let before = self.shares.len();
+                self.shares.retain(|_, (id, _)| id != &request.instance_id);
+                assert_eq!(self.shares.len() + 1, before, "unknown share instance");
+            }
+            Event::Port(request) => match request.resource.as_ref().unwrap() {
+                vmservice::modify_resource_request::Resource::ScsiDisk(disk) => {
+                    let key = (disk.controller, disk.lun);
+                    if request.r#type == ModifyType::Add as i32 {
+                        assert!(self.disks.insert(key, disk.clone()).is_none());
+                    } else {
+                        assert_eq!(request.r#type, ModifyType::Remove as i32);
+                        assert!(self.disks.remove(&key).is_some());
+                    }
+                }
+                vmservice::modify_resource_request::Resource::NicConfig(nic) => {
+                    let Some(vmservice::nic_config::Backend::Consomme(backend)) = &nic.backend
+                    else {
+                        panic!("expected Consomme")
+                    };
+                    for port in &backend.ports {
+                        if request.r#type == ModifyType::Update as i32 {
+                            assert!(!self.ports.contains(port), "port mutation was replayed");
+                            self.ports.push(port.clone());
+                        } else {
+                            assert_eq!(request.r#type, ModifyType::Remove as i32);
+                            let index = self.ports.iter().position(|p| p == port).unwrap();
+                            self.ports.remove(index);
+                        }
+                    }
+                }
+                _ => panic!("unexpected resource"),
+            },
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -36,16 +105,22 @@ impl Server {
     async fn record(&self, event: Event) -> Result<Response<()>, Status> {
         let (status, hang) = {
             let mut state = self.0.lock();
-            state.events.push(event);
-            if let Some(observed) = state.observed.take() {
-                observed.send(()).unwrap();
-            }
             let status = if std::mem::take(&mut state.fail_next) {
                 Some(tonic::Code::InvalidArgument)
             } else {
                 state.next_status.take()
             };
-            (status, std::mem::take(&mut state.hang_next))
+            let hang = std::mem::take(&mut state.hang_next);
+            let lose_response = std::mem::take(&mut state.lose_response_next);
+            if status.is_none() && (!hang || lose_response) {
+                state.remote.commit(&event);
+            }
+            state.events.push(event);
+            if let Some(observed) = state.observed.take() {
+                observed.send(()).unwrap();
+            }
+            // Unlike hang_next, the mutation is already committed before its response is lost.
+            (status, hang || lose_response)
         };
         if hang {
             std::future::pending::<()>().await;
@@ -134,7 +209,9 @@ struct SocketDirectory(std::path::PathBuf);
 
 impl SocketDirectory {
     fn new() -> Self {
-        let path = std::env::temp_dir().join(format!("wsl-rpc-{:?}", GUID::new().unwrap()));
+        let path = std::env::current_dir()
+            .unwrap()
+            .join(format!("wsl-rpc-{:?}", GUID::new().unwrap()));
         std::fs::create_dir(&path).unwrap();
         Self(path)
     }
@@ -589,6 +666,244 @@ fn uncertain_share_mutation_is_not_replayed_and_cleanup_does_not_revalidate() {
     }
 }
 
+fn assert_mutations_not_replayed(fixture: &Fixture) {
+    let vm = &fixture.vm.as_ref().unwrap().0;
+    let event_count = fixture.state.lock().events.len();
+    assert_eq!(vm.inner.lock().status, VmStatus::RecoveryRequired);
+    assert_eq!(
+        vm.add_share("lost".to_string(), r"C:\lost".to_string(), false),
+        rpc::INVALID_STATE
+    );
+    assert_eq!(vm.remove_share("lost"), rpc::INVALID_STATE);
+    assert_eq!(
+        vm.attach_scsi_disk(0, 1, "lost.vhdx".to_string(), false),
+        rpc::INVALID_STATE
+    );
+    assert_eq!(vm.detach_scsi_disk(0, 1), rpc::INVALID_STATE);
+    assert_eq!(
+        vm.bind_port(8080, 80, true, i32::from(AF_INET)),
+        rpc::INVALID_STATE
+    );
+    assert_eq!(
+        vm.unbind_port(8080, 80, true, i32::from(AF_INET)),
+        rpc::INVALID_STATE
+    );
+    assert_eq!(vm.resume_vm(), rpc::INVALID_STATE);
+    assert_eq!(fixture.state.lock().events.len(), event_count);
+}
+
+fn cleanup_does_not_revalidate(fixture: &Fixture) {
+    let vm = &fixture.vm.as_ref().unwrap().0;
+    let event_count = fixture.state.lock().events.len();
+    fixture.state.lock().hang_next = true;
+    let start = Instant::now();
+    assert_eq!(vm.teardown_vm(), rpc::TIMEOUT);
+    assert!(start.elapsed() < Duration::from_secs(2));
+    assert_mutations_not_replayed(fixture);
+    let start = Instant::now();
+    assert_eq!(vm.teardown_vm(), S_OK);
+    assert_eq!(vm.quit(), S_OK);
+    assert!(start.elapsed() < Duration::from_secs(2));
+    assert_eq!(fixture.state.lock().remote, RemoteState::default());
+    assert!(vm.inner.lock().shares.is_empty());
+    assert_mutations_not_replayed(fixture);
+    let state = fixture.state.lock();
+    assert!(matches!(
+        &state.events[event_count..],
+        [Event::Teardown, Event::Teardown, Event::Quit]
+    ));
+}
+
+fn fresh_server_and_config() -> Fixture {
+    let mut fixture = Fixture::with_timeout(Duration::from_millis(300));
+    assert_eq!(fixture.state.lock().remote, RemoteState::default());
+    let config = VmConfigHandle::new();
+    assert_eq!(config.builder.lock().status, VmConfigStatus::Ready);
+    let vm = config
+        .create_vm(
+            fixture
+                .directory
+                .socket_path()
+                .to_string_lossy()
+                .into_owned(),
+            2000,
+        )
+        .unwrap();
+    fixture.vm = Some(crate::WslOpenVmmVm::new(vm));
+    assert_eq!(
+        fixture.vm.as_ref().unwrap().0.inner.lock().status,
+        VmStatus::Active
+    );
+    assert!(
+        fixture
+            .vm
+            .as_ref()
+            .unwrap()
+            .0
+            .inner
+            .lock()
+            .shares
+            .is_empty()
+    );
+    assert!(fixture.state.lock().remote.created);
+    assert!(matches!(&fixture.state.lock().events[..], [Event::Create]));
+    fixture
+}
+
+#[test]
+fn committed_share_with_lost_response_diverges_without_replay_and_recovers_on_new_server() {
+    for remove in [false, true] {
+        let fixture = Fixture::with_timeout(Duration::from_millis(300));
+        let vm = &fixture.vm.as_ref().unwrap().0;
+        if remove {
+            assert_eq!(
+                vm.add_share("lost".to_string(), r"C:\lost".to_string(), true),
+                S_OK
+            );
+            let local = vm.inner.lock().shares["lost"].clone();
+            assert_eq!(fixture.state.lock().remote.shares["lost"].0, local);
+        }
+        fixture.state.lock().lose_response_next = true;
+        let start = Instant::now();
+        let result = if remove {
+            vm.remove_share("lost")
+        } else {
+            vm.add_share("lost".to_string(), r"C:\lost".to_string(), true)
+        };
+        assert_eq!(result, rpc::TIMEOUT);
+        assert!(start.elapsed() < Duration::from_secs(2));
+        assert_eq!(vm.inner.lock().shares.contains_key("lost"), remove);
+        {
+            let state = fixture.state.lock();
+            assert_eq!(state.remote.shares.contains_key("lost"), !remove);
+            assert_eq!(state.events.len(), if remove { 2 } else { 1 });
+            if !remove {
+                let (instance, fs) = &state.remote.shares["lost"];
+                assert!(!instance.is_empty());
+                assert_eq!(fs.root_path, r"C:\lost");
+                assert!(fs.read_only);
+            }
+        }
+        assert_mutations_not_replayed(&fixture);
+        cleanup_does_not_revalidate(&fixture);
+
+        let fresh = fresh_server_and_config();
+        let new_vm = &fresh.vm.as_ref().unwrap().0;
+        assert_eq!(
+            new_vm.add_share("lost".to_string(), r"C:\lost".to_string(), true),
+            S_OK
+        );
+        assert_eq!(
+            fresh.state.lock().remote.shares["lost"].0,
+            new_vm.inner.lock().shares["lost"]
+        );
+        assert_eq!(new_vm.remove_share("lost"), S_OK);
+        assert!(fresh.state.lock().remote.shares.is_empty());
+        assert!(new_vm.inner.lock().shares.is_empty());
+        assert_eq!(fresh.state.lock().events.len(), 3);
+        assert_mutations_not_replayed(&fixture);
+    }
+}
+
+#[test]
+fn committed_disk_and_port_with_lost_response_require_new_server_without_replay() {
+    for disk in [false, true] {
+        for remove in [false, true] {
+            let mutate = |vm: &VmHandle, remove| match (disk, remove) {
+                (true, false) => vm.attach_scsi_disk(0, 1, "lost.vhdx".to_string(), true),
+                (true, true) => vm.detach_scsi_disk(0, 1),
+                (false, false) => vm.bind_port(8080, 80, true, i32::from(AF_INET)),
+                (false, true) => vm.unbind_port(8080, 80, true, i32::from(AF_INET)),
+            };
+            let fixture = Fixture::with_timeout(Duration::from_millis(300));
+            let vm = &fixture.vm.as_ref().unwrap().0;
+            if remove {
+                assert_eq!(mutate(vm, false), S_OK);
+            }
+            fixture.state.lock().lose_response_next = true;
+            let start = Instant::now();
+            assert_eq!(mutate(vm, remove), rpc::TIMEOUT);
+            assert!(start.elapsed() < Duration::from_secs(2));
+            {
+                let state = fixture.state.lock();
+                assert_eq!(state.events.len(), if remove { 2 } else { 1 });
+                assert_eq!(state.remote.disks.len(), usize::from(disk && !remove));
+                assert_eq!(state.remote.ports.len(), usize::from(!disk && !remove));
+                if !remove {
+                    if disk {
+                        let remote = &state.remote.disks[&(0, 1)];
+                        assert_eq!(remote.host_path, "lost.vhdx");
+                        assert!(remote.read_only);
+                    } else {
+                        assert_eq!(state.remote.ports[0].host_port, 8080);
+                        assert_eq!(state.remote.ports[0].guest_port, 80);
+                    }
+                }
+            }
+            // Disks/ports have no Rust-side resource map; the failed caller result cannot
+            // establish their remote state, so the handle must prohibit all mutations.
+            assert_mutations_not_replayed(&fixture);
+            cleanup_does_not_revalidate(&fixture);
+
+            let fresh = fresh_server_and_config();
+            let new_vm = &fresh.vm.as_ref().unwrap().0;
+            assert_eq!(mutate(new_vm, false), S_OK);
+            assert_eq!(fresh.state.lock().remote.disks.len(), usize::from(disk));
+            assert_eq!(fresh.state.lock().remote.ports.len(), usize::from(!disk));
+            assert_eq!(mutate(new_vm, true), S_OK);
+            assert!(fresh.state.lock().remote.disks.is_empty());
+            assert!(fresh.state.lock().remote.ports.is_empty());
+            assert_eq!(fresh.state.lock().events.len(), 3);
+            assert_mutations_not_replayed(&fixture);
+        }
+    }
+}
+
+#[test]
+fn committed_create_with_lost_response_requires_new_config_and_server() {
+    let fixture = Fixture::new();
+    fixture.state.lock().lose_response_next = true;
+    let config = VmConfigHandle::new();
+    let path = fixture
+        .directory
+        .socket_path()
+        .to_string_lossy()
+        .into_owned();
+    let start = Instant::now();
+    assert_eq!(
+        config.create_vm(path.clone(), 300).err().unwrap(),
+        rpc::TIMEOUT
+    );
+    assert!(start.elapsed() < Duration::from_secs(2));
+    assert!(fixture.state.lock().remote.created);
+    assert_eq!(
+        config.builder.lock().status,
+        VmConfigStatus::CreationOutcomeUnknown
+    );
+    assert_eq!(
+        config.create_vm(path, 300).err().unwrap(),
+        rpc::INVALID_STATE
+    );
+    assert!(matches!(&fixture.state.lock().events[..], [Event::Create]));
+
+    let fresh = fresh_server_and_config();
+    assert_eq!(fresh.vm.as_ref().unwrap().0.resume_vm(), S_OK);
+    assert_eq!(
+        config
+            .create_vm(
+                fresh.directory.socket_path().to_string_lossy().into_owned(),
+                300
+            )
+            .err()
+            .unwrap(),
+        rpc::INVALID_STATE
+    );
+    assert!(matches!(
+        &fresh.state.lock().events[..],
+        [Event::Create, Event::Resume]
+    ));
+}
+
 #[test]
 fn definite_rejections_preserve_handle_usability() {
     for (code, expected) in [
@@ -872,6 +1187,148 @@ fn create_timeout_invalidates_config_and_does_not_replay() {
         rpc::INVALID_STATE
     );
     assert_eq!(fixture.state.lock().events.len(), 1);
+}
+
+#[test]
+fn committed_share_with_corrupt_grpc_response_requires_recreation() {
+    use prost::Message;
+    use std::io::{Read, Write};
+
+    fn write_frame(stream: &mut std::net::TcpStream, kind: u8, flags: u8, id: u32, body: &[u8]) {
+        let length = u32::try_from(body.len()).unwrap().to_be_bytes();
+        stream.write_all(&length[1..]).unwrap();
+        stream.write_all(&[kind, flags]).unwrap();
+        stream.write_all(&id.to_be_bytes()).unwrap();
+        stream.write_all(body).unwrap();
+    }
+
+    // A valid response is a control: transport/HPACK mistakes must not masquerade
+    // as detection of a corrupt gRPC message.
+    for body in [
+        &[0, 0, 0, 0, 0][..],
+        &[2, 0, 0, 0, 0][..],    // Invalid compression flag.
+        &[0, 0, 0, 0, 8, 0][..], // Declares eight bytes, delivers only one.
+    ] {
+        let valid = body == [0, 0, 0, 0, 0];
+        let directory = SocketDirectory::new();
+        let listener = directory.listen();
+        let state = Arc::new(Mutex::new(State::default()));
+        let remote = state.clone();
+        let (shutdown, receive) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(3);
+            let (socket, _) = loop {
+                match listener.accept() {
+                    Ok(connection) => break connection,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(Instant::now() < deadline, "client did not connect");
+                        std::thread::sleep(Duration::from_millis(2));
+                    }
+                    Err(error) => panic!("{error}"),
+                }
+            };
+            socket.set_nonblocking(false).unwrap();
+            let mut stream: std::net::TcpStream = socket.into();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut preface = [0; 24];
+            stream.read_exact(&mut preface).unwrap();
+            assert_eq!(&preface, b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n");
+            write_frame(&mut stream, 4, 0, 0, &[]); // SETTINGS.
+            let mut request = Vec::new();
+            let id = loop {
+                let mut header = [0; 9];
+                stream.read_exact(&mut header).unwrap();
+                let length = u32::from_be_bytes([0, header[0], header[1], header[2]]) as usize;
+                assert!(length <= 16_384);
+                let mut payload = vec![0; length];
+                stream.read_exact(&mut payload).unwrap();
+                match header[3] {
+                    4 if header[4] & 1 == 0 => write_frame(&mut stream, 4, 1, 0, &[]),
+                    0 => {
+                        assert_eq!(header[4] & 8, 0, "unexpected padded request");
+                        request.extend(payload);
+                        if header[4] & 1 != 0 {
+                            break u32::from_be_bytes(header[5..9].try_into().unwrap());
+                        }
+                    }
+                    _ => {}
+                }
+            };
+            assert_eq!(request[0], 0);
+            assert_eq!(
+                u32::from_be_bytes(request[1..5].try_into().unwrap()) as usize,
+                request.len() - 5
+            );
+            let event = Event::Add(vmservice::AddVpciDeviceRequest::decode(&request[5..]).unwrap());
+            {
+                let mut state = remote.lock();
+                state.remote.commit(&event);
+                state.events.push(event);
+            }
+            // HPACK: indexed :status=200; literal content-type=application/grpc.
+            let mut headers = vec![0x88, 0x0f, 0x10, 16];
+            headers.extend_from_slice(b"application/grpc");
+            write_frame(&mut stream, 1, 4, id, &headers);
+            write_frame(&mut stream, 0, 0, id, body);
+            // Valid successful trailers, even when the preceding message is corrupt.
+            let mut trailers = vec![0, 11];
+            trailers.extend_from_slice(b"grpc-status");
+            trailers.extend_from_slice(&[1, b'0']);
+            write_frame(&mut stream, 1, 5, id, &trailers);
+            let _ = receive.recv_timeout(Duration::from_secs(5));
+        });
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let client = VmClient::new(
+            runtime
+                .block_on(af_unix::connect_channel(
+                    directory.socket_path(),
+                    Duration::from_secs(2),
+                ))
+                .unwrap(),
+        );
+        let vm = VmHandle::new(runtime, client, Duration::from_millis(300));
+        let start = Instant::now();
+        let result = vm.add_share("lost".to_string(), r"C:\lost".to_string(), false);
+        assert!(start.elapsed() < Duration::from_secs(2));
+        assert_eq!(result, if valid { S_OK } else { E_FAIL });
+        assert!(state.lock().remote.shares.contains_key("lost"));
+        assert_eq!(vm.inner.lock().shares.contains_key("lost"), valid);
+        if !valid {
+            assert_eq!(vm.inner.lock().status, VmStatus::RecoveryRequired);
+            assert_eq!(
+                vm.add_share("lost".to_string(), r"C:\lost".to_string(), false),
+                rpc::INVALID_STATE
+            );
+            assert_eq!(vm.remove_share("lost"), rpc::INVALID_STATE);
+            assert_eq!(vm.resume_vm(), rpc::INVALID_STATE);
+            let start = Instant::now();
+            assert_eq!(vm.teardown_vm(), rpc::TIMEOUT);
+            assert!(start.elapsed() < Duration::from_secs(2));
+            assert_eq!(vm.inner.lock().status, VmStatus::RecoveryRequired);
+            assert_eq!(vm.resume_vm(), rpc::INVALID_STATE);
+            let fresh = fresh_server_and_config();
+            assert_eq!(
+                fresh.vm.as_ref().unwrap().0.add_share(
+                    "lost".to_string(),
+                    r"C:\lost".to_string(),
+                    false
+                ),
+                S_OK
+            );
+        }
+        assert_eq!(state.lock().events.len(), 1);
+        let _ = shutdown.send(());
+        drop(vm);
+        thread.join().unwrap();
+    }
 }
 
 #[test]

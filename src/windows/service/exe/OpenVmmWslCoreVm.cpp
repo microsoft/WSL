@@ -4,6 +4,7 @@
 #include "OpenVmmWslCoreVm.h"
 
 #include "Dmesg.h"
+#include "OpenVmmError.h"
 #include "VirtioFsShareRequest.h"
 #include "WslCoreInstance.h"
 #include "WslCoreVmDiskState.h"
@@ -17,13 +18,18 @@ namespace {
 constexpr size_t c_bootEntropy = 0x1000;
 
 wil::srwlock g_openVmmProcessLock;
-std::map<GUID, wil::shared_handle, wsl::windows::common::helpers::GuidLess> g_openVmmProcesses;
+struct OpenVmmProcess
+{
+    wil::shared_handle Process;
+    std::function<void()> Cancel;
+};
+std::map<GUID, OpenVmmProcess, wsl::windows::common::helpers::GuidLess> g_openVmmProcesses;
 
-void RegisterOpenVmmProcess(_In_ const GUID& VmId, _In_ HANDLE Process)
+void RegisterOpenVmmProcess(_In_ const GUID& VmId, _In_ HANDLE Process, _In_ std::function<void()> Cancel)
 {
     wil::shared_handle process{wsl::windows::common::wslutil::DuplicateHandle(Process)};
     auto lock = g_openVmmProcessLock.lock_exclusive();
-    const auto [entry, inserted] = g_openVmmProcesses.emplace(VmId, std::move(process));
+    const auto [entry, inserted] = g_openVmmProcesses.emplace(VmId, OpenVmmProcess{std::move(process), std::move(Cancel)});
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), !inserted);
 }
 
@@ -32,7 +38,9 @@ wil::shared_handle GetOpenVmmProcess(_In_ const GUID& VmId)
     auto lock = g_openVmmProcessLock.lock_shared();
     const auto process = g_openVmmProcesses.find(VmId);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), process == g_openVmmProcesses.end());
-    return process->second;
+    // Keep the registration locked while using the owner; unregistration precedes destruction.
+    process->second.Cancel();
+    return process->second.Process;
 }
 
 wil::unique_socket ConnectToOpenVmmGuest(
@@ -119,12 +127,14 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
     WSL_LOG("OpenVmmTerminateVmStart", TraceLoggingValue(m_vmId, "VmId"));
     UnregisterProcess();
 
+    const bool alreadyTerminating = m_terminatingEvent.is_signaled();
     {
         auto exitLock = m_exitCallbackLock.lock_exclusive();
         m_terminationCallback = {};
         m_terminatingEvent.SetEvent();
     }
 
+    CancelVmRequests();
     m_portTracker.reset();
     m_gnsSocket.reset();
     m_notifyChannel.reset();
@@ -140,15 +150,23 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
         m_virtioFsThread.join();
     }
 
-    if (m_vm)
+    bool hasVm;
     {
-        if (m_processHandle && !m_vmExitEvent.wait(c_shutdownTimeoutMs))
+        auto rpcLock = m_rpcLock.lock_shared();
+        hasVm = !!m_vm;
+    }
+    if (hasVm && m_processHandle)
+    {
+        if (!alreadyTerminating)
         {
-            LOG_IF_FAILED(WslOpenVmmVmTeardown(m_vm.get()));
+            m_vmExitEvent.wait(c_shutdownTimeoutMs);
         }
 
-        LOG_IF_FAILED(WslOpenVmmVmQuit(m_vm.get()));
-        m_vm.reset();
+        if (WaitForSingleObject(m_processHandle.get(), 0) == WAIT_TIMEOUT)
+        {
+            LOG_IF_FAILED(InvokeVmRpc("Teardown", WslOpenVmmVmTeardown, true));
+            LOG_IF_FAILED(InvokeVmRpc("Quit", WslOpenVmmVmQuit, true));
+        }
     }
 
     if (m_processHandle)
@@ -158,7 +176,9 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
         {
             WSL_LOG("OpenVmmForceTerminate", TraceLoggingValue(m_vmId, "VmId"));
             LOG_LAST_ERROR_IF(!TerminateProcess(m_processHandle.get(), 1));
-            LOG_LAST_ERROR_IF(WaitForSingleObject(m_processHandle.get(), c_processTerminationTimeoutMs) == WAIT_FAILED);
+            const auto terminated = WaitForSingleObject(m_processHandle.get(), c_processTerminationTimeoutMs);
+            LOG_LAST_ERROR_IF(terminated == WAIT_FAILED);
+            LOG_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), terminated == WAIT_TIMEOUT);
         }
         else
         {
@@ -169,7 +189,13 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
     if (m_processWait)
     {
         SetThreadpoolWait(m_processWait.get(), nullptr, nullptr);
+        WaitForThreadpoolWaitCallbacks(m_processWait.get(), TRUE);
         m_processWait.reset();
+    }
+
+    {
+        auto rpcLock = m_rpcLock.lock_exclusive();
+        m_vm.reset();
     }
 
     m_dmesgCollector.reset();
@@ -178,11 +204,21 @@ OpenVmmWslCoreVm::~OpenVmmWslCoreVm() noexcept
     m_processHandle.reset();
     m_processJobObject.reset();
 
-    DeleteFileW(m_listenPath.c_str());
-    DeleteFileW(m_virtioFsListenPath.c_str());
-    DeleteFileW(m_vsockPath.c_str());
-    DeleteFileW(m_rpcSocketPath.c_str());
-    RemoveDirectoryW(m_rpcDirectory.c_str());
+    const auto removePath = [](const std::filesystem::path& path, bool directory) {
+        if (!path.empty() && !(directory ? RemoveDirectoryW(path.c_str()) : DeleteFileW(path.c_str())))
+        {
+            const auto error = GetLastError();
+            if (error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND)
+            {
+                LOG_WIN32_MSG(error, "OpenVMM endpoint cleanup failed");
+            }
+        }
+    };
+    removePath(m_listenPath, false);
+    removePath(m_virtioFsListenPath, false);
+    removePath(m_vsockPath, false);
+    removePath(m_rpcSocketPath, false);
+    removePath(m_rpcDirectory, true);
 
     WSL_LOG("OpenVmmTerminateVmStop", TraceLoggingValue(m_vmId, "VmId"));
 }
@@ -208,28 +244,8 @@ std::unique_ptr<OpenVmmWslCoreVm> OpenVmmWslCoreVm::Create(
 }
 
 void OpenVmmWslCoreVm::Initialize()
+try
 {
-    auto signalEarlyTermination = wil::scope_exit([&] {
-        m_terminatingEvent.SetEvent();
-        m_vmExitEvent.SetEvent();
-
-        UnregisterProcess();
-        m_processWait.reset();
-        m_portTracker.reset();
-        m_gnsSocket.reset();
-        m_notifyChannel.reset();
-        m_miniInitChannel.Close();
-        m_listenSocket.reset();
-        m_vm.reset();
-        m_processHandle.reset();
-        m_processJobObject.reset();
-
-        DeleteFileW(m_listenPath.c_str());
-        DeleteFileW(m_vsockPath.c_str());
-        DeleteFileW(m_rpcSocketPath.c_str());
-        RemoveDirectoryW(m_rpcDirectory.c_str());
-    });
-
     InitializeConfiguration();
 
     m_systemDistroDeviceId = ReserveLun();
@@ -255,8 +271,18 @@ void OpenVmmWslCoreVm::Initialize()
     m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
     ReadGuestCapabilities();
     InitializeGuest();
-
-    signalEarlyTermination.release();
+}
+catch (...)
+{
+    const auto result = wil::ResultFromCaughtException();
+    WSL_LOG(
+        "OpenVmmInitializationFailed",
+        TraceLoggingValue(m_vmId, "VmId"),
+        TraceLoggingValue(m_processHandle ? GetProcessId(m_processHandle.get()) : 0, "ProcessId"),
+        TraceLoggingValue(result, "Result"),
+        TraceLoggingValue(openvmm::FailureCategory(result), "Category"));
+    CancelVmRequests();
+    throw;
 }
 
 void OpenVmmWslCoreVm::InitializeConfiguration()
@@ -579,15 +605,66 @@ void OpenVmmWslCoreVm::LaunchOpenVmm()
     process.SetStdHandles(nullptr, logFile.get(), errorLogFile.get());
 
     m_processHandle = process.Start();
-    RegisterOpenVmmProcess(m_vmId, m_processHandle.get());
+    WSL_LOG(
+        "OpenVmmProcessStarted",
+        TraceLoggingValue(m_vmId, "VmId"),
+        TraceLoggingValue(GetProcessId(m_processHandle.get()), "ProcessId"));
+    RegisterOpenVmmProcess(m_vmId, m_processHandle.get(), [this] { CancelVmRequests(); });
     m_processRegistered = true;
     m_processWait.reset(CreateThreadpoolWait(&OpenVmmWslCoreVm::OnProcessExit, this, nullptr));
     THROW_LAST_ERROR_IF(!m_processWait);
     SetThreadpoolWait(m_processWait.get(), m_processHandle.get(), nullptr);
+    decltype(m_vm) vm;
     THROW_IF_FAILED_MSG(
-        WslOpenVmmCreateVm(config.addressof(), m_rpcSocketPath.c_str(), m_vmConfig.KernelBootTimeout, m_vm.put()),
+        WslOpenVmmCreateVm(config.addressof(), m_rpcSocketPath.c_str(), m_vmConfig.KernelBootTimeout, vm.put()),
         "Failed to create OpenVMM VM");
-    THROW_IF_FAILED_MSG(WslOpenVmmVmResume(m_vm.get()), "Failed to resume OpenVMM VM");
+    {
+        auto rpcLock = m_rpcLock.lock_exclusive();
+        m_vm = std::move(vm);
+    }
+    // Process exit/forced shutdown may have happened before CreateVm published its handle.
+    if (m_terminatingEvent.is_signaled())
+    {
+        CancelVmRequests();
+        THROW_HR(E_ABORT);
+    }
+    THROW_IF_FAILED_MSG(InvokeVmRpc("Resume", WslOpenVmmVmResume), "Failed to resume OpenVMM VM");
+}
+
+void OpenVmmWslCoreVm::CancelVmRequests() noexcept
+{
+    m_terminatingEvent.SetEvent();
+    auto rpcLock = m_rpcLock.lock_shared();
+    if (m_vm)
+    {
+        LOG_IF_FAILED(WslOpenVmmVmCancelRequests(m_vm.get()));
+    }
+}
+
+HRESULT OpenVmmWslCoreVm::InvokeVmRpc(_In_ PCSTR Operation, _In_ const std::function<HRESULT(WslOpenVmmVm*)>& Callback, _In_ bool Cleanup) noexcept
+{
+    auto rpcLock = m_rpcLock.lock_shared();
+    RETURN_HR_IF(E_ABORT, !Cleanup && m_terminatingEvent.is_signaled());
+    RETURN_HR_IF(E_UNEXPECTED, !m_vm);
+    const auto start = GetTickCount64();
+    const auto result = Callback(m_vm.get());
+    WSL_LOG(
+        "OpenVmmRpcCompleted",
+        TraceLoggingValue(m_vmId, "VmId"),
+        TraceLoggingValue(GetProcessId(m_processHandle.get()), "ProcessId"),
+        TraceLoggingValue(Operation, "Operation"),
+        TraceLoggingValue(result, "Result"),
+        TraceLoggingValue(SUCCEEDED(result) ? "Success" : openvmm::FailureCategory(result), "Category"),
+        TraceLoggingValue(GetTickCount64() - start, "ElapsedMs"));
+    if (!Cleanup && openvmm::RequiresRecreation(result))
+    {
+        WSL_LOG("OpenVmmRecoveryRequired", TraceLoggingValue(m_vmId, "VmId"), TraceLoggingValue(Operation, "Operation"));
+        m_terminatingEvent.SetEvent();
+        LOG_IF_FAILED(WslOpenVmmVmCancelRequests(m_vm.get()));
+        // The normal process-exit callback retires the session VM. Never replay an uncertain mutation.
+        LOG_LAST_ERROR_IF(!TerminateProcess(m_processHandle.get(), 1));
+    }
+    return result;
 }
 
 wil::unique_socket OpenVmmWslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout) const
@@ -695,9 +772,11 @@ std::tuple<std::wstring, std::wstring, std::wstring> OpenVmmWslCoreVm::AddVirtio
     GUID tagGuid{};
     THROW_IF_FAILED(CoCreateGuid(&tagGuid));
     const auto tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::GuidToStringFlags::None);
-    THROW_IF_FAILED(WslOpenVmmVmAddShare(m_vm.get(), tag.c_str(), sharePath.c_str(), readOnly));
-    auto removeOnFailure =
-        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { LOG_IF_FAILED(WslOpenVmmVmRemoveShare(m_vm.get(), tag.c_str())); });
+    THROW_IF_FAILED(
+        InvokeVmRpc("AddShare", [&](auto* vm) { return WslOpenVmmVmAddShare(vm, tag.c_str(), sharePath.c_str(), readOnly); }));
+    auto removeOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        LOG_IF_FAILED(InvokeVmRpc("RemoveShare", [&](auto* vm) { return WslOpenVmmVmRemoveShare(vm, tag.c_str()); }));
+    });
 
     m_virtioFsShares.emplace_back(VirtioFsShare{std::move(sharePath), Options, Admin, tag});
     removeOnFailure.release();
@@ -870,8 +949,10 @@ void OpenVmmWslCoreVm::InitializeGuest()
                 }
 
                 const auto port = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&address));
-                return allocate ? WslOpenVmmVmBindPort(m_vm.get(), port, port, protocol == IPPROTO_TCP, address.si_family)
-                                : WslOpenVmmVmUnbindPort(m_vm.get(), port, port, protocol == IPPROTO_TCP, address.si_family);
+                return InvokeVmRpc(allocate ? "BindPort" : "UnbindPort", [&](auto* vm) {
+                    return allocate ? WslOpenVmmVmBindPort(vm, port, port, protocol == IPPROTO_TCP, address.si_family)
+                                    : WslOpenVmmVmUnbindPort(vm, port, port, protocol == IPPROTO_TCP, address.si_family);
+                });
             },
             [](const std::string&, bool) {});
     }
@@ -985,8 +1066,7 @@ void OpenVmmWslCoreVm::UnregisterProcess() noexcept
     }
 }
 
-void CALLBACK OpenVmmWslCoreVm::OnProcessExit(
-    _Inout_ PTP_CALLBACK_INSTANCE, _In_opt_ void* Context, _Inout_ PTP_WAIT, _In_ TP_WAIT_RESULT) noexcept
+void CALLBACK OpenVmmWslCoreVm::OnProcessExit(_Inout_ PTP_CALLBACK_INSTANCE Instance, _In_opt_ void* Context, _Inout_ PTP_WAIT, _In_ TP_WAIT_RESULT) noexcept
 {
     auto* vm = static_cast<OpenVmmWslCoreVm*>(Context);
     DWORD exitCode{};
@@ -995,8 +1075,11 @@ void CALLBACK OpenVmmWslCoreVm::OnProcessExit(
     WSL_LOG(
         "OpenVmmProcessExited",
         TraceLoggingValue(exitCode, "ExitCode"),
+        TraceLoggingValue(GetProcessId(vm->m_processHandle.get()), "ProcessId"),
+        TraceLoggingValue(vm->m_terminatingEvent.is_signaled(), "TerminationRequested"),
         TraceLoggingValue(vm->m_vmId, "VmId"));
 
+    vm->CancelVmRequests();
     std::function<void(GUID)> terminationCallback;
     {
         auto exitLock = vm->m_exitCallbackLock.lock_exclusive();
@@ -1005,11 +1088,15 @@ void CALLBACK OpenVmmWslCoreVm::OnProcessExit(
         terminationCallback = std::move(vm->m_terminationCallback);
     }
 
+    const auto vmId = vm->m_vmId;
+    // The session callback may destroy this VM or wait for its owner's lock. No owner access
+    // is allowed after disassociation, so destructor callback-draining cannot deadlock.
+    DisassociateCurrentThreadFromCallback(Instance);
     if (terminationCallback)
     {
         try
         {
-            terminationCallback(vm->m_vmId);
+            terminationCallback(vmId);
         }
         CATCH_LOG()
     }
@@ -1018,6 +1105,7 @@ void CALLBACK OpenVmmWslCoreVm::OnProcessExit(
 void OpenVmmWslCoreVm::ForceTerminate(_In_ const GUID& VmId)
 {
     const auto process = GetOpenVmmProcess(VmId);
+    WSL_LOG("OpenVmmForcedShutdown", TraceLoggingValue(VmId, "VmId"), TraceLoggingValue(GetProcessId(process.get()), "ProcessId"));
     const auto waitResult = WaitForSingleObject(process.get(), 0);
     if (waitResult == WAIT_OBJECT_0)
     {
@@ -1056,7 +1144,7 @@ ULONG OpenVmmWslCoreVm::AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type,
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
         if (attached)
         {
-            LOG_IF_FAILED(WslOpenVmmVmDetachScsiDisk(m_vm.get(), 0, allocatedLun));
+            LOG_IF_FAILED(InvokeVmRpc("DetachScsiDisk", [&](auto* vm) { return WslOpenVmmVmDetachScsiDisk(vm, 0, allocatedLun); }));
         }
 
         FreeLun(allocatedLun);
@@ -1068,7 +1156,8 @@ ULONG OpenVmmWslCoreVm::AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type,
             Disk, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         THROW_LAST_ERROR_IF(!backingFile);
 
-        THROW_IF_FAILED(WslOpenVmmVmAttachScsiDisk(m_vm.get(), 0, allocatedLun, Disk, ReadOnly));
+        THROW_IF_FAILED(
+            InvokeVmRpc("AttachScsiDisk", [&](auto* vm) { return WslOpenVmmVmAttachScsiDisk(vm, 0, allocatedLun, Disk, ReadOnly); }));
         attached = true;
         m_attachedDisks.emplace(allocatedLun, AttachedDisk{Type, Disk, ReadOnly, IsUserDisk, {}, std::move(backingFile)});
     }
@@ -1200,7 +1289,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> OpenVmmWslCoreVm::DetachDisk(_In_opt_ PCWSTR 
             return result;
         }
 
-        THROW_IF_FAILED(WslOpenVmmVmDetachScsiDisk(m_vm.get(), 0, disk->first));
+        THROW_IF_FAILED(InvokeVmRpc("DetachScsiDisk", [&](auto* vm) { return WslOpenVmmVmDetachScsiDisk(vm, 0, disk->first); }));
         FreeLun(disk->first);
         detached = true;
         disk = m_attachedDisks.erase(disk);
@@ -1228,7 +1317,7 @@ void OpenVmmWslCoreVm::EjectVhd(_In_ PCWSTR VhdPath)
     const auto& result = m_miniInitChannel.Transaction(message);
     LOG_HR_IF_MSG(E_UNEXPECTED, result.Result != 0, "VHD eject failed: %u", result.Result);
 
-    THROW_IF_FAILED(WslOpenVmmVmDetachScsiDisk(m_vm.get(), 0, disk->first));
+    THROW_IF_FAILED(InvokeVmRpc("DetachScsiDisk", [&](auto* vm) { return WslOpenVmmVmDetachScsiDisk(vm, 0, disk->first); }));
     FreeLun(disk->first);
     m_attachedDisks.erase(disk);
 }
@@ -1395,8 +1484,12 @@ void OpenVmmWslCoreVm::RegisterCallbacks(
         else
         {
             std::thread([terminationCallback = TerminationCallback, vmId = m_vmId] {
-                wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
-                terminationCallback(vmId);
+                try
+                {
+                    wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
+                    terminationCallback(vmId);
+                }
+                CATCH_LOG()
             }).detach();
         }
     }

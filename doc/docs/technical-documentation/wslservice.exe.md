@@ -53,6 +53,56 @@ distributions for the user. Automatic fallback is intentionally not provided:
 silently changing backends can change filesystem/networking semantics, and
 retrying after partial initialization risks overlapping resources.
 
+### OpenVMM RPC failure and process lifetime
+
+The private RPC client uses bounded gRPC over AF_UNIX. It never replays an
+uncertain mutation. The backend routes resume, disk, share, and localhost-port
+operations through one service-side failure policy:
+
+| Failure category | HRESULT examples | Backend action |
+| --- | --- | --- |
+| Validation | `E_INVALIDARG`, `ERROR_NOT_FOUND`, `ERROR_ALREADY_EXISTS`, `E_NOTIMPL` | Return the rejection; permit a corrected explicit request. |
+| Authorization | `E_ACCESSDENIED`, `ERROR_LOGON_FAILURE` | Return the rejection; permit a corrected explicit request. |
+| Timeout | `WAIT_TIMEOUT` | Cancel requests and retire the process. |
+| Cancellation | `E_ABORT` | Cancel requests and retire the process. |
+| Transport / protocol | `ERROR_CONNECTION_ABORTED`, `ERROR_INVALID_DATA` | Cancel requests and retire the process. |
+| Invalid state | `ERROR_INVALID_STATE` | Cancel requests and retire the process. |
+| Other server or resource failure | `E_FAIL`, `ERROR_RETRY`, `ERROR_NOT_ENOUGH_MEMORY`, other failing HRESULTs | Cancel requests and retire the process. |
+
+Win32 names in the table denote HRESULTs constructed with `HRESULT_FROM_WIN32`.
+The service intentionally makes a more conservative decision than the RPC
+client: the private ABI does not reveal whether a timeout occurred before
+dispatch, or whether `ERROR_INVALID_STATE` denotes a definite server rejection
+or an already-invalidated client. Both require process recreation at this layer.
+The original operation's HRESULT is returned; no retry or HCS fallback occurs.
+Process exit retires the owning session VM. A subsequent launch constructs a new
+configuration, process, VM identity, RPC handle, and resource bookkeeping.
+
+Normal shutdown cancels mutations before joining the port-tracker and VirtioFS
+workers. Forced shutdown cancels through the VM-ID process registration before
+terminating that exact process. Unexpected process exit also cancels requests.
+Cancellation can run concurrently with an RPC: both hold a shared handle-lifetime
+lock, while publication and destruction hold it exclusively. The RPC client
+continues to own serialization and deadlines. If exit races `CreateVm`, the newly
+published handle is cancelled and initialization fails; a creation already in
+flight without a handle remains bounded by its creation deadline.
+
+Shutdown still permits bounded teardown/quit against a live process, followed by
+timed process termination. Failed initialization uses the same destructor path,
+rather than freeing an RPC handle ahead of its workers. Process-wait callbacks
+finish accessing the backend before notifying the session, so draining them
+cannot deadlock with destruction. Session notifications use weak ownership and
+check the VM identity under the session lock: a delayed notification cannot stop
+a replacement VM.
+
+The existing WSL trace provider records process start/exit, initialization
+failure, forced shutdown, RPC operation/result/category/elapsed time, and
+recovery-required decisions, using the VM ID and process ID where applicable.
+RPC payloads and server error text are not added to these events. Low-level Rust
+tracing remains debugger output, not a new ETW provider or a new WPR profile.
+Endpoint cleanup errors and process-termination timeouts are logged explicitly.
+This is process/RPC diagnostics, not crash-artifact or kernel-panic collection.
+
 ## WSL2 Distributions 
 
 Once the virtual machine is running, WSL distributions can be started by calling `WslCoreVm::CreateInstance`. Each running distribution is represented by a `WslCoreInstance` (see `src/windows/service/WslCoreInstance.cpp`).

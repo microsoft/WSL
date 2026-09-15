@@ -116,6 +116,7 @@ set(HEADERS
     MountSpecParsing.h
     NatNetworking.h
     notifications.h
+    OpenVmmError.h
     precomp.h
     Redirector.h
     registry.hpp

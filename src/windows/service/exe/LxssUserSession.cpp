@@ -3065,7 +3065,12 @@ void LxssUserSessionImpl::_CreateVm()
         // Otherwise if an exception is thrown, calling _VmTerminate() will trigger the 's_VmTerminated' termination callback
         // Which can deadlock since this thread holds the instance lock and HCS can block until the VM termination callback returns before deleting the VM.
 
-        m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
+        m_utilityVm->RegisterCallbacks(std::bind(callback, _1), [weakSession](const GUID& terminatedVmId) {
+            if (const auto session = weakSession.lock())
+            {
+                s_VmTerminated(session.get(), terminatedVmId);
+            }
+        });
     }
 
     _VmCheckIdle();
@@ -4347,14 +4352,18 @@ VOID CALLBACK LxssUserSessionImpl::s_VmIdleTerminate(_Inout_ PTP_CALLBACK_INSTAN
 void LxssUserSessionImpl::s_VmTerminated(_Inout_ LxssUserSessionImpl* UserSession, _In_ const GUID& VmId)
 try
 {
-    UNREFERENCED_PARAMETER(VmId);
-
     if (UserSession->m_suppressVmTerminationCallback.load())
     {
         return;
     }
 
-    UserSession->TerminateByClientId(LXSS_CLIENT_ID_WILDCARD);
+    std::lock_guard lock(UserSession->m_instanceLock);
+    // A disassociated process-exit callback can arrive after shutdown and fresh VM creation.
+    if (UserSession->m_suppressVmTerminationCallback.load() || !IsEqualGUID(UserSession->m_vmId.load(), VmId))
+    {
+        return;
+    }
+    UserSession->TerminateByClientIdLockHeld(LXSS_CLIENT_ID_WILDCARD);
     return;
 }
 CATCH_LOG()

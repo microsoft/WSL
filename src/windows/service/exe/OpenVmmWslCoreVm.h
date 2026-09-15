@@ -116,6 +116,8 @@ private:
     void InitializeConfiguration();
     void InitializeGuest();
     void LaunchOpenVmm();
+    void CancelVmRequests() noexcept;
+    HRESULT InvokeVmRpc(_In_ PCSTR Operation, _In_ const std::function<HRESULT(WslOpenVmmVm*)>& Callback, _In_ bool Cleanup = false) noexcept;
     std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
     void ReadGuestCapabilities();
     static std::string GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
@@ -150,7 +152,9 @@ private:
     std::filesystem::path m_openVmmPath;
     std::filesystem::path m_rpcDirectory;
     std::filesystem::path m_rpcSocketPath;
-    wil::unique_any<WslOpenVmmVm*, decltype(&WslOpenVmmDestroyVm), WslOpenVmmDestroyVm> m_vm;
+    // RPCs and cancellation share this lock; only publication/destruction take it exclusively.
+    wil::srwlock m_rpcLock;
+    _Guarded_by_(m_rpcLock) wil::unique_any<WslOpenVmmVm*, decltype(&WslOpenVmmDestroyVm), WslOpenVmmDestroyVm> m_vm;
     std::filesystem::path m_vsockPath;
     std::filesystem::path m_listenPath;
     std::wstring m_userProfile;
