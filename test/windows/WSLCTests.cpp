@@ -7265,11 +7265,20 @@ class WSLCTests
 
         // Image filters match the image attribute carried by container events.
         {
-            WSLCFilter filter{"image", c_imageName};
+            WSLCFilter filters[]{{"container", id.c_str()}, {"image", c_imageName}};
             wil::com_ptr<IWSLCEventStream> stream;
-            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
             verifyEvents(drain(stream.get()), id, {"create", "start", "kill", "stop", "destroy"});
+        }
+
+        // A non-matching image excludes the same container's events.
+        {
+            WSLCFilter filters[]{{"container", id.c_str()}, {"image", "nonexistent:image"}};
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
+
+            VERIFY_IS_TRUE(drain(stream.get()).empty());
         }
 
         // Values sharing a filter key are OR'd.
