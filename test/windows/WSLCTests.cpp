@@ -144,6 +144,13 @@ class WSLCTests
         return wil::scope_exit([this]() { m_defaultSession = CreateSession(m_defaultSessionSettings); });
     }
 
+    static LONGLONG WaitForNextEventSecond()
+    {
+        const auto nextSecond = floor<seconds>(system_clock::now()) + 1s;
+        std::this_thread::sleep_until(nextSecond);
+        return nextSecond.time_since_epoch().count();
+    }
+
     static wil::com_ptr<IWSLCSessionManager> OpenSessionManager()
     {
         wil::com_ptr<IWSLCSessionManager> sessionManager;
@@ -7158,6 +7165,21 @@ class WSLCTests
         }
     }
 
+    std::vector<wsl::windows::common::wslc_schema::Event> DrainEventStream(IWSLCEventStream* Stream)
+    {
+        std::vector<wsl::windows::common::wslc_schema::Event> events;
+
+        wil::unique_cotaskmem_ansistring eventJson;
+        HRESULT result;
+        while (SUCCEEDED(result = Stream->GetNext(&eventJson)))
+        {
+            events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
+        }
+
+        VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, result);
+        return events;
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";
@@ -7167,22 +7189,6 @@ class WSLCTests
         const auto expectedExitCode = std::to_string(128 + WSLCSignalSIGKILL);
 
         auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
-
-        // Drains a bounded event stream to completion (GetNext returns WSLC_E_EVENT_STREAM_FINISHED
-        // once the until-time has passed and the backlog is exhausted), parsing each event's JSON.
-        auto drain = [](IWSLCEventStream* stream) {
-            std::vector<wsl::windows::common::wslc_schema::Event> events;
-
-            wil::unique_cotaskmem_ansistring eventJson;
-            HRESULT result;
-            while (SUCCEEDED(result = stream->GetNext(&eventJson)))
-            {
-                events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
-            }
-
-            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, result);
-            return events;
-        };
 
         // Verifies the given events match the expected actions in order for a given actor.
         auto verifyEvents = [&](const std::vector<wsl::windows::common::wslc_schema::Event>& events,
@@ -7239,7 +7245,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
-            lifecycleEvents = drain(stream.get());
+            lifecycleEvents = DrainEventStream(stream.get());
             verifyEvents(lifecycleEvents, id, {"create", "start", "kill", "stop", "destroy"});
 
             // The whole lifecycle falls inside the requested window.
@@ -7254,7 +7260,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
-            verifyEvents(drain(stream.get()), id, {action});
+            verifyEvents(DrainEventStream(stream.get()), id, {action});
         };
 
         verifyEventFilter("create");
@@ -7269,7 +7275,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, filters, ARRAYSIZE(filters), &stream));
 
-            verifyEvents(drain(stream.get()), id, {"create", "destroy"});
+            verifyEvents(DrainEventStream(stream.get()), id, {"create", "destroy"});
         }
 
         // Image events are not recorded yet, so a 'type=image' filter excludes the container's
@@ -7279,7 +7285,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
-            VERIFY_IS_TRUE(drain(stream.get()).empty());
+            VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
         }
 
         // An unmatched container id yields an empty stream, and GetNext validates its out-pointer.
@@ -7288,7 +7294,7 @@ class WSLCTests
             wil::com_ptr<IWSLCEventStream> stream;
             VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
 
-            VERIFY_IS_TRUE(drain(stream.get()).empty());
+            VERIFY_IS_TRUE(DrainEventStream(stream.get()).empty());
         }
 
         // A since-time later than a non-zero until-time describes a backwards window and is rejected.
@@ -7297,6 +7303,421 @@ class WSLCTests
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->GetEvents(since + 1, since, nullptr, 0, &stream));
             ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcEventsInvalidTimeWindow(since + 1, since));
         }
+    }
+
+    WSLC_TEST_METHOD(NetworkEventStream)
+    {
+        const std::string networkName = "wslc-test-network-events";
+        const std::string containerName = "wslc-test-network-events-container";
+        const std::string imageName = "debian:latest";
+        const std::string networkDriver = "bridge";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        const LONGLONG since = WaitForNextEventSecond();
+        std::string networkId;
+        std::string containerId;
+
+        {
+            WSLCNetworkOptions options{};
+            options.Name = networkName.c_str();
+            options.Driver = networkDriver.c_str();
+            VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options, nullptr));
+
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+            // CreateNetwork returns only after its event has been recorded.
+            {
+                WSLCFilter filter{"network", networkName.c_str()};
+                wil::com_ptr<IWSLCEventStream> stream;
+                VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, &filter, 1, &stream));
+
+                const auto events = DrainEventStream(stream.get());
+                VERIFY_ARE_EQUAL(static_cast<size_t>(1), events.size());
+                VERIFY_ARE_EQUAL("create", events[0].Action);
+            }
+
+            const auto networks = ListNetworks();
+            const auto created = std::ranges::find_if(networks, [&](const auto& network) { return network.Name == networkName; });
+            VERIFY_ARE_NOT_EQUAL(networks.end(), created);
+            networkId = created->Id;
+
+            // Running a container makes Docker attach and detach an endpoint.
+            {
+                WSLCContainerLauncher launcher(imageName, containerName, {"sleep", "99999"}, {}, networkName);
+                auto container = launcher.Launch(*m_defaultSession);
+                containerId = container.Id();
+
+                VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            }
+
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+            cleanup.release();
+            VERIFY_IS_FALSE(NetworkIsListed(networkName));
+        }
+        const LONGLONG until = now() + 1;
+
+        auto eventsMatching = [&](const std::vector<WSLCFilter>& Filters) {
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, Filters.data(), static_cast<ULONG>(Filters.size()), &stream));
+
+            return DrainEventStream(stream.get());
+        };
+
+        auto verifyActions = [&](const std::vector<wsl::windows::common::wslc_schema::Event>& Events,
+                                 const std::vector<std::string>& ExpectedActions) {
+            VERIFY_ARE_EQUAL(ExpectedActions.size(), Events.size());
+
+            for (size_t i = 0; i < ExpectedActions.size(); ++i)
+            {
+                VERIFY_ARE_EQUAL(ExpectedActions[i], Events[i].Action);
+            }
+        };
+
+        const std::vector<std::string> lifecycleActions{"create", "connect", "disconnect", "destroy"};
+
+        // Verify lifecycle order and actor metadata.
+        {
+            const auto events = eventsMatching({{"network", networkId.c_str()}});
+            verifyActions(events, lifecycleActions);
+
+            for (const auto& event : events)
+            {
+                VERIFY_ARE_EQUAL("network", event.Type);
+                VERIFY_ARE_EQUAL(networkId, event.Actor.ID);
+                VERIFY_ARE_EQUAL(networkName, event.Actor.Attributes.at("name"));
+                VERIFY_ARE_EQUAL(networkDriver, event.Actor.Attributes.at("type"));
+            }
+
+            // Only the endpoint events name the container that attached to the network.
+            VERIFY_IS_FALSE(events[0].Actor.Attributes.contains("container"));
+            VERIFY_ARE_EQUAL(containerId, events[1].Actor.Attributes.at("container"));
+            VERIFY_ARE_EQUAL(containerId, events[2].Actor.Attributes.at("container"));
+            VERIFY_IS_FALSE(events[3].Actor.Attributes.contains("container"));
+        }
+
+        // Docker matches network filters by full or prefixed ID and name.
+        {
+            const std::string networkIdPrefix = networkId.substr(0, 12);
+            const std::string networkNamePrefix = networkName.substr(0, networkName.size() - 1);
+
+            verifyActions(eventsMatching({{"type", "network"}, {"network", networkId.c_str()}}), lifecycleActions);
+            verifyActions(eventsMatching({{"network", networkIdPrefix.c_str()}}), lifecycleActions);
+            verifyActions(eventsMatching({{"network", networkName.c_str()}}), lifecycleActions);
+            verifyActions(eventsMatching({{"network", networkNamePrefix.c_str()}}), lifecycleActions);
+        }
+
+        // Distinct filter keys are AND'd.
+        verifyActions(eventsMatching({{"network", networkName.c_str()}, {"event", "connect"}}), {"connect"});
+
+        // Values sharing a filter key are OR'd.
+        {
+            const std::vector<WSLCFilter> filters{{"network", networkName.c_str()}, {"event", "create"}, {"event", "destroy"}};
+
+            verifyActions(eventsMatching(filters), {"create", "destroy"});
+        }
+
+        // A network that never existed matches nothing.
+        VERIFY_IS_TRUE(eventsMatching({{"network", "wslc-test-no-such-network"}}).empty());
+    }
+
+    WSLC_TEST_METHOD(NetworkPruneEventStream)
+    {
+        const std::string firstNetwork = "wslc-test-prune-events-a";
+        const std::string secondNetwork = "wslc-test-prune-events-b";
+        const std::string pruneLabel = "wslc-test-prune-events";
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+        });
+
+        const LONGLONG since = WaitForNextEventSecond();
+
+        // The label scopes this prune to the test networks.
+        CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
+        CreateNamedNetwork(secondNetwork, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter pruneFilter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), deleted.size());
+
+        cleanup.release();
+
+        const LONGLONG until = now() + 1;
+
+        WSLCFilter filter{"type", "network"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, until, &filter, 1, &stream));
+
+        const auto events = DrainEventStream(stream.get());
+
+        // Keep events for the test networks and Docker's unkeyed aggregate prune.
+        const auto isTestEvent = [&](const wsl::windows::common::wslc_schema::Event& Event) {
+            const auto name = Event.Actor.Attributes.find("name");
+            return Event.Action == "prune" ||
+                   (name != Event.Actor.Attributes.end() && (name->second == firstNetwork || name->second == secondNetwork));
+        };
+
+        std::vector<wsl::windows::common::wslc_schema::Event> testEvents;
+        std::ranges::copy_if(events, std::back_inserter(testEvents), isTestEvent);
+
+        // Docker emits per-network destroys before one aggregate prune.
+        VERIFY_ARE_EQUAL(static_cast<size_t>(5), testEvents.size());
+        VERIFY_ARE_EQUAL("create", testEvents[0].Action);
+        VERIFY_ARE_EQUAL("create", testEvents[1].Action);
+        VERIFY_ARE_EQUAL("destroy", testEvents[2].Action);
+        VERIFY_ARE_EQUAL("destroy", testEvents[3].Action);
+
+        const std::vector<std::string> expectedNetworks{firstNetwork, secondNetwork};
+        const std::vector<std::string> destroyed{testEvents[2].Actor.Attributes.at("name"), testEvents[3].Actor.Attributes.at("name")};
+        VerifyAreEqualUnordered(expectedNetworks, destroyed);
+
+        VERIFY_ARE_EQUAL("prune", testEvents[4].Action);
+        VERIFY_IS_TRUE(testEvents[4].Actor.ID.empty());
+        VERIFY_ARE_EQUAL("0", testEvents[4].Actor.Attributes.at("reclaimed"));
+    }
+
+    // Verify the destroy-before-prune ordering used to correlate unkeyed aggregate events.
+    WSLC_TEST_METHOD(NetworkPruneEventSequenceWithExternalPrune)
+    {
+        const std::string firstNetwork = "wslc-test-prune-unrelated-a";
+        const std::string secondNetwork = "wslc-test-prune-unrelated-b";
+        const std::string pruneLabel = "wslc-test-prune-unrelated";
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+        });
+
+        const LONGLONG since = WaitForNextEventSecond();
+
+        // Generate an unkeyed aggregate event without changing WSLC network state.
+        ExpectCommandResult(
+            m_defaultSession.get(),
+            {"/usr/bin/docker", "network", "prune", "-f", "--filter", "label=wslc-test-prune-matches-nothing"},
+            0);
+
+        CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
+        CreateNamedNetwork(secondNetwork, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter pruneFilter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), deleted.size());
+
+        cleanup.release();
+
+        WSLCFilter filter{"type", "network"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, &filter, 1, &stream));
+
+        const auto events = DrainEventStream(stream.get());
+
+        std::vector<std::string> actions;
+        for (const auto& e : events)
+        {
+            const auto name = e.Actor.Attributes.find("name");
+            if (e.Action == "prune" || (name != e.Actor.Attributes.end() && (name->second == firstNetwork || name->second == secondNetwork)))
+            {
+                actions.push_back(e.Action);
+            }
+        }
+
+        // The external aggregate precedes this request's ordered destroy and prune events.
+        const std::vector<std::string> expected{"prune", "create", "create", "destroy", "destroy", "prune"};
+        VERIFY_ARE_EQUAL(expected, actions);
+
+        // A no-op prune does not require an event-publication barrier.
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&pruneFilter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+    }
+
+    // A create that fails after dockerd made the network must roll it back without publishing events.
+    WSLC_TEST_METHOD(NetworkCreateRollbackSuppressesEvents)
+    {
+        const std::string rolledBack = "wslc-test-network-rollback";
+        const std::string barrier = "wslc-test-network-rollback-barrier";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(rolledBack.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        const LONGLONG since = WaitForNextEventSecond();
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(rolledBack.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+        });
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(TRUE, FALSE, FALSE, 0));
+
+        WSLCNetworkOptions options{};
+        options.Name = rolledBack.c_str();
+        options.Driver = "bridge";
+        VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->CreateNetwork(&options, nullptr));
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+
+        // The rollback removed the network from dockerd, not just from the session's metadata.
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(rolledBack.c_str(), &output));
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "network", "inspect", rolledBack.c_str()}, 1);
+
+        // Docker delivers events in order, so the barrier's events cannot be published before the
+        // rolled-back network's create and destroy were handled.
+        CreateNamedNetwork(barrier);
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        WSLCFilter filter{"type", "network"};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, &filter, 1, &stream));
+
+        for (const auto& e : DrainEventStream(stream.get()))
+        {
+            const auto name = e.Actor.Attributes.find("name");
+            VERIFY_IS_TRUE(name == e.Actor.Attributes.end() || name->second != rolledBack);
+        }
+    }
+
+    // A prune whose events never arrive must fence later prunes until the VM restarts.
+    WSLC_TEST_METHOD(NetworkPruneAbandonedAfterEventTimeout)
+    {
+        const std::string networkName = "wslc-test-prune-abandoned";
+        const std::string pruneLabel = "wslc-test-prune-abandoned";
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        });
+
+        CreateNamedNetwork(networkName, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter filter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+
+        // Drop the events this prune commits against so its publication wait times out.
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, TRUE, FALSE, 2000));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+
+        // The dropped events can never drain, so the fence rejects the next prune.
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        ValidateCOMErrorMessage(wsl::shared::Localization::MessageWslcNetworkPrunePending());
+
+        BOOL wasAlreadyIdle = FALSE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+
+        // The restarted VM clears the abandoned sequence, so prune is accepted again.
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+    }
+
+    // An abandoned prune must drain once its delayed events finally arrive, without a VM restart.
+    WSLC_TEST_METHOD(NetworkPruneAbandonedDrainsDelayedEvents)
+    {
+        const std::string firstNetwork = "wslc-test-prune-delayed-a";
+        const std::string secondNetwork = "wslc-test-prune-delayed-b";
+        const std::string barrier = "wslc-test-prune-delayed-barrier";
+        const std::string pruneLabel = "wslc-test-prune-delayed";
+        const std::string pruneLabelFilter = pruneLabel + "=yes";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(firstNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(secondNetwork.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+        });
+
+        // Two networks so the fence only clears after both destroys precede the aggregate event.
+        CreateNamedNetwork(firstNetwork, {{pruneLabel.c_str(), "yes"}});
+        CreateNamedNetwork(secondNetwork, {{pruneLabel.c_str(), "yes"}});
+
+        WSLCFilter filter{"label", pruneLabelFilter.c_str()};
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkName> deleted;
+
+        // Withhold the events this prune waits for so its publication wait times out.
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, TRUE, 2000));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+
+        // Releasing replays whatever was buffered; the barrier's create event then guarantees any
+        // aggregate event still in flight has also been processed.
+        VERIFY_SUCCEEDED(m_defaultSession->SetNetworkFaultsForTest(FALSE, FALSE, FALSE, 0));
+        CreateNamedNetwork(barrier);
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(barrier.c_str()));
+
+        VERIFY_SUCCEEDED(m_defaultSession->PruneNetworks(&filter, 1, deleted.addressof(), deleted.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), deleted.size());
+    }
+
+    // Verify callback registration survives Docker event-stream reconnection after VM restart.
+    WSLC_TEST_METHOD(NetworkEventsSurviveVmRestart)
+    {
+        const std::string networkName = "wslc-test-network-reconnect";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto now = [] { return duration_cast<seconds>(system_clock::now().time_since_epoch()).count(); };
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        const LONGLONG since = WaitForNextEventSecond();
+
+        CreateNamedNetwork(networkName);
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Listing restarts the VM and recovers the network from dockerd.
+        VERIFY_IS_TRUE(NetworkIsListed(networkName));
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        cleanup.release();
+
+        // The session event store retains create across restart and records destroy after reconnect.
+        WSLCFilter filter{"network", networkName.c_str()};
+        wil::com_ptr<IWSLCEventStream> stream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, now() + 1, &filter, 1, &stream));
+
+        const auto events = DrainEventStream(stream.get());
+
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), events.size());
+        VERIFY_ARE_EQUAL("create", events[0].Action);
+        VERIFY_ARE_EQUAL("destroy", events[1].Action);
     }
 
     WSLC_TEST_METHOD(EventStreamReportsLostEvents)

@@ -96,6 +96,22 @@ namespace {
                     return false;
                 }
             }
+            else if (key == "network")
+            {
+                const auto nameEntry = event.Actor.Attributes.find("name");
+                const std::string_view name =
+                    nameEntry != event.Actor.Attributes.end() ? std::string_view{nameEntry->second} : std::string_view{};
+
+                // Docker matches a network against its id or its name, either in full or by prefix.
+                const auto matchesIdOrName = [&](const std::string& value) {
+                    return event.Actor.ID.starts_with(value) || name.starts_with(value);
+                };
+
+                if (event.Type != "network" || !std::ranges::any_of(values, matchesIdOrName))
+                {
+                    return false;
+                }
+            }
         }
         return true;
     }

@@ -822,6 +822,12 @@ interface IWSLCSession : IUnknown
     // RPC_E_DISCONNECTED. The client holds the returned token for the whole operation; releasing
     // it (or the client exiting) lets the VM idle-terminate again.
     HRESULT BeginContainerOperation([out] IUnknown** Operation);
+
+    // Used only for testing. FailCreateInspect fails the next CreateNetwork after dockerd created the
+    // network, DropEvents discards network events, DeferEvents buffers them until events are re-enabled
+    // (DropEvents and DeferEvents are mutually exclusive), and EventTimeoutMs overrides the
+    // event-publication wait (0 restores the default).
+    HRESULT SetNetworkFaultsForTest([in] BOOL FailCreateInspect, [in] BOOL DropEvents, [in] BOOL DeferEvents, [in] ULONG EventTimeoutMs);
 }
 
 //
