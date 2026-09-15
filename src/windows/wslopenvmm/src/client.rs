@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::future::Future;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
@@ -592,7 +593,10 @@ fn request_with_timeout<T>(message: T, timeout: Duration) -> Request<T> {
 }
 
 fn disk_type(path: &str) -> i32 {
-    if path.ends_with(".vhdx") || path.ends_with(".VHDX") {
+    if Path::new(path)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("vhdx"))
+    {
         DiskType::ScsiDiskTypeVhdx as i32
     } else {
         DiskType::ScsiDiskTypeVhd1 as i32
