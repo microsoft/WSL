@@ -1366,7 +1366,7 @@ Return Value:
 --*/
 
 {
-    std::vector<gsl::byte> Buffer;
+    std::vector<gsl::byte> Buffer(LX_STDIO_RELAY_BUFFER_SIZE);
     ssize_t BytesRead;
     ssize_t BytesWritten;
     pid_t ChildPid;

@@ -129,6 +129,12 @@ Abstract:
 #define LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE (65536)
 
 //
+// Stdio relay buffer size
+//
+
+#define LX_STDIO_RELAY_BUFFER_SIZE (65536)
+
+//
 // Default buffer size for relaying.
 //
 
