@@ -1400,7 +1400,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             // A route update in Linux uses
             // (destination prefix, tos, metric) key alone and would silently overwrite a same-key route
             // belonging to a *different* interface (e.g. another interface's default at the same metric).
-            // An ModifyRequestType::Add plumbs a new route or leaves an existing one in place (EEXIST is ignored),
+            // A ModifyRequestType::Add plumbs a new route or leaves an existing one in place (EEXIST is ignored),
             // which is the desired behavior for PendingUpdate.
             //
             // The route synchronization logic never attempts an in-place update of a route. Whenever

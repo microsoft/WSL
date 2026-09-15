@@ -3188,9 +3188,8 @@ class NetworkTests
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"ip route show");
         LogInfo("Ip route output:\r\n%ls", FixLineEndings(out).c_str());
 
-        // The (?:.*(metric N))? tail lets ".*" skip tokens that precede the metric (e.g. "proto kernel",
-        // "scope link"); tokens after the number (e.g. "onlink", "pref medium") are ignored since this is a
-        // regex_search, not a full-line match. The whole group is optional for routes that report no metric.
+        // The (?:.*(metric N))? skip tokens that precede the metric (e.g. "proto kernel",
+        // "scope link");
         std::wregex defaultRoutePattern(L"default via ([0-9,.]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
         std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
 
@@ -3221,8 +3220,8 @@ class NetworkTests
         LogInfo("Ip -6 route output:\r\n%ls", FixLineEndings(out).c_str());
 
         RoutingTableState state;
-        // See GetIpv4RoutingTableState: ".*" skips tokens before the metric (e.g. "proto kernel"), and tokens
-        // after the number (e.g. "onlink", "pref medium") are ignored by the regex_search.
+        // The (?:.*(metric N))? skip tokens that precede the metric (e.g. "proto kernel",
+        // "scope link");
         std::wregex defaultRoutePattern(L"default via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
         std::wregex routePattern(L"([a-f,A-F,0-9,:,/]+) via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
 
