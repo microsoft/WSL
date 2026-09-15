@@ -3188,8 +3188,11 @@ class NetworkTests
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"ip route show");
         LogInfo("Ip route output:\r\n%ls", FixLineEndings(out).c_str());
 
-        std::wregex defaultRoutePattern(L"default via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
-        std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
+        // The (?:.*(metric N))? tail lets ".*" skip tokens that precede the metric (e.g. "proto kernel",
+        // "scope link"); tokens after the number (e.g. "onlink", "pref medium") are ignored since this is a
+        // regex_search, not a full-line match. The whole group is optional for routes that report no metric.
+        std::wregex defaultRoutePattern(L"default via ([0-9,.]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
+        std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
 
         return GetRoutingTableState(out, defaultRoutePattern, routePattern);
     }
@@ -3218,8 +3221,10 @@ class NetworkTests
         LogInfo("Ip -6 route output:\r\n%ls", FixLineEndings(out).c_str());
 
         RoutingTableState state;
-        std::wregex defaultRoutePattern(L"default via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
-        std::wregex routePattern(L"([a-f,A-F,0-9,:,/]+) via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
+        // See GetIpv4RoutingTableState: ".*" skips tokens before the metric (e.g. "proto kernel"), and tokens
+        // after the number (e.g. "onlink", "pref medium") are ignored by the regex_search.
+        std::wregex defaultRoutePattern(L"default via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
+        std::wregex routePattern(L"([a-f,A-F,0-9,:,/]+) via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*)(?:.*(metric ([0-9]+)))?");
 
         return GetRoutingTableState(out, defaultRoutePattern, routePattern);
     }
@@ -5172,35 +5177,48 @@ class MirroredTests
 
     static void RemoveHostRoute(const std::wstring& destination)
     {
+        // Best-effort cleanup: the route may not exist
         LxsstuLaunchPowershellAndCaptureOutput(
-            std::format(L"Remove-NetRoute -DestinationPrefix {} -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue", destination),
+            std::format(L"try {{ Remove-NetRoute -DestinationPrefix {} -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue }} catch {{}}; exit 0", destination),
             0);
     }
 
-    static std::optional<NetworkTests::Route> WaitForMirroredRoute(
+    static bool HostRouteExists(const std::wstring& destination)
+    {
+        auto [out, _] = LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"@(Get-NetRoute -DestinationPrefix {} -PolicyStore ActiveStore -ErrorAction SilentlyContinue).Count -gt 0", destination),
+            0);
+        return out.find(L"True") != std::wstring::npos;
+    }
+
+    static std::optional<NetworkTests::Route> FindMirroredRoute(
+        ADDRESS_FAMILY family, const std::wstring& destination, const std::wstring& gateway, std::optional<int> metric = std::nullopt)
+    {
+        const auto state = family == AF_INET ? NetworkTests::GetIpv4RoutingTableState() : NetworkTests::GetIpv6RoutingTableState();
+        for (const auto& route : state.Routes)
+        {
+            if (route.Prefix == destination && route.Via == gateway && (!metric.has_value() || route.Metric == metric.value()))
+            {
+                return route;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    static bool WaitForMirroredRoute(
         ADDRESS_FAMILY family, const std::wstring& destination, const std::wstring& gateway, bool shouldExist, std::optional<int> metric = std::nullopt)
     {
         Stopwatch<std::chrono::seconds> Watchdog(std::chrono::seconds(10));
         do
         {
-            std::optional<NetworkTests::Route> match;
-            const auto state = family == AF_INET ? NetworkTests::GetIpv4RoutingTableState() : NetworkTests::GetIpv6RoutingTableState();
-            for (const auto& route : state.Routes)
+            if (FindMirroredRoute(family, destination, gateway, metric).has_value() == shouldExist)
             {
-                if (route.Prefix == destination && route.Via == gateway && (!metric.has_value() || route.Metric == metric.value()))
-                {
-                    match = route;
-                    break;
-                }
-            }
-
-            if (match.has_value() == shouldExist)
-            {
-                return match;
+                return true;
             }
         } while (Sleep(1000), !Watchdog.IsExpired());
 
-        return std::nullopt;
+        return false;
     }
 
     // Adds a host route using RFC 5737 / RFC 3849 documentation ranges (safe to add without
@@ -5217,8 +5235,9 @@ class MirroredTests
         constexpr int metricA = 100;
         constexpr int metricB = 500;
 
-        RemoveHostRoute(destinationA);
-        RemoveHostRoute(destinationB);
+        VERIFY_IS_FALSE(HostRouteExists(destinationA));
+        VERIFY_IS_FALSE(HostRouteExists(destinationB));
+
         auto cleanup = wil::scope_exit([&] {
             RemoveHostRoute(destinationA);
             RemoveHostRoute(destinationB);
@@ -5227,21 +5246,22 @@ class MirroredTests
         AddHostRoute(ifIndex, destinationA, gatewayA, metricA);
         // The mirrored metric is the host route metric plus the interface metric, so its absolute value
         // isn't known up front. Capture the baseline without a metric filter, then assert relative changes.
-        const auto initialRoute = WaitForMirroredRoute(family, destinationA, gatewayA, true);
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true));
+        const auto initialRoute = FindMirroredRoute(family, destinationA, gatewayA);
         VERIFY_IS_TRUE(initialRoute.has_value());
 
         SetHostRouteMetric(destinationA, gatewayA, metricB);
-        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true, initialRoute->Metric + (metricB - metricA)).has_value());
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true, initialRoute->Metric + (metricB - metricA)));
 
         RemoveHostRoute(destinationA);
         AddHostRoute(ifIndex, destinationA, gatewayB, metricB);
-        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayB, true).has_value());
-        VERIFY_IS_FALSE(WaitForMirroredRoute(family, destinationA, gatewayA, false).has_value());
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayB, true));
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, false));
 
         RemoveHostRoute(destinationA);
         AddHostRoute(ifIndex, destinationB, gatewayB, metricB);
-        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationB, gatewayB, true).has_value());
-        VERIFY_IS_FALSE(WaitForMirroredRoute(family, destinationA, gatewayB, false).has_value());
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationB, gatewayB, true));
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayB, false));
     }
 
     WSL2_TEST_METHOD(DnsResolutionBasic)
