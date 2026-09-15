@@ -1724,24 +1724,24 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>轻松在 Windows 上以一流体验运行 Linux 容器。
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+你可以使用 wslc.exe 直接在 Windows 上构建、运行、推送、拉取和管理 Linux 容器。
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+你还可以使用 WSLC API 构建由 Linux 容器驱动运行时逻辑的 Windows 应用程序，从而更轻松地将 Linux 容器直接嵌入到应用中，用于云到本地工作流、AI 应用程序和隔离场景。</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>WSL 容器</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>详细了解 WSL 容器</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>WSL 容器 API 参考</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -3107,7 +3107,7 @@ Windows 版本: {}</value>
     <value>显示所有内容，而不考虑状态。</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>All tags in the repository.</value>
+    <value>存储库中的所有标记。</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>tag 不能与 --all-tags/-a 一起使用</value>

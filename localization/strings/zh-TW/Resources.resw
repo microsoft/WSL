@@ -1915,10 +1915,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>一般</value>
   </data>
   <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
-    <value>WSL container</value>
+    <value>WSL 容器</value>
   </data>
   <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
-    <value>NEW</value>
+    <value>新增功能</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>GPU 加速</value>
@@ -2246,11 +2246,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
-    <value>The option '{}' is not supported.</value>
+    <value>不支援選項 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
-    <value>'{}' is deprecated. Use {} instead.</value>
+    <value>'{}' 已棄用。請改為使用 {}。</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
@@ -2277,7 +2277,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage:  {} {}</value>
+    <value>使用方式:  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2324,7 +2324,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>一般選項:</value>
   </data>
   <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
-    <value>Global Options for '{}':</value>
+    <value>'{}' 的全域選項:</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
@@ -2731,7 +2731,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
   <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
-    <value>無法覆寫 '{0}'，因為它的類型與複製的項目不同。</value>
+    <value>無法覆寫 '{0}'，因為它與複製的項目類型不同。</value>
     <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
@@ -2815,16 +2815,16 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitor container events.</value>
+    <value>監視容器事件。</value>
   </data>
   <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitor real-time events from containers.</value>
+    <value>監視容器中的即時事件。</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
-    <value>Show all events created since the timestamp</value>
+    <value>顯示自該時間戳記以來建立的所有事件</value>
   </data>
   <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
-    <value>Stream events until the timestamp</value>
+    <value>串流事件直至該時間戳記為止</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>管理映像。</value>
@@ -3114,7 +3114,7 @@ Windows 版本：{}</value>
     <value>全部顯示 (不論狀態)。</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>All tags in the repository.</value>
+    <value>存放庫中的所有標籤。</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>標籤不能與 --all-tags/-a 一起使用</value>
@@ -3163,7 +3163,7 @@ Windows 版本：{}</value>
     <value>顯示記錄的更多詳細資料</value>
   </data>
   <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
-    <value>Show image digests</value>
+    <value>顯示映像摘要</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>指定容器 init 處理序的可執行檔</value>
@@ -3313,7 +3313,7 @@ Windows 版本：{}</value>
     <value>追蹤記錄輸出</value>
   </data>
   <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
-    <value>Always follow symlinks in SRC_PATH</value>
+    <value>一律在 SRC_PATH 中遵循符號連結</value>
     <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
@@ -3641,7 +3641,7 @@ Windows 版本：{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
-    <value>無效的 {} 值 '{}'. 預期值為 no、always、on-failure[:max-retries] 或 unless-stopped。</value>
+    <value>無效的 {} 值 '{}'。預期值為 no、always、on-failure[:max-retries] 或 unless-stopped。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
@@ -3730,7 +3730,7 @@ Windows 版本：{}</value>
     <value>限制對網路的外部存取</value>
   </data>
   <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
-    <value>Enable IPv6 networking</value>
+    <value>啟用 IPv6 網路功能</value>
     <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">

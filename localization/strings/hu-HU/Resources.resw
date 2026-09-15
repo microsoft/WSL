@@ -1909,10 +1909,10 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
     <value>Általános</value>
   </data>
   <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
-    <value>WSL container</value>
+    <value>WSL-tároló</value>
   </data>
   <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
-    <value>NEW</value>
+    <value>ÚJ</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>GPU-gyorsítás</value>

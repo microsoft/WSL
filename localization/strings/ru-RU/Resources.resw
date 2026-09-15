@@ -1731,24 +1731,24 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Легко запускайте контейнеры Linux в Windows как первоклассный интерфейс.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+С помощью wslc.exe вы можете создавать, запускать, отправлять, извлекать и администрировать контейнеры Linux непосредственно в Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Кроме того, вы можете использовать API WSLC для создания приложений Windows, логика выполнения которых основана на контейнерах Linux. Это упрощает внедрение контейнеров Linux непосредственно в приложение для рабочих процессов из облака в локальную среду, приложений ИИ и изоляции.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>WSL-контейнер</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Подробнее о WSL-контейнере</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Справочные материалы по API WSL-контейнера</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
