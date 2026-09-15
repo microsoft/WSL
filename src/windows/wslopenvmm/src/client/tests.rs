@@ -474,7 +474,7 @@ fn cancellation_racing_success_requires_recovery() {
         let fixture = Fixture::new();
         let vm = &fixture.vm.as_ref().unwrap().0;
         assert_eq!(
-            vm.with_operation(cleanup, |inner, _, _| {
+            vm.with_operation("CancellationRace", cleanup, |inner, _, _| {
                 assert_eq!(inner.status, VmStatus::Active);
                 assert_eq!(vm.cancel_requests(), S_OK);
                 S_OK
