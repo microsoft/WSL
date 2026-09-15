@@ -67,13 +67,37 @@ class WSLCE2EAliasTests
 
         // Help output should be identical except the executable name in the usage line.
         auto wslcOutput = wslcResult.Stdout.value();
-        const std::wstring usageNeedle = L"Usage: wslc";
-        const std::wstring usageReplacement = L"Usage: container";
+        const std::wstring usageNeedle = L"Usage:  wslc";
+        const std::wstring usageReplacement = L"Usage:  container";
         auto pos = wslcOutput.find(usageNeedle);
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, pos);
         wslcOutput.replace(pos, usageNeedle.size(), usageReplacement);
 
         VERIFY_ARE_EQUAL(wslcOutput, containerResult.Stdout.value());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_CommandHelp_ListsFullInvocationAliases)
+    {
+        const std::wstring startAliases = L"Aliases:\r\n  wslc container start, wslc start\r\n";
+
+        for (const auto commandLine : {L"container start --help", L"start --help"})
+        {
+            const auto result = RunWslc(commandLine);
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            VERIFY_IS_TRUE(result.StdoutContainsSubstring(startAliases));
+        }
+
+        const auto containerResult = RunContainerExe(L"start --help");
+        containerResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(containerResult.StdoutContainsSubstring(L"Aliases:\r\n  container container start, container start\r\n"));
+
+        const auto imageListResult = RunWslc(L"image list --help");
+        imageListResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(imageListResult.StdoutContainsSubstring(L"Aliases:\r\n  wslc image list, wslc image ls, wslc images\r\n"));
+
+        const auto volumeListResult = RunWslc(L"volume list --help");
+        volumeListResult.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(volumeListResult.StdoutContainsSubstring(L"Aliases:\r\n  wslc volume list, wslc volume ls\r\n"));
     }
 };
 

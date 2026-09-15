@@ -264,6 +264,7 @@ class WSLCE2EImageListTests
     {
         // The table and json output must report the same values, formatted the way docker formats
         // them: SI sizes ("120MB", not "119.86 MB") and "<none>" for missing repository/tag data.
+        // CREATED is excluded because the table localizes it while json does not.
         const auto jsonResult = RunWslc(L"image list --format json");
         jsonResult.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -288,8 +289,7 @@ class WSLCE2EImageListTests
                 return line.find(wsl::shared::string::MultiByteToWide(image.ID)) != std::wstring::npos &&
                        line.find(wsl::shared::string::MultiByteToWide(image.Repository)) != std::wstring::npos &&
                        line.find(wsl::shared::string::MultiByteToWide(image.Tag)) != std::wstring::npos &&
-                       line.find(wsl::shared::string::MultiByteToWide(image.Size)) != std::wstring::npos &&
-                       line.find(wsl::shared::string::MultiByteToWide(image.CreatedSince)) != std::wstring::npos;
+                       line.find(wsl::shared::string::MultiByteToWide(image.Size)) != std::wstring::npos;
             });
 
             VERIFY_IS_TRUE(found, std::format(L"Table output has no row matching json values: {}", row).c_str());
@@ -469,6 +469,50 @@ class WSLCE2EImageListTests
         auto noTruncResult = RunWslc(L"image list --no-trunc");
         noTruncResult.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(noTruncResult.StdoutContainsSubstring(fullDebianIdW));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_All_IsSupersetOfDefault)
+    {
+        const auto defaultIds = RunWslcAndGetStdoutLineSet(L"image list --quiet --no-trunc");
+        VERIFY_IS_FALSE(defaultIds.empty(), L"Expected the loaded test images in `image list --quiet` output");
+
+        // --all may surface intermediate images the default listing hides, but it must never drop
+        // an image the default listing showed.
+        for (const auto& spelling :
+             {L"image list --all --quiet --no-trunc", L"image list -a --quiet --no-trunc", L"images --all --quiet --no-trunc"})
+        {
+            WEX::Logging::Log::Comment((std::wstring{L"Verifying --all superset for: "} + spelling).c_str());
+            const auto allIds = RunWslcAndGetStdoutLineSet(spelling);
+
+            for (const auto& id : defaultIds)
+            {
+                VERIFY_IS_TRUE(allIds.contains(id), WEX::Common::String().Format(L"'%ls' was missing from `%ls`", id.c_str(), spelling));
+            }
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_All_ListsLoadedImage)
+    {
+        const auto result = RunWslc(L"image list --all");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line.find(DebianImage.Name) != std::wstring::npos && line.find(DebianImage.Tag) != std::wstring::npos)
+            {
+                return;
+            }
+        }
+
+        VERIFY_FAIL(L"Failed to find the loaded image in `image list --all` output");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_All_ListedInHelp)
+    {
+        const auto result = RunWslc(L"image list --help");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"--all"));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(Localization::WSLCCLI_ImageListAllArgDescription()));
     }
 
 private:

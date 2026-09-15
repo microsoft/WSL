@@ -68,6 +68,12 @@ std::string WideToMultiByte(_In_ std::wstring_view Source);
 std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
 std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
 
+// Shortens a value so it occupies at most MaxDisplayWidth terminal columns, appending an ellipsis when
+// characters are dropped. East Asian wide and fullwidth code points occupy two columns, so fewer of them
+// fit than narrow ones, and a code point is never split. This matches docker's formatter.Ellipsis
+// (cli/command/formatter/displayutils.go), including its handling of widths of one and below.
+std::wstring Ellipsis(_In_ std::wstring_view Value, _In_ size_t MaxDisplayWidth);
+
 // Template implementation for TruncateId to avoid code duplication.
 // Algorithm inspired from Moby for consistency in presentation of shortened IDs.
 // Always strips the algorithm prefix (e.g., "sha256:") if present, and optionally shortens to 12 characters.

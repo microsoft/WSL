@@ -320,6 +320,23 @@ class NetworkTests
         VERIFY_IS_FALSE(makeRoute(AF_INET6, L"::", 128).IsDefault());
     }
 
+    TEST_METHOD(FallbackIpv4Gateway)
+    {
+        const auto getGateway = [](const wchar_t* address, uint8_t prefixLength) {
+            wsl::core::networking::EndpointIpAddress endpoint{};
+            endpoint.Address = wsl::windows::common::string::StringToSockAddrInet(address);
+            endpoint.PrefixLength = prefixLength;
+            return wsl::windows::common::string::SockAddrInetToWstring(wsl::core::networking::GetFallbackIpv4Gateway(endpoint));
+        };
+
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.1", 30), std::wstring(L"198.18.0.2"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.2", 30), std::wstring(L"198.18.0.1"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.0", 31), std::wstring(L"198.18.0.1"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.1", 31), std::wstring(L"198.18.0.0"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.4", 32), std::wstring(L"198.18.0.5"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.5", 32), std::wstring(L"198.18.0.4"));
+    }
+
     WSL2_TEST_METHOD(RemoveAndAddDefaultRoute)
     {
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});

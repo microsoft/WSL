@@ -27,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> VolumeInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::VolumeName, true, Limit::Unlimited),
+        Argument::Create(ArgType::VolumeName, {.Required = true, .Limit = Limit::Unlimited}),
         Argument::Create(ArgType::InspectFormat),
     };
 }

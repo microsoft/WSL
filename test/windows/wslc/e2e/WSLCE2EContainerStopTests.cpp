@@ -249,9 +249,36 @@ class WSLCE2EContainerStopTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_ContinuesAfterFailure)
+    {
+        // Run first container in background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto firstContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(firstContainerId.empty());
+
+        // Run second container in background
+        result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName2, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto secondContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(secondContainerId.empty());
+
+        // A container that cannot be stopped is reported without skipping the ones after it
+        result = RunWslc(std::format(L"container stop {} {} {} -t 0", firstContainerId, InvalidContainerName, secondContainerId));
+        result.Verify(
+            {.Stdout = std::format(L"{}\r\n{}\r\n", firstContainerId, secondContainerId),
+             .Stderr = FormatErrorMessage(
+                 std::format(L"Container '{}' not found.", InvalidContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
+             .ExitCode = 1});
+
+        VerifyContainerIsListed(firstContainerId, L"exited");
+        VerifyContainerIsListed(secondContainerId, L"exited");
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
+    const std::wstring InvalidContainerName = L"wslc-nonexistent-container-for-stop";
     const TestImage& DebianImage = DebianTestImage();
 };
 } // namespace WSLCE2ETests

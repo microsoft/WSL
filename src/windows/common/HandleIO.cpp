@@ -10,6 +10,7 @@ using wsl::windows::common::io::DockerIORelayHandle;
 using wsl::windows::common::io::EventHandle;
 using wsl::windows::common::io::HandleWrapper;
 using wsl::windows::common::io::HTTPChunkBasedReadHandle;
+using wsl::windows::common::io::InitializeFileOffset;
 using wsl::windows::common::io::IOHandleStatus;
 using wsl::windows::common::io::LineBasedReadHandle;
 using wsl::windows::common::io::MultiHandleWait;
@@ -21,17 +22,6 @@ using wsl::windows::common::io::WriteHandle;
 using wsl::windows::common::io::WriteNamedPipe;
 
 namespace {
-
-LARGE_INTEGER InitializeFileOffset(HANDLE File)
-{
-    LARGE_INTEGER Offset{};
-    if (GetFileType(File) == FILE_TYPE_DISK)
-    {
-        LOG_IF_WIN32_BOOL_FALSE(SetFilePointerEx(File, {}, &Offset, FILE_CURRENT));
-    }
-
-    return Offset;
-}
 
 DWORD CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
 {

@@ -65,7 +65,7 @@ WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
     //
 
     wil::unique_file File{fopen(configFilePath, "r")};
-    ParseConfigFile(keys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
+    ParseConfigFile(keys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
 
     //
     // Ensure the DrvFs prefix is well-formed (not empty and ends with a path separator).
