@@ -1729,6 +1729,30 @@ WSL で Docker デスクトップを使用するいくつかの利点を以下�
     <value>https://aka.ms/wsldocs</value>
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
+  <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
+    <value>Windows で Linux コンテナーをファーストクラスのエクスペリエンスとして簡単に実行できます。
+    
+wslc.exeを使用して、Windows で Linux コンテナーを直接ビルド、実行、プッシュ、プル、管理できます。
+
+また、WSLC API を使用して、ランタイム ロジックが Linux コンテナーを利用する Windows アプリケーションを構築し、クラウドからローカルへのワークフロー、AI アプリケーション、分離のために Linux コンテナーをアプリに直接埋め込みやすくすることもできます。</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
+    <value>WSL コンテナー</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
+    <value>WSL コンテナーに関する詳細情報</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslc</value>
+    <comment>{Locked}Uri to the WSL container documentation</comment>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
+    <value>WSL コンテナー API リファレンス</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
+    <value>https://wsl.dev/api-reference/</value>
+    <comment>{Locked}Uri to the WSL container API reference</comment>
+  </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
     <value>グラフィカル ベースの Linux アプリケーションは、alt-tab、スタート メニューの起動、タスク バーのピン留め、切り取り/貼り付けのサポートなど、Windows のネイティブな操作で使用できます。</value>
   </data>
@@ -1889,6 +1913,12 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="Settings_Shell_General.Content" xml:space="preserve">
     <value>全般</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
+    <value>WSL コンテナー</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
+    <value>新規</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>GPU アクセラレータ</value>
@@ -2215,6 +2245,14 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>認識されないコマンド: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
+    <value>オプション '{}' はサポートされていません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
+    <value>'{}' は非推奨です。代わりに {} を使用してください。</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>必須の引数が指定されていません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2222,6 +2260,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
     <value>必須オプションが指定されていません: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
+    <value>グローバル オプション '{}' は、'{}' の後、'{}' の前に指定する必要があります。</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>選択したコマンドに関するヘルプを表示</value>
@@ -2280,6 +2322,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
     <value>グローバル オプション:</value>
+  </data>
+  <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
+    <value>'{}' のグローバル オプション:</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
     <value>エイリアス:</value>
@@ -2463,6 +2509,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
     <value>ネットワーク '{}' は既に存在します。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkPrunePending" xml:space="preserve">
+    <value>以前のネットワーク排除がまだ処理中です。後でもう一度お試しください。</value>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>サポートされていないネットワーク モード: '{}'</value>
@@ -2681,6 +2730,10 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
     <value>ディレクトリをファイル パスにコピーできません。代わりにディレクトリ ターゲット (末尾に区切り記号を含む) を使用してください。</value>
     <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
+  <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
+    <value>コピーされたエントリの種類が異なるため、'{0}' を上書きできません。</value>
+    <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>コンテナーを検査します。</value>
   </data>
@@ -2760,6 +2813,18 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
     <value>送信するシグナル (既定値: コンテナーに構成された STOPSIGNAL、または構成されていない場合は SIGTERM)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
+    <value>コンテナー イベントを監視します。</value>
+  </data>
+  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
+    <value>コンテナーのリアルタイム イベントを監視します。</value>
+  </data>
+  <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
+    <value>タイムスタンプ以降に作成されたすべてのイベントを表示する</value>
+  </data>
+  <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
+    <value>タイムスタンプまでイベントをストリーミングする</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>イメージを管理します。</value>
@@ -3049,7 +3114,7 @@ Windows バージョン: {}</value>
     <value>状態に関係なくすべてを表示します。</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>リポジトリ内のすべてのタグ付き画像をダウンロードします。</value>
+    <value>リポジトリ内のすべてのタグ。</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>タグを --all-tags/-a と共に使用することはできません</value>
@@ -3096,6 +3161,9 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
     <value>ログの詳細をさらに表示する</value>
+  </data>
+  <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
+    <value>イメージ ダイジェストを表示する</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>コンテナー初期化プロセスの実行可能ファイルを指定します</value>
@@ -3244,6 +3312,10 @@ Windows バージョン: {}</value>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>ログ出力をフォローします</value>
   </data>
+  <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
+    <value>SRC_PATH 内のシンボリック リンクを常にたどる</value>
+    <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>出力の書式設定 (json または table) (既定値: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
@@ -3386,6 +3458,9 @@ Windows バージョン: {}</value>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>公開されているすべてのポートをランダム ホスト ポートに発行する</value>
   </data>
+  <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
+    <value>リポジトリ内のすべてのタグ付き画像をダウンロードします。</value>
+  </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>詳細出力を抑制する</value>
   </data>
@@ -3401,6 +3476,13 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>コンテナーを停止後に削除します</value>
+  </data>
+  <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
+    <value>コンテナーが終了したときに適用する再起動ポリシー</value>
+  </data>
+  <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
+    <value>競合するオプション: {} と {} の両方を指定することはできません</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>コンテナーを停止するシグナル</value>
@@ -3558,6 +3640,10 @@ Windows バージョン: {}</value>
     <value>無効な {} 値: {} は認識されたプル ポリシーではありません。サポートされているプル ポリシーは {} です。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
+    <value>無効な {} 値 '{}'。no、always、on-failure[:max-retries]、または unless-stopped が必要です。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>無効な {} 値: {} は認識された進行状況の種類ではありません。サポートされている進行状況の種類: {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3642,6 +3728,10 @@ Windows バージョン: {}</value>
   </data>
   <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
     <value>ネットワークへの外部アクセスを制限する</value>
+  </data>
+  <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
+    <value>IPv6 ネットワークを有効にする</value>
+    <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
     <value>ネットワーク セグメントを表す CIDR 形式のサブネット</value>
