@@ -387,6 +387,67 @@ class WSLCCLIArgumentUnitTests
         return values;
     }
 
+    TEST_METHOD(EventFilter_ConvertsAndCachesSupportedKeys)
+    {
+        const auto filters = ValidateAndGetAllCached<ArgType::EventFilter>(
+            {L"type=container",
+             L"event=start",
+             L"event=stop",
+             L"container=test",
+             L"image=debian:latest",
+             L"image=repo=value",
+             L"event="});
+        const std::vector<std::pair<std::string, std::string>> expected{
+            {"type", "container"},
+            {"event", "start"},
+            {"event", "stop"},
+            {"container", "test"},
+            {"image", "debian:latest"},
+            {"image", "repo=value"},
+            {"event", ""},
+        };
+
+        VERIFY_ARE_EQUAL(expected.size(), filters.size());
+        for (size_t i = 0; i < expected.size(); ++i)
+        {
+            VERIFY_ARE_EQUAL(expected[i].first, filters[i].first);
+            VERIFY_ARE_EQUAL(expected[i].second, filters[i].second);
+        }
+    }
+
+    TEST_METHOD(EventFilter_RejectsUnsupportedKeys)
+    {
+        for (const std::wstring value : {L"network=test", L"label=env=prod", L"Type=container", L"=test"})
+        {
+            const auto expectedMessage = wsl::shared::Localization::MessageWslcInvalidFilter(value.substr(0, value.find(L'=')));
+            ArgMap eager;
+            eager.Add(ArgType::EventFilter, std::wstring(value));
+            VERIFY_THROWS_SPECIFIC(Argument::Create(ArgType::EventFilter).Validate(eager), ArgumentException, [&](const auto& exception) {
+                return exception.Message() == expectedMessage;
+            });
+            VERIFY_IS_FALSE(eager.IsValidated(ArgType::EventFilter));
+            VERIFY_IS_FALSE(eager.ContainsValidated(ArgType::EventFilter));
+
+            ArgMap onDemand;
+            onDemand.Add(ArgType::EventFilter, std::wstring(value));
+            VERIFY_THROWS_SPECIFIC(onDemand.GetAllValues<ArgType::EventFilter>(), ArgumentException, [&](const auto& exception) {
+                return exception.Message() == expectedMessage;
+            });
+            VERIFY_IS_FALSE(onDemand.IsValidated(ArgType::EventFilter));
+            VERIFY_IS_FALSE(onDemand.ContainsValidated(ArgType::EventFilter));
+        }
+    }
+
+    TEST_METHOD(EventFilter_RejectsMalformedValues)
+    {
+        ArgMap args;
+        args.Add(ArgType::EventFilter, std::wstring(L"type"));
+        VERIFY_THROWS_SPECIFIC(Argument::Create(ArgType::EventFilter).Validate(args), ArgumentException, [](const auto& exception) {
+            return exception.Message() == wsl::shared::Localization::WSLCCLI_InvalidFilterError(L"type");
+        });
+        VERIFY_IS_FALSE(args.ContainsValidated(ArgType::EventFilter));
+    }
+
     // Test: Every ArgType whose validation converts its raw string into a typed value must cache
     // that value on the ArgMap during Argument::Validate, so execution reads it back without
     // re-converting. This drives the real validation + caching path for each converted ArgType.

@@ -26,7 +26,7 @@ std::vector<Argument> SystemEventsCommand::GetArguments() const
     return {
         Argument::Create(ArgType::Since, {.Desc = Localization::WSLCCLI_EventsSinceArgDescription()}),
         Argument::Create(ArgType::Until, {.Desc = Localization::WSLCCLI_EventsUntilArgDescription()}),
-        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
+        Argument::Create(ArgType::EventFilter, {.Limit = Limit::Unlimited}),
     };
 }
 

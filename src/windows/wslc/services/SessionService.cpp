@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "SessionService.h"
 #include "ConsoleService.h"
+#include "JsonUtils.h"
 #include "WarningCallback.h"
 #include "wslc_schema.h"
 
@@ -29,8 +30,6 @@ using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
 
 namespace {
-
-    constexpr std::array<std::string_view, 4> c_eventFilterKeys{"type", "event", "container", "image"};
 
     std::string FormatEventTimestamp(std::int64_t timestamp)
     {
@@ -73,17 +72,6 @@ namespace {
         }
 
         return output;
-    }
-
-    void WriteOutput(HANDLE outputHandle, std::string_view output)
-    {
-        while (!output.empty())
-        {
-            DWORD bytesWritten{};
-            THROW_LAST_ERROR_IF(!WriteFile(outputHandle, output.data(), gsl::narrow_cast<DWORD>(output.size()), &bytesWritten, nullptr));
-            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), bytesWritten == 0);
-            output.remove_prefix(bytesWritten);
-        }
     }
 
     void CancelCallWhenSignaled(HANDLE cancelEvent, HANDLE completedEvent, DWORD threadId) noexcept
@@ -283,17 +271,12 @@ int SessionService::Run(Terminal& terminal, const Session& session, const std::v
     return ConsoleService::AttachToCurrentConsole(terminal, console, std::move(process.value()));
 }
 
-void SessionService::StreamEvents(
-    const Session& session, LONGLONG since, LONGLONG until, const std::vector<std::pair<std::string, std::string>>& filterValues, HANDLE cancelEvent)
+void SessionService::StreamEvents(Terminal& terminal, const Session& session, const EventStreamOptions& options, HANDLE cancelEvent)
 {
     std::vector<WSLCFilter> filterEntries;
-    filterEntries.reserve(filterValues.size());
-    for (const auto& [key, value] : filterValues)
+    filterEntries.reserve(options.Filters.size());
+    for (const auto& [key, value] : options.Filters)
     {
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcInvalidFilter(MultiByteToWide(key)),
-            std::ranges::find(c_eventFilterKeys, key) == c_eventFilterKeys.end());
         filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
     }
 
@@ -301,12 +284,7 @@ void SessionService::StreamEvents(
 
     wil::com_ptr<IWSLCEventStream> stream;
     THROW_IF_FAILED(session.Get()->GetEvents(
-        since, until, filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &stream));
-
-    // Event output is UTF-8.
-    wsl::windows::common::ConsoleState console;
-    console.SetOutputCodePageUtf8();
-    const auto outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        options.Since, options.Until, filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &stream));
 
     THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
     const auto disableCallCancellation = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { CoDisableCallCancellation(nullptr); });
@@ -318,21 +296,20 @@ void SessionService::StreamEvents(
         cancellationThread.join();
     });
 
-    while (true)
+    HRESULT result = S_OK;
+    while (SUCCEEDED(result))
     {
         wil::unique_cotaskmem_ansistring eventJson;
-        const auto result = stream->GetNext(&eventJson);
-        if (result == WSLC_E_EVENT_STREAM_FINISHED)
+        result = stream->GetNext(&eventJson);
+        if (SUCCEEDED(result))
         {
-            return;
+            const auto event = wsl::shared::FromJson<wslc_schema::Event>(eventJson.get());
+            terminal.Output(L"{}\n", FormatEvent(event));
+            terminal.Flush(Terminal::Level::Output);
         }
-
-        THROW_IF_FAILED(result);
-
-        auto line = FormatEvent(nlohmann::json::parse(eventJson.get()).get<wslc_schema::Event>());
-        line.push_back('\n');
-        WriteOutput(outputHandle, line);
     }
+
+    THROW_HR_IF(result, result != WSLC_E_EVENT_STREAM_FINISHED);
 }
 
 int SessionService::TerminateSession(Terminal& terminal, const Session& session)

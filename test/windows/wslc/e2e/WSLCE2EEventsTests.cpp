@@ -111,6 +111,11 @@ class WSLCE2EEventsTests
         }
 
         output.pop_back();
+        if (output.ends_with(L'\r'))
+        {
+            output.pop_back();
+        }
+
         VERIFY_ARE_EQUAL(std::wstring::npos, output.find(L'\n'));
         VerifyEventLine(output, expectedEvent);
     }
@@ -153,13 +158,19 @@ class WSLCE2EEventsTests
         VerifyEventLine(lines[1], std::format(L" container start {} (image={}, name={})", containerId, DebianImage.NameAndTag(), c_eventContainerName));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilter)
+    WSLC_TEST_METHOD(WSLCE2E_Events_RejectsUnsupportedFilterBeforeResolvingSession)
     {
-        const auto result = RunWslc(L"events --filter network=test");
-        result.Verify(
-            {.Stdout = L"",
-             .Stderr = FormatErrorMessage(wsl::shared::Localization::MessageWslcInvalidFilter(L"network"), L"E_INVALIDARG"),
-             .ExitCode = 1});
+        GUID sessionGuid{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&sessionGuid));
+        const auto missingSession = L"wslc-events-invalid-filter-" +
+                                    wsl::shared::string::GuidToString<wchar_t>(sessionGuid, wsl::shared::string::GuidToStringFlags::None);
+
+        for (const auto* command : {L"events", L"system events"})
+        {
+            const auto result = RunWslc(std::format(L"--session {} {} --filter network=test", missingSession, command));
+            result.Verify({.Stdout = L"", .ExitCode = 1});
+            VERIFY_IS_TRUE(result.StderrContainsSubstring(wsl::shared::Localization::MessageWslcInvalidFilter(L"network")));
+        }
     }
 
 private:
