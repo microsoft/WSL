@@ -1723,6 +1723,30 @@ Bruk litt tid på å forhåndsvise noen av fellesskapets favorittfunksjoner, ell
     <value>https://aka.ms/wsldocs</value>
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
+  <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
+    <value>Kjør Linux-beholdere enkelt i Windows som en førsteklasses opplevelse.
+    
+Du kan bruke wslc.exe til å bygge, kjøre, sende, hente og administrere Linux-beholdere direkte på Windows.
+
+Du kan også bruke WSLC-API-et til å bygge Windows-programmer som har kjøretidslogikk drevet av Linux-beholdere, noe som gjør det enklere å bygge inn Linux-beholdere direkte i appen din for sky-til-lokale arbeidsflyter, KI-programmer og isolasjon.</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
+    <value>WSL-beholder</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
+    <value>Mer informasjon om WSL-beholder</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslc</value>
+    <comment>{Locked}Uri to the WSL container documentation</comment>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
+    <value>API-referanse for WSL-beholder</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
+    <value>https://wsl.dev/api-reference/</value>
+    <comment>{Locked}Uri to the WSL container API reference</comment>
+  </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
     <value>Du kan bruke grafikkbaserte Linux-programmer med opprinnelige Windows-samhandlinger som alt-tab, starte startmeny, feste oppgavelinje og støtte for klipp ut og lim inn.</value>
   </data>
@@ -1883,6 +1907,12 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
   </data>
   <data name="Settings_Shell_General.Content" xml:space="preserve">
     <value>Generelt</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
+    <value>WSL-beholder</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
+    <value>NY</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>Grafikkbehandlingsenhet-akselerasjon</value>
@@ -2209,6 +2239,14 @@ Bruk:
     <value>Ukjent kommando: »{}»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
+    <value>Alternativet «{}» støttes ikke.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
+    <value>«{}» er avskrevet. Bruk {} i stedet.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>Obligatorisk argument ikke oppgitt: «{}»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2216,6 +2254,10 @@ Bruk:
   <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
     <value>Nødvendig alternativ er ikke angitt: «{}»</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
+    <value>Det globale alternativet «{}» må angis etter «{}» og før «{}».</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Viser hjelp om den valgte kommandoen</value>
@@ -2229,7 +2271,7 @@ Bruk:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Bruk: {} {}</value>
+    <value>Bruk:  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2274,6 +2316,10 @@ Bruk:
   </data>
   <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
     <value>Globale alternativer:</value>
+  </data>
+  <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
+    <value>Globale alternativer for «{}»:</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
     <value>Aliaser:</value>
@@ -2457,6 +2503,9 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
     <value>Nettverket {} finnes allerede.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkPrunePending" xml:space="preserve">
+    <value>En tidligere nettverksbeskjæring behandles fortsatt. Prøv igjen senere.</value>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nettverksmodusen støttes ikke: «{}»</value>
@@ -2675,6 +2724,10 @@ Eksempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Kan ikke kopiere en mappe til en filbane. Bruk et katalogmål (med etterfølgende skilletegn) i stedet.</value>
     <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
   </data>
+  <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
+    <value>Kan ikke skrive over «{0}» fordi den er av en annen type enn den kopierte oppføringen.</value>
+    <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
+  </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspiser en beholder.</value>
   </data>
@@ -2754,6 +2807,18 @@ Eksempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ContainerStopSignalArgDescription" xml:space="preserve">
     <value>Signal som skal sendes (standard: beholderens konfigurerte STOPSIGNAL, eller SIGTERM hvis ingen er konfigurert)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
+    <value>Overvåk beholderhendelser.</value>
+  </data>
+  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
+    <value>Overvåk hendelser i sanntid fra beholdere.</value>
+  </data>
+  <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
+    <value>Vis alle hendelser opprettet siden tidsstempelet</value>
+  </data>
+  <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
+    <value>Strøm hendelser til timestampen</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Administrer avbildninger.</value>
@@ -3043,7 +3108,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Vis alle uavhengig av tilstand.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Last ned alle merkede bilder i repositoriet.</value>
+    <value>Alle merker i repositoriet.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>merke kan ikke brukes med --all-tags/-a</value>
@@ -3090,6 +3155,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
     <value>Vis ekstra detaljer for logger</value>
+  </data>
+  <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
+    <value>Vis bilde-digester</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Angir kjørbar init-prosess for beholder</value>
@@ -3238,6 +3306,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Følg loggutdata</value>
   </data>
+  <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
+    <value>Følg alltid symbolske koblinger i SRC_PATH</value>
+    <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Utdataformatering (json eller table) (Standard: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
@@ -3380,6 +3452,9 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publiser alle eksponerte porter til tilfeldige vertsporter</value>
   </data>
+  <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
+    <value>Last ned alle merkede bilder i repositoriet.</value>
+  </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Undertrykk detaljert utdata</value>
   </data>
@@ -3395,6 +3470,13 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Fjern beholderen etter at den stopper</value>
+  </data>
+  <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
+    <value>Start policyen på nytt som skal brukes når en beholder avsluttes</value>
+  </data>
+  <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
+    <value>Alternativer i konflikt: kan ikke angi både {} og {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal for å stoppe beholderen</value>
@@ -3552,6 +3634,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Ugyldig {}-verdi: {} er ikke en gjenkjent pull-policy. Støttede pull-policyer er: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
+    <value>Ugyldig {}-verdi «{}». Forventet no, always, on-failure[:max-retries] eller unless-stopped.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ugyldig {}-verdi: {} er ikke en gjenkjent fremdriftstype. Støttede fremdriftstyper er: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3636,6 +3722,10 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
   </data>
   <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
     <value>Begrens ekstern tilgang til nettverket</value>
+  </data>
+  <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
+    <value>Aktiver IPv6-nettverk</value>
+    <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
     <value>Delnett i CIDR format som representerer et nettverkssegment</value>
