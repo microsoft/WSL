@@ -19,7 +19,7 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Root Command
-std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> ImageCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));

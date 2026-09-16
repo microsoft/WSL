@@ -1730,24 +1730,24 @@ Dedica un momento a obtener una vista previa de algunas de las características 
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Ejecuta fácilmente contenedores de Linux en Windows con una experiencia de primera clase.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Puedes usar wslc.exe para crear, ejecutar, publicar, extraer y administrar contenedores de Linux directamente en Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+También puedes usar la API de WSLC para crear aplicaciones de Windows cuya lógica de ejecución se base en contenedores de Linux, lo que facilita la inserción de contenedores de Linux directamente en tu aplicación para flujos de trabajo de la nube al entorno local, aplicaciones de IA y aislamiento.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Contenedor WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Más información sobre el contenedor de WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Referencia de la API de contenedores de WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -2246,11 +2246,11 @@ Uso:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
-    <value>The option '{}' is not supported.</value>
+    <value>No se admite la opción '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
-    <value>'{}' is deprecated. Use {} instead.</value>
+    <value>'{}' está en desuso. Use {} en su lugar.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
@@ -2277,7 +2277,7 @@ Uso:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage:  {} {}</value>
+    <value>Uso:  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2324,7 +2324,7 @@ Uso:
     <value>Opciones globales:</value>
   </data>
   <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
-    <value>Global Options for '{}':</value>
+    <value>Opciones globales para '{}':</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
@@ -2815,16 +2815,16 @@ Ejemplo: tar -cf - archivos | wslc container cp - CONTAINER:/path</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitor container events.</value>
+    <value>Supervisar eventos de contenedor.</value>
   </data>
   <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitor real-time events from containers.</value>
+    <value>Supervisar eventos en tiempo real de los contenedores.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
-    <value>Show all events created since the timestamp</value>
+    <value>Mostrar todos los eventos creados desde la marca de tiempo</value>
   </data>
   <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
-    <value>Stream events until the timestamp</value>
+    <value>Transmitir eventos hasta la marca de tiempo</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Administra imágenes.</value>
@@ -3163,7 +3163,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Mostrar más detalles de los registros</value>
   </data>
   <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
-    <value>Show image digests</value>
+    <value>Mostrar resúmenes de imágenes</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Especifica el ejecutable del proceso de inicialización de contenedor</value>
@@ -3313,7 +3313,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Seguimiento de la salida del registro</value>
   </data>
   <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
-    <value>Always follow symlinks in SRC_PATH</value>
+    <value>Seguir siempre los enlaces simbólicos en SRC_PATH</value>
     <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
@@ -3481,7 +3481,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Directiva de reinicio que se aplicará cuando se cierre un contenedor</value>
   </data>
   <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
-    <value>Conflicting options: cannot specify both {} and {}</value>
+    <value>Opciones en conflicto: no se pueden especificar tanto {} como {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
@@ -3730,7 +3730,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Restricción del acceso externo a la red</value>
   </data>
   <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
-    <value>Enable IPv6 networking</value>
+    <value>Habilitar redes IPv6</value>
     <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">

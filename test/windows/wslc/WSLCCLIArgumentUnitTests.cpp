@@ -88,6 +88,21 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
     }
 
+    TEST_METHOD(ArgumentMatchesOption_RequiresNameOrAliasSpecifier)
+    {
+        const auto argument = Argument::Create(ArgType::Quiet);
+
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet=true"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q=true"));
+
+        VERIFY_IS_FALSE(argument.MatchesOption(L"quiet"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"-"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"--"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"---quiet"));
+    }
+
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
     TEST_METHOD(ArgumentCreate_AllArguments)
     {
