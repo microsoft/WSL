@@ -65,13 +65,20 @@ class WSLCE2EAliasTests
         const auto containerResult = RunContainerExe(L"--help");
         containerResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Help output should be identical except the executable name in the usage line.
+        // Help output should be identical after normalizing executable-name references.
         auto wslcOutput = wslcResult.Stdout.value();
-        const std::wstring usageNeedle = L"Usage:  wslc";
-        const std::wstring usageReplacement = L"Usage:  container";
-        auto pos = wslcOutput.find(usageNeedle);
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, pos);
-        wslcOutput.replace(pos, usageNeedle.size(), usageReplacement);
+        const std::pair<std::wstring, std::wstring> executableReferences[] = {
+            {wsl::shared::Localization::WSLCCLI_Usage(L"wslc", L""), wsl::shared::Localization::WSLCCLI_Usage(L"container", L"")},
+            {wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"wslc"),
+             wsl::shared::Localization::WSLCCLI_HeadingScopedGlobalOptions(L"container")},
+        };
+
+        for (const auto& [source, replacement] : executableReferences)
+        {
+            const auto position = wslcOutput.find(source);
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, position);
+            wslcOutput.replace(position, source.size(), replacement);
+        }
 
         VERIFY_ARE_EQUAL(wslcOutput, containerResult.Stdout.value());
     }

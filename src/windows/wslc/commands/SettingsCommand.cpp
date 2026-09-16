@@ -25,7 +25,7 @@ namespace wsl::windows::wslc {
 using namespace wsl::windows::wslc::cli;
 
 // SettingsCommand
-std::vector<std::unique_ptr<Command>> SettingsCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> SettingsCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<SettingsResetCommand>(FullName()));

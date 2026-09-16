@@ -21,7 +21,7 @@ namespace wsl::windows::wslc {
 
 using namespace wsl::windows::wslc::cli;
 // Volume Root Command
-std::vector<std::unique_ptr<Command>> VolumeCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> VolumeCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<VolumeCreateCommand>(FullName()));

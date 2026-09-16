@@ -21,7 +21,7 @@ namespace wsl::windows::wslc {
 
 using namespace wsl::windows::wslc::cli;
 // Image Root Command
-std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> ImageCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));

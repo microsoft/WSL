@@ -21,7 +21,7 @@ using namespace wsl::shared;
 namespace wsl::windows::wslc {
 
 using namespace wsl::windows::wslc::cli;
-std::vector<std::unique_ptr<Command>> SystemCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> SystemCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<SystemInfoCommand>(FullName()));

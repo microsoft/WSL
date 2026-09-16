@@ -3109,7 +3109,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Visa alla oavsett status.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>Alla taggar i lagringsplatsen.</value>
+    <value>Alla taggar på lagringsplatsen.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>tag kan inte användas med --all-tags/-a</value>

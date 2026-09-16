@@ -22,7 +22,7 @@ namespace wsl::windows::wslc {
 
 using namespace wsl::windows::wslc::cli;
 // Session Root Command
-std::vector<std::unique_ptr<Command>> SessionCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> SessionCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<SessionEnterCommand>(FullName()));
