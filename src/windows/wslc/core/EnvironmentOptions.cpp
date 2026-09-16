@@ -12,23 +12,23 @@ Module Name:
 
 namespace wsl::windows::wslc {
 
-void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& environmentArguments) noexcept
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& arguments) noexcept
+{
+    ApplyEnvironmentOptions(target, arguments, c_envBindings);
+}
+
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& arguments, std::span<const EnvBinding> bindings) noexcept
 try
 {
-    for (const auto& arg : environmentArguments)
+    for (const auto& arg : arguments)
     {
-        if (!arg.HasAnyFlag(Flags::EnvironmentOnly))
-        {
-            continue;
-        }
-
         // Lowest-precedence: skip args already set by the caller.
         if (target.Contains(arg.Type()))
         {
             continue;
         }
 
-        for (const auto& binding : c_envBindings)
+        for (const auto& binding : bindings)
         {
             if (binding.Type != arg.Type())
             {
