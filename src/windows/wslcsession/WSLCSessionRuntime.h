@@ -190,6 +190,9 @@ public:
     _Requires_exclusive_lock_held_(m_lock)
     void TearDownVmLockHeld(bool CaptureTerminationReason = false);
     void EnsureVmRunning();
+    _Requires_exclusive_lock_held_(m_lock)
+    void BeginVmStartCompletionLockHeld();
+    void EndVmStartCompletion() noexcept;
     void OnIdleTimer();
     void OnVmExited();
     void InitializeDockerRuntime(const std::filesystem::path& storagePath);
@@ -269,6 +272,12 @@ private:
     wil::srwlock m_lock;
     std::atomic<VmState> m_vmState{VmState::None};
     std::atomic<VmExitDisposition> m_vmExitDisposition{VmExitDisposition::Active};
+
+    // Set before publishing a newly started VM as Running and cleared after recovery and start
+    // notifications complete. Ordinary leases wait for completion; plugin-reentrant ExistingOnly
+    // leases may use the running VM so callbacks cannot deadlock against the startup they block.
+    std::atomic<bool> m_vmStartCompletionPending{false};
+    wil::unique_event m_vmStartCompleteEvent{wil::EventOptions::ManualReset | wil::EventOptions::Signaled};
 
     // Identifies the current VM instance. Bumped under m_lock by StartVmLockHeld, so a notification
     // whose delivery had to drop the runtime lock can still tell whether it is describing the VM it

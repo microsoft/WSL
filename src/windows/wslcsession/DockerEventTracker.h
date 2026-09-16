@@ -63,7 +63,8 @@ public:
         DockerEventTracker* m_tracker = nullptr;
     };
 
-    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::int64_t)>;
+    using ContainerStateChangeCallback =
+        std::function<void(ContainerEvent, std::optional<int>, std::int64_t, std::optional<std::int64_t>)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::int64_t)>;
     using ContainerCreateCallback = std::function<void(const std::string& ContainerId, std::int64_t Time)>;
 
@@ -86,7 +87,7 @@ public:
 
 private:
     void OnEvent(const std::string_view& event);
-    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
+    void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime, std::optional<std::int64_t> eventTimeNanoseconds);
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTime);
     void OnVolumeEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTime);
 

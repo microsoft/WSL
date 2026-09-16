@@ -189,6 +189,13 @@ private:
         Policy
     };
 
+    enum class PolicyRestartPhase
+    {
+        WaitingForDocker,
+        NotifyingPlugin,
+        ApplyingPluginResult
+    };
+
     // Marks the interval between a container exit and its replacement start. Explicit restarts are
     // driven by Restart(); policy restarts are driven by Docker events.
     struct RestartTransaction
@@ -200,12 +207,18 @@ private:
         const RestartSource Source;
         const bool CancelPolicy;
         wil::unique_event Completed{wil::EventOptions::ManualReset};
+
+        // Policy restart fields, accessed under WSLCContainerImpl::m_lock.
+        PolicyRestartPhase Phase = PolicyRestartPhase::WaitingForDocker;
+        HRESULT PluginResult = S_OK;
+        std::string PluginStartedAt;
+        std::int64_t PluginStateTime{};
     };
 
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept;
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime, std::optional<std::int64_t> eventTimeNanoseconds) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
@@ -240,12 +253,18 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime, std::optional<std::int64_t> stopTimeNanoseconds);
     __requires_exclusive_lock_held(m_lock) void ArmPolicyRestartLockHeld();
-    __requires_exclusive_lock_held(m_lock) void ReconcilePolicyRestartStartedLockHeld(
-        const common::docker_schema::InspectContainer& dockerInspect, std::int64_t startTime) noexcept;
+
+    // The event stream, monitor, and startup recovery all enter this state machine. It acquires locks
+    // in runtime-to-lifecycle-to-container order, releases every lock for the external plugin
+    // callback, then re-enters to validate the transaction and exact Docker run before mutation.
+    void ReconcilePolicyRestart() noexcept;
     __requires_exclusive_lock_held(m_lock) void ResolvePolicyRestartLockHeld(bool releaseResources) noexcept;
     __requires_exclusive_lock_held(m_lock) void StartPolicyRestartMonitor();
+
+    // Runtime teardown may wait for timer callbacks while holding the runtime lock exclusively, so
+    // the timer callback must use nonblocking runtime-lock acquisition.
     static void CALLBACK PolicyRestartTimerCallback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) noexcept;
     __requires_lock_held(m_lock) bool PolicyRestartPendingLockHeld() const noexcept;
 
@@ -284,6 +303,10 @@ private:
     // Non-null between a container exit and its replacement start. OnStopped() keeps the container's
     // runtime resources mapped, and policy transactions also keep the VM active while Docker waits.
     _Guarded_by_(m_lock) std::shared_ptr<RestartTransaction> m_restart;
+
+    // A successful Docker stop request is not a policy restart. This count is published before the
+    // request releases m_lock and cleared by the resulting stop event.
+    _Guarded_by_(m_lock) size_t m_manualStopRequests = 0;
 
     // Active-container recovery sets this while session startup owns the runtime and container-list
     // locks. CompleteRecovery clears it after startup releases those locks.
