@@ -19,7 +19,7 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-std::vector<std::unique_ptr<Command>> SystemCommand::GetCommands() const
+std::vector<std::unique_ptr<Command>> SystemCommand::CreateCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<SystemInfoCommand>(FullName()));
