@@ -369,7 +369,7 @@ bool wsl::windows::common::relay::StandardInputRelay(HANDLE ConsoleHandle, HANDL
     {
         if (GetFileType(ConsoleHandle) != FILE_TYPE_CHAR)
         {
-            wsl::windows::common::relay::InterruptableRelay(ConsoleHandle, OutputHandle, ExitEvent, LX_STDIO_RELAY_BUFFER_SIZE);
+            wsl::windows::common::relay::InterruptableRelay(ConsoleHandle, OutputHandle, ExitEvent);
             return true;
         }
 

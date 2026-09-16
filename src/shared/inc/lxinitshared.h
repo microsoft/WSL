@@ -129,16 +129,10 @@ Abstract:
 #define LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE (65536)
 
 //
-// Stdio relay buffer size
-//
-
-#define LX_STDIO_RELAY_BUFFER_SIZE (65536)
-
-//
 // Default buffer size for relaying.
 //
 
-#define LX_RELAY_BUFFER_SIZE 0x1000
+#define LX_RELAY_BUFFER_SIZE (65536)
 
 //
 // HVC terminal devices.

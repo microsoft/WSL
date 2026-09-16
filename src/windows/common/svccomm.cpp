@@ -476,9 +476,9 @@ wsl::windows::common::SvcComm::LaunchProcess(
         }
 
         auto StdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        StdOutWorker = relay::CreateThread(std::move(StdOutSocket), IS_VALID_HANDLE(StdOut) ? StdOut : nullptr, nullptr, LX_STDIO_RELAY_BUFFER_SIZE);
+        StdOutWorker = relay::CreateThread(std::move(StdOutSocket), IS_VALID_HANDLE(StdOut) ? StdOut : nullptr);
         auto StdErr = GetStdHandle(STD_ERROR_HANDLE);
-        StdErrWorker = relay::CreateThread(std::move(StdErrSocket), IS_VALID_HANDLE(StdErr) ? StdErr : nullptr, nullptr, LX_STDIO_RELAY_BUFFER_SIZE);
+        StdErrWorker = relay::CreateThread(std::move(StdErrSocket), IS_VALID_HANDLE(StdErr) ? StdErr : nullptr);
 
         //
         // Spawn wslhost to handle interop requests from processes that have
