@@ -68,7 +68,12 @@ std::string PosixBaseName(std::string_view Path)
     const auto separator = Path.find_last_of('/');
     auto name = std::string(separator == std::string_view::npos ? Path : Path.substr(separator + 1));
 
-    return (name == "/" || name == "." || name == "..") ? std::string{} : name;
+    if (name == "/" || name == "." || name == "..")
+    {
+        return {};
+    }
+
+    return name.find_first_of("\\/:") == std::string::npos ? name : std::string{};
 }
 
 std::filesystem::path MakeStagingDirectory(const std::filesystem::path& Parent)
@@ -485,6 +490,12 @@ void ContainerCp(CLIExecutionContext& context)
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_CpSourceNotFoundError(source), fsError || !pathExists);
 
             auto absPath = std::filesystem::absolute(source);
+
+            // A trailing separator leaves filename() empty, which would name an empty tar entry.
+            if (!absPath.has_filename())
+            {
+                absPath = absPath.parent_path();
+            }
 
             // --follow-link resolves the source path itself; links found inside a copied directory stay links.
             // tar's -h dereferences every link it walks, so it is limited to a source that is itself a link to
