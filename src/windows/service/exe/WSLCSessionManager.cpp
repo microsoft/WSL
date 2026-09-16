@@ -84,11 +84,9 @@ struct SessionSettings
     }
 
     // Default session: name and storage path determined from caller's token.
-    static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, const std::wstring& ResolvedName)
+    static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, const std::wstring& ResolvedName, const settings::UserSettings& UserSettings)
     {
-        auto userSettings = LoadUserSettings(UserToken);
-
-        auto configuredStorageBase = userSettings.Get<settings::Setting::SessionStoragePath>();
+        auto configuredStorageBase = UserSettings.Get<settings::Setting::SessionStoragePath>();
         const bool customConfigured = !configuredStorageBase.empty();
         const std::filesystem::path defaultBase = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
         const std::filesystem::path storageBase =
@@ -100,7 +98,7 @@ struct SessionSettings
         // fires once at creation without a service-side callback that could stall CreateSession.
         const auto storageFlags = customConfigured ? WSLCSessionStorageFlagsWarnCustomLocation : WSLCSessionStorageFlagsNone;
 
-        return std::unique_ptr<SessionSettings>(new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), storageFlags, userSettings));
+        return std::unique_ptr<SessionSettings>(new SessionSettings(std::wstring(ResolvedName), storageDir.wstring(), storageFlags, UserSettings));
     }
 
     // Custom session: caller provides name and storage path.
@@ -244,12 +242,14 @@ void WSLCSessionManagerImpl::CreateSession(
     }
 
     wslutil::StopWatch stopWatch;
+    const auto userSettings = SessionSettings::LoadUserSettings(callerToken.get());
+    const bool useOpenVmm = userSettings.Get<settings::Setting::UseOpenVmm>();
 
     // Initialize settings for the default session.
     std::unique_ptr<SessionSettings> defaultSettings;
     if (Settings == nullptr)
     {
-        defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName);
+        defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName, userSettings);
         Settings = &defaultSettings->Settings;
     }
 
@@ -289,7 +289,7 @@ void WSLCSessionManagerImpl::CreateSession(
 
         // Create the VM factory in the SYSTEM service (privileged). The per-user session
         // uses it to create VMs on demand and recreate them after idle-termination.
-        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings);
+        auto vmFactory = Microsoft::WRL::Make<WSLCVirtualMachineFactory>(Settings, useOpenVmm);
 
         // Launch per-user COM server factory and add it to a fresh per-session job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());

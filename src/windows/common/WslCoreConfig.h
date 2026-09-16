@@ -28,8 +28,8 @@ Abstract:
         T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
         T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
         T_VALUE(c, EnableVirtioFsAggregateShares), T_ENUM(c, FirewallConfigPresence), T_VALUE(c, IsolateDistroCgroup), \
-        T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), T_STRING(c, KernelModulesList), \
-        T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
+        T_VALUE(c, UseOpenVmm), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), \
+        T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
         T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
         T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
         T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
@@ -295,6 +295,7 @@ namespace ConfigSetting {
         static constexpr auto SetVersionDebug = "experimental.setVersionDebug";
         static constexpr auto Swiotlb = "experimental.swiotlb";
         static constexpr auto VirtioFsAggregateShares = "experimental.virtioFsAggregateShares";
+        static constexpr auto UseOpenVmm = "experimental.useOpenVmm";
 
     } // namespace Experimental
 } // namespace ConfigSetting
@@ -384,6 +385,7 @@ struct Config
     int MaxCrashDumpCount = 10;
     UINT64 SwiotlbSizeBytes = 0;
     bool IsolateDistroCgroup = true;
+    bool UseOpenVmm = false;
 
     // Temporary config value to help root cause the truncated archive errors in SetVersion()
     bool SetVersionDebug = false;
