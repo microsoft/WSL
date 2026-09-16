@@ -28,6 +28,23 @@ add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 if (CARGO_EXECUTABLE)
     target_sources(wsltests PRIVATE OpenVmmVirtualMachineBackendTests.cpp)
     target_link_libraries(wsltests virtualmachinebackend)
+    add_dependencies(wsltests initramfs)
+
+    if (WSL_DEVICEHOST_BIN)
+        set(OPENVMM_TEST_EXECUTABLE "${WSL_DEVICEHOST_BIN}/openvmm.exe")
+    else()
+        set(OPENVMM_TEST_EXECUTABLE "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/openvmm.exe")
+    endif()
+
+    add_custom_command(
+        TARGET wsltests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${OPENVMM_TEST_EXECUTABLE}"
+            "$<TARGET_FILE_DIR:wsltests>/openvmm.exe"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/kernel"
+            "$<TARGET_FILE_DIR:wsltests>/kernel"
+        VERBATIM)
 endif()
 
 target_include_directories(wsltests PRIVATE
