@@ -29,7 +29,7 @@ Abstract:
 #include "Terminal.h"
 #include "VTSupport.h"
 
-namespace wsl::windows::wslc {
+namespace wsl::windows::wslc::cli {
 
 using wsl::windows::common::vt::Sequence;
 
@@ -407,7 +407,7 @@ private:
         // For plain cells, wrap the text directly.
         if (cell.sequences.empty())
         {
-            auto chunks = wsl::windows::wslc::details::WrapText(cell.fmt, col.MaxLength);
+            auto chunks = wsl::windows::wslc::cli::details::WrapText(cell.fmt, col.MaxLength);
             std::vector<FormattedCell> result;
             result.reserve(chunks.size());
             for (auto& chunk : chunks)
@@ -438,7 +438,7 @@ private:
             }
         }
 
-        auto chunks = wsl::windows::wslc::details::WrapText(visibleText, col.MaxLength);
+        auto chunks = wsl::windows::wslc::cli::details::WrapText(visibleText, col.MaxLength);
         std::vector<FormattedCell> result;
         result.reserve(chunks.size());
         for (auto& chunk : chunks)
@@ -719,4 +719,4 @@ private:
     }
 };
 
-} // namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc::cli

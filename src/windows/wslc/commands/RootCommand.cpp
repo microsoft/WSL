@@ -28,6 +28,8 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;

@@ -111,6 +111,8 @@ InputSource OpenImageInput(const std::wstring& input)
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 using namespace wsl::windows::wslc::models;
 using wsl::windows::common::wslc_schema::InspectImage;
 

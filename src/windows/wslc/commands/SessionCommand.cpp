@@ -19,6 +19,8 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 // Session Root Command
 std::vector<std::unique_ptr<Command>> SessionCommand::GetCommands() const
 {

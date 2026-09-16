@@ -38,6 +38,8 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+using namespace wsl::windows::wslc::cli;
+
 namespace {
 
     class DECLSPEC_UUID("91EF98A7-99A8-41C2-893C-43CDFB7DB69F") WSLCImageLoadCallback
@@ -228,17 +230,16 @@ void ListImages(CLIExecutionContext& context)
 
         // Create table — only IMAGE ID uses fixed width; other columns shrink to fit the console.
         // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
-        auto table =
-            trunc
-                ? wsl::windows::wslc::TableOutput<5>(
-                      context.Terminal,
-                      {{{L"REPOSITORY", {.Overflow = Shrink}},
-                        {L"TAG", {.Overflow = Shrink}},
-                        {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
-                        {L"CREATED", {.Overflow = Shrink}},
-                        {L"SIZE", {.Overflow = Shrink}}}},
-                      images.size())
-                : wsl::windows::wslc::TableOutput<5>(context.Terminal, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+        auto table = trunc ? wsl::windows::wslc::cli::TableOutput<5>(
+                                 context.Terminal,
+                                 {{{L"REPOSITORY", {.Overflow = Shrink}},
+                                   {L"TAG", {.Overflow = Shrink}},
+                                   {L"IMAGE ID", {.MinWidth = 12, .MaxWidth = 12, .Overflow = Shrink}},
+                                   {L"CREATED", {.Overflow = Shrink}},
+                                   {L"SIZE", {.Overflow = Shrink}}}},
+                                 images.size())
+                           : wsl::windows::wslc::cli::TableOutput<5>(
+                                 context.Terminal, {L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         for (const auto& image : images)
         {

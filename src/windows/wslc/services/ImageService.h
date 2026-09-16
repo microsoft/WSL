@@ -23,6 +23,8 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 struct BuildSecret
 {
     std::wstring Id; // value for docker's --secret id= field

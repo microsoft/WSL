@@ -12,6 +12,8 @@ using namespace wsl::windows::common;
 
 namespace wsl::windows::wslc::execution {
 
+using namespace wsl::windows::wslc::cli;
+
 HANDLE CLIExecutionContext::CreateCancelEvent()
 {
     WI_ASSERT(!CancelEvent);

@@ -19,6 +19,8 @@ Abstract:
 
 namespace wsl::windows::wslc::execution {
 
+using namespace wsl::windows::wslc::cli;
+
 struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
     CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)

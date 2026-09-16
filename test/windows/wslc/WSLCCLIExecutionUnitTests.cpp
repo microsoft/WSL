@@ -26,6 +26,7 @@ Abstract:
 #include "ContainerTasks.h"
 
 using namespace wsl::windows::wslc;
+using namespace wsl::windows::wslc::cli;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
 using namespace WEX::Common;

@@ -21,6 +21,7 @@ Abstract:
 #include "Terminal.h"
 
 using namespace wsl::windows::wslc;
+using namespace wsl::windows::wslc::cli;
 using namespace wsl::windows::common::vt;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;

@@ -3,7 +3,7 @@ set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
-    ContainerModel.cpp
+    wslc/models/ContainerModel.cpp
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
@@ -19,13 +19,13 @@ set(SOURCES
     hcs.cpp
     helpers.cpp
     hvsocket.cpp
-    ICredentialStorage.cpp
-    FileCredStorage.cpp
-    WinCredStorage.cpp
-    InputChannel.cpp
-    OutputChannel.cpp
-    Terminal.cpp
-    TableOutput.cpp
+    wslc/services/ICredentialStorage.cpp
+    wslc/services/FileCredStorage.cpp
+    wslc/services/WinCredStorage.cpp
+    wslc/cli/InputChannel.cpp
+    wslc/cli/OutputChannel.cpp
+    wslc/cli/Terminal.cpp
+    wslc/cli/TableOutput.cpp
     interop.cpp
     HandleIO.cpp
     Localization.cpp
@@ -64,7 +64,7 @@ set(SOURCES
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
-    WSLCUserSettings.cpp
+    wslc/settings/WSLCUserSettings.cpp
     notifications.cpp)
 
 set(HEADERS
@@ -98,7 +98,7 @@ set(HEADERS
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
     ConsoleState.h
-    ContainerModel.h
+    wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
     Distribution.h
@@ -115,13 +115,13 @@ set(HEADERS
     hcs_schema.h
     helpers.hpp
     hvsocket.hpp
-    ICredentialStorage.h
-    FileCredStorage.h
-    WinCredStorage.h
-    InputChannel.h
-    OutputChannel.h
-    Terminal.h
-    TableOutput.h
+    wslc/services/ICredentialStorage.h
+    wslc/services/FileCredStorage.h
+    wslc/services/WinCredStorage.h
+    wslc/cli/InputChannel.h
+    wslc/cli/OutputChannel.h
+    wslc/cli/Terminal.h
+    wslc/cli/TableOutput.h
     INetworkingEngine.h
     interop.hpp
     HandleIO.h
@@ -162,9 +162,9 @@ set(HEADERS
     SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h
-    EnumVariantMap.h
-    WSLCUserSettings.h
-    WSLCSessionDefaults.h
+    wslc/EnumVariantMap.h
+    wslc/settings/WSLCUserSettings.h
+    wslc/WSLCSessionDefaults.h
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
@@ -184,7 +184,7 @@ target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} 
 # WSLCUserSettings.cpp uses yaml-cpp headers.
 # The per-source include path and definition below only apply when the file is
 # compiled on its own, so keep it out of the unity sources.
-set_source_files_properties(WSLCUserSettings.cpp PROPERTIES
+set_source_files_properties(wslc/settings/WSLCUserSettings.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${yaml-cpp_SOURCE_DIR}/include"
     COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE"
     SKIP_UNITY_BUILD_INCLUSION ON)

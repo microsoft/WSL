@@ -24,6 +24,8 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
+using namespace wsl::windows::wslc::cli;
+
 // Registry Root Command
 std::vector<std::unique_ptr<Command>> RegistryCommand::GetCommands() const
 {

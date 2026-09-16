@@ -18,6 +18,8 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
+
+using namespace wsl::windows::wslc::cli;
 // Network Root Command
 std::vector<std::unique_ptr<Command>> NetworkCommand::GetCommands() const
 {

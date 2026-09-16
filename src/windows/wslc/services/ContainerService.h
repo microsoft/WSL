@@ -20,6 +20,8 @@ Abstract:
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
+
+using namespace wsl::windows::wslc::cli;
 struct ContainerService
 {
     // Renders a container state with the time it last changed appended. Table output is localized;
