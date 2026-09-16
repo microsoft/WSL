@@ -1776,7 +1776,8 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exi
         {
             dockerInspect = m_runtime.Docker().InspectContainer(m_id);
             const auto dockerStartTime = GetContainerStartTime(dockerInspect.value());
-            if (dockerInspect->State.Running && dockerStartTime && ContainerStartedAfterEvent(dockerStartTime.value(), stopTime, stopTimeNanoseconds))
+            if ((dockerInspect->State.Running || dockerInspect->State.Restarting) && dockerStartTime &&
+                ContainerStartedAfterEvent(dockerStartTime.value(), stopTime, stopTimeNanoseconds))
             {
                 if (stopTimeNanoseconds)
                 {
@@ -3303,7 +3304,7 @@ try
     }
 
     // Startup recovery removes only its defer gate. The common reconciler owns runtime protection,
-    // Docker inspection, plugin notification, and final state mutation.
+    // Docker inspection, process replacement, and final state mutation.
     ReconcilePolicyRestart();
 }
 CATCH_LOG_MSG("Failed to complete recovery of container '%hs'", m_id.c_str());
@@ -3620,7 +3621,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
 
     RecordEvent(WSLCStateToEventAction(State), EventTime.value_or(StateTime), ExitCode);
 
-    // Restart transactions are resolved by the start-event path that owns them. Policy resolution
+    // Explicit restart transactions are cleared by their expected start event. Policy resolution
     // includes monitor and waiter cleanup in addition to publishing the Running state.
     //
     // Running containers and Docker policy backoff retain VM-scoped resources. Explicit Restart()

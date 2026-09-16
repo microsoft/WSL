@@ -645,7 +645,7 @@ try
     {
         if (e.hooks.ContainerStarted != nullptr)
         {
-            // Failure here aborts the container creation. Surface the first error.
+            // Failure rejects the WSLC-directed start. Surface the first error.
             const auto result = e.hooks.ContainerStarted(Session, InspectJson);
             WSL_LOG(
                 "PluginOnWslcContainerStartedCall",
