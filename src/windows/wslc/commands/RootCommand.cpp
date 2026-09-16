@@ -15,7 +15,6 @@ Abstract:
 
 // Include all commands that parent to the root.
 #include "ContainerCommand.h"
-#include "EventsCommand.h"
 #include "ImageCommand.h"
 #include "NetworkCommand.h"
 #include "RegistryCommand.h"
@@ -33,7 +32,6 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
-    commands.push_back(std::make_unique<EventsCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
     commands.push_back(std::make_unique<NetworkCommand>(FullName()));
     commands.push_back(std::make_unique<RegistryCommand>(FullName()));
@@ -44,6 +42,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<SystemEventsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExportCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
     commands.push_back(std::make_unique<ImageImportCommand>(FullName()));

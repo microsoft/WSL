@@ -21,7 +21,6 @@ Abstract:
 #include "Command.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
-#include "EventsCommand.h"
 #include "ImageCommand.h"
 #include "InspectCommand.h"
 #include "NetworkCommand.h"
@@ -77,14 +76,28 @@ class WSLCCLICommandUnitTests
         auto root = RootCommand();
         auto subcommands = root.GetCommands();
         const auto events = std::ranges::find_if(
-            subcommands, [](const auto& subcommand) { return subcommand->Name() == EventsCommand::CommandName; });
+            subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
 
         VERIFY_IS_TRUE(events != subcommands.end());
+        VERIFY_ARE_EQUAL(std::wstring(L"root:events"), (*events)->FullName());
+        VERIFY_IS_TRUE(typeid(**events) == typeid(SystemEventsCommand));
     }
 
-    TEST_METHOD(EventsCommand_HasExpectedArguments)
+    TEST_METHOD(SystemCommand_ContainsEventsCommand)
     {
-        const auto arguments = EventsCommand(L"root").GetArguments();
+        const auto system = SystemCommand(L"root");
+        const auto subcommands = system.GetCommands();
+        const auto events = std::ranges::find_if(
+            subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
+
+        VERIFY_IS_TRUE(events != subcommands.end());
+        VERIFY_ARE_EQUAL(std::wstring(L"root:system:events"), (*events)->FullName());
+        VERIFY_IS_TRUE(typeid(**events) == typeid(SystemEventsCommand));
+    }
+
+    TEST_METHOD(SystemEventsCommand_HasExpectedArguments)
+    {
+        const auto arguments = SystemEventsCommand(L"root:system").GetArguments();
 
         VERIFY_ARE_EQUAL(3u, arguments.size());
 
