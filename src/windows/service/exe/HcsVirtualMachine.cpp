@@ -937,7 +937,8 @@ void HcsVirtualMachine::FreeLun(ULONG Lun)
 
 namespace wsl::windows::service::wslc {
 
-WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings)
+WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings, bool UseOpenVmm) :
+    m_useOpenVmm(UseOpenVmm)
 {
     THROW_HR_IF(E_POINTER, Settings == nullptr);
 

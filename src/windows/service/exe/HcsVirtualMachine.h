@@ -128,7 +128,7 @@ class WSLCVirtualMachineFactory
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
 {
 public:
-    explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);
+    WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings, bool UseOpenVmm);
 
     IFACEMETHOD(CreateVirtualMachine)(_Out_ IWSLCVirtualMachine** Vm) override;
 
@@ -154,6 +154,7 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::string m_hostLoopback;
     WSLCSessionStorageFlags m_storageFlags{};
+    bool m_useOpenVmm = false;
 };
 
 } // namespace wsl::windows::service::wslc

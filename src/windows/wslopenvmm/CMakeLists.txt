@@ -28,6 +28,13 @@ add_custom_command(
 add_custom_target(wslopenvmm ALL DEPENDS ${WSLOPENVMM_DLL} ${WSLOPENVMM_IMPORT_LIB})
 set_target_properties(wslopenvmm PROPERTIES FOLDER windows SOURCES "Cargo.toml;src/client.rs;src/lib.rs;wslopenvmm.h")
 
+add_library(wslopenvmm_client SHARED IMPORTED GLOBAL)
+set_target_properties(wslopenvmm_client PROPERTIES
+    IMPORTED_IMPLIB "${WSLOPENVMM_IMPORT_LIB}"
+    IMPORTED_LOCATION "${WSLOPENVMM_DLL}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}")
+add_dependencies(wslopenvmm_client wslopenvmm)
+
 string(CONCAT WSLOPENVMM_TEST_COMMAND
     "\"${CMAKE_COMMAND}\" -E env \"VM_SERVICE_PROTO=${VM_SERVICE_PROTO}\" "
     "\"${CARGO_EXECUTABLE}\" test --manifest-path \"${CMAKE_CURRENT_LIST_DIR}/Cargo.toml\" "

@@ -122,6 +122,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_IS_FALSE(s.Get<Setting::UseOpenVmm>());
         VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
@@ -347,6 +348,7 @@ class WSLCCLISettingsUnitTests
             "  hostLoopback: default\n"
             "experimental:\n"
             "  portRelay: default\n"
+            "  useOpenVmm: default\n"
             "credentialStore: default\n");
 
         UserSettingsTest s{dir};
@@ -361,6 +363,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
         VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
         VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::VirtioNet), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
+        VERIFY_IS_FALSE(s.Get<Setting::UseOpenVmm>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -579,11 +582,23 @@ class WSLCCLISettingsUnitTests
             "  storagePath: C:\\wslc-data\n"
             "experimental:\n"
             "  portRelay: wslrelay\n"
+            "  useOpenVmm: true\n"
             "credentialStore: wincred\n");
 
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+    }
+
+    TEST_METHOD(Validation_UseOpenVmm_ExplicitValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "experimental:\n  useOpenVmm: true\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_IS_TRUE(s.Get<Setting::UseOpenVmm>());
     }
 
     TEST_METHOD(Validation_PortRelay_ExplicitValue)
