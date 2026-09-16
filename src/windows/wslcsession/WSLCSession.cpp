@@ -42,7 +42,6 @@ constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr auto c_storageVhdFilename = wsl::windows::wslc::DefaultStorageVhdName;
 constexpr uint32_t c_progressPrecision = 4;
 constexpr auto c_containerCreateEventTimeout = std::chrono::seconds{60};
-constexpr auto c_networkEventTimeout = std::chrono::seconds{60};
 
 // Default grace period to keep an otherwise-idle VM running before tearing it down (used when the
 // session's IdleTimeoutSec setting is 0/unset). This avoids thrashing the VM (repeated
@@ -434,14 +433,6 @@ try
 
     WSLCSessionRuntime::RuntimeHooks hooks;
     hooks.BringUp = [this]() {
-        {
-            // Cleared here rather than at teardown: the previous relay has been joined, so a network
-            // callback blocked on m_networksLock can no longer land after the state is dropped.
-            std::lock_guard networksLock(m_networksLock);
-            m_suppressedNetworkEvents.clear();
-            m_abandonedPrune.reset();
-        }
-
         // Configure storage.
         ConfigureStorage(m_settings, m_userSid.empty() ? nullptr : reinterpret_cast<PSID>(m_userSid.data()));
 
@@ -467,9 +458,6 @@ try
     hooks.TearDownSessionState = [this](bool permanent) {
         std::lock_guard containersLock(m_containersLock);
         std::lock_guard networksLock(m_networksLock);
-
-        // The runtime lock prevents mutators from awaiting publication during teardown.
-        WI_ASSERT(!m_pendingNetworkOperation);
 
         // Network metadata is rebuilt from dockerd on every VM start, so it is always dropped.
         m_networks.clear();
@@ -2506,26 +2494,6 @@ CATCH_LOG()
 void WSLCSession::OnNetworkEvent(const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time) noexcept
 try
 {
-    std::lock_guard dispatchLock{m_networkEventDispatchLock};
-
-    if (m_dropNetworkEventsForTest)
-    {
-        return;
-    }
-
-    if (m_deferNetworkEventsForTest)
-    {
-        m_deferredNetworkEvents.emplace_back(NetworkId, Event, Attributes, Time);
-        return;
-    }
-
-    ProcessNetworkEventDispatchLockHeld(NetworkId, Event, Attributes, Time);
-}
-CATCH_LOG()
-
-__requires_lock_held(m_networkEventDispatchLock) void WSLCSession::ProcessNetworkEventDispatchLockHeld(
-    const std::string& NetworkId, NetworkEvent Event, const std::map<std::string, std::string>& Attributes, std::int64_t Time)
-{
     static const std::map<NetworkEvent, std::string> actions{
         {NetworkEvent::Create, "create"},
         {NetworkEvent::Connect, "connect"},
@@ -2533,148 +2501,9 @@ __requires_lock_held(m_networkEventDispatchLock) void WSLCSession::ProcessNetwor
         {NetworkEvent::Destroy, "destroy"},
         {NetworkEvent::Prune, "prune"}};
 
-    // Mutators hold m_networksLock until their state changes are committed.
-    std::lock_guard networksLock{m_networksLock};
-
-    const auto suppressed = m_suppressedNetworkEvents.find(NetworkId);
-    if (suppressed != m_suppressedNetworkEvents.end())
-    {
-        if (suppressed->second == RollbackNetworkEventSuppression::AllUntilDestroy)
-        {
-            if (Event == NetworkEvent::Destroy)
-            {
-                m_suppressedNetworkEvents.erase(suppressed);
-            }
-
-            return;
-        }
-
-        if (Event == NetworkEvent::Create)
-        {
-            m_suppressedNetworkEvents.erase(suppressed);
-            return;
-        }
-    }
-
     m_eventStore.Record("network", std::string{actions.at(Event)}, NetworkId, Attributes, Time);
-
-    if (m_abandonedPrune)
-    {
-        if (Event == NetworkEvent::Destroy)
-        {
-            m_abandonedPrune->RemainingDestroyIds.erase(NetworkId);
-        }
-        else if (Event == NetworkEvent::Prune && m_abandonedPrune->RemainingDestroyIds.empty())
-        {
-            m_abandonedPrune.reset();
-            return;
-        }
-    }
-
-    if (!m_pendingNetworkOperation)
-    {
-        return;
-    }
-
-    const auto completesPendingOperation = [&]() {
-        switch (m_pendingNetworkOperation->Type)
-        {
-        case PendingNetworkOperationType::Create:
-            return Event == NetworkEvent::Create && NetworkId == m_pendingNetworkOperation->NetworkId;
-
-        case PendingNetworkOperationType::Delete:
-            return Event == NetworkEvent::Destroy && NetworkId == m_pendingNetworkOperation->NetworkId;
-
-        case PendingNetworkOperationType::Prune:
-            if (Event == NetworkEvent::Destroy)
-            {
-                m_pendingNetworkOperation->ExpectedDestroyIds.erase(NetworkId);
-                return false;
-            }
-
-            // Docker serializes prunes and emits the aggregate event after all destroy events.
-            return Event == NetworkEvent::Prune && m_pendingNetworkOperation->ExpectedDestroyIds.empty();
-        }
-
-        return false;
-    };
-
-    if (completesPendingOperation())
-    {
-        // Completing resets the member, so hold a reference of our own across the call.
-        auto operation = m_pendingNetworkOperation;
-        CompletePendingNetworkOperation(operation);
-    }
 }
-
-__requires_lock_held(m_networksLock) std::shared_ptr<WSLCSession::PendingNetworkOperation> WSLCSession::StartPendingNetworkOperation(
-    PendingNetworkOperationType Type, std::string NetworkId, std::unordered_set<std::string> ExpectedDestroyIds)
-{
-    WI_ASSERT(!m_pendingNetworkOperation);
-
-    m_pendingNetworkOperation = std::make_shared<PendingNetworkOperation>();
-    m_pendingNetworkOperation->Type = Type;
-    m_pendingNetworkOperation->NetworkId = std::move(NetworkId);
-    m_pendingNetworkOperation->ExpectedDestroyIds = std::move(ExpectedDestroyIds);
-
-    return m_pendingNetworkOperation;
-}
-
-__requires_lock_held(m_networksLock) void WSLCSession::CompletePendingNetworkOperation(const std::shared_ptr<PendingNetworkOperation>& Operation) noexcept
-{
-    WI_ASSERT(m_pendingNetworkOperation == Operation);
-
-    m_pendingNetworkOperation.reset();
-    Operation->Completed.SetEvent();
-}
-
-void WSLCSession::WaitForNetworkOperationEvent(const std::shared_ptr<PendingNetworkOperation>& Operation)
-{
-    auto io = CreateIOContext();
-    io.AddHandle(std::make_unique<io::EventHandle>(Operation->Completed.get()));
-
-    const auto timeoutOverrideMs = m_networkEventTimeoutMsForTest.load();
-    io.Run(timeoutOverrideMs > 0 ? std::chrono::milliseconds{timeoutOverrideMs} : std::chrono::milliseconds{c_networkEventTimeout});
-
-    WI_ASSERT(Operation->Completed.is_signaled());
-}
-
-void WSLCSession::WaitForPendingNetworkOperationCompletion(const std::shared_ptr<PendingNetworkOperation>& Operation)
-{
-    // Registered before the wait is set up so a throw there cannot strand the slot.
-    auto abandonOnFailure = wil::scope_exit([&]() {
-        std::lock_guard networksLock{m_networksLock};
-        if (m_pendingNetworkOperation != Operation)
-        {
-            return;
-        }
-
-        if (Operation->Type == PendingNetworkOperationType::Prune)
-        {
-            m_abandonedPrune.emplace(AbandonedPrune{std::move(Operation->ExpectedDestroyIds)});
-        }
-
-        CompletePendingNetworkOperation(Operation);
-    });
-
-    WaitForNetworkOperationEvent(Operation);
-
-    abandonOnFailure.release();
-}
-
-void WSLCSession::WaitForConflictingNetworkOperationToComplete(std::unique_lock<std::mutex>& NetworksLock)
-{
-    while (m_pendingNetworkOperation)
-    {
-        auto operation = m_pendingNetworkOperation;
-        NetworksLock.unlock();
-
-        // Only the owner may abandon its operation, so this waits without touching the slot.
-        WaitForNetworkOperationEvent(operation);
-
-        NetworksLock.lock();
-    }
-}
+CATCH_LOG()
 
 HRESULT WSLCSession::OpenContainer(LPCSTR Id, IWSLCContainer** Container)
 try
@@ -3258,7 +3087,6 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::unique_lock networksLock(m_networksLock);
-    WaitForConflictingNetworkOperationToComplete(networksLock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_networks.contains(name));
 
     docker_schema::CreateNetwork request;
@@ -3312,25 +3140,9 @@ try
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
     }
 
-    // Docker may enqueue any network event while callbacks wait for m_networksLock.
-    auto removeNetworkCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name, &createResult]() {
-        m_suppressedNetworkEvents.insert_or_assign(createResult.Id, RollbackNetworkEventSuppression::AllUntilDestroy);
-
-        try
-        {
-            m_runtime.Docker().RemoveNetwork(name);
-        }
-        catch (...)
-        {
-            // Only a network dockerd still reports can be proven undeleted; anything else may yet emit destroy.
-            if (IsNetworkConfirmedPresent(createResult.Id))
-            {
-                m_suppressedNetworkEvents.insert_or_assign(createResult.Id, RollbackNetworkEventSuppression::CreateOnly);
-            }
-
-            throw;
-        }
-    });
+    // Docker published a create event for this network, and publishes a destroy for the removal below.
+    auto removeNetworkCleanup =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_runtime.Docker().RemoveNetwork(name); });
 
     if (!createResult.Warning.empty())
     {
@@ -3375,12 +3187,6 @@ try
 
     removeNetworkCleanup.release();
 
-    auto pendingOperation = StartPendingNetworkOperation(PendingNetworkOperationType::Create, createResult.Id);
-
-    networksLock.unlock();
-
-    WaitForPendingNetworkOperationCompletion(pendingOperation);
-
     return S_OK;
 }
 CATCH_RETURN();
@@ -3399,12 +3205,9 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::unique_lock networksLock(m_networksLock);
-    WaitForConflictingNetworkOperationToComplete(networksLock);
 
     auto it = m_networks.find(name);
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
-
-    auto networkId = it->second.Id;
 
     try
     {
@@ -3421,12 +3224,6 @@ try
 
     m_networks.erase(it);
     WSL_LOG("NetworkDeleted", TraceLoggingValue(name.c_str(), "NetworkName"));
-
-    auto pendingOperation = StartPendingNetworkOperation(PendingNetworkOperationType::Delete, std::move(networkId));
-
-    networksLock.unlock();
-
-    WaitForPendingNetworkOperationCompletion(pendingOperation);
 
     return S_OK;
 }
@@ -3579,10 +3376,6 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
     std::unique_lock networksLock(m_networksLock);
-    WaitForConflictingNetworkOperationToComplete(networksLock);
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE), Localization::MessageWslcNetworkPrunePending(), m_abandonedPrune.has_value());
 
     docker_schema::PruneNetworkResult pruneResult;
     try
@@ -3592,7 +3385,6 @@ try
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune networks");
 
     std::vector<std::string> deleted;
-    std::unordered_set<std::string> deletedIds;
     if (pruneResult.NetworksDeleted.has_value())
     {
         deleted.reserve(pruneResult.NetworksDeleted->size());
@@ -3605,7 +3397,6 @@ try
                 continue;
             }
 
-            deletedIds.insert(network->second.Id);
             deleted.push_back(name);
         }
     }
@@ -3618,17 +3409,10 @@ try
 
     if (deleted.empty())
     {
-        // No committed state change requires an event-publication barrier.
         return S_OK;
     }
 
     WSL_LOG("NetworksPruned", TraceLoggingValue(static_cast<ULONG>(deleted.size()), "Count"));
-
-    auto pendingOperation = StartPendingNetworkOperation(PendingNetworkOperationType::Prune, {}, std::move(deletedIds));
-
-    networksLock.unlock();
-
-    WaitForPendingNetworkOperationCompletion(pendingOperation);
 
     auto output = wil::make_unique_cotaskmem<WSLCNetworkName[]>(deleted.size());
     for (size_t i = 0; i < deleted.size(); ++i)
@@ -3911,53 +3695,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::SetNetworkFaultsForTest(BOOL FailCreateInspect, BOOL DropEvents, BOOL DeferEvents, ULONG EventTimeoutMs)
+HRESULT WSLCSession::SetNetworkFaultsForTest(BOOL FailCreateInspect)
 try
 {
     WSLCExecutionContext context(this);
 
-    THROW_HR_IF(E_INVALIDARG, DropEvents != FALSE && DeferEvents != FALSE);
-
     m_failCreateInspectForTest.store(FailCreateInspect != FALSE);
-    m_networkEventTimeoutMsForTest.store(EventTimeoutMs);
-
-    // Held across the replay so newer Docker callbacks cannot overtake the deferred events.
-    std::lock_guard dispatchLock{m_networkEventDispatchLock};
-
-    m_dropNetworkEventsForTest = DropEvents != FALSE;
-    m_deferNetworkEventsForTest = DeferEvents != FALSE;
-
-    if (!m_dropNetworkEventsForTest && !m_deferNetworkEventsForTest)
-    {
-        for (const auto& event : std::exchange(m_deferredNetworkEvents, {}))
-        {
-            ProcessNetworkEventDispatchLockHeld(event.NetworkId, event.Event, event.Attributes, event.Time);
-        }
-    }
 
     return S_OK;
 }
 CATCH_RETURN();
-
-bool WSLCSession::IsNetworkConfirmedPresent(const std::string& NetworkId) noexcept
-{
-    try
-    {
-        m_runtime.Docker().InspectNetwork(NetworkId);
-        return true;
-    }
-    catch (const DockerHTTPException& e)
-    {
-        // A 404 is the expected answer once the removal has committed.
-        if (e.StatusCode() != 404)
-        {
-            LOG_CAUGHT_EXCEPTION_MSG("Failed to inspect network: %hs", NetworkId.c_str());
-        }
-    }
-    CATCH_LOG_MSG("Failed to inspect network: %hs", NetworkId.c_str())
-
-    return false;
-}
 
 HRESULT WSLCSession::InterfaceSupportsErrorInfo(REFIID riid)
 {
