@@ -364,6 +364,9 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(MountsCount)] const WSLCMountSpec* Mounts;
     ULONG MountsCount;
+
+    [unique, string] LPCSTR RestartPolicy;
+    LONGLONG RestartMaximumRetryCount;
 } WSLCContainerOptions;
 
 typedef char WSLCContainerId[WSLC_CONTAINER_ID_LENGTH + 1] ;

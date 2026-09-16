@@ -7158,6 +7158,53 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerPolicyRestartReplacesInitProcess)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest",
+            "test-policy-restart-init",
+            {"/bin/sh",
+             "-c",
+             "if [ -e /tmp/wslc-policy-restarted ]; then sleep 99999; "
+             "else touch /tmp/wslc-policy-restarted; echo ready; read value; exit 23; fi"},
+            {},
+            "host",
+            WSLCProcessFlagsStdin);
+        launcher.SetRestartPolicy("on-failure", 1);
+
+        auto container = launcher.Launch(*m_defaultSession);
+        auto firstProcess = container.GetInitProcess();
+        WaitForOutput(firstProcess.GetStdHandle(1), "ready");
+
+        auto stdinHandle = firstProcess.GetStdHandle(0);
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(stdinHandle.Get(), "go\n", 3, &bytesWritten, nullptr));
+        VERIFY_ARE_EQUAL(3UL, bytesWritten);
+        VERIFY_ARE_EQUAL(23, firstProcess.Wait());
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_FAIL, container.State() != WslcContainerStateRunning); },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(30));
+
+        auto restartedProcess = container.GetInitProcess();
+        VERIFY_ARE_EQUAL(WslcProcessStateRunning, restartedProcess.State());
+        VERIFY_ARE_EQUAL(WslcProcessStateExited, firstProcess.State());
+    }
+
+    WSLC_TEST_METHOD(ContainerManualStopSuppressesPolicyRestart)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "test-policy-manual-stop", {"/bin/sh", "-c", "exec tail -f /dev/null"});
+        launcher.SetRestartPolicy("always", 0);
+
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_ARE_EQUAL(WslcContainerStateExited, container.State());
+
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";

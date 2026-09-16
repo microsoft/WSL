@@ -125,6 +125,7 @@ public:
 
     // Re-registers a stopped container's VM-scoped port allocations against the restarted VM.
     void RecoverPorts(const common::docker_schema::ContainerInfo& dockerContainer);
+    void CompleteRecovery() noexcept;
 
     __requires_lock_held(m_lock) void CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode = std::nullopt) noexcept;
 
@@ -182,17 +183,42 @@ private:
         unique_com_disconnect Wrapper;
     };
 
-    // Restart() runs a stop phase followed by a start phase. This marks the pair as one transaction so
-    // that Start() and Stop() cannot land in between.
+    enum class RestartSource
+    {
+        Explicit,
+        Policy
+    };
+
+    enum class PolicyRestartPhase
+    {
+        WaitingForDocker,
+        NotifyingPlugin,
+        ApplyingPluginResult
+    };
+
+    // Marks the interval between a container exit and its replacement start. Explicit restarts are
+    // driven by Restart(); policy restarts are driven by Docker events.
     struct RestartTransaction
     {
+        RestartTransaction(RestartSource source, bool cancelPolicy = false) noexcept : Source(source), CancelPolicy(cancelPolicy)
+        {
+        }
+
+        const RestartSource Source;
+        const bool CancelPolicy;
         wil::unique_event Completed{wil::EventOptions::ManualReset};
+
+        // Policy restart fields, accessed under WSLCContainerImpl::m_lock.
+        PolicyRestartPhase Phase = PolicyRestartPhase::WaitingForDocker;
+        HRESULT PluginResult = S_OK;
+        std::string PluginStartedAt;
+        std::int64_t PluginStateTime{};
     };
 
     __requires_exclusive_lock_held(m_lock) void RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime) noexcept;
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::int64_t eventTime, std::optional<std::int64_t> eventTimeNanoseconds) noexcept;
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
@@ -208,6 +234,8 @@ private:
     // restart they are part of.
     void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+    __requires_exclusive_lock_held(m_lock) void AcquireRuntimeResourcesLockHeld();
+    __requires_exclusive_lock_held(m_lock) void ReplaceInitProcessLockHeld(std::unique_ptr<WSLCProcessIO>&& io);
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
@@ -225,7 +253,20 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
-    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime);
+    __requires_exclusive_lock_held(m_lock) void OnStopped(int exitCode, std::int64_t stopTime, std::optional<std::int64_t> stopTimeNanoseconds);
+    __requires_exclusive_lock_held(m_lock) void ArmPolicyRestartLockHeld();
+
+    // The event stream, monitor, and startup recovery all enter this state machine. It acquires locks
+    // in runtime-to-lifecycle-to-container order, releases every lock for the external plugin
+    // callback, then re-enters to validate the transaction and exact Docker run before mutation.
+    void ReconcilePolicyRestart() noexcept;
+    __requires_exclusive_lock_held(m_lock) void ResolvePolicyRestartLockHeld(bool releaseResources) noexcept;
+    __requires_exclusive_lock_held(m_lock) void StartPolicyRestartMonitor();
+
+    // Runtime teardown may wait for timer callbacks while holding the runtime lock exclusively, so
+    // the timer callback must use nonblocking runtime-lock acquisition.
+    static void CALLBACK PolicyRestartTimerCallback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) noexcept;
+    __requires_lock_held(m_lock) bool PolicyRestartPendingLockHeld() const noexcept;
 
     void SetExitCode(int ExitCode) noexcept;
     void SignalInitProcessExit() noexcept;
@@ -237,8 +278,8 @@ private:
     void MapPorts();
     void UnmapPorts();
 
-    // Acquires or releases the activity hold so it is held exactly while the container is Running,
-    // keeping the session's VM alive across idle teardown.
+    // Acquires or releases the activity hold while the container is running or awaiting a Docker
+    // policy restart, keeping the session's VM alive across idle teardown.
     __requires_lock_held(m_lock) void UpdateActivityHoldLockHeld() noexcept;
 
     __requires_shared_lock_held(m_lock) std::string InspectLockHeld(bool Size = false) const;
@@ -259,16 +300,24 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
-    // Non-null from before Restart()'s stop phase until its start phase commits Running. Start() and
-    // Stop() stand down for that window, and OnStopped() keeps the container's runtime resources mapped
-    // and skips the auto-delete of an --rm container. Delete() does not stand down: a remove that lands
-    // between the two phases takes effect, and the restart's start phase fails.
+    // Non-null between a container exit and its replacement start. OnStopped() keeps the container's
+    // runtime resources mapped, and policy transactions also keep the VM active while Docker waits.
     _Guarded_by_(m_lock) std::shared_ptr<RestartTransaction> m_restart;
+
+    // A successful Docker stop request is not a policy restart. This count is published before the
+    // request releases m_lock and cleared by the resulting stop event.
+    _Guarded_by_(m_lock) size_t m_manualStopRequests = 0;
+
+    // Active-container recovery sets this while session startup owns the runtime and container-list
+    // locks. CompleteRecovery clears it after startup releases those locks.
+    _Guarded_by_(m_lock) bool m_deferPolicyRestartReconciliation = false;
 
     // True between a successful StartPhase() and the release of the container's ports and mounts. A
     // restart leaves this set across the two phases, which is what tells the start phase they are still
     // held and must not be re-acquired.
     _Guarded_by_(m_lock) bool m_runtimeResourcesHeld = false;
+
+    wil::unique_threadpool_timer m_policyRestartTimer;
 
     // The container outlives any single VM: it survives idle-termination and is reused when the VM
     // restarts. VM-scoped resources (Vm(), Docker(), Volumes(), Events(), Relay()) are therefore
@@ -294,9 +343,9 @@ private:
     EventStore& m_eventStore;
     std::string m_networkMode;
 
-    // Held (non-empty) exactly while the container is Running so the session's VM stays alive even
-    // when no client holds the wrapper (e.g. a detached `run -d` container). Maintained by
-    // UpdateActivityHoldLockHeld(); released automatically when the container is destroyed.
+    // Held while the container is Running or awaiting a Docker policy restart so the session's VM
+    // stays alive even when no client holds the wrapper. Maintained by UpdateActivityHoldLockHeld();
+    // released automatically when the container is destroyed.
     ActivityRef m_activityHold;
 };
 

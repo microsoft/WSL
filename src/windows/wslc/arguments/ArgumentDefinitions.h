@@ -117,6 +117,7 @@ _(PublishAll,       "publish-all",          L"P",             Kind::Flag,       
 _(Pull,             "pull",                 NO_ALIAS,         Kind::Value,      PullPolicy,   Localization::WSLCCLI_PullArgDescription()) \
 _(Quiet,            "quiet",                L"q",             Kind::Flag,       NoConversion, Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,           "rm",                   NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_RemoveArgDescription()) \
+_(Restart,          "restart",              NO_ALIAS,         Kind::Value,      RestartPolicy, Localization::WSLCCLI_RestartArgDescription()) \
 /*_(Scheme,           "scheme",               NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_SchemeArgDescription())*/ \
 _(Secret,           "secret",               NO_ALIAS,         Kind::Value,      BuildSecret,  Localization::WSLCCLI_SecretArgDescription()) \
 _(Server,           "server",               NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_LoginServerArgDescription()) \
