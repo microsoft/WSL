@@ -505,6 +505,72 @@ class NetworkTests
         VERIFY_IS_TRUE(v6CustomRouteGone);
     }
 
+    // Verifies the netlink flags used to add routes don't cause failures for the exact same route added on a different interface.
+    WSL2_TEST_METHOD(DuplicateRoutesOnMultipleInterfaces)
+    {
+        TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link add dummy0 type veth peer name dummy0peer"), (DWORD)0);
+        // Deleting dummy0 will also delete dummy0peer automatically
+        auto cleanupDummy = wil::scope_exit([&] { LxsstuLaunchWsl(L"ip link delete dummy0"); });
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link set dummy0 up"), (DWORD)0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link set dummy0peer up"), (DWORD)0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.0.3/24 dev dummy0"), (DWORD)0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add fc00::3/64 dev dummy0"), (DWORD)0);
+
+        // Same destination prefix, metric, and gateway on both interfaces - differing only by oif.
+        wsl::shared::hns::Route v4Route;
+        v4Route.NextHop = L"192.168.0.12";
+        v4Route.DestinationPrefix = L"192.168.77.0/24";
+        v4Route.Family = AF_INET;
+        v4Route.Metric = 7;
+        SendDeviceSettingsRequest(L"eth0", v4Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"dummy0", v4Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        wsl::shared::hns::Route v6Route;
+        v6Route.NextHop = L"fc00::12";
+        v6Route.DestinationPrefix = L"fc00:77::/80";
+        v6Route.Family = AF_INET6;
+        v6Route.Metric = 7;
+        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"dummy0", v6Route, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        const bool v4RouteOnEth0 = RouteExists({L"192.168.0.12", L"eth0", L"192.168.77.0/24", 7});
+        const bool v4RouteOnDummy0 = RouteExists({L"192.168.0.12", L"dummy0", L"192.168.77.0/24", 7});
+
+        // Unlike IPv4, the kernel merges same-prefix/same-metric IPv6 routes into a single ECMP
+        // route with one "nexthop via ... dev ..." line per interface, so check each nexthop's
+        // presence directly rather than via the single-line RouteExists parser. Sample output:
+        //   fc00:77::/80 proto kernel metric 7 pref medium
+        //           nexthop via fc00::12 dev eth0 weight 1
+        //           nexthop via fc00::12 dev dummy0 weight 1
+        auto v6RouteExists = [](const std::wstring& device) {
+            return LxsstuLaunchWsl(L"ip -6 route show fc00:77::/80 | grep \"via fc00::12\" | grep -w " + device) == (DWORD)0;
+        };
+        const bool v6RouteOnEth0 = v6RouteExists(L"eth0");
+        const bool v6RouteOnDummy0 = v6RouteExists(L"dummy0");
+
+        SendDeviceSettingsRequest(L"eth0", v4Route, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"dummy0", v4Route, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", v6Route, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"dummy0", v6Route, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+
+        const bool v4RouteGoneEth0 = !RouteExists({L"192.168.0.12", L"eth0", L"192.168.77.0/24", 7});
+        const bool v4RouteGoneDummy0 = !RouteExists({L"192.168.0.12", L"dummy0", L"192.168.77.0/24", 7});
+        const bool v6RouteGoneEth0 = !v6RouteExists(L"eth0");
+        const bool v6RouteGoneDummy0 = !v6RouteExists(L"dummy0");
+
+        VERIFY_IS_TRUE(v4RouteOnEth0);
+        VERIFY_IS_TRUE(v4RouteOnDummy0);
+        VERIFY_IS_TRUE(v6RouteOnEth0);
+        VERIFY_IS_TRUE(v6RouteOnDummy0);
+
+        VERIFY_IS_TRUE(v4RouteGoneEth0);
+        VERIFY_IS_TRUE(v4RouteGoneDummy0);
+        VERIFY_IS_TRUE(v6RouteGoneEth0);
+        VERIFY_IS_TRUE(v6RouteGoneDummy0);
+    }
+
     WSL2_TEST_METHOD(ResetRoutes)
     {
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
