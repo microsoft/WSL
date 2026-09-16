@@ -256,7 +256,7 @@ try
         // This is required because there could have been messages between the process and wsl.exe, and wslhost has no way to know what the sequence numbers were.
         channel.IgnoreSequenceNumbers();
 
-        wsl::windows::common::interop::VmModeWorkerThread(channel, vmId, true);
+        wsl::windows::common::interop::VmModeWorkerThread(channel, vmId, true, true);
     }
 
     return 0;
