@@ -1164,6 +1164,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         std::lock_guard processesLock{m_processesLock};
         m_initProcess.Reset();
         m_initProcessControl = nullptr;
+        m_initProcessStartedAt.clear();
     });
 
     // Refuse to start if any referenced named volume is in a failed state.
@@ -1205,7 +1206,9 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         CATCH_LOG();
     }
 
-    auto inspectJson = InspectLockHeld();
+    const auto dockerInspect = m_runtime.Docker().InspectContainer(m_id);
+    m_initProcessStartedAt = dockerInspect.State.StartedAt;
+    auto inspectJson = wsl::shared::ToJson(BuildInspectContainer(dockerInspect));
     const auto pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
     if (FAILED(pluginResult))
     {
@@ -1344,6 +1347,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 {
     // Either owner may disconnect the COM wrapper, so both must outlive m_lock.
     unique_com_disconnect comWrapper;
+    bool notifyContainerStopping = false;
     bool reconcilePolicyRestart = false;
     std::shared_ptr<StateTransition> transition;
 
@@ -1377,13 +1381,14 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             }
             else
             {
-                WSL_LOG("UnexpectedContainerStart", TraceLoggingValue(m_id.c_str(), "Id"));
+                notifyContainerStopping = PrepareForUnexpectedStartLockHeld(eventTime);
+                reconcilePolicyRestart = true;
             }
         }
         else if (event == ContainerEvent::Stop)
         {
             WI_ASSERT(exitCode.has_value());
-            OnStopped(exitCode.value(), eventTime, eventTimeNanoseconds);
+            notifyContainerStopping = OnStopped(exitCode.value(), eventTime, eventTimeNanoseconds);
         }
         else if (event == ContainerEvent::Destroy)
         {
@@ -1415,10 +1420,64 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             TraceLoggingValue((int)event, "Event"));
     }
 
+    if (notifyContainerStopping)
+    {
+        // Plugin callbacks may re-enter WSLC. Invoke this after releasing lifecycle and container
+        // locks, but before policy reconciliation can report the replacement start.
+        try
+        {
+            LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
+        }
+        CATCH_LOG();
+    }
+
     if (reconcilePolicyRestart)
     {
         ReconcilePolicyRestart();
     }
+}
+
+__requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::PrepareForUnexpectedStartLockHeld(std::int64_t eventTime) noexcept
+try
+{
+    if (m_state != WslcContainerStateRunning || m_restart)
+    {
+        return false;
+    }
+
+    const auto dockerInspect = m_runtime.Docker().InspectContainer(m_id);
+    if ((!dockerInspect.State.Running && !dockerInspect.State.Restarting) || dockerInspect.State.StartedAt.empty() ||
+        dockerInspect.State.StartedAt == c_unsetTimestamp || dockerInspect.State.StartedAt == m_initProcessStartedAt)
+    {
+        return false;
+    }
+
+    WSL_LOG(
+        "MissedContainerStop",
+        TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+        TraceLoggingValue(m_id.c_str(), "Id"),
+        TraceLoggingValue(m_initProcessStartedAt.c_str(), "PreviousStartedAt"),
+        TraceLoggingValue(dockerInspect.State.StartedAt.c_str(), "CurrentStartedAt"));
+
+    // The start event proves Docker replaced the run represented by the current process wrapper.
+    // Preserve resources, retire that wrapper with a synthetic exit, and let the common reconciler
+    // validate and publish the active Docker run.
+    ArmPolicyRestartLockHeld();
+
+    constexpr auto c_unknownExitCode = 128 + WSLCSignalSIGKILL;
+    // Any pending manual stop targeted the replaced run whose exit is being synthesized here.
+    m_manualStopRequests = 0;
+    SetExitCode(c_unknownExitCode);
+    ReleaseProcesses();
+    CommitState(WslcContainerStateExited, eventTime, c_unknownExitCode);
+    SignalInitProcessExit();
+    m_initProcessStartedAt.clear();
+    return true;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION_MSG("Failed to reconcile unexpected start of container '%hs'", m_id.c_str());
+    return false;
 }
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
@@ -1696,7 +1755,7 @@ __requires_exclusive_lock_held(m_lock) std::shared_ptr<WSLCContainerImpl::StateT
     return StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exitCode, std::int64_t stopTime, std::optional<std::int64_t> stopTimeNanoseconds)
+__requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::OnStopped(int exitCode, std::int64_t stopTime, std::optional<std::int64_t> stopTimeNanoseconds)
 {
     auto transition = m_transition;
 
@@ -1706,10 +1765,11 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     if (transition && (transition->ExpectedEvent == ContainerEvent::Start))
     {
         WSL_LOG("UnexpectedContainerExit", TraceLoggingValue(m_id.c_str(), "Id"), TraceLoggingValue(exitCode, "ExitCode"));
-        return;
+        return false;
     }
 
     std::optional<DockerInspectContainer> dockerInspect;
+    bool replacementNeedsReconciliation = false;
     if (m_state == WslcContainerStateRunning && !transition)
     {
         try
@@ -1737,7 +1797,12 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
                             "DockerStartTime"));
                 }
 
-                return;
+                if (m_initProcessStartedAt == dockerInspect->State.StartedAt)
+                {
+                    return false;
+                }
+
+                replacementNeedsReconciliation = true;
             }
         }
         catch (...)
@@ -1746,11 +1811,12 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
         }
     }
 
+    const bool notifyContainerStopping = m_state == WslcContainerStateRunning;
     SetExitCode(exitCode);
 
-    const bool manualStop = std::exchange(m_manualStopRequests, 0) != 0;
-    bool policyRestartPending = false;
-    if (m_state == WslcContainerStateRunning && !transition && !m_restart && !manualStop)
+    const bool manualStop = replacementNeedsReconciliation ? false : (std::exchange(m_manualStopRequests, 0) != 0);
+    bool policyRestartPending = replacementNeedsReconciliation;
+    if (!policyRestartPending && m_state == WslcContainerStateRunning && !transition && !m_restart && !manualStop)
     {
         if (dockerInspect)
         {
@@ -1764,23 +1830,13 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
         }
     }
 
-    if (policyRestartPending)
+    if (policyRestartPending && !m_restart)
     {
         try
         {
             ArmPolicyRestartLockHeld();
         }
         CATCH_LOG_MSG("Failed to start policy restart monitor for container '%hs'", m_id.c_str());
-    }
-
-    // Notify plugin manager that the container is stopping. Errors are ignored.
-    if (m_state == WslcContainerStateRunning)
-    {
-        try
-        {
-            LOG_IF_FAILED(m_pluginNotifier->OnContainerStopping(m_id.c_str()));
-        }
-        CATCH_LOG();
     }
 
     ReleaseProcesses();
@@ -1791,7 +1847,8 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
         ReleaseRuntimeResources();
     }
 
-    // Ignore duplicate or late Stop events so they do not overwrite an already committed state.
+    // Ignore duplicate Stop events. A stale stop for an older wrapper still commits that wrapper's
+    // exit before the replacement run is reconciled.
     if (m_state == WslcContainerStateRunning)
     {
         CommitState(WslcContainerStateExited, stopTime, exitCode);
@@ -1802,7 +1859,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     // Docker delete request is already sent.
     if (transition && transition->ExpectedEvent == ContainerEvent::Destroy)
     {
-        return;
+        return notifyContainerStopping;
     }
 
     // Stop with Rm must initiate Delete.
@@ -1821,7 +1878,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
                 transition = StartTransition(TransitionKind::Delete, ContainerEvent::Destroy);
             }
 
-            return;
+            return notifyContainerStopping;
         }
         catch (...)
         {
@@ -1831,11 +1888,14 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(int exi
     }
 
     SignalInitProcessExit();
+    m_initProcessStartedAt.clear();
 
     if (transition)
     {
         CompleteTransition(transition, std::move(transitionException));
     }
+
+    return notifyContainerStopping;
 }
 
 __requires_lock_held(m_lock) bool WSLCContainerImpl::PolicyRestartPendingLockHeld() const noexcept
@@ -1849,7 +1909,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ArmPolicyRestartL
 
     m_restart = std::make_shared<RestartTransaction>(RestartSource::Policy);
     auto resetOnFailure = wil::scope_exit([this]() { m_restart.reset(); });
-    StartPolicyRestartMonitor();
+    SchedulePolicyRestartMonitorLockHeld();
     UpdateActivityHoldLockHeld();
     resetOnFailure.release();
 }
@@ -1857,145 +1917,81 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ArmPolicyRestartL
 void WSLCContainerImpl::ReconcilePolicyRestart() noexcept
 try
 {
-    std::shared_ptr<RestartTransaction> notificationRestart;
-    std::string inspectJson;
-
+    // Runtime teardown may wait for this timer while holding the exclusive runtime lock. Every entry
+    // point therefore uses the same nonblocking acquisition and leaves pending work for a later
+    // event or timer tick when the runtime is unavailable.
+    auto runtimeLock = m_runtime.TryLockShared();
+    if (!runtimeLock || !m_runtime.HasDocker() || m_runtime.VmExited())
     {
-        // Runtime teardown may wait for this timer while holding the exclusive runtime lock. Every
-        // entry point therefore uses the same nonblocking acquisition and leaves pending work for a
-        // later event or timer tick when the runtime is unavailable.
-        auto runtimeLock = m_runtime.TryLockShared();
-        if (!runtimeLock || !m_runtime.HasDocker() || m_runtime.VmExited())
-        {
-            return;
-        }
-
-        auto lifecycleLock = m_lifecycleLock.lock_exclusive();
-        auto lock = m_lock.lock_exclusive();
-        if (!PolicyRestartPendingLockHeld() || m_deferPolicyRestartReconciliation)
-        {
-            return;
-        }
-
-        const auto restart = m_restart;
-        if (restart->Phase == PolicyRestartPhase::NotifyingPlugin)
-        {
-            return;
-        }
-
-        const auto resetPluginNotification = [&restart]() noexcept {
-            restart->Phase = PolicyRestartPhase::WaitingForDocker;
-            restart->PluginResult = S_OK;
-            restart->PluginStartedAt.clear();
-            restart->PluginStateTime = 0;
-        };
-
-        const auto dockerInspect = m_runtime.Docker().InspectContainer(m_id);
-        if (dockerInspect.State.Restarting)
-        {
-            if (restart->Phase == PolicyRestartPhase::ApplyingPluginResult)
-            {
-                resetPluginNotification();
-            }
-
-            return;
-        }
-
-        if (!dockerInspect.State.Running)
-        {
-            ResolvePolicyRestartLockHeld(false);
-            [[maybe_unused]] const auto transition = OnFailedRestartExclusiveLockHeld();
-            return;
-        }
-
-        if (restart->Phase == PolicyRestartPhase::ApplyingPluginResult)
-        {
-            if (dockerInspect.State.StartedAt != restart->PluginStartedAt)
-            {
-                // The plugin result belongs only to the run identified by PluginStartedAt. A later
-                // run is evaluated independently.
-                resetPluginNotification();
-                return;
-            }
-
-            if (FAILED(restart->PluginResult))
-            {
-                try
-                {
-                    m_runtime.Docker().StopContainer(m_id, {}, {});
-                }
-                CATCH_LOG_MSG("Failed to stop rejected policy restart of container '%hs'", m_id.c_str());
-
-                ResolvePolicyRestartLockHeld(true);
-                return;
-            }
-
-            try
-            {
-                ReplaceInitProcessLockHeld(nullptr);
-                CommitState(WslcContainerStateRunning, restart->PluginStateTime);
-
-                // Policy resolution also disarms the abandonment monitor, signals lifecycle waiters,
-                // and updates the VM activity hold.
-                ResolvePolicyRestartLockHeld(false);
-            }
-            catch (...)
-            {
-                LOG_CAUGHT_EXCEPTION_MSG("Failed to reconcile policy restart of container '%hs'", m_id.c_str());
-
-                try
-                {
-                    m_runtime.Docker().StopContainer(m_id, {}, {});
-                }
-                CATCH_LOG_MSG("Failed to stop rejected policy restart of container '%hs'", m_id.c_str());
-
-                ResolvePolicyRestartLockHeld(true);
-            }
-
-            return;
-        }
-
-        WI_ASSERT(restart->Phase == PolicyRestartPhase::WaitingForDocker);
-
-        const auto dockerStartTime = GetContainerStartTime(dockerInspect);
-        const auto dockerStartTimeSeconds =
-            dockerStartTime ? std::make_optional(std::chrono::floor<std::chrono::seconds>(*dockerStartTime).time_since_epoch().count())
-                            : std::nullopt;
-
-        inspectJson = wsl::shared::ToJson(BuildInspectContainer(dockerInspect));
-        restart->Phase = PolicyRestartPhase::NotifyingPlugin;
-        restart->PluginStartedAt = dockerInspect.State.StartedAt;
-        restart->PluginStateTime = dockerStartTimeSeconds.value_or(std::time(nullptr));
-        notificationRestart = restart;
+        return;
     }
 
-    // External callbacks run without runtime, lifecycle, or container locks and may re-enter WSLC.
-    HRESULT pluginResult;
+    auto lifecycleLock = m_lifecycleLock.lock_exclusive();
+    auto lock = m_lock.lock_exclusive();
+    if (m_deferPolicyRestartReconciliation)
+    {
+        return;
+    }
+
+    const auto dockerInspect = m_runtime.Docker().InspectContainer(m_id);
+    if (!PolicyRestartPendingLockHeld())
+    {
+        if (m_state == WslcContainerStateRunning || (!dockerInspect.State.Running && !dockerInspect.State.Restarting))
+        {
+            return;
+        }
+
+        const bool runtimeResourcesWereHeld = m_runtimeResourcesHeld;
+        AcquireRuntimeResourcesLockHeld();
+        auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, runtimeResourcesWereHeld]() {
+            if (!runtimeResourcesWereHeld && !PolicyRestartPendingLockHeld())
+            {
+                ReleaseRuntimeResources();
+            }
+        });
+        ArmPolicyRestartLockHeld();
+        resourceCleanup.release();
+    }
+
+    if (dockerInspect.State.Restarting)
+    {
+        return;
+    }
+
+    if (!dockerInspect.State.Running)
+    {
+        ResolvePolicyRestartLockHeld(false);
+        [[maybe_unused]] const auto transition = OnFailedRestartExclusiveLockHeld();
+        return;
+    }
+
     try
     {
-        pluginResult = m_pluginNotifier->OnContainerStarted(inspectJson.c_str());
+        ReplaceInitProcessLockHeld(nullptr);
+        m_initProcessStartedAt = dockerInspect.State.StartedAt;
+
+        const auto dockerStartTime = GetContainerStartTime(dockerInspect);
+        const std::int64_t stateTime =
+            dockerStartTime ? std::chrono::floor<std::chrono::seconds>(*dockerStartTime).time_since_epoch().count() : std::time(nullptr);
+        const auto publicationTime = std::max(stateTime, static_cast<std::int64_t>(std::time(nullptr)));
+        CommitState(WslcContainerStateRunning, stateTime, std::nullopt, publicationTime);
+
+        // The initial WSLC-directed start authorized this container configuration and its restart
+        // policy, so Docker retries do not create another plugin authorization boundary.
+        ResolvePolicyRestartLockHeld(false);
     }
     catch (...)
     {
-        pluginResult = wil::ResultFromCaughtException();
-    }
+        LOG_CAUGHT_EXCEPTION_MSG("Failed to reconcile policy restart of container '%hs'", m_id.c_str());
 
-    LOG_IF_FAILED_MSG(pluginResult, "Plugin rejected policy restart of container '%hs' (0x%x)", m_id.c_str(), pluginResult);
-
-    {
-        auto lock = m_lock.lock_exclusive();
-        if (m_restart != notificationRestart || notificationRestart->Phase != PolicyRestartPhase::NotifyingPlugin)
+        try
         {
-            return;
+            m_runtime.Docker().StopContainer(m_id, {}, {});
         }
+        CATCH_LOG_MSG("Failed to stop unreconciled policy restart of container '%hs'", m_id.c_str());
 
-        notificationRestart->PluginResult = pluginResult;
-        notificationRestart->Phase = PolicyRestartPhase::ApplyingPluginResult;
+        ResolvePolicyRestartLockHeld(true);
     }
-
-    // Re-enter through the same state machine so callback completion follows the same runtime and
-    // exact-run validation as every later event or timer tick.
-    ReconcilePolicyRestart();
 }
 catch (...)
 {
@@ -2026,18 +2022,19 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ResolvePolicyRest
     UpdateActivityHoldLockHeld();
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::StartPolicyRestartMonitor()
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::SchedulePolicyRestartMonitorLockHeld()
 {
+    WI_ASSERT(PolicyRestartPendingLockHeld());
+
     if (!m_policyRestartTimer)
     {
         m_policyRestartTimer.reset(CreateThreadpoolTimer(PolicyRestartTimerCallback, this, nullptr));
         THROW_LAST_ERROR_IF(!m_policyRestartTimer);
     }
 
-    constexpr auto c_pollInterval = 200ms;
-    auto dueTime =
-        wil::filetime::from_int64(static_cast<ULONGLONG>(-1 * wil::filetime_duration::one_millisecond * c_pollInterval.count()));
-    SetThreadpoolTimer(m_policyRestartTimer.get(), &dueTime, gsl::narrow<DWORD>(c_pollInterval.count()), 0);
+    const auto delay = std::chrono::duration_cast<std::chrono::milliseconds>(m_restart->MonitorDelay);
+    auto dueTime = wil::filetime::from_int64(static_cast<ULONGLONG>(-1 * wil::filetime_duration::one_millisecond * delay.count()));
+    SetThreadpoolTimer(m_policyRestartTimer.get(), &dueTime, 0, 0);
 }
 
 void CALLBACK WSLCContainerImpl::PolicyRestartTimerCallback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER) noexcept
@@ -2046,7 +2043,27 @@ void CALLBACK WSLCContainerImpl::PolicyRestartTimerCallback(PTP_CALLBACK_INSTANC
     try
     {
         const auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
+        std::shared_ptr<RestartTransaction> restart;
+        {
+            auto lock = container.m_lock.lock_shared();
+            if (!container.PolicyRestartPendingLockHeld())
+            {
+                return;
+            }
+
+            restart = container.m_restart;
+        }
+
         container.ReconcilePolicyRestart();
+
+        auto lock = container.m_lock.lock_exclusive();
+        if (container.m_restart == restart)
+        {
+            constexpr auto c_maxMonitorDelay = 10s;
+            restart->MonitorDelay = std::min(restart->MonitorDelay * 2, c_maxMonitorDelay);
+            container.SchedulePolicyRestartMonitorLockHeld();
+        }
     }
     CATCH_LOG_MSG("Failed to monitor policy restart of container '%hs'", container.m_id.c_str());
 }
@@ -3194,8 +3211,10 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         }
     }
 
-    const bool activeRestartRecovery = dockerContainer.State == ContainerState::Running || dockerContainer.State == ContainerState::Restarting;
-    const auto initialState = activeRestartRecovery ? WslcContainerStateExited : DockerStateToWSLCState(dockerContainer.State);
+    // The list state is provisional. Event registration and a fresh inspect below establish the
+    // authoritative state before the wrapper is exposed.
+    const bool listedActive = dockerContainer.State == ContainerState::Running || dockerContainer.State == ContainerState::Restarting;
+    const auto initialState = listedActive ? WslcContainerStateExited : DockerStateToWSLCState(dockerContainer.State);
 
     auto container = std::make_shared<WSLCContainerImpl>(
         wslcSession,
@@ -3216,63 +3235,54 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
-    // Restore the state change timestamp from Docker inspect data.
-    try
-    {
-        const auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
-        auto state = DockerStateToWSLCState(dockerContainer.State);
-
-        if (state == WslcContainerStateCreated)
-        {
-            // A created-but-never-started container has no StartedAt/FinishedAt; its state last
-            // changed when it was created.
-            container->m_stateChangedAt = dockerContainer.Created;
-        }
-        else
-        {
-            const auto& timestamp = (state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
-
-            if (!timestamp.empty() && timestamp != c_unsetTimestamp)
-            {
-                container->m_stateChangedAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(timestamp);
-            }
-        }
-    }
-    catch (...)
-    {
-        LOG_CAUGHT_EXCEPTION();
-        EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
-            wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
-    }
-
-    if (activeRestartRecovery)
     {
         auto lock = container->m_lock.lock_exclusive();
-        container->AcquireRuntimeResourcesLockHeld();
 
-        // Register for Docker events while holding m_lock, then arm the policy transaction before an
-        // already-queued start event can be processed.
+        // Register first so a transition after the inspect cannot be lost. Reconciliation remains
+        // deferred until session startup releases its recovery locks.
         container->m_deferPolicyRestartReconciliation = true;
         container->Initialize();
-        container->ArmPolicyRestartLockHeld();
+
+        const auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
+        const auto inspectState = nlohmann::json(inspectData.State.Status).get<ContainerState>();
+        const bool activeRestartRecovery = inspectData.State.Running || inspectData.State.Restarting;
+        const auto state = DockerStateToWSLCState(inspectState);
+        container->m_state = activeRestartRecovery ? WslcContainerStateExited : state;
 
         try
         {
-            const auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
-            if (inspectData.State.Restarting || inspectData.State.Running)
+            if (state == WslcContainerStateCreated)
             {
-                // CompleteRecovery reconciles after session startup releases its recovery locks.
+                // A created-but-never-started container has no StartedAt/FinishedAt; its state last
+                // changed when it was created.
+                container->m_stateChangedAt = dockerContainer.Created;
             }
             else
             {
-                container->ResolvePolicyRestartLockHeld(true);
+                const auto& timestamp = activeRestartRecovery ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
+
+                if (!timestamp.empty() && timestamp != c_unsetTimestamp)
+                {
+                    container->m_stateChangedAt = wsl::windows::common::timestamp::Rfc3339ToEpoch(timestamp);
+                }
             }
         }
-        CATCH_LOG_MSG("Failed to reconcile recovered container '%hs'", dockerContainer.Id.c_str());
-    }
-    else
-    {
-        container->Initialize();
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageWslcContainerTimestampRecoveryFailed(
+                wsl::shared::string::MultiByteToWide(dockerContainer.Id)));
+        }
+
+        if (activeRestartRecovery)
+        {
+            container->AcquireRuntimeResourcesLockHeld();
+            container->ArmPolicyRestartLockHeld();
+        }
+        else
+        {
+            container->UpdateActivityHoldLockHeld();
+        }
     }
 
     return container;
@@ -3592,7 +3602,8 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
     return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
-__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerState State, std::int64_t Time, std::optional<int> ExitCode) noexcept
+__requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(
+    WSLCContainerState State, std::int64_t StateTime, std::optional<int> ExitCode, std::optional<std::int64_t> EventTime) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
@@ -3605,9 +3616,9 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::CommitState(WSLCContainerSt
 
     m_state = State;
     m_stateGeneration++;
-    m_stateChangedAt = Time;
+    m_stateChangedAt = StateTime;
 
-    RecordEvent(WSLCStateToEventAction(State), Time, ExitCode);
+    RecordEvent(WSLCStateToEventAction(State), EventTime.value_or(StateTime), ExitCode);
 
     // Restart transactions are resolved by the start-event path that owns them. Policy resolution
     // includes monitor and waiter cleanup in addition to publishing the Running state.

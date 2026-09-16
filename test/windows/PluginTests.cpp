@@ -842,18 +842,18 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    WSL2_TEST_METHOD(WslcContainerRestartReentry)
+    WSL2_TEST_METHOD(WslcContainerRestartAuthorizationInherited)
     {
-        ConfigurePlugin(PluginTestType::WslcContainerRestartReentry);
+        ConfigurePlugin(PluginTestType::WslcContainerRestartAuthorizationInherited);
 
         {
-            auto session = CreateWslcSession(L"plugin-wslc-container-restart-reentry");
+            auto session = CreateWslcSession(L"plugin-wslc-container-restart-authorization");
 
             LoadTestImage(*session, "debian:latest");
 
             wsl::windows::common::WSLCContainerLauncher launcher(
                 "debian:latest",
-                "wslc-plugin-restart-reentry",
+                "wslc-plugin-restart-authorization",
                 {"/bin/sh",
                  "-c",
                  "if [ -e /tmp/wslc-plugin-restarted ]; then exec tail -f /dev/null; "
@@ -881,14 +881,13 @@ class PluginTests
 
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=26
-            WSLC Session created, name=plugin-wslc-container-restart-reentry, id=*, pid=*, token=set, sid=set
+            WSLC Session created, name=plugin-wslc-container-restart-authorization, id=*, pid=*, token=set, sid=set
             WSLC Image created, session=*, id=sha256:*, name=debian:latest
-            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-reentry, image=debian:latest, state=running
+            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-authorization, image=debian:latest, state=running
+            WSLC Container restart policy authorization: on-failure:1
             WSLC Container stopping, session=*, id=*
-            WSLC Container started, session=*, id=*, name=/wslc-plugin-restart-reentry, image=debian:latest, state=running
-            WSLC Policy restart reentrant WSLCCreateProcess: ok
             WSLC Container stopping, session=*, id=*
-            WSLC Session stopping, name=plugin-wslc-container-restart-reentry, id=*)";
+            WSLC Session stopping, name=plugin-wslc-container-restart-authorization, id=*)";
 
         ValidateLogFile(ExpectedOutput);
     }

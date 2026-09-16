@@ -132,7 +132,9 @@ typedef HRESULT (*WSLPluginAPI_OnSessionCreated)(const struct WSLCSessionInforma
 // Called when a WSLC session is about to stop. Errors are ignored.
 typedef HRESULT (*WSLPluginAPI_OnSessionStopping)(const struct WSLCSessionInformation* Session);
 
-// Called when a container starts. Returning an error prevents the container creation.
+// Called when WSLC starts a container. Returning an error rejects the start and causes WSLC to stop
+// the container. Docker restart-policy retries inherit the original approval and do not invoke this
+// callback.
 // 'InspectContainer' is a JSON document that follows the wslc_schema::InspectContainer format.
 typedef HRESULT (*WSLPluginAPI_ContainerStarted)(const struct WSLCSessionInformation* Session, LPCSTR InspectContainer);
 

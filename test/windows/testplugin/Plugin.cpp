@@ -47,7 +47,6 @@ std::atomic<HANDLE> g_leakedProcessExitEvent = nullptr;
 std::thread g_stopWindowCaller;
 HRESULT g_stopWindowCallerResult = E_PENDING;
 std::atomic<bool> g_leakedProcessDied = false;
-std::atomic<size_t> g_wslcContainerStartedCount = 0;
 
 std::optional<uint32_t> g_previousInitPid;
 
@@ -641,16 +640,15 @@ try
         return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
     }
 
-    if (g_testType == PluginTestType::WslcContainerRestartReentry && ++g_wslcContainerStartedCount == 2)
+    if (g_testType == PluginTestType::WslcContainerRestartAuthorizationInherited)
     {
-        std::vector<const char*> args = {"/bin/true", nullptr};
-        WSLCProcessHandle process = nullptr;
-        const auto hr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
-        g_logfile << "WSLC Policy restart reentrant WSLCCreateProcess: " << (SUCCEEDED(hr) ? "ok" : "failed") << std::endl;
-        if (SUCCEEDED(hr))
+        if (container.HostConfig.RestartPolicy.Name != "on-failure" || container.HostConfig.RestartPolicy.MaximumRetryCount != 1)
         {
-            g_api->WSLCReleaseProcess(process);
+            g_logfile << "WSLC Container restart policy authorization: invalid" << std::endl;
+            return E_UNEXPECTED;
         }
+
+        g_logfile << "WSLC Container restart policy authorization: on-failure:1" << std::endl;
     }
 
     return S_OK;
@@ -865,11 +863,13 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcContainerRestartReentry));
+        THROW_HR_IF(
+            E_INVALIDARG,
+            static_cast<DWORD>(g_testType) <= 0 ||
+                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcContainerRestartAuthorizationInherited));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;
-        g_wslcContainerStartedCount = 0;
         Hooks->OnVMStarted = &OnVmStarted;
         Hooks->OnVMStopping = &OnVmStopping;
         Hooks->OnDistributionStarted = &OnDistroStarted;
