@@ -15,7 +15,6 @@ VmCreateRequest CreateRequest()
 {
     VmCreateRequest request;
     THROW_IF_FAILED(CoCreateGuid(&request.VmId));
-    request.OwnerName = L"Backend test";
     request.Processor.Count = 2;
     request.Memory.SizeBytes = 512 * c_mib;
     request.Boot.KernelPath = L"C:\\images\\kernel";
@@ -55,7 +54,6 @@ class OpenVmmVirtualMachineBackendTests
         const auto description = ValidateCreateRequest(request);
 
         VERIFY_IS_TRUE(IsEqualGUID(request.VmId, description.Identity.VmId));
-        VERIFY_ARE_EQUAL(request.OwnerName, description.OwnerName);
         VERIFY_ARE_EQUAL(request.Processor.Count, description.Processor.Count);
         VERIFY_ARE_EQUAL(request.Memory.SizeBytes, description.Memory.SizeBytes);
         VERIFY_ARE_EQUAL(VmBootMethod::LinuxDirect, description.Boot.Method);
@@ -68,19 +66,18 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_FALSE(disk.ReadOnly);
     }
 
-    TEST_METHOD(ReservesExactPlacementsBeforeAutomaticAndPreferredDisks)
+    TEST_METHOD(ReservesExactPlacementsBeforeAutomaticDisks)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRequest();
-        request.BootDisks = {CreateDisk(L"preferred"), CreateDisk(L"automatic"), CreateDisk(L"exact")};
-        request.BootDisks[0].Disk.Placement = VmScsiPlacement{{0, 0}, VmPlacementPolicy::Preferred};
-        request.BootDisks[2].Disk.Placement = VmScsiPlacement{{0, 0}, VmPlacementPolicy::Exact};
+        request.BootDisks = {CreateDisk(L"automatic-1"), CreateDisk(L"automatic-2"), CreateDisk(L"exact")};
+        request.BootDisks[2].Disk.Placement = VmScsiPlacement{{0, 0}};
         const auto description = ValidateCreateRequest(request);
-        VERIFY_ARE_EQUAL(UINT32{1}, description.BootDisks.at(L"preferred").GuestAddress.Lun);
-        VERIFY_ARE_EQUAL(UINT32{2}, description.BootDisks.at(L"automatic").GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{1}, description.BootDisks.at(L"automatic-1").GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{2}, description.BootDisks.at(L"automatic-2").GuestAddress.Lun);
         VERIFY_ARE_EQUAL(UINT32{0}, description.BootDisks.at(L"exact").GuestAddress.Lun);
 
-        request.BootDisks[0].Disk.Placement->Policy = VmPlacementPolicy::Exact;
+        request.BootDisks[0].Disk.Placement = VmScsiPlacement{{0, 0}};
         VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
         request.BootDisks[0].Disk.Placement.reset();
         request.BootDisks[1].Key = request.BootDisks[0].Key;
@@ -153,21 +150,82 @@ class OpenVmmVirtualMachineBackendTests
         request.Boot.KernelPath = L"relative-kernel";
         VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
         request.Boot.KernelPath = L"C:\\images\\kernel";
-        request.Boot.Method = VmBootMethod::LinuxFirmware;
+        request.Boot.Method = VmBootMethod::Uefi;
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
 
-    TEST_METHOD(CapabilitiesDoNotAdvertiseUnimplementedOperations)
+    TEST_METHOD(BootsAndTerminates)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        const auto basePath = wsl::windows::common::wslutil::GetBasePath();
+        request.Boot.KernelPath = basePath / L"kernel";
+        request.Boot.InitrdPath = basePath / LXSS_VM_MODE_INITRD_NAME;
+        request.Boot.GuestCommandLine = L"panic=-1";
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto terminationEvent = backend->GetTerminationEvent();
+        backend->Start();
+
+        const auto runningResult = WaitForSingleObject(terminationEvent.get(), 100);
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), runningResult);
+        if (runningResult == WAIT_TIMEOUT)
+        {
+            backend->Terminate();
+        }
+
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
+    }
+
+    TEST_METHOD(CapabilitiesReflectVmServiceProtocol)
     {
         const auto capabilities = OpenVmmVirtualMachineBackend::QueryCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::OpenVmm, capabilities.Backend);
-        VERIFY_IS_FALSE(capabilities.Operations.contains(VmOperation::Start));
-        VERIFY_IS_FALSE(capabilities.Features.contains(VmFeature::UserModeNatNetwork));
-        if constexpr (!wsl::shared::Arm64)
+
+        decltype(capabilities.Operations) expectedOperations;
+        for (const auto operation :
+             {VmOperation::Create,
+              VmOperation::Start,
+              VmOperation::Terminate,
+              VmOperation::CreateGuestListener,
+              VmOperation::AcceptGuestConnection,
+              VmOperation::ConnectGuest,
+              VmOperation::CloseGuestListener,
+              VmOperation::AttachDisk,
+              VmOperation::DetachDisk,
+              VmOperation::CreateFileSystemDevice,
+              VmOperation::AddFileSystemShare,
+              VmOperation::RemoveFileSystemShare,
+              VmOperation::RemoveDevice,
+              VmOperation::AddNetworkAdapter,
+              VmOperation::UpdateNetworkAdapter,
+              VmOperation::BindPort,
+              VmOperation::UnbindPort})
         {
-            VERIFY_IS_TRUE(capabilities.Operations.at(VmOperation::Create).Supported);
-            VERIFY_IS_FALSE(capabilities.Operations.at(VmOperation::Create).RequiredDeadline);
+            expectedOperations.set(static_cast<size_t>(operation));
         }
+        VERIFY_IS_TRUE(capabilities.Operations == expectedOperations);
+
+        decltype(capabilities.Features) expectedFeatures;
+        for (const auto feature :
+             {VmFeature::LinuxDirectBoot,
+              VmFeature::LinuxFirmwareBoot,
+              VmFeature::MemoryOvercommit,
+              VmFeature::SerialConsole,
+              VmFeature::VirtioConsole,
+              VmFeature::Vhd,
+              VmFeature::Vhdx,
+              VmFeature::VirtioFsFileBacked,
+              VmFeature::SavedStateOnCrash,
+              VmFeature::UserModeNatNetwork,
+              VmFeature::TcpPortBinding,
+              VmFeature::UdpPortBinding,
+              VmFeature::Ipv6PortBinding,
+              VmFeature::ScopedIpv6PortBinding})
+        {
+            expectedFeatures.set(static_cast<size_t>(feature));
+        }
+        VERIFY_IS_TRUE(capabilities.Features == expectedFeatures);
     }
 };
 

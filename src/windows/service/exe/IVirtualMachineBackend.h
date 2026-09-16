@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <wil/resource.h>
 #include <array>
+#include <bitset>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -102,8 +103,11 @@ enum class VmFeature
     ScopedIpv6PortBinding,
     DynamicHostPort,
     VirtualHostAddress,
-    StaticDnsARecord
+    StaticDnsARecord,
+    Count
 };
+
+static_assert(static_cast<size_t>(VmFeature::Count) == 35);
 
 enum class VmOperation
 {
@@ -130,27 +134,11 @@ enum class VmOperation
     BindPort,
     UnbindPort,
     CreateVirtualAddress,
-    CreateDnsRecord
+    CreateDnsRecord,
+    Count
 };
 
-struct VmOperationSupport
-{
-    bool Supported = false;
-    bool BeforeStart = false;
-    bool WhileRunning = false;
-    bool RequiredDeadline = false;
-    bool InFlightCancellation = false;
-};
-
-struct VmFeatureSupport
-{
-    bool Supported = false;
-    bool CanCreateBeforeStart = false;
-    bool CanAddWhileRunning = false;
-    bool CanRemoveDeviceWhileRunning = false;
-    bool CanRemoveShareWhileRunning = false;
-    std::wstring Limitation;
-};
+static_assert(static_cast<size_t>(VmOperation::Count) == 24);
 
 struct VmResourceLimits
 {
@@ -167,8 +155,8 @@ struct VmResourceLimits
 struct VmPlatformCapabilities
 {
     BackendKind Backend;
-    std::map<VmFeature, VmFeatureSupport> Features;
-    std::map<VmOperation, VmOperationSupport> Operations;
+    std::bitset<static_cast<size_t>(VmFeature::Count)> Features;
+    std::bitset<static_cast<size_t>(VmOperation::Count)> Operations;
 };
 
 enum class VmState
@@ -216,7 +204,7 @@ enum class VmBootMethod
 {
     Automatic,
     LinuxDirect,
-    LinuxFirmware
+    Uefi
 };
 
 struct VmLinuxBootRequest
@@ -284,16 +272,9 @@ struct VmPhysicalDiskSource
     std::wstring DevicePath;
 };
 
-enum class VmPlacementPolicy
-{
-    Exact,
-    Preferred
-};
-
 struct VmScsiPlacement
 {
     VmScsiAddress Address;
-    VmPlacementPolicy Policy = VmPlacementPolicy::Exact;
 };
 
 struct VmDiskRequest
@@ -325,8 +306,6 @@ struct VmCrashCaptureRequest
 struct VmCreateRequest
 {
     GUID VmId{};
-    std::wstring OwnerName;
-    std::optional<std::wstring> HostingProcessName;
     VmProcessorRequest Processor;
     VmMemoryRequest Memory;
     VmLinuxBootRequest Boot;
@@ -364,9 +343,7 @@ struct VmEffectiveBoot
 struct VmDescription
 {
     VmInstanceId Identity;
-    BackendKind Backend = BackendKind::Hcs;
-    std::wstring OwnerName;
-    std::optional<std::wstring> HostingProcessName;
+    BackendKind Backend;
     VmEffectiveProcessor Processor;
     VmEffectiveMemory Memory;
     VmEffectiveBoot Boot;

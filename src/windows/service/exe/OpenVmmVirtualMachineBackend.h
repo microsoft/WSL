@@ -56,7 +56,16 @@ private:
 
     struct State
     {
+        struct AttachedDisk
+        {
+            VmDiskAttachment Attachment;
+            wil::unique_hfile BackingFile;
+        };
+
+        wil::srwlock m_lock;
         VmDescription m_description;
+        _Guarded_by_(m_lock) std::map<std::uint64_t, AttachedDisk> m_attachedDisks;
+        _Guarded_by_(m_lock) std::uint64_t m_nextDiskId = 1;
         UniqueVm m_vm;
         wil::unique_handle m_process;
         wil::unique_handle m_job;
