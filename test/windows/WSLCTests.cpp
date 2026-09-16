@@ -7509,7 +7509,7 @@ class WSLCTests
         VERIFY_ARE_EQUAL("0", testEvents[4].Actor.Attributes.at("reclaimed"));
     }
 
-    // Verify the destroy-before-prune ordering used to correlate unkeyed aggregate events.
+    // Verify Docker emits destroy events before the aggregate prune event.
     WSLC_TEST_METHOD(NetworkPruneEventSequenceWithExternalPrune)
     {
         const std::string firstNetwork = "wslc-test-prune-unrelated-a";

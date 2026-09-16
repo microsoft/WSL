@@ -3086,7 +3086,7 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    std::unique_lock networksLock(m_networksLock);
+    std::lock_guard networksLock(m_networksLock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_networks.contains(name));
 
     docker_schema::CreateNetwork request;
@@ -3204,7 +3204,7 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    std::unique_lock networksLock(m_networksLock);
+    std::lock_guard networksLock(m_networksLock);
 
     auto it = m_networks.find(name);
     THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
@@ -3375,7 +3375,7 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
 
-    std::unique_lock networksLock(m_networksLock);
+    std::lock_guard networksLock(m_networksLock);
 
     docker_schema::PruneNetworkResult pruneResult;
     try
