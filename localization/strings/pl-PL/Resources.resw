@@ -1724,24 +1724,24 @@ Poświęć chwilę, aby zapoznać się z niektórymi ulubionymi funkcjami społe
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Z łatwością uruchamiaj kontenery systemu Linux w systemie Windows jako środowisko najwyższej klasy.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Za pomocą pliku wslc.exe możesz kompilować, uruchamiać, wypychać, pobierać i zarządzać kontenerami systemu Linux bezpośrednio w systemie Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Możesz także użyć interfejsu API WSLC do tworzenia aplikacji systemu Windows, których logika środowiska uruchomieniowego jest oparta na kontenerach systemu Linux, co ułatwia osadzanie ich bezpośrednio w aplikacjach na potrzeby przepływów pracy z chmury do środowiska lokalnego, aplikacji AI i izolacji.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Kontener WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Dowiedz się więcej o kontenerze WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Dokumentacja interfejsu API kontenera WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -1909,10 +1909,10 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
     <value>Ogólne</value>
   </data>
   <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Kontener WSL</value>
   </data>
   <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
-    <value>NEW</value>
+    <value>NOWY</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>Przyspieszanie procesora GPU</value>
@@ -2240,11 +2240,11 @@ Użycie:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
-    <value>The option '{}' is not supported.</value>
+    <value>Opcja „{}” nie jest obsługiwana.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
-    <value>'{}' is deprecated. Use {} instead.</value>
+    <value>„{}” jest przestarzałe. Zamiast tego użyj {}.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
@@ -2256,7 +2256,7 @@ Użycie:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
-    <value>Global option '{}' must be specified after '{}' and before '{}'.</value>
+    <value>Opcja globalna „{}” musi zostać określona po „{}” i przed „{}”.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
@@ -2271,7 +2271,7 @@ Użycie:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage:  {} {}</value>
+    <value>Użycie:  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2318,7 +2318,7 @@ Użycie:
     <value>Opcje globalne:</value>
   </data>
   <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
-    <value>Global Options for '{}':</value>
+    <value>Opcje globalne dla „{}”:</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
@@ -2809,16 +2809,16 @@ Przykład: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitor container events.</value>
+    <value>Monitoruj zdarzenia kontenera.</value>
   </data>
   <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitor real-time events from containers.</value>
+    <value>Monitoruj zdarzenia z kontenerów w czasie rzeczywistym.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
-    <value>Show all events created since the timestamp</value>
+    <value>Pokaż wszystkie zdarzenia utworzone od sygnatury czasowej</value>
   </data>
   <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
-    <value>Stream events until the timestamp</value>
+    <value>Przesyłaj strumieniowo zdarzenia do sygnatury czasowej</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Zarządzaj obrazami.</value>
@@ -3108,7 +3108,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Pokaż wszystko bez względu na stan.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>All tags in the repository.</value>
+    <value>Wszystkie tagi w repozytorium.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>tagu nie można używać z opcją --all-tags/-a</value>
@@ -3157,7 +3157,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Pokaż dodatkowe szczegóły dzienników</value>
   </data>
   <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
-    <value>Show image digests</value>
+    <value>Pokaż skróty obrazów</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Określa plik wykonywalny procesu init kontenera</value>
@@ -3307,7 +3307,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Śledź dane wyjściowe dziennika</value>
   </data>
   <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
-    <value>Always follow symlinks in SRC_PATH</value>
+    <value>Zawsze podążaj za linkami symbolicznymi w ścieżce SRC_PATH</value>
     <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
@@ -3472,7 +3472,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Usuń kontener po jego zatrzymaniu</value>
   </data>
   <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
-    <value>Restart policy to apply when a container exits</value>
+    <value>Zasady ponownego uruchamiania stosowane po zakończeniu działania kontenera</value>
   </data>
   <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
     <value>Opcje powodujące konflikt: nie można określić jednocześnie elementów {} i {}</value>
@@ -3635,7 +3635,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
-    <value>Invalid {} value '{}'. Expected no, always, on-failure[:max-retries], or unless-stopped.</value>
+    <value>Nieprawidłowa wartość {} „{}”. Oczekiwano no, always, on-failure[:max-retries] lub unless-stopped.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
@@ -3724,7 +3724,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Ogranicz dostęp zewnętrzny do sieci</value>
   </data>
   <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
-    <value>Enable IPv6 networking</value>
+    <value>Włącz sieć IPv6</value>
     <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">

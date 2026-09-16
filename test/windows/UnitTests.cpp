@@ -2185,6 +2185,7 @@ Usage:
 
         validateWarnings(L"[foo]\na=b", L"wsl: Unknown key 'foo.a' in /etc/wsl.conf:2\r\n");
         validateWarnings(L"a=a\\m", L"wsl: Invalid escaped character: 'm' in /etc/wsl.conf:1\r\n");
+        validateWarnings(L"a=a\\\r\n", L"wsl: Invalid escaped character: '\r' in /etc/wsl.conf:1\r\n");
         validateWarnings(L"[=b", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n");
         validateWarnings(
             L"[=b\n[network]\nhostname=foo", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n", L"hostname", L"foo\n");

@@ -1916,10 +1916,10 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
     <value>Geral</value>
   </data>
   <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Contêiner WSL</value>
   </data>
   <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
-    <value>NEW</value>
+    <value>NOVO</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>Aceleração da GPU</value>
@@ -2247,11 +2247,11 @@ Uso:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
-    <value>The option '{}' is not supported.</value>
+    <value>Não há suporte para a opção '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
-    <value>'{}' is deprecated. Use {} instead.</value>
+    <value>'{}' foi preterido. Use {} em vez disso.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
@@ -2278,7 +2278,7 @@ Uso:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage:  {} {}</value>
+    <value>Uso:  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2325,7 +2325,7 @@ Uso:
     <value>Opções Globais:</value>
   </data>
   <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
-    <value>Global Options for '{}':</value>
+    <value>Opções Globais para '{}':</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
@@ -2816,16 +2816,16 @@ Exemplo: tar -cf - arquivos | wslc container cp - CONTAINER:/path</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_EventsDesc" xml:space="preserve">
-    <value>Monitor container events.</value>
+    <value>Monitore os eventos de contêiner.</value>
   </data>
   <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
-    <value>Monitor real-time events from containers.</value>
+    <value>Monitore eventos em tempo real a partir de contêineres.</value>
   </data>
   <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
-    <value>Show all events created since the timestamp</value>
+    <value>Mostrar todos os eventos criados desde o carimbo de data/hora</value>
   </data>
   <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
-    <value>Stream events until the timestamp</value>
+    <value>Transmitir eventos até o carimbo de data/hora</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Gerenciar imagens.</value>
@@ -3115,7 +3115,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Mostrar tudo independentemente do estado.</value>
   </data>
   <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
-    <value>All tags in the repository.</value>
+    <value>Todas as tags no repositório.</value>
   </data>
   <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
     <value>marca não pode ser usada com --all-tags/-a</value>
@@ -3164,7 +3164,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Mostrar mais detalhes dos logs</value>
   </data>
   <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
-    <value>Show image digests</value>
+    <value>Mostrar resumos de imagem</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Especifica o executável do processo de inicialização do contêiner</value>
@@ -3314,7 +3314,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Seguir a saída do log</value>
   </data>
   <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
-    <value>Always follow symlinks in SRC_PATH</value>
+    <value>Sempre siga symlinks no SRC_PATH</value>
     <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
@@ -3479,7 +3479,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Remover o contêiner após ele parar</value>
   </data>
   <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
-    <value>Reinicie a política a ser aplicada quando um contêiner sair</value>
+    <value>Política de reinicialização a ser aplicada quando um contêiner for encerrado</value>
   </data>
   <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
     <value>Opções conflitantes: não é possível especificar {} e {}</value>
@@ -3731,7 +3731,7 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Restringir o acesso externo à rede</value>
   </data>
   <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
-    <value>Enable IPv6 networking</value>
+    <value>Habilitar rede IPv6</value>
     <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">

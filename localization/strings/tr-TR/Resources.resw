@@ -1724,24 +1724,24 @@ Topluluğun sık kullanılan özelliklerinden bazılarını önizlemek veya kaps
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Linux kapsayıcılarını Windows üzerinde birinci sınıf bir deneyim olarak kolayca çalıştırın.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Linux kapsayıcılarını doğrudan Windows üzerinde oluşturmak, çalıştırmak, göndermek, çekmek ve yönetmek için wslc.exe’yi kullanabilirsiniz.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Ayrıca, çalışma zamanı mantığı Linux kapsayıcıları tarafından desteklenen Windows uygulamaları oluşturmak için WSLC API’sini de kullanabilirsiniz. Böylece buluttan yerel iş akışları, yapay zeka uygulamaları ve yalıtım için Linux kapsayıcılarını doğrudan uygulamanıza eklemek daha kolay olur.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>WSL kapsayıcısı</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>WSL kapsayıcısı hakkında daha fazla bilgi edinin</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>WSL kapsayıcı API başvurusu</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
@@ -3472,7 +3472,7 @@ Windows sürümü: {}</value>
     <value>Kapsayıcı durduktan sonra kaldır</value>
   </data>
   <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
-    <value>Bir konteyner kapandığında uygulamak için ilkeyi yeniden başlat</value>
+    <value>Bir kapsayıcı kapandığında uygulamak için ilkeyi yeniden başlat</value>
   </data>
   <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
     <value>Çakışan seçenekler: hem {} hem de {} belirtilemez</value>
