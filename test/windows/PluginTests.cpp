@@ -772,7 +772,31 @@ class PluginTests
             VERIFY_SUCCEEDED(session->DeleteImage(&deleteOpts, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
             // Pull the image back — this should trigger the ImageCreated plugin callback.
-            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(session->PullImage(registryImage.c_str(), nullptr, FALSE, nullptr, nullptr));
+
+            // Publish two distinct images into one repository, one of them under two tags. An --all-tags
+            // pull reports a digest per tag, so this covers both that every image the pull created is
+            // notified and that two tags resolving to one image are notified once.
+            const auto versionedRepo = std::format("{}/debian-versioned", registryAddress);
+            auto publish = [&](LPCSTR image, LPCSTR tag) {
+                const auto reference = std::format("{}:{}", versionedRepo, tag);
+                tagOptions.Image = image;
+                tagOptions.Repo = versionedRepo.c_str();
+                tagOptions.Tag = tag;
+                VERIFY_SUCCEEDED(session->TagImage(&tagOptions));
+                VERIFY_SUCCEEDED(session->PushImage(reference.c_str(), emptyAuth.c_str(), FALSE, nullptr, nullptr));
+
+                // Drop the local tag so the pull is the only thing that can report it.
+                WSLCDeleteImageOptions deleteOptions{.Image = reference.c_str(), .Flags = WSLCDeleteImageFlagsNone};
+                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deleted;
+                VERIFY_SUCCEEDED(session->DeleteImage(&deleteOptions, deleted.addressof(), deleted.size_address<ULONG>()));
+            };
+
+            publish("debian:latest", "v1");
+            publish("debian:latest", "v2");
+            publish("wslc-registry:latest", "v3");
+
+            VERIFY_SUCCEEDED(session->PullImage(versionedRepo.c_str(), nullptr, TRUE, nullptr, nullptr));
         }
 
         constexpr auto ExpectedOutput =
@@ -782,6 +806,8 @@ class PluginTests
             WSLC Image created, session=*, id=sha256:*, name=wslc-registry:latest
             WSLC Container started, session=*, id=*, name=*, image=wslc-registry:latest, state=running
             WSLC Image created, session=*, id=sha256:*, name=127.0.0.1:5000/debian:latest
+            WSLC Image created, session=*, id=sha256:*, name=*
+            WSLC Image created, session=*, id=sha256:*, name=*
             WSLC Container stopping, session=*, id=*
             WSLC Session stopping, name=plugin-wslc-pull-test, id=*)";
 
