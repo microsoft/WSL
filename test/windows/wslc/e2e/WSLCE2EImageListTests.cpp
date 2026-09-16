@@ -518,16 +518,9 @@ class WSLCE2EImageListTests
         // not imply it, because reporting is gated on the flag or an explicit {{.Digest}} in the format.
         VERIFY_ARE_EQUAL(std::string{c_none}, digestFor(L"image list --format json", debian));
 
-        // The test images are loaded from a tarball, so they carry no repo digest and
-        // report "<none>" even when digests are requested. Anything reported must be a bare digest.
-        const auto digest = digestFor(L"image list --digests --format json", debian);
-        VERIFY_ARE_NOT_EQUAL(std::string{}, digest, L"Debian image was missing from `image list --digests --format json`");
-
-        if (digest != c_none)
-        {
-            VERIFY_IS_TRUE(digest.starts_with("sha256:"), L"Digest should be reported as 'sha256:...'");
-            VERIFY_IS_TRUE(digest.find('@') == std::string::npos, L"Digest should not retain the 'repo@' prefix");
-        }
+        // The test images are loaded from a tarball, so they carry no repo digest and report
+        // "<none>" even when digests are requested.
+        VERIFY_ARE_EQUAL(std::string{c_none}, digestFor(L"image list --digests --format json", debian));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_TableMatchesJson)
@@ -538,8 +531,8 @@ class WSLCE2EImageListTests
         auto tableResult = RunWslc(L"image list --digests");
         tableResult.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Every digest reported by json output must appear in the table's DIGEST column, so the two
-        // renderings cannot drift.
+        // Whatever json reports in the Digest field must also appear in the table's DIGEST column.
+        // The fixtures carry no repo digests, so this pins the "<none>" placeholder.
         for (const auto& image : ParseNdjsonOutputAs<ImageOutputInformation>(jsonResult))
         {
             const auto digest = wsl::shared::string::MultiByteToWide(image.Digest);
@@ -570,12 +563,8 @@ class WSLCE2EImageListTests
                 seen.emplace(image.Repository, image.Tag, image.Digest).second,
                 L"A repository, tag and digest triple must not be listed twice");
 
-            // A digest is always qualified by the repository it was pulled from, so a row that
-            // reports one names that repository instead of falling back to the placeholder.
-            if (image.Digest != c_none)
-            {
-                VERIFY_ARE_NOT_EQUAL(std::string{c_none}, image.Repository, L"A row reporting a digest must name its repository");
-            }
+            // The fixtures carry no repo digest, so every row reports the placeholder.
+            VERIFY_ARE_EQUAL(std::string{c_none}, image.Digest);
         }
 
         // Expanding per digest can only ever add rows relative to the default listing.
