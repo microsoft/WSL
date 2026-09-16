@@ -574,6 +574,88 @@ class WSLCE2EImageListTests
         VERIFY_IS_TRUE(digestRows.size() >= ParseNdjsonOutputAs<ImageOutputInformation>(defaultResult).size());
     }
 
+    // Publishes one image into two repositories of a local registry and pulls both back, so the
+    // image carries a real repo digest per repository. This is the only image list coverage of a
+    // non-empty digest: the tar-loaded fixtures never have one.
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_GroupsPulledDigestsByRepository)
+    {
+        auto session = OpenDefaultElevatedSession();
+
+        {
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15010);
+            const auto registryAddressW = MultiByteToWide(registryAddress);
+
+            const auto firstRepository = std::format(L"{}/alpine-digest-a", registryAddressW);
+            const auto secondRepository = std::format(L"{}/alpine-digest-b", registryAddressW);
+            const auto firstTag = std::format(L"{}:v1", firstRepository);
+            const auto secondTag = std::format(L"{}:v1", secondRepository);
+
+            auto cleanup = wil::scope_exit([&]() {
+                RunWslc(std::format(L"image delete --force {}", firstTag));
+                RunWslc(std::format(L"image delete --force {}", secondTag));
+            });
+
+            RunWslcAndVerify(std::format(L"image tag {} {}", AlpineImage.NameAndTag(), firstTag), {.ExitCode = 0});
+            RunWslcAndVerify(std::format(L"image tag {} {}", AlpineImage.NameAndTag(), secondTag), {.ExitCode = 0});
+            RunWslcAndVerify(std::format(L"push {}", firstTag), {.Stderr = L"", .ExitCode = 0});
+            RunWslcAndVerify(std::format(L"push {}", secondTag), {.Stderr = L"", .ExitCode = 0});
+
+            // Drop the pushed copies so the pull is what attaches the repo digests.
+            RunWslcAndVerify(std::format(L"image delete --force {}", firstTag), {.ExitCode = 0});
+            RunWslcAndVerify(std::format(L"image delete --force {}", secondTag), {.ExitCode = 0});
+            RunWslcAndVerify(std::format(L"pull {}", firstTag), {.Stderr = L"", .ExitCode = 0});
+            RunWslcAndVerify(std::format(L"pull {}", secondTag), {.Stderr = L"", .ExitCode = 0});
+
+            const auto rowsFor = [](const WSLCExecutionResult& result, const std::wstring& repository) {
+                const auto repositoryUtf8 = WideToMultiByte(repository);
+                std::vector<ImageOutputInformation> matching;
+                for (const auto& image : ParseNdjsonOutputAs<ImageOutputInformation>(result))
+                {
+                    if (image.Repository == repositoryUtf8)
+                    {
+                        matching.push_back(image);
+                    }
+                }
+
+                return matching;
+            };
+
+            auto digestResult = RunWslc(L"image list --digests --format json");
+            digestResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+            // Each repository reports its own digest against its own tag. A digest that was not
+            // grouped by repository would cross both repositories into extra rows.
+            for (const auto& repository : {firstRepository, secondRepository})
+            {
+                const auto rows = rowsFor(digestResult, repository);
+                VERIFY_ARE_EQUAL(
+                    1u, rows.size(), WEX::Common::String().Format(L"'%ls' should report exactly one digest row", repository.c_str()));
+
+                VERIFY_ARE_EQUAL(std::string{"v1"}, rows[0].Tag);
+                VERIFY_ARE_NOT_EQUAL(std::string{c_none}, rows[0].Digest, L"A pulled image must report its repo digest");
+                VERIFY_IS_TRUE(rows[0].Digest.starts_with("sha256:"), L"Digest should be reported as 'sha256:...'");
+                VERIFY_IS_TRUE(rows[0].Digest.find('@') == std::string::npos, L"Digest should not retain the 'repo@' prefix");
+            }
+
+            // Both repositories hold the same content, so the pushed manifests share a digest and the
+            // rows differ only by repository.
+            VERIFY_ARE_EQUAL(rowsFor(digestResult, firstRepository)[0].Digest, rowsFor(digestResult, secondRepository)[0].Digest);
+            VERIFY_ARE_EQUAL(rowsFor(digestResult, firstRepository)[0].ID, rowsFor(digestResult, secondRepository)[0].ID);
+
+            // Without --digests the same repositories still report one tagged row, with no digest.
+            auto defaultResult = RunWslc(L"image list --format json");
+            defaultResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+            for (const auto& repository : {firstRepository, secondRepository})
+            {
+                const auto rows = rowsFor(defaultResult, repository);
+                VERIFY_ARE_EQUAL(1u, rows.size());
+                VERIFY_ARE_EQUAL(std::string{"v1"}, rows[0].Tag);
+                VERIFY_ARE_EQUAL(std::string{c_none}, rows[0].Digest);
+            }
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_List_Digests_QuietStillOutputsIdsOnly)
     {
         const auto result = RunWslc(L"image list --digests --quiet");
