@@ -3542,13 +3542,11 @@ Usage:
         wsl::windows::common::SubProcess process(nullptr, command.c_str());
         VERIFY_ARE_EQUAL(process.Run(), 0L);
 
-        std::ifstream file(c_outputPath, std::ios::binary);
-        VERIFY_IS_TRUE(file.good());
-        const std::string actual{std::istreambuf_iterator<char>(file), {}};
+        const auto actual = ReadFileContent(c_outputPath);
 
         VERIFY_ARE_EQUAL(2 * c_byteCount, actual.size());
-        VERIFY_ARE_EQUAL(c_byteCount, std::count(actual.begin(), actual.end(), 'O'));
-        VERIFY_ARE_EQUAL(c_byteCount, std::count(actual.begin(), actual.end(), 'E'));
+        VERIFY_ARE_EQUAL(c_byteCount, std::count(actual.begin(), actual.end(), L'O'));
+        VERIFY_ARE_EQUAL(c_byteCount, std::count(actual.begin(), actual.end(), L'E'));
     }
 
     TEST_METHOD(GlobalFlagsOverride)
