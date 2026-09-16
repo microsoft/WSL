@@ -1,12 +1,6 @@
 # Copyright (C) Microsoft Corporation. All rights reserved.
 
-if ("${TARGET_PLATFORM}" STREQUAL "x64")
-    set(RUST_TARGET x86_64-pc-windows-msvc)
-elseif ("${TARGET_PLATFORM}" STREQUAL "arm64")
-    set(RUST_TARGET aarch64-pc-windows-msvc)
-else()
-    message(FATAL_ERROR "Unsupported Rust target platform: '${TARGET_PLATFORM}'")
-endif()
+set(RUST_TARGET ${WSLOPENVMM_RUST_TARGET})
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(CARGO_PROFILE release)
@@ -17,18 +11,21 @@ endif()
 
 set(CARGO_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/cargo-target)
 set(CARGO_OUTPUT ${CARGO_TARGET_DIR}/${RUST_TARGET}/${CARGO_PROFILE}/wslopenvmm.dll)
+set(CARGO_IMPORT_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/${CARGO_PROFILE}/wslopenvmm.dll.lib)
 set(WSLOPENVMM_DLL ${BIN}/wslopenvmm.dll)
-set(VM_SERVICE_PROTO "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto" CACHE FILEPATH "OpenVMM RPC protocol schema")
+set(WSLOPENVMM_IMPORT_LIB ${BIN}/wslopenvmm.dll.lib)
+set(VM_SERVICE_PROTO "${WSL_DEVICE_HOST_SOURCE_DIR}/proto/VMService.proto")
 
 add_custom_command(
-    OUTPUT ${WSLOPENVMM_DLL}
+    OUTPUT ${WSLOPENVMM_DLL} ${WSLOPENVMM_IMPORT_LIB}
     COMMAND ${CMAKE_COMMAND} -E env "VM_SERVICE_PROTO=${VM_SERVICE_PROTO}" ${CARGO_EXECUTABLE} build --manifest-path ${CMAKE_CURRENT_LIST_DIR}/Cargo.toml --target ${RUST_TARGET} --target-dir ${CARGO_TARGET_DIR} ${CARGO_BUILD_ARGUMENTS}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CARGO_OUTPUT} ${WSLOPENVMM_DLL}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CARGO_IMPORT_LIB} ${WSLOPENVMM_IMPORT_LIB}
     DEPENDS ${VM_SERVICE_PROTO} Cargo.lock Cargo.toml build.rs src/client.rs src/lib.rs src/af_unix.rs src/rpc.rs src/diagnostics.rs wslopenvmm.h
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM)
 
-add_custom_target(wslopenvmm ALL DEPENDS ${WSLOPENVMM_DLL})
+add_custom_target(wslopenvmm ALL DEPENDS ${WSLOPENVMM_DLL} ${WSLOPENVMM_IMPORT_LIB})
 set_target_properties(wslopenvmm PROPERTIES FOLDER windows SOURCES "Cargo.toml;src/client.rs;src/lib.rs;wslopenvmm.h")
 
 string(CONCAT WSLOPENVMM_TEST_COMMAND

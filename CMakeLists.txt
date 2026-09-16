@@ -168,12 +168,13 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
     find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
 endif()
 
+find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
+
 if (WSL_DEVICEHOST_BIN)
     set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICEHOST_BIN}/WslDeviceHost.idl")
     set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICEHOST_BIN}/wsldevicehost.dll")
     set(WSL_DEVICE_HOST_VERSION "9.0.0-localbuild")
 else()
-    find_nuget_package(Microsoft.WSL.DeviceHost WSL_DEVICE_HOST /build/native)
     set(WSL_VIRTIO_NET_IDL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/idl/WslDeviceHost.idl")
     set(WSL_DEVICE_HOST_DLL_PATH "${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll")
 endif()
@@ -569,10 +570,29 @@ set(TAEF_LINK_LIBRARIES
     Wex.Common.lib
     Wex.Logger.lib)
 
-# Only enable OpenVMM when its Rust toolchain is available.
+# Only enable OpenVMM when its Rust target is available.
 find_program(CARGO_EXECUTABLE cargo)
-if (NOT CARGO_EXECUTABLE)
-    message(WARNING "Cargo was not found; wslopenvmm will not be built or tested.")
+if (CARGO_EXECUTABLE)
+    if ("${TARGET_PLATFORM}" STREQUAL "x64")
+        set(WSLOPENVMM_RUST_TARGET x86_64-pc-windows-msvc)
+    elseif ("${TARGET_PLATFORM}" STREQUAL "arm64")
+        set(WSLOPENVMM_RUST_TARGET aarch64-pc-windows-msvc)
+    else()
+        message(FATAL_ERROR "Unsupported Rust target platform: '${TARGET_PLATFORM}'")
+    endif()
+
+    execute_process(
+        COMMAND rustup target list --installed
+        OUTPUT_VARIABLE RUST_INSTALLED_TARGETS
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    if (NOT RUST_INSTALLED_TARGETS MATCHES "${WSLOPENVMM_RUST_TARGET}")
+        message(FATAL_ERROR
+            "The Rust target '${WSLOPENVMM_RUST_TARGET}' is not installed. "
+            "Install it with 'rustup target add ${WSLOPENVMM_RUST_TARGET}'.")
+    endif()
+else()
+    message(FATAL_ERROR "Cargo was not found.")
 endif()
 
 # Subprojects
