@@ -32,12 +32,13 @@ public:
     // Filters, advancing SequenceNumber past it. A nullopt SequenceNumber starts a fresh reader at the
     // oldest buffered event (no gap is reported). If the reader has since fallen behind the ring,
     // resyncs SequenceNumber to the oldest buffered event and throws WSLC_E_EVENTS_LOST. Returns
-    // nullopt once the Until window has closed.
+    // nullopt once the Until window has closed or CancelEvent is signaled.
     std::optional<wsl::windows::common::wslc_schema::Event> Get(
         std::optional<uint64_t>& SequenceNumber,
         std::optional<std::chrono::sys_seconds> Since,
         std::optional<std::chrono::sys_seconds> Until,
-        const std::map<std::string, std::vector<std::string>>& Filters);
+        const std::map<std::string, std::vector<std::string>>& Filters,
+        HANDLE CancelEvent);
 
     void OnSessionTerminating();
 
@@ -45,9 +46,9 @@ private:
     void Append(wsl::windows::common::wslc_schema::Event Event);
 
     // Blocks until the event at SequenceNumber is buffered, its slot is evicted, or the session
-    // terminates or the COM call is canceled. Returns false only when Until elapsed with no event
-    // ready. Throws E_ABORT if the session terminated while waiting.
-    bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until);
+    // terminates or CancelEvent is signaled. Returns false on cancellation or when Until elapsed
+    // with no event ready. Throws E_ABORT if the session terminated while waiting.
+    bool WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, HANDLE CancelEvent);
 
     std::optional<wsl::windows::common::wslc_schema::Event> GetLockHeld(uint64_t SequenceNumber);
 
@@ -71,7 +72,7 @@ public:
         int64_t UntilTime,
         std::map<std::string, std::vector<std::string>> Filters);
 
-    IFACEMETHOD(GetNext)(_Outptr_result_z_ LPSTR* EventJson) override;
+    IFACEMETHOD(GetNext)(_In_opt_ HANDLE CancelEvent, _Outptr_result_z_ LPSTR* EventJson) override;
 
 private:
     Microsoft::WRL::ComPtr<WSLCSession> m_session;

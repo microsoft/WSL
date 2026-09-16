@@ -99,9 +99,8 @@ class WSLCE2EEventsTests
         WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(expectedEvent));
 
         events.SendCtrlBreak();
-        const auto cancellation = wsl::windows::common::wslutil::ErrorToString({.Code = HRESULT_FROM_WIN32(ERROR_CANCELLED)});
-        events.ExpectStderr(wsl::shared::string::WideToMultiByte(std::format(L"\r\n{}\r\n", cancellation.Message)));
-        VERIFY_ARE_EQUAL(1, events.Wait());
+        VERIFY_ARE_EQUAL(0, events.Wait());
+        events.VerifyNoErrors();
 
         auto output = wsl::shared::string::MultiByteToWide(events.GetStdoutData());
         VERIFY_IS_TRUE(output.ends_with(L'\n'));

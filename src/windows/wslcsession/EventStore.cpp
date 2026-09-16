@@ -12,7 +12,17 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    constexpr auto c_cancellationPollInterval = std::chrono::milliseconds{100};
+    bool IsCancelled(HANDLE CancelEvent)
+    {
+        if (CancelEvent == nullptr)
+        {
+            return false;
+        }
+
+        const auto result = WaitForSingleObject(CancelEvent, 0);
+        THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+        return result == WAIT_OBJECT_0;
+    }
 
     std::optional<std::chrono::sys_seconds> ToTimeBound(int64_t TimeSeconds)
     {
@@ -138,47 +148,53 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::GetLockHeld(
     return m_events[index];
 }
 
-bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until)
+bool EventStore::WaitForEvent(std::unique_lock<std::mutex>& Lock, uint64_t SequenceNumber, std::optional<std::chrono::sys_seconds> Until, HANDLE CancelEvent)
 {
-    // Ready once the reader's event is buffered, its slot is evicted, or the session terminates.
-    // Eviction while parked wakes us too, so the caller reports the gap on its next pass.
-    const auto ready = [&] { return m_terminating || SequenceNumber < m_firstSequenceNumber + m_events.size(); };
+    // Eviction also makes this true, so the caller can report the gap after waking.
+    const auto eventAvailable = [&] { return SequenceNumber < m_firstSequenceNumber + m_events.size(); };
+    const auto deadlineReached = [&] { return Until.has_value() && std::chrono::system_clock::now() >= Until.value(); };
+    const auto shouldWait = [&] { return !m_terminating && !IsCancelled(CancelEvent) && !eventAvailable() && !deadlineReached(); };
 
-    while (!ready())
+    while (shouldWait())
     {
         if (Until.has_value())
         {
-            const auto wakeTime =
-                std::min<std::chrono::system_clock::time_point>(Until.value(), std::chrono::system_clock::now() + c_cancellationPollInterval);
-            m_updated.wait_until(Lock, wakeTime);
+            m_updated.wait_until(Lock, Until.value());
         }
         else
         {
-            m_updated.wait_for(Lock, c_cancellationPollInterval);
-        }
-
-        const auto cancellationResult = CoTestCancel();
-        if (cancellationResult != RPC_S_CALLPENDING)
-        {
-            THROW_IF_FAILED(cancellationResult);
-        }
-
-        if (Until.has_value() && std::chrono::system_clock::now() >= Until.value() && !ready())
-        {
-            return false;
+            m_updated.wait(Lock);
         }
     }
 
     THROW_HR_IF(E_ABORT, m_terminating);
-    return true;
+    return !IsCancelled(CancelEvent) && eventAvailable();
 }
 
 std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
     std::optional<uint64_t>& SequenceNumber,
     std::optional<std::chrono::sys_seconds> Since,
     std::optional<std::chrono::sys_seconds> Until,
-    const std::map<std::string, std::vector<std::string>>& Filters)
+    const std::map<std::string, std::vector<std::string>>& Filters,
+    HANDLE CancelEvent)
 {
+    // Destroy the wait after releasing m_lock: its callback takes the same mutex to prevent
+    // a cancellation notification from being lost between checking the predicate and waiting.
+    wil::unique_threadpool_wait cancellationWait;
+    if (CancelEvent != nullptr)
+    {
+        cancellationWait.reset(CreateThreadpoolWait(
+            [](PTP_CALLBACK_INSTANCE, PVOID context, PTP_WAIT, TP_WAIT_RESULT) {
+                auto* store = static_cast<EventStore*>(context);
+                std::lock_guard lock(store->m_lock);
+                store->m_updated.notify_all();
+            },
+            this,
+            nullptr));
+        THROW_LAST_ERROR_IF(!cancellationWait);
+        SetThreadpoolWait(cancellationWait.get(), CancelEvent, nullptr);
+    }
+
     std::unique_lock lock(m_lock);
 
     // Position the reader. A first read (no sequence number yet) starts at the oldest buffered
@@ -187,6 +203,11 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
 
     while (true)
     {
+        if (IsCancelled(CancelEvent))
+        {
+            return std::nullopt;
+        }
+
         // A reader that has fallen behind the ring missed events to eviction: reset it so the
         // next call starts fresh at the oldest buffered event, and report the gap.
         if (SequenceNumber.value() < m_firstSequenceNumber)
@@ -195,9 +216,9 @@ std::optional<wsl::windows::common::wslc_schema::Event> EventStore::Get(
             THROW_HR(WSLC_E_EVENTS_LOST);
         }
 
-        if (!WaitForEvent(lock, SequenceNumber.value(), Until))
+        if (!WaitForEvent(lock, SequenceNumber.value(), Until, CancelEvent))
         {
-            // The until window elapsed with no further event: the stream is finished.
+            // The caller cancelled or the until window elapsed with no further event.
             return std::nullopt;
         }
 
@@ -258,14 +279,19 @@ HRESULT EventStream::RuntimeClassInitialize(
     return S_OK;
 }
 
-HRESULT EventStream::GetNext(LPSTR* EventJson)
+HRESULT EventStream::GetNext(HANDLE CancelEvent, LPSTR* EventJson)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, EventJson);
     *EventJson = nullptr;
 
+    if (IsCancelled(CancelEvent))
+    {
+        return WSLC_E_EVENT_STREAM_FINISHED;
+    }
+
     std::lock_guard lock(m_lock);
-    const auto event = m_store->Get(m_nextSequenceNumber, m_since, m_until, m_filters);
+    const auto event = m_store->Get(m_nextSequenceNumber, m_since, m_until, m_filters, CancelEvent);
     if (!event.has_value())
     {
         return WSLC_E_EVENT_STREAM_FINISHED;

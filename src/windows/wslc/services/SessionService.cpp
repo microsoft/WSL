@@ -74,37 +74,6 @@ namespace {
         return output;
     }
 
-    void CancelCallWhenSignaled(HANDLE cancelEvent, HANDLE completedEvent, DWORD threadId) noexcept
-    {
-        const std::array handles{cancelEvent, completedEvent};
-        const auto waitResult = WaitForMultipleObjects(static_cast<DWORD>(handles.size()), handles.data(), FALSE, INFINITE);
-        if (waitResult != WAIT_OBJECT_0)
-        {
-            LOG_LAST_ERROR_IF(waitResult == WAIT_FAILED);
-            return;
-        }
-
-        while (WaitForSingleObject(completedEvent, 0) != WAIT_OBJECT_0)
-        {
-            const auto result = CoCancelCall(threadId, 0);
-            if (SUCCEEDED(result))
-            {
-                return;
-            }
-
-            if (result != RPC_E_CALL_COMPLETE && result != E_NOINTERFACE)
-            {
-                LOG_IF_FAILED(result);
-                return;
-            }
-
-            if (WaitForSingleObject(completedEvent, 10) == WAIT_OBJECT_0)
-            {
-                return;
-            }
-        }
-    }
-
 } // namespace
 
 static wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
@@ -286,21 +255,11 @@ void SessionService::StreamEvents(Terminal& terminal, const Session& session, co
     THROW_IF_FAILED(session.Get()->GetEvents(
         options.Since, options.Until, filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &stream));
 
-    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
-    const auto disableCallCancellation = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { CoDisableCallCancellation(nullptr); });
-
-    wil::unique_event completedEvent(wil::EventOptions::ManualReset);
-    std::thread cancellationThread{CancelCallWhenSignaled, cancelEvent, completedEvent.get(), GetCurrentThreadId()};
-    const auto cancellationCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        completedEvent.SetEvent();
-        cancellationThread.join();
-    });
-
     HRESULT result = S_OK;
     while (SUCCEEDED(result))
     {
         wil::unique_cotaskmem_ansistring eventJson;
-        result = stream->GetNext(&eventJson);
+        result = stream->GetNext(cancelEvent, &eventJson);
         if (SUCCEEDED(result))
         {
             const auto event = wsl::shared::FromJson<wslc_schema::Event>(eventJson.get());

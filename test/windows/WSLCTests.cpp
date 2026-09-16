@@ -7175,7 +7175,7 @@ class WSLCTests
 
             wil::unique_cotaskmem_ansistring eventJson;
             HRESULT result;
-            while (SUCCEEDED(result = stream->GetNext(&eventJson)))
+            while (SUCCEEDED(result = stream->GetNext(nullptr, &eventJson)))
             {
                 events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
             }
@@ -7332,7 +7332,7 @@ class WSLCTests
 
         // Read one event to place the reader's cursor inside the ring.
         wil::unique_cotaskmem_ansistring eventJson;
-        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        VERIFY_SUCCEEDED(stream->GetNext(nullptr, &eventJson));
         const auto firstEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
         VERIFY_ARE_EQUAL("create", firstEvent.Action);
         VERIFY_ARE_EQUAL(id, firstEvent.Actor.ID);
@@ -7349,10 +7349,10 @@ class WSLCTests
         VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
 
-        VERIFY_ARE_EQUAL(WSLC_E_EVENTS_LOST, stream->GetNext(&eventJson));
+        VERIFY_ARE_EQUAL(WSLC_E_EVENTS_LOST, stream->GetNext(nullptr, &eventJson));
 
         // Reporting the gap resyncs the reader, so it resumes from the oldest event still buffered.
-        VERIFY_SUCCEEDED(stream->GetNext(&eventJson));
+        VERIFY_SUCCEEDED(stream->GetNext(nullptr, &eventJson));
         const auto resumedEvent = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
         VERIFY_ARE_EQUAL("kill", resumedEvent.Action);
         VERIFY_ARE_EQUAL(id, resumedEvent.Actor.ID);
@@ -7399,14 +7399,14 @@ class WSLCTests
 
         firstReader = std::thread([&]() {
             firstReaderStarted.SetEvent();
-            firstResult = stream->GetNext(&firstEventJson);
+            firstResult = stream->GetNext(nullptr, &firstEventJson);
         });
         VERIFY_IS_TRUE(firstReaderStarted.wait(30 * 1000));
         VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(firstReader.native_handle(), 100));
 
         secondReader = std::thread([&]() {
             secondReaderStarted.SetEvent();
-            secondResult = stream->GetNext(&secondEventJson);
+            secondResult = stream->GetNext(nullptr, &secondEventJson);
         });
         VERIFY_IS_TRUE(secondReaderStarted.wait(30 * 1000));
         VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(secondReader.native_handle(), 100));
@@ -7449,7 +7449,7 @@ class WSLCTests
         std::promise<HRESULT> getNextResult;
         std::thread readerThread([&]() {
             wil::unique_cotaskmem_ansistring eventJson;
-            getNextResult.set_value(stream->GetNext(&eventJson));
+            getNextResult.set_value(stream->GetNext(nullptr, &eventJson));
         });
         auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { readerThread.join(); });
 
@@ -7464,38 +7464,78 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_ABORT, future.get());
     }
 
-    WSLC_TEST_METHOD(EventStreamCancellationAbortsReader)
+    WSLC_TEST_METHOD(EventStreamCancellationFinishesReader)
     {
-        WSLCFilter filter{"type", "container"};
-        const LONGLONG since = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-        wil::com_ptr<IWSLCEventStream> stream;
-        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(since, 0, &filter, 1, &stream));
+        WSLCFilter filter{"container", "nonexistent-event-stream-container"};
+        const LONGLONG now = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+        const std::array<LONGLONG, 2> untilTimes{0, now + 120};
 
-        std::promise<HRESULT> getNextResult;
-        wil::unique_event readerStarted{wil::EventOptions::ManualReset};
-        DWORD readerThreadId{};
-        std::thread readerThread([&]() {
-            const auto coInitialize = wil::CoInitializeEx();
-            THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
-            const auto disableCallCancellation =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { CoDisableCallCancellation(nullptr); });
+        for (const auto until : untilTimes)
+        {
+            wil::com_ptr<IWSLCEventStream> stream;
+            VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &stream));
 
-            readerThreadId = GetCurrentThreadId();
-            readerStarted.SetEvent();
-
+            std::promise<HRESULT> getNextResult;
+            wil::unique_event readerStarted{wil::EventOptions::ManualReset};
+            wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
             wil::unique_cotaskmem_ansistring eventJson;
-            getNextResult.set_value(stream->GetNext(&eventJson));
-        });
-        auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { readerThread.join(); });
+            std::thread readerThread([&]() {
+                const auto coInitialize = wil::CoInitializeEx();
+                readerStarted.SetEvent();
+                getNextResult.set_value(stream->GetNext(cancelEvent.get(), &eventJson));
+            });
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                cancelEvent.SetEvent();
+                FAIL_FAST_IF_MSG(
+                    WaitForSingleObject(readerThread.native_handle(), 10 * 1000) != WAIT_OBJECT_0,
+                    "event stream reader did not finish after cancellation");
+                readerThread.join();
+            });
 
-        VERIFY_IS_TRUE(readerStarted.wait(30 * 1000));
-        VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readerThread.native_handle(), 100));
-        VERIFY_SUCCEEDED(CoCancelCall(readerThreadId, 0));
+            VERIFY_IS_TRUE(readerStarted.wait(30 * 1000));
+            VERIFY_ARE_EQUAL(WAIT_TIMEOUT, WaitForSingleObject(readerThread.native_handle(), 100));
+            cancelEvent.SetEvent();
 
-        auto future = getNextResult.get_future();
-        FAIL_FAST_IF_MSG(
-            future.wait_for(10s) != std::future_status::ready, "event stream reader did not abort after COM cancellation");
-        VERIFY_ARE_EQUAL(RPC_E_CALL_CANCELED, future.get());
+            auto future = getNextResult.get_future();
+            FAIL_FAST_IF_MSG(
+                future.wait_for(10s) != std::future_status::ready, "event stream reader did not finish after cancellation");
+            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, future.get());
+            VERIFY_IS_NULL(eventJson.get());
+        }
+    }
+
+    WSLC_TEST_METHOD(EventStreamCancellationPreservesBufferedEvents)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-event-cancellation", {"sleep", "99999"});
+        auto container = launcher.Launch(*m_defaultSession);
+        const auto id = container.Id();
+
+        WSLCFilter filter{"container", id.c_str()};
+        const LONGLONG until = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() + 120;
+        wil::com_ptr<IWSLCEventStream> stream;
+        wil::com_ptr<IWSLCEventStream> otherStream;
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &stream));
+        VERIFY_SUCCEEDED(m_defaultSession->GetEvents(0, until, &filter, 1, &otherStream));
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+        for (const auto* action : {"create", "start"})
+        {
+            cancelEvent.SetEvent();
+            wil::unique_cotaskmem_ansistring eventJson;
+            VERIFY_ARE_EQUAL(WSLC_E_EVENT_STREAM_FINISHED, stream->GetNext(cancelEvent.get(), &eventJson));
+            VERIFY_IS_NULL(eventJson.get());
+
+            // Cancelling one subscription must neither affect another nor consume its own next event.
+            wil::unique_cotaskmem_ansistring otherEventJson;
+            VERIFY_SUCCEEDED(otherStream->GetNext(nullptr, &otherEventJson));
+
+            cancelEvent.ResetEvent();
+            VERIFY_SUCCEEDED(stream->GetNext(cancelEvent.get(), &eventJson));
+            VERIFY_ARE_EQUAL(std::string{otherEventJson.get()}, std::string{eventJson.get()});
+            const auto event = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get());
+            VERIFY_ARE_EQUAL(action, event.Action);
+            VERIFY_ARE_EQUAL(id, event.Actor.ID);
+        }
     }
 
     WSLC_TEST_METHOD(OpenContainer)
