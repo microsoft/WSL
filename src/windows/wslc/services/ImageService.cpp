@@ -290,7 +290,7 @@ void ImageService::Build(
 }
 
 std::vector<ImageInformation> ImageService::List(
-    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters)
+    wsl::windows::wslc::models::Session& session, const std::vector<std::pair<std::string, std::string>>& filters, bool containerCounts, bool all, bool digests)
 {
     std::vector<WSLCFilter> filterEntries;
     filterEntries.reserve(filters.size());
@@ -301,6 +301,9 @@ std::vector<ImageInformation> ImageService::List(
 
     WSLCListImagesOptions options{};
     options.Flags = WSLCListImagesFlagsNone;
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsContainerCounts, containerCounts);
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsAll, all);
+    WI_SetFlagIf(options.Flags, WSLCListImagesFlagsDigests, digests);
     options.Filters = filterEntries.empty() ? nullptr : filterEntries.data();
     options.FiltersCount = static_cast<ULONG>(filterEntries.size());
 
@@ -324,8 +327,15 @@ std::vector<ImageInformation> ImageService::List(
         }
 
         info.Id = image.Hash;
+
+        if (digests)
+        {
+            info.Digest = DigestFromRepoDigest(image.Digest);
+        }
+
         info.Created = image.Created;
         info.Size = image.Size;
+        info.Containers = image.Containers;
         result.push_back(info);
     }
 
@@ -349,7 +359,8 @@ std::string ImageService::Import(Terminal& terminal, wsl::windows::wslc::models:
     return imageId.get() ? std::string(imageId.get()) : std::string();
 }
 
-void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
+std::vector<wsl::windows::wslc::models::DeletedImageEntry> ImageService::Delete(
+    wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
     WSLCDeleteImageOptions options{};
     options.Image = image.c_str();
@@ -366,14 +377,23 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+
+    std::vector<wsl::windows::wslc::models::DeletedImageEntry> result;
+    result.reserve(deletedImages.size());
+    for (const auto& entry : deletedImages)
+    {
+        result.push_back({entry.Image, entry.Type == WSLCDeletedImageTypeDeleted});
+    }
+
+    return result;
 }
 
-void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
     WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback, &warningCallback));
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
@@ -399,12 +419,12 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Push(Terminal& terminal, wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback, bool allTags)
 {
     WarningCallback warningCallback(terminal);
     auto server = GetServerFromImage(image);
     auto auth = RegistryService::Get(server);
-    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback, &warningCallback));
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), allTags ? TRUE : FALSE, callback, &warningCallback));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::vector<std::string>& images, const std::wstring& output, HANDLE cancelEvent)
@@ -473,15 +493,15 @@ wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(
 
     wsl::windows::wslc::models::PruneImagesResult result;
     result.SpaceReclaimed = spaceReclaimed;
-    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    for (const auto& entry : deletedImages)
     {
-        if (ptr->Type == WSLCDeletedImageTypeDeleted)
+        if (entry.Type == WSLCDeletedImageTypeDeleted)
         {
-            result.DeletedImages.push_back(ptr->Image);
+            result.DeletedImages.push_back(entry.Image);
         }
         else
         {
-            result.UntaggedImages.push_back(ptr->Image);
+            result.UntaggedImages.push_back(entry.Image);
         }
     }
 

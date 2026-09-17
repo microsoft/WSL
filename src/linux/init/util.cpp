@@ -1218,7 +1218,7 @@ Return Value:
             return FeatureFlags;
         }
 
-        MESSAGE_HEADER Message;
+        MESSAGE_HEADER Message{};
         Message.MessageType = LxInitMessageQueryFeatureFlags;
         Message.MessageSize = sizeof(Message);
 
@@ -1288,7 +1288,7 @@ try
     wsl::shared::SocketChannel channel{UtilConnectUnix(WSL_INIT_INTEROP_SOCKET), "wslinfo"};
     THROW_LAST_ERROR_IF(channel.Socket() < 0);
 
-    MESSAGE_HEADER Message;
+    MESSAGE_HEADER Message{};
     Message.MessageType = LxInitMessageQueryNetworkingMode;
     Message.MessageSize = sizeof(Message);
 

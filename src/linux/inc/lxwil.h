@@ -16,10 +16,13 @@ namespace wil {
 #define FAIL_FAST() raise(SIGABRT);
 #define FAIL_FAST_CAUGHT_EXCEPTION() FAIL_FAST()
 #define FAIL_FAST_IF(condition) \
-    if ((condition)) \
+    do \
     { \
-        FAIL_FAST() \
-    }
+        if ((condition)) \
+        { \
+            FAIL_FAST(); \
+        } \
+    } while ((void)0, 0)
 
 typedef void LogFunction(const char* message, const char* exceptionDescription) noexcept;
 __declspec(selectany) LogFunction* g_LogExceptionCallback{};
@@ -650,10 +653,13 @@ using integral_from_enum = typename details::variable_size_mapping<T>::type;
 #define WI_ASSERT(condition) assert(condition)
 
 #define EMIT_USER_WARNING(Warning) \
-    if (::wil::ScopedWarningsCollector::CanCollectWarning()) \
+    do \
     { \
-        ::wil::ScopedWarningsCollector::CollectWarning(Warning); \
-    }
+        if (::wil::ScopedWarningsCollector::CanCollectWarning()) \
+        { \
+            ::wil::ScopedWarningsCollector::CollectWarning(Warning); \
+        } \
+    } while ((void)0, 0)
 
 class ScopedWarningsCollector
 {

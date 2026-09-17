@@ -26,9 +26,8 @@ struct ContainerCommand final : public Command
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
-
 protected:
+    std::vector<std::unique_ptr<Command>> CreateCommands() const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -173,6 +172,21 @@ struct ContainerRemoveCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"remove";
     ContainerRemoveCommand(const std::wstring& parent) : Command(CommandName, {L"delete", L"rm"}, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Restart Command
+struct ContainerRestartCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"restart";
+    ContainerRestartCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

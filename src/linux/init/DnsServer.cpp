@@ -4,8 +4,8 @@
 #include <sys/epoll.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include "DnsServer.h"
 #include "RuntimeErrorWithSourceLocation.h"
+#include "DnsServer.h"
 #include "Syscall.h"
 #include "util.h"
 
@@ -15,6 +15,8 @@ constexpr int c_dnsServerPort = 53;
 constexpr int c_epollWaitMaxEvents = 100;
 // Maximum size of DNS over UDP requests is 4096 bytes (max size is reached for EDNS UDP requests)
 constexpr int c_maxUdpDnsBufferSize = 4096;
+// Maximum time to wait for a tunneled UDP DNS response
+constexpr auto c_udpRequestTimeout = std::chrono::seconds{60};
 // Max number of pending connections in the TCP listen queue
 constexpr int c_maxListenBacklog = 1000;
 
@@ -119,9 +121,12 @@ try
     }
 
     // Stop tracking the request, irrespective of the DNS response being successfully sent
-    const auto removeDnsRequest = wil::scope_exit([&] { m_udpRequests.erase(dnsClientIdentifier.DnsClientId); });
+    const auto removeDnsRequest = wil::scope_exit([&] {
+        m_udpRequestExpirations.erase(it->second.m_expiration);
+        m_udpRequests.erase(it);
+    });
 
-    sockaddr_in& remoteAddr = it->second;
+    sockaddr_in& remoteAddr = it->second.m_remoteAddress;
 
     // Send DNS response buffer back to the Linux DNS client
     int bufferSize = dnsBuffer.size();
@@ -298,6 +303,25 @@ try
 }
 CATCH_LOG()
 
+int DnsServer::ExpireUdpRequestsAndGetTimeout() noexcept
+{
+    std::scoped_lock<std::mutex> lock{m_udpLock};
+    const auto now = std::chrono::steady_clock::now();
+
+    while (!m_udpRequestExpirations.empty() && m_udpRequestExpirations.front().first <= now)
+    {
+        m_udpRequests.erase(m_udpRequestExpirations.front().second);
+        m_udpRequestExpirations.pop_front();
+    }
+
+    if (m_udpRequestExpirations.empty())
+    {
+        return -1;
+    }
+
+    return static_cast<int>(std::chrono::ceil<std::chrono::milliseconds>(m_udpRequestExpirations.front().first - now).count());
+}
+
 void DnsServer::ServerLoop() noexcept
 {
     UtilSetThreadName("DnsServer");
@@ -311,7 +335,8 @@ void DnsServer::ServerLoop() noexcept
         {
             // A fixed number of events is requested from epoll_wait (c_epollWaitMaxEvents). In case the number of ready events is
             // greater than c_epollWaitMaxEvents, epoll will round-robin through the ready events until we get a notification for all of them.
-            size_t numReadyEvents = Syscall(epoll_wait, m_epollFd.get(), events, c_epollWaitMaxEvents, -1);
+            const auto timeout = ExpireUdpRequestsAndGetTimeout();
+            size_t numReadyEvents = Syscall(epoll_wait, m_epollFd.get(), events, c_epollWaitMaxEvents, timeout);
 
             // No event
             if (numReadyEvents == 0)
@@ -388,14 +413,26 @@ try
         udpRequestId = requestId;
 
         // Track the request
-        m_udpRequests.emplace(requestId, remoteAddr);
+        const auto expiration = std::chrono::steady_clock::now() + c_udpRequestTimeout;
+        const auto expirationIt = m_udpRequestExpirations.emplace(m_udpRequestExpirations.end(), expiration, requestId);
+        auto removeExpirationOnError = wil::scope_exit([&] { m_udpRequestExpirations.erase(expirationIt); });
+
+        const auto [_, inserted] = m_udpRequests.emplace(requestId, UdpRequestContext{remoteAddr, expirationIt});
+        THROW_UNEXPECTED_IF(!inserted);
+
+        removeExpirationOnError.release();
     }
 
     if (!dnsRequest.empty())
     {
         auto removeRequestOnError = wil::scope_exit([&] {
             std::scoped_lock<std::mutex> lock{m_udpLock};
-            m_udpRequests.erase(udpRequestId);
+            const auto it = m_udpRequests.find(udpRequestId);
+            if (it != m_udpRequests.end())
+            {
+                m_udpRequestExpirations.erase(it->second.m_expiration);
+                m_udpRequests.erase(it);
+            }
         });
 
         // Tunnel request to Windows

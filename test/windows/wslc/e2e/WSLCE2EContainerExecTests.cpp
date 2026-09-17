@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 
@@ -28,14 +29,13 @@ class WSLCE2EContainerExecTests
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), HostEnvVariableValue2.c_str()));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(MissingHostEnvVariableName.c_str(), nullptr));
 
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureImageIsDeleted(DebianImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), nullptr));
@@ -86,7 +86,8 @@ class WSLCE2EContainerExecTests
     {
         auto result = RunWslc(std::format(L"container exec {} echo hello", WslcContainerName));
         result.Verify(
-            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+            {.Stderr =
+                 FormatErrorMessage(std::format(L"Container '{}' not found.", WslcContainerName), L"WSLC_E_CONTAINER_NOT_FOUND"),
              .ExitCode = 1});
     }
 
@@ -425,7 +426,8 @@ class WSLCE2EContainerExecTests
 
         auto inspect = InspectContainer(WslcContainerName);
         result = RunWslc(std::format(L"container exec {} echo should-fail", WslcContainerName));
-        auto errorMessage = std::format(L"Container '{}' is not running.\r\nError code: WSLC_E_CONTAINER_NOT_RUNNING\r\n", inspect.Id);
+        auto errorMessage =
+            FormatErrorMessage(std::format(L"Container '{}' is not running.", inspect.Id), L"WSLC_E_CONTAINER_NOT_RUNNING");
         result.Verify({.Stderr = errorMessage, .ExitCode = 1});
     }
 

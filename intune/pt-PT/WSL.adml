@@ -55,6 +55,9 @@
         <string id="AllowWSLContainer"><!-- _locComment_text='{Locked="WSL"}' -->Permitir o contentor WSL</string>
         <string id="AllowWSLContainerExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Esta política controla se o contentor WSL pode ser utilizado neste computador. Quando ativada ou não configurada, os utilizadores e as aplicações Windows podem executar contentores Linux através do WSL. Quando definida como desativada, o contentor WSL é bloqueado para todos os utilizadores e as aplicações Windows não conseguem executar contentores Linux. Aviso: definir esta política como "Disabled" pode comprometer aplicações Windows que dependem de contentores Linux.</string>
 
+        <string id="AllowWSLContainerPrivileged"><!-- _locComment_text='{Locked="WSL"}' -->Permitir contentores WSL privilegiados</string>
+        <string id="AllowWSLContainerPrivilegedExplain"><!-- _locComment_text='{Locked="WSL"}{Locked="Disabled"}' -->Esta política controla se WSL contentores podem ser executados em modo privilegiado neste computador. Quando ativada ou não configurada, os utilizadores e as aplicações do Windows podem iniciar contentores privilegiados. Quando definido como 'Disabled', os pedidos para iniciar um contentor privilegiado são recusados para todos os utilizadores e aplicações do Windows. Os contentores privilegiados são executados com capacidades de Linux elevadas e isolamento reduzido do anfitrião do contentor.</string>
+
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Lista de permissões para registos de contentor WSL</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->Quando ativado, o contentor WSL só poderá solicitar imagens dos registos listados aqui. Isto afeta tanto a CLI do contentor WSL como todas as aplicações que utilizam a API do contentor WSL.</string>
     </stringTable>

@@ -24,6 +24,7 @@ Abstract:
 #include "WSLCNetworkMetadata.h"
 #include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
+#include "EventStore.h"
 #include "IORelay.h"
 #include <atomic>
 #include <list>
@@ -114,10 +115,20 @@ public:
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
+    // Event streaming. Opens a stream object that yields matching events one at a time via
+    // IWSLCEventStream::GetNext.
+    IFACEMETHOD(GetEvents)(
+        _In_ LONGLONG SinceTime,
+        _In_ LONGLONG UntilTime,
+        _In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
+        _In_ ULONG FiltersCount,
+        _Outptr_ IWSLCEventStream** Stream) override;
+
     // Image management.
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR Image,
         _In_opt_ LPCSTR RegistryAuthenticationInformation,
+        _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
@@ -140,6 +151,7 @@ public:
     IFACEMETHOD(PushImage)(
         _In_ LPCSTR Image,
         _In_ LPCSTR RegistryAuthenticationInformation,
+        _In_ BOOL AllTags,
         _In_opt_ IProgressCallback* ProgressCallback,
         _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
@@ -180,8 +192,7 @@ public:
     IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListVolumes)
-    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count)
-        override;
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ LPSTR* Output) override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneVolumes)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
@@ -195,8 +206,7 @@ public:
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)
-    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count)
-        override;
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ LPSTR* Output) override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneNetworks)
     (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCNetworkName** Networks, _Out_ ULONG* NetworksCount)
@@ -264,11 +274,6 @@ public:
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
 
-    HANDLE SessionTerminatingEvent() const noexcept
-    {
-        return m_sessionTerminatingEvent.get();
-    }
-
     ULONG Id() const noexcept
     {
         return m_id;
@@ -321,6 +326,30 @@ private:
 
     void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
 
+    // A create RPC hands the container off to the Docker event stream thread here and waits, so the
+    // container is committed and its create event recorded from that thread. Recording it from the RPC
+    // thread instead would let another container's event be recorded first and regress the event
+    // stream's timestamps.
+    struct PendingContainerCreate
+    {
+        wil::unique_event Completed{wil::EventOptions::ManualReset};
+        std::shared_ptr<WSLCContainerImpl> Container;
+        std::exception_ptr Exception;
+    };
+
+    __requires_lock_held(m_containersLock) std::shared_ptr<PendingContainerCreate> StartPendingCreate(std::shared_ptr<WSLCContainerImpl> Container);
+
+    __requires_lock_held(m_containersLock) void CompletePendingCreate(
+        const std::shared_ptr<PendingContainerCreate>& PendingCreate, std::exception_ptr Exception) noexcept;
+
+    void WaitForPendingCreateCompletion(const std::shared_ptr<PendingContainerCreate>& PendingCreate);
+
+    // Returns with the lock held once no create is in flight. Only one fits: the slot is unkeyed,
+    // because the container ID isn't known until Docker assigns it.
+    void WaitForConflictingCreateToComplete(std::unique_lock<std::mutex>& ContainersLock);
+
+    void OnContainerCreated(const std::string& ContainerId, std::int64_t Time) noexcept;
+
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
 
     void Ext4Format(const std::string& Device);
@@ -330,6 +359,10 @@ private:
     void OnCrashDumpWritten(const std::wstring& DumpPath, const std::string& ProcessName, ULONG Pid, ULONG Signal, ULONGLONG Timestamp);
 
     void OnImageCreated(const std::string& ImageNameOrId) noexcept;
+
+    // Notifies plugins for each image created by an --all-tags pull, identified by the manifest digests
+    // the pull reported. Requires the VM lease.
+    void OnRepositoryImagesCreated(const wsl::windows::common::wslutil::RepositoryReference& Repository, const std::vector<std::string>& Digests) noexcept;
 
     void OnImageDeleted(const std::string& ImageId) noexcept;
 
@@ -347,7 +380,9 @@ private:
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
-    void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
+    // Returns the manifest digest each pulled tag resolved to, in the order the daemon reported them.
+    std::vector<std::string> StreamImageOperation(
+        DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
 
     // The VM factory is a cross-process proxy supplied by the SYSTEM service at Initialize() time
     // but first used later (on demand) from a different thread/apartment. A directly stored proxy
@@ -389,6 +424,14 @@ private:
     std::atomic<bool> m_terminating{false};
 
     wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
+
+    // Bounded in-memory ring of recent lifecycle events, shared by all event-stream subscribers.
+    EventStore m_eventStore;
+
+    __guarded_by(m_containersLock) std::shared_ptr<PendingContainerCreate> m_pendingCreate;
+
+    // N.B. Declared after everything OnContainerCreated() touches so the callback is unregistered first.
+    DockerEventTracker::EventTrackingReference m_containerEventTracking;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;

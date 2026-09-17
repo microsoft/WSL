@@ -34,6 +34,7 @@ inline constexpr auto c_allowCustomNetworkingModeUserSetting = L"AllowNetworking
 inline constexpr auto c_allowCustomFirewallUserSetting = L"AllowFirewallUserSetting";
 inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
 inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
+inline constexpr auto c_allowWSLContainerPrivileged = L"AllowWSLContainerPrivileged";
 inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";
 
 inline std::optional<DWORD> GetPolicyValue(HKEY key, LPCWSTR name)

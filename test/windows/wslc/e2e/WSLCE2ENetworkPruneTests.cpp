@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "TestImageRegistry.h"
 
 namespace WSLCE2ETests {
 using namespace wsl::shared;
@@ -25,7 +26,7 @@ class WSLCE2ENetworkPruneTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        TestImageRegistry::Instance().EnsureLoaded(DebianImage);
         CleanUpAllTestState();
         return true;
     }
@@ -39,7 +40,6 @@ class WSLCE2ENetworkPruneTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         CleanUpAllTestState();
-        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -53,11 +53,11 @@ class WSLCE2ENetworkPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_NoNetworks)
     {
         // Prune when no unused networks exist should succeed without reporting any of our test networks.
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_FALSE(result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)));
-        VERIFY_IS_FALSE(result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName2)));
+        VERIFY_IS_FALSE(result.StdoutContainsLine(TestNetworkName));
+        VERIFY_IS_FALSE(result.StdoutContainsLine(TestNetworkName2));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_RemovesUnusedNetwork)
@@ -67,12 +67,14 @@ class WSLCE2ENetworkPruneTests
 
         auto cleanup = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(TestNetworkName); });
 
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto output = result.GetStdoutLines();
-        VERIFY_ARE_EQUAL(1u, output.size());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, output[0].find(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)));
+        VERIFY_ARE_EQUAL(3u, output.size());
+        VERIFY_ARE_EQUAL(Localization::WSLCCLI_NetworkPruneDeletedHeader(), output[0]);
+        VERIFY_ARE_EQUAL(TestNetworkName, output[1]);
+        VERIFY_ARE_EQUAL(std::wstring{}, output[2]);
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }
@@ -89,11 +91,11 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName2);
         });
 
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)));
-        VERIFY_IS_TRUE(result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName2)));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestNetworkName));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestNetworkName2));
 
         VerifyNetworkIsNotListed(TestNetworkName);
         VerifyNetworkIsNotListed(TestNetworkName2);
@@ -114,12 +116,10 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName);
         });
 
-        const auto result = RunWslc(L"network prune");
+        const auto result = RunWslc(L"network prune --force");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_FALSE(
-            result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)),
-            L"Network in use by a running container must not be pruned");
+        VERIFY_IS_FALSE(result.StdoutContainsLine(TestNetworkName), L"Network in use by a running container must not be pruned");
 
         VerifyNetworkIsListed(TestNetworkName);
     }
@@ -132,18 +132,17 @@ class WSLCE2ENetworkPruneTests
         auto cleanup = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(TestNetworkName); });
 
         // A label filter that does not match the network should preserve it.
-        const auto filteredPrune = RunWslc(L"network prune --filter label=wslc.test.never=present");
+        const auto filteredPrune = RunWslc(L"network prune --force --filter label=wslc.test.never=present");
         filteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_FALSE(
-            filteredPrune.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)),
-            L"Filtered prune should not have deleted the non-matching network");
+            filteredPrune.StdoutContainsLine(TestNetworkName), L"Filtered prune should not have deleted the non-matching network");
         VerifyNetworkIsListed(TestNetworkName);
 
         // A subsequent unfiltered prune should still remove it, proving the filter
         // was the reason it survived.
-        const auto unfilteredPrune = RunWslc(L"network prune");
+        const auto unfilteredPrune = RunWslc(L"network prune --force");
         unfilteredPrune.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(unfilteredPrune.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)));
+        VERIFY_IS_TRUE(unfilteredPrune.StdoutContainsLine(TestNetworkName));
         VerifyNetworkIsNotListed(TestNetworkName);
     }
 
@@ -159,13 +158,11 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName2);
         });
 
-        const auto result = RunWslc(L"network prune --filter label=wslc.test.prune=keep");
+        const auto result = RunWslc(L"network prune --force --filter label=wslc.test.prune=keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)));
-        VERIFY_IS_FALSE(
-            result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName2)),
-            L"Network without the matching label must not be deleted");
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestNetworkName));
+        VERIFY_IS_FALSE(result.StdoutContainsLine(TestNetworkName2), L"Network without the matching label must not be deleted");
 
         VerifyNetworkIsNotListed(TestNetworkName);
         VerifyNetworkIsListed(TestNetworkName2);
@@ -183,13 +180,12 @@ class WSLCE2ENetworkPruneTests
             EnsureNetworkDoesNotExist(TestNetworkName2);
         });
 
-        const auto result = RunWslc(L"network prune --filter label!=wslc.test.keep");
+        const auto result = RunWslc(L"network prune --force --filter label!=wslc.test.keep");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName2)));
+        VERIFY_IS_TRUE(result.StdoutContainsLine(TestNetworkName2));
         VERIFY_IS_FALSE(
-            result.StdoutContainsLine(Localization::WSLCCLI_NetworkPruneDeleted(TestNetworkName)),
-            L"Labeled network must be preserved when prune negates that label");
+            result.StdoutContainsLine(TestNetworkName), L"Labeled network must be preserved when prune negates that label");
 
         VerifyNetworkIsListed(TestNetworkName);
         VerifyNetworkIsNotListed(TestNetworkName2);
@@ -204,7 +200,7 @@ class WSLCE2ENetworkPruneTests
 
     WSLC_TEST_METHOD(WSLCE2E_Network_Prune_Filter_InvalidKey)
     {
-        const auto result = RunWslc(L"network prune --filter color=red");
+        const auto result = RunWslc(L"network prune --force --filter color=red");
         result.Verify({.Stdout = L"", .ExitCode = 1});
         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"invalid filter 'color'\r\nError code: E_INVALIDARG"));
     }

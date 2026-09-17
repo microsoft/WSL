@@ -175,7 +175,12 @@ class InstallerTests
 
     static void CallMsiExec(const std::wstring& Args)
     {
-        VERIFY_ARE_EQUAL(0L, RunMsiExec(Args));
+        auto exitCode = RunMsiExec(Args);
+        if (exitCode != ERROR_SUCCESS && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED)
+        {
+            LogError("msiexec failed with exit code %lu", exitCode);
+            VERIFY_FAIL();
+        }
     }
 
     std::wstring GetMsiProductCode() const
@@ -716,10 +721,10 @@ class InstallerTests
         // Validate that calling wsl.exe triggers the install.
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"echo ok", -1, nulDevice.get());
         VERIFY_ARE_EQUAL(
-            L"\r\nAnother application has exclusive access to the file 'C:\\Program Files\\WSL\\wsl.exe'.  Please shut down all "
-            L"other applications, then click Retry.\r\n"
-            L"Update failed (exit code: 1603).\r\n"
-            L"Error code: Wsl/CallMsi/Install/ERROR_INSTALL_FAILURE\r\n",
+            FormatErrorMessage(
+                L"\r\nAnother application has exclusive access to the file 'C:\\Program Files\\WSL\\wsl.exe'.  Please shut "
+                L"down all other applications, then click Retry.\r\nUpdate failed (exit code: 1603).",
+                L"Wsl/CallMsi/Install/ERROR_INSTALL_FAILURE"),
             output);
     }
 

@@ -3623,7 +3623,7 @@ Return Value:
 
 #define READV_SYSCALL_NR 19
 
-#elif __arm__
+#elif __aarch64__
 
 #define READV_SYSCALL_NR 65
 

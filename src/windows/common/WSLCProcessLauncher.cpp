@@ -223,7 +223,7 @@ ClientRunningWSLCProcess::ClientRunningWSLCProcess(wil::com_ptr<IWSLCProcess>&& 
 {
 }
 
-wil::unique_handle ClientRunningWSLCProcess::GetStdHandle(int Index)
+wsl::windows::common::io::HandleWrapper ClientRunningWSLCProcess::GetStdHandle(int Index)
 {
     wslutil::COMOutputHandle handle;
     THROW_IF_FAILED_MSG(m_process->GetStdHandle(static_cast<WSLCFD>(Index), &handle), "Failed to get handle: %i", Index);

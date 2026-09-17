@@ -20,7 +20,9 @@ Abstract:
 #include "Exceptions.h"
 #include "ImageService.h"
 #include "Localization.h"
+#include "MountSpecParsing.h"
 #include <algorithm>
+#include <array>
 #include <type_traits>
 #include <utility>
 #include <wslc.h>
@@ -30,6 +32,8 @@ using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
+
+namespace mount = wsl::windows::common::mount;
 
 namespace argument::details {
     struct RawArgMapAccess
@@ -44,6 +48,8 @@ namespace argument::details {
 
 namespace {
     using argument::details::RawArgMapAccess;
+
+    constexpr std::array<std::string_view, 4> c_eventFilterKeys{"type", "event", "container", "image"};
 
     // Converts each raw value for argument A using the provided converter and caches the result on
     // the ArgMap. This is the single point where an argument's string input is converted; execution
@@ -185,6 +191,12 @@ void Argument::Validate(ArgMap& execArgs) const
         });
         break;
 
+    case ArgType::Timeout:
+        CacheConverted<ArgType::Timeout>(execArgs, m_name, [](const std::wstring& value, const std::wstring& name) {
+            return validation::GetIntegerFromString<LONG>(value, name);
+        });
+        break;
+
     case ArgType::Secret:
         CacheConverted<ArgType::Secret>(
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseSecretSpec(value); });
@@ -209,6 +221,18 @@ void Argument::Validate(ArgMap& execArgs) const
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseFilter(value); });
         break;
 
+    case ArgType::EventFilter:
+        CacheConverted<ArgType::EventFilter>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            auto filter = validation::ParseFilter(value);
+            if (std::ranges::find(c_eventFilterKeys, filter.first) == c_eventFilterKeys.end())
+            {
+                throw ArgumentException(Localization::MessageWslcInvalidFilter(MultiByteToWide(filter.first)));
+            }
+
+            return filter;
+        });
+        break;
+
     case ArgType::Label:
         CacheConverted<ArgType::Label>(
             execArgs, m_name, [](const std::wstring& value, const std::wstring&) { return validation::ParseLabel(value); });
@@ -228,7 +252,52 @@ void Argument::Validate(ArgMap& execArgs) const
         break;
 
     case ArgType::Volume:
-        validation::ValidateVolumeMount(RawArgMapAccess::GetAll<ArgType::Volume>(execArgs));
+        CacheConverted<ArgType::Volume>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerVolumeString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(ex.Reason());
+            }
+        });
+        break;
+
+    case ArgType::TMPFS:
+        CacheConverted<ArgType::TMPFS>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerTmpfsString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_InvalidTmpfsError(value, ex.Reason()));
+            }
+        });
+        break;
+
+    case ArgType::Mount:
+        CacheConverted<ArgType::Mount>(execArgs, m_name, [](const std::wstring& value, const std::wstring&) {
+            try
+            {
+                auto mountSpec = mount::ParseDockerMountString(value);
+                mount::ValidateMountSpec(mountSpec);
+                return mountSpec;
+            }
+            catch (const mount::MountUnsupportedException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_UnsupportedMountError(value, ex.Reason()));
+            }
+            catch (const mount::MountException& ex)
+            {
+                throw ArgumentException(Localization::WSLCCLI_InvalidMountError(value, ex.Reason()));
+            }
+        });
         break;
 
     case ArgType::WorkDir:
@@ -301,24 +370,6 @@ void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLCSignalFromString(value, argName);
-    }
-}
-
-void ValidateVolumeMount(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = models::VolumeMount::Parse(value);
-    }
-}
-
-// Validates that each --filter argument is in the form "key=value". Rejects entries without an '=';
-// the runtime validates the key and value for specific objects.
-void ValidateFilter(const std::vector<std::wstring>& values)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = ParseFilter(value);
     }
 }
 

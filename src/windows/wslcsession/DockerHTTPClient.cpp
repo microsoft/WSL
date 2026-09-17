@@ -265,11 +265,12 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std
 }
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(
-    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters)
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);
     url.SetParameter("limit", std::to_string(limit));
+    url.SetParameter("size", size);
 
     if (!filters.empty())
     {
@@ -355,9 +356,12 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool D
     Transaction(verb::delete_, url);
 }
 
-docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
+docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id, bool Size)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
+    auto url = URL::Create("/containers/{}/json", Id);
+    url.SetParameter("size", Size);
+
+    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, url);
 }
 
 docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string& Id)
@@ -522,13 +526,14 @@ docker_schema::PruneNetworkResult DockerHTTPClient::PruneNetworks(const std::map
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneNetworkResult>(verb::post, url);
 }
 
-wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
     url.SetParameter("follow", WI_IsFlagSet(Flags, WSLCLogsFlagsFollow));
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
     url.SetParameter("timestamps", WI_IsFlagSet(Flags, WSLCLogsFlagsTimestamps));
+    url.SetParameter("details", WI_IsFlagSet(Flags, WSLCLogsFlagsDetails));
 
     if (Tail != 0)
     {

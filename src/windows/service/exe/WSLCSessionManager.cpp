@@ -362,6 +362,12 @@ void WSLCSessionManagerImpl::CreateSession(
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
         TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"),
+        TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+
+    WSL_LOG(
+        "WSLCCreateSessionCaller",
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(callerFileName.c_str(), "CallerFileName"),
         TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 

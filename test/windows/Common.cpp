@@ -1538,6 +1538,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"\n"
         L"mountDeviceTimeout=120000\n"
         L"kernelBootTimeout=120000\n"
+        L"distributionStartTimeout=120000\n"
         L"debugConsoleLogFile=" +
         EscapePath(Default.debugConsoleLogFile.value_or(kernelLogs)) +
         L"\n"
@@ -2808,6 +2809,11 @@ PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
 
 PartialHandleRead::~PartialHandleRead()
 {
+    Stop();
+}
+
+void PartialHandleRead::Stop()
+{
     m_exitEvent.SetEvent();
     if (m_thread.joinable())
     {
@@ -2950,7 +2956,7 @@ private:
     std::string m_targetValue;
 };
 
-void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout)
+void WaitForOutput(wsl::windows::common::io::HandleWrapper handle, std::string_view targetValue, std::chrono::milliseconds timeout)
 {
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));
@@ -2980,6 +2986,10 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     else if (imageName == "wslc-registry:latest")
     {
         result /= L"wslc-registry.tar";
+    }
+    else if (imageName == "docker/dockerfile:1")
+    {
+        result /= L"dockerfile-frontend.tar";
     }
     else
     {
@@ -3148,4 +3158,14 @@ void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
         LogError("Expected COM error containing: '%ls' but none was set", ExpectedSubstring.c_str());
         VERIFY_FAIL();
     }
+}
+
+std::wstring FormatErrorMessage(std::wstring_view message, std::wstring_view errorCode)
+{
+    return std::format(
+        L"{}\r\nError code: {}\r\n"
+        L"If this error was unexpected, please consider searching for existing issues or filing a new issue at "
+        L"https://github.com/microsoft/WSL/issues.\r\n",
+        message,
+        errorCode);
 }

@@ -400,6 +400,7 @@ public:
     void Expect(const std::string& Expected);
     void ExpectConsume(const std::string& Expected);
     void ExpectClosed(DWORD Timeout = 60 * 1000);
+    void Stop();
 
     std::string ReadBytes(size_t Length);
     std::string ConsumeBytes(size_t Length);
@@ -646,7 +647,11 @@ std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair();
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
-void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s);
+void WaitForOutput(wsl::windows::common::io::HandleWrapper handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s);
+inline void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s)
+{
+    WaitForOutput(wsl::windows::common::io::HandleWrapper{std::move(handle)}, targetValue, timeout);
+}
 
 std::string EscapeString(const std::string& Input);
 
@@ -723,3 +728,5 @@ void WriteSocket(SOCKET Socket, const void* data, size_t size);
 void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current());
 
 void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring);
+
+std::wstring FormatErrorMessage(std::wstring_view message, std::wstring_view errorCode);

@@ -26,6 +26,7 @@ set(SOURCES
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
+    MountSpecParsing.cpp
     NatNetworking.cpp
     notifications.cpp
     Redirector.cpp
@@ -36,6 +37,7 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    timestamp.cpp
     VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
@@ -111,6 +113,7 @@ set(HEADERS
     LxssPort.h
     LxssSecurity.h
     LxssServerPort.h
+    MountSpecParsing.h
     NatNetworking.h
     notifications.h
     precomp.h
@@ -123,9 +126,11 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    timestamp.hpp
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
+    WSLCContainerEntry.h
     ConsommeNetworking.h
     WSLCProcessLauncher.h
     WslClient.h
@@ -158,10 +163,18 @@ endfunction()
 
 add_common_library(common)
 
+# common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
+# the config file parser, so anything linking common needs those libraries too.
+# PUBLIC propagates them instead of making each consumer restate them.
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile)
+
 # WSLCUserSettings.cpp uses yaml-cpp headers.
+# The per-source include path and definition below only apply when the file is
+# compiled on its own, so keep it out of the unity sources.
 set_source_files_properties(WSLCUserSettings.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${yaml-cpp_SOURCE_DIR}/include"
-    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE")
+    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE"
+    SKIP_UNITY_BUILD_INCLUSION ON)
 
 # For Fuzzing builds, there are some targets that cannot be built with ASAN instrumentation.
 # These targets use a non-instrumented copy of the common library.
