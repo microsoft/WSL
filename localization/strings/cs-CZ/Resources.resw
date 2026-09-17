@@ -1724,24 +1724,24 @@ Věnujte chvíli zobrazení náhledu některých oblíbených funkcí komunity n
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Snadno spouštějte linuxové kontejnery na Windows jako plnohodnotné prostředí.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Můžete použít wslc.exe k vytváření, spouštění, odesílání, stahování a správě linuxových kontejnerů přímo na Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Můžete také použít WSLC API k vytváření aplikací pro Windows, jejichž logiku za běhu zajišťují linuxové kontejnery, což usnadňuje přímé vložení linuxových kontejnerů do vaší aplikace pro pracovní postupy z cloudu do místního prostředí, aplikací s AI a izolace.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Kontejner WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Další informace o kontejneru WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Referenční dokumentace API kontejneru WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>
