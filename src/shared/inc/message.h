@@ -18,39 +18,16 @@ Abstract:
 #include <string>
 #include <string_view>
 #include <type_traits>
-#include <utility>
 #include <gsl/gsl>
 #include <cassert>
 
 namespace wsl::shared {
-
-template <typename T, typename = void>
-struct HasBufferMember : std::false_type
-{
-};
-
-template <typename T>
-struct HasBufferMember<T, std::void_t<decltype(std::declval<T&>().Buffer)>> : std::true_type
-{
-};
 
 template <typename TMessage>
 class MessageWriter
 {
     using THeader = decltype(TMessage::Header);
     using TMessageType = decltype(THeader::MessageType);
-
-    static constexpr size_t GetBufferOffset()
-    {
-        if constexpr (HasBufferMember<TMessage>::value)
-        {
-            return reinterpret_cast<size_t>(&reinterpret_cast<TMessage*>(0)->Buffer);
-        }
-        else
-        {
-            return sizeof(TMessage);
-        }
-    }
 
 public:
     MessageWriter(TMessageType type)
@@ -62,20 +39,15 @@ public:
         //    char buffer[0];
         // };
         // Would have a.buffer at byte 1, but sizeof(a) can be > 1 depending on padding.
-        // Some message types do not have a flexible array member; in that case, the message starts
-        // immediately after the fixed-size fields.
 
-        const auto bufferOffset = GetBufferOffset();
+        const auto bufferOffset = reinterpret_cast<size_t>(&reinterpret_cast<TMessage*>(0)->Buffer);
         m_buffer.resize(bufferOffset);
 
         (*this)->Header.MessageType = type;
         Size() = static_cast<unsigned long>(bufferOffset);
 
-        if constexpr (HasBufferMember<TMessage>::value)
-        {
-            // Validate that 'Buffer' has a char type.
-            static_assert(std::is_same_v<std::remove_reference_t<decltype((*this)->Buffer[0])>, char>);
-        }
+        // Validate that 'Buffer' has a char type.
+        static_assert(std::is_same_v<std::remove_reference_t<decltype((*this)->Buffer[0])>, char>);
     }
 
     MessageWriter() : MessageWriter(TMessage::Type)

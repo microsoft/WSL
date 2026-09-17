@@ -205,15 +205,15 @@ void WslCoreInstance::CreateLxProcess(
 
     message->Columns = Columns;
     message->Rows = Rows;
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsStdInConsole, (StdHandles->StdIn.HandleType == LxssHandleConsole));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsStdOutConsole, (StdHandles->StdOut.HandleType == LxssHandleConsole));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsStdErrConsole, (StdHandles->StdErr.HandleType == LxssHandleConsole));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsElevated, (drvfsMount == LxInitDrvfsMountElevated));
-    WI_SetFlagIf(message->Common.Flags, LxInitCreateProcessFlagsInteropEnabled, LXSS_INTEROP_ENABLED(CreateProcessContext.Flags));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsStdInConsole, (StdHandles->StdIn.HandleType == LxssHandleConsole));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsStdOutConsole, (StdHandles->StdOut.HandleType == LxssHandleConsole));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsStdErrConsole, (StdHandles->StdErr.HandleType == LxssHandleConsole));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsElevated, (drvfsMount == LxInitDrvfsMountElevated));
+    WI_SetFlagIf(message->Flags, LxInitCreateProcessFlagsInteropEnabled, LXSS_INTEROP_ENABLED(CreateProcessContext.Flags));
 
     if (m_configuration.RunOOBE && CreateProcessData.Filename.empty() && CreateProcessData.CommandLine.empty())
     {
-        WI_SetFlag(message->Common.Flags, LxInitCreateProcessFlagAllowOOBE);
+        WI_SetFlag(message->Flags, LxInitCreateProcessFlagAllowOOBE);
     }
 
     // Create a session leader if needed.
@@ -232,7 +232,7 @@ void WslCoreInstance::CreateLxProcess(
 
     // Connect to the port specified by the session leader.
     std::vector<wil::unique_socket> sockets(LX_INIT_UTILITY_VM_CREATE_PROCESS_SOCKET_COUNT);
-    if (WI_IsFlagSet(message->Common.Flags, LxInitCreateProcessFlagAllowOOBE))
+    if (WI_IsFlagSet(message->Flags, LxInitCreateProcessFlagAllowOOBE))
     {
         sockets.emplace_back();
     }
@@ -251,7 +251,7 @@ void WslCoreInstance::CreateLxProcess(
     *CommunicationChannel = reinterpret_cast<HANDLE>(sockets[3].release());
     *InteropSocket = reinterpret_cast<HANDLE>(sockets[4].release());
 
-    if (WI_IsFlagSet(message->Common.Flags, LxInitCreateProcessFlagAllowOOBE))
+    if (WI_IsFlagSet(message->Flags, LxInitCreateProcessFlagAllowOOBE))
     {
         {
             m_oobeCompleteEvent.create(wil::EventOptions::ManualReset);

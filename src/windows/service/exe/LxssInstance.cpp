@@ -521,7 +521,7 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
     WI_ASSERT(Message.size() <= ULONG_MAX);
 
     const auto MessageLocal = (PLX_INIT_CREATE_PROCESS)Message.data();
-    const bool AllowOOBE = WI_IsFlagSet(MessageLocal->Common.Flags, LxInitCreateProcessFlagAllowOOBE);
+    const bool AllowOOBE = WI_IsFlagSet(MessageLocal->Flags, LxInitCreateProcessFlagAllowOOBE);
     auto HandleEraser =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { _ReleaseHandlesFromLxProcessMarshalMessage(MessagePort, MessageLocal); });
 
@@ -670,7 +670,7 @@ std::vector<gsl::byte> LxssInstance::_CreateLxProcessMarshalMessage(
 
     if (m_configuration.RunOOBE && CreateProcessData.Filename.empty() && CreateProcessData.CommandLine.empty())
     {
-        WI_SetFlag(MessageLocal->Common.Flags, LxInitCreateProcessFlagAllowOOBE);
+        WI_SetFlag(MessageLocal->Flags, LxInitCreateProcessFlagAllowOOBE);
     }
 
     Eraser.release();

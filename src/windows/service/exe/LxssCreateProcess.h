@@ -70,17 +70,15 @@ public:
     static inline wil::unique_socket CreateLinuxProcess(
         _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout)
     {
-        std::vector<char> ArgumentsData;
-        for (const auto* e = Arguments; *e != nullptr; e++)
+        size_t argumentCount = 0;
+        while (Arguments[argumentCount] != nullptr)
         {
-            ArgumentsData.insert(ArgumentsData.end(), *e, *e + strlen(*e) + 1);
+            ++argumentCount;
         }
-
-        ArgumentsData.emplace_back('\0');
 
         wsl::shared::MessageWriter<CREATE_PROCESS_MESSAGE> message(LxInitCreateProcess);
         message.WriteString(message->PathIndex, Path);
-        gsl::copy(as_bytes(gsl::span(ArgumentsData)), message.InsertBuffer(message->CommandLineIndex, ArgumentsData.size()));
+        message.WriteStringArray(message->CommandLineIndex, Arguments, argumentCount);
         auto transaction = channel.StartTransaction(Timeout);
         transaction.Send<CREATE_PROCESS_MESSAGE>(message.Span());
 
@@ -96,58 +94,31 @@ public:
         return processSocket;
     }
 
-private:
+public:
     template <typename TMessage>
-    static std::vector<gsl::byte> CreateMessageImpl(_In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid)
+    static std::vector<gsl::byte> CreateMessage(_In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid)
     {
         wsl::shared::MessageWriter<TMessage> message;
-        auto& common = message->Common;
 
-        common.DefaultUid = DefaultUid;
-        common.Flags = 0;
-        common.ShellOptions = CreateProcessData.ShellOptions;
+        message->DefaultUid = DefaultUid;
+        message->Flags = 0;
+        message->ShellOptions = CreateProcessData.ShellOptions;
 
-        message.WriteString(common.FilenameOffset, CreateProcessData.Filename);
-        message.WriteString(common.CurrentWorkingDirectoryOffset, CreateProcessData.CurrentWorkingDirectory);
+        message.WriteString(message->FilenameOffset, CreateProcessData.Filename);
+        message.WriteString(message->CurrentWorkingDirectoryOffset, CreateProcessData.CurrentWorkingDirectory);
 
         const auto commandLine = wsl::shared::string::StringPointersFromArray(CreateProcessData.CommandLine, false);
         const auto environment = wsl::shared::string::StringPointersFromArray(CreateProcessData.Environment, false);
         const auto ntEnvironment = wsl::shared::string::StringPointersFromArray(CreateProcessData.NtEnvironment, false);
 
-        WI_ASSERT(CreateProcessData.CommandLine.size() <= USHORT_MAX);
-        common.CommandLineCount = gsl::narrow_cast<USHORT>(CreateProcessData.CommandLine.size());
-        message.WriteStringArray(common.CommandLineOffset, commandLine.data(), commandLine.size());
+        message.WriteStringArray(message->CommandLineOffset, commandLine.data(), commandLine.size());
+        message.WriteStringArray(message->EnvironmentOffset, environment.data(), environment.size());
+        message.WriteStringArray(message->NtEnvironmentOffset, ntEnvironment.data(), ntEnvironment.size());
 
-        WI_ASSERT(CreateProcessData.Environment.size() <= USHORT_MAX);
-        common.EnvironmentCount = gsl::narrow_cast<USHORT>(CreateProcessData.Environment.size());
-        message.WriteStringArray(common.EnvironmentOffset, environment.data(), environment.size());
-
-        WI_ASSERT(CreateProcessData.NtEnvironment.size() <= USHORT_MAX);
-        common.NtEnvironmentCount = gsl::narrow_cast<USHORT>(CreateProcessData.NtEnvironment.size());
-        message.WriteStringArray(common.NtEnvironmentOffset, ntEnvironment.data(), ntEnvironment.size());
-
-        message.WriteString(common.NtPathOffset, CreateProcessData.NtPath);
-        message.WriteString(common.UsernameOffset, CreateProcessData.Username);
+        message.WriteString(message->NtPathOffset, CreateProcessData.NtPath);
+        message.WriteString(message->UsernameOffset, CreateProcessData.Username);
 
         return message.MoveBuffer();
-    }
-
-public:
-    template <typename TMessage>
-    static std::vector<gsl::byte> CreateMessage(_In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid)
-    {
-        static_assert(
-            std::is_same_v<TMessage, LX_INIT_CREATE_PROCESS> || std::is_same_v<TMessage, LX_INIT_CREATE_PROCESS_UTILITY_VM>,
-            "Unsupported create-process message type");
-
-        if constexpr (std::is_same_v<TMessage, LX_INIT_CREATE_PROCESS>)
-        {
-            return CreateMessageImpl<LX_INIT_CREATE_PROCESS>(CreateProcessData, DefaultUid);
-        }
-        else
-        {
-            return CreateMessageImpl<LX_INIT_CREATE_PROCESS_UTILITY_VM>(CreateProcessData, DefaultUid);
-        }
     }
 };
 
