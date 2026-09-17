@@ -52,11 +52,6 @@ class LxssCreateProcess
 {
 public:
     /// <summary>
-    /// Allocates and initializes a create process message.
-    /// </summary>
-    static std::vector<gsl::byte> CreateMessage(_In_ LX_MESSAGE_TYPE MessageType, _In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid);
-
-    /// <summary>
     /// Parses create process arguments.
     /// </summary>
     static CreateLxProcessData ParseArguments(
@@ -71,6 +66,7 @@ public:
         _In_ const std::vector<std::string>& DefaultEnvironment,
         _In_ ULONG Flags);
 
+public:
     static inline wil::unique_socket CreateLinuxProcess(
         _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout)
     {
@@ -98,6 +94,60 @@ public:
         THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
 
         return processSocket;
+    }
+
+private:
+    template <typename TMessage>
+    static std::vector<gsl::byte> CreateMessageImpl(_In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid)
+    {
+        wsl::shared::MessageWriter<TMessage> message;
+        auto& common = message->Common;
+
+        common.DefaultUid = DefaultUid;
+        common.Flags = 0;
+        common.ShellOptions = CreateProcessData.ShellOptions;
+
+        message.WriteString(common.FilenameOffset, CreateProcessData.Filename);
+        message.WriteString(common.CurrentWorkingDirectoryOffset, CreateProcessData.CurrentWorkingDirectory);
+
+        const auto commandLine = wsl::shared::string::StringPointersFromArray(CreateProcessData.CommandLine, false);
+        const auto environment = wsl::shared::string::StringPointersFromArray(CreateProcessData.Environment, false);
+        const auto ntEnvironment = wsl::shared::string::StringPointersFromArray(CreateProcessData.NtEnvironment, false);
+
+        WI_ASSERT(CreateProcessData.CommandLine.size() <= USHORT_MAX);
+        common.CommandLineCount = gsl::narrow_cast<USHORT>(CreateProcessData.CommandLine.size());
+        message.WriteStringArray(common.CommandLineOffset, commandLine.data(), commandLine.size());
+
+        WI_ASSERT(CreateProcessData.Environment.size() <= USHORT_MAX);
+        common.EnvironmentCount = gsl::narrow_cast<USHORT>(CreateProcessData.Environment.size());
+        message.WriteStringArray(common.EnvironmentOffset, environment.data(), environment.size());
+
+        WI_ASSERT(CreateProcessData.NtEnvironment.size() <= USHORT_MAX);
+        common.NtEnvironmentCount = gsl::narrow_cast<USHORT>(CreateProcessData.NtEnvironment.size());
+        message.WriteStringArray(common.NtEnvironmentOffset, ntEnvironment.data(), ntEnvironment.size());
+
+        message.WriteString(common.NtPathOffset, CreateProcessData.NtPath);
+        message.WriteString(common.UsernameOffset, CreateProcessData.Username);
+
+        return message.MoveBuffer();
+    }
+
+public:
+    template <typename TMessage>
+    static std::vector<gsl::byte> CreateMessage(_In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid)
+    {
+        static_assert(
+            std::is_same_v<TMessage, LX_INIT_CREATE_PROCESS> || std::is_same_v<TMessage, LX_INIT_CREATE_PROCESS_UTILITY_VM>,
+            "Unsupported create-process message type");
+
+        if constexpr (std::is_same_v<TMessage, LX_INIT_CREATE_PROCESS>)
+        {
+            return CreateMessageImpl<LX_INIT_CREATE_PROCESS>(CreateProcessData, DefaultUid);
+        }
+        else
+        {
+            return CreateMessageImpl<LX_INIT_CREATE_PROCESS_UTILITY_VM>(CreateProcessData, DefaultUid);
+        }
     }
 };
 

@@ -228,6 +228,7 @@ Abstract:
 //
 
 #define LX_INIT_PLAN9 "plan9"
+#define LX_INIT_PLAN9_BIND_ARG "--bind"
 #define LX_INIT_PLAN9_CONTROL_SOCKET_ARG "--control-socket"
 #define LX_INIT_PLAN9_SOCKET_PATH_ARG "--socket-path"
 #define LX_INIT_PLAN9_SERVER_FD_ARG "--server-fd"
@@ -1550,7 +1551,7 @@ struct CREATE_PROCESS_MESSAGE
     unsigned int CommandLineIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), STRING_FIELD(CommandLineIndex));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
 };
 
 struct EJECT_VHD_MESSAGE

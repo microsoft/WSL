@@ -186,7 +186,7 @@ void WslCoreInstance::CreateLxProcess(
 
     // Initialize the create process message.
     // N.B. m_defaultUid can only be read after m_oobeCompleteEvent is signaled since OOBE can change the default UID.
-    auto messageBuffer = LxssCreateProcess::CreateMessage(LxInitMessageCreateProcessUtilityVm, CreateProcessData, m_defaultUid);
+    auto messageBuffer = LxssCreateProcess::CreateMessage<LX_INIT_CREATE_PROCESS_UTILITY_VM>(CreateProcessData, m_defaultUid);
 
     const auto messageSpan = gsl::make_span(messageBuffer);
     const auto message = gslhelpers::get_struct<LX_INIT_CREATE_PROCESS_UTILITY_VM>(messageSpan);

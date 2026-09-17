@@ -406,6 +406,11 @@ inline std::vector<std::string> ArrayFromSpan(gsl::span<const gsl::byte> Span, s
     return Result;
 }
 
+inline std::vector<std::string> ReadStringArray(gsl::span<const gsl::byte> Span, size_t Offset = 0)
+{
+    return ArrayFromSpan(Span, Offset);
+}
+
 constexpr auto c_defaultHostName = "localhost";
 
 inline std::string CleanHostname(const std::string_view Hostname)

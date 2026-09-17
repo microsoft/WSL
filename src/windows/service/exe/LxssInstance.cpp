@@ -624,7 +624,7 @@ std::vector<gsl::byte> LxssInstance::_CreateLxProcessMarshalMessage(
     _In_ ULONG DefaultUid) const
 {
     // Allocate a message and initialize the common parameters.
-    auto Message = LxssCreateProcess::CreateMessage(LxInitMessageCreateProcess, CreateProcessData, DefaultUid);
+    auto Message = LxssCreateProcess::CreateMessage<LX_INIT_CREATE_PROCESS>(CreateProcessData, DefaultUid);
 
     const auto MessageLocal = (PLX_INIT_CREATE_PROCESS)Message.data();
 

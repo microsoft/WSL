@@ -977,12 +977,9 @@ try
     // Initialize the command line will a null-terminator.
     //
 
-    auto CommandLine = Buffer.subspan(Common->CommandLineOffset);
-    for (unsigned short Index = 0; Index < Common->CommandLineCount; Index += 1)
+    for (const auto& Argument : wsl::shared::string::ReadStringArray(Buffer, Common->CommandLineOffset))
     {
-        std::string_view Argument{wsl::shared::string::FromSpan(CommandLine)};
-        Parsed->CommandLine.emplace_back(Argument.data());
-        CommandLine = CommandLine.subspan(Argument.size() + 1);
+        Parsed->CommandLine.emplace_back(Argument);
     }
 
     //
@@ -3352,10 +3349,12 @@ Return Value:
 
 unsigned int StartPlan9(int Argc, char** Argv)
 {
-    constexpr auto* Usage = "Usage: plan9 " LX_INIT_PLAN9_CONTROL_SOCKET_ARG " fd " LX_INIT_PLAN9_SOCKET_PATH_ARG
-                            " path " LX_INIT_PLAN9_SERVER_FD_ARG " fd " LX_INIT_PLAN9_LOG_FILE_ARG
-                            " log-file " LX_INIT_PLAN9_LOG_LEVEL_ARG " level " LX_INIT_PLAN9_PIPE_FD_ARG " fd [--log-truncate]\n";
+    constexpr auto* Usage = "Usage: plan9 (" LX_INIT_PLAN9_BIND_ARG " port | " LX_INIT_PLAN9_SERVER_FD_ARG
+                            " fd [" LX_INIT_PLAN9_SOCKET_PATH_ARG " path]) [" LX_INIT_PLAN9_CONTROL_SOCKET_ARG
+                            " fd] [" LX_INIT_PLAN9_LOG_FILE_ARG " log-file] [" LX_INIT_PLAN9_LOG_LEVEL_ARG
+                            " level] [" LX_INIT_PLAN9_PIPE_FD_ARG " fd] [" LX_INIT_PLAN9_TRUNCATE_LOG_ARG "]\n";
 
+    std::optional<int> BindPort;
     bool LogTruncate = false;
     int LogLevel = TRACE_LEVEL_INFORMATION;
     wil::unique_fd PipeFd;
@@ -3365,6 +3364,7 @@ unsigned int StartPlan9(int Argc, char** Argv)
     wil::unique_fd ServerFd;
 
     ArgumentParser parser(Argc, Argv);
+    parser.AddArgument(Integer{BindPort}, LX_INIT_PLAN9_BIND_ARG);
     parser.AddArgument(UniqueFd{ControlSocket}, LX_INIT_PLAN9_CONTROL_SOCKET_ARG);
     parser.AddArgument(SocketPath, LX_INIT_PLAN9_SOCKET_PATH_ARG);
     parser.AddArgument(UniqueFd{ServerFd}, LX_INIT_PLAN9_SERVER_FD_ARG);
@@ -3383,7 +3383,14 @@ unsigned int StartPlan9(int Argc, char** Argv)
         return 1;
     }
 
-    RunPlan9Server(SocketPath, LogFile, LogLevel, LogTruncate, ControlSocket.get(), ServerFd.get(), PipeFd);
+    if (BindPort.has_value() == static_cast<bool>(ServerFd) ||
+        (BindPort.has_value() && (*BindPort <= 0 || *BindPort > std::numeric_limits<uint16_t>::max())))
+    {
+        std::cerr << Usage;
+        return 1;
+    }
+
+    RunPlan9Server(SocketPath, LogFile, LogLevel, LogTruncate, BindPort.value_or(-1), ControlSocket.get(), std::move(ServerFd), PipeFd);
 
     return 0;
 }
