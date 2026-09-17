@@ -213,7 +213,9 @@ struct TableOutput
     // Omits columns whose data cells are all empty, dropping their headers along with them,
     // instead of rendering them at header width. Emptiness is measured across the buffered data
     // rows only, so header text never keeps a column alive. Lets a table be declared with its full
-    // set of potential columns and shed the ones the caller left unpopulated.
+    // set of potential columns and shed the ones the caller left unpopulated. A table with no data
+    // rows has no emptiness to infer, so it renders every column; use SetColumnHidden() to omit one
+    // there.
     void SetDropEmptyColumns(bool dropEmptyColumns)
     {
         m_dropEmptyColumns = dropEmptyColumns;

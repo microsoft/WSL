@@ -709,9 +709,6 @@ ParseKeyValue:
                 value += '\t';
                 break;
 
-            case '\r':
-                break;
-
             case '\n':
                 // Line continuation. Skip both characters.
                 line++;

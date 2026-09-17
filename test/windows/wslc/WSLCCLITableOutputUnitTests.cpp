@@ -216,6 +216,128 @@ class WSLCCLITableOutputUnitTests
         VERIFY_IS_FALSE(cap.table.IsEmpty());
     }
 
+    TEST_METHOD(TableOutput_DropEmptyColumns_OmitsUnpopulatedMiddleColumn)
+    {
+        TableOutputCapture<3> cap(TableOutput<3>::header_t{L"NAME", L"DIGEST", L"STATUS"});
+        cap.table.SetDropEmptyColumns(true);
+
+        cap.table.WriteRow({L"container-a", L"", L"running"});
+        cap.table.WriteRow({L"container-b", L"", L"stopped"});
+        cap.table.Complete();
+
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(3), lines.size());
+
+        // The header of a dropped column is omitted along with its cells.
+        VERIFY_IS_TRUE(lines[0].find(L"DIGEST") == std::wstring::npos);
+        VERIFY_IS_TRUE(lines[0].find(L"NAME") != std::wstring::npos);
+        VERIFY_IS_TRUE(lines[0].find(L"STATUS") != std::wstring::npos);
+
+        // The surviving columns are separated by exactly one padding gap, not two.
+        const auto& dataLine = lines[1];
+        const auto namePos = dataLine.find(L"container-a");
+        const auto statusPos = dataLine.find(L"running");
+        VERIFY_IS_TRUE(namePos != std::wstring::npos);
+        VERIFY_IS_TRUE(statusPos != std::wstring::npos);
+        VERIFY_ARE_EQUAL(namePos + wcslen(L"container-a") + TableOutput<3>::DefaultColumnPadding, statusPos);
+    }
+
+    TEST_METHOD(TableOutput_DropEmptyColumns_KeepsColumnWithAnyValue)
+    {
+        TableOutputCapture<3> cap(TableOutput<3>::header_t{L"NAME", L"DIGEST", L"STATUS"});
+        cap.table.SetDropEmptyColumns(true);
+
+        cap.table.WriteRow({L"container-a", L"", L"running"});
+        cap.table.WriteRow({L"container-b", L"sha256:abc", L"stopped"});
+        cap.table.Complete();
+
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(3), lines.size());
+        VERIFY_IS_TRUE(lines[0].find(L"DIGEST") != std::wstring::npos);
+        VERIFY_IS_TRUE(lines[2].find(L"sha256:abc") != std::wstring::npos);
+    }
+
+    TEST_METHOD(TableOutput_DropEmptyColumns_DisabledByDefault_RendersEmptyColumnAtHeaderWidth)
+    {
+        TableOutputCapture<3> cap(TableOutput<3>::header_t{L"NAME", L"DIGEST", L"STATUS"});
+
+        cap.table.WriteRow({L"container-a", L"", L"running"});
+        cap.table.Complete();
+
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), lines.size());
+        VERIFY_IS_TRUE(lines[0].find(L"DIGEST") != std::wstring::npos);
+
+        // The empty column still reserves its header width plus padding.
+        const auto& dataLine = lines[1];
+        const auto namePos = dataLine.find(L"container-a");
+        const auto statusPos = dataLine.find(L"running");
+        const auto expected = namePos + wcslen(L"container-a") + TableOutput<3>::DefaultColumnPadding + wcslen(L"DIGEST") +
+                              TableOutput<3>::DefaultColumnPadding;
+        VERIFY_ARE_EQUAL(expected, statusPos);
+    }
+
+    TEST_METHOD(TableOutput_DropEmptyColumns_OmitsTrailingColumn)
+    {
+        TableOutputCapture<3> cap(TableOutput<3>::header_t{L"NAME", L"STATUS", L"DIGEST"});
+        cap.table.SetDropEmptyColumns(true);
+
+        cap.table.WriteRow({L"container-a", L"running", L""});
+        cap.table.Complete();
+
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), lines.size());
+        VERIFY_IS_TRUE(lines[0].find(L"DIGEST") == std::wstring::npos);
+
+        // No trailing padding is emitted for the dropped column.
+        VERIFY_IS_TRUE(lines[1].ends_with(L"running"));
+    }
+
+    TEST_METHOD(TableOutput_ColumnHidden_OmittedEvenWhenPopulated)
+    {
+        TableOutputCapture<3> cap(TableOutput<3>::header_t{L"NAME", L"DIGEST", L"STATUS"});
+        cap.table.SetColumnHidden(1, true);
+
+        cap.table.WriteRow({L"container-a", L"sha256:abc", L"running"});
+        cap.table.Complete();
+
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), lines.size());
+        VERIFY_IS_TRUE(lines[0].find(L"DIGEST") == std::wstring::npos);
+        VERIFY_IS_TRUE(lines[1].find(L"sha256:abc") == std::wstring::npos);
+
+        const auto& dataLine = lines[1];
+        const auto namePos = dataLine.find(L"container-a");
+        VERIFY_ARE_EQUAL(namePos + wcslen(L"container-a") + TableOutput<3>::DefaultColumnPadding, dataLine.find(L"running"));
+    }
+
+    TEST_METHOD(TableOutput_ColumnHidden_OmittedFromHeaderOnlyTable)
+    {
+        TableOutputCapture<3> cap(TableOutput<3>::header_t{L"NAME", L"DIGEST", L"STATUS"});
+        cap.table.SetAlwaysShowHeader(true);
+        cap.table.SetColumnHidden(1, true);
+        cap.table.Complete();
+
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), lines.size());
+        VERIFY_IS_TRUE(lines[0].find(L"DIGEST") == std::wstring::npos);
+        VERIFY_IS_TRUE(lines[0].find(L"NAME") != std::wstring::npos);
+        VERIFY_IS_TRUE(lines[0].find(L"STATUS") != std::wstring::npos);
+    }
+
+    TEST_METHOD(TableOutput_DropEmptyColumns_HeaderOnlyTableStillShowsAllColumns)
+    {
+        // With no rows there is no data to infer emptiness from, so drop-empty leaves the header intact.
+        TableOutputCapture<3> cap(TableOutput<3>::header_t{L"NAME", L"DIGEST", L"STATUS"});
+        cap.table.SetAlwaysShowHeader(true);
+        cap.table.SetDropEmptyColumns(true);
+        cap.table.Complete();
+
+        auto lines = cap.lines();
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), lines.size());
+        VERIFY_IS_TRUE(lines[0].find(L"DIGEST") != std::wstring::npos);
+    }
+
     TEST_METHOD(TableOutput_ColumnDefinition_NameAndConfigUsed)
     {
         TableOutput<2>::column_def_t defs{{

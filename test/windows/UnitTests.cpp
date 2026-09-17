@@ -24,6 +24,7 @@ Abstract:
 #include "registry.hpp"
 #include "helpers.hpp"
 #include "svccomm.hpp"
+#include "relay.hpp"
 #include "ConsoleState.h"
 #include "lxfsshares.h"
 #include <userenv.h>
@@ -2148,7 +2149,11 @@ Usage:
     {
         DistroFileChange configChange(L"/etc/wsl.conf", false);
 
-        auto validateWarnings = [&configChange](const std::wstring& config, const std::wstring& expectedWarnings) {
+        auto validateWarnings = [&configChange](
+                                    const std::wstring& config,
+                                    const std::wstring& expectedWarnings,
+                                    const std::wstring& command = L"-u root echo ok",
+                                    const std::wstring& expectedOutput = L"ok\n") {
             configChange.SetContent(config.c_str());
 
             TerminateDistribution();
@@ -2162,8 +2167,8 @@ Usage:
 
             while (std::chrono::steady_clock::now() < deadline)
             {
-                auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"-u root echo ok");
-                VERIFY_ARE_EQUAL(L"ok\n", output);
+                auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(command);
+                VERIFY_ARE_EQUAL(expectedOutput, output);
 
                 if (!warnings.empty() || expectedWarnings.empty())
                 {
@@ -2181,7 +2186,10 @@ Usage:
 
         validateWarnings(L"[foo]\na=b", L"wsl: Unknown key 'foo.a' in /etc/wsl.conf:2\r\n");
         validateWarnings(L"a=a\\m", L"wsl: Invalid escaped character: 'm' in /etc/wsl.conf:1\r\n");
+        validateWarnings(L"a=a\\\r\n", L"wsl: Invalid escaped character: '\r' in /etc/wsl.conf:1\r\n");
         validateWarnings(L"[=b", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n");
+        validateWarnings(
+            L"[=b\n[network]\nhostname=foo", L"wsl: Invalid section name in /etc/wsl.conf:1\r\n", L"hostname", L"foo\n");
         validateWarnings(L"\r\n\r\n[foo]\r\na=b", L"wsl: Unknown key 'foo.a' in /etc/wsl.conf:5\r\n");
 
         // Validate that CRLF is correctly handled
@@ -3519,6 +3527,27 @@ Usage:
         auto [output, _] = LxsstuLaunchCommandAndCaptureOutput(cmd.data());
 
         VERIFY_ARE_EQUAL(output, L"previous content\r\nok\n");
+    }
+
+    WSL2_TEST_METHOD(MergedOutputFileOffsets)
+    {
+        constexpr auto c_outputPath = L"merged-output.txt";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(c_outputPath); });
+        constexpr int c_byteCount = 100;
+        const auto command = std::format(
+            L"cmd.exe /d /s /c \"wsl.exe -d {} --exec /bin/sh -c "
+            L"\"for index in $(seq 1 {}); do printf O; printf E >&2; done\" > {} 2>&1\"",
+            LXSS_DISTRO_NAME_TEST_L,
+            c_byteCount,
+            c_outputPath);
+        wsl::windows::common::SubProcess process(nullptr, command.c_str());
+        VERIFY_ARE_EQUAL(process.Run(), 0L);
+
+        const auto actual = ReadFileContent(c_outputPath);
+
+        VERIFY_ARE_EQUAL(2 * c_byteCount, actual.size());
+        VERIFY_ARE_EQUAL(c_byteCount, std::count(actual.begin(), actual.end(), L'O'));
+        VERIFY_ARE_EQUAL(c_byteCount, std::count(actual.begin(), actual.end(), L'E'));
     }
 
     TEST_METHOD(GlobalFlagsOverride)

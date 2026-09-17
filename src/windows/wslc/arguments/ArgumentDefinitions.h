@@ -50,6 +50,7 @@ _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      
 _(Force,            "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,           "detach",               L"d",             Kind::Flag,       NoConversion, Localization::WSLCCLI_DetachArgDescription()) \
 _(Details,          "details",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DetailsArgDescription()) \
+_(Digests,          "digests",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DigestsArgDescription()) \
 _(DNS,              "dns",                  NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSArgDescription()) \
 /*_(DNSDomain,        "dns-domain",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSDomainArgDescription())*/ \
 _(DNSOption,        "dns-option",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DNSOptionArgDescription()) \
