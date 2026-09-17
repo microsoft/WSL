@@ -187,6 +187,33 @@ namespace {
         VERIFY_ARE_EQUAL(static_cast<uint8_t>(responseType), response[4]);
     }
 
+    Plan9Server ConnectToOpenedServer()
+    {
+        auto server = ConnectToServer();
+
+        std::vector<uint8_t> payload;
+        AppendU32(payload, 8192);
+        AppendString(payload, "9P2000.L");
+        SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)), Plan9MessageType::Rversion);
+
+        payload.clear();
+        AppendU32(payload, 1);
+        AppendU32(payload, UINT32_MAX);
+        AppendString(payload, "");
+        AppendString(payload, "");
+        AppendU32(payload, 0);
+        SendMessageAndExpectResponse(
+            server.client.get(), MakePlan9Message(Plan9MessageType::Tattach, std::move(payload)), Plan9MessageType::Rattach);
+
+        payload.clear();
+        AppendU32(payload, 1);
+        AppendU32(payload, 0);
+        SendMessageAndExpectResponse(server.client.get(), MakePlan9Message(Plan9MessageType::Tlopen, std::move(payload)), Plan9MessageType::Rlopen);
+
+        return server;
+    }
+
 } // namespace
 
 class Plan9ProtocolTests
@@ -242,40 +269,20 @@ class Plan9ProtocolTests
     }
 
     // Validate that the server rejects client ids that extend past the end of the message.
-    WSL2_TEST_METHOD(GetLockRejectsOversizedClientId)
+    WSL2_TEST_METHOD(GetLockRejectsTruncatedClientId)
     {
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -sf /init /plan9"), 0u);
 
-        auto server = ConnectToServer();
+        auto server = ConnectToOpenedServer();
 
         std::vector<uint8_t> payload;
-        AppendU32(payload, 8192);
-        AppendString(payload, "9P2000.L");
-        SendMessageAndExpectResponse(
-            server.client.get(), MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)), Plan9MessageType::Rversion);
-
-        payload.clear();
-        AppendU32(payload, 1);
-        AppendU32(payload, UINT32_MAX);
-        AppendString(payload, "");
-        AppendString(payload, "");
-        AppendU32(payload, 0);
-        SendMessageAndExpectResponse(
-            server.client.get(), MakePlan9Message(Plan9MessageType::Tattach, std::move(payload)), Plan9MessageType::Rattach);
-
-        payload.clear();
-        AppendU32(payload, 1);
-        AppendU32(payload, 0);
-        SendMessageAndExpectResponse(server.client.get(), MakePlan9Message(Plan9MessageType::Tlopen, std::move(payload)), Plan9MessageType::Rlopen);
-
-        payload.clear();
         AppendU32(payload, 1);
         AppendU8(payload, 0);
         AppendU64(payload, 0);
         AppendU64(payload, 0);
         AppendU32(payload, 0);
-        AppendString(payload, std::string(4096, 'A'));
+        AppendU16(payload, 1);
         SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tgetlock, std::move(payload)));
 
         const auto response = ReceivePlan9Message(server.client.get());

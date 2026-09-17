@@ -649,7 +649,7 @@ inline void TraceLogMessage([[maybe_unused]] gsl::span<const gsl::byte> message)
         auto proc_id = reader.U32();
         text.AddField("proc_id", proc_id);
         const auto client_id = reader.TryString();
-        text.AddField("client_id", client_id.Success && client_id.Result.size() <= 40 ? client_id.Result : "<invalid>");
+        text.AddField("client_id", client_id.Success ? client_id.Result : "<invalid>");
         break;
     }
 
@@ -679,7 +679,7 @@ inline void TraceLogMessage([[maybe_unused]] gsl::span<const gsl::byte> message)
         auto proc_id = reader.U32();
         text.AddField("proc_id", proc_id);
         const auto client_id = reader.TryString();
-        text.AddField("client_id", client_id.Success && client_id.Result.size() <= 40 ? client_id.Result : "<invalid>");
+        text.AddField("client_id", client_id.Success ? client_id.Result : "<invalid>");
         break;
     }
 
@@ -697,7 +697,7 @@ inline void TraceLogMessage([[maybe_unused]] gsl::span<const gsl::byte> message)
         auto proc_id = reader.U32();
         text.AddField("proc_id", proc_id);
         const auto client_id = reader.TryString();
-        text.AddField("client_id", client_id.Success && client_id.Result.size() <= 40 ? client_id.Result : "<invalid>");
+        text.AddField("client_id", client_id.Success ? client_id.Result : "<invalid>");
         break;
     }
 
