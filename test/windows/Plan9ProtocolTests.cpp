@@ -15,14 +15,17 @@ namespace {
         0x00, 0x08, 0x00, '9',  'P',
         '2',  '0',  '0',  '0',  '.',
         'L'};
+
     constexpr std::array<uint8_t, 21> c_versionResponse = {
         0x15, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Rversion),
         0xff, 0xff, 0x00, 0x00, 0x01,
         0x00, 0x08, 0x00, '9',  'P',
         '2',  '0',  '0',  '0',  '.',
         'L'};
+
     constexpr std::array<uint8_t, 11> c_invalidArgumentResponse = {
         0x0b, 0x00, 0x00, 0x00, static_cast<uint8_t>(Plan9MessageType::Rlerror), 0xff, 0xff, EINVAL, 0x00, 0x00, 0x00};
+
     constexpr uint16_t c_plan9Port = 1234;
 
     void AppendU8(std::vector<uint8_t>& buffer, uint8_t value)
@@ -74,6 +77,8 @@ namespace {
         wil::unique_handle process;
         wil::unique_socket client;
         wil::unique_hfile stdinPipe;
+        wil::unique_hfile outputPipe;
+        std::unique_ptr<PartialHandleRead> output;
 
         Plan9Server() = default;
         Plan9Server(Plan9Server&&) = default;
@@ -88,25 +93,40 @@ namespace {
             {
                 VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess::GetExitCode(process.get(), 30000), 0);
             }
+
+            if (output)
+            {
+                output->ExpectClosed();
+                LogInfo("Plan9 logs: %hs", output->GetData().c_str());
+            }
         }
     };
 
     Plan9Server ConnectToServer()
     {
         auto [stdinRead, stdinWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
-        auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        auto [logRead, logWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
         THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdinRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
-        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(writePipe.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(logWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
-        auto commandLine = LxssGenerateWslCommandLine(std::format(L"/plan9 --bind {}", c_plan9Port).c_str());
+        // TRACE_LEVEL_VERBOSE == 5
+        auto commandLine = LxssGenerateWslCommandLine(
+            std::format(L"/plan9 --bind {} --log-file /dev/stderr --log-level {}", c_plan9Port, 5).c_str());
+
         Plan9Server server;
-        server.process = LxsstuStartProcess(commandLine.data(), stdinRead.get(), writePipe.get());
+        server.process = LxsstuStartProcess(commandLine.data(), stdinRead.get(), stdoutWrite.get(), logWrite.get());
         server.stdinPipe = std::move(stdinWrite);
+        server.outputPipe = std::move(logRead);
+        server.output = std::make_unique<PartialHandleRead>(server.outputPipe.get());
         stdinRead.reset();
-        writePipe.reset();
+        stdoutWrite.reset();
+        logWrite.reset();
 
-        PartialHandleRead output{readPipe.get()};
-        output.Expect(std::format("bound port {}\n", c_plan9Port));
+        // Wait for the port to be bound before connecting.
+        PartialHandleRead stdoutReader{stdoutRead.get()};
+        stdoutReader.Expect(std::format("bound port {}\n", c_plan9Port));
 
         SOCKADDR_IN address{};
         address.sin_family = AF_INET;

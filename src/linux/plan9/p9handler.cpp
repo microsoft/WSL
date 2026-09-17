@@ -1245,7 +1245,6 @@ private:
     // Process a Plan 9 message, and write the response to the specified buffer.
     Task<void> ProcessMessage(SpanReader& reader, MessageResponse& response)
     {
-        LogMessage(reader.Span());
         const auto messageSize = reader.U32(); // message size, already validated
         auto messageType = reader.U8();
         const auto messageTag = reader.U16();
@@ -1260,6 +1259,8 @@ private:
         }
         else
         {
+            LogMessage(reader.Span());
+
             try
             {
                 error = co_await HandleMessage(static_cast<MessageType>(messageType), reader, response);
