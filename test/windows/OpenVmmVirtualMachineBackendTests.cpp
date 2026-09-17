@@ -22,6 +22,16 @@ VmCreateRequest CreateRequest()
     return request;
 }
 
+VmCreateRequest CreateRunnableRequest()
+{
+    auto request = CreateRequest();
+    const auto basePath = wsl::windows::common::wslutil::GetBasePath();
+    request.Boot.KernelPath = basePath / L"kernel";
+    request.Boot.InitrdPath = basePath / LXSS_VM_MODE_INITRD_NAME;
+    request.Boot.GuestCommandLine = L"panic=-1";
+    return request;
+}
+
 VmBootDiskRequest CreateDisk(std::wstring Key)
 {
     VmBootDiskRequest disk;
@@ -33,6 +43,27 @@ VmBootDiskRequest CreateDisk(std::wstring Key)
 HRESULT DescribeResult(const VmCreateRequest& Request)
 {
     return wil::ResultFromException([&] { ValidateCreateRequest(Request); });
+}
+
+template <typename Callback>
+HRESULT OperationResult(Callback&& Operation)
+{
+    return wil::ResultFromException(std::forward<Callback>(Operation));
+}
+
+std::uint16_t ReserveTcpPort()
+{
+    wil::unique_socket socket{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !socket);
+
+    SOCKADDR_IN address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
+    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), bind(socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
+
+    int addressLength = sizeof(address);
+    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), getsockname(socket.get(), reinterpret_cast<sockaddr*>(&address), &addressLength) == SOCKET_ERROR);
+    return ntohs(address.sin_port);
 }
 
 } // namespace
@@ -157,13 +188,7 @@ class OpenVmmVirtualMachineBackendTests
     TEST_METHOD(BootsAndTerminates)
     {
         SKIP_TEST_ARM64();
-        auto request = CreateRequest();
-        const auto basePath = wsl::windows::common::wslutil::GetBasePath();
-        request.Boot.KernelPath = basePath / L"kernel";
-        request.Boot.InitrdPath = basePath / LXSS_VM_MODE_INITRD_NAME;
-        request.Boot.GuestCommandLine = L"panic=-1";
-
-        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
         auto terminationEvent = backend->GetTerminationEvent();
         backend->Start();
 
@@ -175,6 +200,114 @@ class OpenVmmVirtualMachineBackendTests
         }
 
         VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(terminationEvent.get(), 30 * 1000));
+    }
+
+    TEST_METHOD(ManagesFileSystemNetworkAndPortResources)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRunnableRequest();
+
+        GUID directoryId{};
+        THROW_IF_FAILED(CoCreateGuid(&directoryId));
+        const auto sharePath =
+            wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) /
+            (L"OpenVmmBackendTest-" + wsl::shared::string::GuidToString<wchar_t>(directoryId, wsl::shared::string::GuidToStringFlags::None));
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(sharePath.c_str(), nullptr));
+        auto removeShareDirectory = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(sharePath.c_str())); });
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        VmFileSystemDeviceRequest fileSystemRequest{{L"test-share", VmVirtioFsLayout::Aggregate}};
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        fileSystemRequest.Transport.Layout = VmVirtioFsLayout::SingleShare;
+        const auto fileSystemDevice = backend->CreateFileSystemDevice(fileSystemRequest);
+        VERIFY_IS_TRUE(IsEqualGUID(request.VmId, fileSystemDevice.Id.Owner.VmId));
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+
+        VmFileSystemShareRequest shareRequest;
+        shareRequest.HostPath = sharePath;
+        shareRequest.Options.MountOptions.emplace(L"unsupported", L"");
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
+        shareRequest.Options.MountOptions.clear();
+        const auto share = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
+        VERIFY_IS_TRUE(IsEqualGUID(request.VmId, share.Id.Owner.VmId));
+        VERIFY_ARE_EQUAL(fileSystemDevice.Id.Value, share.Device.Value);
+        VERIFY_ARE_EQUAL(fileSystemRequest.Transport.Tag, share.GuestAddress.Tag);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
+                             backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
+                         }));
+
+        auto invalidShare = share.Id;
+        THROW_IF_FAILED(CoCreateGuid(&invalidShare.Owner.VmId));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->RemoveFileSystemShare(invalidShare); }));
+        backend->RemoveFileSystemShare(share.Id);
+        const auto replacementShare = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
+        VERIFY_ARE_NOT_EQUAL(share.Id.Value, replacementShare.Id.Value);
+        backend->RemoveFileSystemShare(replacementShare.Id);
+
+        VmNetworkAdapterRequest networkRequest;
+        networkRequest.Tag = L"eth0";
+        networkRequest.Configuration.ClientIpv4.Bytes = {192, 168, 127, 2};
+        networkRequest.Configuration.ClientMac.Bytes = {0x00, 0x15, 0x5d, 0x01, 0x02, 0x03};
+        networkRequest.Configuration.GatewayIpv4.Bytes = {192, 168, 127, 1};
+        networkRequest.Configuration.Netmask.Bytes = {255, 255, 255, 0};
+        const auto network = backend->AddNetworkAdapter(networkRequest);
+        VERIFY_IS_TRUE(IsEqualGUID(request.VmId, network.Id.Owner.VmId));
+        VERIFY_IS_TRUE(network.GuestInstanceId.has_value());
+        VERIFY_ARE_EQUAL(networkRequest.Tag, network.Tag);
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->AddNetworkAdapter(networkRequest); }));
+
+        VmPortBindingRequest bindingRequest;
+        bindingRequest.Listen.Address = VmIpv4Address{{127, 0, 0, 1}};
+        bindingRequest.Listen.Port = ReserveTcpPort();
+        bindingRequest.GuestPort = 80;
+        const auto binding = backend->BindPort(network.Id, bindingRequest);
+        VERIFY_IS_TRUE(IsEqualGUID(request.VmId, binding.Id.Owner.VmId));
+        VERIFY_ARE_EQUAL(network.Id.Value, binding.Device.Value);
+        VERIFY_ARE_EQUAL(bindingRequest.Listen.Port, binding.EffectiveListen.Port);
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->BindPort(network.Id, bindingRequest); }));
+
+        auto dynamicBinding = bindingRequest;
+        dynamicBinding.Listen.Port = 0;
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->BindPort(network.Id, dynamicBinding); }));
+        backend->UnbindPort(binding.Id);
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding.Id); }));
+
+        backend->Terminate();
+    }
+
+    TEST_METHOD(CancelPendingOperationsCancelsGuestAccept)
+    {
+        SKIP_TEST_ARM64();
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto listener = backend->CreateGuestListener({50000});
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateGuestListener(listener.Port); }));
+
+        std::promise<void> acceptStarted;
+        auto started = acceptStarted.get_future();
+        auto accept = std::async(std::launch::async, [&] {
+            acceptStarted.set_value();
+            return OperationResult([&] { backend->AcceptGuestConnection(listener.Id); });
+        });
+        started.get();
+
+        backend->CancelPendingOperations();
+        const auto acceptStatus = accept.wait_for(std::chrono::seconds{30});
+        VERIFY_ARE_EQUAL(std::future_status::ready, acceptStatus);
+        if (acceptStatus != std::future_status::ready)
+        {
+            backend->Terminate();
+        }
+        VERIFY_ARE_EQUAL(E_ABORT, accept.get());
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CloseGuestListener(listener.Id); }));
+        if (acceptStatus == std::future_status::ready)
+        {
+            backend->Terminate();
+        }
     }
 
     TEST_METHOD(CapabilitiesReflectVmServiceProtocol)
