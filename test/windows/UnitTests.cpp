@@ -2348,8 +2348,7 @@ Usage:
 
                 validateWarnings(
                     L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=1.2.3",
-                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:24\r\n", wslConfigPath) +
-                        dnsTunnelingDisabledWarning);
+                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:24\r\n", wslConfigPath));
             }
         }
 
