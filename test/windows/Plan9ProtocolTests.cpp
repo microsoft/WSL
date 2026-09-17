@@ -268,8 +268,29 @@ class Plan9ProtocolTests
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
     }
 
-    // Validate that the server rejects client ids that extend past the end of the message.
-    WSL2_TEST_METHOD(GetLockRejectsTruncatedClientId)
+    // Validate that logging and processing a string that extends past the end of the message returns EINVAL.
+    WSL2_TEST_METHOD(VersionRejectsTruncatedString)
+    {
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -sf /init /plan9"), 0u);
+
+        auto server = ConnectToServer();
+
+        std::vector<uint8_t> payload;
+        AppendU32(payload, 8192);
+        AppendU16(payload, 1);
+        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)));
+
+        auto response = ReceivePlan9Message(server.client.get());
+        VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
+
+        SendAll(server.client.get(), c_versionRequest);
+        response = ReceivePlan9Message(server.client.get());
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+    }
+
+    // Validate that the lock handlers reject client ids that extend past the end of the message.
+    WSL2_TEST_METHOD(LockRequestsRejectTruncatedClientId)
     {
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -sf /init /plan9"), 0u);
@@ -287,6 +308,19 @@ class Plan9ProtocolTests
 
         const auto response = ReceivePlan9Message(server.client.get());
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, response));
+
+        payload.clear();
+        AppendU32(payload, 1);
+        AppendU8(payload, 0);
+        AppendU32(payload, 0);
+        AppendU64(payload, 0);
+        AppendU64(payload, 0);
+        AppendU32(payload, 0);
+        AppendU16(payload, 1);
+        SendAll(server.client.get(), MakePlan9Message(Plan9MessageType::Tlock, std::move(payload)));
+
+        const auto lockResponse = ReceivePlan9Message(server.client.get());
+        VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, lockResponse));
     }
 };
 } // namespace Plan9ProtocolTests
