@@ -1256,7 +1256,6 @@ bool WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
         wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::milliseconds(100), std::chrono::minutes(2), [&]() {
             return wil::ResultFromCaughtException() == E_ABORT;
         });
-
     }
     catch (...)
     {
