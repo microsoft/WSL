@@ -1237,7 +1237,7 @@ std::pair<DWORD, DWORD> GetServiceState(SC_HANDLE service)
     return std::make_pair(status.dwCurrentState, status.dwProcessId);
 }
 
-void WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
+bool WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
 {
     DWORD currentState{};
     DWORD pid{};
@@ -1256,10 +1256,13 @@ void WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
         wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::milliseconds(100), std::chrono::minutes(2), [&]() {
             return wil::ResultFromCaughtException() == E_ABORT;
         });
+
+        return true;
     }
     catch (...)
     {
         LogError("Timed waiting for service to reach state: %lu. Current state: %lu, error: 0x%x", state, currentState, wil::ResultFromCaughtException());
+        return false;
     }
 }
 
@@ -1318,7 +1321,7 @@ Return Value:
         VERIFY_ARE_EQUAL(GetLastError(), ERROR_SERVICE_ALREADY_RUNNING);
     }
 
-    WaitForServiceState(service.get(), SERVICE_RUNNING, 0);
+    VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_RUNNING, 0));
 }
 
 void StopWslService()
