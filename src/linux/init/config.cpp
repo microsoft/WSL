@@ -1603,7 +1603,19 @@ Routine Description:
 
 Arguments:
 
-    Common - Supplies a pointer to the common create process message data.
+    Buffer - Supplies the create process message buffer containing the
+        variable-length environment data.
+
+    EnvironmentOffset - Supplies the offset in Buffer to the Linux environment
+        string array.
+
+    NtEnvironmentOffset - Supplies the offset in Buffer to the Windows
+        environment string array.
+
+    NtPathOffset - Supplies the offset in Buffer to the null-terminated Windows
+        PATH string.
+
+    Config - Supplies the distribution configuration.
 
 Return Value:
 

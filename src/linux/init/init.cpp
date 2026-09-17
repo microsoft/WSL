@@ -936,7 +936,12 @@ Arguments:
 
     Parsed - Supplies a buffer to store the common create process parameters.
 
-    Buffer - Supplies the common create process message data.
+    Buffer - Supplies the complete create process message, including the
+        variable-length data referenced by offsets in Message.
+
+    Message - Supplies the fixed create process message fields and the offsets
+        into Buffer for the filename, current working directory, command line,
+        environment blocks, Windows PATH, and username.
 
     Config - Supplies the distribution configuration.
 
