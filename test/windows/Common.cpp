@@ -1257,13 +1257,13 @@ bool WaitForServiceState(SC_HANDLE service, DWORD state, DWORD previousPid)
             return wil::ResultFromCaughtException() == E_ABORT;
         });
 
-        return true;
     }
     catch (...)
     {
         LogError("Timed waiting for service to reach state: %lu. Current state: %lu, error: 0x%x", state, currentState, wil::ResultFromCaughtException());
-        return false;
     }
+
+    return currentState == state;
 }
 
 void StopService(SC_HANDLE service)
