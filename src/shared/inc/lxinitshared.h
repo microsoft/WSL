@@ -132,7 +132,7 @@ Abstract:
 // Default buffer size for relaying.
 //
 
-#define LX_RELAY_BUFFER_SIZE 0x1000
+#define LX_RELAY_BUFFER_SIZE (65536)
 
 //
 // HVC terminal devices.
