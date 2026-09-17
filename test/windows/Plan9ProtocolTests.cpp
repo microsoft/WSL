@@ -11,7 +11,7 @@ namespace {
     constexpr std::array<uint8_t, 21> c_versionResponse = {0x15, 0x00, 0x00, 0x00, 0x65, 0xff, 0xff, 0x00, 0x00, 0x01, 0x00,
                                                            0x08, 0x00, '9',  'P',  '2',  '0',  '0',  '0',  '.',  'L'};
     constexpr std::array<uint8_t, 11> c_invalidArgumentResponse = {0x0b, 0x00, 0x00, 0x00, 0x07, 0xff, 0xff, EINVAL, 0x00, 0x00, 0x00};
-    constexpr uint16_t c_plan9Port = 54321;
+    constexpr uint16_t c_plan9Port = 1234;
 
     void AppendU8(std::vector<uint8_t>& buffer, uint8_t value)
     {
@@ -74,10 +74,7 @@ namespace {
             stdinPipe.reset();
             if (process)
             {
-                VERIFY_ARE_EQUAL(WaitForSingleObject(process.get(), 30000), WAIT_OBJECT_0);
-                DWORD exitCode{};
-                VERIFY_IS_TRUE(GetExitCodeProcess(process.get(), &exitCode));
-                VERIFY_ARE_EQUAL(exitCode, 0u);
+                VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess::GetExitCode(process.get(), 30000), 0);
             }
         }
     };
