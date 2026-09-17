@@ -103,4 +103,3 @@ CreateLxProcessData LxssCreateProcess::ParseArguments(
 
     return Parsed;
 }
-

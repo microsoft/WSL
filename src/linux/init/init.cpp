@@ -107,11 +107,7 @@ void CreateProcessCommon(PCREATE_PROCESS_PARSED_COMMON Common, int TtyFd, int Se
 CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, const wsl::linux::WslDistributionConfig& Config);
 
 template <typename TMessage>
-int CreateProcessParseCommon(
-    PCREATE_PROCESS_PARSED_COMMON Parsed,
-    gsl::span<gsl::byte> Buffer,
-    const TMessage* Message,
-    const wsl::linux::WslDistributionConfig& Config);
+int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const TMessage* Message, const wsl::linux::WslDistributionConfig& Config);
 
 int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED Parsed, pid_t CreateProcessPid, int MessageFd);
 
@@ -928,11 +924,7 @@ Return Value:
 }
 
 template <typename TMessage>
-int CreateProcessParseCommon(
-    PCREATE_PROCESS_PARSED_COMMON Parsed,
-    gsl::span<gsl::byte> Buffer,
-    const TMessage* Message,
-    const wsl::linux::WslDistributionConfig& Config)
+int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const TMessage* Message, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -1023,8 +1015,8 @@ try
     }
 
     Parsed->CommandLine.emplace_back(nullptr);
-    Parsed->Environment = ConfigCreateEnvironmentBlock(
-        Buffer, Message->EnvironmentOffset, Message->NtEnvironmentOffset, Message->NtPathOffset, Config);
+    Parsed->Environment =
+        ConfigCreateEnvironmentBlock(Buffer, Message->EnvironmentOffset, Message->NtEnvironmentOffset, Message->NtPathOffset, Config);
     Parsed->Filename = wsl::shared::string::FromSpan(Buffer, Message->FilenameOffset);
     Parsed->ShellOptions = static_cast<CREATE_PROCESS_SHELL_OPTIONS>(Message->ShellOptions);
     Parsed->Uid = PasswordEntry ? PasswordEntry->pw_uid : ROOT_UID; // If the default user was not found, fall back to root.
