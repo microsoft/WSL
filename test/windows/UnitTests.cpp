@@ -2254,6 +2254,10 @@ Usage:
         };
 
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
+        const auto dnsTunnelingDisabledWarning =
+            wsl::windows::common::helpers::IsServiceRunning(L"GlobalSecureAccessTunnelingService")
+                ? std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageDnsTunnelingDisabled())
+                : L"";
 
         validateWarnings(L"a=b", std::format(L"wsl: Unknown key 'wsl2.a' in {}:22\r\n", wslConfigPath));
         validateWarnings(L"[=b", std::format(L"wsl: Invalid section name in {}:22\r\n", wslConfigPath));
@@ -2339,12 +2343,13 @@ Usage:
             if (TryLoadDnsResolverMethods())
             {
                 // Verify DNS tunneling settings are parsed correctly
-                validateWarnings(L"[experimental]\ndnsTunneling=true\nbestEffortDnsParsing=true", L"");
-                validateWarnings(L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=10.255.255.1", L"");
+                validateWarnings(L"[experimental]\ndnsTunneling=true\nbestEffortDnsParsing=true", dnsTunnelingDisabledWarning);
+                validateWarnings(L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=10.255.255.1", dnsTunnelingDisabledWarning);
 
                 validateWarnings(
                     L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=1.2.3",
-                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:24\r\n", wslConfigPath));
+                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:24\r\n", wslConfigPath) +
+                        dnsTunnelingDisabledWarning);
             }
         }
 
