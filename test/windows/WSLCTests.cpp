@@ -7164,7 +7164,7 @@ class WSLCTests
 
         wil::unique_cotaskmem_ansistring eventJson;
         HRESULT result;
-        while (SUCCEEDED(result = Stream->GetNext(&eventJson)))
+        while (SUCCEEDED(result = Stream->GetNext(nullptr, &eventJson)))
         {
             events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
         }
@@ -7196,7 +7196,7 @@ class WSLCTests
         wil::unique_cotaskmem_ansistring eventJson;
         for (size_t index = 0; index < Count; ++index)
         {
-            VERIFY_SUCCEEDED(Stream->GetNext(&eventJson));
+            VERIFY_SUCCEEDED(Stream->GetNext(nullptr, &eventJson));
             events.push_back(wsl::shared::FromJson<wsl::windows::common::wslc_schema::Event>(eventJson.get()));
         }
 
