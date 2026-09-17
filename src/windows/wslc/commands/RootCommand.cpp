@@ -44,6 +44,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::CreateCommands() const
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<SystemEventsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExportCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
     commands.push_back(std::make_unique<ImageImportCommand>(FullName()));
