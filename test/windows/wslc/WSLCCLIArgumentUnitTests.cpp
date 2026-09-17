@@ -88,6 +88,21 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(std::wstring{L"Custom description"}, overrides.Description());
     }
 
+    TEST_METHOD(ArgumentMatchesOption_RequiresNameOrAliasSpecifier)
+    {
+        const auto argument = Argument::Create(ArgType::Quiet);
+
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"--quiet=true"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q"));
+        VERIFY_IS_TRUE(argument.MatchesOption(L"-q=true"));
+
+        VERIFY_IS_FALSE(argument.MatchesOption(L"quiet"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"-"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"--"));
+        VERIFY_IS_FALSE(argument.MatchesOption(L"---quiet"));
+    }
+
     // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
     TEST_METHOD(ArgumentCreate_AllArguments)
     {
@@ -412,8 +427,9 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::HealthRetries>(L"3"), 3);
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Last>(L"5"), 5);
 
-        // string -> LONG
+        // string -> LONG (Time and Timeout share the converter)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Time>(L"5"), 5L);
+        VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Timeout>(L"5"), 5L);
 
         // string -> ULONGLONG (Tail is a raw integer; Since/Until go through the timestamp parser)
         VERIFY_ARE_EQUAL(ValidateAndGetCached<ArgType::Tail>(L"10"), 10ULL);

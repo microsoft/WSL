@@ -1730,6 +1730,30 @@ Prenez un moment pour prévisualiser certaines des fonctionnalités préférées
     <value>https://aka.ms/wsldocs</value>
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
+  <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
+    <value>Exécutez facilement des conteneurs Linux sur Windows en tant qu’expérience de premier ordre.
+    
+Vous pouvez utiliser wslc.exe pour générer, exécuter, envoyer (push), extraire et gérer des conteneurs Linux directement sur Windows.
+
+Vous pouvez également utiliser l’API WSLC pour créer des applications Windows dont la logique d’exécution repose sur des conteneurs Linux, ce qui facilite l’intégration directe de conteneurs Linux dans votre application pour des flux de travail du cloud vers le local, des applications d’IA et l’isolation.</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
+    <value>Conteneur WSL</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
+    <value>En savoir plus sur le conteneur WSL</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslc</value>
+    <comment>{Locked}Uri to the WSL container documentation</comment>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
+    <value>Référence API de conteneur WSL</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
+    <value>https://wsl.dev/api-reference/</value>
+    <comment>{Locked}Uri to the WSL container API reference</comment>
+  </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
     <value>Vous pouvez utiliser des applications Linux graphiques avec des interactions Windows natives telles que Alt-Tab, le lancement du menu Démarrer, l'épinglage de la barre des tâches et la prise en charge du copier-coller.</value>
   </data>
@@ -1890,6 +1914,12 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
   </data>
   <data name="Settings_Shell_General.Content" xml:space="preserve">
     <value>Général</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
+    <value>Conteneur WSL</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
+    <value>NOUVEAU</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>Accélération GPU</value>
@@ -2202,6 +2232,10 @@ Utilisation :
     <value>Le conteneur '{}' est introuvable.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerDeleted" xml:space="preserve">
+    <value>Le conteneur '{}' a été supprimé.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Le nom de Mise en réseau ne peut pas être vide.</value>
   </data>
@@ -2212,6 +2246,14 @@ Utilisation :
     <value>Commande non reconnue : '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
+    <value>L’option '{}' n’est pas prise en charge.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
+    <value>'{}' est déconseillé. Utilisez {} à la place.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>Argument requis non fourni : '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2219,6 +2261,10 @@ Utilisation :
   <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
     <value>Option obligatoire non fournie : « {} »</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
+    <value>L’option globale '{}' doit être spécifiée après '{}' et avant '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Affiche l’aide sur la commande sélectionnée</value>
@@ -2232,7 +2278,7 @@ Utilisation :
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Utilisation : {} {}</value>
+    <value>Utilisation :  {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -2240,6 +2286,9 @@ Utilisation :
   </data>
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>options</value>
+  </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>options globales</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Les alias de commande suivants sont disponibles :</value>
@@ -2274,6 +2323,10 @@ Utilisation :
   </data>
   <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
     <value>Options globales :</value>
+  </data>
+  <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
+    <value>Options globales pour '{}':</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
     <value>Alias :</value>
@@ -2378,6 +2431,10 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
     <value>Nom non valide : '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcEventsInvalidTimeWindow" xml:space="preserve">
+    <value>L’heure `since` ({}) ne peut pas être postérieure à l’heure `until` ({})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="`since`"}{Locked="`until`"}</comment>
+  </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Le chemin n’est pas absolu : « {} »</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2453,6 +2510,9 @@ Pour plus d’informations sur la confidentialité de ce produit, veuillez consu
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
     <value>Le réseau '{}' existe déjà.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkPrunePending" xml:space="preserve">
+    <value>Une purge du réseau précédente est toujours en cours de traitement. Réessayez plus tard.</value>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Mode réseau non pris en charge : « {} »</value>
@@ -2635,6 +2695,9 @@ Utilisation : wslc container cp [OPTIONS] SOURCE DEST
     <value>Destination : chemin d’accès local ou CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Masquer l’affichage de la progression pendant la copie</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Format de destination non valide. CONTAINER:PATH attendu</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
@@ -2667,6 +2730,10 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
     <value>Impossible de copier un répertoire vers un chemin d’accès de fichier. Utilisez une cible de répertoire (avec séparateur de fin) à la place.</value>
     <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
+  </data>
+  <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
+    <value>Impossible de remplacer '{0}' car il s’agit d’un type différent de celui de l’entrée copiée.</value>
+    <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspecter un conteneur.</value>
@@ -2713,6 +2780,12 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ContainerRemoveLongDesc" xml:space="preserve">
     <value>Supprime les conteneurs.</value>
   </data>
+  <data name="WSLCCLI_ContainerRestartDesc" xml:space="preserve">
+    <value>Redémarrez les conteneurs.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRestartLongDesc" xml:space="preserve">
+    <value>Redémarre les conteneurs. Les Containers qui ne sont pas en cours d’exécution sont démarrés.</value>
+  </data>
   <data name="WSLCCLI_ContainerRunDesc" xml:space="preserve">
     <value>Exécutez un conteneur.</value>
   </data>
@@ -2742,6 +2815,18 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Signal à envoyer (par défaut : STOPSIGNAL configuré du conteneur, ou SIGTERM si aucun n’est configuré)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
+    <value>Surveiller les événements des conteneurs.</value>
+  </data>
+  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
+    <value>Surveiller les événements en temps réel des conteneurs.</value>
+  </data>
+  <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
+    <value>Afficher tous les événements créés depuis l’horodatage</value>
+  </data>
+  <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
+    <value>Stream d’événements jusqu’à l’horodatage</value>
+  </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Gérer les images.</value>
   </data>
@@ -2768,6 +2853,9 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importe le contenu d’un tarball pour créer une image du système de fichiers. Vous pouvez également étiqueter l’image avec un nom de référentiel et une balise.</value>
   </data>
+  <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
+    <value>Affichez toutes les images (les images intermédiaires sont masquées par défaut).</value>
+  </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Lister les images.</value>
   </data>
@@ -2779,6 +2867,9 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Charge les images.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Masquer l’affichage de la progression pendant le chargement</value>
   </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Extraire les images.</value>
@@ -2816,6 +2907,9 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Chargez une image dans un registre.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Masquer le résultat détaillé</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Supprimé : {}</value>
@@ -2908,6 +3002,39 @@ Exemple : tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
     <value>Commandes de gestion de niveau système.</value>
   </data>
+  <data name="WSLCCLI_SystemInfoDesc" xml:space="preserve">
+    <value>Afficher les informations système.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoLongDesc" xml:space="preserve">
+    <value>Affiche des informations de version pour le client wslc et le service du gestionnaire de sessions, ainsi que la liste des sessions actives.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
+    <value>Client :</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>Version WSL : {}
+Version du noyau : {}
+Version de Direct3D : {}
+Version de DXCore : {}
+Version de Windows : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
+    <value>Serveur :</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoSettingsFile" xml:space="preserve">
+    <value>Fichier de paramètres : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessionManagerVersion" xml:space="preserve">
+    <value>Version du gestionnaire de session : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessions" xml:space="preserve">
+    <value>Sessions : {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Marquer une image.</value>
   </data>
@@ -2987,6 +3114,13 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Affichez tout, quel que soit l’état.</value>
   </data>
+  <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
+    <value>Toutes les étiquettes du référentiel.</value>
+  </data>
+  <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
+    <value>La balise ne peut pas être utilisée avec l’option --all-tags/-a</value>
+    <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
     <value>Mode archive (accepté pour la compatibilité avec l’interface de ligne de commande Docker)</value>
     <comment>{Locked="Docker"}</comment>
@@ -3026,6 +3160,12 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
     <value>Exécutez le conteneur en mode détaché</value>
   </data>
+  <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
+    <value>Affichez des détails supplémentaires pour les journaux</value>
+  </data>
+  <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
+    <value>Afficher les résumés d’image</value>
+  </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Spécifie l’exécutable du processus d’initialisation du conteneur</value>
   </data>
@@ -3045,8 +3185,41 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Filtrer la sortie en fonction des conditions fournies</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Valeur non valide « {} » pour l’option '-f, --filter' : format incorrect du filtre (nom=valeur attendu)</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+    <value>Valeur {} non valide pour l’option '--filter' : format incorrect du filtre (nom attendu=valeur)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
+    <value>Fournir des valeurs de filtre (par exemple, « until=&lt;timestamp&gt; »)</value>
+    <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
+    <value>Fournir des valeurs de filtre (par exemple, « label=&lt;label&gt; »)</value>
+    <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
+    <value>Ne demandez pas de confirmation</value>
+  </data>
+  <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
+    <value>Voulez-vous vraiment continuer ?</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
+    <value>ATTENTION ! Cela supprimera tous les conteneurs arrêtés.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
+    <value>AVERTISSEMENT! Cela supprimera toutes les images non taguées.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
+    <value>AVERTISSEMENT! Cette opération supprimera toutes les images qui n’ont pas au moins un conteneur associé.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
+    <value>AVERTISSEMENT ! Cette opération supprime les volumes locaux anonymes qui ne sont pas utilisés par au moins un conteneur.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
+    <value>AVERTISSEMENT ! Cette opération supprimera tous les volumes locaux non utilisés par au moins un conteneur.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
+    <value>AVERTISSEMENT ! Cette opération supprime tous les réseaux personnalisés qui ne sont pas utilisés par au moins un conteneur.</value>
+  </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Argument non valide "{}" pour l’option '--mount' : {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3139,6 +3312,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Suivre la sortie du journal</value>
+  </data>
+  <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
+    <value>Toujours suivre les liens symboliques dans SRC_PATH</value>
+    <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Mise en forme de sortie (json ou table) (Par défault: table)</value>
@@ -3282,6 +3459,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publier tous les ports exposés sur des ports aléatoires de l’hôte</value>
   </data>
+  <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
+    <value>Télécharger toutes les images marquées dans le référentiel.</value>
+  </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Masquer le résultat détaillé</value>
   </data>
@@ -3289,11 +3469,21 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Utilisation de la balise par défaut : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
+    <value>Envoyer tous les tags d’une image vers le dépôt</value>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Affiche uniquement les ID des conteneurs</value>
   </data>
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Supprimez le conteneur après son arrêt</value>
+  </data>
+  <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
+    <value>Stratégie de redémarrage à appliquer à la fermeture d’un conteneur</value>
+  </data>
+  <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
+    <value>Options en conflit : impossible de spécifier à la fois {} et {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal pour arrêter le conteneur</value>
@@ -3318,6 +3508,16 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Référence d’image actuelle ou existante au format nom_image[ :tag]</value>
   </data>
+  <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
+    <value>Afficher la taille totale des fichiers</value>
+  </data>
+  <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
+    <value>Afficher la taille totale des fichiers si le type est conteneur</value>
+  </data>
+  <data name="WSLCCLI_InspectSizeIgnoredWarning" xml:space="preserve">
+    <value>AVERTISSEMENT : --size ignoré pour {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--size "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Étiquette de l'image construite</value>
   </data>
@@ -3337,7 +3537,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Nouvelle référence d’image au format image-name[:tag]</value>
   </data>
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
-    <value>Délai d’attente en secondes avant l’exécution (par défaut 5)</value>
+    <value>Secondes à attendre avant de tuer le conteneur (par défaut : délai d’expiration d’arrêt configuré du conteneur)</value>
   </data>
   <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
     <value>Ouvrir un TTY avec le processus de conteneur.</value>
@@ -3441,6 +3641,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Valeur {} non valide : {} n’est pas une politique de récupération reconnue. Les politiques de récupération prises en charge sont : {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
+    <value>Valeur {} non valide '{}'. Valeurs attendues : no, always, on-failure[:max-retries], or unless-stopped.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Valeur {} non valide : {} n’est pas un type de progression reconnu. Les types de progression pris en charge sont : {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3525,6 +3729,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
     <value>Restreindre l’accès externe au réseau</value>
+  </data>
+  <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
+    <value>Activer la mise en réseau IPv6</value>
+    <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
     <value>Sous-réseau au format CIDR qui représente un segment réseau</value>
@@ -3696,6 +3904,12 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
     <value>NOM</value>
   </data>
+  <data name="WSLCCLI_TableHeaderNames" xml:space="preserve">
+    <value>NOMS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCommand" xml:space="preserve">
+    <value>COMMANDE</value>
+  </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>IMAGE</value>
   </data>
@@ -3707,6 +3921,9 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
     <value>PORTS</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
+    <value>TAILLE</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>Pourcentage UC</value>
@@ -3725,6 +3942,30 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
+    <value>créé</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateRunning" xml:space="preserve">
+    <value>en cours d’exécution</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateStopped" xml:space="preserve">
+    <value>arrêté</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateExited" xml:space="preserve">
+    <value>quitté</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
+    <value>invalide</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
+    <value>{} (virtuel {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>Il y a moins d’une seconde</value>

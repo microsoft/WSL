@@ -796,8 +796,13 @@ catch (...)
     EMIT_USER_WARNING(Localization::MessageWslcInstallCertsFailed(wslutil::GetErrorString(wil::ResultFromCaughtException())));
 }
 
-void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
+std::vector<std::string> WSLCSession::StreamImageOperation(
+    DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
 {
+    constexpr std::string_view c_digestStatusPrefix = "Digest: ";
+
+    std::vector<std::string> pulledDigests;
+
     auto io = CreateIOContext();
 
     struct Response
@@ -860,6 +865,15 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
             return;
         }
 
+        // A pull reports the digest each tag resolved to on its own status line. This and the
+        // "Pulling from" line are the only per-tag messages both the graphdriver and containerd image
+        // stores emit identically; the trailing "Status:" line is per-pull on one and per-tag on the
+        // other, so it is not usable to enumerate what was pulled.
+        if (parsed.status.starts_with(c_digestStatusPrefix))
+        {
+            pulledDigests.emplace_back(parsed.status.substr(c_digestStatusPrefix.size()));
+        }
+
         if (ProgressCallback != nullptr)
         {
             THROW_IF_FAILED(ProgressCallback->OnProgress(
@@ -905,12 +919,35 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         // Can happen if an error is returned during progress after receiving an OK status.
         THROW_HR_WITH_USER_ERROR(E_FAIL, reportedError.value().c_str());
     }
+
+    return pulledDigests;
 }
 
 void WSLCSession::OnImageCreated(const std::string& ImageNameOrId) noexcept
 try
 {
     LOG_IF_FAILED(m_pluginNotifier->OnImageCreated(InspectImageLockHeld(ImageNameOrId).c_str()));
+}
+CATCH_LOG()
+
+void WSLCSession::OnRepositoryImagesCreated(const wslutil::RepositoryReference& Repository, const std::vector<std::string>& Digests) noexcept
+try
+{
+    // An --all-tags pull names a repository, so the images it created are identified by the digests the
+    // pull itself reported rather than by enumerating the repository afterwards: enumerating observes
+    // whatever the repository holds once the pull has finished, which is both wider than what this pull
+    // created and open to being changed in between. Notifying by digest reference rather than by tag
+    // keeps each notification bound to the artifact that was pulled even if its tags move, and the
+    // inspect payload already carries every tag pointing at it.
+    std::vector<std::string> notified;
+    for (const auto& digest : Digests)
+    {
+        if (std::ranges::find(notified, digest) == notified.end())
+        {
+            notified.emplace_back(digest);
+            OnImageCreated(std::format("{}@{}", Repository.Name, digest));
+        }
+    }
 }
 CATCH_LOG()
 
@@ -921,7 +958,7 @@ try
 }
 CATCH_LOG()
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -931,15 +968,18 @@ try
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError(), AllTags && tagOrDigest.has_value());
+
+    if (!AllTags && !tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
     EnforceRegistryAllowlist(repo);
 
     auto runtime = m_runtime.Acquire();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
-
-    if (!tagOrDigest.has_value())
-    {
-        tagOrDigest = "latest";
-    }
 
     std::optional<std::string> registryAuth;
 
@@ -949,9 +989,17 @@ try
     }
 
     auto requestContext = runtime.Docker().PullImage(repo.Name, tagOrDigest, registryAuth);
-    StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
-    OnImageCreated(Image);
+    const auto pulledDigests = StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
+
+    if (AllTags)
+    {
+        OnRepositoryImagesCreated(repo, pulledDigests);
+    }
+    else
+    {
+        OnImageCreated(Image);
+    }
 
     return S_OK;
 }
@@ -2105,7 +2153,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, BOOL AllTags, IProgressCallback* ProgressCallback, IWarningCallback* WarningCallback)
 try
 {
     WSLCExecutionContext context(this, WarningCallback);
@@ -2116,6 +2164,14 @@ try
     const auto reference = wslutil::ImageReference::Parse(Image);
     const auto& repo = reference.Repository;
     auto tagOrDigest = reference.TagOrDigest();
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_AllTagsWithTagError(), AllTags && tagOrDigest.has_value());
+
+    if (!AllTags && !tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
     EnforceRegistryAllowlist(repo);
 
     auto lock = AcquireLease();
@@ -2628,6 +2684,7 @@ try
     *PortsCount = 0;
 
     bool all = false;
+    bool size = false;
     int limit = -1;
     std::map<std::string, std::vector<std::string>> filters;
 
@@ -2640,6 +2697,7 @@ try
             Options->Flags);
 
         all = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsAll);
+        size = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsSize);
         limit = static_cast<int>(Options->Limit);
 
         filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
@@ -2651,7 +2709,7 @@ try
     std::vector<docker_schema::ContainerInfo> dockerContainers;
     try
     {
-        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters);
+        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters, size);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
 
@@ -2730,6 +2788,8 @@ try
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
+        output[index].SizeRw = dockerContainer.SizeRw;
+        output[index].SizeRootFs = dockerContainer.SizeRootFs;
 
         for (const auto& port : e->GetPorts())
         {
@@ -3684,7 +3744,7 @@ HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return PullImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+    return PullImage(Image, RegistryAuthenticationInformation, FALSE, progress.Get(), warning.Get());
 }
 
 HRESULT WSLCSession::LoadImage(WSLCCompatHandle ImageHandle, IWSLCCompatProgressCallback*, ULONGLONG ContentLength, IWSLCCompatWarningCallback* WarningCallback)
@@ -3792,7 +3852,7 @@ HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInform
     const auto progress = apicompat::Convert(ProgressCallback);
     const auto warning = apicompat::Convert(WarningCallback);
 
-    return PushImage(Image, RegistryAuthenticationInformation, progress.Get(), warning.Get());
+    return PushImage(Image, RegistryAuthenticationInformation, FALSE, progress.Get(), warning.Get());
 }
 
 HRESULT WSLCSession::CreateContainer(const WSLCCompatContainerOptions* Options, IWSLCCompatWarningCallback* WarningCallback, IWSLCCompatContainer** Container)

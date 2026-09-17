@@ -320,6 +320,23 @@ class NetworkTests
         VERIFY_IS_FALSE(makeRoute(AF_INET6, L"::", 128).IsDefault());
     }
 
+    TEST_METHOD(FallbackIpv4Gateway)
+    {
+        const auto getGateway = [](const wchar_t* address, uint8_t prefixLength) {
+            wsl::core::networking::EndpointIpAddress endpoint{};
+            endpoint.Address = wsl::windows::common::string::StringToSockAddrInet(address);
+            endpoint.PrefixLength = prefixLength;
+            return wsl::windows::common::string::SockAddrInetToWstring(wsl::core::networking::GetFallbackIpv4Gateway(endpoint));
+        };
+
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.1", 30), std::wstring(L"198.18.0.2"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.2", 30), std::wstring(L"198.18.0.1"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.0", 31), std::wstring(L"198.18.0.1"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.1", 31), std::wstring(L"198.18.0.0"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.4", 32), std::wstring(L"198.18.0.5"));
+        VERIFY_ARE_EQUAL(getGateway(L"198.18.0.5", 32), std::wstring(L"198.18.0.4"));
+    }
+
     WSL2_TEST_METHOD(RemoveAndAddDefaultRoute)
     {
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
@@ -2342,7 +2359,11 @@ class NetworkTests
                 SOCKADDR_IN addr{};
                 addr.sin_family = AF_INET;
                 addr.sin_port = htons(assignedPort);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+                THROW_HR_IF_MSG(
+                    E_FAIL,
+                    bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR,
+                    "Failed to bind port %u",
+                    assignedPort);
             },
             std::chrono::seconds(1),
             std::chrono::minutes(2)));
@@ -5493,6 +5514,17 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
+        originalRange = wsl::shared::string::Trim(originalRange);
+
+        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&originalRange] {
+            LxsstuLaunchWsl(std::format(L"echo '{}' > /proc/sys/net/ipv4/ip_local_port_range", originalRange));
+        });
+
+        // Keep anonymous guest binds out of the host's ephemeral port range, where an existing host bind
+        // would prevent consomme from forwarding the selected port.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo '1234 1239' > /proc/sys/net/ipv4/ip_local_port_range"), 0);
 
         NetworkTests::VerifyPortZeroBindIsTracked();
 

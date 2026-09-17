@@ -2047,6 +2047,8 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.Name = dockerInspect.Name;
     wslcInspect.Created = dockerInspect.Created;
     wslcInspect.Image = dockerInspect.Image;
+    wslcInspect.SizeRw = dockerInspect.SizeRw;
+    wslcInspect.SizeRootFs = dockerInspect.SizeRootFs;
 
     // Map container state.
     wslcInspect.State.Status = dockerInspect.State.Status;
@@ -2854,21 +2856,21 @@ const std::string& WSLCContainerImpl::ID() const noexcept
     return m_id;
 }
 
-void WSLCContainerImpl::Inspect(LPSTR* Output) const
+void WSLCContainerImpl::Inspect(BOOL Size, LPSTR* Output) const
 {
     auto lock = m_lock.lock_shared();
 
     try
     {
-        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectLockHeld().c_str()).release();
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(InspectLockHeld(!!Size).c_str()).release();
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
-std::string WSLCContainerImpl::InspectLockHeld() const
+std::string WSLCContainerImpl::InspectLockHeld(bool Size) const
 {
     // Get Docker inspect data
-    auto dockerInspect = m_runtime.Docker().InspectContainer(m_id);
+    auto dockerInspect = m_runtime.Docker().InspectContainer(m_id, Size);
 
     // Convert to WSLC schema
     auto wslcInspect = BuildInspectContainer(dockerInspect);
@@ -3303,7 +3305,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCContainer::Inspect(LPSTR* Output)
+HRESULT WSLCContainer::Inspect(BOOL Size, LPSTR* Output)
 try
 {
     WSLCExecutionContext context(&m_session);
@@ -3313,7 +3315,7 @@ try
     *Output = nullptr;
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::Inspect, Output);
+    return CallImpl(&WSLCContainerImpl::Inspect, Size, Output);
 }
 CATCH_RETURN();
 
@@ -3645,5 +3647,12 @@ try
     RETURN_HR_IF_NULL(E_UNEXPECTED, process);
 
     return process.CopyTo(Process);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::Inspect(LPSTR* Output)
+try
+{
+    return Inspect(FALSE, Output);
 }
 CATCH_RETURN();

@@ -1723,6 +1723,30 @@ Ta en stund för att förhandsgranska några av communityns favoritfunktioner el
     <value>https://aka.ms/wsldocs</value>
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
+  <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
+    <value>Kör enkelt Linux-containrar på Windows med en förstklassig upplevelse.
+    
+Du kan använda wslc.exe för att bygga, köra, pusha, hämta och hantera Linux-containrar direkt på Windows.
+
+Du kan också använda WSLC-API:et för att bygga Windows-program vars körlogik drivs av Linux-containrar, vilket gör det enklare att bädda in Linux-containrar direkt i appen för arbetsflöden från moln till lokal miljö, AI-program och isolering.</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
+    <value>WSL-container</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
+    <value>Läs mer om WSL-container</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslc</value>
+    <comment>{Locked}Uri to the WSL container documentation</comment>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
+    <value>API-referens för WSL-container</value>
+  </data>
+  <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
+    <value>https://wsl.dev/api-reference/</value>
+    <comment>{Locked}Uri to the WSL container API reference</comment>
+  </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
     <value>Du kan använda grafiska Linux-program med inbyggda Windows-interaktioner som alt-tab, startmenystart, fästning i aktivitetsfältet och stöd för klipp ut och klistra in.</value>
   </data>
@@ -1883,6 +1907,12 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
   </data>
   <data name="Settings_Shell_General.Content" xml:space="preserve">
     <value>Allmänt</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer.Content" xml:space="preserve">
+    <value>WSL-container</value>
+  </data>
+  <data name="Settings_Shell_WSLContainer_NewBadgeText.Text" xml:space="preserve">
+    <value>NYTT</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
     <value>GPU-acceleration</value>
@@ -2195,6 +2225,10 @@ Användning:
     <value>Containern '{}' hittades inte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerDeleted" xml:space="preserve">
+    <value>Containern {} har tagits bort.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcNetworkNameRequired" xml:space="preserve">
     <value>Nätverksnamnet får inte vara tomt.</value>
   </data>
@@ -2205,6 +2239,14 @@ Användning:
     <value>Okänt kommando: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_UnsupportedOptionError" xml:space="preserve">
+    <value>Alternativet {} stöds inte.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeprecatedArgumentWarning" xml:space="preserve">
+    <value>{} är inaktuell. Använd {} i stället.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
     <value>Obligatoriska argument saknas: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2212,6 +2254,10 @@ Användning:
   <data name="WSLCCLI_RequiredArgumentOptionError" xml:space="preserve">
     <value>Obligatoriskt alternativ har inte angetts: ''{}''</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MisplacedInheritedGlobalOptionError" xml:space="preserve">
+    <value>Globalt alternativ '{}' måste anges efter '{}' och före '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Visar hjälp om det markerade kommandot</value>
@@ -2233,6 +2279,9 @@ Användning:
   </data>
   <data name="WSLCCLI_Options" xml:space="preserve">
     <value>alternativ</value>
+  </data>
+  <data name="WSLCCLI_GlobalOptions" xml:space="preserve">
+    <value>globala alternativ</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>Följande kommandoalias är tillgängliga:</value>
@@ -2267,6 +2316,10 @@ Användning:
   </data>
   <data name="WSLCCLI_HeadingGlobalOptions" xml:space="preserve">
     <value>Globala alternativ:</value>
+  </data>
+  <data name="WSLCCLI_HeadingScopedGlobalOptions" xml:space="preserve">
+    <value>Globala alternativ för {}:</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HeadingAliases" xml:space="preserve">
     <value>Alias:</value>
@@ -2371,6 +2424,10 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <value>Ogiltigt namn: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcEventsInvalidTimeWindow" xml:space="preserve">
+    <value>`since`-tiden ({}) kan inte vara efter `until`-tiden ({})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="`since`"}{Locked="`until`"}</comment>
+  </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Sökvägen är inte absolut: ''{}''</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2446,6 +2503,9 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
     <value>Nätverket '{}' finns redan.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkPrunePending" xml:space="preserve">
+    <value>En tidigare rensning av nätverk bearbetas fortfarande. Försök igen senare.</value>
   </data>
   <data name="MessageWslcInvalidNetworkMode" xml:space="preserve">
     <value>Nätverksläge som inte stöds: '{}'</value>
@@ -2628,6 +2688,9 @@ Användning: wslc container cp [ALTERNATIV] SOURCE DEST
     <value>Destination: lokal sökväg eller CONTAINER:PATH</value>
     <comment>{Locked="CONTAINER:PATH"}</comment>
   </data>
+  <data name="WSLCCLI_CpQuietArgDescription" xml:space="preserve">
+    <value>Utelämna förloppsutdata under kopiering</value>
+  </data>
   <data name="WSLCCLI_CpInvalidTargetError" xml:space="preserve">
     <value>Ogiltigt målformat.
  Förväntat format: CONTAINER:PATH</value>
@@ -2661,6 +2724,10 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_CpSourceIsDirectoryError" xml:space="preserve">
     <value>Det går inte att kopiera en katalog till en filsökväg. Använd ett katalogmål (med avslutande avgränsare) i stället.</value>
     <comment>Shown when the user tries to copy a directory from the container to a file destination.</comment>
+  </data>
+  <data name="WSLCCLI_CpDestinationTypeMismatchError" xml:space="preserve">
+    <value>Det går inte att skriva över {0} eftersom det är en annan typ än den kopierade posten.</value>
+    <comment>{0} is the destination path. Shown when a file would replace a directory, or a directory would replace a file.</comment>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
     <value>Inspektera en container.</value>
@@ -2707,6 +2774,12 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ContainerRemoveLongDesc" xml:space="preserve">
     <value>Tar bort containrar.</value>
   </data>
+  <data name="WSLCCLI_ContainerRestartDesc" xml:space="preserve">
+    <value>Starta om containrar.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRestartLongDesc" xml:space="preserve">
+    <value>Startar om containrar. Containrar som inte körs startas.</value>
+  </data>
   <data name="WSLCCLI_ContainerRunDesc" xml:space="preserve">
     <value>Kör en container.</value>
   </data>
@@ -2736,6 +2809,18 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
     <value>Signal att skicka (standard: containerns konfigurerade STOPSIGNAL eller SIGTERM om ingen har konfigurerats)</value>
     <comment>{Locked="STOPSIGNAL"}{Locked="SIGTERM"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_EventsDesc" xml:space="preserve">
+    <value>Övervaka containerhändelser.</value>
+  </data>
+  <data name="WSLCCLI_EventsLongDesc" xml:space="preserve">
+    <value>Övervaka händelser i realtid från containrar.</value>
+  </data>
+  <data name="WSLCCLI_EventsSinceArgDescription" xml:space="preserve">
+    <value>Visa alla händelser som skapats sedan tidsstämpeln</value>
+  </data>
+  <data name="WSLCCLI_EventsUntilArgDescription" xml:space="preserve">
+    <value>Strömma händelser fram till tidsstämpeln</value>
+  </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
     <value>Hantera bilder.</value>
   </data>
@@ -2762,6 +2847,9 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
     <value>Importerar innehållet i en tarball för att skapa en filsystemsbild. Du kan valfritt tagga avbildningen med en lagringsplats och ett taggnamn.</value>
   </data>
+  <data name="WSLCCLI_ImageListAllArgDescription" xml:space="preserve">
+    <value>Visa alla bilder (standard döljer mellanliggande bilder).</value>
+  </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>Lista bilder.</value>
   </data>
@@ -2773,6 +2861,9 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
     <value>Läser in bilder.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadQuietArgDescription" xml:space="preserve">
+    <value>Utelämna förloppsutdata under inläsning</value>
   </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
     <value>Hämta bilder.</value>
@@ -2810,6 +2901,9 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
     <value>Ladda upp en bild till ett register.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushQuietArgDescription" xml:space="preserve">
+    <value>Dölj utförlig utdata</value>
   </data>
   <data name="WSLCCLI_ImageDeleteDeleted" xml:space="preserve">
     <value>Borttagen: {}</value>
@@ -2902,6 +2996,39 @@ Exempel: tar -cf - files | wslc container cp - CONTAINER:/path</value>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
     <value>Hanteringskommandon på systemnivå.</value>
   </data>
+  <data name="WSLCCLI_SystemInfoDesc" xml:space="preserve">
+    <value>Visa systeminformation.</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoLongDesc" xml:space="preserve">
+    <value>Visar versionsinformation för wslc-klienten och sessionshanterartjänsten, tillsammans med listan över aktiva sessioner.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoClientHeader" xml:space="preserve">
+    <value>Klient:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoVersions" xml:space="preserve">
+    <value>WSL-version: {}
+Kernelversion: {}
+Direct3D-version: {}
+DXCore-version: {}
+Windows-version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoServerHeader" xml:space="preserve">
+    <value>Server:</value>
+  </data>
+  <data name="WSLCCLI_SystemInfoSettingsFile" xml:space="preserve">
+    <value>Inställningsfil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessionManagerVersion" xml:space="preserve">
+    <value>Sessionshanterarens version: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SystemInfoSessions" xml:space="preserve">
+    <value>Sessioner: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Tagga en bild.</value>
   </data>
@@ -2981,6 +3108,13 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Visa alla oavsett status.</value>
   </data>
+  <data name="WSLCCLI_AllTagsArgDescription" xml:space="preserve">
+    <value>Alla taggar på lagringsplatsen.</value>
+  </data>
+  <data name="WSLCCLI_AllTagsWithTagError" xml:space="preserve">
+    <value>tag kan inte användas med --all-tags/-a</value>
+    <comment>{Locked="-a"}{Locked="--all-tags/"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ArchiveArgDescription" xml:space="preserve">
     <value>Arkivläge (stöds för kompatibilitet med Docker CLI)</value>
     <comment>{Locked="Docker"}</comment>
@@ -3020,6 +3154,12 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
     <value>Kör containern i frånkopplat läge</value>
   </data>
+  <data name="WSLCCLI_DetailsArgDescription" xml:space="preserve">
+    <value>Visa extra information för loggar</value>
+  </data>
+  <data name="WSLCCLI_DigestsArgDescription" xml:space="preserve">
+    <value>Visa bildsammandrag</value>
+  </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
     <value>Anger den körbara filen för containerns init-process</value>
   </data>
@@ -3039,8 +3179,41 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Filtrera utdata baserat på angivna villkor</value>
   </data>
   <data name="WSLCCLI_InvalidFilterError" xml:space="preserve">
-    <value>Ogiltigt värde ''{}'' för alternativet ''-f, --filter'': felaktigt filterformat (förväntat name=value)</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>  </data>
+    <value>Ogiltigt värde ''{} för alternativet' --filter': felaktigt format för filtret (förväntat namn=värde)</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--filter'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneFilterArgDescription" xml:space="preserve">
+    <value>Ange filtervärden (t.ex. "until=&lt;timestamp&gt;")</value>
+    <comment>{Locked="until"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumePruneFilterArgDescription" xml:space="preserve">
+    <value>Ange filtervärden (t.ex. "label=&lt;label&gt;")</value>
+    <comment>{Locked="label"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PruneForceArgDescription" xml:space="preserve">
+    <value>Fråga inte efter bekräftelse</value>
+  </data>
+  <data name="WSLCCLI_PruneConfirmPrompt" xml:space="preserve">
+    <value>Vill du fortsätta?</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneConfirm" xml:space="preserve">
+    <value>VARNING! Detta kommer att ta bort alla stoppade containrar.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneConfirm" xml:space="preserve">
+    <value>VARNING! Detta tar bort alla hängande bilder.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllConfirm" xml:space="preserve">
+    <value>VARNING! Detta kommer att ta bort alla bilder som inte har minst en behållare associerad med dem.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneConfirm" xml:space="preserve">
+    <value>VARNING! Detta kommer att ta bort anonyma lokala volymer som inte används av minst en behållare.</value>
+  </data>
+  <data name="WSLCCLI_VolumePruneAllConfirm" xml:space="preserve">
+    <value>VARNING! Alla lokala volymer som inte används av minst en container tas bort.</value>
+  </data>
+  <data name="WSLCCLI_NetworkPruneConfirm" xml:space="preserve">
+    <value>VARNING! Detta tar bort alla anpassade nätverk som inte används av minst en container.</value>
+  </data>
   <data name="WSLCCLI_InvalidMountError" xml:space="preserve">
     <value>Ogiltigt argument {} för alternativet '--mount': {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--mount'"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3133,6 +3306,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Följ loggutdata</value>
+  </data>
+  <data name="WSLCCLI_FollowLinkArgDescription" xml:space="preserve">
+    <value>Följ alltid symboliska länkar i SRC_PATH</value>
+    <comment>{Locked="SRC_PATH"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
     <value>Utdataformat (json eller table) (standard: table)</value>
@@ -3276,6 +3453,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
     <value>Publicera alla exponerade portar till slumpmässiga värdportar</value>
   </data>
+  <data name="WSLCCLI_PullAllTagsArgDescription" xml:space="preserve">
+    <value>Ladda ned alla taggade bilder i lagringsplatsen.</value>
+  </data>
   <data name="WSLCCLI_PullQuietArgDescription" xml:space="preserve">
     <value>Dölj utförlig utdata</value>
   </data>
@@ -3283,11 +3463,21 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Använder standardtagg: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_PushAllTagsArgDescription" xml:space="preserve">
+    <value>Skicka alla taggar för en avbildning till lagringsplatsen</value>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Visar endast container-ID:n</value>
   </data>
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Ta bort containern när den stoppas</value>
+  </data>
+  <data name="WSLCCLI_RestartArgDescription" xml:space="preserve">
+    <value>Omstartspolicy som ska tillämpas när en container avslutas</value>
+  </data>
+  <data name="WSLCCLI_ConflictingOptionsError" xml:space="preserve">
+    <value>Konflikterande alternativ: det går inte att ange både {} och {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
     <value>Signal för att stoppa containern</value>
@@ -3312,6 +3502,16 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuell eller befintlig bildreferens i formatet image-name[:tag]</value>
   </data>
+  <data name="WSLCCLI_SizeArgDescription" xml:space="preserve">
+    <value>Visa totala filstorlekar</value>
+  </data>
+  <data name="WSLCCLI_InspectSizeArgDescription" xml:space="preserve">
+    <value>Visa totalt antal filstorlekar om typen är container</value>
+  </data>
+  <data name="WSLCCLI_InspectSizeIgnoredWarning" xml:space="preserve">
+    <value>VARNING: --size ignoreras för {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--size "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tagg för den byggda bilden</value>
   </data>
@@ -3331,7 +3531,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Ny bildreferens i formatet image-name[:tag]</value>
   </data>
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
-    <value>Väntetid i sekunder innan körning (standard 5)</value>
+    <value>Sekunder att vänta innan containern tvingas avslutas (standard: containerns konfigurerade timeout för stopp)</value>
   </data>
   <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
     <value>Öppna en TTY med containerprocessen.</value>
@@ -3435,6 +3635,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Ogiltigt {}-värde: {} är inte en känd pull-princip. Pull-principer som stöds är: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidRestartPolicyError" xml:space="preserve">
+    <value>Ogiltigt {} värde {}. Förväntade värden är no, always, on-failure[:max-retries] eller unless-stopped.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidProgressTypeError" xml:space="preserve">
     <value>Ogiltigt {}-värde: {} är inte en känd förloppstyp. Förloppstyper som stöds är: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -3519,6 +3723,10 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_NetworkInternalArgDescription" xml:space="preserve">
     <value>Begränsa extern åtkomst till nätverket</value>
+  </data>
+  <data name="WSLCCLI_NetworkIpv6ArgDescription" xml:space="preserve">
+    <value>Aktivera IPv6-nätverk</value>
+    <comment>{Locked="IPv6"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_NetworkSubnetArgDescription" xml:space="preserve">
     <value>Undernät i CIDR format som representerar ett nätverkssegment</value>
@@ -3690,6 +3898,12 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_TableHeaderName" xml:space="preserve">
     <value>NAMN</value>
   </data>
+  <data name="WSLCCLI_TableHeaderNames" xml:space="preserve">
+    <value>NAMN</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderCommand" xml:space="preserve">
+    <value>KOMMANDO</value>
+  </data>
   <data name="WSLCCLI_TableHeaderImage" xml:space="preserve">
     <value>BILD</value>
   </data>
@@ -3701,6 +3915,9 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_TableHeaderPorts" xml:space="preserve">
     <value>PORTAR</value>
+  </data>
+  <data name="WSLCCLI_TableHeaderSize" xml:space="preserve">
+    <value>STORLEK</value>
   </data>
   <data name="WSLCCLI_TableHeaderCpuPercent" xml:space="preserve">
     <value>CPU %</value>
@@ -3719,6 +3936,30 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   </data>
   <data name="WSLCCLI_TableHeaderPids" xml:space="preserve">
     <value>PIDS</value>
+  </data>
+  <data name="WSLCCLI_ContainerStateCreated" xml:space="preserve">
+    <value>skapat</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateRunning" xml:space="preserve">
+    <value>körs</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateStopped" xml:space="preserve">
+    <value>stoppad</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateExited" xml:space="preserve">
+    <value>avslutad</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStateInvalid" xml:space="preserve">
+    <value>ogiltig</value>
+    <comment>Container state shown in the STATUS column of `wslc container list`.</comment>
+  </data>
+  <data name="WSLCCLI_ContainerSizeWithVirtual" xml:space="preserve">
+    <value>{} (virtuell {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The first placeholder is the size of the container writable layer, the second is the total size including the read-only image layers. Shown in the SIZE column of 'wslc container list --size'.</comment>
   </data>
   <data name="WSLCCLI_RelativeTimeLessThanASecond" xml:space="preserve">
     <value>För mindre än en sekund sedan</value>

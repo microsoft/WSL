@@ -385,6 +385,8 @@ typedef struct _WSLCContainerEntry
     WSLCContainerId Id;
     LONGLONG StateChangedAt;
     LONGLONG CreatedAt;
+    LONGLONG SizeRw;
+    LONGLONG SizeRootFs;
     ULONG LocalVolumes;
     WSLCContainerState State;
 } WSLCContainerEntry;
@@ -574,7 +576,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetState([out] WSLCContainerState* State);
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
     HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] const WSLCProcessStartOptions* StartOptions, [out] IWSLCProcess** Process);
-    HRESULT Inspect([out] LPSTR* Output);
+    HRESULT Inspect([in] BOOL Size, [out] LPSTR* Output);
     HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] LONGLONG Since, [in] LONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
@@ -737,7 +739,7 @@ interface IWSLCSession : IUnknown
         [out] IWSLCEventStream** Stream);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in] BOOL AllTags, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT LoadImage([in] WSLCHandle ImageHandle, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [in, unique] IImageLoadCallback* LoadCallback);
     HRESULT ImportImage([in] WSLCHandle ImageHandle, [in, unique] LPCSTR ImageName, [in] ULONGLONG ContentLength, [in, unique] IWarningCallback* WarningCallback, [out] LPSTR* ImageId);
@@ -797,7 +799,7 @@ interface IWSLCSession : IUnknown
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
-    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in] BOOL AllTags, [in, unique] IProgressCallback* ProgressCallback, [in, unique] IWarningCallback* WarningCallback);
     HRESULT PruneVolumes([in, unique, size_is(FiltersCount)] const WSLCFilter* Filters, [in] ULONG FiltersCount, [in, unique] IWarningCallback* WarningCallback, [out, size_is(, *VolumesCount)] WSLCVolumeName** Volumes, [out] ULONG* VolumesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Network management.

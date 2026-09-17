@@ -552,6 +552,44 @@ class WSLCCLITerminalUnitTests
         VERIFY_ARE_EQUAL(expected, result);
     }
 
+    TEST_METHOD(Terminal_Confirm)
+    {
+        // The prompt is written inline on stdout with the standard suffix appended, and nothing
+        // goes to stderr.
+        {
+            InputCaptureTerminal cap{L"y\n"};
+            VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
+            VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
+            VERIFY_ARE_EQUAL(std::wstring{L""}, cap.errPipe.captured());
+        }
+
+        // Only a bare y accepts, in either case and with surrounding whitespace trimmed.
+        for (const auto* answer : {L"y\n", L"Y\n", L"  y  \n"})
+        {
+            InputCaptureTerminal cap{answer};
+            VERIFY_IS_TRUE(cap.terminal.Confirm(L"Remove everything?"));
+        }
+
+        // Anything else declines, including a spelled-out yes, matching the container CLI ecosystem.
+        // A prune with no input attached must abort rather than block, so end of input declines too.
+        for (const auto* answer : {L"yes\n", L"n\n", L"N\n", L"no\n", L"\n", L"maybe\n", L""})
+        {
+            InputCaptureTerminal cap{answer};
+            VERIFY_IS_FALSE(cap.terminal.Confirm(L"Remove everything?"));
+            VERIFY_ARE_EQUAL(std::wstring{L"Remove everything? [y/N] "}, cap.outPipe.captured());
+        }
+
+        // The message is a formatting argument, not a format string, so braces must not be
+        // interpreted.
+        {
+            InputCaptureTerminal cap{L"y\n"};
+            const std::wstring message = L"Remove {} {0} {name} 100%?";
+
+            VERIFY_IS_TRUE(cap.terminal.Confirm(message));
+            VERIFY_ARE_EQUAL(message + L" [y/N] ", cap.outPipe.captured());
+        }
+    }
+
     TEST_METHOD(Terminal_ReadLineMaskDefaultsToUnmasked)
     {
         // ReadLine(bool mask = false): the default reads without masking and returns
