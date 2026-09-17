@@ -132,13 +132,13 @@ class WSLCCLIArgumentUnitTests
             {
             case Kind::Value:
             case Kind::Positional:
-                args.Add(argType, std::wstring(L"test"));
+                args.Add(argType, std::wstring(L"test"), Source::CommandLine);
                 break;
             case Kind::Forward:
-                args.Add(argType, std::vector<std::wstring>{L"forward1", L"forward2"});
+                args.Add(argType, std::vector<std::wstring>{L"forward1", L"forward2"}, Source::CommandLine);
                 break;
             case Kind::Flag:
-                args.Add(argType, true);
+                args.Add(argType, true, Source::CommandLine);
                 break;
             default:
                 VERIFY_FAIL(L"Unhandled ValueType in test");
@@ -242,11 +242,11 @@ class WSLCCLIArgumentUnitTests
         ArgMap argsContainer;
 
         // Verify basic add
-        argsContainer.Add<ArgType::Help>(true);
+        argsContainer.Add<ArgType::Help>(true, Source::CommandLine);
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::Help));
-        argsContainer.Add<ArgType::ContainerId>(std::wstring(L"test"));
+        argsContainer.Add<ArgType::ContainerId>(std::wstring(L"test"), Source::CommandLine);
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ContainerId));
-        argsContainer.Add<ArgType::ForwardArgs>(std::vector<std::wstring>{L"test1", L"test2"});
+        argsContainer.Add<ArgType::ForwardArgs>(std::vector<std::wstring>{L"test1", L"test2"}, Source::CommandLine);
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ForwardArgs));
 
         // Verify basic retrieval
@@ -259,10 +259,13 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(retrievedStringSet[1], std::wstring(L"test2"));
 
         // Verify multimap functionality and Runtime Add
-        argsContainer.Add(ArgType::Publish, std::wstring(L"test1"));
-        argsContainer.Add(ArgType::Publish, std::wstring(L"test2"));
-        argsContainer.Add(ArgType::Publish, std::wstring(L"test3"));
+        argsContainer.Add(ArgType::Publish, std::wstring(L"test1"), Source::Environment);
+        argsContainer.Add(ArgType::Publish, std::wstring(L"test2"), Source::Settings);
+        argsContainer.Add(ArgType::Publish, std::wstring(L"test3"), Source::CommandLine);
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
+        VERIFY_ARE_EQUAL(Source::Environment | Source::Settings | Source::CommandLine, argsContainer.GetSource(ArgType::Publish));
+        VERIFY_IS_TRUE(argsContainer.HasAnySource(ArgType::Publish, Source::Environment | Source::CommandLine));
+        VERIFY_IS_FALSE(argsContainer.HasAnySource(ArgType::Publish, Source::Input));
         auto publishArgs = argsContainer.GetAllValues<ArgType::Publish>();
         VERIFY_ARE_EQUAL(publishArgs.size(), 3);
         VERIFY_ARE_EQUAL(publishArgs[0], std::wstring(L"test1"));
@@ -271,15 +274,17 @@ class WSLCCLIArgumentUnitTests
 
         // Verify Remove
         ArgMap removeArgs;
-        removeArgs.Add<ArgType::Publish>(L"test");
+        removeArgs.Add<ArgType::Publish>(L"test", Source::Input);
         removeArgs.Remove(ArgType::Publish);
         VERIFY_ARE_EQUAL(removeArgs.Count(ArgType::Publish), 0);
+        VERIFY_ARE_EQUAL(Source::None, removeArgs.GetSource(ArgType::Publish));
+        VERIFY_IS_FALSE(removeArgs.HasAnySource(ArgType::Publish, Source::Input));
 
         // Verify compile time add works like runtime add for multimap types.
         ArgMap compileTimeArgs;
-        compileTimeArgs.Add<ArgType::Publish>(L"test1");
-        compileTimeArgs.Add<ArgType::Publish>(L"test2");
-        compileTimeArgs.Add<ArgType::Publish>(L"test3");
+        compileTimeArgs.Add<ArgType::Publish>(L"test1", Source::CommandLine);
+        compileTimeArgs.Add<ArgType::Publish>(L"test2", Source::CommandLine);
+        compileTimeArgs.Add<ArgType::Publish>(L"test3", Source::CommandLine);
         VERIFY_ARE_EQUAL(compileTimeArgs.Count(ArgType::Publish), 3);
         publishArgs = compileTimeArgs.GetAllValues<ArgType::Publish>();
         VERIFY_ARE_EQUAL(publishArgs.size(), 3);
@@ -312,9 +317,9 @@ class WSLCCLIArgumentUnitTests
 
         // Populate raw arguments so the validated-cache invariant (raw count == validated count,
         // enforced by a debug assert in the cache readers) holds when values are read below.
-        args.Add(ArgType::StopTimeout, std::wstring(L"30"));
-        args.Add(ArgType::Filter, std::wstring(L"status=running"));
-        args.Add(ArgType::Filter, std::wstring(L"label=env=prod"));
+        args.Add(ArgType::StopTimeout, std::wstring(L"30"), Source::CommandLine);
+        args.Add(ArgType::Filter, std::wstring(L"status=running"), Source::CommandLine);
+        args.Add(ArgType::Filter, std::wstring(L"label=env=prod"), Source::CommandLine);
 
         // Nothing cached yet.
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::StopTimeout));
@@ -338,14 +343,40 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(filters[1].second, std::string("env=prod"));
 
         // GetAllValidated returns empty when nothing is cached for the argument.
+        VERIFY_ARE_EQUAL(Source::None, args.GetSource(ArgType::Signal));
         auto empty = args.GetAllValues<ArgType::Signal>();
         VERIFY_IS_TRUE(empty.empty());
+        VERIFY_ARE_EQUAL(Source::None, args.GetSource(ArgType::Signal));
 
         // An absent argument resolves to its value type's default-constructed value.
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Memory));
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Memory), static_cast<size_t>(0));
+        VERIFY_ARE_EQUAL(Source::None, args.GetSource(ArgType::Memory));
         VERIFY_ARE_EQUAL(args.GetValue<ArgType::Memory>(), int64_t{});
         VERIFY_IS_FALSE(args.Contains(ArgType::Memory));
+        VERIFY_ARE_EQUAL(Source::Default, args.GetSource(ArgType::Memory));
+        VERIFY_IS_TRUE(args.HasAnySource(ArgType::Memory, Source::Default));
+    }
+
+    TEST_METHOD(ArgMap_SourceRequiresSingleContributor)
+    {
+        ArgMap args;
+
+        VERIFY_THROWS_SPECIFIC(
+            args.Add(ArgType::Name, std::wstring(L"none"), Source::None), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_INVALIDARG;
+            });
+        VERIFY_THROWS_SPECIFIC(
+            args.Add(ArgType::Name, std::wstring(L"multiple"), Source::Environment | Source::CommandLine),
+            wil::ResultException,
+            [](const wil::ResultException& e) { return e.GetErrorCode() == E_INVALIDARG; });
+        VERIFY_THROWS_SPECIFIC(
+            args.Add(ArgType::Name, std::wstring(L"unknown"), static_cast<Source>(0x20)),
+            wil::ResultException,
+            [](const wil::ResultException& e) { return e.GetErrorCode() == E_INVALIDARG; });
+
+        VERIFY_IS_FALSE(args.Contains(ArgType::Name));
+        VERIFY_ARE_EQUAL(Source::None, args.GetSource(ArgType::Name));
     }
 
     // Helper: run validation for a single-value argument and return the converted result (type fixed
@@ -359,12 +390,12 @@ class WSLCCLIArgumentUnitTests
     static auto ValidateAndGetCached(const std::wstring& raw)
     {
         ArgMap eager;
-        eager.Add(E, std::wstring(raw));
+        eager.Add(E, std::wstring(raw), Source::CommandLine);
         Argument::Create(E).Validate(eager);
         VERIFY_IS_TRUE(eager.ContainsValidated(E));
 
         ArgMap onDemand;
-        onDemand.Add(E, std::wstring(raw));
+        onDemand.Add(E, std::wstring(raw), Source::CommandLine);
         VERIFY_IS_FALSE(onDemand.ContainsValidated(E)); // no validation pass ran
         auto value = onDemand.GetValue<E>();            // triggers on-demand validation
         VERIFY_IS_TRUE(onDemand.ContainsValidated(E));
@@ -381,7 +412,7 @@ class WSLCCLIArgumentUnitTests
         ArgMap eager;
         for (const auto& raw : raws)
         {
-            eager.Add(E, std::wstring(raw));
+            eager.Add(E, std::wstring(raw), Source::CommandLine);
         }
 
         Argument::Create(E).Validate(eager);
@@ -393,7 +424,7 @@ class WSLCCLIArgumentUnitTests
         ArgMap onDemand;
         for (const auto& raw : raws)
         {
-            onDemand.Add(E, std::wstring(raw));
+            onDemand.Add(E, std::wstring(raw), Source::CommandLine);
         }
 
         VERIFY_IS_FALSE(onDemand.ContainsValidated(E)); // no validation pass ran
@@ -473,8 +504,8 @@ class WSLCCLIArgumentUnitTests
         // string -> pair<key, value> (filter). A single Validate call caches every raw value in order.
         {
             ArgMap args;
-            args.Add(ArgType::Filter, std::wstring(L"status=running"));
-            args.Add(ArgType::Filter, std::wstring(L"label=env=prod")); // split on first '='
+            args.Add(ArgType::Filter, std::wstring(L"status=running"), Source::CommandLine);
+            args.Add(ArgType::Filter, std::wstring(L"label=env=prod"), Source::CommandLine); // split on first '='
             Argument::Create(ArgType::Filter).Validate(args);
             auto filters = args.GetAllValues<ArgType::Filter>();
             VERIFY_ARE_EQUAL(filters.size(), static_cast<size_t>(2));
@@ -605,7 +636,7 @@ class WSLCCLIArgumentUnitTests
         for (const auto& c : cases)
         {
             ArgMap args;
-            args.Add(c.Type, std::wstring(c.Value));
+            args.Add(c.Type, std::wstring(c.Value), Source::CommandLine);
             Argument::Create(c.Type).Validate(args);
             VERIFY_IS_FALSE(args.ContainsValidated(c.Type));
         }
@@ -613,7 +644,7 @@ class WSLCCLIArgumentUnitTests
         // NoHealthcheck is a flag whose validation only rejects conflicting health options. With
         // no conflicts present it passes and caches nothing.
         ArgMap noHealthcheck;
-        noHealthcheck.Add(ArgType::NoHealthcheck, true);
+        noHealthcheck.Add(ArgType::NoHealthcheck, true, Source::CommandLine);
         Argument::Create(ArgType::NoHealthcheck).Validate(noHealthcheck);
         VERIFY_IS_FALSE(noHealthcheck.ContainsValidated(ArgType::NoHealthcheck));
     }
@@ -622,7 +653,7 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ArgumentValidate_InvalidValueThrowsAndCachesNothing)
     {
         ArgMap args;
-        args.Add(ArgType::Format, std::wstring(L"xml"));
+        args.Add(ArgType::Format, std::wstring(L"xml"), Source::CommandLine);
         VERIFY_THROWS(Argument::Create(ArgType::Format).Validate(args), ArgumentException);
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
     }
@@ -642,7 +673,7 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ArgumentValidate_OnDemandInvalidValueThrows)
     {
         ArgMap args;
-        args.Add(ArgType::Format, std::wstring(L"xml")); // not a valid FormatType
+        args.Add(ArgType::Format, std::wstring(L"xml"), Source::CommandLine); // not a valid FormatType
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
         VERIFY_THROWS(args.GetValue<ArgType::Format>(), ArgumentException);
         VERIFY_IS_FALSE(args.ContainsValidated(ArgType::Format));
@@ -653,13 +684,14 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ArgumentValidate_PostValidationAddBeforeReadRevalidates)
     {
         ArgMap args;
-        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
+        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"), Source::Environment);
         Argument::Create(ArgType::Signal).Validate(args);
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(1));
 
         // Add a second raw value before the first read. The map-action callback drops the cache.
-        args.Add(ArgType::Signal, std::wstring(L"SIGKILL"));
+        args.Add(ArgType::Signal, std::wstring(L"SIGKILL"), Source::CommandLine);
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(0));
+        VERIFY_ARE_EQUAL(Source::Environment | Source::CommandLine, args.GetSource(ArgType::Signal));
 
         // The first read re-validates both raw values on demand, in insertion order.
         auto signals = args.GetAllValues<ArgType::Signal>();
@@ -674,20 +706,20 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ArgumentValidate_OnDemandArgIsChecked)
     {
         ArgMap labels;
-        labels.Add(ArgType::BuildLabel, std::wstring(L"foo"));
-        labels.Add(ArgType::BuildLabel, std::wstring(L"foo="));
+        labels.Add(ArgType::BuildLabel, std::wstring(L"foo"), Source::CommandLine);
+        labels.Add(ArgType::BuildLabel, std::wstring(L"foo="), Source::CommandLine);
         auto labelValues = labels.GetAllValues<ArgType::BuildLabel>();
         VERIFY_ARE_EQUAL(labelValues.size(), static_cast<size_t>(2));
         VERIFY_ARE_EQUAL(labelValues[0], std::wstring(L"foo"));
         VERIFY_ARE_EQUAL(labelValues[1], std::wstring(L"foo="));
 
         ArgMap invalidLabel;
-        invalidLabel.Add(ArgType::BuildLabel, std::wstring(L"=value"));
+        invalidLabel.Add(ArgType::BuildLabel, std::wstring(L"=value"), Source::CommandLine);
         VERIFY_THROWS(invalidLabel.GetAllValues<ArgType::BuildLabel>(), wil::ResultException);
 
         // Valid value, no prior validation pass: the read validates and converts on demand.
         ArgMap valid;
-        valid.Add(ArgType::Network, std::wstring(L"name=custom,alias=web"));
+        valid.Add(ArgType::Network, std::wstring(L"name=custom,alias=web"), Source::CommandLine);
         auto networks = valid.GetAllValues<ArgType::Network>();
         VERIFY_ARE_EQUAL(networks.size(), static_cast<size_t>(1));
         VERIFY_ARE_EQUAL(networks[0].Name, std::string("custom"));
@@ -697,22 +729,22 @@ class WSLCCLIArgumentUnitTests
         // Invalid value, no prior validation pass: the read validates on demand and throws, matching
         // the failure the up-front pass raises for the same value.
         ArgMap invalid;
-        invalid.Add(ArgType::Network, std::wstring(L"host"));
+        invalid.Add(ArgType::Network, std::wstring(L"host"), Source::CommandLine);
         VERIFY_THROWS(invalid.GetAllValues<ArgType::Network>(), ExecutionException);
 
         // Valid up-front, then an unsupported value added before the first read: the map-action
         // callback clears the validated record, so the read re-validates on demand and throws.
         ArgMap added;
-        added.Add(ArgType::Network, std::wstring(L"bridge"));
+        added.Add(ArgType::Network, std::wstring(L"bridge"), Source::Environment);
         Argument::Create(ArgType::Network).Validate(added);
-        added.Add(ArgType::Network, std::wstring(L"host"));
+        added.Add(ArgType::Network, std::wstring(L"host"), Source::CommandLine);
         VERIFY_THROWS(added.GetAllValues<ArgType::Network>(), ExecutionException);
     }
 
     TEST_METHOD(ArgumentValidate_ReadMakesArgumentImmutable)
     {
         ArgMap args;
-        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"));
+        args.Add(ArgType::Signal, std::wstring(L"SIGTERM"), Source::CommandLine);
         VERIFY_ARE_EQUAL(args.GetValue<ArgType::Signal>(), WSLCSignalSIGTERM);
         VERIFY_ARE_EQUAL(args.CountValidated(ArgType::Signal), static_cast<size_t>(1));
 
@@ -726,13 +758,14 @@ class WSLCCLIArgumentUnitTests
             });
         };
 
-        verifyImmutableFailure([&] { args.Add(ArgType::Signal, std::wstring(L"SIGKILL")); });
+        verifyImmutableFailure([&] { args.Add(ArgType::Signal, std::wstring(L"SIGKILL"), Source::Environment); });
+        VERIFY_ARE_EQUAL(Source::CommandLine, args.GetSource(ArgType::Signal));
         verifyImmutableFailure([&] { args.Remove(ArgType::Signal); });
         verifyImmutableFailure([&] { args.InvalidateValidated(ArgType::Signal); });
         verifyImmutableFailure([&] { args.AddValidated<ArgType::Signal>(WSLCSignalSIGKILL); });
 
         // Immutability is per argument; other arguments remain writable until they are read.
-        args.Add(ArgType::StopTimeout, std::wstring(L"30"));
+        args.Add(ArgType::StopTimeout, std::wstring(L"30"), Source::CommandLine);
         VERIFY_ARE_EQUAL(args.GetValue<ArgType::StopTimeout>(), 30);
     }
 
@@ -746,14 +779,19 @@ class WSLCCLIArgumentUnitTests
 
         ArgMap absent;
         VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>());
+        VERIFY_ARE_EQUAL(Source::Default, absent.GetSource(ArgType::Quiet));
         VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>(true));
         VERIFY_IS_FALSE(absent.GetValue<ArgType::Quiet>());
         VERIFY_IS_FALSE(absent.Contains(ArgType::Quiet));
-        verifyImmutableFailure([&] { absent.Add(ArgType::Quiet, true); });
+        verifyImmutableFailure([&] { absent.Add(ArgType::Quiet, true, Source::CommandLine); });
+
+        ArgMap callerDefault;
+        VERIFY_ARE_EQUAL(int64_t{42}, callerDefault.GetValue<ArgType::Memory>(42));
+        VERIFY_ARE_EQUAL(Source::Default, callerDefault.GetSource(ArgType::Memory));
 
         ArgMap present;
-        present.Add(ArgType::NoHealthcheck, true);
-        present.Add(ArgType::HealthCmd, std::wstring(L"CMD echo healthy"));
+        present.Add(ArgType::NoHealthcheck, true, Source::CommandLine);
+        present.Add(ArgType::HealthCmd, std::wstring(L"CMD echo healthy"), Source::CommandLine);
         VERIFY_THROWS(present.GetValue<ArgType::NoHealthcheck>(), ArgumentException);
 
         // A failed read does not freeze the argument, so correcting the conflicting input permits
