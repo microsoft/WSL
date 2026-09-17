@@ -6476,6 +6476,15 @@ class WSLCTests
             options.Flags = WSLCContainerFlagsNone;
             options.InitProcessOptions.Flags = static_cast<WSLCProcessFlags>(0x4);
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
+
+            // Invalid restart policy values and retry counts are rejected at the service boundary.
+            options.InitProcessOptions.Flags = WSLCProcessFlagsNone;
+            options.RestartPolicy = static_cast<WSLCContainerRestartPolicy>(100);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
+
+            options.RestartPolicy = WSLCContainerRestartPolicyAlways;
+            options.RestartMaximumRetryCount = 1;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateContainer(&options, nullptr, &container));
         }
 
         // Validate that env is correctly wired.
@@ -7170,7 +7179,7 @@ class WSLCTests
             {},
             "host",
             WSLCProcessFlagsStdin);
-        launcher.SetRestartPolicy("on-failure", 1);
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 1);
 
         auto container = launcher.Launch(*m_defaultSession);
         auto firstProcess = container.GetInitProcess();
@@ -7195,7 +7204,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerManualStopSuppressesPolicyRestart)
     {
         WSLCContainerLauncher launcher("debian:latest", "test-policy-manual-stop", {"/bin/sh", "-c", "exec tail -f /dev/null"});
-        launcher.SetRestartPolicy("always", 0);
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways, 0);
 
         auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
         VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
@@ -11764,12 +11773,12 @@ class WSLCTests
             auto session = CreateSession(GetDefaultSessionSettings(L"restart-policy-recovery-test", true));
 
             WSLCContainerLauncher alwaysLauncher("debian:latest", c_alwaysName, {"/bin/sleep", "9999"});
-            alwaysLauncher.SetRestartPolicy("always", 0);
+            alwaysLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways, 0);
             auto alwaysContainer = alwaysLauncher.Launch(*session, WSLCContainerStartFlagsNone);
             alwaysContainer.SetDeleteOnClose(false);
 
             WSLCContainerLauncher unlessStoppedLauncher("debian:latest", c_unlessStoppedName, {"/bin/sleep", "9999"});
-            unlessStoppedLauncher.SetRestartPolicy("unless-stopped", 0);
+            unlessStoppedLauncher.SetRestartPolicy(WSLCContainerRestartPolicyUnlessStopped, 0);
             auto unlessStoppedContainer = unlessStoppedLauncher.Launch(*session, WSLCContainerStartFlagsNone);
             unlessStoppedContainer.SetDeleteOnClose(false);
 
@@ -11814,7 +11823,7 @@ class WSLCTests
 
             WSLCContainerLauncher launcher(
                 "debian:latest", c_containerName, {"/bin/sh", "-c", "echo run >> /data/runs.txt; exit 1"});
-            launcher.SetRestartPolicy("on-failure", 1);
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 1);
             launcher.AddVolume(hostFolder.wstring(), "/data", false);
             auto container = launcher.Launch(*session, WSLCContainerStartFlagsNone);
             container.SetDeleteOnClose(false);

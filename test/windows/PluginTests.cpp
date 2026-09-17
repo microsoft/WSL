@@ -861,7 +861,7 @@ class PluginTests
                 {},
                 "host",
                 WSLCProcessFlagsStdin);
-            launcher.SetRestartPolicy("on-failure", 1);
+            launcher.SetRestartPolicy(WSLCContainerRestartPolicyOnFailure, 1);
 
             auto container = launcher.Launch(*session);
             auto firstProcess = container.GetInitProcess();

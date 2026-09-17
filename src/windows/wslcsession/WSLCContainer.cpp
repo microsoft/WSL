@@ -46,6 +46,7 @@ using wsl::windows::service::wslc::IORelay;
 using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::NetworkEntry;
 using wsl::windows::service::wslc::RelayedProcessIO;
+using wsl::windows::service::wslc::RestartPolicyName;
 using wsl::windows::service::wslc::ServiceProcessLauncher;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::unique_com_disconnect;
@@ -55,7 +56,7 @@ using wsl::windows::service::wslc::WSLCContainerImpl;
 using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataLabel;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
-using wsl::windows::service::wslc::WSLCContainerRestartPolicy;
+using wsl::windows::service::wslc::WSLCContainerRestartPolicyConfig;
 using wsl::windows::service::wslc::WSLCContainerRestartState;
 using wsl::windows::service::wslc::WSLCContainerRestartStateV1;
 using wsl::windows::service::wslc::WSLCExecutionContext;
@@ -88,13 +89,16 @@ void ValidateStopTimeout(LONG TimeoutSeconds, bool allowDefault)
         TimeoutSeconds < 0 && TimeoutSeconds != WSLC_STOP_TIMEOUT_NONE && (!allowDefault || TimeoutSeconds != WSLC_STOP_TIMEOUT_DEFAULT));
 }
 
-void ValidateRestartPolicy(std::string_view name, std::int64_t maximumRetryCount)
+void ValidateRestartPolicy(WSLCContainerRestartPolicy policy, std::int64_t maximumRetryCount)
 {
-    const bool validName = name.empty() || name == "no" || name == "always" || name == "on-failure" || name == "unless-stopped";
-    THROW_HR_IF_MSG(E_INVALIDARG, !validName, "Invalid container restart policy: %.*hs", static_cast<int>(name.size()), name.data());
+    const bool validPolicy = policy == WSLCContainerRestartPolicyNone || policy == WSLCContainerRestartPolicyAlways ||
+                             policy == WSLCContainerRestartPolicyOnFailure || policy == WSLCContainerRestartPolicyUnlessStopped;
+    THROW_HR_IF_MSG(E_INVALIDARG, !validPolicy, "Invalid container restart policy: %i", static_cast<int>(policy));
     THROW_HR_IF_MSG(E_INVALIDARG, maximumRetryCount < 0, "Restart maximum retry count cannot be negative");
     THROW_HR_IF_MSG(
-        E_INVALIDARG, name != "on-failure" && maximumRetryCount != 0, "Restart maximum retry count is only valid for on-failure");
+        E_INVALIDARG,
+        policy != WSLCContainerRestartPolicyOnFailure && maximumRetryCount != 0,
+        "Restart maximum retry count is only valid for on-failure");
 }
 
 std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
@@ -965,7 +969,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::vector<std::string>&& namedVolumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
-    WSLCContainerRestartPolicy restartPolicy,
+    WSLCContainerRestartPolicyConfig restartPolicy,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
     EventStore& eventStore,
     WSLCContainerState InitialState,
@@ -1572,7 +1576,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
                 ResolvePolicyRestartLockHeld(false);
                 CommitState(WslcContainerStateDeleted, eventTime);
                 comWrapper = ReleaseResources();
-                removeRestartState = !m_restartPolicy.Name.empty() && m_restartPolicy.Name != "no";
+                removeRestartState = m_restartPolicy.Name != WSLCContainerRestartPolicyNone;
             }
 
             // Signal init exit after the state transition and resource cleanup so awaiters observe Deleted.
@@ -2013,7 +2017,7 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::ShouldRestartForP
     constexpr auto c_initialRestartDelay = 100ms;
     constexpr auto c_maxRestartDelay = 60000ms;
 
-    if (m_restartPolicy.Name.empty() || m_restartPolicy.Name == "no")
+    if (m_restartPolicy.Name == WSLCContainerRestartPolicyNone)
     {
         return false;
     }
@@ -2025,8 +2029,9 @@ __requires_exclusive_lock_held(m_lock) bool WSLCContainerImpl::ShouldRestartForP
 
     m_policyRestartDelay = m_policyRestartDelay == 0ms ? c_initialRestartDelay : std::min(m_policyRestartDelay * 2, c_maxRestartDelay);
 
-    bool restart = m_restartPolicy.Name == "always" || (m_restartPolicy.Name == "unless-stopped" && !hasBeenManuallyStopped);
-    if (m_restartPolicy.Name == "on-failure")
+    bool restart = m_restartPolicy.Name == WSLCContainerRestartPolicyAlways ||
+                   (m_restartPolicy.Name == WSLCContainerRestartPolicyUnlessStopped && !hasBeenManuallyStopped);
+    if (m_restartPolicy.Name == WSLCContainerRestartPolicyOnFailure)
     {
         restart = exitCode != 0 && (m_restartPolicy.MaximumRetryCount == 0 || m_policyRestartCount < m_restartPolicy.MaximumRetryCount);
     }
@@ -2068,7 +2073,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ArmPolicyRestartL
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::PersistRestartStateLockHeld()
 {
-    if (m_restartPolicy.Name.empty() || m_restartPolicy.Name == "no")
+    if (m_restartPolicy.Name == WSLCContainerRestartPolicyNone)
     {
         return;
     }
@@ -2868,7 +2873,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     wslcInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
     wslcInspect.HostConfig.Memory = dockerInspect.HostConfig.Memory;
     wslcInspect.HostConfig.NanoCpus = dockerInspect.HostConfig.NanoCpus;
-    wslcInspect.HostConfig.RestartPolicy.Name = m_restartPolicy.Name;
+    wslcInspect.HostConfig.RestartPolicy.Name = RestartPolicyName(m_restartPolicy.Name);
     wslcInspect.HostConfig.RestartPolicy.MaximumRetryCount = m_restartPolicy.MaximumRetryCount;
 
     if (dockerInspect.HostConfig.Ulimits.has_value())
@@ -3077,19 +3082,15 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.StopTimeout = static_cast<int>(containerOptions.StopTimeout);
     }
 
-    WSLCContainerRestartPolicy restartPolicy;
-    if (containerOptions.RestartPolicy != nullptr)
-    {
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"),
-            WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsRm) && containerOptions.RestartPolicy[0] != '\0' &&
-                std::string_view{containerOptions.RestartPolicy} != "no");
-
-        ValidateRestartPolicy(containerOptions.RestartPolicy, containerOptions.RestartMaximumRetryCount);
-        restartPolicy.Name = containerOptions.RestartPolicy[0] == '\0' ? "no" : containerOptions.RestartPolicy;
-        restartPolicy.MaximumRetryCount = containerOptions.RestartMaximumRetryCount;
-    }
+    WSLCContainerRestartPolicyConfig restartPolicy{
+        .Name = containerOptions.RestartPolicy,
+        .MaximumRetryCount = containerOptions.RestartMaximumRetryCount,
+    };
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"),
+        WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsRm) && restartPolicy.Name != WSLCContainerRestartPolicyNone);
+    ValidateRestartPolicy(restartPolicy.Name, restartPolicy.MaximumRetryCount);
 
     if (containerOptions.InitProcessOptions.CurrentDirectory != nullptr)
     {
@@ -3563,7 +3564,7 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     ValidateRestartPolicy(metadata.RestartPolicy.Name, metadata.RestartPolicy.MaximumRetryCount);
-    const auto restartState = metadata.RestartPolicy.Name.empty() || metadata.RestartPolicy.Name == "no"
+    const auto restartState = metadata.RestartPolicy.Name == WSLCContainerRestartPolicyNone
                                   ? WSLCContainerRestartStateV1{}
                                   : ReadContainerRestartState(virtualMachine, dockerContainer.Id);
     auto labels = StripInternalLabels(dockerContainer.Labels);

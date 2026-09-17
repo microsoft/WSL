@@ -197,19 +197,19 @@ class WSLCCLIArgumentUnitTests
 
         // Verify container restart policy.
         auto restartPolicy = validation::GetRestartPolicyFromString(L"");
-        VERIFY_ARE_EQUAL(std::string("no"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNone, restartPolicy.Policy);
         VERIFY_ARE_EQUAL(0LL, restartPolicy.MaximumRetryCount);
 
         restartPolicy = validation::GetRestartPolicyFromString(L"always");
-        VERIFY_ARE_EQUAL(std::string("always"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyAlways, restartPolicy.Policy);
         VERIFY_ARE_EQUAL(0LL, restartPolicy.MaximumRetryCount);
 
         restartPolicy = validation::GetRestartPolicyFromString(L"on-failure:3");
-        VERIFY_ARE_EQUAL(std::string("on-failure"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyOnFailure, restartPolicy.Policy);
         VERIFY_ARE_EQUAL(3LL, restartPolicy.MaximumRetryCount);
 
         restartPolicy = validation::GetRestartPolicyFromString(L"unless-stopped");
-        VERIFY_ARE_EQUAL(std::string("unless-stopped"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyUnlessStopped, restartPolicy.Policy);
         VERIFY_ARE_EQUAL(0LL, restartPolicy.MaximumRetryCount);
 
         VERIFY_NO_THROW(validation::GetRestartPolicyFromString(L"on-failure"));
@@ -434,7 +434,7 @@ class WSLCCLIArgumentUnitTests
 
         // string -> RestartPolicy
         const auto restartPolicy = ValidateAndGetCached<ArgType::Restart>(L"on-failure:5");
-        VERIFY_ARE_EQUAL(std::string("on-failure"), restartPolicy.Name);
+        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyOnFailure, restartPolicy.Policy);
         VERIFY_ARE_EQUAL(5LL, restartPolicy.MaximumRetryCount);
 
         // string -> WSLCSignal (Signal and StopSignal share the converter)

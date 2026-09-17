@@ -52,13 +52,64 @@ struct WSLCVolumeMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly, SourceFilename, CreateSourceIfMissing);
 };
 
-struct WSLCContainerRestartPolicy
+inline std::string_view RestartPolicyName(WSLCContainerRestartPolicy policy) noexcept
 {
-    std::string Name{"no"};
-    std::int64_t MaximumRetryCount{};
+    switch (policy)
+    {
+    case WSLCContainerRestartPolicyNone:
+        return "no";
+    case WSLCContainerRestartPolicyAlways:
+        return "always";
+    case WSLCContainerRestartPolicyOnFailure:
+        return "on-failure";
+    case WSLCContainerRestartPolicyUnlessStopped:
+        return "unless-stopped";
+    default:
+        return {};
+    }
+}
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerRestartPolicy, Name, MaximumRetryCount);
+inline WSLCContainerRestartPolicy RestartPolicyFromName(std::string_view name) noexcept
+{
+    if (name == "no")
+    {
+        return WSLCContainerRestartPolicyNone;
+    }
+    if (name == "always")
+    {
+        return WSLCContainerRestartPolicyAlways;
+    }
+    if (name == "on-failure")
+    {
+        return WSLCContainerRestartPolicyOnFailure;
+    }
+    if (name == "unless-stopped")
+    {
+        return WSLCContainerRestartPolicyUnlessStopped;
+    }
+
+    return WSLCContainerRestartPolicyInvalid;
+}
+
+struct WSLCContainerRestartPolicyConfig
+{
+    WSLCContainerRestartPolicy Name{WSLCContainerRestartPolicyNone};
+    std::int64_t MaximumRetryCount{};
 };
+
+inline void to_json(nlohmann::json& json, const WSLCContainerRestartPolicyConfig& policy)
+{
+    json = {
+        {"Name", std::string{RestartPolicyName(policy.Name)}},
+        {"MaximumRetryCount", policy.MaximumRetryCount},
+    };
+}
+
+inline void from_json(const nlohmann::json& json, WSLCContainerRestartPolicyConfig& policy)
+{
+    policy.Name = RestartPolicyFromName(json.value("Name", std::string{"no"}));
+    policy.MaximumRetryCount = json.value("MaximumRetryCount", std::int64_t{});
+}
 
 struct WSLCContainerMetadataV1
 {
@@ -66,7 +117,7 @@ struct WSLCContainerMetadataV1
     WSLCProcessFlags InitProcessFlags{WSLCProcessFlagsNone};
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
-    WSLCContainerRestartPolicy RestartPolicy;
+    WSLCContainerRestartPolicyConfig RestartPolicy;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes, RestartPolicy);
 };

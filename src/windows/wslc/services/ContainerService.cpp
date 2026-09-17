@@ -180,7 +180,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Terminal& termi
         containerLauncher.SetStopTimeout(options.StopTimeout.value());
     }
 
-    containerLauncher.SetRestartPolicy(options.Restart.Name, options.Restart.MaximumRetryCount);
+    containerLauncher.SetRestartPolicy(options.Restart.Policy, options.Restart.MaximumRetryCount);
 
     if (options.ShmSize.has_value())
     {

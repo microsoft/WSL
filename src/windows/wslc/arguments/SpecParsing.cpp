@@ -700,15 +700,27 @@ models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std:
 
 models::RestartPolicy GetRestartPolicyFromString(const std::wstring& input, const std::wstring& argName)
 {
+    static constexpr std::pair<std::wstring_view, WSLCContainerRestartPolicy> c_restartPolicies[] = {
+        {L"no", WSLCContainerRestartPolicyNone},
+        {L"always", WSLCContainerRestartPolicyAlways},
+        {L"on-failure", WSLCContainerRestartPolicyOnFailure},
+        {L"unless-stopped", WSLCContainerRestartPolicyUnlessStopped},
+    };
+
     if (input.empty())
     {
         return {};
     }
 
     const auto parts = SplitKeyValue(input, L':');
-    if (parts.Key != L"no" && parts.Key != L"always" && parts.Key != L"on-failure" && parts.Key != L"unless-stopped")
+    auto policy = WSLCContainerRestartPolicyInvalid;
+    for (const auto& [name, value] : c_restartPolicies)
     {
-        throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
+        if (parts.Key == name)
+        {
+            policy = value;
+            break;
+        }
     }
 
     int64_t maximumRetryCount{};
@@ -733,13 +745,26 @@ models::RestartPolicy GetRestartPolicyFromString(const std::wstring& input, cons
         }
     }
 
-    if (parts.Key != L"on-failure" && maximumRetryCount != 0)
+    switch (policy)
     {
+    case WSLCContainerRestartPolicyNone:
+    case WSLCContainerRestartPolicyAlways:
+    case WSLCContainerRestartPolicyUnlessStopped:
+        if (maximumRetryCount != 0)
+        {
+            throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
+        }
+        break;
+
+    case WSLCContainerRestartPolicyOnFailure:
+        break;
+
+    default:
         throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
     }
 
     return {
-        .Name = WideToMultiByte(parts.Key),
+        .Policy = policy,
         .MaximumRetryCount = maximumRetryCount,
     };
 }

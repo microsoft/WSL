@@ -86,7 +86,7 @@ public:
         std::vector<std::string>&& namedVolumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
-        WSLCContainerRestartPolicy restartPolicy,
+        WSLCContainerRestartPolicyConfig restartPolicy,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore,
         WSLCContainerState InitialState,
@@ -326,7 +326,7 @@ private:
 
     // Docker is configured with restart=no. The requested policy is persisted in WSLC metadata and
     // evaluated here so every replacement start crosses the plugin authorization boundary.
-    const WSLCContainerRestartPolicy m_restartPolicy;
+    const WSLCContainerRestartPolicyConfig m_restartPolicy;
     _Guarded_by_(m_lock) std::int64_t m_policyRestartCount {};
     _Guarded_by_(m_lock) std::chrono::milliseconds m_policyRestartDelay {};
     _Guarded_by_(m_lock) std::optional<std::chrono::steady_clock::time_point> m_runStartedAt;
