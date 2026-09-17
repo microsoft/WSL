@@ -310,6 +310,10 @@ struct ImageReference
     // reference is malformed.
     static ImageReference Parse(const std::string& input);
 
+    // Parse an image reference string, returning nullopt when it is malformed. Use this where a bad reference should be
+    // skipped rather than reported, such as when listing references supplied by the daemon.
+    static std::optional<ImageReference> TryParse(const std::string& input);
+
     // Collapse the reference to a single tag-or-digest field, where a digest takes precedence over a tag. This matches
     // how callers that resolve, pull or push a single reference treat the two.
     std::optional<std::string> TagOrDigest() const
