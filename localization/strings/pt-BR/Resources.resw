@@ -1731,24 +1731,24 @@ Reserve um momento para visualizar alguns dos recursos favoritos da comunidade o
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer.Description" xml:space="preserve">
-    <value>Easily run Linux containers on Windows as a first-class experience.
+    <value>Execute facilmente contêineres do Linux no Windows como uma experiência de primeira classe.
     
-You can use wslc.exe to build, run, push, pull, and manage Linux containers directly on Windows.
+Você pode usar wslc.exe para compilar, executar, efetuar push, efetuar pull e gerenciar contêineres do Linux diretamente no Windows.
 
-You can also use the WSLC API to build Windows applications whose runtime logic is powered by Linux containers, making it easier to embed Linux containers directly into your app for cloud-to-local workflows, AI applications, and isolation.</value>
+Você também pode usar a API do WSLC para criar aplicativos do Windows cuja lógica de runtime é alimentada por contêineres do Linux, facilitando a inserção de contêineres do Linux diretamente em seu aplicativo para fluxos de trabalho de nuvem para local, aplicativos de IA e isolamento.</value>
   </data>
   <data name="Settings_OOBEWSLContainer.Title" xml:space="preserve">
-    <value>WSL container</value>
+    <value>Contêiner WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.Content" xml:space="preserve">
-    <value>Learn more about WSL container</value>
+    <value>Saiba mais sobre o contêiner WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_LearnMoreLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslc</value>
     <comment>{Locked}Uri to the WSL container documentation</comment>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.Content" xml:space="preserve">
-    <value>WSL container API reference</value>
+    <value>Referência da API de contêiner WSL</value>
   </data>
   <data name="Settings_OOBEWSLContainer_APIReferenceLink.NavigateUri" xml:space="preserve">
     <value>https://wsl.dev/api-reference/</value>

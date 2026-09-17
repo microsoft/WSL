@@ -72,6 +72,50 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    TEST_METHOD(RootCommand_ContainsEventsCommand)
+    {
+        auto root = RootCommand();
+        const auto& subcommands = root.GetCommands();
+        const auto events = std::ranges::find_if(
+            subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
+
+        VERIFY_IS_TRUE(events != subcommands.end());
+        VERIFY_ARE_EQUAL(std::wstring(L"root:events"), (*events)->FullName());
+        VERIFY_IS_TRUE(typeid(**events) == typeid(SystemEventsCommand));
+    }
+
+    TEST_METHOD(SystemCommand_ContainsEventsCommand)
+    {
+        const auto system = SystemCommand(L"root");
+        const auto& subcommands = system.GetCommands();
+        const auto events = std::ranges::find_if(
+            subcommands, [](const auto& subcommand) { return subcommand->Name() == SystemEventsCommand::CommandName; });
+
+        VERIFY_IS_TRUE(events != subcommands.end());
+        VERIFY_ARE_EQUAL(std::wstring(L"root:system:events"), (*events)->FullName());
+        VERIFY_IS_TRUE(typeid(**events) == typeid(SystemEventsCommand));
+    }
+
+    TEST_METHOD(SystemEventsCommand_HasExpectedArguments)
+    {
+        const auto arguments = SystemEventsCommand(L"root:system").GetArguments();
+
+        VERIFY_ARE_EQUAL(3u, arguments.size());
+
+        VERIFY_ARE_EQUAL(ArgType::Since, arguments[0].Type());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsSinceArgDescription(), arguments[0].Description());
+        VERIFY_IS_TRUE(arguments[0].IsSingle());
+
+        VERIFY_ARE_EQUAL(ArgType::Until, arguments[1].Type());
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::WSLCCLI_EventsUntilArgDescription(), arguments[1].Description());
+        VERIFY_IS_TRUE(arguments[1].IsSingle());
+
+        VERIFY_ARE_EQUAL(ArgType::EventFilter, arguments[2].Type());
+        VERIFY_ARE_EQUAL(std::wstring(L"filter"), arguments[2].Name());
+        VERIFY_ARE_EQUAL(std::wstring(L"f"), arguments[2].Alias());
+        VERIFY_IS_TRUE(arguments[2].IsUnlimited());
+    }
+
     TEST_METHOD(RootCommand_RetainsSubcommands)
     {
         RootCommand root;
@@ -246,6 +290,26 @@ class WSLCCLICommandUnitTests
             VERIFY_IS_TRUE(itr != args.end());
             VERIFY_ARE_EQUAL(std::wstring{L"follow-link"}, itr->Name());
             VERIFY_ARE_EQUAL(std::wstring{L"L"}, itr->Alias());
+            VERIFY_ARE_EQUAL(Kind::Flag, itr->Kind());
+            VERIFY_IS_FALSE(itr->Required());
+        }
+    }
+
+    // Test: Verify image list exposes --digests with no short alias
+    TEST_METHOD(ImageListCommand_HasDigestsArgument)
+    {
+        const std::pair<std::wstring, std::vector<Argument>> spellings[] = {
+            {L"image list", ImageListCommand(L"image").GetArguments()}, {L"images", ImageListCommand(L"wslc", true).GetArguments()}};
+
+        for (const auto& [label, args] : spellings)
+        {
+            LogComment(L"Verifying --digests for: " + label);
+
+            auto itr = std::find_if(args.begin(), args.end(), [](const Argument& arg) { return arg.Type() == ArgType::Digests; });
+
+            VERIFY_IS_TRUE(itr != args.end());
+            VERIFY_ARE_EQUAL(std::wstring{L"digests"}, itr->Name());
+            VERIFY_ARE_EQUAL(std::wstring{L""}, itr->Alias());
             VERIFY_ARE_EQUAL(Kind::Flag, itr->Kind());
             VERIFY_IS_FALSE(itr->Required());
         }

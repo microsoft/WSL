@@ -15,14 +15,69 @@ Abstract:
 #include "precomp.h"
 #include "SessionService.h"
 #include "ConsoleService.h"
+#include "JsonUtils.h"
 #include "WarningCallback.h"
+#include "wslc_schema.h"
+
 #include <wslc.h>
 #include <WSLCProcessLauncher.h>
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
+using namespace wsl::shared::string;
+using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
+
+namespace {
+
+    std::string FormatEventTimestamp(std::int64_t timestamp)
+    {
+        using namespace std::chrono;
+
+        const sys_seconds time{seconds{timestamp}};
+        const time_zone* zone;
+        try
+        {
+            zone = current_zone();
+        }
+        catch (const std::runtime_error&)
+        {
+            // The time zone database is unavailable, so report UTC rather than failing the stream.
+            LOG_CAUGHT_EXCEPTION();
+            return std::format("{:%FT%T.000000000+00:00}", time);
+        }
+
+        auto output = std::format("{:%FT%T.000000000%z}", zoned_time{zone, time});
+        output.insert(output.size() - 2, ":");
+        return output;
+    }
+
+    std::string FormatEvent(const wslc_schema::Event& event)
+    {
+        auto output = std::format("{} {} {} {}", FormatEventTimestamp(event.time), event.Type, event.Action, event.Actor.ID);
+        if (!event.Actor.Attributes.empty())
+        {
+            output.append(" (");
+            bool first = true;
+            for (const auto& [key, value] : event.Actor.Attributes)
+            {
+                if (!first)
+                {
+                    output.append(", ");
+                }
+
+                output.append(std::format("{}={}", key, value));
+                first = false;
+            }
+
+            output.push_back(')');
+        }
+
+        return output;
+    }
+
+} // namespace
 
 static wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
 {
@@ -186,6 +241,42 @@ int SessionService::Run(Terminal& terminal, const Session& session, const std::v
 
     wsl::windows::common::ConsoleState console{};
     return ConsoleService::AttachToCurrentConsole(terminal, console, std::move(process.value()));
+}
+
+void SessionService::StreamEvents(Terminal& terminal, const Session& session, const EventStreamOptions& options, HANDLE cancelEvent)
+{
+    std::vector<WSLCFilter> filterEntries;
+    filterEntries.reserve(options.Filters.size());
+    for (const auto& [key, value] : options.Filters)
+    {
+        filterEntries.push_back({.Key = key.c_str(), .Value = value.c_str()});
+    }
+
+    [[maybe_unused]] auto operation = session.BeginContainerOperation();
+
+    wil::com_ptr<IWSLCEventStream> stream;
+    THROW_IF_FAILED(session.Get()->GetEvents(
+        options.Since, options.Until, filterEntries.empty() ? nullptr : filterEntries.data(), static_cast<ULONG>(filterEntries.size()), &stream));
+
+    HRESULT result = S_OK;
+    while (SUCCEEDED(result))
+    {
+        wil::unique_cotaskmem_ansistring eventJson;
+        result = stream->GetNext(cancelEvent, &eventJson);
+        if (SUCCEEDED(result))
+        {
+            const auto event = wsl::shared::FromJson<wslc_schema::Event>(eventJson.get());
+            terminal.Output(L"{}\n", FormatEvent(event));
+            terminal.Flush(Terminal::Level::Output);
+        }
+    }
+
+    if (result == E_ABORT && cancelEvent != nullptr && wil::event_is_signaled(cancelEvent))
+    {
+        return;
+    }
+
+    THROW_HR_IF(result, result != WSLC_E_EVENT_STREAM_FINISHED);
 }
 
 int SessionService::TerminateSession(Terminal& terminal, const Session& session)
