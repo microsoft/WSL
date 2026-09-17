@@ -1259,10 +1259,10 @@ private:
         }
         else
         {
-            LogMessage(reader.Span());
-
             try
             {
+                LogMessage(reader.Span());
+
                 error = co_await HandleMessage(static_cast<MessageType>(messageType), reader, response);
             }
             catch (...)
