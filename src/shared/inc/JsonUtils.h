@@ -97,7 +97,7 @@ T FromJson(Iterator First, Iterator Last)
 template <typename T, typename TJson = nlohmann::json>
 T FromJson(const char* Value)
 {
-    return FromJson<T, TJson>(Value, Value + std::char_traits<char>::length(Value));
+    return FromJson<T, TJson>(Value, Value + strlen(Value));
 }
 
 template <typename T, typename TJson = nlohmann::json>
