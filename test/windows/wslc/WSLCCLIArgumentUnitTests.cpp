@@ -264,8 +264,6 @@ class WSLCCLIArgumentUnitTests
         argsContainer.Add(ArgType::Publish, std::wstring(L"test3"), Source::CommandLine);
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
         VERIFY_ARE_EQUAL(Source::Environment | Source::Settings | Source::CommandLine, argsContainer.GetSource(ArgType::Publish));
-        VERIFY_IS_TRUE(argsContainer.HasAnySource(ArgType::Publish, Source::Environment | Source::CommandLine));
-        VERIFY_IS_FALSE(argsContainer.HasAnySource(ArgType::Publish, Source::Input));
         auto publishArgs = argsContainer.GetAllValues<ArgType::Publish>();
         VERIFY_ARE_EQUAL(publishArgs.size(), 3);
         VERIFY_ARE_EQUAL(publishArgs[0], std::wstring(L"test1"));
@@ -278,7 +276,6 @@ class WSLCCLIArgumentUnitTests
         removeArgs.Remove(ArgType::Publish);
         VERIFY_ARE_EQUAL(removeArgs.Count(ArgType::Publish), 0);
         VERIFY_ARE_EQUAL(Source::None, removeArgs.GetSource(ArgType::Publish));
-        VERIFY_IS_FALSE(removeArgs.HasAnySource(ArgType::Publish, Source::Input));
 
         // Verify compile time add works like runtime add for multimap types.
         ArgMap compileTimeArgs;
@@ -355,7 +352,6 @@ class WSLCCLIArgumentUnitTests
         VERIFY_ARE_EQUAL(args.GetValue<ArgType::Memory>(), int64_t{});
         VERIFY_IS_FALSE(args.Contains(ArgType::Memory));
         VERIFY_ARE_EQUAL(Source::Default, args.GetSource(ArgType::Memory));
-        VERIFY_IS_TRUE(args.HasAnySource(ArgType::Memory, Source::Default));
     }
 
     TEST_METHOD(ArgMap_SourceRequiresSingleContributor)

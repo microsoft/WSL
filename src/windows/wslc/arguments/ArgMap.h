@@ -129,11 +129,6 @@ public:
         return source != m_sources.end() ? source->second : Source::None;
     }
 
-    bool HasAnySource(ArgType type, Source sources) const noexcept
-    {
-        return (GetSource(type) & sources) != Source::None;
-    }
-
     // Validated-value cache. Argument validation converts raw strings into typed values and caches
     // them here so execution reuses them without re-parsing. The store is type-erased (std::any keyed
     // by ArgType) to keep this base header free of the domain headers that define the converted types;
