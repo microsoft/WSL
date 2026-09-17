@@ -108,6 +108,12 @@ struct Terminal
         EmitFormatted(Level::Error, std::move(fmt), std::forward<Args>(args)...);
     }
 
+    // Makes redirected output visible before a blocking operation.
+    void Flush(Level level) const
+    {
+        ChannelFor(level).Flush();
+    }
+
     // True when user input is attached to an interactive console (a prompt can be
     // shown and echo can be masked); false when input is redirected from a file or pipe.
     bool IsInputInteractive() const noexcept
