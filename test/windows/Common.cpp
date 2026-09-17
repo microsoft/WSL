@@ -1317,8 +1317,6 @@ Return Value:
     {
         VERIFY_ARE_EQUAL(GetLastError(), ERROR_SERVICE_ALREADY_RUNNING);
     }
-
-    WaitForServiceState(service.get(), SERVICE_RUNNING, 0);
 }
 
 void StopWslService()
