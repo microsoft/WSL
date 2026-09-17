@@ -112,8 +112,8 @@ namespace {
         THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(logWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
         // TRACE_LEVEL_VERBOSE == 5
-        auto commandLine = LxssGenerateWslCommandLine(
-            std::format(L"/plan9 --bind {} --log-file /dev/stderr --log-level {}", c_plan9Port, 5).c_str());
+        auto commandLine =
+            LxssGenerateWslCommandLine(std::format(L"/plan9 --bind {} --log-file /dev/stderr --log-level {}", c_plan9Port, 5).c_str());
 
         Plan9Server server;
         server.process = LxsstuStartProcess(commandLine.data(), stdinRead.get(), stdoutWrite.get(), logWrite.get());
